@@ -1,7 +1,7 @@
 # This workload uses several tens of thousands of tables and the workload is evenly distributed
 # among them. The workload creates, opens and drop tables, and it generates warning if the time
 # taken is more than the configured max_idle_table_cycle.
-conn_config="cache_size=10G,eviction=(threads_min=4,threads_max=4),file_manager=(close_idle_time=30),session_max=1000"
+conn_config="cache_size=10G,eviction=(threads_min=4,threads_max=4),file_manager=(close_idle_time=30),session_max=1000,statistics=[all,clear],statistics_log=(wait=1,json=false,on_close=true)"
 table_config="type=file"
 table_count=15000
 max_idle_table_cycle=2

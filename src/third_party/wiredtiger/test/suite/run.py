@@ -119,8 +119,10 @@ Options:\n\
                                  be run without executing any.\n\
   -g      | --gdb                all subprocesses (like calls to wt) use gdb\n\
   -h      | --help               show this message\n\
+          | --hook name[=arg]    set up hooks from hook_<name>.py, with optional arg\n\
   -j N    | --parallel N         run all tests in parallel using N processes\n\
   -l      | --long               run the entire test suite\n\
+          | --noremove           do not remove WT_TEST or -D target before run\n\
   -p      | --preserve           preserve output files in WT_TEST/<testname>\n\
   -r N    | --random-sample N    randomly sort scenarios to be run, then\n\
                                  execute every Nth (2<=N<=1000) scenario.\n\
@@ -306,6 +308,7 @@ def error(exitval, prefix, msg):
 if __name__ == '__main__':
     # Turn numbers and ranges into test module names
     preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = ignoreStdout = False
+    removeAtStart = True
     asan = False
     parallel = 0
     random_sample = 0
@@ -318,6 +321,7 @@ if __name__ == '__main__':
     verbose = 1
     args = sys.argv[1:]
     testargs = []
+    hook_names = []
     while len(args) > 0:
         arg = args.pop(0)
         from unittest import defaultTestLoader as loader
@@ -367,8 +371,17 @@ if __name__ == '__main__':
             if option == '-help' or option == 'h':
                 usage()
                 sys.exit(0)
+            if option == '-hook':
+                if len(args) == 0:
+                    usage()
+                    sys.exit(2)
+                hook_names.append(args.pop(0))
+                continue
             if option == '-long' or option == 'l':
                 longtest = True
+                continue
+            if option == '-noremove':
+                removeAtStart = False
                 continue
             if option == '-random-sample' or option == 'r':
                 if len(args) == 0:
@@ -519,11 +532,13 @@ if __name__ == '__main__':
     tests = unittest.TestSuite()
     from testscenarios.scenarios import generate_scenarios
 
+    import wthooks
+    hookmgr = wthooks.WiredTigerHookManager(hook_names)
     # All global variables should be set before any test classes are loaded.
     # That way, verbose printing can be done at the class definition level.
-    wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub, lldbSub,
-                                          verbose, wt_builddir, dirarg,
-                                          longtest, ignoreStdout, seedw, seedz)
+    wttest.WiredTigerTestCase.globalSetup(preserve, removeAtStart, timestamp, gdbSub, lldbSub,
+                                          verbose, wt_builddir, dirarg, longtest,
+                                          ignoreStdout, seedw, seedz, hookmgr)
 
     # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:
@@ -542,6 +557,7 @@ if __name__ == '__main__':
         for arg in testargs:
             testsFromArg(tests, loader, arg, scenario)
 
+    tests = hookmgr.filter_tests(tests)
     # Shuffle the tests and create a new suite containing every Nth test from
     # the original suite
     if random_sample > 0:

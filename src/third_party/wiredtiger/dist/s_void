@@ -78,6 +78,7 @@ func_ok()
 	    -e '/int __wt_stat_dsrc_desc$/d' \
 	    -e '/int __wt_stat_join_desc$/d' \
 	    -e '/int __wt_stat_session_desc/d' \
+	    -e '/int __wt_tiered_close/d' \
 	    -e '/int __wt_txn_read_upd_list$/d' \
 	    -e '/int __wt_txn_rollback_required$/d' \
 	    -e '/int __wt_win_directory_list_free$/d' \
@@ -105,11 +106,11 @@ func_ok()
 	    -e '/int index_compare_primary$/d' \
 	    -e '/int index_compare_u$/d' \
 	    -e '/int index_extractor_u$/d' \
+	    -e '/int local_directory_list_free$/d' \
 	    -e '/int local_err$/d' \
 	    -e '/int local_file_lock$/d' \
 	    -e '/int local_file_sync$/d' \
-	    -e '/int local_location_handle_close$/d' \
-	    -e '/int local_location_list_free$/d' \
+	    -e '/int local_fs_terminate$/d' \
 	    -e '/int log_print_err$/d' \
 	    -e '/int lz4_error$/d' \
 	    -e '/int lz4_pre_size$/d' \

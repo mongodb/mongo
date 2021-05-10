@@ -631,7 +631,14 @@ __wt_txn_tw_stop_visible(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
 static inline bool
 __wt_txn_tw_start_visible(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
 {
-    return ((WT_TIME_WINDOW_HAS_STOP(tw) || !tw->prepare) &&
+    /*
+     * Check the prepared flag if there is no stop time point or the start and stop time points are
+     * from the same transaction.
+     */
+    return (((WT_TIME_WINDOW_HAS_STOP(tw) &&
+               (tw->start_txn != tw->stop_txn || tw->start_ts != tw->stop_ts ||
+                 tw->durable_start_ts != tw->durable_stop_ts)) ||
+              !tw->prepare) &&
       __wt_txn_visible(session, tw->start_txn, tw->start_ts));
 }
 
@@ -642,7 +649,14 @@ __wt_txn_tw_start_visible(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
 static inline bool
 __wt_txn_tw_start_visible_all(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
 {
-    return ((WT_TIME_WINDOW_HAS_STOP(tw) || !tw->prepare) &&
+    /*
+     * Check the prepared flag if there is no stop time point or the start and stop time points are
+     * from the same transaction.
+     */
+    return (((WT_TIME_WINDOW_HAS_STOP(tw) &&
+               (tw->start_txn != tw->stop_txn || tw->start_ts != tw->stop_ts ||
+                 tw->durable_start_ts != tw->durable_stop_ts)) ||
+              !tw->prepare) &&
       __wt_txn_visible_all(session, tw->start_txn, tw->durable_start_ts));
 }
 

@@ -29,16 +29,15 @@
 #ifndef RUNTIME_MONITOR_H
 #define RUNTIME_MONITOR_H
 
-#include <thread>
-
 extern "C" {
 #include "wiredtiger.h"
 }
 
-#include "api_const.h"
-#include "component.h"
+#include "util/debug_utils.h"
+#include "util/api_const.h"
+#include "core/component.h"
+#include "core/throttle.h"
 #include "connection_manager.h"
-#include "debug_utils.h"
 
 namespace test_harness {
 /* Static statistic get function. */
@@ -55,8 +54,7 @@ class statistic {
     public:
     statistic(configuration *config)
     {
-        testutil_assert(config != nullptr);
-        testutil_check(config->get_bool(ENABLED, _enabled));
+        _enabled = config->get_bool(ENABLED);
     }
 
     /* Check that the given statistic is within bounds. */
@@ -79,7 +77,7 @@ class cache_limit_statistic : public statistic {
     public:
     cache_limit_statistic(configuration *config) : statistic(config)
     {
-        testutil_check(config->get_int(LIMIT, limit));
+        limit = config->get_int(LIMIT);
     }
 
     void
@@ -104,7 +102,7 @@ class cache_limit_statistic : public statistic {
             debug_print(error_string, DEBUG_ERROR);
             testutil_assert(use_percent < limit);
         } else
-            debug_print("Usage: " + std::to_string(use_percent), DEBUG_TRACE);
+            debug_print("Cache usage: " + std::to_string(use_percent), DEBUG_TRACE);
     }
 
     private:
@@ -117,7 +115,7 @@ class cache_limit_statistic : public statistic {
  */
 class runtime_monitor : public component {
     public:
-    runtime_monitor(configuration *config) : component(config), _ops(1) {}
+    runtime_monitor(configuration *config) : component("runtime_monitor", config) {}
 
     ~runtime_monitor()
     {
@@ -135,37 +133,35 @@ class runtime_monitor : public component {
     {
         configuration *sub_config;
         std::string statistic_list;
-        /* Parse the configuration for the runtime monitor. */
-        testutil_check(_config->get_int(RATE_PER_SECOND, _ops));
 
-        /* Load known statistics. */
-        sub_config = _config->get_subconfig(STAT_CACHE_SIZE);
-        _stats.push_back(new cache_limit_statistic(sub_config));
-        delete sub_config;
+        /* Load the general component things. */
         component::load();
+
+        if (_enabled) {
+            _session = connection_manager::instance().create_session();
+
+            /* Open our statistic cursor. */
+            _session->open_cursor(_session, STATISTICS_URI, nullptr, nullptr, &_cursor);
+
+            /* Load known statistics. */
+            sub_config = _config->get_subconfig(STAT_CACHE_SIZE);
+            _stats.push_back(new cache_limit_statistic(sub_config));
+            delete sub_config;
+        }
     }
 
     void
-    run()
+    do_work()
     {
-        WT_SESSION *session = connection_manager::instance().create_session();
-        WT_CURSOR *cursor = nullptr;
-
-        /* Open a statistics cursor. */
-        testutil_check(session->open_cursor(session, STATISTICS_URI, nullptr, nullptr, &cursor));
-
-        while (_running) {
-            /* Sleep so that we do x operations per second. To be replaced by throttles. */
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000 / _ops));
-            for (const auto &it : _stats) {
-                if (it->is_enabled())
-                    it->check(cursor);
-            }
+        for (const auto &it : _stats) {
+            if (it->is_enabled())
+                it->check(_cursor);
         }
     }
 
     private:
-    int64_t _ops;
+    WT_CURSOR *_cursor = nullptr;
+    WT_SESSION *_session = nullptr;
     std::vector<statistic *> _stats;
 };
 } // namespace test_harness

@@ -1,6 +1,33 @@
 Ticket reference tags refer to tickets in the MongoDB JIRA tracking system:
 https://jira.mongodb.org
 
+WiredTiger release 10.0.0, 2021-04-12
+------------------------------------
+
+See the upgrading documentation for details of API and behavior changes.
+
+Significant changes:
+* WT-4008	Add ARM NEON support for row search operations
+* WT-5083	Add mips64el support
+* WT-6598	Add new API allowing changing dhandle hash bucket size
+* WT-4427	Make WiredTiger timestamps always on and 8 bytes
+* WT-4642	Store transaction IDs durably
+* WT-5225	Create persistent file for History store
+* WT-5500	Implement new history store format
+* WT-6677	Map read committed/uncommitted isolation to read-only transaction
+* WT-6710	Change default transaction isolation to snapshot
+* WT-4833	Drop support for Python2
+* WT-6410	Remove WT_SESSION.rebalance
+* WT-6528	Remove offensive terminology in WiredTiger API and source code
+* WT-6674	Remove Async API code and documentation
+* WT-6675	Remove WiredTiger Java language API and documentation
+* WT-6678	Remove Huffman Encoding support for Keys
+* WT-6713	Remove transaction support from custom data sources
+* WT-7295	Compatibility with older versions of WT
+
+See JIRA changelog for a full listing:
+https://jira.mongodb.org/projects/WT/versions/24082
+
 WiredTiger release 3.2.1, 2019-08-27
 ------------------------------------
 

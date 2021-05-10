@@ -429,7 +429,7 @@ err:
  */
 static int
 __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner,
-  WT_CURSOR *other, const char *cfg[], WT_CURSOR **cursorp)
+  WT_CURSOR *other, const char *cfg[], uint64_t hash_value, WT_CURSOR **cursorp)
 {
     WT_COLGROUP *colgroup;
     WT_DATA_SOURCE *dsrc;
@@ -528,6 +528,9 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *
         *cursorp = NULL;
     }
 
+    if (*cursorp != NULL)
+        (*cursorp)->uri_hash = hash_value;
+
     return (ret);
 }
 
@@ -540,18 +543,22 @@ __wt_open_cursor(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, co
   WT_CURSOR **cursorp)
 {
     WT_DECL_RET;
+    uint64_t hash_value;
+
+    hash_value = 0;
 
     /* We should not open other cursors when there are open history store cursors in the session. */
     WT_ASSERT(session, strcmp(uri, WT_HS_URI) == 0 || session->hs_cursor_counter == 0);
 
     /* We do not cache any subordinate tables/files cursors. */
     if (owner == NULL) {
-        if ((ret = __wt_cursor_cache_get(session, uri, NULL, cfg, cursorp)) == 0)
+        __wt_cursor_get_hash(session, uri, NULL, &hash_value);
+        if ((ret = __wt_cursor_cache_get(session, uri, hash_value, NULL, cfg, cursorp)) == 0)
             return (0);
         WT_RET_NOTFOUND_OK(ret);
     }
 
-    return (__session_open_cursor_int(session, uri, owner, NULL, cfg, cursorp));
+    return (__session_open_cursor_int(session, uri, owner, NULL, cfg, hash_value, cursorp));
 }
 
 /*
@@ -565,10 +572,11 @@ __session_open_cursor(WT_SESSION *wt_session, const char *uri, WT_CURSOR *to_dup
     WT_CURSOR *cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
+    uint64_t hash_value;
     bool dup_backup, statjoin;
 
     cursor = *cursorp = NULL;
-
+    hash_value = 0;
     dup_backup = false;
     session = (WT_SESSION_IMPL *)wt_session;
     SESSION_API_CALL(session, open_cursor, config, cfg);
@@ -579,7 +587,8 @@ __session_open_cursor(WT_SESSION *wt_session, const char *uri, WT_CURSOR *to_dup
             WT_ERR_MSG(session, EINVAL,
               "should be passed either a URI or a cursor to duplicate, but not both");
 
-        if ((ret = __wt_cursor_cache_get(session, uri, to_dup, cfg, &cursor)) == 0)
+        __wt_cursor_get_hash(session, uri, to_dup, &hash_value);
+        if ((ret = __wt_cursor_cache_get(session, uri, hash_value, to_dup, cfg, &cursor)) == 0)
             goto done;
 
         /*
@@ -600,8 +609,11 @@ __session_open_cursor(WT_SESSION *wt_session, const char *uri, WT_CURSOR *to_dup
         }
     }
 
+    if (config != NULL && (WT_PREFIX_MATCH(uri, "backup:") || to_dup != NULL))
+        __wt_verbose(session, WT_VERB_BACKUP, "Backup cursor config \"%s\"", config);
+
     WT_ERR(__session_open_cursor_int(
-      session, uri, NULL, statjoin || dup_backup ? to_dup : NULL, cfg, &cursor));
+      session, uri, NULL, statjoin || dup_backup ? to_dup : NULL, cfg, hash_value, &cursor));
 
 done:
     if (to_dup != NULL && !statjoin && !dup_backup)
@@ -2142,7 +2154,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, con
      * caller decline this work.
      */
     if (open_metadata) {
-        WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
+        WT_ASSERT(session, !FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA));
         if ((ret = __wt_metadata_cursor(session, NULL)) != 0) {
             WT_TRET(__wt_session_close_internal(session));
             return (ret);
@@ -2159,7 +2171,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, con
  */
 int
 __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name, bool open_metadata,
-  uint32_t session_flags, WT_SESSION_IMPL **sessionp)
+  uint32_t session_flags, uint32_t session_lock_flags, WT_SESSION_IMPL **sessionp)
 {
     WT_SESSION_IMPL *session;
 
@@ -2175,6 +2187,7 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name, bool open
      * during close. Set a flag to avoid this: internal sessions are not closed automatically.
      */
     F_SET(session, session_flags | WT_SESSION_INTERNAL);
+    FLD_SET(session->lock_flags, session_lock_flags);
 
     *sessionp = session;
     return (0);

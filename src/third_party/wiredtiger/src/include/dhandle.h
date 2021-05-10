@@ -42,17 +42,17 @@
 
 #define WT_DHANDLE_RELEASE(dhandle) (void)__wt_atomic_sub32(&(dhandle)->session_ref, 1)
 
-#define WT_DHANDLE_NEXT(session, dhandle, head, field)                       \
-    do {                                                                     \
-        WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST)); \
-        if ((dhandle) == NULL)                                               \
-            (dhandle) = TAILQ_FIRST(head);                                   \
-        else {                                                               \
-            WT_DHANDLE_RELEASE(dhandle);                                     \
-            (dhandle) = TAILQ_NEXT(dhandle, field);                          \
-        }                                                                    \
-        if ((dhandle) != NULL)                                               \
-            WT_DHANDLE_ACQUIRE(dhandle);                                     \
+#define WT_DHANDLE_NEXT(session, dhandle, head, field)                                     \
+    do {                                                                                   \
+        WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST)); \
+        if ((dhandle) == NULL)                                                             \
+            (dhandle) = TAILQ_FIRST(head);                                                 \
+        else {                                                                             \
+            WT_DHANDLE_RELEASE(dhandle);                                                   \
+            (dhandle) = TAILQ_NEXT(dhandle, field);                                        \
+        }                                                                                  \
+        if ((dhandle) != NULL)                                                             \
+            WT_DHANDLE_ACQUIRE(dhandle);                                                   \
     } while (0)
 
 /*
@@ -84,7 +84,12 @@ struct __wt_data_handle {
     WT_DATA_SOURCE *dsrc; /* Data source for this handle */
     void *handle;         /* Generic handle */
 
-    enum { WT_DHANDLE_TYPE_BTREE, WT_DHANDLE_TYPE_TABLE, WT_DHANDLE_TYPE_TIERED } type;
+    enum {
+        WT_DHANDLE_TYPE_BTREE,
+        WT_DHANDLE_TYPE_TABLE,
+        WT_DHANDLE_TYPE_TIERED,
+        WT_DHANDLE_TYPE_TIERED_TREE
+    } type;
 
     bool compact_skip; /* If the handle failed to compact */
 

@@ -34,10 +34,10 @@ This is version $WIREDTIGER_VERSION of WiredTiger.
 Instructions for configuring, building, and installing WiredTiger are available online.
 
     For Linux, MacOS, and other POSIX systems:
-    http://source.wiredtiger.com/develop/build-posix.html
+    https://source.wiredtiger.com/develop/build-posix.html
 
     For Windows:
-    http://source.wiredtiger.com/develop/build-windows.html
+    https://source.wiredtiger.com/develop/build-windows.html
 END_TEXT
 
 cmp $t $f > /dev/null 2>&1 ||

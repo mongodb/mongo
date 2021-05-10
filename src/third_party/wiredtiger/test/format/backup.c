@@ -266,21 +266,21 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
                 len = strlen(g.home) + strlen(name) + 10;
                 tmp = dmalloc(len);
                 testutil_check(__wt_snprintf(tmp, len, "%s/%s", g.home, name));
-                error_sys_check(rfd = open(tmp, O_RDONLY, 0));
+                error_sys_check(rfd = open(tmp, O_RDONLY, 0644));
                 free(tmp);
                 tmp = NULL;
 
                 len = strlen(g.home) + strlen("BACKUP") + strlen(name) + 10;
                 tmp = dmalloc(len);
                 testutil_check(__wt_snprintf(tmp, len, "%s/BACKUP/%s", g.home, name));
-                error_sys_check(wfd1 = open(tmp, O_WRONLY | O_CREAT, 0));
+                error_sys_check(wfd1 = open(tmp, O_WRONLY | O_CREAT, 0644));
                 free(tmp);
                 tmp = NULL;
 
                 len = strlen(g.home) + strlen("BACKUP.copy") + strlen(name) + 10;
                 tmp = dmalloc(len);
                 testutil_check(__wt_snprintf(tmp, len, "%s/BACKUP.copy/%s", g.home, name));
-                error_sys_check(wfd2 = open(tmp, O_WRONLY | O_CREAT, 0));
+                error_sys_check(wfd2 = open(tmp, O_WRONLY | O_CREAT, 0644));
                 free(tmp);
                 tmp = NULL;
 
@@ -348,39 +348,6 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
     }
     free(tmp);
 }
-
-/*
- * copy_file --
- *     Copy a single file into the backup directories.
- */
-static void
-copy_file(WT_SESSION *session, const char *name)
-{
-    size_t len;
-    char *first, *second;
-
-    len = strlen("BACKUP") + strlen(name) + 10;
-    first = dmalloc(len);
-    testutil_check(__wt_snprintf(first, len, "BACKUP/%s", name));
-    testutil_check(__wt_copy_and_sync(session, name, first));
-
-    /*
-     * Save another copy of the original file to make debugging recovery errors easier.
-     */
-    len = strlen("BACKUP.copy") + strlen(name) + 10;
-    second = dmalloc(len);
-    testutil_check(__wt_snprintf(second, len, "BACKUP.copy/%s", name));
-    testutil_check(__wt_copy_and_sync(session, first, second));
-
-    free(first);
-    free(second);
-}
-
-/*
- * Backup directory initialize command, remove and re-create the primary backup directory, plus a
- * copy we maintain for recovery testing.
- */
-#define HOME_BACKUP_INIT_CMD "rm -rf %s/BACKUP %s/BACKUP.copy && mkdir %s/BACKUP %s/BACKUP.copy"
 
 #define RESTORE_SKIP 1
 #define RESTORE_SUCCESS 0
@@ -507,11 +474,10 @@ backup(void *arg)
     WT_CURSOR *backup_cursor;
     WT_DECL_RET;
     WT_SESSION *session;
-    size_t len;
     u_int incremental, period;
     uint64_t src_id, this_id;
     const char *config, *key;
-    char cfg[512], *cmd;
+    char cfg[512];
     bool full, incr_full;
 
     (void)(arg);
@@ -615,12 +581,7 @@ backup(void *arg)
 
         /* If we're taking a full backup, create the backup directories. */
         if (full || incremental == 0) {
-            len = strlen(g.home) * 4 + strlen(HOME_BACKUP_INIT_CMD) + 1;
-            cmd = dmalloc(len);
-            testutil_check(
-              __wt_snprintf(cmd, len, HOME_BACKUP_INIT_CMD, g.home, g.home, g.home, g.home));
-            testutil_checkfmt(system(cmd), "%s", "backup directory creation failed");
-            free(cmd);
+            testutil_create_backup_directory(g.home);
         }
 
         /*
@@ -636,12 +597,12 @@ backup(void *arg)
             testutil_check(backup_cursor->get_key(backup_cursor, &key));
             if (g.c_backup_incr_flag == INCREMENTAL_BLOCK) {
                 if (full)
-                    copy_file(session, key);
+                    testutil_copy_file(session, key);
                 else
                     copy_blocks(session, backup_cursor, key);
 
             } else
-                copy_file(session, key);
+                testutil_copy_file(session, key);
             active_files_add(active_now, key);
         }
         if (ret != WT_NOTFOUND)

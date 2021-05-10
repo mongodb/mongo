@@ -87,8 +87,8 @@ __wt_schema_internal_session(WT_SESSION_IMPL *session, WT_SESSION_IMPL **int_ses
     if (F_ISSET(session->txn, WT_TXN_RUNNING)) {
         /* We should not have a schema txn running now. */
         WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SCHEMA_TXN));
-        WT_RET(
-          __wt_open_internal_session(S2C(session), "schema", true, session->flags, int_sessionp));
+        WT_RET(__wt_open_internal_session(
+          S2C(session), "schema", true, session->flags, session->lock_flags, int_sessionp));
     }
     return (0);
 }

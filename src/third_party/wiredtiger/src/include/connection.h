@@ -33,10 +33,11 @@ extern WT_PROCESS __wt_process;
 
 /*
  * WT_BUCKET_STORAGE --
- *	A list entry for a storage source with a unique (name, bucket).
+ *	A list entry for a storage source with a unique name (bucket, prefix).
  */
 struct __wt_bucket_storage {
-    const char *bucket;                /* Bucket location */
+    const char *bucket;                /* Bucket name */
+    const char *bucket_prefix;         /* Bucket prefix */
     int owned;                         /* Storage needs to be terminated */
     uint64_t object_size;              /* Tiered object size */
     uint64_t retain_secs;              /* Tiered period */
@@ -52,6 +53,15 @@ struct __wt_bucket_storage {
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 };
+
+/* Call a function with the bucket storage and its associated file system. */
+#define WT_WITH_BUCKET_STORAGE(bsto, s, e)                                  \
+    do {                                                                    \
+        WT_BUCKET_STORAGE *__saved_bstorage = (s)->bucket_storage;          \
+        (s)->bucket_storage = ((bsto) == NULL ? S2C(s)->bstorage : (bsto)); \
+        e;                                                                  \
+        (s)->bucket_storage = __saved_bstorage;                             \
+    } while (0)
 
 /*
  * WT_KEYED_ENCRYPTOR --
@@ -156,22 +166,22 @@ struct __wt_name_flag {
  * Macros to ensure the dhandle is inserted or removed from both the main queue and the hashed
  * queue.
  */
-#define WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket)                              \
-    do {                                                                           \
-        WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE)); \
-        TAILQ_INSERT_HEAD(&(conn)->dhqh, dhandle, q);                              \
-        TAILQ_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashq);                \
-        ++(conn)->dh_bucket_count[bucket];                                         \
-        ++(conn)->dhandle_count;                                                   \
+#define WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket)                                            \
+    do {                                                                                         \
+        WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST_WRITE)); \
+        TAILQ_INSERT_HEAD(&(conn)->dhqh, dhandle, q);                                            \
+        TAILQ_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashq);                              \
+        ++(conn)->dh_bucket_count[bucket];                                                       \
+        ++(conn)->dhandle_count;                                                                 \
     } while (0)
 
-#define WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket)                              \
-    do {                                                                           \
-        WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE)); \
-        TAILQ_REMOVE(&(conn)->dhqh, dhandle, q);                                   \
-        TAILQ_REMOVE(&(conn)->dhhash[bucket], dhandle, hashq);                     \
-        --(conn)->dh_bucket_count[bucket];                                         \
-        --(conn)->dhandle_count;                                                   \
+#define WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket)                                            \
+    do {                                                                                         \
+        WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST_WRITE)); \
+        TAILQ_REMOVE(&(conn)->dhqh, dhandle, q);                                                 \
+        TAILQ_REMOVE(&(conn)->dhhash[bucket], dhandle, hashq);                                   \
+        --(conn)->dh_bucket_count[bucket];                                                       \
+        --(conn)->dhandle_count;                                                                 \
     } while (0)
 
 /*
@@ -378,7 +388,8 @@ struct __wt_connection_impl {
 
     WT_LSM_MANAGER lsm_manager; /* LSM worker thread information */
 
-    WT_BUCKET_STORAGE *bstorage; /* Bucket storage for the connection */
+    WT_BUCKET_STORAGE *bstorage;     /* Bucket storage for the connection */
+    WT_BUCKET_STORAGE bstorage_none; /* Bucket storage for "none" */
 
     WT_KEYED_ENCRYPTOR *kencryptor; /* Encryptor for metadata and log */
 
@@ -406,11 +417,13 @@ struct __wt_connection_impl {
     wt_thread_t tiered_tid;          /* Tiered thread */
     bool tiered_tid_set;             /* Tiered thread set */
     WT_CONDVAR *tiered_cond;         /* Tiered wait mutex */
+    bool tiered_server_running;      /* Internal tiered server operating */
 
-    const char *tiered_cluster;       /* Tiered storage cluster name */
-    const char *tiered_member;        /* Tiered storage member name */
-    WT_TIERED_MANAGER tiered_manager; /* Tiered worker thread information */
-    bool tiered_server_running;       /* Internal tiered server operating */
+    WT_TIERED_MANAGER tiered_mgr;        /* Tiered manager thread information */
+    WT_SESSION_IMPL *tiered_mgr_session; /* Tiered manager thread session */
+    wt_thread_t tiered_mgr_tid;          /* Tiered manager thread */
+    bool tiered_mgr_tid_set;             /* Tiered manager thread set */
+    WT_CONDVAR *tiered_mgr_cond;         /* Tiered manager wait mutex */
 
     uint32_t tiered_threads_max; /* Max tiered threads */
     uint32_t tiered_threads_min; /* Min tiered threads */
@@ -613,6 +626,7 @@ struct __wt_connection_impl {
 #define WT_CONN_SERVER_STATISTICS 0x10u
 #define WT_CONN_SERVER_SWEEP 0x20u
 #define WT_CONN_SERVER_TIERED 0x40u
+#define WT_CONN_SERVER_TIERED_MGR 0x80u
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t server_flags;
 

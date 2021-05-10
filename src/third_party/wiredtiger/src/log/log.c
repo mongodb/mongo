@@ -157,7 +157,7 @@ __log_wait_for_earlier_slot(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
          * If we're on a locked path and the write LSN is not advancing, unlock in case an earlier
          * thread is trying to switch its slot and complete its operation.
          */
-        if (F_ISSET(session, WT_SESSION_LOCKED_SLOT))
+        if (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SLOT))
             __wt_spin_unlock(session, &log->log_slot_lock);
         /*
          * This may not be initialized if we are starting at an older log file version. So only
@@ -169,7 +169,7 @@ __log_wait_for_earlier_slot(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
             __wt_yield();
         else
             __wt_cond_wait(session, log->log_write_cond, 200, NULL);
-        if (F_ISSET(session, WT_SESSION_LOCKED_SLOT))
+        if (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SLOT))
             __wt_spin_lock(session, &log->log_slot_lock);
     }
 }
@@ -1129,7 +1129,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
      * write to the log. If the log file size is small we could fill a log file before the previous
      * one is closed. Wait for that to close.
      */
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SLOT));
     for (yield_cnt = 0; log->log_close_fh != NULL;) {
         WT_STAT_CONN_INCR(session, log_close_yields);
         /*
@@ -1334,7 +1334,7 @@ __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
      * the release LSN. That way when log files switch, we're waiting for the correct LSN from
      * outstanding writes.
      */
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SLOT));
     /*
      * We need to set the release LSN earlier, before a log file change.
      */

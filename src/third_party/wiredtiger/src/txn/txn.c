@@ -171,6 +171,7 @@ __wt_txn_active(WT_SESSION_IMPL *session, uint64_t txnid)
     WT_ORDERED_READ(session_cnt, conn->session_cnt);
     WT_STAT_CONN_INCR(session, txn_walk_sessions);
     for (i = 0, s = txn_global->txn_shared_list; i < session_cnt; i++, s++) {
+        WT_STAT_CONN_INCR(session, txn_sessions_walked);
         /* If the transaction is in the list, it is uncommitted. */
         if (s->id == txnid)
             goto done;
@@ -243,6 +244,7 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool publish)
     WT_ORDERED_READ(session_cnt, conn->session_cnt);
     WT_STAT_CONN_INCR(session, txn_walk_sessions);
     for (i = 0, s = txn_global->txn_shared_list; i < session_cnt; i++, s++) {
+        WT_STAT_CONN_INCR(session, txn_sessions_walked);
         /*
          * Build our snapshot of any concurrent transaction IDs.
          *
@@ -344,6 +346,7 @@ __txn_oldest_scan(WT_SESSION_IMPL *session, uint64_t *oldest_idp, uint64_t *last
     WT_ORDERED_READ(session_cnt, conn->session_cnt);
     WT_STAT_CONN_INCR(session, txn_walk_sessions);
     for (i = 0, s = txn_global->txn_shared_list; i < session_cnt; i++, s++) {
+        WT_STAT_CONN_INCR(session, txn_sessions_walked);
         /* Update the last running transaction ID. */
         while ((id = s->id) != WT_TXN_NONE && WT_TXNID_LE(prev_oldest_id, id) &&
           WT_TXNID_LT(id, last_running)) {
@@ -1046,6 +1049,9 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     WT_DECL_RET;
     WT_TXN *txn;
     WT_UPDATE *fix_upd, *tombstone, *upd;
+#ifdef HAVE_DIAGNOSTIC
+    WT_UPDATE *head_upd;
+#endif
     size_t not_used;
     uint32_t hs_btree_id;
     bool upd_appended;
@@ -1057,12 +1063,18 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
 
     WT_RET(__txn_search_prepared_op(session, op, cursorp, &upd));
 
+    __wt_verbose(session, WT_VERB_TRANSACTION,
+      "resolving prepared op for txnid: %" PRIu64 " that %s", txn->id,
+      commit ? "committed" : "roll backed");
     /*
      * Aborted updates can exist in the update chain of our transaction. Generally this will occur
      * due to a reserved update. As such we should skip over these updates.
      */
     for (; upd != NULL && upd->txnid == WT_TXN_ABORTED; upd = upd->next)
         ;
+#ifdef HAVE_DIAGNOSTIC
+    head_upd = upd;
+#endif
 
     /*
      * The head of the update chain is not a prepared update, which means all the prepared updates
@@ -1170,6 +1182,28 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
      */
     if (fix_upd != NULL)
         WT_ERR(__txn_fixup_prepared_update(session, hs_cursor, fix_upd, commit));
+
+#ifdef HAVE_DIAGNOSTIC
+    for (; head_upd != NULL; head_upd = head_upd->next) {
+        /*
+         * Assert if we still have an update from the current transaction that hasn't been aborted.
+         * Only perform this check if aborting the prepared transaction.
+         */
+        WT_ASSERT(
+          session, commit || head_upd->txnid == WT_TXN_ABORTED || head_upd->txnid != txn->id);
+
+        if (head_upd->txnid == WT_TXN_ABORTED)
+            continue;
+
+        /*
+         * If we restored an update from the history store, it should be the last update on the
+         * chain.
+         */
+        if (upd_appended && head_upd->type == WT_UPDATE_STANDARD &&
+          F_ISSET(head_upd, WT_UPDATE_RESTORED_FROM_HS))
+            WT_ASSERT(session, head_upd->next == NULL);
+    }
+#endif
 
 err:
     if (hs_cursor != NULL)
@@ -1350,7 +1384,7 @@ __txn_mod_compare(const void *a, const void *b)
      */
     if (aopt->type == WT_TXN_OP_BASIC_ROW || aopt->type == WT_TXN_OP_INMEM_ROW)
         return (aopt->btree->collator == NULL ?
-            __wt_lex_compare(&aopt->u.op_row.key, &bopt->u.op_row.key) :
+            __wt_lex_compare(&aopt->u.op_row.key, &bopt->u.op_row.key, false) :
             0);
     return (aopt->u.op_col.recno < bopt->u.op_col.recno);
 }
@@ -2025,7 +2059,6 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
     txn_global->current = txn_global->last_running = txn_global->metadata_pinned =
       txn_global->oldest_id = WT_TXN_FIRST;
 
-    WT_RET(__wt_spin_init(session, &txn_global->id_lock, "transaction id lock"));
     WT_RWLOCK_INIT_TRACKED(session, &txn_global->rwlock, txn_global);
     WT_RET(__wt_rwlock_init(session, &txn_global->visibility_rwlock));
 
@@ -2053,7 +2086,6 @@ __wt_txn_global_destroy(WT_SESSION_IMPL *session)
     if (txn_global == NULL)
         return;
 
-    __wt_spin_destroy(session, &txn_global->id_lock);
     __wt_rwlock_destroy(session, &txn_global->rwlock);
     __wt_rwlock_destroy(session, &txn_global->visibility_rwlock);
     __wt_free(session, txn_global->txn_shared_list);
@@ -2127,7 +2159,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
         }
 
         s = NULL;
-        WT_TRET(__wt_open_internal_session(conn, "close_ckpt", true, 0, &s));
+        WT_TRET(__wt_open_internal_session(conn, "close_ckpt", true, 0, 0, &s));
         if (s != NULL) {
             const char *checkpoint_cfg[] = {
               WT_CONFIG_BASE(session, WT_SESSION_checkpoint), ckpt_cfg, NULL};
@@ -2152,7 +2184,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
  *     eviction.
  */
 int
-__wt_txn_is_blocking(WT_SESSION_IMPL *session, bool conservative)
+__wt_txn_is_blocking(WT_SESSION_IMPL *session)
 {
     WT_TXN *txn;
     WT_TXN_SHARED *txn_shared;
@@ -2166,32 +2198,12 @@ __wt_txn_is_blocking(WT_SESSION_IMPL *session, bool conservative)
     if (F_ISSET(txn, WT_TXN_PREPARE))
         return (0);
 
-    /* The checkpoint transaction shouldn't be blocking but if it is don't roll it back. */
-    if (WT_SESSION_IS_CHECKPOINT(session))
-        return (0);
-
     /*
      * MongoDB can't (yet) handle rolling back read only transactions. For this reason, don't check
      * unless there's at least one update or we're configured to time out thread operations (a way
      * to confirm our caller is prepared for rollback).
      */
     if (txn->mod_count == 0 && !__wt_op_timer_fired(session))
-        return (0);
-
-    /*
-     * Be less aggressive about aborting the oldest transaction in the case of trying to make
-     * forced eviction successful. Specifically excuse it if:
-     *  * Hasn't done many updates
-     *  * Is in the middle of a commit or abort
-     *
-     * This threshold that we're comparing the number of updates to is related and must be greater
-     * than the threshold we use in reconciliation's "need split" helper. If we're going to rollback
-     * a transaction, we need to have considered splitting the page in the case that its updates are
-     * on a single page.
-     */
-    if (conservative &&
-      (txn->mod_count < (10 + WT_REC_SPLIT_MIN_ITEMS_USE_MEM) ||
-        F_ISSET(session, WT_SESSION_RESOLVING_TXN)))
         return (0);
 
     /*
@@ -2337,6 +2349,7 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
      */
     WT_STAT_CONN_INCR(session, txn_walk_sessions);
     for (i = 0, s = txn_global->txn_shared_list; i < session_cnt; i++, s++) {
+        WT_STAT_CONN_INCR(session, txn_sessions_walked);
         /* Skip sessions with no active transaction */
         if ((id = s->id) == WT_TXN_NONE && s->pinned_id == WT_TXN_NONE)
             continue;

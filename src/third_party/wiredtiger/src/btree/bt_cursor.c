@@ -348,6 +348,15 @@ __cursor_col_search(WT_CURSOR_BTREE *cbt, WT_REF *leaf, bool *leaf_foundp)
     WT_SESSION_IMPL *session;
 
     session = CUR2S(cbt);
+
+#ifdef HAVE_DIAGNOSTIC
+    /*
+     * Turn off cursor-order checks in all cases on search. The search/search-near functions turn
+     * them back on after a successful search.
+     */
+    __wt_cursor_key_order_reset(cbt);
+#endif
+
     WT_WITH_PAGE_INDEX(
       session, ret = __wt_col_search(cbt, cbt->iface.recno, leaf, false, leaf_foundp));
     return (ret);
@@ -364,6 +373,15 @@ __cursor_row_search(WT_CURSOR_BTREE *cbt, bool insert, WT_REF *leaf, bool *leaf_
     WT_SESSION_IMPL *session;
 
     session = CUR2S(cbt);
+
+#ifdef HAVE_DIAGNOSTIC
+    /*
+     * Turn off cursor-order checks in all cases on search. The search/search-near functions turn
+     * them back on after a successful search.
+     */
+    __wt_cursor_key_order_reset(cbt);
+#endif
+
     WT_WITH_PAGE_INDEX(
       session, ret = __wt_row_search(cbt, &cbt->iface.key, insert, leaf, false, leaf_foundp));
     return (ret);
@@ -690,7 +708,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
          * here because at low isolation levels, new records could appear as we are stepping through
          * the tree.
          */
-        while ((ret = __wt_btcur_next(cbt, false)) != WT_NOTFOUND) {
+        while ((ret = __wt_btcur_next_prefix(cbt, &state.key, false)) != WT_NOTFOUND) {
             WT_ERR(ret);
             if (btree->type == BTREE_ROW)
                 WT_ERR(__wt_compare(session, btree->collator, &cursor->key, &state.key, &exact));
@@ -703,7 +721,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
         /*
          * We walked to the end of the tree without finding a match. Walk backwards instead.
          */
-        while ((ret = __wt_btcur_prev(cbt, false)) != WT_NOTFOUND) {
+        while ((ret = __wt_btcur_prev_prefix(cbt, &state.key, false)) != WT_NOTFOUND) {
             WT_ERR(ret);
             if (btree->type == BTREE_ROW)
                 WT_ERR(__wt_compare(session, btree->collator, &cursor->key, &state.key, &exact));
@@ -725,6 +743,11 @@ err:
 #endif
 
     if (ret != 0) {
+        /*
+         * It is important that this reset is kept as the cursor state is modified in the above prev
+         * and next loops. Those internally do reset the cursor but not when performing a prefix
+         * search near.
+         */
         WT_TRET(__cursor_reset(cbt));
         __cursor_state_restore(cursor, &state);
     }
@@ -1168,7 +1191,7 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     uint64_t yield_count, sleep_usecs;
-    bool leaf_found, valid;
+    bool valid;
 
     btree = CUR2BT(cbt);
     cursor = &cbt->iface;
@@ -1221,30 +1244,11 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
     WT_ERR(__cursor_localvalue(cursor));
     __cursor_state_save(cursor, &state);
 
-    /* If our caller configures for a local search and we have a page pinned, do that search. */
-    if (F_ISSET(cursor, WT_CURSTD_UPDATE_LOCAL) && __cursor_page_pinned(cbt, true)) {
-        __wt_txn_cursor_op(session);
-        WT_ERR(__wt_txn_autocommit_check(session));
-
-        WT_ERR(btree->type == BTREE_ROW ? __cursor_row_search(cbt, true, cbt->ref, &leaf_found) :
-                                          __cursor_col_search(cbt, cbt->ref, &leaf_found));
-        /*
-         * Only use the pinned page search results if search returns an exact match or a slot other
-         * than the page's boundary slots, if that's not the case, the record might belong on an
-         * entirely different page. This test is simplistic as we're ignoring append lists (there
-         * may be no page slots or we might be legitimately positioned after the last page slot).
-         * Ignore those cases, it makes things too complicated.
-         */
-        if (leaf_found &&
-          (cbt->compare == 0 || (cbt->slot != 0 && cbt->slot != cbt->ref->page->entries - 1)))
-            goto update_local;
-    }
-
 retry:
     WT_ERR(__cursor_func_init(cbt, true));
     WT_ERR(btree->type == BTREE_ROW ? __cursor_row_search(cbt, true, NULL, NULL) :
                                       __cursor_col_search(cbt, NULL, NULL));
-update_local:
+
     if (btree->type == BTREE_ROW) {
         /*
          * If not overwriting, check for conflicts and fail if the key does not exist.

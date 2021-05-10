@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2021 MongoDB, Inc.
+# Public Domain 2014-present MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -87,7 +87,7 @@ class test_import10(backup_base):
         cursor.close()
 
         all_files = self.take_full_backup(self.dir, bkup_c)
-        self.assertTrue(self.uri + "wt" not in all_files)
+        self.assertTrue(self.uri + ".wt" not in all_files)
         bkup_c.close()
 
 if __name__ == '__main__':

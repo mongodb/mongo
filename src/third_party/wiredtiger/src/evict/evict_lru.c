@@ -292,11 +292,11 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
          * set the flag on both sessions because we may call clear_walk when we are walking with the
          * walk session, locked.
          */
-        F_SET(session, WT_SESSION_LOCKED_PASS);
-        F_SET(cache->walk_session, WT_SESSION_LOCKED_PASS);
+        FLD_SET(session->lock_flags, WT_SESSION_LOCKED_PASS);
+        FLD_SET(cache->walk_session->lock_flags, WT_SESSION_LOCKED_PASS);
         ret = __evict_server(session, &did_work);
-        F_CLR(cache->walk_session, WT_SESSION_LOCKED_PASS);
-        F_CLR(session, WT_SESSION_LOCKED_PASS);
+        FLD_CLR(cache->walk_session->lock_flags, WT_SESSION_LOCKED_PASS);
+        FLD_CLR(session->lock_flags, WT_SESSION_LOCKED_PASS);
         was_intr = cache->pass_intr != 0;
         __wt_spin_unlock(session, &cache->evict_pass_lock);
         WT_ERR(ret);
@@ -733,11 +733,11 @@ __evict_pass(WT_SESSION_IMPL *session)
              * race conditions that other threads can enter into the flow of evict server when there
              * is already another server is running.
              */
-            F_CLR(session, WT_SESSION_LOCKED_PASS);
+            FLD_CLR(session->lock_flags, WT_SESSION_LOCKED_PASS);
             __wt_spin_unlock(session, &cache->evict_pass_lock);
             ret = __evict_lru_pages(session, true);
             __wt_spin_lock(session, &cache->evict_pass_lock);
-            F_SET(session, WT_SESSION_LOCKED_PASS);
+            FLD_SET(session->lock_flags, WT_SESSION_LOCKED_PASS);
             WT_RET(ret);
         }
 
@@ -809,7 +809,7 @@ __evict_clear_walk(WT_SESSION_IMPL *session)
     btree = S2BT(session);
     cache = S2C(session)->cache;
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_PASS));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_PASS));
     if (session->dhandle == cache->walk_tree)
         cache->walk_tree = NULL;
 
@@ -1741,9 +1741,10 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
      */
     if (!WT_IS_HS(btree->dhandle) && __wt_cache_hs_dirty(session)) {
         /* If target pages are less than 10, keep it like that. */
-        target_pages = target_pages < 10 ? target_pages : target_pages / 10;
-        WT_STAT_CONN_INCR(session, cache_eviction_target_page_reduced);
-        WT_STAT_DATA_INCR(session, cache_eviction_target_page_reduced);
+        if (target_pages >= 10) {
+            target_pages = target_pages / 10;
+            WT_STAT_CONN_DATA_INCR(session, cache_eviction_target_page_reduced);
+        }
     }
 
     /* If we don't want any pages from this tree, move on. */
@@ -2375,7 +2376,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
          * rolled back. Ignore if in recovery, those transactions can't be rolled back.
          */
         if (!F_ISSET(conn, WT_CONN_RECOVERING) && __wt_cache_stuck(session)) {
-            ret = __wt_txn_is_blocking(session, false);
+            ret = __wt_txn_is_blocking(session);
             if (ret == WT_ROLLBACK) {
                 --cache->evict_aggressive_score;
                 WT_STAT_CONN_INCR(session, txn_fail_cache);

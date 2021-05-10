@@ -239,6 +239,21 @@ struct __wt_extension_api {
       WT_CONFIG_ARG *config, WT_CONFIG_PARSER **config_parserp);
 
     /*!
+     * Get the file system abstraction used by WiredTiger.
+     *
+     * @param wt_api the extension handle
+     * @param session the session handle (or NULL if none available)
+     * @param file_system the returned file system handle.
+     * @errors
+     * If called from an extension's initialization routine, this may
+     * return WT_NOTFOUND if the file system has not yet been established.
+     *
+     * @snippet ex_data_source.c WT_EXTENSION metadata insert
+     */
+    int (*file_system_get)(
+      WT_EXTENSION_API *wt_api, WT_SESSION *session, WT_FILE_SYSTEM **file_system);
+
+    /*!
      * Insert a row into the metadata if it does not already exist.
      *
      * @param wt_api the extension handle

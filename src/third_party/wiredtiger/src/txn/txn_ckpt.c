@@ -897,7 +897,13 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      */
     if (F_ISSET(hs_dhandle, WT_DHANDLE_OPEN)) {
         time_start_hs = __wt_clock(session);
+        conn->txn_global.checkpoint_running_hs = true;
+        WT_STAT_CONN_SET(session, txn_checkpoint_running_hs, 1);
+
         WT_WITH_DHANDLE(session, hs_dhandle, ret = __wt_checkpoint(session, cfg));
+
+        WT_STAT_CONN_SET(session, txn_checkpoint_running_hs, 0);
+        conn->txn_global.checkpoint_running_hs = false;
         WT_ERR(ret);
 
         /*
@@ -1870,8 +1876,9 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 
     /* We must hold the metadata lock if checkpointing the metadata. */
-    WT_ASSERT(
-      session, !WT_IS_METADATA(session->dhandle) || F_ISSET(session, WT_SESSION_LOCKED_METADATA));
+    WT_ASSERT(session,
+      !WT_IS_METADATA(session->dhandle) ||
+        FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_METADATA));
 
     WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
     force = cval.val != 0;
@@ -1941,6 +1948,16 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
         (!F_ISSET(S2C(session), WT_CONN_FILE_CLOSE_SYNC) && !metadata)))
         return (__wt_set_return(session, EBUSY));
 
+    /*
+     * Make sure there isn't a potential race between backup copying the metadata and a checkpoint
+     * changing the metadata. Backup holds both the checkpoint and schema locks. Checkpoint should
+     * hold those also except on the final checkpoint during close. Confirm the caller either is the
+     * final checkpoint or holds at least one of the locks.
+     */
+    WT_ASSERT(session,
+      final ||
+        (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_CHECKPOINT) ||
+          FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA)));
     /*
      * Turn on metadata tracking if:
      * - The session is not already doing metadata tracking.

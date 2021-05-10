@@ -121,6 +121,8 @@ WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
 WiredTigerException
+WiredTigerHS
+WiredTigerLAS
 WiredTigerLog
 WiredTigerPanicException
 WiredTigerPreplog
@@ -499,6 +501,7 @@ readonly
 realclean
 realloc
 realloc'd
+rebalance
 recno
 recnoN
 recnum

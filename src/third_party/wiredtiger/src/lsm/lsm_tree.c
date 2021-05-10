@@ -73,7 +73,8 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
 
     /* We may be destroying an lsm_tree before it was added. */
     if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
-        WT_ASSERT(session, final || F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE));
+        WT_ASSERT(
+          session, final || FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST_WRITE));
         TAILQ_REMOVE(&S2C(session)->lsmqh, lsm_tree, q);
     }
 
@@ -282,7 +283,7 @@ __lsm_tree_cleanup_old(WT_SESSION_IMPL *session, const char *uri)
 int
 __wt_lsm_tree_setup_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA));
     __wt_epoch(session, &chunk->create_time);
 
     WT_RET(__wt_spin_init(session, &chunk->timestamp_spinlock, "LSM chunk timestamp"));
@@ -376,7 +377,7 @@ __lsm_tree_find(WT_SESSION_IMPL *session, const char *uri, bool exclusive, WT_LS
     WT_LSM_TREE *lsm_tree;
 
     *treep = NULL;
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST));
 
     /* See if the tree is already open. */
     TAILQ_FOREACH (lsm_tree, &S2C(session)->lsmqh, q)
@@ -461,7 +462,7 @@ __lsm_tree_open(WT_SESSION_IMPL *session, const char *uri, bool exclusive, WT_LS
     conn = S2C(session);
     lsm_tree = NULL;
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST_WRITE));
 
     /* Start the LSM manager thread if it isn't running. */
     WT_RET(__wt_lsm_manager_start(session));
@@ -1006,7 +1007,8 @@ __wt_lsm_tree_readlock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
      * Diagnostic: avoid deadlocks with the schema lock: if we need it for an operation, we should
      * already have it.
      */
-    F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE | WT_SESSION_NO_SCHEMA_LOCK);
+    F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE);
+    FLD_SET(session->lock_flags, WT_SESSION_NO_SCHEMA_LOCK);
 }
 
 /*
@@ -1016,7 +1018,8 @@ __wt_lsm_tree_readlock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 void
 __wt_lsm_tree_readunlock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-    F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE | WT_SESSION_NO_SCHEMA_LOCK);
+    F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
+    FLD_CLR(session->lock_flags, WT_SESSION_NO_SCHEMA_LOCK);
 
     __wt_readunlock(session, &lsm_tree->rwlock);
 }
@@ -1034,7 +1037,8 @@ __wt_lsm_tree_writelock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
      * Diagnostic: avoid deadlocks with the schema lock: if we need it for an operation, we should
      * already have it.
      */
-    F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE | WT_SESSION_NO_SCHEMA_LOCK);
+    F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE);
+    FLD_SET(session->lock_flags, WT_SESSION_NO_SCHEMA_LOCK);
 }
 
 /*
@@ -1044,7 +1048,8 @@ __wt_lsm_tree_writelock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 void
 __wt_lsm_tree_writeunlock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-    F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE | WT_SESSION_NO_SCHEMA_LOCK);
+    F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
+    FLD_CLR(session->lock_flags, WT_SESSION_NO_SCHEMA_LOCK);
 
     __wt_writeunlock(session, &lsm_tree->rwlock);
 }

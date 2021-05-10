@@ -205,13 +205,19 @@ functions:
     # Use separate shell.exec with "silent" directive to avoid exposing credentail in task log.
     - command: shell.exec
       params:
-        working_dir: "wiredtiger/wiredtiger.github.com"
+        working_dir: "wiredtiger"
         shell: bash
         silent: true
         script: |
           set -o errexit
           set -o verbose
 
+          if [[ "${branch_name}" != "develop" ]]; then
+            echo "We only run the documentation update task on the WiredTiger (develop) Evergreen project."
+            exit 0
+          fi
+
+          cd wiredtiger.github.com
           git push https://${doc-update-github-token}@github.com/wiredtiger/wiredtiger.github.com
   "make check directory":
     command: shell.exec
@@ -300,11 +306,11 @@ functions:
   "truncated log test":
     command: shell.exec
     params:
-      working_dir: "wiredtiger/build_posix/test/csuite"
+      working_dir: "wiredtiger/build_posix/"
       script: |
         set -o errexit
         set -o verbose
-        ${test_env_vars|} ./test_truncated_log ${truncated_log_args|} 2>&1
+        ${test_env_vars|} ./test/csuite/test_truncated_log ${truncated_log_args|} 2>&1
   "recovery stress test script":
     command: shell.exec
     params:
@@ -554,17 +560,6 @@ tasks:
       - func: "upload artifact"
       - func: "cleanup"
 
-  - name: compile-asan
-    tags: ["pull_request"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb" CXXFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb"
-          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
-      - func: "upload artifact"
-      - func: "cleanup"
-
   - name: compile-msan
     commands:
       - func: "get project"
@@ -700,22 +695,6 @@ tasks:
           smp_command: -j 1
           test_env_vars: MSAN_OPTIONS=abort_on_error=1:disable_coredump=0 MSAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer TESTUTIL_SLOW_MACHINE=1
 
-  - name: make-check-asan-test
-    depends_on:
-      - name: compile-asan
-    commands:
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: compile-asan
-      - func: "compile wiredtiger"
-        vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb" CXXFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb"
-          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
-      - func: "make check all"
-        vars:
-          smp_command: -j 1
-          test_env_vars: ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer TESTUTIL_SLOW_MACHINE=1 TESTUTIL_BYPASS_ASAN=1
-
   - name: make-check-linux-no-ftruncate-test
     depends_on:
       - name: compile-linux-no-ftruncate
@@ -731,7 +710,7 @@ tasks:
   # Start of normal make check test tasks
 
   - name: lang-python-test
-    tags: ["pull_request"]
+    tags: ["pull_request", "python"]
     depends_on:
       - name: compile
     commands:
@@ -750,23 +729,6 @@ tasks:
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
-          directory: examples/c
-
-  - name: examples-c-asan-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile-asan
-    commands:
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: compile-asan
-      - func: "compile wiredtiger"
-        vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=address -ggdb" CXXFLAGS="-fsanitize=address -ggdb"
-          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
-      - func: "make check directory"
-        vars:
-          test_env_vars: ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
           directory: examples/c
 
   - name: examples-c-production-disable-shared-test
@@ -952,6 +914,24 @@ tasks:
             set -o verbose
             UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:abort_on_error=1:disable_coredump=0 ./ex_access
 
+  # Start of cppsuite test tasks.
+
+  - name: poc-test-cpp
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test/cppsuite/run -t poc_test -f test/cppsuite/configs/config_poc_test_default.txt -l 1
+
+  # End of cppsuite test tasks.
   # Start of csuite test tasks
 
   - name: csuite-incr-backup-test
@@ -1508,6 +1488,7 @@ tasks:
   # Start of Python unit test tasks
 
   - name: unit-test
+    tags: ["python"]
     depends_on:
     - name: compile
     commands:
@@ -1515,12 +1496,14 @@ tasks:
       - func: "unit test"
 
   - name: unit-test-with-compile
+    tags: ["python"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
       - func: "unit test"
 
   - name: unit-test-long
+    tags: ["python"]
     depends_on:
     - name: compile
     commands:
@@ -1530,6 +1513,7 @@ tasks:
           unit_test_args: -v 2 --long
 
   - name: unit-linux-no-ftruncate-test
+    tags: ["python"]
     depends_on:
     - name: compile-linux-no-ftruncate
     commands:
@@ -1540,6 +1524,7 @@ tasks:
 
   # Run the tests that uses suite_random with a random starting seed
   - name: unit-test-random-seed
+    tags: ["python"]
     depends_on:
     - name: compile
     commands:
@@ -1551,7 +1536,7 @@ tasks:
   # and we use the -b option of the test/suite/run.py script to split up the tests.
 
   - name: unit-test-bucket00
-    tags: ["pull_request", "unit_test"]
+    tags: ["pull_request", "python", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -1561,7 +1546,7 @@ tasks:
           unit_test_args: -v 2 -b 0/11
 
   - name: unit-test-bucket01
-    tags: ["pull_request", "unit_test"]
+    tags: ["pull_request", "python", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -1571,7 +1556,7 @@ tasks:
           unit_test_args: -v 2 -b 1/11
 
   - name: unit-test-bucket02
-    tags: ["pull_request", "unit_test"]
+    tags: ["pull_request", "python", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -1581,7 +1566,7 @@ tasks:
           unit_test_args: -v 2 -b 2/11
 
   - name: unit-test-bucket03
-    tags: ["pull_request", "unit_test"]
+    tags: ["pull_request", "python", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -1591,7 +1576,7 @@ tasks:
           unit_test_args: -v 2 -b 3/11
 
   - name: unit-test-bucket04
-    tags: ["pull_request", "unit_test"]
+    tags: ["pull_request", "python", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -1601,7 +1586,7 @@ tasks:
           unit_test_args: -v 2 -b 4/11
 
   - name: unit-test-bucket05
-    tags: ["pull_request", "unit_test"]
+    tags: ["pull_request", "python", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -1611,7 +1596,7 @@ tasks:
           unit_test_args: -v 2 -b 5/11
 
   - name: unit-test-bucket06
-    tags: ["pull_request", "unit_test"]
+    tags: ["pull_request", "python", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -1621,7 +1606,7 @@ tasks:
           unit_test_args: -v 2 -b 6/11
 
   - name: unit-test-bucket07
-    tags: ["pull_request", "unit_test"]
+    tags: ["pull_request", "python", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -1631,7 +1616,7 @@ tasks:
           unit_test_args: -v 2 -b 7/11
 
   - name: unit-test-bucket08
-    tags: ["pull_request", "unit_test"]
+    tags: ["pull_request", "python", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -1641,7 +1626,7 @@ tasks:
           unit_test_args: -v 2 -b 8/11
 
   - name: unit-test-bucket09
-    tags: ["pull_request", "unit_test"]
+    tags: ["pull_request", "python", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -1651,7 +1636,7 @@ tasks:
           unit_test_args: -v 2 -b 9/11
 
   - name: unit-test-bucket10
-    tags: ["pull_request", "unit_test"]
+    tags: ["pull_request", "python", "unit_test"]
     depends_on:
     - name: compile
     commands:
@@ -1676,7 +1661,7 @@ tasks:
             sh s_all -A -E 2>&1
 
   - name: conf-dump-test
-    tags: ["pull_request"]
+    tags: ["pull_request", "python"]
     depends_on:
     - name: compile
     commands:
@@ -1735,14 +1720,15 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
             if [ "Windows_NT" = "$OS" ]; then
+              cd ..
               cmd.exe /c t_fops.exe
             else
-              build_posix/test/fops/t
+              ${test_env_vars|} test/fops/t
             fi
 
   - name: million-collection-test
@@ -2561,7 +2547,6 @@ buildvariants:
     - name: linux-directio
       distros: ubuntu1804-build
     - name: syscall-linux
-    - name: make-check-asan-test
     - name: configure-combinations
     - name: checkpoint-filetypes-test
     - name: unit-test-long
@@ -2574,6 +2559,29 @@ buildvariants:
     - name: long-test
     - name: static-wt-build-test
     - name: format-failure-configs-test
+
+- name: ubuntu1804-asan
+  display_name: "! Ubuntu 18.04 ASAN"
+  run_on:
+  - ubuntu1804-test
+  expansions:
+    configure_env_vars:
+      CC=/opt/mongodbtoolchain/v3/bin/clang
+      CXX=/opt/mongodbtoolchain/v3/bin/clang++
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+      CFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb"
+      CXXFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb"
+    posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static --prefix=$(pwd)/LOCAL_INSTALL
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+    test_env_vars:
+      ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
+      ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+      TESTUTIL_BYPASS_ASAN=1
+      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+  tasks:
+    - name: ".pull_request !.windows_only !.pull_request_compilers !.python"
+    - examples-c-test
 
 - name: ubuntu1804-compilers
   display_name: "! Ubuntu 18.04 Compilers"
@@ -2663,8 +2671,6 @@ buildvariants:
     - name: linux-directio
       distros: rhel80-build
     - name: syscall-linux
-    - name: compile-asan
-    - name: make-check-asan-test
     - name: checkpoint-filetypes-test
     - name: unit-test-long
     - name: spinlock-gcc-test

@@ -113,9 +113,9 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
     WT_DECL_ITEM(orig_hs_value_buf);
     WT_DECL_RET;
     WT_ITEM hs_key, recno_key;
-    WT_MODIFY_VECTOR modifies;
     WT_TXN_SHARED *txn_shared;
     WT_UPDATE *mod_upd;
+    WT_UPDATE_VECTOR modifies;
     wt_timestamp_t durable_timestamp, durable_timestamp_tmp;
     wt_timestamp_t hs_stop_durable_ts, hs_stop_durable_ts_tmp, read_timestamp;
     uint64_t upd_type_full;
@@ -126,7 +126,7 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
     mod_upd = NULL;
     orig_hs_value_buf = NULL;
     WT_CLEAR(hs_key);
-    __wt_modify_vector_init(session, &modifies);
+    __wt_update_vector_init(session, &modifies);
     txn_shared = WT_SESSION_TXN_SHARED(session);
     upd_found = false;
 
@@ -201,7 +201,7 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
 
         while (upd_type == WT_UPDATE_MODIFY) {
             WT_ERR(__wt_upd_alloc(session, hs_value, upd_type, &mod_upd, NULL));
-            WT_ERR(__wt_modify_vector_push(&modifies, mod_upd));
+            WT_ERR(__wt_update_vector_push(&modifies, mod_upd));
             mod_upd = NULL;
 
             /*
@@ -230,7 +230,7 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
         }
         WT_ASSERT(session, upd_type == WT_UPDATE_STANDARD);
         while (modifies.size > 0) {
-            __wt_modify_vector_pop(&modifies, &mod_upd);
+            __wt_update_vector_pop(&modifies, &mod_upd);
             WT_ERR(__wt_modify_apply_item(session, value_format, hs_value, mod_upd->data));
             __wt_free_update_list(session, &mod_upd);
         }
@@ -258,10 +258,10 @@ err:
 
     __wt_free_update_list(session, &mod_upd);
     while (modifies.size > 0) {
-        __wt_modify_vector_pop(&modifies, &mod_upd);
+        __wt_update_vector_pop(&modifies, &mod_upd);
         __wt_free_update_list(session, &mod_upd);
     }
-    __wt_modify_vector_free(&modifies);
+    __wt_update_vector_free(&modifies);
 
     if (ret == 0) {
         if (upd_found)

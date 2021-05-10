@@ -377,10 +377,14 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page
          * stop timestamp if the original update's commit timestamp is out of order. We may see
          * records newer than or equal to the onpage value if eviction runs concurrently with
          * checkpoint. In that case, don't verify the first record.
+         *
+         * If we have fixed the out-of-order timestamps, then the newer update reinserted with an
+         * older timestamp may have a durable timestamp that is smaller than the current stop
+         * durable timestamp.
          */
         WT_ASSERT(session,
           hs_stop_durable_ts <= newer_hs_durable_ts || hs_start_ts == hs_stop_durable_ts ||
-            first_record);
+            hs_start_ts == newer_hs_durable_ts || first_record);
 
         if (hs_stop_durable_ts < newer_hs_durable_ts)
             WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_stop_older_than_newer_start);
@@ -419,7 +423,7 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page
               __wt_timestamp_to_string(hs_durable_ts, ts_string[1]),
               __wt_timestamp_to_string(hs_stop_durable_ts, ts_string[2]),
               __wt_timestamp_to_string(rollback_timestamp, ts_string[3]), hs_tw->start_txn, type);
-            WT_ASSERT(session, hs_tw->start_ts < unpack->tw.start_ts);
+            WT_ASSERT(session, hs_tw->start_ts <= unpack->tw.start_ts);
             valid_update_found = true;
             break;
         }
@@ -1408,7 +1412,7 @@ __rollback_to_stable_btree_apply(WT_SESSION_IMPL *session)
       __wt_timestamp_to_string(rollback_timestamp, ts_string[0]),
       __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[1]));
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA));
     WT_RET(__wt_metadata_cursor(session, &cursor));
 
     if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
@@ -1586,58 +1590,29 @@ err:
  *     Rollback all modifications with timestamps more recent than the passed in timestamp.
  */
 static int
-__rollback_to_stable(WT_SESSION_IMPL *session)
+__rollback_to_stable(WT_SESSION_IMPL *session, bool no_ckpt)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
+    WT_TXN_GLOBAL *txn_global;
 
     conn = S2C(session);
+    txn_global = &conn->txn_global;
 
-    WT_RET(__rollback_to_stable_check(session));
+    /*
+     * Rollback to stable should ignore tombstones in the history store since it needs to scan the
+     * entire table sequentially.
+     */
+    F_SET(session, WT_SESSION_ROLLBACK_TO_STABLE);
+
+    WT_ERR(__rollback_to_stable_check(session));
 
     /*
      * Allocate a non-durable btree bitstring. We increment the global value before using it, so the
      * current value is already in use, and hence we need to add one here.
      */
     conn->stable_rollback_maxfile = conn->next_file_id + 1;
-    WT_WITH_SCHEMA_LOCK(session, ret = __rollback_to_stable_btree_apply(session));
-
-    return (ret);
-}
-
-/*
- * __wt_rollback_to_stable --
- *     Rollback all modifications with timestamps more recent than the passed in timestamp.
- */
-int
-__wt_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckpt)
-{
-    WT_DECL_RET;
-    WT_TXN_GLOBAL *txn_global;
-
-    WT_UNUSED(cfg);
-
-    txn_global = &S2C(session)->txn_global;
-
-    /*
-     * Don't use the connection's default session: we are working on data handles and (a) don't want
-     * to cache all of them forever, plus (b) can't guarantee that no other method will be called
-     * concurrently. Copy parent session no logging option to the internal session to make sure that
-     * rollback to stable doesn't generate log records.
-     */
-    WT_RET(__wt_open_internal_session(S2C(session), "txn rollback_to_stable", true,
-      F_MASK(session, WT_SESSION_NO_LOGGING), &session));
-
-    /*
-     * Rollback to stable should ignore tombstones in the history store since it needs to scan the
-     * entire table sequentially.
-     */
-    WT_STAT_CONN_SET(session, txn_rollback_to_stable_running, 1);
-    F_SET(session, WT_SESSION_ROLLBACK_TO_STABLE);
-    ret = __rollback_to_stable(session);
-    F_CLR(session, WT_SESSION_ROLLBACK_TO_STABLE);
-    WT_STAT_CONN_SET(session, txn_rollback_to_stable_running, 0);
-    WT_RET(ret);
+    WT_ERR(__rollback_to_stable_btree_apply(session));
 
     /* Rollback the global durable timestamp to the stable timestamp. */
     txn_global->has_durable_timestamp = txn_global->has_stable_timestamp;
@@ -1648,8 +1623,39 @@ __wt_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckp
      * ensure that both in-memory and on-disk versions are the same unless caller requested for no
      * checkpoint.
      */
-    if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !no_ckpt)
-        WT_TRET(session->iface.checkpoint(&session->iface, "force=1"));
+    if (!F_ISSET(conn, WT_CONN_IN_MEMORY) && !no_ckpt)
+        WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
+
+err:
+    F_CLR(session, WT_SESSION_ROLLBACK_TO_STABLE);
+    return (ret);
+}
+
+/*
+ * __wt_rollback_to_stable --
+ *     Rollback the database to the stable timestamp.
+ */
+int
+__wt_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckpt)
+{
+    WT_DECL_RET;
+
+    WT_UNUSED(cfg);
+
+    /*
+     * Don't use the connection's default session: we are working on data handles and (a) don't want
+     * to cache all of them forever, plus (b) can't guarantee that no other method will be called
+     * concurrently. Copy parent session no logging option to the internal session to make sure that
+     * rollback to stable doesn't generate log records.
+     */
+    WT_RET(__wt_open_internal_session(S2C(session), "txn rollback_to_stable", true,
+      F_MASK(session, WT_SESSION_NO_LOGGING), 0, &session));
+
+    WT_STAT_CONN_SET(session, txn_rollback_to_stable_running, 1);
+    WT_WITH_CHECKPOINT_LOCK(
+      session, WT_WITH_SCHEMA_LOCK(session, ret = __rollback_to_stable(session, no_ckpt)));
+    WT_STAT_CONN_SET(session, txn_rollback_to_stable_running, 0);
+
     WT_TRET(__wt_session_close_internal(session));
 
     return (ret);

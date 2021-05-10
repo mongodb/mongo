@@ -29,6 +29,8 @@
 #ifndef THREAD_CONTEXT_H
 #define THREAD_CONTEXT_H
 
+#include "../core/throttle.h"
+#include "database_model.h"
 #include "random_generator.h"
 #include "workload_tracking.h"
 
@@ -48,13 +50,10 @@ enum class thread_operation {
 /* Container class for a thread and any data types it may need to interact with the database. */
 class thread_context {
     public:
-    thread_context(timestamp_manager *timestamp_manager, workload_tracking *tracking,
-      std::vector<std::string> collection_names, thread_operation type, int64_t max_op,
-      int64_t min_op, int64_t value_size)
-        : _collection_names(collection_names), _current_op_count(0U), _in_txn(false),
-          _running(false), _min_op(min_op), _max_op(max_op), _max_op_count(0),
-          _timestamp_manager(timestamp_manager), _type(type), _tracking(tracking),
-          _value_size(value_size)
+    thread_context(timestamp_manager *timestamp_manager, workload_tracking *tracking, database &db,
+      thread_operation type, int64_t max_op, int64_t min_op, int64_t value_size, throttle throttle)
+        : _database(db), _min_op(min_op), _max_op(max_op), _timestamp_manager(timestamp_manager),
+          _type(type), _tracking(tracking), _value_size(value_size), _throttle(throttle)
     {
     }
 
@@ -64,16 +63,34 @@ class thread_context {
         _running = false;
     }
 
-    const std::vector<std::string> &
+    const std::vector<std::string>
     get_collection_names() const
     {
-        return (_collection_names);
+        return (_database.get_collection_names());
+    }
+
+    const keys_iterator_t
+    get_collection_keys_begin(const std::string &collection_name) const
+    {
+        return (_database.get_collection_keys_begin(collection_name));
+    }
+
+    const keys_iterator_t
+    get_collection_keys_end(const std::string &collection_name) const
+    {
+        return (_database.get_collection_keys_end(collection_name));
     }
 
     thread_operation
     get_thread_operation() const
     {
         return (_type);
+    }
+
+    timestamp_manager *
+    get_timestamp_manager() const
+    {
+        return (_timestamp_manager);
     }
 
     workload_tracking *
@@ -94,6 +111,18 @@ class thread_context {
         return (_running);
     }
 
+    bool
+    is_in_transaction() const
+    {
+        return (_in_txn);
+    }
+
+    void
+    sleep()
+    {
+        _throttle.sleep();
+    }
+
     void
     set_running(bool running)
     {
@@ -105,7 +134,7 @@ class thread_context {
     {
         if (!_in_txn && _timestamp_manager->is_enabled()) {
             testutil_check(
-              session->begin_transaction(session, config.empty() ? NULL : config.c_str()));
+              session->begin_transaction(session, config.empty() ? nullptr : config.c_str()));
             /* This randomizes the number of operations to be executed in one transaction. */
             _max_op_count = random_generator::instance().generate_integer(_min_op, _max_op);
             _current_op_count = 0;
@@ -113,65 +142,69 @@ class thread_context {
         }
     }
 
-    /* Returns true if the current transaction has been committed. */
+    /*
+     * The current transaction can be committed if:
+     *  - The timestamp manager is enabled and
+     *  - A transaction has started and
+     *      - The thread is done working. This is useful when the test is ended and the thread has
+     * not reached the maximum number of operations per transaction or
+     *      - The number of operations executed in the current transaction has exceeded the
+     * threshold.
+     */
     bool
+    can_commit_transaction() const
+    {
+        return (_timestamp_manager->is_enabled() && _in_txn &&
+          (!_running || (_current_op_count > _max_op_count)));
+    }
+
+    void
     commit_transaction(WT_SESSION *session, const std::string &config)
     {
-        if (!_timestamp_manager->is_enabled())
-            return (true);
-
         /* A transaction cannot be committed if not started. */
         testutil_assert(_in_txn);
-        /* The current transaction should be committed if:
-         *  - The thread is done working. This is useful when the test is ended and the thread has
-         * not reached the maximum number of operations per transaction.
-         *  - The number of operations executed in the current transaction has exceeded the
-         * threshold.
-         */
-        if (!_running || (++_current_op_count > _max_op_count)) {
-            testutil_check(
-              session->commit_transaction(session, config.empty() ? nullptr : config.c_str()));
-            _in_txn = false;
-        }
+        testutil_check(
+          session->commit_transaction(session, config.empty() ? nullptr : config.c_str()));
+        _in_txn = false;
+    }
 
-        return (!_in_txn);
+    void
+    increment_operation_count(uint64_t inc = 1)
+    {
+        _current_op_count += inc;
     }
 
     /*
-     * Set a commit timestamp if the timestamp manager is enabled and always return the timestamp
-     * that should have been used for the commit.
+     * Set a commit timestamp if the timestamp manager is enabled.
      */
-    wt_timestamp_t
-    set_commit_timestamp(WT_SESSION *session)
+    void
+    set_commit_timestamp(WT_SESSION *session, wt_timestamp_t ts)
     {
+        if (!_timestamp_manager->is_enabled())
+            return;
 
-        wt_timestamp_t ts = _timestamp_manager->get_next_ts();
-        std::string config;
-
-        if (_timestamp_manager->is_enabled()) {
-            config = std::string(COMMIT_TS) + "=" + _timestamp_manager->decimal_to_hex(ts);
-            testutil_check(session->timestamp_transaction(session, config.c_str()));
-        }
-
-        return (ts);
+        std::string config = std::string(COMMIT_TS) + "=" + _timestamp_manager->decimal_to_hex(ts);
+        testutil_check(session->timestamp_transaction(session, config.c_str()));
     }
 
     private:
-    const std::vector<std::string> _collection_names;
+    /* Representation of the collections and their key/value pairs in memory. */
+    database _database;
     /*
      * _current_op_count is the current number of operations that have been executed in the current
      * transaction.
      */
-    uint64_t _current_op_count;
-    bool _in_txn, _running;
+    uint64_t _current_op_count = 0U;
+    bool _in_txn = false, _running = false;
     /*
      * _min_op and _max_op are the minimum and maximum number of operations within one transaction.
      * _max_op_count is the current maximum number of operations that can be executed in the current
      * transaction. _max_op_count will always be <= _max_op.
      */
-    int64_t _min_op, _max_op, _max_op_count;
+    int64_t _min_op, _max_op, _max_op_count = 0;
     timestamp_manager *_timestamp_manager;
     const thread_operation _type;
+    throttle _throttle;
     workload_tracking *_tracking;
     /* Temporary member that comes from the test configuration. */
     int64_t _value_size;

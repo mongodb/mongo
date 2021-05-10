@@ -156,14 +156,6 @@ chain, it checks the version on the disk image, which is the version that was ch
 to disk in the last reconciliation. If it is still invisible, WiredTiger will search the history
 store to check if there is a version visible to the reader there.
 
-The repeated read guarantee under snapshot isolation may break in one case if the timestamps
-committed to the updates are out of order, e.g,
-
-`U@20 -> U@30 -> U@15`
-
-In the above example, reading with timestamp 15 doesn't guarantee to return the third update. In
-some cases, users may read the second update U@30 if it is moved to the history store.
-
 @subsection Durability
 
 WiredTiger transactions support commit level durability and checkpoint level durability. An

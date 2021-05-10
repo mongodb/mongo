@@ -129,7 +129,9 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
         WT_ERR(cursor->get_value(cursor, &value));
         filecfg[1] = value;
         WT_ERR(__wt_direct_io_size_check(session, filecfg, "allocation_size", &allocsize));
-        WT_ERR(__wt_block_manager_create(session, key, allocsize));
+        WT_WITH_BUCKET_STORAGE(
+          NULL, session, ret = __wt_block_manager_create(session, key, allocsize));
+        WT_ERR(ret);
     }
     WT_ERR_NOTFOUND_OK(ret, false);
 
@@ -339,7 +341,7 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
     *valuep = NULL;
 
     /* Require single-threading. */
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TURTLE));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TURTLE));
 
     /*
      * Open the turtle file; there's one case where we won't find the turtle file, yet still
@@ -404,7 +406,7 @@ __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
     conn = S2C(session);
 
     /* Require single-threading. */
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TURTLE));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TURTLE));
 
     /*
      * Create the turtle setup file: we currently re-write it from scratch every time.

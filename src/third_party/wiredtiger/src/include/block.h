@@ -185,6 +185,7 @@ struct __wt_bm {
     int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, bool *);
     int (*compact_start)(WT_BM *, WT_SESSION_IMPL *);
     int (*corrupt)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
+    int (*flush_tier)(WT_BM *, WT_SESSION_IMPL *, uint8_t **, size_t *);
     int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     bool (*is_mapped)(WT_BM *, WT_SESSION_IMPL *);
     int (*map_discard)(WT_BM *, WT_SESSION_IMPL *, void *, size_t);

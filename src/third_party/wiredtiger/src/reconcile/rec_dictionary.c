@@ -156,7 +156,7 @@ __wt_rec_dictionary_lookup(
     *dpp = NULL;
 
     /* Search the dictionary, and return any match we find. */
-    hash = __wt_hash_fnv64(val->buf.data, val->buf.size);
+    hash = __wt_hash_city64(val->buf.data, val->buf.size);
     for (dp = __rec_dictionary_skip_search(r->dictionary_head, hash);
          dp != NULL && dp->hash == hash; dp = dp->next[0]) {
         WT_RET(

@@ -179,7 +179,10 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.assertEqual(keys_removed, 0)
         self.assertEqual(hs_restore_updates, nrows)
         self.assertEqual(keys_restored, 0)
-        self.assertEqual(upd_aborted, 0)
+        if self.prepare:
+            self.assertGreaterEqual(upd_aborted, 0)
+        else:
+            self.assertEqual(upd_aborted, 0)
         self.assertGreater(pages_visited, 0)
         self.assertGreaterEqual(hs_removed, nrows)
         self.assertGreaterEqual(hs_sweep, 0)
@@ -195,6 +198,10 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
 
     def test_rollback_to_stable_same_ts(self):
         nrows = 1500
+
+        # Prepare transactions for column store table is not yet supported.
+        if self.prepare and self.key_format == 'r':
+            self.skipTest('Prepare transactions for column store table is not yet supported')
 
         # Create a table without logging.
         self.pr("create/populate table")
@@ -277,7 +284,10 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.assertEqual(keys_removed, 0)
         self.assertEqual(hs_restore_updates, nrows)
         self.assertEqual(keys_restored, 0)
-        self.assertEqual(upd_aborted, 0)
+        if self.prepare:
+            self.assertGreaterEqual(upd_aborted, 0)
+        else:
+            self.assertEqual(upd_aborted, 0)
         self.assertGreater(pages_visited, 0)
         self.assertGreaterEqual(hs_removed, nrows * 3)
         self.assertGreaterEqual(hs_sweep, 0)
@@ -291,6 +301,10 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
 
     def test_rollback_to_stable_same_ts_append(self):
         nrows = 1500
+
+        # Prepare transactions for column store table is not yet supported.
+        if self.prepare and self.key_format == 'r':
+            self.skipTest('Prepare transactions for column store table is not yet supported')
 
         # Create a table without logging.
         self.pr("create/populate table")
@@ -373,7 +387,10 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.assertEqual(keys_removed, 0)
         self.assertEqual(hs_restore_updates, nrows)
         self.assertEqual(keys_restored, 0)
-        self.assertEqual(upd_aborted, 0)
+        if self.prepare:
+            self.assertGreaterEqual(upd_aborted, 0)
+        else:
+            self.assertEqual(upd_aborted, 0)
         self.assertGreater(pages_visited, 0)
         self.assertGreaterEqual(hs_removed, nrows * 3)
         self.assertGreaterEqual(hs_sweep, 0)

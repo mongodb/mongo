@@ -33,7 +33,7 @@
  * Default schema for tracking operations on collections (key_format: Collection name / Key /
  * Timestamp, value_format: Operation type / Value)
  */
-#define OPERATION_TRACKING_KEY_FORMAT WT_UNCHECKED_STRING(Sii)
+#define OPERATION_TRACKING_KEY_FORMAT WT_UNCHECKED_STRING(SSQ)
 #define OPERATION_TRACKING_VALUE_FORMAT WT_UNCHECKED_STRING(iS)
 #define OPERATION_TRACKING_TABLE_CONFIG \
     "key_format=" OPERATION_TRACKING_KEY_FORMAT ",value_format=" OPERATION_TRACKING_VALUE_FORMAT
@@ -42,7 +42,7 @@
  * Default schema for tracking schema operations on collections (key_format: Collection name /
  * Timestamp, value_format: Operation type)
  */
-#define SCHEMA_TRACKING_KEY_FORMAT WT_UNCHECKED_STRING(Si)
+#define SCHEMA_TRACKING_KEY_FORMAT WT_UNCHECKED_STRING(SQ)
 #define SCHEMA_TRACKING_VALUE_FORMAT WT_UNCHECKED_STRING(i)
 #define SCHEMA_TRACKING_TABLE_CONFIG \
     "key_format=" SCHEMA_TRACKING_KEY_FORMAT ",value_format=" SCHEMA_TRACKING_VALUE_FORMAT
@@ -57,8 +57,7 @@ class workload_tracking : public component {
     workload_tracking(configuration *_config, const std::string &operation_table_config,
       const std::string &operation_table_name, const std::string &schema_table_config,
       const std::string &schema_table_name)
-        : component(_config), _cursor_operations(nullptr), _cursor_schema(nullptr),
-          _operation_table_config(operation_table_config),
+        : component("workload_tracking", _config), _operation_table_config(operation_table_config),
           _operation_table_name(operation_table_name), _schema_table_config(schema_table_config),
           _schema_table_name(schema_table_name)
     {
@@ -81,7 +80,8 @@ class workload_tracking : public component {
     {
         WT_SESSION *session;
 
-        testutil_check(_config->get_bool(ENABLED, _enabled));
+        component::load();
+
         if (!_enabled)
             return;
 
@@ -145,8 +145,8 @@ class workload_tracking : public component {
     }
 
     private:
-    WT_CURSOR *_cursor_operations;
-    WT_CURSOR *_cursor_schema;
+    WT_CURSOR *_cursor_operations = nullptr;
+    WT_CURSOR *_cursor_schema = nullptr;
     const std::string _operation_table_config;
     const std::string _operation_table_name;
     const std::string _schema_table_config;

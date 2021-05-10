@@ -144,7 +144,7 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
      */
     session_flags = WT_SESSION_CAN_WAIT;
     WT_RET(__wt_open_internal_session(
-      conn, "checkpoint-server", true, session_flags, &conn->ckpt_session));
+      conn, "checkpoint-server", true, session_flags, 0, &conn->ckpt_session));
     session = conn->ckpt_session;
 
     WT_RET(__wt_cond_alloc(session, "checkpoint server", &conn->ckpt_cond));

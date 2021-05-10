@@ -59,8 +59,10 @@ __wt_schema_tiered_worker(WT_SESSION_IMPL *session, const char *uri,
     WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, open_flags));
     tiered = (WT_TIERED *)session->dhandle;
 
-    for (i = 0; i < tiered->ntiers; i++) {
-        dhandle = tiered->tiers[i];
+    for (i = 0; i < WT_TIERED_MAX_TIERS; i++) {
+        dhandle = tiered->tiers[i].tier;
+        if (dhandle == NULL)
+            continue;
         WT_SAVE_DHANDLE(session,
           ret = __wt_schema_worker(session, dhandle->name, file_func, name_func, cfg, open_flags));
         WT_ERR(ret);
@@ -142,7 +144,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
          * checkpoints, do not. Opening indexes requires the handle write lock, so check whether
          * that lock is held when deciding what to do.
          */
-        if (F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE))
+        if (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE_WRITE))
             WT_ERR(__wt_schema_open_indices(session, table));
 
         for (i = 0; i < table->nindices; i++) {

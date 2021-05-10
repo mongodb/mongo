@@ -36,17 +36,23 @@ class test_tiered05(wttest.WiredTigerTestCase):
     uri = "table:test_tiered05"
 
     auth_token = "test_token"
+    bucket = "my_bucket"
+    bucket_prefix = "my_prefix"
     extension_name = "local_store"
+    bucket = "./objects"
 
     def conn_extensions(self, extlist):
         extlist.skip_if_missing = True
         extlist.extension('storage_sources', self.extension_name)
 
     def conn_config(self):
+        os.mkdir(self.bucket)
         return \
           'statistics=(fast),' + \
           'tiered_manager=(wait=10),' + \
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
+          'bucket=%s,' % self.bucket + \
+          'bucket_prefix=%s,' % self.bucket_prefix + \
           'name=%s,' % self.extension_name + \
           'object_target_size=20M)'
 

@@ -85,7 +85,9 @@ class Translator:
                            'readonly', 'reopen_connection', 'run_ops',
                            'sample_interval', 'sess_config', 'table_config',
                            'table_count', 'threads', 'transaction_config',
-                           'value_sz' ]
+                           'value_sz',
+                           'max_idle_table_cycle',
+                           'max_idle_table_cycle_fatal' ]
 
     def set_opt(self, optname, val):
         if optname not in self.supported_opt_list:
@@ -535,6 +537,8 @@ class Translator:
         self.get_string_opt('transaction_config', '')
         self.get_boolean_opt('compact', False)
         self.get_int_opt('pareto', 0)
+        self.get_int_opt('max_idle_table_cycle', 0)
+        self.get_boolean_opt('max_idle_table_cycle_fatal', False)
         opts = self.options
         if opts.range_partition and opts.random_range == 0:
             self.fatal_error('range_partition requires random_range to be set')
@@ -546,6 +550,14 @@ class Translator:
         if self.options.sample_interval_ms != 0:
             workloadopts += 'workload.options.sample_interval_ms = ' + \
                 str(self.options.sample_interval_ms) + '\n'
+
+        if self.options.max_idle_table_cycle > 0:
+            workloadopts += 'workload.options.max_idle_table_cycle = ' + \
+            str(self.options.max_idle_table_cycle) + '\n'
+
+        if self.options.max_idle_table_cycle_fatal:
+            workloadopts += 'workload.options.max_idle_table_cycle_fatal = ' + \
+            str(self.options.max_idle_table_cycle_fatal) + '\n'
 
         s = '#/usr/bin/env python\n'
         s += '# generated from ' + self.filename + '\n'

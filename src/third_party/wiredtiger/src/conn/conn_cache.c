@@ -251,7 +251,7 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__wt_spin_init(session, &cache->evict_queue_lock, "cache eviction queue"));
     WT_RET(__wt_spin_init(session, &cache->evict_walk_lock, "cache walk"));
     if ((ret = __wt_open_internal_session(
-           conn, "evict pass", false, WT_SESSION_NO_DATA_HANDLES, &cache->walk_session)) != 0)
+           conn, "evict pass", false, WT_SESSION_NO_DATA_HANDLES, 0, &cache->walk_session)) != 0)
         WT_RET_MSG(NULL, ret, "Failed to create session for eviction walks");
 
     /* Allocate the LRU eviction queue. */

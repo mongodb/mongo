@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 #
 # Public Domain 2014-present MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.

@@ -695,11 +695,11 @@ config_in_memory(void)
      */
     if (config_is_perm("backup"))
         return;
-    if (config_is_perm("checkpoint"))
-        return;
     if (config_is_perm("btree.compression"))
         return;
-    if (config_is_perm("runs.source") && DATASOURCE("lsm"))
+    if (config_is_perm("checkpoint"))
+        return;
+    if (config_is_perm("import"))
         return;
     if (config_is_perm("logging"))
         return;
@@ -708,6 +708,8 @@ config_in_memory(void)
     if (config_is_perm("ops.salvage"))
         return;
     if (config_is_perm("ops.verify"))
+        return;
+    if (config_is_perm("runs.source") && DATASOURCE("lsm"))
         return;
 
     if (!config_is_perm("runs.in_memory") && mmrand(NULL, 1, 20) == 1)
@@ -724,18 +726,20 @@ config_in_memory_reset(void)
     uint32_t cache;
 
     /* Turn off a lot of stuff. */
-    if (!config_is_perm("ops.alter"))
-        config_single("ops.alter=off", false);
     if (!config_is_perm("backup"))
         config_single("backup=off", false);
-    if (!config_is_perm("checkpoint"))
-        config_single("checkpoint=off", false);
     if (!config_is_perm("btree.compression"))
         config_single("btree.compression=none", false);
-    if (!config_is_perm("ops.hs_cursor"))
-        config_single("ops.hs_cursor=off", false);
+    if (!config_is_perm("checkpoint"))
+        config_single("checkpoint=off", false);
+    if (!config_is_perm("import"))
+        config_single("import=off", false);
     if (!config_is_perm("logging"))
         config_single("logging=off", false);
+    if (!config_is_perm("ops.alter"))
+        config_single("ops.alter=off", false);
+    if (!config_is_perm("ops.hs_cursor"))
+        config_single("ops.hs_cursor=off", false);
     if (!config_is_perm("ops.salvage"))
         config_single("ops.salvage=off", false);
     if (!config_is_perm("ops.verify"))

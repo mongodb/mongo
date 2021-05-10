@@ -235,7 +235,7 @@ operations(u_int ops_seconds, bool lastrun)
     TINFO *tinfo, total;
     WT_CONNECTION *conn;
     WT_SESSION *session;
-    wt_thread_t alter_tid, backup_tid, checkpoint_tid, compact_tid, hs_tid, random_tid;
+    wt_thread_t alter_tid, backup_tid, checkpoint_tid, compact_tid, hs_tid, import_tid, random_tid;
     wt_thread_t timestamp_tid;
     int64_t fourths, quit_fourths, thread_ops;
     uint32_t i;
@@ -249,6 +249,7 @@ operations(u_int ops_seconds, bool lastrun)
     memset(&checkpoint_tid, 0, sizeof(checkpoint_tid));
     memset(&compact_tid, 0, sizeof(compact_tid));
     memset(&hs_tid, 0, sizeof(hs_tid));
+    memset(&import_tid, 0, sizeof(import_tid));
     memset(&random_tid, 0, sizeof(random_tid));
     memset(&timestamp_tid, 0, sizeof(timestamp_tid));
 
@@ -302,6 +303,8 @@ operations(u_int ops_seconds, bool lastrun)
         testutil_check(__wt_thread_create(NULL, &compact_tid, compact, NULL));
     if (g.c_hs_cursor)
         testutil_check(__wt_thread_create(NULL, &hs_tid, hs_cursor, NULL));
+    if (g.c_import)
+        testutil_check(__wt_thread_create(NULL, &import_tid, import, NULL));
     if (g.c_random_cursor)
         testutil_check(__wt_thread_create(NULL, &random_tid, random_kv, NULL));
     if (g.c_txn_timestamps)
@@ -386,6 +389,8 @@ operations(u_int ops_seconds, bool lastrun)
         testutil_check(__wt_thread_join(NULL, &compact_tid));
     if (g.c_hs_cursor)
         testutil_check(__wt_thread_join(NULL, &hs_tid));
+    if (g.c_import)
+        testutil_check(__wt_thread_join(NULL, &import_tid));
     if (g.c_random_cursor)
         testutil_check(__wt_thread_join(NULL, &random_tid));
     if (g.c_txn_timestamps)

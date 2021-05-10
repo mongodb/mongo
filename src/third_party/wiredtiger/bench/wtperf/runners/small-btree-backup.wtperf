@@ -1,0 +1,9 @@
+# wtperf options file: small btree configuration
+conn_config="cache_size=500MB"
+table_config="type=file"
+icount=500000
+report_interval=5
+run_time=120
+populate_threads=1
+threads=((count=8,reads=1))
+backup_interval=40

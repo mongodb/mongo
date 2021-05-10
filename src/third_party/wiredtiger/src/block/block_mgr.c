@@ -289,6 +289,30 @@ __bm_compact_start_readonly(WT_BM *bm, WT_SESSION_IMPL *session)
 }
 
 /*
+ * __bm_flush_tier --
+ *     Flush the underlying file to the shared tier.
+ */
+static int
+__bm_flush_tier(WT_BM *bm, WT_SESSION_IMPL *session, uint8_t **flush_cookie, size_t *cookie_size)
+{
+    return (__wt_block_tiered_flush(session, bm->block, flush_cookie, cookie_size));
+}
+
+/*
+ * __bm_flush_tier_readonly --
+ *     Flush the underlying file to the shared tier; readonly version.
+ */
+static int
+__bm_flush_tier_readonly(
+  WT_BM *bm, WT_SESSION_IMPL *session, uint8_t **flush_cookie, size_t *cookie_size)
+{
+    WT_UNUSED(flush_cookie);
+    WT_UNUSED(cookie_size);
+
+    return (__bm_readonly(bm, session));
+}
+
+/*
  * __bm_free --
  *     Free a block of space to the underlying file.
  */
@@ -565,6 +589,7 @@ __bm_method_set(WT_BM *bm, bool readonly)
     bm->compact_skip = __bm_compact_skip;
     bm->compact_start = __bm_compact_start;
     bm->corrupt = __wt_bm_corrupt;
+    bm->flush_tier = __bm_flush_tier;
     bm->free = __bm_free;
     bm->is_mapped = __bm_is_mapped;
     bm->map_discard = __bm_map_discard;
@@ -591,6 +616,7 @@ __bm_method_set(WT_BM *bm, bool readonly)
         bm->compact_page_skip = __bm_compact_page_skip_readonly;
         bm->compact_skip = __bm_compact_skip_readonly;
         bm->compact_start = __bm_compact_start_readonly;
+        bm->flush_tier = __bm_flush_tier_readonly;
         bm->free = __bm_free_readonly;
         bm->salvage_end = __bm_salvage_end_readonly;
         bm->salvage_next = __bm_salvage_next_readonly;

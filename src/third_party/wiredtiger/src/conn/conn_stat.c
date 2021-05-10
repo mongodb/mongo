@@ -617,7 +617,7 @@ __statlog_start(WT_CONNECTION_IMPL *conn)
     FLD_SET(conn->server_flags, WT_CONN_SERVER_STATISTICS);
 
     /* The statistics log server gets its own session. */
-    WT_RET(__wt_open_internal_session(conn, "statlog-server", true, 0, &conn->stat_session));
+    WT_RET(__wt_open_internal_session(conn, "statlog-server", true, 0, 0, &conn->stat_session));
     session = conn->stat_session;
 
     WT_RET(__wt_cond_alloc(session, "statistics log server", &conn->stat_cond));

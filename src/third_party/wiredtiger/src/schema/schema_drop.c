@@ -56,7 +56,7 @@ __drop_colgroup(WT_SESSION_IMPL *session, const char *uri, bool force, const cha
     WT_DECL_RET;
     WT_TABLE *table;
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE_WRITE));
 
     /* If we can get the colgroup, detach it from the table. */
     if ((ret = __wt_schema_get_colgroup(session, uri, force, &table, &colgroup)) == 0) {
@@ -102,7 +102,7 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
     const char *name;
     bool tracked;
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE_WRITE));
 
     name = uri;
     WT_PREFIX_SKIP_REQUIRED(session, name, "table:");
@@ -186,9 +186,10 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
     tiered = (WT_TIERED *)session->dhandle;
 
     /* Drop the tiers. */
-    for (i = 0; i < tiered->ntiers; i++) {
-        tier = tiered->tiers[i];
-        WT_ERR(__wt_schema_drop(session, tier->name, cfg));
+    for (i = 0; i < WT_TIERED_MAX_TIERS; i++) {
+        tier = tiered->tiers[i].tier;
+        if (tier != NULL)
+            WT_ERR(__wt_schema_drop(session, tier->name, cfg));
     }
 
     ret = __wt_metadata_remove(session, uri);

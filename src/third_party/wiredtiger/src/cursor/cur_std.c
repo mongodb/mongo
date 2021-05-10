@@ -757,18 +757,35 @@ err:
 }
 
 /*
+ * __wt_cursor_get_hash --
+ *     Get hash value from the given uri.
+ */
+void
+__wt_cursor_get_hash(
+  WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *to_dup, uint64_t *hash_value)
+{
+    if (to_dup != NULL) {
+        WT_ASSERT(session, uri == NULL);
+        *hash_value = to_dup->uri_hash;
+    } else {
+        WT_ASSERT(session, uri != NULL);
+        *hash_value = __wt_hash_city64(uri, strlen(uri));
+    }
+}
+
+/*
  * __wt_cursor_cache_get --
  *     Open a matching cursor from the cache.
  */
 int
-__wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *to_dup,
-  const char *cfg[], WT_CURSOR **cursorp)
+__wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_value,
+  WT_CURSOR *to_dup, const char *cfg[], WT_CURSOR **cursorp)
 {
     WT_CONFIG_ITEM cval;
     WT_CURSOR *cursor;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_RET;
-    uint64_t bucket, hash_value;
+    uint64_t bucket;
     uint32_t overwrite_flag;
     bool have_config;
 
@@ -818,18 +835,8 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *to_d
             return (WT_NOTFOUND);
     }
 
-    /*
-     * Caller guarantees that exactly one of the URI and the duplicate cursor is non-NULL.
-     */
-    if (to_dup != NULL) {
-        WT_ASSERT(session, uri == NULL);
+    if (to_dup != NULL)
         uri = to_dup->uri;
-        hash_value = to_dup->uri_hash;
-    } else {
-        WT_ASSERT(session, uri != NULL);
-        hash_value = __wt_hash_city64(uri, strlen(uri));
-    }
-
     /*
      * Walk through all cursors, if there is a cached cursor that matches uri and configuration, use
      * it.
@@ -848,7 +855,8 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *to_d
              * For these configuration values, there is no difference in the resulting cursor other
              * than flag values, so fix them up according to the given configuration.
              */
-            F_CLR(cursor, WT_CURSTD_APPEND | WT_CURSTD_RAW | WT_CURSTD_OVERWRITE);
+            F_CLR(cursor,
+              WT_CURSTD_APPEND | WT_CURSTD_PREFIX_SEARCH | WT_CURSTD_RAW | WT_CURSTD_OVERWRITE);
             F_SET(cursor, overwrite_flag);
             /*
              * If this is a btree cursor, clear its read_once flag.
@@ -1052,6 +1060,22 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
     } else
         WT_ERR_NOTFOUND_OK(ret, false);
 
+    /* Set the prefix search near flag. */
+    if ((ret = __wt_config_getones(session, config, "prefix_key", &cval)) == 0) {
+        if (cval.val) {
+            /* Prefix search near configuration can only be used for row-store. */
+            if (WT_CURSOR_RECNO(cursor))
+                WT_ERR_MSG(
+                  session, EINVAL, "cannot use prefix key search near for column store formats");
+            if (CUR2BT(cursor)->collator != NULL)
+                WT_ERR_MSG(
+                  session, EINVAL, "cannot use prefix key search near with a custom collator");
+            F_SET(cursor, WT_CURSTD_PREFIX_SEARCH);
+        } else
+            F_CLR(cursor, WT_CURSTD_PREFIX_SEARCH);
+    } else
+        WT_ERR_NOTFOUND_OK(ret, false);
+
     WT_ERR(__cursor_config_debug(cursor, cfg));
 
 err:
@@ -1113,8 +1137,11 @@ __wt_cursor_init(
 
     session = CUR2S(cursor);
 
-    if (cursor->internal_uri == NULL)
+    if (cursor->internal_uri == NULL) {
+        /* Various cursor code assumes there is an internal URI, so there better be one to set. */
+        WT_ASSERT(session, uri != NULL);
         WT_RET(__wt_strdup(session, uri, &cursor->internal_uri));
+    }
 
     /*
      * append The append flag is only relevant to column stores.

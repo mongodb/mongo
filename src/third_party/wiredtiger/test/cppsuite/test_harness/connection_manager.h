@@ -36,8 +36,8 @@ extern "C" {
 #include "wiredtiger.h"
 }
 
-#include "api_const.h"
-#include "debug_utils.h"
+#include "util/api_const.h"
+#include "util/debug_utils.h"
 
 namespace test_harness {
 /*

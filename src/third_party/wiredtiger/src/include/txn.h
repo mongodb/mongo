@@ -133,8 +133,6 @@ struct __wt_txn_global {
     bool oldest_is_pinned;
     bool stable_is_pinned;
 
-    WT_SPINLOCK id_lock;
-
     /* Protects the active transaction states. */
     WT_RWLOCK rwlock;
 
@@ -151,6 +149,7 @@ struct __wt_txn_global {
      * once checkpoint has finished reading a table, it won't revisit it.
      */
     volatile bool checkpoint_running;    /* Checkpoint running */
+    volatile bool checkpoint_running_hs; /* Checkpoint running and processing history store file */
     volatile uint32_t checkpoint_id;     /* Checkpoint's session ID */
     WT_TXN_SHARED checkpoint_txn_shared; /* Checkpoint's txn shared state */
     wt_timestamp_t checkpoint_timestamp; /* Checkpoint's timestamp */
