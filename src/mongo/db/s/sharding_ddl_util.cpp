@@ -37,6 +37,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
@@ -115,6 +116,18 @@ void deleteCollection(OperationContext* opCtx, const NamespaceString& nss) {
 }
 
 }  // namespace
+
+void linearizeCSRSReads(OperationContext* opCtx) {
+    // Take advantage of ShardingLogging to perform a write to the configsvr with majority read
+    // concern to guarantee that any read after this method sees any write performed by the previous
+    // primary.
+    uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
+        opCtx,
+        "Linearize CSRS reads",
+        NamespaceString::kServerConfigurationNamespace.ns(),
+        {},
+        ShardingCatalogClient::kMajorityWriteConcern));
+}
 
 void sendAuthenticatedCommandToShards(OperationContext* opCtx,
                                       StringData dbName,

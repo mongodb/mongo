@@ -381,6 +381,17 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
+                if (_recoveredFromDisk) {
+                    // If a stedown happened it could've ocurred while waiting for majority when
+                    // writing config.collections. If the refresh happens before this write is
+                    // majority committed, we will only see the data on config.chunks but not on
+                    // config.collections, so we need to serialize the refresh with the collection
+                    // creation.
+                    sharding_ddl_util::linearizeCSRSReads(opCtx);
+                }
+
+                // Quick check (without critical section) to see if another create collection
+                // already succeeded.
                 if (auto createCollectionResponseOpt =
                         sharding_ddl_util::checkIfCollectionAlreadySharded(
                             opCtx,
@@ -408,6 +419,27 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 RecoverableCriticalSectionService::get(opCtx)
                     ->acquireRecoverableCriticalSectionBlockWrites(
                         opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+
+                // Check if the collection was already created, this time under the critical
+                // section.
+                if (auto createCollectionResponseOpt =
+                        sharding_ddl_util::checkIfCollectionAlreadySharded(
+                            opCtx,
+                            nss(),
+                            _shardKeyPattern->getKeyPattern().toBSON(),
+                            getCollation(opCtx, nss(), _doc.getCollation()),
+                            _doc.getUnique().value_or(false))) {
+                    _result = createCollectionResponseOpt;
+                    // The collection was already created and commited but there was a
+                    // stepdown after the commit.
+                    RecoverableCriticalSectionService::get(opCtx)
+                        ->releaseRecoverableCriticalSection(
+                            opCtx,
+                            nss(),
+                            _critSecReason,
+                            ShardingCatalogClient::kMajorityWriteConcern);
+                    return;
+                }
 
                 if (_recoveredFromDisk) {
                     auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
@@ -563,15 +595,7 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
     LOGV2_DEBUG(
         5277903, 2, "Create collection _createCollectionAndIndexes", "namespace"_attr = nss());
 
-    auto unique = _doc.getUnique().value_or(false);
     _collation = getCollation(opCtx, nss(), _doc.getCollation());
-
-    if (auto createCollectionResponseOpt =
-            mongo::sharding_ddl_util::checkIfCollectionAlreadySharded(
-                opCtx, nss(), _shardKeyPattern->getKeyPattern().toBSON(), *_collation, unique)) {
-        _result = createCollectionResponseOpt;
-        return;
-    }
 
     const auto indexCreated = shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
         opCtx,

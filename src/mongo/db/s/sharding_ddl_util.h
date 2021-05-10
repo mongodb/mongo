@@ -40,6 +40,12 @@ namespace mongo {
 namespace sharding_ddl_util {
 
 /**
+ * Creates a barrier after which we are guaranteed that all writes to the config server performed by
+ * the previous primary have been majority commited and will be seen by the new primary.
+ */
+void linearizeCSRSReads(OperationContext* opCtx);
+
+/**
  * Generic utility to send a command to a list of shards. Throws if one of the commands fails.
  */
 void sendAuthenticatedCommandToShards(OperationContext* opCtx,
