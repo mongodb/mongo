@@ -32,6 +32,7 @@
 #include "mongo/util/thread_context.h"
 
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -110,8 +111,8 @@ public:
      */
     template <typename F>
     void launchAndJoinThread(F&& f) {
-        auto t = stdx::thread(std::forward<F>(f));
-        t.join();
+        unittest::threadAssertionMonitoredTest(
+            [&](auto& monitor) { monitor.spawn(std::forward<F>(f)).join(); });
     }
 
     /**
