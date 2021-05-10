@@ -344,7 +344,7 @@ public:
                 // Three cases:
                 //
                 // First, initialDataTimestamp is Timestamp(0, 1) -> Take full checkpoint. This is
-                // when there is no consistent view of the data (i.e: during initial sync).
+                // when there is no consistent view of the data (e.g: during initial sync).
                 //
                 // Second, stableTimestamp < initialDataTimestamp: Skip checkpoints. The data on
                 // disk is prone to being rolled back. Hold off on checkpoints.  Hope that the
@@ -357,6 +357,9 @@ public:
                     UniqueWiredTigerSession session = _sessionCache->getSession();
                     WT_SESSION* s = session->getSession();
                     invariantWTOK(s->checkpoint(s, "use_timestamp=false"));
+                    LOG_FOR_RECOVERY(2)
+                        << "Completed unstable checkpoint."
+                        << " InitialDataTimestamp: " << initialDataTimestamp.toString();
                 } else if (stableTimestamp < initialDataTimestamp) {
                     LOG_FOR_RECOVERY(2)
                         << "Stable timestamp is behind the initial data timestamp, skipping "
@@ -1005,7 +1008,7 @@ void WiredTigerKVEngine::cleanShutdown() {
 
     const Timestamp stableTimestamp = getStableTimestamp();
     const Timestamp initialDataTimestamp = getInitialDataTimestamp();
-    if (stableTimestamp >= initialDataTimestamp) {
+    if (gTakeUnstableCheckpointOnShutdown || stableTimestamp >= initialDataTimestamp) {
         invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
     } else {
         log() << "Skipping checkpoint during clean shutdown because stableTimestamp ("
