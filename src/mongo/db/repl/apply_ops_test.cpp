@@ -336,7 +336,9 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
 /**
  * Generates oplog entries with the given number used for the timestamp.
  */
-OplogEntry makeOplogEntry(OpTypeEnum opType, const BSONObj& oField) {
+OplogEntry makeOplogEntry(OpTypeEnum opType,
+                          const BSONObj& oField,
+                          const std::vector<StmtId>& stmtIds = {}) {
     return {DurableOplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
                               boost::none,                 // hash
                               opType,                      // op type
@@ -349,7 +351,7 @@ OplogEntry makeOplogEntry(OpTypeEnum opType, const BSONObj& oField) {
                               {},                          // sessionInfo
                               boost::none,                 // upsert
                               Date_t(),                    // wall clock time
-                              {},                          // statement ids
+                              stmtIds,                     // statement ids
                               boost::none,    // optime of previous write within same transaction
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
@@ -448,6 +450,62 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
 
         // OpTime of CRUD operation should match applyOps.
         ASSERT_EQUALS(oplogEntry.getOpTime(), operation3.getOpTime());
+    }
+
+    ASSERT(operations.cend() == it);
+}
+
+TEST_F(ApplyOpsTest, ExtractOperationsFromApplyOpsMultiStmtIds) {
+    NamespaceString ns1("test.a");
+    auto ui1 = UUID::gen();
+    auto op1 = BSON("op"
+                    << "i"
+                    << "ns" << ns1.ns() << "ui" << ui1 << "o" << BSON("_id" << 1));
+
+    NamespaceString ns2("test.b");
+    auto ui2 = UUID::gen();
+    auto op2 = BSON("op"
+                    << "u"
+                    << "ns" << ns2.ns() << "ui" << ui2 << "b" << true << "o" << BSON("x" << 1)
+                    << "o2" << BSON("_id" << 2));
+
+    auto oplogEntry =
+        makeOplogEntry(OpTypeEnum::kCommand, BSON("applyOps" << BSON_ARRAY(op1 << op2)), {0, 1});
+
+    auto operations = ApplyOps::extractOperations(oplogEntry);
+    ASSERT_EQUALS(2U, operations.size())
+        << "Unexpected number of operations extracted: " << oplogEntry.toBSONForLogging();
+
+    // Check extracted CRUD operations.
+    auto it = operations.cbegin();
+    {
+        ASSERT(operations.cend() != it);
+        const auto& operation1 = *(it++);
+        ASSERT(OpTypeEnum::kInsert == operation1.getOpType())
+            << "Unexpected op type: " << operation1.toBSONForLogging();
+        ASSERT_EQUALS(ui1, *operation1.getUuid());
+        ASSERT_EQUALS(ns1, operation1.getNss());
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 1), operation1.getOperationToApply());
+
+        // OpTime of CRUD operation should match applyOps.
+        ASSERT_EQUALS(oplogEntry.getOpTime(), operation1.getOpTime());
+    }
+
+    {
+        ASSERT(operations.cend() != it);
+        const auto& operation2 = *(it++);
+        ASSERT(OpTypeEnum::kUpdate == operation2.getOpType())
+            << "Unexpected op type: " << operation2.toBSONForLogging();
+        ASSERT_EQUALS(ui2, *operation2.getUuid());
+        ASSERT_EQUALS(ns2, operation2.getNss());
+        ASSERT_BSONOBJ_EQ(BSON("x" << 1), operation2.getOperationToApply());
+
+        auto optionalUpsertBool = operation2.getUpsert();
+        ASSERT(optionalUpsertBool);
+        ASSERT(*optionalUpsertBool);
+
+        // OpTime of CRUD operation should match applyOps.
+        ASSERT_EQUALS(oplogEntry.getOpTime(), operation2.getOpTime());
     }
 
     ASSERT(operations.cend() == it);

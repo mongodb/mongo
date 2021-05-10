@@ -401,6 +401,41 @@ assert.eq(true, res.results[0], "Valid insert with transaction number failed");
 assert.eq(true, res.results[1], "Valid update with transaction number failed");
 assert.eq(true, res.results[2], "Valid delete with transaction number failed");
 
+// Ops with multiple statement IDs are valid.
+res = db.runCommand({
+    applyOps: [
+        {
+            op: "i",
+            ns: t.getFullName(),
+            o: {_id: 7, x: 24},
+            lsid: lsid,
+            txnNumber: NumberLong(3),
+            stmtId: [NumberInt(0), NumberInt(1)]
+        },
+        {
+            op: "u",
+            ns: t.getFullName(),
+            o2: {_id: 8},
+            o: {$set: {x: 25}},
+            lsid: lsid,
+            txnNumber: NumberLong(3),
+            stmtId: [NumberInt(2), NumberInt(3)]
+        },
+        {
+            op: "d",
+            ns: t.getFullName(),
+            o: {_id: 7},
+            lsid: lsid,
+            txnNumber: NumberLong(4),
+            stmtId: [NumberInt(0), NumberInt(1)]
+        },
+    ]
+});
+
+assert.eq(true, res.results[0], "Valid insert with multiple statement IDs failed");
+assert.eq(true, res.results[1], "Valid update with multiple statement IDs failed");
+assert.eq(true, res.results[2], "Valid delete with multiple statement IDs failed");
+
 // When applying a "u" (update) op, we default to 'UpdateNode' update semantics, and $set
 // operations add new fields in lexicographic order.
 res = assert.commandWorked(db.adminCommand({
