@@ -258,7 +258,10 @@ bool BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
     _waitToCommitBatch(batch);
 
     BucketAccess bucket(this, batch->bucket());
-    if (!bucket) {
+    if (batch->finished()) {
+        // Someone may have aborted it while we were waiting.
+        return false;
+    } else if (!bucket) {
         abort(batch);
         return false;
     }
@@ -1166,6 +1169,10 @@ void BucketCatalog::WriteBatch::_finish(const CommitInfo& info) {
 
 void BucketCatalog::WriteBatch::_abort(const boost::optional<Status>& status,
                                        bool canAccessBucket) {
+    if (finished()) {
+        return;
+    }
+
     _active = false;
     std::string bucketIdentification;
     if (canAccessBucket) {
