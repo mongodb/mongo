@@ -350,6 +350,7 @@ env.Library(
         'sharding_ddl_coordinator_service.cpp',
         'sharding_server_status.cpp',
         'sharding_state_command.cpp',
+        'shardsvr_abort_reshard_collection_command.cpp',
         'shardsvr_cleanup_reshard_collection_command.cpp',
         'shardsvr_create_collection_command.cpp',
         'shardsvr_create_collection_participant_command.cpp',

@@ -100,6 +100,9 @@ public:
     static void insertStateDocument(OperationContext* opCtx,
                                     const ReshardingDonorDocument& donorDoc);
 
+    // Initiates the cancellation of the resharding operation.
+    void abort();
+
 private:
     /**
      * Runs up until the donor is either in state kBlockingWrites or encountered an error.
@@ -181,9 +184,6 @@ private:
     //
     // Should only be called once per lifetime.
     CancellationToken _initAbortSource(const CancellationToken& stepdownToken);
-
-    // Initiates the cancellation of the resharding operation.
-    void _onAbortEncountered(const Status& abortReason);
 
     // The primary-only service instance corresponding to the donor instance. Not owned.
     const ReshardingDonorService* const _donorService;

@@ -145,6 +145,9 @@ public:
     static void insertStateDocument(OperationContext* opCtx,
                                     const ReshardingRecipientDocument& recipientDoc);
 
+    // Initiates the cancellation of the resharding operation.
+    void abort();
+
 private:
     // The following functions correspond to the actions to take at a particular recipient state.
     ExecutorFuture<void> _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
@@ -216,9 +219,6 @@ private:
     //
     // Should only be called once per lifetime.
     CancellationToken _initAbortSource(const CancellationToken& stepdownToken);
-
-    // Initiates the cancellation of the resharding operation.
-    void _onAbortEncountered(OperationContext* opCtx, const Status& abortReason);
 
     const ReshardingRecipientService* const _recipientService;
 

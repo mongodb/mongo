@@ -51,3 +51,12 @@ commands:
     namespace: type
     api_version: ""
     type: namespacestring
+
+  _shardsvrAbortReshardCollection:
+    command_name: _shardsvrAbortReshardCollection
+    cpp_name: ShardsvrAbortReshardCollection
+    description: "The internal command used by resharding coordinator to abort participants."
+    strict: false
+    namespace: type
+    api_version: ""
+    type: uuid

@@ -412,8 +412,7 @@ boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::repo
 void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChanges(
     OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
     if (reshardingFields.getState() == CoordinatorStateEnum::kAborting) {
-        auto abortReason = Status(ErrorCodes::ReshardCollectionAborted, "aborted");
-        _onAbortEncountered(opCtx, abortReason);
+        abort();
         return;
     }
 
@@ -938,11 +937,10 @@ CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortS
     return _abortSource->token();
 }
 
-void ReshardingRecipientService::RecipientStateMachine::_onAbortEncountered(
-    OperationContext* opCtx, const Status& abortReason) {
+void ReshardingRecipientService::RecipientStateMachine::abort() {
     auto abortSource = [&]() -> boost::optional<CancellationSource> {
         stdx::lock_guard<Latch> lk(_mutex);
-        _abortReason = abortReason;
+        _abortReason = Status(ErrorCodes::ReshardCollectionAborted, "aborted");
         invariant(!_abortReason->isOK());
 
         if (_dataReplication) {
@@ -953,9 +951,11 @@ void ReshardingRecipientService::RecipientStateMachine::_onAbortEncountered(
             return _abortSource;
         } else {
             // run() hasn't been called, notify the operation should be aborted by setting an
-            // error.
-            invariant(!_coordinatorHasDecisionPersisted.getFuture().isReady());
-            _coordinatorHasDecisionPersisted.setError(_abortReason.get());
+            // error. Abort is allowed to be retried, so setError only if it has not yet been
+            // done before.
+            if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
+                _coordinatorHasDecisionPersisted.setError(_abortReason.get());
+            }
             return boost::none;
         }
     }();

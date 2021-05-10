@@ -184,12 +184,6 @@ public:
         _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kCommitting);
     }
 
-    void notifyReshardingAborting(OperationContext* opCtx,
-                                  DonorStateMachine& donor,
-                                  const ReshardingDonorDocument& donorDoc) {
-        _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kAborting);
-    }
-
     void checkStateDocumentRemoved(OperationContext* opCtx) {
         AutoGetCollection donorColl(
             opCtx, NamespaceString::kDonorReshardingOperationsNamespace, MODE_IS);
@@ -492,7 +486,7 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterAbort) {
         // The call to notifyToStartBlockingWrites() is skipped here because the donor is being
         // notified that the resharding operation is aborting before the donor would have
         // transitioned to kBlockingWrites.
-        notifyReshardingAborting(opCtx.get(), *donor, doc);
+        donor->abort();
 
         // Step down before the transition to kDone can complete.
         doneTransitionGuard->wait(DonorStateEnum::kDone);
@@ -510,7 +504,7 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterAbort) {
         donor = *maybeDonor;
         doneTransitionGuard.reset();
 
-        notifyReshardingAborting(opCtx.get(), *donor, doc);
+        donor->abort();
         ASSERT_OK(donor->getCompletionFuture().getNoThrow());
         checkStateDocumentRemoved(opCtx.get());
 
@@ -549,7 +543,7 @@ TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
             ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
         }
 
-        notifyReshardingAborting(opCtx.get(), *donor, doc);
+        donor->abort();
         ASSERT_OK(donor->getCompletionFuture().getNoThrow());
         checkStateDocumentRemoved(opCtx.get());
 

@@ -52,6 +52,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -1254,8 +1255,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_onAbortCoordinatorAnd
     _updateCoordinatorDocStateAndCatalogEntries(
         CoordinatorStateEnum::kAborting, _coordinatorDoc, boost::none, boost::none, status);
 
-    auto nss = _coordinatorDoc.getSourceNss();
-    _tellAllParticipantsToRefresh(nss, executor);
+    _tellAllParticipantsToAbort(executor);
 
     // Wait for all participants to acknowledge the operation reached an unrecoverable
     // error.
@@ -1633,6 +1633,27 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsTo
     sharding_util::sendCommandToShards(opCtx.get(),
                                        NamespaceString::kAdminDb,
                                        refreshCmd,
+                                       {participantShardIds.begin(), participantShardIds.end()},
+                                       **executor);
+}
+
+void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsToAbort(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+
+    auto donorShardIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
+    auto recipientShardIds =
+        extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
+    std::set<ShardId> participantShardIds{donorShardIds.begin(), donorShardIds.end()};
+    participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
+
+    ShardsvrAbortReshardCollection abortCmd(_coordinatorDoc.getReshardingUUID());
+    abortCmd.setDbName("admin");
+
+    sharding_util::sendCommandToShards(opCtx.get(),
+                                       NamespaceString::kAdminDb,
+                                       abortCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
+                                                            << WriteConcernOptions::Majority)),
                                        {participantShardIds.begin(), participantShardIds.end()},
                                        **executor);
 }
