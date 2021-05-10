@@ -9,21 +9,6 @@ load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
 const coll = db.expression_get_field;
 coll.drop();
 
-for (let i = 0; i < 2; i++) {
-    assert.commandWorked(coll.insert({
-        _id: i,
-        x: i,
-        y: "c",
-        "a$b": "foo",
-        "a.b": "bar",
-        "a.$b": 5,
-        ".xy": i,
-        ".$xz": i,
-        "..zz": i,
-        c: {d: "x"},
-    }));
-}
-
 // Test that $getField fails with the provided 'code' for invalid arguments 'getFieldArgs'.
 function assertGetFieldFailedWithCode(getFieldArgs, code) {
     const error =
@@ -50,6 +35,27 @@ if (!isDotsAndDollarsEnabled) {
     // run the rest of the test.
     assertGetFieldFailedWithCode({field: "a", from: {a: "b"}}, 31325);
     return;
+}
+
+for (let i = 0; i < 2; i++) {
+    assert.commandWorked(coll.insert({
+        _id: i,
+        x: i,
+        y: "c",
+        "a$b": "foo",
+        "a.b": "bar",
+        "a.$b": 5,
+        ".xy": i,
+        ".$xz": i,
+        "..zz": i,
+        "$a": 10,
+        "$x.$y": 20,
+        "$x..$y": {"$a": 1, "$b..$c": 2},
+        c: {d: "x"},
+        e: {"$f": 30},
+        f: [{"$a": 41}, {"$b..": 42}],
+        "$v..": null
+    }));
 }
 
 // Test that $getField fails with a document missing named arguments.
@@ -93,6 +99,13 @@ assertGetFieldResultsEq("a.$b", [{_id: 0, test: 5}, {_id: 1, test: 5}]);
 assertGetFieldResultsEq(".xy", [{_id: 0, test: 0}, {_id: 1, test: 1}]);
 assertGetFieldResultsEq(".$xz", [{_id: 0, test: 0}, {_id: 1, test: 1}]);
 assertGetFieldResultsEq("..zz", [{_id: 0, test: 0}, {_id: 1, test: 1}]);
+assertGetFieldResultsEq({$const: "$a"}, [{_id: 0, test: 10}, {_id: 1, test: 10}]);
+assertGetFieldResultsEq({$const: "$x.$y"}, [{_id: 0, test: 20}, {_id: 1, test: 20}]);
+assertGetFieldResultsEq(
+    {$const: "$x..$y"},
+    [{_id: 0, test: {"$a": 1, "$b..$c": 2}}, {_id: 1, test: {"$a": 1, "$b..$c": 2}}]);
+assertGetFieldResultsEq({field: {$const: "$f"}, input: "$e"},
+                        [{_id: 0, test: 30}, {_id: 1, test: 30}]);
 
 // Test that $getField treats dotted fields as key literals instead of field paths. Note that it is
 // necessary to use $const in places, otherwise object field validation would reject some of these
@@ -134,6 +147,9 @@ assertGetFieldResultsEq({field: {$const: "$a"}, input: {$const: {"$a": null, b: 
                         [{_id: 0, test: null}, {_id: 1, test: null}]);
 assertGetFieldResultsEq({field: "a", input: {}},
                         [{_id: 0}, {_id: 1}]);  // The test field should evaluate to missing.
+assertGetFieldResultsEq({$const: "$v.."}, [{_id: 0, test: null}, {_id: 1, test: null}]);
+assertGetFieldResultsEq({$const: "$u.."},
+                        [{_id: 0}, {_id: 1}]);  // The test field should evaluate to missing.
 
 // Test case where $getField stages are nested.
 assertGetFieldResultsEq(
@@ -145,6 +161,10 @@ assertGetFieldResultsEq(
 assertGetFieldResultsEq(
     {field: "a", input: {$getField: {field: "b.d", input: {$const: {"b.c": {a: 5}}}}}},
     [{_id: 0, test: null}, {_id: 1, test: null}]);
+assertGetFieldResultsEq({field: {$const: "$a"}, input: {$getField: {$const: "$x..$y"}}},
+                        [{_id: 0, test: 1}, {_id: 1, test: 1}]);
+assertGetFieldResultsEq({field: {$const: "$b..$c"}, input: {$getField: {$const: "$x..$y"}}},
+                        [{_id: 0, test: 2}, {_id: 1, test: 2}]);
 
 // Test case when a dotted/dollar path is within an array.
 assertGetFieldResultsEq({
@@ -157,6 +177,10 @@ assertGetFieldResultsEq({
     input: {$arrayElemAt: [[{$const: {"a..": 1}}, {$const: {"a..": 2}}], 1]}
 },
                         [{_id: 0, test: 2}, {_id: 1, test: 2}]);
+assertGetFieldResultsEq({field: {$const: "$a"}, input: {$arrayElemAt: ["$f", 0]}},
+                        [{_id: 0, test: 41}, {_id: 1, test: 41}]);
+assertGetFieldResultsEq({field: {$const: "$b.."}, input: {$arrayElemAt: ["$f", 1]}},
+                        [{_id: 0, test: 42}, {_id: 1, test: 42}]);
 
 // Test $getField expression with other pipeline stages.
 

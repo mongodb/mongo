@@ -1,5 +1,6 @@
 /**
  * Tests basic functionality of the $setField expression.
+ * @tags: [assumes_unsharded_collection]
  */
 (function() {
 "use strict";
@@ -20,7 +21,11 @@ function buildTestCase(i) {
         ".xy": i,
         ".$xz": i,
         "..zz": i,
+        "$a": 10,
+        "$x.$y": 20,
+        "$x..$y": {"$a": 1, "$b..$c": 2},
         c: {d: "x"},
+        e: {"$f": 30}
     };
 }
 
@@ -42,10 +47,6 @@ function getTestCasesForSet(field, value) {
 
 function getTestCasesForUnset(field, value) {
     return [unsetTestCaseField(0, field, value), unsetTestCaseField(1, field, value)];
-}
-
-for (let i = 0; i < 2; i++) {
-    assert.commandWorked(coll.insert(buildTestCase(i)));
 }
 
 // Test that $setField fails with the provided 'code' for invalid arguments 'setFieldArgs'.
@@ -90,6 +91,10 @@ if (!isDotsAndDollarsEnabled) {
     // run the rest of the test.
     assertSetFieldFailedWithCode({field: "a", input: {a: "b"}, value: "foo"}, 31325);
     return;
+}
+
+for (let i = 0; i < 2; i++) {
+    assert.commandWorked(coll.insert(buildTestCase(i)));
 }
 
 // Test that $setField fails with a document missing named arguments.
@@ -152,7 +157,7 @@ assertSetFieldResultsEq({field: "not_going_to_be_a_field", input: null, value: 0
 
 // Test that $setField correctly updates 'field' in the $$ROOT object to 'value', or clears it if
 // value is set to $$REMOVE.
-const testFields = ["a", "a$b", "a.b", "x", "a.$b", ".xy", ".$xz", "..zz"];
+const testFields = ["a", "a$b", "a.b", "x", "a.$b", ".xy", ".$xz", "..zz", "$a", "$x.$y", "$x..$y"];
 for (const field in testFields) {
     assertSetFieldInRootDoc(field, null);
     assertSetFieldInRootDoc(field, 12345);
@@ -231,6 +236,15 @@ assertSetFieldResultsEq({
                             {_id: 0, test: {"b.c": {a: 5}, "b.d": "forget-me-not", "a": 0}},
                             {_id: 1, test: {"b.c": {a: 5}, "b.d": "forget-me-not", "a": 1}}
                         ]);
+assertSetFieldResultsEq({
+    field: {$const: "$h.$i"},
+    input: {$setField: {field: {$const: "$g.."}, input: "$e", value: "forget-me-not"}},
+    value: "$_id"
+},
+                        [
+                            {_id: 0, test: {"$f": 30, "$g..": "forget-me-not", "$h.$i": 0}},
+                            {_id: 1, test: {"$f": 30, "$g..": "forget-me-not", "$h.$i": 1}}
+                        ]);
 
 // Test $getField and $setField together.
 assertPipelineResultsEq([{
@@ -255,4 +269,37 @@ assertPipelineResultsEq([{
                             }
                         }],
                         [{_id: 0, result: true}, {_id: 1, result: true}]);
+assertSetFieldResultsEq({
+    field: {$const: "$x..$y"},
+    input: {},
+    value: {
+        $setField:
+            {field: {$const: "$a"}, input: {$getField: {$const: "$x..$y"}}, value: "forget-me-not"}
+    },
+},
+                        [
+                            {_id: 0, test: {"$x..$y": {"$a": "forget-me-not", "$b..$c": 2}}},
+                            {_id: 1, test: {"$x..$y": {"$a": "forget-me-not", "$b..$c": 2}}}
+                        ]);
+
+// Test $setField and $-prefixed fields with $replaceWith.
+assert(coll.drop());
+assert.commandWorked(coll.insert({_id: 0, "x": 1, "a$b": "foo", "$x..$y": {"$a": 1, "$b..$c": 2}}));
+assertPipelineResultsEq(
+    [{
+        $replaceWith: {
+            $setField: {
+                field: {$const: "$x..$y"},
+                input: "$$ROOT",
+                value: {
+                    $setField: {
+                        field: {$const: "$a"},
+                        input: {$getField: {$const: "$x..$y"}},
+                        value: "forget-me-not"
+                    }
+                },
+            }
+        }
+    }],
+    [{_id: 0, "x": 1, "a$b": "foo", "$x..$y": {"$a": "forget-me-not", "$b..$c": 2}}]);
 })();
