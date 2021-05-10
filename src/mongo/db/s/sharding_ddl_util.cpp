@@ -651,5 +651,9 @@ DropReply dropCollectionLocally(OperationContext* opCtx, const NamespaceString& 
     return result;
 }
 
+boost::optional<UUID> getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss) {
+    AutoGetCollection autoColl(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsForbidden);
+    return autoColl ? boost::make_optional(autoColl->uuid()) : boost::none;
+}
 }  // namespace sharding_ddl_util
 }  // namespace mongo

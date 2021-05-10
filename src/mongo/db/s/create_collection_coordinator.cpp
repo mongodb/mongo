@@ -146,44 +146,6 @@ std::vector<TagsType> getTagsAndValidate(OperationContext* opCtx,
     return tags;
 }
 
-boost::optional<UUID> getUUIDFromPrimaryShard(OperationContext* opCtx, const NamespaceString& nss) {
-    // Obtain the collection's UUID from the primary shard's listCollections response.
-    DBDirectClient localClient(opCtx);
-    BSONObj res;
-    {
-        std::list<BSONObj> all =
-            localClient.getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
-        if (!all.empty()) {
-            res = all.front().getOwned();
-        }
-    }
-
-    uassert(ErrorCodes::InternalError,
-            str::stream() << "expected to have an entry for " << nss.toString()
-                          << " in listCollections response, but did not",
-            !res.isEmpty());
-
-    BSONObj collectionInfo;
-    if (res["info"].type() == BSONType::Object) {
-        collectionInfo = res["info"].Obj();
-    }
-
-    uassert(ErrorCodes::InternalError,
-            str::stream() << "expected to return 'info' field as part of "
-                             "listCollections for "
-                          << nss.ns()
-                          << " because the cluster is in featureCompatibilityVersion=3.6, but got "
-                          << res,
-            !collectionInfo.isEmpty());
-
-    uassert(ErrorCodes::InternalError,
-            str::stream() << "expected to return a UUID for collection " << nss.ns()
-                          << " as part of 'info' field but got " << res,
-            collectionInfo.hasField("uuid"));
-
-    return uassertStatusOK(UUID::parse(collectionInfo["uuid"]));
-}
-
 bool checkIfCollectionIsEmpty(OperationContext* opCtx, const NamespaceString& nss) {
     // Use find with predicate instead of count in order to ensure that the count
     // command doesn't just consult the cached metadata, which may not always be
@@ -440,17 +402,16 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
                 if (_recoveredFromDisk) {
-                    LOGV2_DEBUG(5458704,
-                                1,
-                                "Removing partial changes from previous run",
-                                "namespace"_attr = nss());
-                    try {
-                        removeChunks(opCtx, *getUUIDFromPrimaryShard(opCtx, nss()));
+                    auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
+                    // If the collection can be found locally, then we clean up the config.chunks
+                    // collection.
+                    if (uuid) {
+                        LOGV2_DEBUG(5458704,
+                                    1,
+                                    "Removing partial changes from previous run",
+                                    "namespace"_attr = nss());
+                        removeChunks(opCtx, *uuid);
                         broadcastDropCollection(opCtx, nss(), **executor);
-                    } catch (const DBException& ex) {
-                        LOGV2_WARNING(5555101,
-                                      "The partial changes operations failed, this is normal.",
-                                      "error"_attr = redact(ex));
                     }
                 }
 
@@ -624,7 +585,7 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
                                         ShardingCatalogClient::kMajorityWriteConcern,
                                         &ignoreResult));
 
-    _collectionUUID = *getUUIDFromPrimaryShard(opCtx, nss());
+    _collectionUUID = *sharding_ddl_util::getCollectionUUID(opCtx, nss());
 }
 
 void CreateCollectionCoordinator::_createPolicyAndChunks(OperationContext* opCtx) {

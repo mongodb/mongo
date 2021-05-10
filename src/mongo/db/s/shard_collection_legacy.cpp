@@ -115,12 +115,6 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyShardedWithSam
         opCtx, nss, request.getKey(), *request.getCollation(), request.getUnique());
 }
 
-boost::optional<UUID> getUUID(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollection autoColl(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsForbidden);
-    const auto& coll = autoColl.getCollection();
-    return coll ? boost::make_optional(coll->uuid()) : boost::none;
-}
-
 void checkForExistingChunks(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const boost::optional<UUID>& optUUID) {
@@ -268,7 +262,9 @@ ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const ShardsvrShardCollectionRequest& request) {
     auto tags = getTagsAndValidate(opCtx, nss, request.getKey());
-    auto uuid = request.getGetUUIDfromPrimaryShard() ? *getUUID(opCtx, nss) : UUID::gen();
+    auto uuid = request.getGetUUIDfromPrimaryShard()
+        ? *sharding_ddl_util::getCollectionUUID(opCtx, nss)
+        : UUID::gen();
 
     const bool isEmpty = checkIfCollectionIsEmpty(opCtx, nss);
     return {uuid, ShardKeyPattern(request.getKey()), tags, isEmpty};
@@ -562,12 +558,12 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
                 checkForExistingChunks(opCtx, nss, boost::none);
             } else if (serverGlobalParams.featureCompatibility.getVersion() ==
                        FCVersion::kVersion49) {
-                if (auto optUUID = getUUID(opCtx, nss))
+                if (auto optUUID = sharding_ddl_util::getCollectionUUID(opCtx, nss))
                     checkForExistingChunks(opCtx, nss, optUUID);
             } else {
                 // In the intermediate state must check for leftovers from both formats
                 checkForExistingChunks(opCtx, nss, boost::none);
-                if (auto optUUID = getUUID(opCtx, nss))
+                if (auto optUUID = sharding_ddl_util::getCollectionUUID(opCtx, nss))
                     checkForExistingChunks(opCtx, nss, optUUID);
             }
         } else {

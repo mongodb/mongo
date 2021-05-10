@@ -171,5 +171,11 @@ void stopMigrations(OperationContext* opCtx, const NamespaceString& nss);
  */
 DropReply dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss);
 
+/*
+ * Returns the UUID of the collection (if exists) using the catalog. It does not provide any locking
+ *guarantees.
+ **/
+boost::optional<UUID> getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss);
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo
