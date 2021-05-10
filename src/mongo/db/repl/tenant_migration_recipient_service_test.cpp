@@ -1741,6 +1741,9 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherResumesFromTopOfOplogBuf
 
     hangBeforeFetcherFp->waitForTimesEntered(initialTimesEntered + 1);
 
+    const OpTime updatedOpTime(Timestamp(3, 1), 1);
+    insertTopOfOplog(&replSet, updatedOpTime);
+
     const auto oplogBuffer = getDonorOplogBuffer(instance.get());
     OplogBuffer::Batch batch1;
     const OpTime resumeOpTime(Timestamp(2, 1), initialOpTime.getTerm());
