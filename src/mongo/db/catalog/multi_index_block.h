@@ -56,6 +56,7 @@ class Collection;
 class MatchExpression;
 class NamespaceString;
 class OperationContext;
+class ProgressMeterHolder;
 
 /**
  * Builds one or more indexes.
@@ -328,6 +329,14 @@ private:
      * Updates the current state to Aborted with the given reason.
      */
     void _setStateToAbortedIfNotCommitted(StringData reason);
+
+    /**
+     * Performs a collection scan on the given collection and inserts the relevant index keys into
+     * the external sorter.
+     */
+    Status _doCollectionScan(OperationContext* opCtx,
+                             Collection* collection,
+                             ProgressMeterHolder* progress);
 
     // Is set during init() and ensures subsequent function calls act on the same Collection.
     boost::optional<UUID> _collectionUUID;
