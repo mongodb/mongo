@@ -1993,17 +1993,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
 
                        stdx::unique_lock lk(_mutex);
 
-                       {
-                           // Throwing error when cloner is canceled externally via interrupt(),
-                           // makes the instance to skip the remaining task (i.e., starting oplog
-                           // applier) in the sync process. This step is necessary to prevent race
-                           // between interrupt() and starting oplog applier for the failover
-                           // scenarios where we don't start the cloner if the tenant data is
-                           // already in consistent state.
-                           stdx::lock_guard<TenantMigrationSharedData> sharedDatalk(*_sharedData);
-                           uassertStatusOK(_sharedData->getStatus(sharedDatalk));
-                       }
-
                        // Create the oplog applier but do not start it yet.
                        invariant(_stateDoc.getStartApplyingDonorOpTime());
 
@@ -2041,6 +2030,18 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        } else {
                            beginApplyingAfterOpTime = *_stateDoc.getStartApplyingDonorOpTime();
                        }
+
+                       {
+                           // Throwing error when cloner is canceled externally via interrupt(),
+                           // makes the instance to skip the remaining task (i.e., starting oplog
+                           // applier) in the sync process. This step is necessary to prevent race
+                           // between interrupt() and starting oplog applier for the failover
+                           // scenarios where we don't start the cloner if the tenant data is
+                           // already in consistent state.
+                           stdx::lock_guard<TenantMigrationSharedData> sharedDatalk(*_sharedData);
+                           uassertStatusOK(_sharedData->getStatus(sharedDatalk));
+                       }
+
                        LOGV2_DEBUG(4881202,
                                    1,
                                    "Recipient migration service creating oplog applier",
