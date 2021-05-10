@@ -56,6 +56,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/protocol.h"
+#include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point_service.h"
@@ -522,7 +523,7 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
     long long errorCode, blockTimeMS;
     const Command* cmd = invocation->definition();
 
-    MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
+    MONGO_FAIL_POINT_BLOCK_IF(failCommand, scoped, [&](const BSONObj& data) {
         closeConnection = data.hasField("closeConnection") &&
             bsonExtractBooleanField(data, "closeConnection", &closeConnection).isOK() &&
             closeConnection;
@@ -536,6 +537,13 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
         return shouldActivateFailCommandFailPoint(data, invocation, opCtx->getClient()) &&
             (closeConnection || blockConnection || hasErrorCode);
     }) {
+        const BSONObj& data = scoped.getData();
+        // State change codes are rewritten on the way out of a `mongos`
+        // server. Errors injected via failpoint manipulation are normally
+        // exempt from this. However, we provide an override option so they
+        // can be made subject to rewriting if that's really necessary.
+        if (bool b; !bsonExtractBooleanField(data, "allowRewriteStateChange", &b).isOK() || !b)
+            rpc::RewriteStateChangeErrors::setEnabled(opCtx, false);
         if (closeConnection) {
             opCtx->getClient()->session()->end();
             log() << "Failing command '" << cmd->getName()

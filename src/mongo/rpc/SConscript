@@ -71,6 +71,23 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
+        'rewrite_state_change_errors',
+    ],
+)
+
+env.Library(
+    target='rewrite_state_change_errors',
+    source=[
+        'rewrite_state_change_errors.cpp',
+        env.Idlc('rewrite_state_change_errors_server_parameter.idl')[0],
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/s/is_mongos',
+        '$BUILD_DIR/third_party/shim_pcrecpp',
     ],
 )
 
@@ -200,6 +217,17 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'client_metadata',
+    ]
+)
+
+env.CppUnitTest(
+    target='rewrite_state_change_errors_test',
+    source=[
+        'rewrite_state_change_errors_test.cpp',
+    ],
+    LIBDEPS=[
+        'rewrite_state_change_errors',
+        'rpc',
     ]
 )
 

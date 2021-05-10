@@ -67,6 +67,7 @@
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/parallel.h"
@@ -804,6 +805,11 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
             dbResponse.exhaustNS = cursorObj.getField("ns").String();
             dbResponse.exhaustCursorId = cursorObj.getField("id").numberLong();
         }
+    }
+    if (auto doc =
+            rpc::RewriteStateChangeErrors::rewrite(reply->getBodyBuilder().asTempObj(), opCtx)) {
+        reply->reset();
+        reply->getBodyBuilder().appendElements(*doc);
     }
     dbResponse.response = reply->done();
 

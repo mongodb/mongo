@@ -31,7 +31,7 @@ function runTest(st, session, sessionDB, writeCmdName, writeCmd, isSharded) {
     session.startTransaction();
     assert.commandFailedWithCode(
         sessionDB.runCommand(writeCmd),
-        retryableError,
+        ErrorCodes.doMongosRewrite(st.s, retryableError),
         "expected write in transaction not to be retried on retryable error, cmd: " +
             tojson(writeCmd) + ", sharded: " + isSharded);
     assert.commandFailedWithCode(session.abortTransaction_forTesting(),
