@@ -81,7 +81,7 @@ let test = function(db) {
 
 // Testing against a sharded cluster.
 {
-    const st = new ShardingTest({shards: 1, config: 1});
+    const st = new ShardingTest({shards: 1});
     const db = st.s.getDB("test");
     test(db);
     st.stop();

@@ -6,7 +6,7 @@
 
 const dbName = "json_schema_sharding";
 
-var st = new ShardingTest({shards: 2, mongos: 1, config: 1});
+var st = new ShardingTest({shards: 2, mongos: 1});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.name);

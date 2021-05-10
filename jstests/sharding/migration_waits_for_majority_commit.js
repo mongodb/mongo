@@ -11,7 +11,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
 load("jstests/libs/write_concern_util.js");
 
 // Set up a sharded cluster with two shards, two chunks, and one document in one of the chunks.
-const st = new ShardingTest({shards: 2, rs: {nodes: 2}, config: 1});
+const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 const testDB = st.s.getDB("test");
 
 assert.commandWorked(testDB.foo.insert({_id: 1}, {writeConcern: {w: "majority"}}));

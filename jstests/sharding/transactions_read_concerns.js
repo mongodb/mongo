@@ -13,7 +13,7 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-const st = new ShardingTest({shards: 2, config: 1});
+const st = new ShardingTest({shards: 2});
 
 // Set up a sharded collection with 2 chunks, one on each shard.
 

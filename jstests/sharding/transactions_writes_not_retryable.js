@@ -89,7 +89,7 @@ const kCmdTestCases = [
     }
 ];
 
-const st = new ShardingTest({shards: 1, config: 1});
+const st = new ShardingTest({shards: 1});
 
 const session = st.s.startSession();
 const sessionDB = session.getDatabase(dbName);

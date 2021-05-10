@@ -62,7 +62,7 @@ let shardingScenarios = {
         compatibleCollections: [shardedCollName, unshardedCollName],
         name: "singleShard",
         setUp: function(collName) {
-            const st = new ShardingTest({shards: 1, mongos: 1, config: 1});
+            const st = new ShardingTest({shards: 1, mongos: 1});
             return shardingScenarios.allScenarios.setUp(st, collName);
         }
     },
@@ -74,7 +74,7 @@ let shardingScenarios = {
         compatibleCollections: [shardedCollName],
         name: "multiShardAllShardReads",
         setUp: function(collName) {
-            let st = new ShardingTest({shards: 3, mongos: 1, config: 1});
+            let st = new ShardingTest({shards: 3, mongos: 1});
             st = shardingScenarios.allScenarios.setUp(st, collName);
 
             if (st === undefined) {
@@ -118,7 +118,7 @@ let shardingScenarios = {
         compatibleCollections: [shardedCollName],
         name: "multiShardSomeShardReads",
         setUp: function(collName) {
-            let st = new ShardingTest({shards: 3, mongos: 1, config: 1});
+            let st = new ShardingTest({shards: 3, mongos: 1});
             st = shardingScenarios.allScenarios.setUp(st, collName);
 
             if (st === undefined) {

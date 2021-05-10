@@ -9,7 +9,7 @@
 const dbName = "test";
 const collName = "coll";
 
-const st = new ShardingTest({shards: 1, mongos: 1, config: 1});
+const st = new ShardingTest({shards: 1, mongos: 1});
 const mongosDB = st.s0.getDB(dbName);
 let coll = mongosDB.getCollection(collName);
 

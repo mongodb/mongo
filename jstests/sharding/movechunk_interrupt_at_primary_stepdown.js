@@ -14,7 +14,7 @@ load("jstests/sharding/libs/find_chunks_util.js");
 
 // Intentionally use a config server with 1 node so that the step down and promotion to primary
 // are guaranteed to happen on the same host
-var st = new ShardingTest({config: 1, shards: 2, other: {chunkSize: 1}});
+var st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 var mongos = st.s0;
 
 assert.commandWorked(mongos.adminCommand({enableSharding: 'TestDB'}));

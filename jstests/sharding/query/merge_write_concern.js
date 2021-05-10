@@ -4,7 +4,7 @@
 
 load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
 
-const st = new ShardingTest({shards: 2, rs: {nodes: 3}, config: 1});
+const st = new ShardingTest({shards: 2, rs: {nodes: 3}});
 
 const mongosDB = st.s0.getDB("merge_write_concern");
 const source = mongosDB["source"];

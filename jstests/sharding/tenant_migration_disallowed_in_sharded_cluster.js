@@ -10,7 +10,7 @@
 
 load("jstests/replsets/libs/tenant_migration_test.js");
 
-const st = new ShardingTest({shards: 1, config: 1});
+const st = new ShardingTest({shards: 1});
 const donorRstShard = st.rs0;
 const donorRstConfig = st.configRS;
 const recipientRst = new ReplSetTest({nodes: 1});

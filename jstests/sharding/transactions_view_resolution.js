@@ -60,7 +60,7 @@ function setUpShardedCollectionAndView(st, session, primaryShard) {
     return shardedView;
 }
 
-const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
+const st = new ShardingTest({shards: 2, mongos: 1});
 const session = st.s.startSession();
 
 // Set up an unsharded collection on shard0.

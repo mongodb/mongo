@@ -3,7 +3,7 @@
 (function() {
 "use strict";
 
-const st = new ShardingTest({mongos: 1, config: 1, shard: 1, rs: {nodes: 2}});
+const st = new ShardingTest({mongos: 1, shard: 1, rs: {nodes: 2}});
 const mongosDB = st.s.getDB("test");
 const mongosColl = mongosDB.mycoll;
 

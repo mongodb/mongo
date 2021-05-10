@@ -2,7 +2,7 @@
 (function() {
 "use strict";
 
-const st = new ShardingTest({shards: 1, config: 1});
+const st = new ShardingTest({shards: 1});
 
 const res = assert.commandWorked(st.shard0.adminCommand({serverStatus: 1}));
 assert.neq(null, res.twoPhaseCommitCoordinator);

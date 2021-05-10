@@ -7,7 +7,7 @@
 
 load("jstests/sharding/libs/failpoint_helpers.js");
 
-let st = new ShardingTest({shards: 1, config: 1});
+let st = new ShardingTest({shards: 1});
 
 // Test drop collection
 {

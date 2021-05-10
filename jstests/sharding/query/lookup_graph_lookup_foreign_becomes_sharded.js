@@ -13,7 +13,7 @@ load("jstests/aggregation/extras/utils.js");         // For assertErrorCode.
 load("jstests/libs/profiler.js");                    // For profilerHasSingleMatchingEntryOrThrow.
 load("jstests/multiVersion/libs/multi_cluster.js");  // For ShardingTest.waitUntilStable.
 
-const st = new ShardingTest({shards: 1, config: 1, mongos: 2, rs: {nodes: 1}});
+const st = new ShardingTest({shards: 1, mongos: 2, rs: {nodes: 1}});
 const shard0 = st.rs0;
 
 const freshMongos = st.s0.getDB(jsTestName());

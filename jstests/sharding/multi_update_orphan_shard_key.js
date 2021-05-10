@@ -8,7 +8,7 @@
 
 load("jstests/libs/fail_point_util.js");
 
-const st = new ShardingTest({mongos: 1, config: 1, shards: 2, rs: {nodes: 1}});
+const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 1}});
 const dbName = "test";
 const collName = "update_orphan_shard_key";
 const collection = st.s.getDB(dbName).getCollection(collName);

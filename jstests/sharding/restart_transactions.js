@@ -148,7 +148,7 @@ function runTest(routerDB, directDB) {
                                  50911);
 }
 
-const st = new ShardingTest({shards: 1, mongos: 1, config: 1});
+const st = new ShardingTest({shards: 1, mongos: 1});
 
 // Directly connect to the shard primary to simulate internal retries by mongos.
 const shardDBName = "test";

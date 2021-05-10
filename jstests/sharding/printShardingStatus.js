@@ -7,7 +7,7 @@
 
 const MONGOS_COUNT = 2;
 
-var st = new ShardingTest({shards: 1, mongos: MONGOS_COUNT, config: 1});
+var st = new ShardingTest({shards: 1, mongos: MONGOS_COUNT});
 
 var standalone = MongoRunner.runMongod();
 

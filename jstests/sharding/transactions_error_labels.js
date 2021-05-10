@@ -125,7 +125,7 @@ const runCommitTests = function(commandSentToShard) {
     turnOffFailCommand(st.rs0);
 };
 
-let st = new ShardingTest({shards: 2, config: 1, mongosOptions: {verbose: 3}});
+let st = new ShardingTest({shards: 2, mongosOptions: {verbose: 3}});
 
 // Create a sharded collection with a chunk on each shard:
 // shard0: [-inf, 0)

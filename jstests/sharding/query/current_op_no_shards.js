@@ -3,7 +3,7 @@
  * set, and does not cause the mongoS floating point failure described in SERVER-30084.
  */
 (function() {
-const st = new ShardingTest({shards: 0, config: 1});
+const st = new ShardingTest({shards: 0});
 
 const adminDB = st.s.getDB("admin");
 

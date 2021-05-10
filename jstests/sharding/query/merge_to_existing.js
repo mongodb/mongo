@@ -5,7 +5,7 @@
 load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
 load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
 
-const st = new ShardingTest({shards: 2, rs: {nodes: 1}, config: 1});
+const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 const mongosDB = st.s0.getDB("source_db");
 const sourceColl = mongosDB["source_coll"];

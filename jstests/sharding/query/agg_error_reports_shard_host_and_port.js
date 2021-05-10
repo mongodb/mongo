@@ -5,7 +5,7 @@
 
 load("jstests/aggregation/extras/utils.js");  // For assertErrCodeAndErrMsgContains.
 
-const st = new ShardingTest({shards: 2, config: 1});
+const st = new ShardingTest({shards: 2});
 
 const mongosDb = st.s.getDB(jsTestName());
 const coll = mongosDb.getCollection("foo");

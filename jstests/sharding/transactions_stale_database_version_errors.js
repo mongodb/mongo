@@ -9,7 +9,7 @@ load("jstests/sharding/libs/sharded_transactions_helpers.js");
 const dbName = "test";
 const collName = "foo";
 
-const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
+const st = new ShardingTest({shards: 2, mongos: 1});
 
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 

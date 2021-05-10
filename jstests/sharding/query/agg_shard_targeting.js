@@ -25,7 +25,7 @@
 (function() {
 load("jstests/libs/profiler.js");  // For profilerHas*OrThrow helper functions.
 
-const st = new ShardingTest({shards: 2, mongos: 2, config: 1});
+const st = new ShardingTest({shards: 2, mongos: 2});
 
 // mongosForAgg will be used to perform all aggregations.
 // mongosForMove does all chunk migrations, leaving mongosForAgg with stale config metadata.

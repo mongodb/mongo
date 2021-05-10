@@ -3,7 +3,7 @@
  * set with a cursorID of zero.
  */
 (function() {
-const st = new ShardingTest({shards: 0, config: 1});
+const st = new ShardingTest({shards: 0});
 
 const adminDB = st.s.getDB("admin");
 const testDB = st.s.getDB("test");

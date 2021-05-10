@@ -8,7 +8,7 @@ load("jstests/libs/fixture_helpers.js");                         // For isSharde
 load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
 load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
 
-const st = new ShardingTest({shards: 2, config: 1, mongos: 1});
+const st = new ShardingTest({shards: 2, mongos: 1});
 const testName = "lookup_sharded";
 
 const nodeList = DiscoverTopology.findNonConfigNodes(st.s);

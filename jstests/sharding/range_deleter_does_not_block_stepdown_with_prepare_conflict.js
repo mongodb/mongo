@@ -31,7 +31,7 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-const st = new ShardingTest({shards: [{verbose: 1}, {verbose: 1}], config: 1});
+const st = new ShardingTest({shards: [{verbose: 1}, {verbose: 1}]});
 
 // Set up sharded collection with two chunks - [-inf, 0), [0, inf)
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));

@@ -6,7 +6,7 @@
 load("jstests/libs/analyze_plan.js");                 // For 'getAggPlanStage'.
 load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
 
-const st = new ShardingTest({shards: 2, rs: {nodes: 1}, config: 1});
+const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 const mongosDB = st.s0.getDB("merge_on_fields");
 const firstColl = mongosDB.first;

@@ -17,7 +17,7 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-const st = new ShardingTest({shards: 3, config: 1, mongos: 2});
+const st = new ShardingTest({shards: 3, mongos: 2});
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);

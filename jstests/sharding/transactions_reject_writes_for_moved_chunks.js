@@ -23,7 +23,7 @@ function expectChunks(st, ns, chunks) {
 
 const dbName = "test";
 
-const st = new ShardingTest({shards: 3, mongos: 1, config: 1});
+const st = new ShardingTest({shards: 3, mongos: 1});
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 //

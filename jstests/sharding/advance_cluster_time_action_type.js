@@ -8,7 +8,7 @@
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
-let st = new ShardingTest({mongos: 1, config: 1, shards: 1, keyFile: 'jstests/libs/key1'});
+let st = new ShardingTest({mongos: 1, shards: 1, keyFile: 'jstests/libs/key1'});
 
 let adminDB = st.s.getDB('admin');
 

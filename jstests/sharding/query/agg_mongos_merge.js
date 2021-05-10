@@ -19,7 +19,7 @@ load('jstests/libs/geo_near_random.js');  // For GeoNearRandomTest.
 load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
 load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
 
-const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
+const st = new ShardingTest({shards: 2, mongos: 1});
 
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];

@@ -71,7 +71,7 @@ function runTest(st, collName, errorCode, isSharded) {
     }
 }
 
-const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
+const st = new ShardingTest({shards: 2, mongos: 1});
 
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 

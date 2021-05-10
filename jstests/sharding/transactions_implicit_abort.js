@@ -11,7 +11,7 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + '.' + collName;
 
-const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
+const st = new ShardingTest({shards: 2, mongos: 1});
 
 // Set up a sharded collection with one chunk on each shard.
 

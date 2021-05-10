@@ -8,7 +8,7 @@ load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode,
                                                       // assertMergeFailsWithoutUniqueIndex,
 // assertMergeSucceedsWithExpectedUniqueIndex.
 
-const st = new ShardingTest({shards: 2, rs: {nodes: 1}, config: 1});
+const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 const mongosDB = st.s0.getDB("merge_hashed_shard_key");
 const foreignDB = st.s0.getDB("merge_hashed_shard_key_foreign");

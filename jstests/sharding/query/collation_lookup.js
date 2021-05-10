@@ -357,7 +357,7 @@ function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collati
         res);
 }
 
-const st = new ShardingTest({shards: 2, config: 1});
+const st = new ShardingTest({shards: 2});
 // TODO SERVER-38830: when a pipeline $lookup is capable of serializing its 'let' variables to
 // remote shards this can be re-enabled.
 // setParameterOnAllHosts(
