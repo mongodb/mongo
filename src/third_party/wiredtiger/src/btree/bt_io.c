@@ -307,7 +307,12 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_t *add
     if (encrypted)
         F_SET(dsk, WT_PAGE_ENCRYPTED);
 
-    WT_ASSERT(session, (dsk->write_gen != 0 && dsk->write_gen > btree->base_write_gen));
+    /*
+     * The page image must have a proper write generation number before writing it to disk. The page
+     * images that are created during recovery may have the write generation number less than the
+     * btree base write generation number, so don't verify it.
+     */
+    WT_ASSERT(session, dsk->write_gen != 0);
 
     /*
      * Checksum the data if the buffer isn't compressed or checksums are configured.
