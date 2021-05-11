@@ -93,15 +93,15 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
                               << " parts at a time."};
     }
 
-    const auto status = splitChunk(opCtx,
-                                   nss,
-                                   shardKeyPattern.toBSON(),
-                                   chunkRange,
-                                   splitPoints,
-                                   shardId.toString(),
-                                   collectionVersion.epoch());
-
-    return status.getStatus().withContext("split failed");
+    return splitChunk(opCtx,
+                      nss,
+                      shardKeyPattern.toBSON(),
+                      chunkRange,
+                      splitPoints,
+                      shardId.toString(),
+                      collectionVersion.epoch())
+        .getStatus()
+        .withContext("split failed");
 }
 
 /**
@@ -396,13 +396,6 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
               << (topChunkMinKey.isEmpty() ? ""
                                            : " (top chunk migration suggested" +
                           (std::string)(shouldBalance ? ")" : ", but no migrations allowed)"));
-
-        // Because the ShardServerOpObserver uses the metadata from the CSS for tracking incoming
-        // writes, if we split a chunk but do not force a CSS refresh, subsequent inserts will see
-        // stale metadata and so will not trigger a chunk split. If we force metadata refresh here,
-        // we can limit the amount of time that the op observer is tracking writes on the parent
-        // chunk rather than on its child chunks.
-        forceShardFilteringMetadataRefresh(opCtx.get(), nss, false);
 
         // Balance the resulting chunks if the autobalance option is enabled and if we split at the
         // first or last chunk on the collection as part of top chunk optimization.
