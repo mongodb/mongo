@@ -536,16 +536,10 @@ void CollectionCatalog::write(OperationContext* opCtx,
 }
 
 
-void CollectionCatalog::setCollectionNamespace(OperationContext* opCtx,
-                                               Collection* coll,
-                                               const NamespaceString& fromCollection,
-                                               const NamespaceString& toCollection) const {
-    // Rather than maintain, in addition to the UUID -> Collection* mapping, an auxiliary
-    // data structure with the UUID -> namespace mapping, the CollectionCatalog relies on
-    // Collection::ns() to provide UUID to namespace lookup. In addition, the CollectionCatalog
-    // does not require callers to hold locks.
+void CollectionCatalog::onCollectionRename(OperationContext* opCtx,
+                                           Collection* coll,
+                                           const NamespaceString& fromCollection) const {
     invariant(coll);
-    coll->setNs(toCollection);
 
     auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
     uncommittedCatalogUpdates.rename(coll, fromCollection);
@@ -560,18 +554,6 @@ void CollectionCatalog::dropCollection(OperationContext* opCtx, Collection* coll
     // Requesting a writable collection normally ensures we have registered PublishCatalogUpdates
     // with the recovery unit. However, when the writable Collection was requested in Inplace mode
     // (or is the oplog) this is not the case. So make sure we are registered in all cases.
-    PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
-}
-
-void CollectionCatalog::dropCollection(OperationContext* opCtx, const CollectionPtr& coll) const {
-    invariant(coll);
-    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
-
-    auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
-    uncommittedCatalogUpdates.drop(coll.get());
-
-    // Ensure we have registered publish change if this collection haven't been made writable
-    // previously
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 }
 

@@ -42,7 +42,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -371,8 +370,7 @@ void _validateCatalogEntry(OperationContext* opCtx,
                            ValidateState* validateState,
                            ValidateResults* results) {
     const auto& collection = validateState->getCollection();
-    CollectionOptions options =
-        DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->getCatalogId());
+    const auto& options = collection->getCollectionOptions();
     if (options.uuid) {
         addErrorIfUnequal(*(options.uuid), validateState->uuid(), "UUID", results);
     } else {
@@ -408,11 +406,10 @@ void _validateCatalogEntry(OperationContext* opCtx,
     }
 
     std::vector<std::string> indexes;
-    DurableCatalog::get(opCtx)->getReadyIndexes(opCtx, collection->getCatalogId(), &indexes);
+    collection->getReadyIndexes(&indexes);
     for (auto& index : indexes) {
         MultikeyPaths multikeyPaths;
-        const bool isMultikey = DurableCatalog::get(opCtx)->isIndexMultikey(
-            opCtx, collection->getCatalogId(), index, &multikeyPaths);
+        const bool isMultikey = collection->isIndexMultikey(opCtx, index, &multikeyPaths);
         const bool hasMultiKeyPaths = std::any_of(multikeyPaths.begin(),
                                                   multikeyPaths.end(),
                                                   [](auto& pathSet) { return pathSet.size() > 0; });

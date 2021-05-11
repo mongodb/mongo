@@ -34,6 +34,7 @@
 
 namespace mongo {
 
+class Collection;
 class Ident;
 class OperationContext;
 class NamespaceString;
@@ -54,9 +55,7 @@ namespace catalog {
  */
 void removeIndex(OperationContext* opCtx,
                  StringData indexName,
-                 RecordId collectionCatalogId,
-                 UUID collectionUUID,
-                 const NamespaceString& nss,
+                 Collection* collection,
                  std::shared_ptr<Ident> ident);
 
 /**

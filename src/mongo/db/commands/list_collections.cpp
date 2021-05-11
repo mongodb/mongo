@@ -61,7 +61,6 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view_catalog.h"
@@ -192,19 +191,17 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
         return b.obj();
     }
 
-    CollectionOptions options =
-        DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->getCatalogId());
+    const auto& options = collection->getCollectionOptions();
 
     // While the UUID is stored as a collection option, from the user's perspective it is an
-    // unsettable read-only property, so put it in the 'info' section.
-    auto uuid = options.uuid;
-    options.uuid.reset();
-    b.append("options", options.toBSON());
+    // unsettable read-only property, so put it in the 'info' section. Pass 'false' to toBSON so it
+    // doesn't include 'uuid' here.
+    b.append("options", options.toBSON(false));
 
     BSONObjBuilder infoBuilder;
     infoBuilder.append("readOnly", storageGlobalParams.readOnly);
-    if (uuid)
-        infoBuilder.appendElements(uuid->toBSON());
+    if (options.uuid)
+        infoBuilder.appendElements(options.uuid->toBSON());
     b.append("info", infoBuilder.obj());
 
     auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);

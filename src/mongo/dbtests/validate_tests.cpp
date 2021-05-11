@@ -3331,6 +3331,7 @@ public:
             coll = _db->createCollection(&_opCtx, _nss);
             wunit.commit();
         }
+        auto writableCollection = const_cast<Collection*>(coll.get());
 
         const auto indexName = "mk_index";
         auto status = dbtests::createIndexFromSpec(&_opCtx,
@@ -3346,12 +3347,13 @@ public:
             WriteUnitOfWork wunit(&_opCtx);
             auto collMetadata =
                 DurableCatalog::get(&_opCtx)->getMetaData(&_opCtx, coll->getCatalogId());
-            int offset = collMetadata.findIndexOffset(indexName);
+            int offset = collMetadata->findIndexOffset(indexName);
             ASSERT_GTE(offset, 0);
 
-            auto& indexMetadata = collMetadata.indexes[offset];
+            auto& indexMetadata = collMetadata->indexes[offset];
             indexMetadata.multikeyPaths = {};
-            DurableCatalog::get(&_opCtx)->putMetaData(&_opCtx, coll->getCatalogId(), collMetadata);
+            auto writableCollection = const_cast<Collection*>(coll.get());
+            writableCollection->replaceMetadata(&_opCtx, std::move(collMetadata));
             wunit.commit();
         }
 
@@ -3361,7 +3363,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             auto writableCatalog = const_cast<IndexCatalog*>(indexCatalog);
-            descriptor = writableCatalog->refreshEntry(&_opCtx, descriptor);
+            descriptor = writableCatalog->refreshEntry(&_opCtx, writableCollection, descriptor);
             wunit.commit();
         }
 

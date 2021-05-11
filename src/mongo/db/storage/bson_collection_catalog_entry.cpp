@@ -160,7 +160,7 @@ bool BSONCollectionCatalogEntry::MetaData::eraseIndex(StringData name) {
     return true;
 }
 
-BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
+BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) const {
     BSONObjBuilder b;
     b.append("ns", ns);
     b.append("options", options.toBSON());
@@ -170,14 +170,20 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
             BSONObjBuilder sub(arr.subobjStart());
             sub.append("spec", indexes[i].spec);
             sub.appendBool("ready", indexes[i].ready);
-            sub.appendBool("multikey", indexes[i].multikey);
+            {
+                stdx::unique_lock lock(indexes[i].multikeyMutex, stdx::defer_lock_t{});
+                if (!hasExclusiveAccess) {
+                    lock.lock();
+                }
+                sub.appendBool("multikey", indexes[i].multikey);
 
-            if (!indexes[i].multikeyPaths.empty()) {
-                BSONObjBuilder subMultikeyPaths(sub.subobjStart("multikeyPaths"));
-                appendMultikeyPathsAsBytes(indexes[i].spec.getObjectField("key"),
-                                           indexes[i].multikeyPaths,
-                                           &subMultikeyPaths);
-                subMultikeyPaths.doneFast();
+                if (!indexes[i].multikeyPaths.empty()) {
+                    BSONObjBuilder subMultikeyPaths(sub.subobjStart("multikeyPaths"));
+                    appendMultikeyPathsAsBytes(indexes[i].spec.getObjectField("key"),
+                                               indexes[i].multikeyPaths,
+                                               &subMultikeyPaths);
+                    subMultikeyPaths.doneFast();
+                }
             }
 
             sub.append("head", 0ll);  // For backward compatibility with 4.0

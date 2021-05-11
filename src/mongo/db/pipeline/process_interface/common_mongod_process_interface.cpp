@@ -65,7 +65,6 @@
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
@@ -285,9 +284,7 @@ BSONObj CommonMongodProcessInterface::getCollectionOptions(OperationContext* opC
         return collectionOptions;
     }
 
-    collectionOptions = DurableCatalog::get(opCtx)
-                            ->getCollectionOptions(opCtx, collection->getCatalogId())
-                            .toBSON();
+    collectionOptions = collection->getCollectionOptions().toBSON();
     return collectionOptions;
 }
 

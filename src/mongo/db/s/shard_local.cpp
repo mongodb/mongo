@@ -167,6 +167,7 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
         auto removeIndexBuildsToo = false;
         auto indexSpecs = indexCatalog->removeExistingIndexes(
             opCtx,
+            CollectionPtr(collection, CollectionPtr::NoYieldTag{}),
             uassertStatusOK(
                 collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, {index.toBSON()})),
             removeIndexBuildsToo);

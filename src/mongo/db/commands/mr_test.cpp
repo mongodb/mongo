@@ -537,7 +537,7 @@ TEST_F(MapReduceCommandTest, ReplacingExistingOutputCollectionPreservesIndexes) 
                 WriteUnitOfWork wuow(_opCtx.get());
                 ASSERT_OK(
                     coll.getWritableCollection()->getIndexCatalog()->createIndexOnEmptyCollection(
-                        _opCtx.get(), indexSpec));
+                        _opCtx.get(), coll.getWritableCollection(), indexSpec));
                 wuow.commit();
             });
     }

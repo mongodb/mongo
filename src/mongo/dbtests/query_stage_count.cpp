@@ -75,6 +75,7 @@ public:
 
         coll->getIndexCatalog()
             ->createIndexOnEmptyCollection(&_opCtx,
+                                           coll,
                                            BSON("key" << BSON("x" << 1) << "name"
                                                       << "x_1"
                                                       << "v" << 1))

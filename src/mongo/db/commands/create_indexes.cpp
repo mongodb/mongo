@@ -220,7 +220,7 @@ std::vector<BSONObj> resolveDefaultsAndRemoveExistingIndexes(OperationContext* o
     auto normalSpecs = IndexBuildsCoordinator::normalizeIndexSpecs(opCtx, collection, indexSpecs);
 
     return collection->getIndexCatalog()->removeExistingIndexes(
-        opCtx, normalSpecs, false /*removeIndexBuildsToo*/);
+        opCtx, collection, normalSpecs, false /*removeIndexBuildsToo*/);
 }
 
 /**

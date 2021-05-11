@@ -47,7 +47,6 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/rs_rollback.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/util/str.h"
 
@@ -356,9 +355,7 @@ void RollbackResyncsCollectionOptionsTest::resyncCollectionOptionsTest(
 
     // Make sure the collection options are correct.
     AutoGetCollectionForReadCommand autoColl(_opCtx.get(), NamespaceString(nss.toString()));
-    auto collAfterRollbackOptions =
-        DurableCatalog::get(_opCtx.get())
-            ->getCollectionOptions(_opCtx.get(), autoColl.getCollection()->getCatalogId());
+    auto collAfterRollbackOptions = autoColl->getCollectionOptions();
 
     BSONObjBuilder expectedOptionsBob;
     if (localCollOptions.uuid) {

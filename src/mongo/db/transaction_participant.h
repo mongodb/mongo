@@ -35,6 +35,7 @@
 
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
+#include "mongo/db/catalog/uncommitted_multikey.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/locker.h"
@@ -232,6 +233,7 @@ public:
         repl::ReadConcernArgs _readConcernArgs;
         WriteUnitOfWork::RecoveryUnitState _ruState;
         std::shared_ptr<UncommittedCollections::UncommittedCollectionsMap> _uncommittedCollections;
+        std::shared_ptr<UncommittedMultikey::MultikeyMap> _uncommittedMultikey;
     };
 
     /**

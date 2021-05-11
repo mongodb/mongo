@@ -89,7 +89,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_participant.h"
@@ -208,7 +207,8 @@ void createIndexForApplyOps(OperationContext* opCtx,
                                 << "; normalized index specs: "
                                 << BSON("normalSpecs" << normalSpecs));
         auto indexCatalog = indexCollection->getIndexCatalog();
-        auto prepareSpecResult = indexCatalog->prepareSpecForCreate(opCtx, normalSpecs[0], {});
+        auto prepareSpecResult =
+            indexCatalog->prepareSpecForCreate(opCtx, indexCollection, normalSpecs[0], {});
         if (ErrorCodes::IndexBuildAlreadyInProgress == prepareSpecResult) {
             LOGV2(4924900,
                   "Index build: already in progress during initial sync",
@@ -659,8 +659,7 @@ void createOplog(OperationContext* opCtx,
 
     if (collection) {
         if (replSettings.getOplogSizeBytes() != 0) {
-            const CollectionOptions oplogOpts =
-                DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->getCatalogId());
+            const CollectionOptions& oplogOpts = collection->getCollectionOptions();
 
             int o = (int)(oplogOpts.cappedSize / (1024 * 1024));
             int n = (int)(replSettings.getOplogSizeBytes() / (1024 * 1024));

@@ -52,7 +52,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -137,7 +136,9 @@ int _createIndexOnEmptyCollection(OperationContext* opCtx, NamespaceString nss, 
     auto indexCatalog = coll.getWritableCollection()->getIndexCatalog();
     ASSERT(indexCatalog);
 
-    ASSERT_OK(indexCatalog->createIndexOnEmptyCollection(opCtx, indexSpec).getStatus());
+    ASSERT_OK(
+        indexCatalog->createIndexOnEmptyCollection(opCtx, coll.getWritableCollection(), indexSpec)
+            .getStatus());
     wunit.commit();
 
     return indexCatalog->numIndexesReady(opCtx);
@@ -793,9 +794,7 @@ TEST_F(StorageInterfaceImplTest, RenameCollectionWithStayTempFalseMakesItNotTemp
 
     AutoGetCollectionForReadCommand autoColl2(opCtx, toNss);
     ASSERT_TRUE(autoColl2.getCollection());
-    ASSERT_FALSE(DurableCatalog::get(opCtx)
-                     ->getCollectionOptions(opCtx, autoColl2.getCollection()->getCatalogId())
-                     .temp);
+    ASSERT_FALSE(autoColl2->getCollectionOptions().temp);
 }
 
 TEST_F(StorageInterfaceImplTest, RenameCollectionWithStayTempTrueMakesItTemp) {
@@ -814,9 +813,7 @@ TEST_F(StorageInterfaceImplTest, RenameCollectionWithStayTempTrueMakesItTemp) {
 
     AutoGetCollectionForReadCommand autoColl2(opCtx, toNss);
     ASSERT_TRUE(autoColl2.getCollection());
-    ASSERT_TRUE(DurableCatalog::get(opCtx)
-                    ->getCollectionOptions(opCtx, autoColl2.getCollection()->getCatalogId())
-                    .temp);
+    ASSERT_TRUE(autoColl2->getCollectionOptions().temp);
 }
 
 TEST_F(StorageInterfaceImplTest, RenameCollectionFailsBetweenDatabases) {

@@ -40,20 +40,17 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/storage/durable_catalog.h"
 
 namespace mongo {
 
-StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
-                                           RecordId catalogId,
+StatusWith<IndexNameObjs> getIndexNameObjs(const CollectionPtr& collection,
                                            std::function<bool(const std::string&)> filter) {
     IndexNameObjs ret;
     std::vector<std::string>& indexNames = ret.first;
     std::vector<BSONObj>& indexSpecs = ret.second;
-    auto durableCatalog = DurableCatalog::get(opCtx);
     {
         // Fetch all indexes
-        durableCatalog->getAllIndexes(opCtx, catalogId, &indexNames);
+        collection->getAllIndexes(&indexNames);
         auto newEnd =
             std::remove_if(indexNames.begin(),
                            indexNames.end(),
@@ -64,7 +61,7 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
 
 
         for (const auto& name : indexNames) {
-            BSONObj spec = durableCatalog->getIndexSpec(opCtx, catalogId, name);
+            BSONObj spec = collection->getIndexSpec(name);
             using IndexVersion = IndexDescriptor::IndexVersion;
             IndexVersion indexVersion = IndexVersion::kV1;
             if (auto indexVersionElem = spec[IndexDescriptor::kIndexVersionFieldName]) {

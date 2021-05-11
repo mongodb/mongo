@@ -91,8 +91,12 @@ struct CollectionOptions {
      */
     static CollectionOptions fromCreateCommand(const CreateCommand& cmd);
 
-    void appendBSON(BSONObjBuilder* builder) const;
-    BSONObj toBSON() const;
+    /**
+     * Serialize to BSON. The 'includeUUID' parameter is used for the listCollections command to do
+     * special formatting for the uuid.
+     */
+    void appendBSON(BSONObjBuilder* builder, bool includeUUID) const;
+    BSONObj toBSON(bool includeUUID = true) const;
 
     /**
      * Returns true if given options matches to this.

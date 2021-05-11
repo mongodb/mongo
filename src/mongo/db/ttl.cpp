@@ -54,7 +54,6 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/ttl_gen.h"
@@ -326,21 +325,18 @@ private:
                                 TTLCollectionCache* ttlCollectionCache,
                                 const CollectionPtr& collection,
                                 std::string indexName) {
-        if (!DurableCatalog::get(opCtx)->isIndexPresent(
-                opCtx, collection->getCatalogId(), indexName)) {
+        if (!collection->isIndexPresent(indexName)) {
             ttlCollectionCache->deregisterTTLInfo(collection->uuid(), indexName);
             return;
         }
 
-        BSONObj spec =
-            DurableCatalog::get(opCtx)->getIndexSpec(opCtx, collection->getCatalogId(), indexName);
+        BSONObj spec = collection->getIndexSpec(indexName);
         if (!spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
             ttlCollectionCache->deregisterTTLInfo(collection->uuid(), indexName);
             return;
         }
 
-        if (!DurableCatalog::get(opCtx)->isIndexReady(
-                opCtx, collection->getCatalogId(), indexName)) {
+        if (!collection->isIndexReady(indexName)) {
             return;
         }
 
@@ -451,8 +447,7 @@ private:
     void deleteExpiredWithCollscan(OperationContext* opCtx,
                                    TTLCollectionCache* ttlCollectionCache,
                                    const CollectionPtr& collection) {
-        auto collOptions =
-            DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->getCatalogId());
+        const auto& collOptions = collection->getCollectionOptions();
         uassert(5400701,
                 "collection is not clustered by _id but is described as being TTL",
                 collOptions.clusteredIndex);

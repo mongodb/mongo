@@ -53,7 +53,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/exit.h"
@@ -148,11 +147,10 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
  * Returns true if the collection associated with the given CollectionCatalogEntry has an index on
  * the _id field
  */
-bool checkIdIndexExists(OperationContext* opCtx, RecordId catalogId) {
-    auto durableCatalog = DurableCatalog::get(opCtx);
-    auto indexCount = durableCatalog->getTotalIndexCount(opCtx, catalogId);
+bool checkIdIndexExists(OperationContext* opCtx, const CollectionPtr& coll) {
+    auto indexCount = coll->getTotalIndexCount();
     auto indexNames = std::vector<std::string>(indexCount);
-    durableCatalog->getAllIndexes(opCtx, catalogId, &indexNames);
+    coll->getAllIndexes(&indexNames);
 
     for (auto name : indexNames) {
         if (name == "_id_") {
@@ -171,7 +169,7 @@ Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
     });
 
     const auto indexCatalog = collection->getIndexCatalog();
-    const auto idIndexSpec = indexCatalog->getDefaultIdIndexSpec();
+    const auto idIndexSpec = indexCatalog->getDefaultIdIndexSpec(collection);
 
     CollectionWriter collWriter(collection);
     auto swSpecs = indexer.init(opCtx, collWriter, idIndexSpec, MultiIndexBlock::kNoopOnInitFn);
@@ -225,15 +223,13 @@ Status ensureCollectionProperties(OperationContext* opCtx,
 
         // All user-created replicated collections created since MongoDB 4.0 have _id indexes.
         auto requiresIndex = coll->requiresIdIndex() && coll->ns().isReplicated();
-        auto collOptions =
-            DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, coll->getCatalogId());
+        const auto& collOptions = coll->getCollectionOptions();
         auto hasAutoIndexIdField = collOptions.autoIndexId == CollectionOptions::YES;
 
         // Even if the autoIndexId field is not YES, the collection may still have an _id index
         // that was created manually by the user. Check the list of indexes to confirm index
         // does not exist before attempting to build it or returning an error.
-        if (requiresIndex && !hasAutoIndexIdField &&
-            !checkIdIndexExists(opCtx, coll->getCatalogId())) {
+        if (requiresIndex && !hasAutoIndexIdField && !checkIdIndexExists(opCtx, coll)) {
             LOGV2(21001,
                   "collection {coll_ns} is missing an _id index",
                   "Collection is missing an _id index",
@@ -397,13 +393,13 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.
     StringMap<IndexNameObjs> nsToIndexNameObjMap;
+    auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& idxIdentifier : reconcileResult.indexesToRebuild) {
         NamespaceString collNss = idxIdentifier.nss;
         const std::string& indexName = idxIdentifier.indexName;
         auto swIndexSpecs =
-            getIndexNameObjs(opCtx, idxIdentifier.catalogId, [&indexName](const std::string& name) {
-                return name == indexName;
-            });
+            getIndexNameObjs(catalog->lookupCollectionByNamespace(opCtx, collNss),
+                             [&indexName](const std::string& name) { return name == indexName; });
         if (!swIndexSpecs.isOK() || swIndexSpecs.getValue().first.empty()) {
             fassert(40590,
                     {ErrorCodes::InternalError,
@@ -420,7 +416,6 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
         ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
     }
 
-    auto catalog = CollectionCatalog::get(opCtx);
     for (const auto& entry : nsToIndexNameObjMap) {
         NamespaceString collNss(entry.first);
 

@@ -761,6 +761,7 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     _apiParameters = APIParameters::get(opCtx);
     _readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     _uncommittedCollections = UncommittedCollections::get(opCtx).releaseResources();
+    _uncommittedMultikey = UncommittedMultikey::get(opCtx).releaseResources();
 }
 
 TransactionParticipant::TxnResources::~TxnResources() {
@@ -827,6 +828,10 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     // Transfer ownership of UncommittedCollections
     UncommittedCollections::get(opCtx).receiveResources(_uncommittedCollections);
     _uncommittedCollections = nullptr;
+
+    // Transfer ownership of UncommittedMultikey
+    UncommittedMultikey::get(opCtx).receiveResources(_uncommittedMultikey);
+    _uncommittedMultikey = nullptr;
 
     auto oldState = opCtx->setRecoveryUnit(std::move(_recoveryUnit),
                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
@@ -1158,7 +1163,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
                 str::stream() << "prepareTransaction failed because one of the transaction "
                                  "operations was done against a temporary collection '"
                               << collection->ns() << "'.",
-                !collection->isTemporary(opCtx));
+                !collection->isTemporary());
     }
 
     boost::optional<OplogSlotReserver> oplogSlotReserver;

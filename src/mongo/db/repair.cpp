@@ -56,7 +56,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/rebuild_indexes.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/storage_util.h"
@@ -73,7 +72,7 @@ Status rebuildIndexesForNamespace(OperationContext* opCtx,
                                   StorageEngine* engine) {
     opCtx->checkForInterrupt();
     auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
-    auto swIndexNameObjs = getIndexNameObjs(opCtx, collection->getCatalogId());
+    auto swIndexNameObjs = getIndexNameObjs(collection);
     if (!swIndexNameObjs.isOK())
         return swIndexNameObjs.getStatus();
 
@@ -87,12 +86,11 @@ Status rebuildIndexesForNamespace(OperationContext* opCtx,
 }
 
 namespace {
-Status dropUnfinishedIndexes(OperationContext* opCtx, const CollectionPtr& collection) {
+Status dropUnfinishedIndexes(OperationContext* opCtx, Collection* collection) {
     std::vector<std::string> indexNames;
-    auto durableCatalog = DurableCatalog::get(opCtx);
-    durableCatalog->getAllIndexes(opCtx, collection->getCatalogId(), &indexNames);
+    collection->getAllIndexes(&indexNames);
     for (const auto& indexName : indexNames) {
-        if (!durableCatalog->isIndexReady(opCtx, collection->getCatalogId(), indexName)) {
+        if (!collection->isIndexReady(indexName)) {
             LOGV2(3871400,
                   "Dropping unfinished index '{name}' after collection was modified by "
                   "repair",
@@ -102,12 +100,7 @@ Status dropUnfinishedIndexes(OperationContext* opCtx, const CollectionPtr& colle
             WriteUnitOfWork wuow(opCtx);
             // There are no concurrent users of the index while --repair is running, so it is OK to
             // pass in a nullptr for the index 'ident', promising that the index is not in use.
-            catalog::removeIndex(opCtx,
-                                 indexName,
-                                 collection->getCatalogId(),
-                                 collection->uuid(),
-                                 collection->ns(),
-                                 nullptr /*ident */);
+            catalog::removeIndex(opCtx, indexName, collection, nullptr /*ident */);
             wuow.commit();
 
             StorageRepairObserver::get(opCtx->getServiceContext())

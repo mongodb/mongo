@@ -63,7 +63,8 @@ public:
             auto indexSpec = BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
                                       << "key" << BSON("a" << 1) << "name"
                                       << "a_1");
-            uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(&_opCtx, indexSpec));
+            uassertStatusOK(
+                indexCatalog->createIndexOnEmptyCollection(&_opCtx, collection, indexSpec));
 
             wunit.commit();
 

@@ -41,10 +41,17 @@ class CollectionCatalog;
 
 class CollectionImpl final : public Collection {
 public:
+    // TODO SERVER-56999: We should just need one API to create Collections
     explicit CollectionImpl(OperationContext* opCtx,
                             const NamespaceString& nss,
                             RecordId catalogId,
                             const CollectionOptions& options,
+                            std::unique_ptr<RecordStore> recordStore);
+
+    explicit CollectionImpl(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            RecordId catalogId,
+                            std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
                             std::unique_ptr<RecordStore> recordStore);
 
     ~CollectionImpl();
@@ -53,11 +60,19 @@ public:
 
     class FactoryImpl : public Factory {
     public:
+        // TODO SERVER-56999: We should just need one API to create Collections
         std::shared_ptr<Collection> make(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          RecordId catalogId,
                                          const CollectionOptions& options,
                                          std::unique_ptr<RecordStore> rs) const final;
+
+        std::shared_ptr<Collection> make(
+            OperationContext* opCtx,
+            const NamespaceString& nss,
+            RecordId catalogId,
+            std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
+            std::unique_ptr<RecordStore> rs) const final;
     };
 
     SharedCollectionDecorations* getSharedDecorations() const final;
@@ -71,7 +86,7 @@ public:
         return _ns;
     }
 
-    void setNs(NamespaceString nss) final;
+    Status rename(OperationContext* opCtx, const NamespaceString& nss, bool stayTemp) final;
 
     RecordId getCatalogId() const {
         return _catalogId;
@@ -298,9 +313,11 @@ public:
     bool getRecordPreImages() const final;
     void setRecordPreImages(OperationContext* opCtx, bool val) final;
 
-    bool isTemporary(OperationContext* opCtx) const final;
+    bool isTemporary() const final;
 
     bool isClustered() const final;
+    void updateClusteredIndexTTLSetting(OperationContext* opCtx,
+                                        boost::optional<int64_t> expireAfterSeconds) final;
 
     Status updateCappedSize(OperationContext* opCtx, long long newCappedSize) final;
 
@@ -373,6 +390,8 @@ public:
      */
     const CollatorInterface* getDefaultCollator() const final;
 
+    const CollectionOptions& getCollectionOptions() const final;
+
     StatusWith<std::vector<BSONObj>> addCollationDefaultsToIndexSpecsForCreate(
         OperationContext* opCtx, const std::vector<BSONObj>& indexSpecs) const final;
 
@@ -387,6 +406,55 @@ public:
 
     void establishOplogCollectionForLogging(OperationContext* opCtx) final;
     void onDeregisterFromCatalog(OperationContext* opCtx) final;
+
+    Status checkMetaDataForIndex(const std::string& indexName, const BSONObj& spec) const final;
+
+    void updateTTLSetting(OperationContext* opCtx,
+                          StringData idxName,
+                          long long newExpireSeconds) final;
+
+    void updateHiddenSetting(OperationContext* opCtx, StringData idxName, bool hidden) final;
+
+    void setIsTemp(OperationContext* opCtx, bool isTemp) final;
+
+    void removeIndex(OperationContext* opCtx, StringData indexName) final;
+
+    Status prepareForIndexBuild(OperationContext* opCtx,
+                                const IndexDescriptor* spec,
+                                boost::optional<UUID> buildUUID,
+                                bool isBackgroundSecondaryBuild) final;
+
+    boost::optional<UUID> getIndexBuildUUID(StringData indexName) const final;
+
+    bool isIndexMultikey(OperationContext* opCtx,
+                         StringData indexName,
+                         MultikeyPaths* multikeyPaths) const final;
+
+    bool setIndexIsMultikey(OperationContext* opCtx,
+                            StringData indexName,
+                            const MultikeyPaths& multikeyPaths) const final;
+
+    void forceSetIndexIsMultikey(OperationContext* opCtx,
+                                 const IndexDescriptor* desc,
+                                 bool isMultikey,
+                                 const MultikeyPaths& multikeyPaths) const final;
+
+    int getTotalIndexCount() const final;
+
+    int getCompletedIndexCount() const final;
+
+    BSONObj getIndexSpec(StringData indexName) const final;
+
+    void getAllIndexes(std::vector<std::string>* names) const final;
+
+    void getReadyIndexes(std::vector<std::string>* names) const final;
+
+    bool isIndexPresent(StringData indexName) const final;
+
+    bool isIndexReady(StringData indexName) const final;
+
+    void replaceMetadata(OperationContext* opCtx,
+                         std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md) final;
 
 private:
     /**
@@ -412,6 +480,13 @@ private:
      * exceeded. Generates oplog entries for the deleted records in FCV >= 5.0.
      */
     void _cappedDeleteAsNeeded(OperationContext* opCtx, const RecordId& justInserted) const;
+
+    /**
+     * Writes metadata to the DurableCatalog. Func should have the function signature
+     * 'void(BSONCollectionCatalogEntry::MetaData&)'
+     */
+    template <typename Func>
+    void _writeMetadata(OperationContext* opCtx, Func func);
 
     /**
      * Holder of shared state between CollectionImpl clones. Also implements CappedCallback, a
@@ -475,7 +550,6 @@ private:
         // Capped information.
         const bool _isCapped;
         const long long _cappedMaxDocs;
-        long long _cappedMaxSize;
 
         // For capped deletes performed on collections where '_needCappedLock' is false, the mutex
         // below protects '_cappedFirstRecord'. Otherwise, when '_needCappedLock' is true, the
@@ -491,21 +565,21 @@ private:
     bool _cachedCommitted = true;
     std::shared_ptr<SharedState> _shared;
 
+    // Collection metadata cached from the DurableCatalog. Is kept separate from the SharedState
+    // because it may be updated.
+    std::shared_ptr<const BSONCollectionCatalogEntry::MetaData> _metadata;
+
     clonable_ptr<IndexCatalog> _indexCatalog;
 
     // The validator is using shared state internally. Collections share validator until a new
     // validator is set in setValidator which sets a new instance.
     Validator _validator;
-    boost::optional<ValidationActionEnum> _validationAction;
-    boost::optional<ValidationLevelEnum> _validationLevel;
 
     // Whether or not this collection is clustered on _id values.
     bool _clustered = false;
 
     // If this is a time-series buckets collection, the metadata for this collection.
     boost::optional<TimeseriesOptions> _timeseriesOptions;
-
-    bool _recordPreImages = false;
 
     // The earliest snapshot that is allowed to use this collection.
     boost::optional<Timestamp> _minVisibleSnapshot;

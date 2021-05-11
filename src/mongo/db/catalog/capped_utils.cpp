@@ -51,7 +51,6 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/util/scopeguard.h"
 
@@ -145,8 +144,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
 
     // create new collection
     {
-        auto options =
-            DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, fromCollection->getCatalogId());
+        auto options = fromCollection->getCollectionOptions();
         // The capped collection will get its own new unique id, as the conversion isn't reversible,
         // so it can't be rolled back.
         options.uuid.reset();
