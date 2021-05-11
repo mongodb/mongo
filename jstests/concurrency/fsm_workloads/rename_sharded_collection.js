@@ -12,15 +12,11 @@
  *
  * @tags: [
  *   requires_sharding,
- *   # TODO (SERVER-54881): ensure the new DDL paths work with balancer, autosplit
- *   # and causal consistency.
- *   assumes_balancer_off,
- *   assumes_autosplit_off,
- *   does_not_support_causal_consistency,
  *   # TODO (SERVER-54881): ensure the new DDL paths work with add/remove shards
  *   does_not_support_add_remove_shards,
- *   # Can be removed once PM-1965-Milestone-1 is completed.
+ *   # TODO (SERVER-56838): investigate timeout of this FSM with transactions
  *   does_not_support_transactions,
+ *   # Can be removed once PM-1965-Milestone-1 is completed.
  *   featureFlagShardingFullDDLSupport
  *  ]
  */
@@ -47,11 +43,15 @@ function initAndFillShardedCollection(db, collName, shardNames) {
         assert.commandWorked(db.adminCommand({split: ns, middle: {x: nextShardKeyValue}}));
 
         const lastInsertedShardKeyValue = nextShardKeyValue - 1;
-        assert.commandWorked(db.adminCommand({
+
+        // When balancer is enabled, move chunks could overlap and fail with
+        // ConflictingOperationInProgress
+        const res = db.adminCommand({
             moveChunk: ns,
             find: {x: lastInsertedShardKeyValue},
             to: shardNames[Random.randInt(shardNames.length)],
-        }));
+        });
+        assert.commandWorkedOrFailedWithCode(res, ErrorCodes.ConflictingOperationInProgress);
     }
 }
 
@@ -151,8 +151,8 @@ var $config = (function() {
     let transitions = {rename: {rename: 1.0}};
 
     return {
-        threadCount: 5,
-        iterations: 50,
+        threadCount: 12,
+        iterations: 64,
         startState: 'rename',
         states: states,
         transitions: transitions,
