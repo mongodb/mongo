@@ -8,7 +8,9 @@ from dataclasses import dataclass
 from typing import Iterable, Callable, Optional, NamedTuple, Dict, List
 
 import click
+from evergreen import RetryingEvergreenApi
 
+EVG_CONFIG_FILE = "./.evergreen.yml"
 BASE_SEARCH_DIR = "."
 IGNORED_PATHS = [".git"]
 ISSUE_RE = re.compile('(BUILD|SERVER|WT|PM|TOOLS|TIG|PERF|BF)-[0-9]+')
@@ -194,12 +196,26 @@ def walk_fs(root: str, action: Callable[[str, Iterable[str]], None]) -> None:
                 continue
 
 
+def get_summary_for_patch(version_id: str) -> str:
+    """
+    Get the description provided for the given patch build.
+
+    :param version_id: Version ID of the patch build to query.
+    :return: Description provided for the patch build.
+    """
+    evg_api = RetryingEvergreenApi.get_api(config_file=EVG_CONFIG_FILE)
+    return evg_api.version_by_id(version_id).message
+
+
 @click.command()
 @click.option("--ticket", help="Only report on TODOs associated with given Jira ticket.")
 @click.option("--base-dir", default=BASE_SEARCH_DIR, help="Base directory to search in.")
 @click.option("--commit-message",
               help="For commit-queue execution only, ensure no TODOs for this commit")
-def main(ticket: Optional[str], base_dir: str, commit_message: Optional[str]):
+@click.option("--patch-build", type=str,
+              help="For patch build execution only, check for any TODOs from patch description")
+def main(ticket: Optional[str], base_dir: str, commit_message: Optional[str],
+         patch_build: Optional[str]):
     """
     Search for and report on TODO comments in the code base.
 
@@ -242,11 +258,17 @@ def main(ticket: Optional[str], base_dir: str, commit_message: Optional[str]):
     \f
     :param ticket: Only report on TODOs associated with this jira ticket.
     :param base_dir: Search files in this base directory.
-    :param commit_message: Commit message if running in the commit-queue.[
+    :param commit_message: Commit message if running in the commit-queue.
+    :param patch_build: Version ID of patch build to check.
 
     """
     if commit_message and ticket is not None:
         raise click.UsageError("--ticket cannot be used in commit queue.")
+
+    if patch_build:
+        if ticket is not None:
+            raise click.UsageError("--ticket cannot be used in patch builds.")
+        commit_message = get_summary_for_patch(patch_build)
 
     todo_checker = TodoChecker()
     todo_checker.check_all_files(base_dir)
