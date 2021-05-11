@@ -120,12 +120,15 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
     // Iterate through the pipeline stages until we find one which cannot be cached.
     // A stage cannot be cached if it either: 1. depends on a variable defined in this scope, or
     // 2. generates random numbers.
+    DocumentSource* lastPtr = nullptr;
     for (; prefixSplit != container->end(); ++prefixSplit) {
         (*prefixSplit)->getDependencies(&deps);
 
         if (deps.hasVariableReferenceTo(varIDs) || deps.needRandomGenerator) {
             break;
         }
+
+        lastPtr = prefixSplit->get();
     }
 
     // The 'prefixSplit' iterator is now pointing to the first stage of the correlated suffix. If
@@ -138,6 +141,8 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
 
     // If the cache has been populated and is serving results, remove the non-correlated prefix.
     if (_cache->isServing()) {
+        // Need to dispose last stage to be removed.
+        lastPtr->dispose();
         container->erase(container->begin(), prefixSplit);
     }
 

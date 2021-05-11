@@ -77,4 +77,22 @@ cursor.toArray().forEach(user => {
     assert.eq(1, joinedDocs.length);
     assert.eq(user['_id'], joinedDocs[0].owner);
 });
+
+// SERVER-57000: Test handling of lack of correlation (addFields with empty set of columns)
+assert.doesNotThrow(() => testColl.aggregate([
+    {
+        $lookup: {
+            as: 'items_check',
+            from: joinColl.getName(),
+            pipeline: [
+                {$addFields: {}},
+                {
+                    $facet: {
+                        all: [{$match: {}}],
+                    },
+                },
+            ],
+        },
+    },
+]));
 })();

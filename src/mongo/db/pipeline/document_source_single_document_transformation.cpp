@@ -58,6 +58,10 @@ const char* DocumentSourceSingleDocumentTransformation::getSourceName() const {
 }
 
 DocumentSource::GetNextResult DocumentSourceSingleDocumentTransformation::doGetNext() {
+    if (!_parsedTransform) {
+        return DocumentSource::GetNextResult::makeEOF();
+    }
+
     // Get the next input document.
     auto input = pSource->getNext();
     if (!input.isAdvanced()) {
@@ -69,7 +73,9 @@ DocumentSource::GetNextResult DocumentSourceSingleDocumentTransformation::doGetN
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimize() {
-    _parsedTransform->optimize();
+    if (_parsedTransform) {
+        _parsedTransform->optimize();
+    }
     return this;
 }
 
