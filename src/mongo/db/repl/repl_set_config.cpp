@@ -382,6 +382,17 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
                       "one non-arbiter member with priority > 0");
     }
 
+    // This validation must be done outside the IDL because we need to parse the settings object
+    // completely to get the custom write modes.
+    const auto& defaultWriteConcern = getSettings()->getDefaultWriteConcern();
+    if (!defaultWriteConcern.wMode.empty() &&
+        WriteConcernOptions::kMajority != defaultWriteConcern.wMode &&
+        !findCustomWriteMode(defaultWriteConcern.wMode).isOK()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Default write concern requires undefined write mode "
+                                    << defaultWriteConcern.wMode);
+    }
+
     if (getConfigServer()) {
         if (arbiterCount > 0) {
             return Status(ErrorCodes::BadValue,
@@ -715,14 +726,6 @@ bool ReplSetConfig::isImplicitDefaultWriteConcernMajority() const {
     // can be fulfilled.
     auto arbiters = _totalVotingMembers - _writableVotingMembersCount;
     return arbiters == 0 || _writableVotingMembersCount > _majorityVoteCount;
-}
-
-bool ReplSetConfig::containsCustomizedGetLastErrorDefaults() const {
-    // Since the ReplSetConfig always has a WriteConcernOptions, the only way to know if it has been
-    // customized through getLastErrorDefaults is if it's different from { w: 1, wtimeout: 0 }.
-    const auto& getLastErrorDefaults = getDefaultWriteConcern();
-    return !(getLastErrorDefaults.wNumNodes == 1 && getLastErrorDefaults.wTimeout == 0 &&
-             getLastErrorDefaults.syncMode == WriteConcernOptions::SyncMode::UNSET);
 }
 
 MemberConfig* MutableReplSetConfig::_findMemberByID(MemberId id) {
