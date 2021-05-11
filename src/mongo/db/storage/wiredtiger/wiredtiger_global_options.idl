@@ -97,7 +97,7 @@ configs:
         short_name: wiredTigerCollectionBlockCompressor
         validator:
             callback: 'WiredTigerGlobalOptions::validateWiredTigerCompressor'
-        default: snappy
+        default: 'zstd'
     "storage.wiredTiger.collectionConfig.configString":
         description: 'WiredTiger custom collection configuration settings'
         arg_vartype: String
