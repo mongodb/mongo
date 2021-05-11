@@ -1301,10 +1301,9 @@ struct __wt_insert_head {
         NULL :                                                          \
         (page)->modify->mod_row_update[WT_ROW_SLOT(page, ip)])
 /*
- * WT_ROW_INSERT_SMALLEST references an additional slot past the end of the
- * "one per WT_ROW slot" insert array.  That's because the insert array requires
- * an extra slot to hold keys that sort before any key found on the original
- * page.
+ * WT_ROW_INSERT_SMALLEST references an additional slot past the end of the "one per WT_ROW slot"
+ * insert array. That's because the insert array requires an extra slot to hold keys that sort
+ * before any key found on the original page.
  */
 #define WT_ROW_INSERT_SMALLEST(page)                                    \
     ((page)->modify == NULL || (page)->modify->mod_row_insert == NULL ? \

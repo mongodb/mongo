@@ -32,22 +32,18 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
     }
 
     /*
-     * Row-store leaf pages are written as one big prefix-compressed chunk,
-     * that is, only the first key on the page is not prefix-compressed, and
-     * to instantiate the last key on the page, you have to take the first
-     * key on the page and roll it forward to the end of the page.  We don't
-     * want to do that on every page access, of course, so we instantiate a
-     * set of keys, essentially creating prefix chunks on the page, where we
-     * can roll forward from the closest, previous, instantiated key.  The
-     * complication is that not all keys on a page are equal: we're doing a
-     * binary search on the  page, which means there are keys we look at a
-     * lot (every time we search the page), and keys we never look at unless
-     * they are actually being searched for.  This function figures out the
-     * "interesting" keys on a page, and then we sequentially walk that list
-     * instantiating those keys.
+     * Row-store leaf pages are written as one big prefix-compressed chunk, that is, only the first
+     * key on the page is not prefix-compressed, and to instantiate the last key on the page, you
+     * have to take the first key on the page and roll it forward to the end of the page. We don't
+     * want to do that on every page access, of course, so we instantiate a set of keys, essentially
+     * creating prefix chunks on the page, where we can roll forward from the closest, previous,
+     * instantiated key. The complication is that not all keys on a page are equal: we're doing a
+     * binary search on the page, which means there are keys we look at a lot (every time we search
+     * the page), and keys we never look at unless they are actually being searched for. This
+     * function figures out the "interesting" keys on a page, and then we sequentially walk that
+     * list instantiating those keys.
      *
-     * Allocate a bit array and figure out the set of "interesting" keys,
-     * marking up the array.
+     * Allocate a bit array and figure out the set of "interesting" keys, marking up the array.
      */
     WT_RET(__wt_scr_alloc(session, 0, &key));
     WT_RET(__wt_scr_alloc(session, (uint32_t)__bitstr_size(page->entries), &tmp));

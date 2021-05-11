@@ -49,18 +49,15 @@ __posix_sync(WT_SESSION_IMPL *session, int fd, const char *name, const char *fun
 
 #if defined(F_FULLFSYNC)
     /*
-     * OS X fsync documentation:
-     * "Note that while fsync() will flush all data from the host to the
-     * drive (i.e. the "permanent storage device"), the drive itself may
-     * not physically write the data to the platters for quite some time
-     * and it may be written in an out-of-order sequence. For applications
-     * that require tighter guarantees about the integrity of their data,
-     * Mac OS X provides the F_FULLFSYNC fcntl. The F_FULLFSYNC fcntl asks
-     * the drive to flush all buffered data to permanent storage."
+     * OS X fsync documentation: "Note that while fsync() will flush all data from the host to the
+     * drive (i.e. the "permanent storage device"), the drive itself may not physically write the
+     * data to the platters for quite some time and it may be written in an out-of-order sequence.
+     * For applications that require tighter guarantees about the integrity of their data, Mac OS X
+     * provides the F_FULLFSYNC fcntl. The F_FULLFSYNC fcntl asks the drive to flush all buffered
+     * data to permanent storage."
      *
-     * OS X F_FULLFSYNC fcntl documentation:
-     * "This is currently implemented on HFS, MS-DOS (FAT), and Universal
-     * Disk Format (UDF) file systems."
+     * OS X F_FULLFSYNC fcntl documentation: "This is currently implemented on HFS, MS-DOS (FAT),
+     * and Universal Disk Format (UDF) file systems."
      *
      * See comment in __posix_sync(): sync cannot be retried or fail.
      */
@@ -1032,11 +1029,10 @@ __wt_map_file(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
  * file while others might be reading or writing it:
  *
  * Every time someone reads or writes from the mapped region, they increment the "use" count via
- * cas. If someone wants to change the file size, they set the "stop" flag. If a session sees
- * the stop flag, it does not read via mmap, but resorts to the regular syscall. The session
- * that set the stop flag spin-waits until the "use" count goes to zero. Then it changes the
- * file size and remaps the region without synchronization. Once all that is done, it resets the
- * "stop" flag.
+ * cas. If someone wants to change the file size, they set the "stop" flag. If a session sees the
+ * stop flag, it does not read via mmap, but resorts to the regular syscall. The session that set
+ * the stop flag spin-waits until the "use" count goes to zero. Then it changes the file size and
+ * remaps the region without synchronization. Once all that is done, it resets the "stop" flag.
  */
 
 /*

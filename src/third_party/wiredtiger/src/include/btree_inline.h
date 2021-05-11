@@ -1726,14 +1726,13 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
     bool acquired;
 
     /*
-     * This function is here to simplify the error handling during hazard
-     * pointer coupling so we never leave a hazard pointer dangling.  The
-     * assumption is we're holding a hazard pointer on "held", and want to
-     * acquire a hazard pointer on "want", releasing the hazard pointer on
+     * This function is here to simplify the error handling during hazard pointer coupling so we
+     * never leave a hazard pointer dangling. The assumption is we're holding a hazard pointer on
+     * "held", and want to acquire a hazard pointer on "want", releasing the hazard pointer on
      * "held" when we're done.
      *
-     * When walking the tree, we sometimes swap to the same page. Fast-path
-     * that to avoid thinking about error handling.
+     * When walking the tree, we sometimes swap to the same page. Fast-path that to avoid thinking
+     * about error handling.
      */
     if (held == want)
         return (0);

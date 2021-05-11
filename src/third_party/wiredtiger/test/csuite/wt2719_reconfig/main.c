@@ -183,9 +183,8 @@ main(int argc, char *argv[])
     /*
      * A linear pass through the list, adding random elements.
      *
-     * WiredTiger configurations are usually "the last one set wins", but
-     * "shared_cache" and "cache_set" options aren't allowed in the same
-     * configuration string.
+     * WiredTiger configurations are usually "the last one set wins", but "shared_cache" and
+     * "cache_set" options aren't allowed in the same configuration string.
      */
     for (i = 0; i < WT_ELEMENTS(list); ++i) {
         p = list[i];

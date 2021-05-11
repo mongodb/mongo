@@ -462,8 +462,7 @@ config_opt(WTPERF *wtperf, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
         break;
     case STRING_TYPE:
         /*
-         * Thread configuration is the one case where the type isn't a
-         * "string", it's a "struct".
+         * Thread configuration is the one case where the type isn't a "string", it's a "struct".
          */
         if (v->type == WT_CONFIG_ITEM_STRUCT && STRING_MATCH("threads", k->str, k->len))
             return (config_threads(wtperf, v->str, v->len));
@@ -821,12 +820,10 @@ config_consolidate(CONFIG_OPTS *opts)
     char *string_key;
 
     /*
-     * This loop iterates over the config queue and for each entry checks if
-     * a later queue entry has the same key. If there's a match, and key is
-     * "conn_config" or "table_config", the later queue entry is replaced
-     * with a concatenated entry of the two queue entries, the current queue
-     * entry is removed. For any other key, if there is a match, the current
-     * queue entry is removed.
+     * This loop iterates over the config queue and for each entry checks if a later queue entry has
+     * the same key. If there's a match, and key is "conn_config" or "table_config", the later queue
+     * entry is replaced with a concatenated entry of the two queue entries, the current queue entry
+     * is removed. For any other key, if there is a match, the current queue entry is removed.
      */
     conf_line = TAILQ_FIRST(&opts->config_head);
     while (conf_line != NULL) {

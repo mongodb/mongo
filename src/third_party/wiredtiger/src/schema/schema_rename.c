@@ -135,8 +135,7 @@ __rename_tree(WT_SESSION_IMPL *session, WT_TABLE *table, const char *newuri, con
     /*
      * Create the new data source URI and update the schema value.
      *
-     * 'name' has the format (colgroup|index):<tablename>[:<suffix>];
-     * we need the suffix.
+     * 'name' has the format (colgroup|index):<tablename>[:<suffix>]; we need the suffix.
      */
     is_colgroup = WT_PREFIX_MATCH(name, "colgroup:");
     if (!is_colgroup && !WT_PREFIX_MATCH(name, "index:"))

@@ -389,9 +389,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
         F_CLR(btree, WT_BTREE_IGNORE_CACHE);
 
     /*
-     * The metadata isn't blocked by in-memory cache limits because metadata
-     * "unroll" is performed by updates that are potentially blocked by the
-     * cache-full checks.
+     * The metadata isn't blocked by in-memory cache limits because metadata "unroll" is performed
+     * by updates that are potentially blocked by the cache-full checks.
      */
     if (WT_IS_METADATA(btree->dhandle))
         F_SET(btree, WT_BTREE_IGNORE_CACHE);

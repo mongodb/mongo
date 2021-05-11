@@ -1480,15 +1480,13 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR(__wt_config_gets_def(session, cfg, "sync", 0, &cval));
 
     /*
-     * If the user chose the default setting, check whether sync is enabled
-     * for this transaction (either inherited or via begin_transaction).
-     * If sync is disabled, clear the field to avoid the log write being
-     * flushed.
+     * If the user chose the default setting, check whether sync is enabled for this transaction
+     * (either inherited or via begin_transaction). If sync is disabled, clear the field to avoid
+     * the log write being flushed.
      *
-     * Otherwise check for specific settings.  We don't need to check for
-     * "on" because that is the default inherited from the connection.  If
-     * the user set anything in begin_transaction, we only override with an
-     * explicit setting.
+     * Otherwise check for specific settings. We don't need to check for "on" because that is the
+     * default inherited from the connection. If the user set anything in begin_transaction, we only
+     * override with an explicit setting.
      */
     if (cval.len == 0) {
         if (!FLD_ISSET(txn->txn_logsync, WT_LOG_SYNC_ENABLED) && !F_ISSET(txn, WT_TXN_SYNC_SET))

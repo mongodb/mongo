@@ -696,10 +696,9 @@ __curtiered_search_near(WT_CURSOR *cursor, int *exactp)
         }
 
         /*
-         * Prefer larger cursors.  There are two reasons: (1) we expect
-         * prefix searches to be a common case (as in our own indices);
-         * and (2) we need a way to unambiguously know we have the
-         * "closest" result.
+         * Prefer larger cursors. There are two reasons: (1) we expect prefix searches to be a
+         * common case (as in our own indices); and (2) we need a way to unambiguously know we have
+         * the "closest" result.
          */
         if (cmp < 0) {
             if ((ret = c->next(c)) == WT_NOTFOUND) {

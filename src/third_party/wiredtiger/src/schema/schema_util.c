@@ -141,9 +141,9 @@ __wt_str_name_check(WT_SESSION_IMPL *session, const char *str)
     bool skip;
 
     /*
-     * Check if name is somewhere in the WiredTiger name space: it would be
-     * "bad" if the application truncated the metadata file.  Skip any
-     * leading URI prefix if needed, check and then skip over a table name.
+     * Check if name is somewhere in the WiredTiger name space: it would be "bad" if the application
+     * truncated the metadata file. Skip any leading URI prefix if needed, check and then skip over
+     * a table name.
      */
     name = str;
     skip = false;

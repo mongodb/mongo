@@ -280,18 +280,16 @@ __wt_block_misplaced(WT_SESSION_IMPL *session, WT_BLOCK *block, const char *list
         return (0);
 
     /*
-     * Verify a block the btree engine thinks it "owns" doesn't appear on
-     * the available or discard lists (it might reasonably be on the alloc
-     * list, if it was allocated since the last checkpoint).  The engine
-     * "owns" a block if it's trying to read or free the block, and those
+     * Verify a block the btree engine thinks it "owns" doesn't appear on the available or discard
+     * lists (it might reasonably be on the alloc list, if it was allocated since the last
+     * checkpoint). The engine "owns" a block if it's trying to read or free the block, and those
      * functions make this check.
      *
      * Any block being read or freed should not be "available".
      *
-     * Any block being read or freed in the live system should not be on the
-     * discard list.  (A checkpoint handle might be reading a block which is
-     * on the live system's discard list; any attempt to free a block from a
-     * checkpoint handle has already failed.)
+     * Any block being read or freed in the live system should not be on the discard list. (A
+     * checkpoint handle might be reading a block which is on the live system's discard list; any
+     * attempt to free a block from a checkpoint handle has already failed.)
      */
     __wt_spin_lock(session, &block->live_lock);
     if (__block_off_match(&block->live.avail, offset, size))

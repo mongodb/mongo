@@ -1782,14 +1782,12 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 
     if (type == WT_PAGE_ROW_LEAF) {
         /*
-         * Copy the first key from the original page into first ref in
-         * the new parent. Pages created in memory always have a
-         * "smallest" insert list, so look there first.  If we don't
-         * find one, get the first key from the disk image.
+         * Copy the first key from the original page into first ref in the new parent. Pages created
+         * in memory always have a "smallest" insert list, so look there first. If we don't find
+         * one, get the first key from the disk image.
          *
-         * We can't just use the key from the original ref: it may have
-         * been suffix-compressed, and after the split the truncated key
-         * may not be valid.
+         * We can't just use the key from the original ref: it may have been suffix-compressed, and
+         * after the split the truncated key may not be valid.
          */
         WT_ERR(__wt_scr_alloc(session, 0, &key));
         if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(page))) != NULL) {

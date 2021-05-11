@@ -74,8 +74,8 @@ static bool do_rename = true;
     } while (0)
 
 /*
- * We keep an array of tables, each one may or may not be in use.
- * "In use" means it has been created, and will be updated from time to time.
+ * We keep an array of tables, each one may or may not be in use. "In use" means it has been
+ * created, and will be updated from time to time.
  */
 typedef struct {
     char *name;            /* non-null entries represent tables in use */
@@ -189,8 +189,7 @@ key_value(uint64_t change_count, char *key, size_t key_size, WT_ITEM *item, OPER
      * is inserted, it is all the letter 'a'. When the value is updated, is it mostly 'b', with some
      * 'c' mixed in. When the value is to modified, we'll end up with a value with mostly 'b' and
      * 'M' mixed in, in different spots. Thus the modify operation will have both additions ('M')
-     * and
-     * subtractions ('c') from the previous version.
+     * and subtractions ('c') from the previous version.
      */
     if (op_type == INSERT)
         ch = 'a';

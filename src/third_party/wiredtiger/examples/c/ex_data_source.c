@@ -351,8 +351,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session, const char *uri, WT_CO
             int my_data_source_overwrite;
 
             /*
-             * Retrieve the value of the boolean type configuration string
-             * "overwrite".
+             * Retrieve the value of the boolean type configuration string "overwrite".
              */
             error_check(wt_api->config_get(wt_api, session, config, "overwrite", &v));
             my_data_source_overwrite = v.val != 0;
@@ -367,8 +366,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session, const char *uri, WT_CO
             int64_t my_data_source_page_size;
 
             /*
-             * Retrieve the value of the integer type configuration string
-             * "page_size".
+             * Retrieve the value of the integer type configuration string "page_size".
              */
             error_check(wt_api->config_get(wt_api, session, config, "page_size", &v));
             my_data_source_page_size = v.val;
@@ -383,8 +381,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session, const char *uri, WT_CO
             const char *my_data_source_key;
 
             /*
-             * Retrieve the value of the string type configuration string
-             * "key_format".
+             * Retrieve the value of the string type configuration string "key_format".
              */
             error_check(wt_api->config_get(wt_api, session, config, "key_format", &v));
 
