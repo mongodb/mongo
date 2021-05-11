@@ -36,7 +36,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -65,7 +64,6 @@
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -577,11 +575,7 @@ public:
             // If the 'failGetMoreAfterCursorCheckout' failpoint is enabled, throw an exception with
             // the given 'errorCode' value, or ErrorCodes::InternalError if 'errorCode' is omitted.
             failGetMoreAfterCursorCheckout.executeIf(
-                [&](const BSONObj& data) {
-                    if (bool b;
-                        !bsonExtractBooleanField(data, "allowRewriteStateChange", &b).isOK() || !b)
-                        rpc::RewriteStateChangeErrors::setEnabled(opCtx, false);
-
+                [](const BSONObj& data) {
                     auto errorCode = (data["errorCode"] ? data["errorCode"].safeNumberLong()
                                                         : ErrorCodes::InternalError);
                     uasserted(errorCode, "Hit the 'failGetMoreAfterCursorCheckout' failpoint");

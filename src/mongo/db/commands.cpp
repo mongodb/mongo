@@ -61,7 +61,6 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/protocol.h"
-#include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point.h"
@@ -682,13 +681,6 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
     const Command* cmd = invocation->definition();
     failCommand.executeIf(
         [&](const BSONObj& data) {
-            // State change codes are rewritten on the way out of a `mongos`
-            // server. Errors injected via failpoint manipulation are normally
-            // exempt from this. However, we provide an override option so they
-            // can be made subject to rewriting if that's really necessary.
-            if (bool b; !bsonExtractBooleanField(data, "allowRewriteStateChange", &b).isOK() || !b)
-                rpc::RewriteStateChangeErrors::setEnabled(opCtx, false);
-
             if (data.hasField(kErrorLabelsFieldName) &&
                 data[kErrorLabelsFieldName].type() == Array) {
                 // Propagate error labels specified in the failCommand failpoint to the
