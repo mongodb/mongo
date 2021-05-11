@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/query/plan_executor.h"
-
 
 namespace mongo {
 
@@ -50,4 +50,14 @@ long long deleteObjects(OperationContext* opCtx,
                         bool justOne,
                         bool god = false,
                         bool fromMigrate = false);
+
+struct DeleteResult {
+    long long nDeleted;
+    boost::optional<BSONObj> requestedPreImage;
+};
+
+DeleteResult deleteObject(OperationContext* opCtx,
+                          const CollectionPtr& collection,
+                          const DeleteRequest& request);
+
 }  // namespace mongo

@@ -71,6 +71,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/bgsync.h"
@@ -253,6 +254,37 @@ void createIndexForApplyOps(OperationContext* opCtx,
     indexBuildsCoordinator->createIndex(opCtx, collUUID, indexSpec, constraints, fromMigrate);
 
     opCtx->recoveryUnit()->abandonSnapshot();
+}
+
+void writeToImageCollection(OperationContext* opCtx,
+                            const LogicalSessionId& sessionId,
+                            const Timestamp timestamp,
+                            repl::RetryImageEnum imageKind,
+                            const BSONObj& dataImage,
+                            bool* upsertConfigImage) {
+    createConfigImagesIfNecessary_temporary(opCtx);
+    AutoGetCollection autoColl(opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(sessionId);
+    imageEntry.setTs(timestamp);
+    imageEntry.setImageKind(imageKind);
+    imageEntry.setImage(dataImage);
+
+    UpdateRequest request;
+    request.setNamespaceString(NamespaceString::kConfigImagesNamespace);
+    request.setQuery(
+        BSON("_id" << imageEntry.get_id().toBSON() << "ts" << BSON("$lt" << imageEntry.getTs())));
+    request.setUpsert(*upsertConfigImage);
+    request.setUpdateModification(
+        write_ops::UpdateModification::parseFromClassicUpdate(imageEntry.toBSON()));
+    request.setFromOplogApplication(true);
+    try {
+        ::mongo::update(opCtx, autoColl.getDb(), request);
+    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+        // We can get a duplicate key when two upserts race on inserting a document.
+        *upsertConfigImage = false;
+        throw WriteConflictException();
+    }
 }
 
 /* we write to local.oplog.rs:
@@ -1522,37 +1554,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 }
 
                 if (op.getNeedsRetryImage()) {
-                    createConfigImagesIfNecessary_temporary(opCtx);
-                    AutoGetCollection autoColl(
-                        opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
-                    repl::ImageEntry image;
-                    image.set_id(op.getSessionId().get());
-                    image.setTs(op.getTimestamp());
-                    switch (op.getNeedsRetryImage().get()) {
-                        case repl::RetryImageEnum::kPreImage:
-                            image.setImageKind(repl::RetryImageEnum::kPreImage);
-                            break;
-                        case repl::RetryImageEnum::kPostImage:
-                            image.setImageKind(repl::RetryImageEnum::kPostImage);
-                            break;
-                    }
-                    image.setImage(ur.requestedDocImage);
-
-                    auto request = UpdateRequest();
-                    request.setNamespaceString(NamespaceString("config.image_collection"));
-                    request.setQuery(BSON("_id" << image.get_id().toBSON() << "ts"
-                                                << BSON("$lt" << image.getTs())));
-                    request.setUpsert(upsertConfigImage);
-                    request.setUpdateModification(
-                        write_ops::UpdateModification::parseFromClassicUpdate(image.toBSON()));
-                    request.setFromOplogApplication(true);
-                    try {
-                        ::mongo::update(opCtx, autoColl.getDb(), request);
-                    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
-                        // We can get a duplicate key when two upserts race on inserting a document.
-                        upsertConfigImage = false;
-                        throw WriteConflictException();
-                    }
+                    writeToImageCollection(opCtx,
+                                           op.getSessionId().get(),
+                                           op.getTimestamp(),
+                                           op.getNeedsRetryImage().get(),
+                                           ur.requestedDocImage,
+                                           &upsertConfigImage);
                 }
 
                 wuow.commit();
@@ -1592,14 +1599,31 @@ Status applyOperation_inlock(OperationContext* opCtx,
             }
 
             const StringData ns = op.getNss().ns();
+            bool upsertConfigImage = true;
             writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
                 WriteUnitOfWork wuow(opCtx);
                 if (timestamp != Timestamp::min()) {
                     uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
                 }
-                auto nDeleted = deleteObjects(
-                    opCtx, collection, requestNss, deleteCriteria, true /* justOne */);
-                if (nDeleted == 0 && mode == OplogApplication::Mode::kSecondary) {
+
+                DeleteRequest request;
+                request.setNsString(requestNss);
+                request.setQuery(deleteCriteria);
+                if (op.getNeedsRetryImage() == repl::RetryImageEnum::kPreImage) {
+                    request.setReturnDeleted(true);
+                }
+
+                DeleteResult result = deleteObject(opCtx, collection, request);
+                if (result.nDeleted == 1 && op.getNeedsRetryImage()) {
+                    writeToImageCollection(opCtx,
+                                           op.getSessionId().get(),
+                                           op.getTimestamp(),
+                                           repl::RetryImageEnum::kPreImage,
+                                           result.requestedPreImage.get(),
+                                           &upsertConfigImage);
+                }
+
+                if (result.nDeleted == 0 && mode == OplogApplication::Mode::kSecondary) {
                     LOGV2_WARNING(2170002,
                                   "Applied a delete which did not delete anything in steady state "
                                   "replication",

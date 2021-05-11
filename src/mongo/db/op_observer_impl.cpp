@@ -260,6 +260,26 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     return opTimes;
 }
 
+void writeToImageCollection(OperationContext* opCtx,
+                            const LogicalSessionId& sessionId,
+                            const Timestamp timestamp,
+                            repl::RetryImageEnum imageKind,
+                            const BSONObj& dataImage) {
+    AutoGetCollection autoColl(opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(sessionId);
+    imageEntry.setTs(timestamp);
+    imageEntry.setImageKind(imageKind);
+    imageEntry.setImage(dataImage);
+
+    repl::UnreplicatedWritesBlock unreplicated(opCtx);
+    AutoGetCollection imageCollectionRaii(
+        opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
+    UpdateResult res = Helpers::upsert(
+        opCtx, NamespaceString::kConfigImagesNamespace.toString(), imageEntry.toBSON());
+    invariant(res.numDocsModified == 1 || !res.upsertedId.isEmpty());
+}
+
 }  // namespace
 
 BSONObj OpObserverImpl::DocumentKey::getId() const {
@@ -617,26 +637,18 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 
         if (oplogEntry.getNeedsRetryImage()) {
             // If the oplog entry has `needsRetryImage`, copy the image into image collection.
-            repl::ImageEntry image;
-            image.set_id(*opCtx->getLogicalSessionId());
-            image.setTs(opTime.writeOpTime.getTimestamp());
-            switch (oplogEntry.getNeedsRetryImage().get()) {
-                case repl::RetryImageEnum::kPreImage:
-                    image.setImageKind(repl::RetryImageEnum::kPreImage);
-                    image.setImage(args.updateArgs.preImageDoc.get());
-                    break;
-                case repl::RetryImageEnum::kPostImage:
-                    image.setImageKind(repl::RetryImageEnum::kPostImage);
-                    image.setImage(args.updateArgs.updatedDoc);
-                    break;
-            }
-
-            repl::UnreplicatedWritesBlock unreplicated(opCtx);
-            AutoGetCollection imageCollectionRaii(
-                opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
-            UpdateResult res = Helpers::upsert(
-                opCtx, NamespaceString::kConfigImagesNamespace.toString(), image.toBSON());
-            invariant(res.numDocsModified == 1 || !res.upsertedId.isEmpty());
+            const BSONObj& dataImage = [&]() {
+                if (oplogEntry.getNeedsRetryImage().get() == repl::RetryImageEnum::kPreImage) {
+                    return args.updateArgs.preImageDoc.get();
+                } else {
+                    return args.updateArgs.updatedDoc;
+                }
+            }();
+            writeToImageCollection(opCtx,
+                                   *opCtx->getLogicalSessionId(),
+                                   opTime.writeOpTime.getTimestamp(),
+                                   oplogEntry.getNeedsRetryImage().get(),
+                                   dataImage);
         }
 
         SessionTxnRecord sessionTxnRecord;
@@ -722,19 +734,33 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         MutableOplogEntry oplogEntry;
-        if (args.deletedDoc) {
-            if (!repl::gStoreFindAndModifyImagesInOplog.load()) {
-                invariant(opCtx->getTxnNumber());
-                invariant(repl::feature_flags::gFeatureFlagRetryableFindAndModify
-                              .isEnabledAndIgnoreFCV());
+        if (args.deletedDoc &&
+            repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCV() &&
+            !repl::gStoreFindAndModifyImagesInOplog.load() &&
+            !args.preImageRecordingEnabledForCollection) {
+            // If we have a deleted document and the image should be saved to
+            // `config.image_collection`...
+            invariant(opCtx->getTxnNumber());
 
-                oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPreImage});
-            }
+            oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPreImage});
         }
 
-        boost::optional<BSONObj> deletedDoc =
-            args.deletedDoc ? boost::optional<BSONObj>(*(args.deletedDoc)) : boost::none;
-        opTime = replLogDelete(opCtx, nss, &oplogEntry, uuid, stmtId, args.fromMigrate, deletedDoc);
+        boost::optional<BSONObj> deletedDocForOplog = boost::none;
+        if (args.deletedDoc && !oplogEntry.getNeedsRetryImage()) {
+            // If we have a deletedDoc preImage and we're not writing it to
+            // `config.image_collection`, instead write it to the oplog.
+            deletedDocForOplog = {*(args.deletedDoc)};
+        }
+        opTime = replLogDelete(
+            opCtx, nss, &oplogEntry, uuid, stmtId, args.fromMigrate, deletedDocForOplog);
+
+        if (oplogEntry.getNeedsRetryImage()) {
+            writeToImageCollection(opCtx,
+                                   *opCtx->getLogicalSessionId(),
+                                   opTime.writeOpTime.getTimestamp(),
+                                   repl::RetryImageEnum::kPreImage,
+                                   *(args.deletedDoc));
+        }
 
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
@@ -1101,9 +1127,9 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
 }
 
 namespace {
-// Accepts an empty BSON builder and appends the given transaction statements to an 'applyOps'
-// array field. Appends as many operations as possible until either the constructed object
-// exceeds the 16MB limit or the maximum number of transaction statements allowed in one entry.
+// Accepts an empty BSON builder and appends the given transaction statements to an 'applyOps' array
+// field. Appends as many operations as possible until either the constructed object exceeds the
+// 16MB limit or the maximum number of transaction statements allowed in one entry.
 //
 // Returns an iterator to the first statement that wasn't packed into the applyOps object.
 std::vector<repl::ReplOperation>::iterator packTransactionStatementsForApplyOps(
@@ -1115,12 +1141,12 @@ std::vector<repl::ReplOperation>::iterator packTransactionStatementsForApplyOps(
     BSONArrayBuilder opsArray(applyOpsBuilder->subarrayStart("applyOps"_sd));
     for (stmtIter = stmtBegin; stmtIter != stmtEnd; stmtIter++) {
         const auto& stmt = *stmtIter;
-        // Stop packing when either number of transaction operations is reached, or when the
-        // next one would put the array over the maximum BSON Object User Size.  We rely on the
-        // head room between BSONObjMaxUserSize and BSONObjMaxInternalSize to cover the
-        // BSON overhead and the other applyOps fields.  But if the array with a single
-        // operation exceeds BSONObjMaxUserSize, we still log it, as a single max-length
-        // operation should be able to be applied.
+        // Stop packing when either number of transaction operations is reached, or when the next
+        // one would put the array over the maximum BSON Object User Size.  We rely on the head room
+        // between BSONObjMaxUserSize and BSONObjMaxInternalSize to cover the BSON overhead and the
+        // other applyOps fields.  But if the array with a single operation exceeds
+        // BSONObjMaxUserSize, we still log it, as a single max-length operation should be able to
+        // be applied.
         if (opsArray.arrSize() == gMaxNumberOfTransactionOperationsInSingleOplogEntry ||
             (opsArray.arrSize() > 0 &&
              (opsArray.len() + DurableOplogEntry::getDurableReplOperationSize(stmt) >
@@ -1129,8 +1155,8 @@ std::vector<repl::ReplOperation>::iterator packTransactionStatementsForApplyOps(
         opsArray.append(stmt.toBSON());
     }
     try {
-        // BSONArrayBuilder will throw a BSONObjectTooLarge exception if we exceeded the max
-        // BSON size.
+        // BSONArrayBuilder will throw a BSONObjectTooLarge exception if we exceeded the max BSON
+        // size.
         opsArray.done();
     } catch (const AssertionException& e) {
         // Change the error code to TransactionTooLarge if it is BSONObjectTooLarge.
@@ -1146,12 +1172,11 @@ std::vector<repl::ReplOperation>::iterator packTransactionStatementsForApplyOps(
 // builder object already has  an 'applyOps' field appended pointing to the desired array of ops
 // i.e. { "applyOps" : [op1, op2, ...] }
 //
-// @param txnState the 'state' field of the transaction table entry update.
-// @param startOpTime the optime of the 'startOpTime' field of the transaction table entry
-// update. If boost::none, no 'startOpTime' field will be included in the new transaction table
-// entry. Only meaningful if 'updateTxnTable' is true.
-// @param updateTxnTable determines whether the transactions table will updated after the oplog
-// entry is written.
+// @param txnState the 'state' field of the transaction table entry update.  @param startOpTime the
+// optime of the 'startOpTime' field of the transaction table entry update. If boost::none, no
+// 'startOpTime' field will be included in the new transaction table entry. Only meaningful if
+// 'updateTxnTable' is true.  @param updateTxnTable determines whether the transactions table will
+// updated after the oplog entry is written.
 //
 // Returns the optime of the written oplog entry.
 OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
@@ -1188,18 +1213,18 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
 }
 
 // Logs transaction oplog entries for preparing a transaction or committing an unprepared
-// transaction. This includes the in-progress 'partialTxn' oplog entries followed by the
-// implicit prepare or commit entry. If the 'prepare' argument is true, it will log entries for
-// a prepared transaction. Otherwise, it logs entries for an unprepared transaction. The total
-// number of oplog entries written will be <= the size of the given 'stmts' vector, and will
-// depend on how many transaction statements are given, the data size of each statement, and the
+// transaction. This includes the in-progress 'partialTxn' oplog entries followed by the implicit
+// prepare or commit entry. If the 'prepare' argument is true, it will log entries for a prepared
+// transaction. Otherwise, it logs entries for an unprepared transaction. The total number of oplog
+// entries written will be <= the size of the given 'stmts' vector, and will depend on how many
+// transaction statements are given, the data size of each statement, and the
 // 'maxNumberOfTransactionOperationsInSingleOplogEntry' server parameter.
 //
-// This function expects that the size of 'oplogSlots' be at least as big as the size of 'stmts'
-// in the worst case, where each operation requires an applyOps entry of its own. If there are
-// more oplog slots than applyOps operations are written, the number of oplog slots
-// corresponding to the number of applyOps written will be used. It also expects that the vector
-// of given statements is non-empty.
+// This function expects that the size of 'oplogSlots' be at least as big as the size of 'stmts' in
+// the worst case, where each operation requires an applyOps entry of its own. If there are more
+// oplog slots than applyOps operations are written, the number of oplog slots corresponding to the
+// number of applyOps written will be used. It also expects that the vector of given statements is
+// non-empty.
 //
 // In the case of writing entries for a prepared transaction, the last oplog entry (i.e. the
 // implicit prepare) will always be written using the last oplog slot given, even if this means
@@ -1215,8 +1240,8 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
     invariant(stmts->size() <= oplogSlots.size());
 
     // Storage transaction commit is the last place inside a transaction that can throw an
-    // exception. In order to safely allow exceptions to be thrown at that point, this function
-    // must be called from an outer WriteUnitOfWork in order to be rolled back upon reaching the
+    // exception. In order to safely allow exceptions to be thrown at that point, this function must
+    // be called from an outer WriteUnitOfWork in order to be rolled back upon reaching the
     // exception.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
@@ -1277,8 +1302,8 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
         if (isPartialTxn) {
             // Partial transactions create multiple oplog entries in the same WriteUnitOfWork.
             // Because of this, partial transactions will set multiple timestamps, violating the
-            // multi timestamp constraint. It's safe to ignore the multi timestamp constraints
-            // here as additional rollback logic is in place for this case.
+            // multi timestamp constraint. It's safe to ignore the multi timestamp constraints here
+            // as additional rollback logic is in place for this case.
             opCtx->recoveryUnit()->ignoreAllMultiTimestampConstraints();
         }
 
@@ -1351,14 +1376,14 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
     // write conflict retry loop.
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
-    // We must not have a maximum lock timeout, since writing the commit or abort oplog entry
-    // for a prepared transaction must always succeed.
+    // We must not have a maximum lock timeout, since writing the commit or abort oplog entry for a
+    // prepared transaction must always succeed.
     invariant(!opCtx->lockState()->hasMaxLockTimeout());
 
     writeConflictRetry(
         opCtx, "onPreparedTransactionCommitOrAbort", NamespaceString::kRsOplogNamespace.ns(), [&] {
-            // Writes to the oplog only require a Global intent lock. Guaranteed
-            // by OplogSlotReserver.
+            // Writes to the oplog only require a Global intent lock. Guaranteed by
+            // OplogSlotReserver.
             invariant(opCtx->lockState()->isWriteLocked());
 
             WriteUnitOfWork wuow(opCtx);
@@ -1395,9 +1420,9 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     // reserve enough entries for all statements in the transaction.
     auto oplogSlots = repl::getNextOpTimes(opCtx, statements->size() + numberOfPreImagesToWrite);
 
-    // Throw TenantMigrationConflict error if the database for the transaction statements is
-    // being migrated. We only need check the namespace of the first statement since a
-    // transaction's statements must all be for the same tenant.
+    // Throw TenantMigrationConflict error if the database for the transaction statements is being
+    // migrated. We only need check the namespace of the first statement since a transaction's
+    // statements must all be for the same tenant.
     tenant_migration_access_blocker::checkIfCanWriteOrThrow(opCtx,
                                                             statements->begin()->getNss().db());
 
@@ -1466,11 +1491,11 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
                 // It is possible that the transaction resulted in no changes, In that case, we
                 // should not write any operations other than the prepare oplog entry.
                 if (!statements->empty()) {
-                    // We had reserved enough oplog slots for the worst case where each
-                    // operation produced one oplog entry.  When operations are smaller and can
-                    // be packed, we will waste the extra slots.  The implicit prepare oplog
-                    // entry will still use the last reserved slot, because the transaction
-                    // participant has already used that as the prepare time.
+                    // We had reserved enough oplog slots for the worst case where each operation
+                    // produced one oplog entry.  When operations are smaller and can be packed, we
+                    // will waste the extra slots.  The implicit prepare oplog entry will still use
+                    // the last reserved slot, because the transaction participant has already used
+                    // that as the prepare time.
                     logOplogEntriesForTransaction(opCtx,
                                                   statements,
                                                   reservedSlots,
@@ -1542,8 +1567,8 @@ void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
         fassertFailedNoTrace(50712);
     }
 
-    // Force the config server to update its shard registry on next access. Otherwise it may
-    // have the stale data that has been just rolled back.
+    // Force the config server to update its shard registry on next access. Otherwise it may have
+    // the stale data that has been just rolled back.
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         if (auto shardRegistry = Grid::get(opCtx)->shardRegistry()) {
             shardRegistry->clearEntries();
