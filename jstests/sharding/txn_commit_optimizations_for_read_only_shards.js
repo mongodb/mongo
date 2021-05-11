@@ -52,11 +52,9 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-// TODO (SERVER-37364): Uncomment this line; otherwise, the coordinator will wait too long to
-// time out waiting for votes and the test will time out.
 // Lower the transaction timeout, since this test exercises cases where the coordinator should
-// time out collecting prepare votes.
-// TestData.transactionLifetimeLimitSeconds = 30;
+// time out collecting prepare votes from participants that cannot majority commit writes.
+TestData.transactionLifetimeLimitSeconds = 30;
 
 let st = new ShardingTest({
     shards: 3,
@@ -242,7 +240,7 @@ const failureModes = {
         },
     },
     participantCannotMajorityCommitWritesClientSendsWriteConcernMajority: {
-        beforeStatements: () => {
+        beforeStatements: (expectTwoPhaseCommit) => {
             // The default WC is majority and stopServerReplication will prevent satisfying any
             // majority writes.
             assert.commandWorked(st.s.adminCommand({
@@ -250,8 +248,10 @@ const failureModes = {
                 defaultWriteConcern: {w: 1},
                 writeConcern: {w: "majority"}
             }));
-            // Participant cannot majority commit writes.
-            stopServerReplication(st.rs0.getSecondaries());
+            // If two-phase commit is involved, rs0 will be the coordinator so we should disable
+            // replication on a different participant.
+            stopServerReplication(expectTwoPhaseCommit ? st.rs1.getSecondaries()
+                                                       : st.rs0.getSecondaries());
 
             // Do a write on rs0 through the router outside the transaction to ensure the
             // transaction will choose a read time that has not been majority committed.
@@ -261,26 +261,37 @@ const failureModes = {
         getCommitCommand: (lsid, txnNumber) => {
             return addTxnFields(makeCommitCommand(10 * 1000 /* wtimeout */), lsid, txnNumber);
         },
-        checkCommitResult: (res) => {
-            // Commit should return ok with a writeConcernError with wtimeout.
-            assert.commandWorkedIgnoringWriteConcernErrors(res);
-            checkWriteConcernTimedOut(res);
-            assert.eq(null, res.errorLabels);
+        checkCommitResult: (res, expectTwoPhaseCommit) => {
+            if (expectTwoPhaseCommit) {
+                // One of the participants cannot majority commit writes so the coordinator will
+                // timeout waiting for votes, and consequently abort the transaction with
+                // NoSuchTransaction error as the abort reason.
+                assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
+                assert.eq(["TransientTransactionError"], res.errorLabels);
+            } else {
+                // Commit should return ok with a writeConcernError with wtimeout.
+                assert.commandWorkedIgnoringWriteConcernErrors(res);
+                checkWriteConcernTimedOut(res);
+                assert.eq(null, res.errorLabels);
+            }
         },
-        cleanUp: () => {
-            restartServerReplication(st.rs0.getSecondaries());
+        cleanUp: (expectTwoPhaseCommit) => {
+            restartServerReplication(expectTwoPhaseCommit ? st.rs1.getSecondaries()
+                                                          : st.rs0.getSecondaries());
         },
     },
     participantCannotMajorityCommitWritesClientSendsWriteConcern1: {
-        beforeStatements: () => {
+        beforeStatements: (expectTwoPhaseCommit) => {
             // stopServerReplication will prevent fulfil any majority writes.
             assert.commandWorked(st.s.adminCommand({
                 setDefaultRWConcern: 1,
                 defaultWriteConcern: {w: 1},
                 writeConcern: {w: "majority"}
             }));
-            // Participant cannot majority commit writes.
-            stopServerReplication(st.rs0.getSecondaries());
+            // If two-phase commit is involved, rs0 will be the coordinator so we should disable
+            // replication on a different participant.
+            stopServerReplication(expectTwoPhaseCommit ? st.rs1.getSecondaries()
+                                                       : st.rs0.getSecondaries());
 
             // Do a write on rs0 through the router outside the transaction to ensure the
             // transaction will choose a read time that has not been majority committed.
@@ -290,13 +301,22 @@ const failureModes = {
         getCommitCommand: (lsid, txnNumber) => {
             return addTxnFields({commitTransaction: 1, writeConcern: {w: 1}}, lsid, txnNumber);
         },
-        checkCommitResult: (res) => {
-            // Commit should return ok without writeConcern error
-            assert.commandWorked(res);
-            assert.eq(null, res.errorLabels);
+        checkCommitResult: (res, expectTwoPhaseCommit) => {
+            if (expectTwoPhaseCommit) {
+                // One of the participants cannot majority commit writes so the coordinator will
+                // timeout waiting for votes, and consequently abort the transaction with
+                // NoSuchTransaction error as the abort reason.
+                assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
+                assert.eq(["TransientTransactionError"], res.errorLabels);
+            } else {
+                // Commit should return ok without writeConcern error.
+                assert.commandWorked(res);
+                assert.eq(null, res.errorLabels);
+            }
         },
-        cleanUp: () => {
-            restartServerReplication(st.rs0.getSecondaries());
+        cleanUp: (expectTwoPhaseCommit) => {
+            restartServerReplication(expectTwoPhaseCommit ? st.rs1.getSecondaries()
+                                                          : st.rs0.getSecondaries());
         },
     },
     clientSendsInvalidWriteConcernOnCommit: {
@@ -321,11 +341,17 @@ const failureModes = {
 
 for (const failureModeName in failureModes) {
     for (const type in transactionTypes) {
-        // If the participants cannot majority commit writes, the coordinator will timeout
-        // waiting for votes, and consequently send out abortTransaction to the participants
-        // who will then respond with NoSuchTransaction error.
         if (failureModeName.includes("participantCannotMajorityCommitWrites") &&
-            type.includes("ExpectTwoPhaseCommit")) {
+            type.includes("ExpectTwoPhaseCommit") &&
+            (jsTestOptions().useRandomBinVersionsWithinReplicaSet ||
+             jsTestOptions().shardMixedBinVersions)) {
+            // In v4.4, the coordinator will also make an abort decision after timing out waiting
+            // for votes in these cases. However, coordinateCommitTransaction will not return as
+            // soon as the decision is made durable on the coordinator, instead it will wait for the
+            // decision to be majority-ack'd by all participants, which can't happen while one of
+            // the participants can't majority commit writes.
+            jsTest.log(
+                `${failureModeName} with ${type} is skipped since we're running v4.4 binaries`);
             continue;
         }
 
@@ -339,9 +365,10 @@ for (const failureModeName in failureModes) {
         jsTest.log(`Testing ${failureModeName} with ${type} at txnNumber ${txnNumber}`);
 
         const failureMode = failureModes[failureModeName];
+        const expectTwoPhaseCommit = type.includes("TwoPhaseCommit");
 
         // Run the statements.
-        failureMode.beforeStatements();
+        failureMode.beforeStatements(expectTwoPhaseCommit);
         let startTransaction = true;
         transactionTypes[type](txnNumber).forEach(command => {
             assert.commandWorked(st.s.getDB(dbName).runCommand(
@@ -353,11 +380,11 @@ for (const failureModeName in failureModes) {
         const commitCmd = failureMode.getCommitCommand(lsid, txnNumber);
         failureMode.beforeCommit();
         const commitRes = st.s.adminCommand(commitCmd);
-        failureMode.checkCommitResult(commitRes);
+        failureMode.checkCommitResult(commitRes, expectTwoPhaseCommit);
 
         // Re-running commit should return the same response.
         const commitRetryRes = st.s.adminCommand(commitCmd);
-        failureMode.checkCommitResult(commitRetryRes);
+        failureMode.checkCommitResult(commitRetryRes, expectTwoPhaseCommit);
 
         if (type.includes("ExpectSingleShardCommit")) {
             waitForLog("Committing single-shard transaction", 2);
@@ -373,7 +400,7 @@ for (const failureModeName in failureModes) {
 
         clearRawMongoProgramOutput();
 
-        failureMode.cleanUp();
+        failureMode.cleanUp(expectTwoPhaseCommit);
     }
 }
 
