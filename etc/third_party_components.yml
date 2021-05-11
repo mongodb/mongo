@@ -156,7 +156,7 @@ components:
     homepage_url: https://github.com/jbeder/yaml-cpp
     open_hub_url: https://www.openhub.net/p/jbeder_yaml-cpp
     release_monitoring_id: 5284
-    local_directory_path: src/third_party/yaml-cpp-0.6.2
+    local_directory_path: src/third_party/yaml-cpp
     team_owner: "Security"
 
   JSON-Schema-Test-Suite:
