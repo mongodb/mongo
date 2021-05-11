@@ -7,7 +7,7 @@ config_variables:
   password: *keyFileData
   username: __system
 
-test_kind: js_test
+test_kind: multi_stmt_txn_passthrough
 # This suite starts two 3-node replica sets and uses the ContinuousTenantMigration hook to run
 # background tenant migrations. It also wraps all CRUD commands in transactions and asserts that
 # the transactions are committed/aborted correctly while tenant migrations are running.
@@ -420,11 +420,6 @@ executor:
         # so. Therefore, the garbage collection delay doesn't need to be large.
         tenantMigrationGarbageCollectionDelayMS: 1
         ttlMonitorSleepSecs: 1
-        # The donor replica set may have active transactions while a migration is in progress. If
-        # the migration is committed, those transactions may never receive 'commitTransaction' or
-        # 'abortTransaction', since all writes are automatically rerouted to the recipient. We set
-        # a low 'transactionLifetimeLimitSeconds' value to ensure that they are cleaned up quickly.
-        transactionLifetimeLimitSeconds: 20
         # Tenant migrations is not currently compatible with implicitly replicated retryable
         # findAndModify images.
         storeFindAndModifyImagesInSideCollection: false
