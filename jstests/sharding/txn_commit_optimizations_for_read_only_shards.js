@@ -38,10 +38,14 @@ const addTxnFields = function(command, lsid, txnNumber, startTransaction) {
     return Object.assign({}, command, txnFields);
 };
 
-const defaultCommitCommand = {
-    commitTransaction: 1,
-    writeConcern: {w: "majority", wtimeout: 6000}
+const makeCommitCommand = function(wtimeout) {
+    let writeConcern = {w: "majority"};
+    if (wtimeout) {
+        writeConcern.wtimeout = wtimeout;
+    }
+    return {commitTransaction: 1, writeConcern: writeConcern};
 };
+
 const noop = () => {};
 
 const dbName = "test";
@@ -205,7 +209,7 @@ const failureModes = {
         beforeStatements: noop,
         beforeCommit: noop,
         getCommitCommand: (lsid, txnNumber) => {
-            return addTxnFields(defaultCommitCommand, lsid, txnNumber);
+            return addTxnFields(makeCommitCommand(), lsid, txnNumber);
         },
         checkCommitResult: (res) => {
             // Commit should return ok without writeConcern error
@@ -226,7 +230,7 @@ const failureModes = {
             st.rs0.awaitNodesAgreeOnPrimary();
         },
         getCommitCommand: (lsid, txnNumber) => {
-            return addTxnFields(defaultCommitCommand, lsid, txnNumber);
+            return addTxnFields(makeCommitCommand(), lsid, txnNumber);
         },
         checkCommitResult: (res) => {
             // Commit should return NoSuchTransaction.
@@ -255,7 +259,7 @@ const failureModes = {
         },
         beforeCommit: noop,
         getCommitCommand: (lsid, txnNumber) => {
-            return addTxnFields(defaultCommitCommand, lsid, txnNumber);
+            return addTxnFields(makeCommitCommand(10 * 1000 /* wtimeout */), lsid, txnNumber);
         },
         checkCommitResult: (res) => {
             // Commit should return ok with a writeConcernError with wtimeout.
