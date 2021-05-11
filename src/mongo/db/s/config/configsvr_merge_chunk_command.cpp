@@ -111,13 +111,15 @@ public:
 
         auto parsedRequest = uassertStatusOK(MergeChunkRequest::parseFromConfigCommand(cmdObj));
 
-        uassertStatusOK(
+        const BSONObj shardAndCollVers = uassertStatusOK(
             ShardingCatalogManager::get(opCtx)->commitChunkMerge(opCtx,
                                                                  parsedRequest.getNamespace(),
                                                                  parsedRequest.getEpoch(),
                                                                  parsedRequest.getChunkBoundaries(),
                                                                  parsedRequest.getShardName(),
                                                                  parsedRequest.getValidAfter()));
+        result.appendElements(shardAndCollVers);
+
         return true;
     }
 
