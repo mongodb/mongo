@@ -288,6 +288,7 @@ void tassertFailed(const Status& status, SourceLocation loc) {
                 "Tripwire assertion",
                 "error"_attr = status,
                 "location"_attr = SourceLocationHolder(std::move(loc)));
+    printStackTrace();
     breakpoint();
     error_details::throwExceptionForStatus(status);
 }
