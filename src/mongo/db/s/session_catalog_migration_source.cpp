@@ -36,6 +36,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/session.h"
@@ -52,8 +53,47 @@ namespace {
 
 PseudoRandom hashGenerator(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64());
 
+boost::optional<repl::OplogEntry> forgeNoopEntryFromImageCollection(const repl::OplogEntry& entry,
+                                                                    OperationContext* opCtx) {
+    invariant(entry.getNeedsRetryImage());
+    DBDirectClient client(opCtx);
+    const auto query = BSON("_id" << entry.getSessionId()->toBSON());
+    auto imageDoc = client.findOne(NamespaceString::kConfigImagesNamespace.ns(), query);
+    if (imageDoc.isEmpty()) {
+        return boost::none;
+    }
+    auto imageEntry = repl::ImageEntry::parse(
+        IDLParserErrorContext("Parse image entry in nextSessionMigrationBatch"), imageDoc);
+    if (imageEntry.getTxnNumber() != *entry.getTxnNumber()) {
+        // In our snapshot, fetch the current transaction number for a session. If that transaction
+        // number doesn't match what's found on the image lookup, it implies that the image is not
+        // the correct version for this oplog entry. We will not forge a noop from it.
+        return boost::none;
+    }
+
+    BSONObjBuilder b;
+    // The opTime, namespace, and wall fields are expected to get overwritten by the
+    // destination.
+    b.append("ts", Timestamp::min());
+    b.append("t", -1LL);
+    b.appendDate("wall", Date_t::now());
+    b.append("ns", entry.getNamespace().ns());
+    b.append("op", OpType_serializer(repl::OpTypeEnum::kNoop));
+    b.append("v", repl::OplogEntry::kOplogVersion);
+    // The 'h' field is used for pv0 which is now deprecated.
+    b.append("h", 0LL);
+    b.append("o", imageEntry.getImage());
+    b.append(repl::OplogEntryBase::kSessionIdFieldName, imageEntry.get_id().toBSON());
+    b.append(repl::OplogEntryBase::kTxnNumberFieldName, imageEntry.getTxnNumber());
+    b.append(repl::OplogEntryBase::kStatementIdFieldName, *entry.getStatementId());
+    return uassertStatusOK(repl::OplogEntry::parse(b.obj()));
+}
+
 boost::optional<repl::OplogEntry> fetchPrePostImageOplog(OperationContext* opCtx,
                                                          const repl::OplogEntry& oplog) {
+    if (oplog.getNeedsRetryImage()) {
+        return forgeNoopEntryFromImageCollection(oplog, opCtx);
+    }
     auto opTimeToFetch = oplog.getPreImageOpTime();
 
     if (!opTimeToFetch) {
@@ -201,6 +241,9 @@ SessionCatalogMigrationSource::OplogResult SessionCatalogMigrationSource::getLas
 
     {
         stdx::lock_guard<stdx::mutex> _lk(_newOplogMutex);
+        if (_lastFetchedNewWriteOplogImage) {
+            return OplogResult(_lastFetchedNewWriteOplogImage.get(), false);
+        }
         return OplogResult(_lastFetchedNewWriteOplog, true);
     }
 }
@@ -312,6 +355,14 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
     {
         stdx::lock_guard<stdx::mutex> lk(_newOplogMutex);
 
+        if (_lastFetchedNewWriteOplogImage) {
+            // This indicates that the last consumed oplog entry was a forged image oplog. We must
+            // not buffer the next oplog entry until we have consumed the original oplog entry that
+            // generated the forged image.
+            _lastFetchedNewWriteOplogImage.reset();
+            return true;
+        }
+
         if (_newWriteOpTimeList.empty()) {
             _lastFetchedNewWriteOplog.reset();
             return false;
@@ -330,13 +381,20 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
             str::stream() << "Unable to fetch oplog entry with opTime: "
                           << nextOpTimeToFetch.toBSON(),
             !newWriteOplog.isEmpty());
-
+    auto newWriteOplogEntry = uassertStatusOK(repl::OplogEntry::parse(newWriteOplog));
+    boost::optional<repl::OplogEntry> forgedNoopImage;
+    if (newWriteOplogEntry.getNeedsRetryImage()) {
+        forgedNoopImage = forgeNoopEntryFromImageCollection(newWriteOplogEntry, opCtx);
+    }
     {
         stdx::lock_guard<stdx::mutex> lk(_newOplogMutex);
-        _lastFetchedNewWriteOplog = uassertStatusOK(repl::OplogEntry::parse(newWriteOplog));
+        _lastFetchedNewWriteOplog = newWriteOplogEntry;
         _newWriteOpTimeList.pop_front();
-    }
 
+        if (forgedNoopImage) {
+            _lastFetchedNewWriteOplogImage = forgedNoopImage;
+        }
+    }
     return true;
 }
 

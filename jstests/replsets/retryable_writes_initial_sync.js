@@ -1,6 +1,8 @@
 /**
  * Tests that retryable findAndModify data stored in the `config.image_collection` side collection
  * do not get populated by nodes doing oplog application while in initial sync.
+ *
+ * @tags: [uses_transactions]
  */
 (function() {
     'use strict';

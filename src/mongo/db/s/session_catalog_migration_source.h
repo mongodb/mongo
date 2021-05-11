@@ -238,6 +238,9 @@ private:
     // Used to store the last fetched oplog. This enables calling get multiple times.
     boost::optional<repl::OplogEntry> _lastFetchedOplog;
 
+    // Used to store an image when `_lastFetchedNewWriteOplog` has a `needsRetryImage` field.
+    boost::optional<repl::OplogEntry> _lastFetchedNewWriteOplogImage;
+
     // Protects _newWriteTsList, _lastFetchedNewWriteOplog, _state, _newOplogNotification
     stdx::mutex _newOplogMutex;
 
