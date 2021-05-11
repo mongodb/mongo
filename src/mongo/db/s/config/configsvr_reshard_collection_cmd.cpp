@@ -98,7 +98,6 @@ public:
                 uassert(ErrorCodes::BadValue,
                         "Must specify value for zones field",
                         request().getZones());
-                validateZones(request().getZones().get(), authoritativeTags);
             }
 
             if (request().get_presetReshardedChunks()) {
@@ -123,6 +122,19 @@ public:
             auto tempReshardingNss = constructTemporaryReshardingNss(
                 nss.db(), getCollectionUUIDFromChunkManger(nss, cm));
 
+
+            boost::optional<std::vector<ReshardingZoneType>> zones;
+            if (request().getZones()) {
+                zones.emplace();
+                zones->reserve(request().getZones()->size());
+                for (const BSONObj& obj : request().getZones().get()) {
+                    zones->push_back(ReshardingZoneType::parse(
+                        IDLParserErrorContext("ReshardingZoneType"), obj));
+                }
+
+                checkForOverlappingZones(zones.get());
+            }
+
             auto coordinatorDoc =
                 ReshardingCoordinatorDocument(std::move(CoordinatorStateEnum::kUnused),
                                               {},   // donorShards
@@ -137,7 +149,7 @@ public:
                                                            std::move(tempReshardingNss),
                                                            request().getKey());
             coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
-            coordinatorDoc.setZones(request().getZones());
+            coordinatorDoc.setZones(std::move(zones));
             coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
             coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
 

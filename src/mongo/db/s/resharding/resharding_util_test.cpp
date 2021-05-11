@@ -88,19 +88,8 @@ protected:
         return reshardedchunkBuilder.obj();
     }
 
-    BSONObj makeZone(const ChunkRange range, std::string zoneName) {
-        BSONObjBuilder tagDocBuilder;
-        tagDocBuilder.append("_id",
-                             BSON(TagsType::ns(nss().ns()) << TagsType::min(range.getMin())));
-        tagDocBuilder.append(TagsType::ns(), nss().ns());
-        tagDocBuilder.append(TagsType::min(), range.getMin());
-        tagDocBuilder.append(TagsType::max(), range.getMax());
-        tagDocBuilder.append(TagsType::tag(), zoneName);
-        return tagDocBuilder.obj();
-    }
-
-    TagsType makeTagType(const ChunkRange range, std::string zoneName) {
-        return unittest::assertGet(TagsType::fromBSON(makeZone(range, zoneName)));
+    ReshardingZoneType makeZone(const ChunkRange range, std::string zoneName) {
+        return ReshardingZoneType(zoneName, range.getMin(), range.getMax());
     }
 
     const std::string zoneName(std::string zoneNum) {
@@ -215,48 +204,25 @@ TEST_F(ReshardingUtilTest, SuccessfulValidateZoneCase) {
         ChunkRange(keyPattern().globalMin(), BSON(shardKey() << 0)),
         ChunkRange(BSON(shardKey() << 0), BSON(shardKey() << 10)),
     };
-    const std::vector<TagsType> authoritativeTags = {makeTagType(zoneRanges[1], zoneName("1"))};
-    std::vector<mongo::BSONObj> zones;
+    std::vector<mongo::ReshardingZoneType> zones;
     zones.push_back(makeZone(zoneRanges[0], zoneName("1")));
-    validateZones(zones, authoritativeTags);
+    zones.push_back(makeZone(zoneRanges[1], zoneName("2")));
+
+    checkForOverlappingZones(zones);
 }
 
-TEST_F(ReshardingUtilTest, FailWhenMissingZoneNameInUserProvidedZone) {
-    const std::vector<ChunkRange> zoneRanges = {
-        ChunkRange(keyPattern().globalMin(), BSON(shardKey() << 0)),
-        ChunkRange(BSON(shardKey() << 0), BSON(shardKey() << 10)),
-    };
-    const std::vector<TagsType> authoritativeTags = {makeTagType(zoneRanges[1], zoneName("1"))};
-    std::vector<mongo::BSONObj> zones;
-    // make a zoneBSONObj and remove the zoneName field from it.
-    auto zone = makeZone(zoneRanges[0], zoneName("0")).removeField(TagsType::tag());
-    zones.push_back(zone);
-    ASSERT_THROWS_CODE(validateZones(zones, authoritativeTags), DBException, ErrorCodes::NoSuchKey);
-}
-
-TEST_F(ReshardingUtilTest, FailWhenZoneNameDoesNotExistInConfigTagsCollection) {
-    const std::vector<ChunkRange> zoneRanges = {
-        ChunkRange(keyPattern().globalMin(), BSON(shardKey() << 0)),
-        ChunkRange(BSON(shardKey() << 0), BSON(shardKey() << 10)),
-    };
-    const std::vector<TagsType> authoritativeTags = {makeTagType(zoneRanges[1], zoneName("1"))};
-    std::vector<mongo::BSONObj> zones;
-    zones.push_back(makeZone(zoneRanges[0], zoneName("0")));
-    ASSERT_THROWS_CODE(validateZones(zones, authoritativeTags), DBException, ErrorCodes::BadValue);
-}
 
 TEST_F(ReshardingUtilTest, FailWhenOverlappingZones) {
     const std::vector<ChunkRange> overlapZoneRanges = {
         ChunkRange(BSON(shardKey() << 0), BSON(shardKey() << 10)),
         ChunkRange(BSON(shardKey() << 8), keyPattern().globalMax()),
     };
-    const std::vector<TagsType> authoritativeTags = {
-        makeTagType(overlapZoneRanges[0], zoneName("0")),
-        makeTagType(overlapZoneRanges[1], zoneName("1"))};
-    std::vector<mongo::BSONObj> zones;
+
+    std::vector<ReshardingZoneType> zones;
     zones.push_back(makeZone(overlapZoneRanges[0], zoneName("0")));
     zones.push_back(makeZone(overlapZoneRanges[1], zoneName("1")));
-    ASSERT_THROWS_CODE(validateZones(zones, authoritativeTags), DBException, ErrorCodes::BadValue);
+
+    ASSERT_THROWS_CODE(checkForOverlappingZones(zones), DBException, ErrorCodes::BadValue);
 }
 
 TEST(ReshardingUtilTest, AssertDonorOplogIdSerialization) {

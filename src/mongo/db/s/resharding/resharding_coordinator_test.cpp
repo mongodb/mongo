@@ -574,7 +574,8 @@ protected:
 
         std::vector<BSONObj> zones;
         if (expectedCoordinatorDoc.getZones()) {
-            zones = std::move(expectedCoordinatorDoc.getZones().get());
+            zones = buildTagsDocsFromZones(expectedCoordinatorDoc.getTempReshardingNss(),
+                                           *expectedCoordinatorDoc.getZones());
         }
         expectedCoordinatorDoc.setZones(boost::none);
         expectedCoordinatorDoc.setPresetReshardedChunks(boost::none);
@@ -734,8 +735,12 @@ TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoSucceeds) {
 
     auto newZones = makeZones(_tempNss, _newShardKey);
     std::vector<BSONObj> zonesBSON;
+    std::vector<ReshardingZoneType> reshardingZoneTypes;
     for (const auto& zone : newZones) {
         zonesBSON.push_back(zone.toBSON());
+
+        ReshardingZoneType zoneType(zone.getTag(), zone.getMinKey(), zone.getMaxKey());
+        reshardingZoneTypes.push_back(zoneType);
     }
 
     std::vector<BSONObj> presetBSONChunks;
@@ -747,7 +752,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoSucceeds) {
     // Persist the updates on disk
     auto expectedCoordinatorDoc = coordinatorDoc;
     expectedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
-    expectedCoordinatorDoc.setZones(zonesBSON);
+    expectedCoordinatorDoc.setZones(std::move(reshardingZoneTypes));
     expectedCoordinatorDoc.setPresetReshardedChunks(presetBSONChunks);
 
     writeInitialStateAndCatalogUpdatesExpectSuccess(

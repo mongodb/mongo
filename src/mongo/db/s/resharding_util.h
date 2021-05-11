@@ -250,15 +250,13 @@ Timestamp getHighestMinFetchTimestamp(const std::vector<DonorShardEntry>& donorS
 /**
  * Asserts that there is not an overlap in the zone ranges.
  */
-void checkForOverlappingZones(std::vector<TagsType>& zones);
+void checkForOverlappingZones(std::vector<ReshardingZoneType>& zones);
 
 /**
- * Validates zones provided with a reshardCollection cmd. Parses each BSONObj to a valid
- * TagsType and asserts that each zones's name is associated with an existing entry in
- * config.tags. Then, asserts that there is not an overlap in the zone ranges.
+ * Builds documents to insert into config.tags from zones provided to reshardCollection cmd.
  */
-void validateZones(const std::vector<mongo::BSONObj>& zones,
-                   const std::vector<TagsType>& authoritativeTags);
+std::vector<BSONObj> buildTagsDocsFromZones(const NamespaceString& tempNss,
+                                            const std::vector<ReshardingZoneType>& zones);
 
 /**
  * Creates a view on the oplog that facilitates the specialized oplog tailing a resharding

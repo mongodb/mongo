@@ -780,7 +780,11 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
             parsedZones->reserve(rawBSONZones->size());
 
             for (const auto& zone : *rawBSONZones) {
-                parsedZones->push_back(uassertStatusOK(TagsType::fromBSON(zone)));
+                ChunkRange range(zone.getMin(), zone.getMax());
+                TagsType tag(
+                    coordinatorDoc.getTempReshardingNss(), zone.getZone().toString(), range);
+
+                parsedZones->push_back(tag);
             }
         }
 
@@ -1281,7 +1285,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     // the possibility of the document reaching the BSONObj size constraint.
     std::vector<BSONObj> zones;
     if (updatedCoordinatorDoc.getZones()) {
-        zones = std::move(updatedCoordinatorDoc.getZones().get());
+        zones = buildTagsDocsFromZones(updatedCoordinatorDoc.getTempReshardingNss(),
+                                       *updatedCoordinatorDoc.getZones());
     }
     updatedCoordinatorDoc.setPresetReshardedChunks(boost::none);
     updatedCoordinatorDoc.setZones(boost::none);

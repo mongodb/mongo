@@ -89,7 +89,7 @@ structs:
                 type: array<RecipientShardEntry>
                 description: "The list of all recipient shards for this resharding operation."
             zones:
-                type: array<object_owned>
+                type: array<ReshardingZoneType>
                 description: "The zones associated with the new shard key."
                 optional: true
             numInitialChunks:

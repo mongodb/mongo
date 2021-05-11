@@ -221,3 +221,19 @@ structs:
             shardId:
                 type: shard_id
                 description: "A shard identifier."
+
+    ReshardingZoneType:
+        description: >-
+            Object describing a zone for the collection being resharded using the new shard key.
+        # Use strict:false to avoid complications around upgrade/downgrade.
+        strict: false
+        fields:
+            zone:
+                type: string
+                description: "The zone name."
+            min:
+                type: object_owned 
+                description: "The min key of the chunk range assigned to the zone."
+            max:
+                type: object_owned
+                description: "The max key of the chunk range assigned to the zone."
