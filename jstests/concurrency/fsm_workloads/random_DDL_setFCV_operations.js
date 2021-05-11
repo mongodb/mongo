@@ -23,7 +23,7 @@
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/random_DDL_CRUD_operations.js');
+load('jstests/concurrency/fsm_workloads/random_DDL_operations.js');
 load("jstests/libs/override_methods/mongos_manual_intervention_actions.js");
 
 var $config = extendWorkload($config, function($config, $super) {
