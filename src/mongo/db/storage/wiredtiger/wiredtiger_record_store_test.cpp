@@ -41,9 +41,9 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_stones.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -850,6 +850,70 @@ TEST(WiredTigerRecordStoreTest, OplogStones_AscendingOrder) {
         ASSERT_EQ(2U, oplogStones->numStones());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
+    }
+}
+
+// Ensure that if we sample and create duplicate oplog stones, perform truncation correctly, and
+// with no crashing behavior. This scenario may be possible if the same record is sampled multiple
+// times during startup, which can be very likely if the size storer is very innacurate.
+TEST(WiredTigerRecordStoreTest, OplogStones_Duplicates) {
+    std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
+    auto wtHarnessHelper = dynamic_cast<WiredTigerHarnessHelper*>(harnessHelper.get());
+    std::unique_ptr<RecordStore> rs(wtHarnessHelper->newOplogRecordStoreNoInit());
+
+    WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
+
+    {
+        // Before initializing the RecordStore, which also starts the oplog sampling process,
+        // populate with a few records.
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 0), 100), RecordId(1, 0));
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(2, 0), 100), RecordId(2, 0));
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(3, 0), 100), RecordId(3, 0));
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(4, 0), 100), RecordId(4, 0));
+    }
+
+    // Force the oplog visibility timestamp to be up-to-date to the last record.
+    auto wtKvEngine = dynamic_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
+    wtKvEngine->getOplogManager()->setOplogReadTimestamp(Timestamp(4, 0));
+
+    {
+        // Force initialize the oplog stones to use sampling by providing very large, innacurate
+        // sizes. This should cause us to oversample the records in the oplog.
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        wtrs->setNumRecords(1024 * 1024);
+        wtrs->setDataSize(1024 * 1024 * 1024);
+        wtrs->postConstructorInit(opCtx.get());
+    }
+
+    WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
+
+    // Confirm that sampling occurred and that some stones were generated.
+    ASSERT(oplogStones->processedBySampling());
+    auto stonesBefore = oplogStones->numStones();
+    ASSERT_GT(stonesBefore, 0U);
+
+    {
+        // Reclaiming should do nothing because the data size is still under the maximum.
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        wtrs->reclaimOplog(opCtx.get(), Timestamp(4, 0));
+        ASSERT_EQ(stonesBefore, oplogStones->numStones());
+
+        // Reduce the oplog size to ensure we create a stone and truncate on the next insert.
+        ASSERT_OK(wtrs->updateOplogSize(400));
+
+        // Inserting these records should meet the requirements for truncation. That is: there is a
+        // record, 5, after the last stone, 4, and before the truncation point, 6.
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(5, 0), 100), RecordId(5, 0));
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(6, 0), 100), RecordId(6, 0));
+
+        // Ensure every stone has been cleaned up except for the last one ending in 6.
+        wtrs->reclaimOplog(opCtx.get(), Timestamp(6, 0));
+        ASSERT_EQ(1, oplogStones->numStones());
+
+        // The original oplog should have rolled over and the size and count should be accurate.
+        ASSERT_EQ(1, wtrs->numRecords(opCtx.get()));
+        ASSERT_EQ(100, wtrs->dataSize(opCtx.get()));
     }
 }
 

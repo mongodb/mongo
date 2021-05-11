@@ -117,6 +117,10 @@ public:
 
     void setMinBytesPerStone(int64_t size);
 
+    bool processedBySampling() const {
+        return _processBySampling.load();
+    }
+
 private:
     class InsertChange;
     class TruncateChange;
