@@ -122,6 +122,26 @@ void ReshardingMetrics::onCompletion(ReshardingOperationStatusEnum status) noexc
     _currentOp = boost::none;
 }
 
+void ReshardingMetrics::onStepUp() noexcept {
+    stdx::lock_guard<Latch> lk(_mutex);
+    invariant(!_currentOp.has_value(), kAnotherOperationInProgress);
+    _currentOp.emplace(_svcCtx->getFastClockSource());
+
+    // TODO SERVER-53913 Implement donor metrics rehydration.
+    // TODO SERVER-53914 Implement coordinator metrics rehydration.
+    // TODO SERVER-53912 Implement recipient metrics rehydration.
+
+    // TODO SERVER-56739 Resume the runningOperation duration from a timestamp stored on disk
+    // instead of starting from the current time.
+    _currentOp->runningOperation.start();
+    _currentOp->opStatus = ReshardingOperationStatusEnum::kRunning;
+}
+
+void ReshardingMetrics::onStepDown() noexcept {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _currentOp = boost::none;
+}
+
 void ReshardingMetrics::setDonorState(DonorStateEnum state) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_currentOp.has_value(), kNoOperationInProgress);

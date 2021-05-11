@@ -121,7 +121,28 @@ private:
 DEATH_TEST_F(ReshardingMetricsTest, RunOnCompletionBeforeOnStart, "No operation is in progress") {
     getMetrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess);
 }
+
+DEATH_TEST_F(ReshardingMetricsTest,
+             RunOnStepUpAfterOnStartInvariants,
+             "Another operation is in progress") {
+    getMetrics()->onStart();
+    getMetrics()->onStepUp();
+}
+
+DEATH_TEST_F(ReshardingMetricsTest,
+             RunOnCompletionAfterOnStepDownInvariants,
+             "No operation is in progress") {
+    getMetrics()->onStart();
+    getMetrics()->onStepDown();
+    getMetrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess);
+}
 */
+
+TEST_F(ReshardingMetricsTest, RunOnStepDownAfterOnCompletionIsSafe) {
+    getMetrics()->onStart();
+    getMetrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess);
+    getMetrics()->onStepDown();
+}
 
 TEST_F(ReshardingMetricsTest, OperationStatus) {
     getMetrics()->onStart();
@@ -294,6 +315,24 @@ TEST_F(ReshardingMetricsTest, CurrentOpMetricsAreNotRetainedAfterCompletion) {
                  OpReportType::CurrentOpReportRecipientRole);
     advanceTime();
     getMetrics()->onCompletion(ReshardingOperationStatusEnum::kFailure);
+    advanceTime();
+
+    ASSERT_FALSE(getReport(OpReportType::CurrentOpReportRecipientRole)[kTag].ok());
+}
+
+TEST_F(ReshardingMetricsTest, CurrentOpMetricsAreNotRetainedAfterStepDown) {
+    auto constexpr kTag = "documentsCopied";
+    getMetrics()->onStart();
+    const auto kDocumentsToCopy = 2;
+    const auto kBytesToCopy = 200;
+    getMetrics()->setRecipientState(RecipientStateEnum::kCloning);
+    getMetrics()->onDocumentsCopied(kDocumentsToCopy, kBytesToCopy);
+    checkMetrics(kTag,
+                 kDocumentsToCopy,
+                 "Current metrics are not set",
+                 OpReportType::CurrentOpReportRecipientRole);
+    advanceTime();
+    getMetrics()->onStepDown();
     advanceTime();
 
     ASSERT_FALSE(getReport(OpReportType::CurrentOpReportRecipientRole)[kTag].ok());

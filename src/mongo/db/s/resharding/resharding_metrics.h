@@ -61,6 +61,10 @@ public:
     // at any time.
     void onStart() noexcept;
 
+    // Marks the resumption of a resharding operation. Note that only one resharding operation may
+    // run at any time.
+    void onStepUp() noexcept;
+
     // So long as a resharding operation is in progress, the following may be used to update the
     // state of a donor, a recipient, and a coordinator, respectively.
     void setDonorState(DonorStateEnum) noexcept;
@@ -83,6 +87,10 @@ public:
     // Allows tracking writes during a critical section when the donor's state is either of
     // "donating-oplog-entries" or "blocking-writes".
     void onWriteDuringCriticalSection(int64_t writes) noexcept;
+
+    // Tears down the currentOp variable so that the node that is stepping up may continue the
+    // resharding operation from disk.
+    void onStepDown() noexcept;
 
     // Marks the completion of the current (active) resharding operation. Aborts the process if no
     // resharding operation is in progress.

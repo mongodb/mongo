@@ -1138,9 +1138,8 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             return _persistDecisionAndFinishReshardOperation(executor, updatedCoordinatorDoc);
         })
         .onCompletion([this, self = shared_from_this(), executor](Status status) {
-            // TODO SERVER-53914 depending on where we load metrics at the start of the operation,
-            // this may need to change
-            if (_coordinatorDoc.getState() != CoordinatorStateEnum::kUnused) {
+            if (!_ctHolder->isSteppingOrShuttingDown() &&
+                _coordinatorDoc.getState() != CoordinatorStateEnum::kUnused) {
                 // Notify `ReshardingMetrics` as the operation is now complete for external
                 // observers.
                 markCompleted(status);
@@ -1169,6 +1168,10 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
         .onCompletion([this, self = shared_from_this()](Status status) {
             // On stepdown or shutdown, the _scopedExecutor may have already been shut down.
             // Schedule cleanup work on the parent executor.
+            if (_ctHolder->isSteppingOrShuttingDown()) {
+                ReshardingMetrics::get(cc().getServiceContext())->onStepDown();
+            }
+
             if (!status.isOK()) {
                 {
                     auto lg = stdx::lock_guard(_fulfillmentMutex);
@@ -1251,6 +1254,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::onOkayToEnterCritical(
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kUnused) {
+        ReshardingMetrics::get(cc().getServiceContext())->onStepUp();
         return;
     }
 
