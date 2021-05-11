@@ -1,5 +1,5 @@
 /**
- * Tests basic functionality of the $setField expression.
+ * Tests basic functionality of the $setField expression and the $unsetField alias.
  * @tags: [assumes_unsharded_collection]
  */
 (function() {
@@ -56,24 +56,46 @@ function assertSetFieldFailedWithCode(setFieldArgs, code) {
     assert.commandFailedWithCode(error, code);
 }
 
+// Test that $unsetField fails with the provided 'code' for invalid arguments 'unsetFieldArgs'.
+function assertUnsetFieldFailedWithCode(unsetFieldArgs, code) {
+    const error =
+        assert.throws(() => coll.aggregate([{$project: {test: {$unsetField: unsetFieldArgs}}}]));
+    assert.commandFailedWithCode(error, code);
+}
+
 // Test that $setField returns the 'expected' results for the given arguments 'setFieldArgs'.
 function assertSetFieldResultsEq(setFieldArgs, expected) {
     assertPipelineResultsEq([{$project: {_id: 1, test: {$setField: setFieldArgs}}}], expected);
+}
+
+// Test that $unsetField returns the 'expected' results for the given arguments 'unsetFieldArgs'.
+function assertUnsetFieldResultsEq(unsetFieldArgs, expected) {
+    assertPipelineResultsEq([{$project: {_id: 1, test: {$unsetField: unsetFieldArgs}}}], expected);
 }
 
 // Test that $setField correctly sets the 'field' to 'value' in all documents in 'coll'.
 function assertSetFieldInRootDoc(field, value) {
     // Wrap 'field' argument to $setField in $const to allow test cases containing dots and dollars.
     assertPipelineResultsEq(
-        [{$project: {_id: 1, test: {$setField: {field: {$const: field}, value}}}}],
+        [{$project: {_id: 1, test: {$setField: {field: {$const: field}, input: "$$ROOT", value}}}}],
         getTestCasesForSet(field, value));
 }
 
-// Test that $setField correctly unsets the 'field' in all documents in 'coll'.
+// Test that $setField and $unsetField both correctly unset the 'field' in all documents in 'coll'.
 function assertUnsetFieldInRootDoc(field) {
     // Wrap 'field' argument to $setField in $const to allow test cases containing dots and dollars.
     assertPipelineResultsEq(
-        [{$project: {_id: 1, test: {$setField: {field: {$const: field}, value: "$$REMOVE"}}}}],
+        [{
+            $project: {
+                _id: 1,
+                test: {$setField: {field: {$const: field}, input: "$$ROOT", value: "$$REMOVE"}}
+            }
+        }],
+        getTestCasesForUnset(field));
+
+    // Test $unsetField alias as well.
+    assertPipelineResultsEq(
+        [{$project: {_id: 1, test: {$unsetField: {field: {$const: field}, input: "$$ROOT"}}}}],
         getTestCasesForUnset(field));
 }
 
@@ -102,34 +124,62 @@ for (let i = 0; i < 2; i++) {
 // Field and value are missing.
 assertSetFieldFailedWithCode({input: {a: "b"}}, 4161102);
 assertSetFieldFailedWithCode({}, 4161102);
+assertUnsetFieldFailedWithCode({input: {a: "b"}}, 4161102);
+assertUnsetFieldFailedWithCode({}, 4161102);
 
 // Field is missing.
 assertSetFieldFailedWithCode({value: "a"}, 4161102);
 assertSetFieldFailedWithCode({value: "a", input: {a: "b"}}, 4161102);
 
-// Value is missing.
+// Value is missing in $setField.
 assertSetFieldFailedWithCode({field: "a"}, 4161103);
 assertSetFieldFailedWithCode({field: "a", input: {a: "b"}}, 4161103);
 
-// Test that $setField fails with a document with one or more arguments of incorrect type.
+// Value is present in $unsetField.
+assertUnsetFieldFailedWithCode({field: "a", value: "foo"}, 4161101);
+assertUnsetFieldFailedWithCode({field: "a", value: null, input: {a: "b"}}, 4161101);
+
+// Input is missing.
+assertSetFieldFailedWithCode({field: null, value: 0}, 4161109);
+assertSetFieldFailedWithCode({field: "foo", value: 0}, 4161109);
+assertUnsetFieldFailedWithCode({field: null}, 4161109);
+assertUnsetFieldFailedWithCode({field: "foo"}, 4161109);
+
+// Test that $setField fails with one or more arguments of incorrect type.
 assertSetFieldFailedWithCode({field: true, input: {a: "b"}, value: 24}, 4161107);
 assertSetFieldFailedWithCode({field: {"a": 1}, input: {"a": 1}, value: 24}, 4161106);
 assertSetFieldFailedWithCode({field: 33, input: 33, value: 24}, 4161107);
 assertSetFieldFailedWithCode({field: "a", input: true, value: 24}, 4161105);
 
+// Test that $unsetField fails with one or more arguments of incorrect type.
+assertUnsetFieldFailedWithCode({field: true, input: {a: "b"}}, 4161107);
+assertUnsetFieldFailedWithCode({field: {"a": 1}, input: {"a": 1}}, 4161106);
+assertUnsetFieldFailedWithCode({field: 33, input: 33}, 4161107);
+assertUnsetFieldFailedWithCode({field: "a", input: true}, 4161105);
+
 // Test that $setField fails when 'field' is not a constant string argument.
 assertSetFieldFailedWithCode({field: null, input: {}, value: 0}, 4161107);
-assertSetFieldFailedWithCode({field: null, value: 0}, 4161107);
 assertSetFieldFailedWithCode({field: "$field_path", input: {}, value: 0}, 4161108);
-assertSetFieldFailedWithCode({field: "$field_path", value: 0}, 4161108);
 assertSetFieldFailedWithCode(
     {field: {$concat: ["a.b", ".", "c"]}, input: {$const: {"a.b.c": 5}}, value: 12345}, 4161106);
+
+// Test that $unsetField fails when 'field' is not a constant string argument.
+assertUnsetFieldFailedWithCode({field: null, input: {}}, 4161107);
+assertUnsetFieldFailedWithCode({field: "$field_path", input: {}}, 4161108);
+assertUnsetFieldFailedWithCode({field: {$concat: ["a.b", ".", "c"]}, input: {$const: {"a.b.c": 5}}},
+                               4161106);
 
 // $setField does not accept an argument that is not an object.
 assertSetFieldFailedWithCode(5, 4161100);
 assertSetFieldFailedWithCode(true, 4161100);
 assertSetFieldFailedWithCode({$add: [2, 3]}, 4161101);
 assertSetFieldFailedWithCode("foo", 4161100);
+
+// $unsetField does not accept an argument that is not an object.
+assertUnsetFieldFailedWithCode(5, 4161100);
+assertUnsetFieldFailedWithCode(true, 4161100);
+assertUnsetFieldFailedWithCode({$add: [2, 3]}, 4161101);
+assertUnsetFieldFailedWithCode("foo", 4161100);
 
 // Test that $setField fails with a document with invalid arguments.
 assertSetFieldFailedWithCode({field: "a", input: {a: "b"}, unknown: true}, 4161101);
@@ -151,9 +201,19 @@ assertSetFieldResultsEq({field: "a", input: {b: "b"}, value: "$$REMOVE"},
 assertSetFieldResultsEq({field: "a", input: {}, value: "$$REMOVE"},
                         [{_id: 0, test: {}}, {_id: 1, test: {}}]);
 
+// Test that $unsetField correctly removes the field in the provided object.
+assertUnsetFieldResultsEq({field: "a", input: {a: "b"}}, [{_id: 0, test: {}}, {_id: 1, test: {}}]);
+assertUnsetFieldResultsEq({field: "a", input: {b: "b"}},
+                          [{_id: 0, test: {b: "b"}}, {_id: 1, test: {b: "b"}}]);
+assertUnsetFieldResultsEq({field: "a", input: {}}, [{_id: 0, test: {}}, {_id: 1, test: {}}]);
+
 // Test that $setField returns null when given a nullish 'input'.
 assertSetFieldResultsEq({field: "not_going_to_be_a_field", input: null, value: 0},
                         [{_id: 0, test: null}, {_id: 1, test: null}]);
+
+// Test that $unsetField returns null when given a nullish 'input'.
+assertUnsetFieldResultsEq({field: "not_going_to_be_a_field", input: null},
+                          [{_id: 0, test: null}, {_id: 1, test: null}]);
 
 // Test that $setField correctly updates 'field' in the $$ROOT object to 'value', or clears it if
 // value is set to $$REMOVE.
@@ -258,6 +318,7 @@ assertPipelineResultsEq([{
                                                 input: {
                                                     $setField: {
                                                         field: "foo",
+                                                        input: "$$ROOT",
                                                         value: 1234,
                                                     }
                                                 }

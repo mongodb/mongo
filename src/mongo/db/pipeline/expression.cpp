@@ -7333,11 +7333,19 @@ REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION(setField,
                                          ExpressionSetField::parse,
                                          feature_flags::gFeatureFlagDotsAndDollars);
 
+// $unsetField is syntactic sugar for $setField where value is set to $$REMOVE.
+REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION(unsetField,
+                                         ExpressionSetField::parse,
+                                         feature_flags::gFeatureFlagDotsAndDollars);
+
 intrusive_ptr<Expression> ExpressionSetField::parse(ExpressionContext* const expCtx,
                                                     BSONElement expr,
                                                     const VariablesParseState& vps) {
+    const auto name = expr.fieldNameStringData();
+    const bool isUnsetField = name == "$unsetField";
+
     uassert(4161100,
-            "$setField only supports an object as its argument",
+            str::stream() << name << " only supports an object as its argument",
             expr.type() == BSONType::Object);
 
     boost::intrusive_ptr<Expression> fieldExpr;
@@ -7350,25 +7358,23 @@ intrusive_ptr<Expression> ExpressionSetField::parse(ExpressionContext* const exp
             fieldExpr = Expression::parseOperand(expCtx, elem, vps);
         } else if (fieldName == "input"_sd) {
             inputExpr = Expression::parseOperand(expCtx, elem, vps);
-        } else if (fieldName == "value"_sd) {
+        } else if (!isUnsetField && fieldName == "value"_sd) {
             valueExpr = Expression::parseOperand(expCtx, elem, vps);
         } else {
             uasserted(4161101,
-                      str::stream()
-                          << kExpressionName << " found an unknown argument: " << fieldName);
+                      str::stream() << name << " found an unknown argument: " << fieldName);
         }
     }
 
-    if (!inputExpr) {
-        inputExpr = ExpressionFieldPath::parse(expCtx, "$$CURRENT", vps);
+    if (isUnsetField) {
+        tassert(
+            4161110, str::stream() << name << " expects 'value' not to be specified.", !valueExpr);
+        valueExpr = ExpressionFieldPath::parse(expCtx, "$$REMOVE", vps);
     }
 
-    uassert(4161102,
-            str::stream() << kExpressionName << " requires 'field' to be specified",
-            fieldExpr);
-    uassert(4161103,
-            str::stream() << kExpressionName << " requires 'value' to be specified",
-            valueExpr);
+    uassert(4161102, str::stream() << name << " requires 'field' to be specified", fieldExpr);
+    uassert(4161103, str::stream() << name << " requires 'value' to be specified", valueExpr);
+    uassert(4161109, str::stream() << name << " requires 'input' to be specified", inputExpr);
 
     // The 'field' argument to '$setField' must evaluate to a constant string, for example,
     // {$const: "$a.b"}. In case the user has forgotten to wrap the value into a '$const' or
@@ -7384,12 +7390,12 @@ intrusive_ptr<Expression> ExpressionSetField::parse(ExpressionContext* const exp
 
     auto constFieldExpr = dynamic_cast<ExpressionConstant*>(fieldExpr.get());
     uassert(4161106,
-            str::stream() << kExpressionName
+            str::stream() << name
                           << " requires 'field' to evaluate to a constant, "
                              "but got a non-constant argument",
             constFieldExpr);
     uassert(4161107,
-            str::stream() << kExpressionName
+            str::stream() << name
                           << " requires 'field' to evaluate to type String, "
                              "but got "
                           << typeName(constFieldExpr->getValue().getType()),
