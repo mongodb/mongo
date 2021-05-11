@@ -181,9 +181,22 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
         return cmdResponseStatus.getStatus();
     }
 
+    const Shard::CommandResponse& cmdResponse = cmdResponseStatus.getValue();
+    boost::optional<ChunkVersion> shardVersionReceived = [&]() -> boost::optional<ChunkVersion> {
+        // old versions might not have the shardVersion field
+        if (cmdResponse.response[ChunkVersion::kShardVersionField]) {
+            return uassertStatusOK(ChunkVersion::parseWithField(cmdResponse.response,
+                                                                ChunkVersion::kShardVersionField));
+        }
+        return boost::none;
+    }();
+
+    // Always refresh metadata and provide the chunk version
+    onShardVersionMismatch(opCtx, nss, shardVersionReceived);
+
     // Check commandStatus and writeConcernStatus
-    auto commandStatus = cmdResponseStatus.getValue().commandStatus;
-    auto writeConcernStatus = cmdResponseStatus.getValue().writeConcernStatus;
+    auto commandStatus = cmdResponse.commandStatus;
+    auto writeConcernStatus = cmdResponse.writeConcernStatus;
 
     // Send stale epoch if epoch of request did not match epoch of collection
     if (commandStatus == ErrorCodes::StaleEpoch) {
@@ -191,13 +204,12 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     }
 
     //
-    // If _configsvrCommitChunkSplit returned an error, refresh and look at the metadata to
+    // If _configsvrCommitChunkSplit returned an error, look at the metadata to
     // determine if the split actually did happen. This can happen if there's a network error
     // getting the response from the first call to _configsvrCommitChunkSplit, but it actually
     // succeeds, thus the automatic retry fails with a precondition violation, for example.
     //
     if (!commandStatus.isOK() || !writeConcernStatus.isOK()) {
-        onShardVersionMismatch(opCtx, nss, boost::none);
 
         if (checkMetadataForSuccessfulSplitChunk(
                 opCtx, nss, expectedCollectionEpoch, chunkRange, splitKeys)) {
@@ -242,7 +254,6 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
                checkIfSingleDoc(opCtx, collection.getCollection(), idx, &frontChunk)) {
         return boost::optional<ChunkRange>(ChunkRange(frontChunk.getMin(), frontChunk.getMax()));
     }
-
     return boost::optional<ChunkRange>(boost::none);
 }
 
