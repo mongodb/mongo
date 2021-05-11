@@ -213,8 +213,9 @@ env.Library(
 )
 
 env.Library(
-    target="change_stream_invalidation_info",
+    target="change_stream_error_extra_info",
     source=[
+        'change_stream_topology_change_info.cpp',
         'change_stream_invalidation_info.cpp',
     ],
     LIBDEPS=[
@@ -298,7 +299,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/logical_session_cache',
         '$BUILD_DIR/mongo/db/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/pipeline/change_stream_invalidation_info',
+        '$BUILD_DIR/mongo/db/pipeline/change_stream_error_extra_info',
         '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
@@ -343,6 +344,7 @@ env.Library(
         'document_source_change_stream_close_cursor.cpp',
         'document_source_change_stream_ensure_resume_token_present.cpp',
         'document_source_change_stream_oplog_match.cpp',
+        'document_source_change_stream_topology_change.cpp',
         'document_source_change_stream_transform.cpp',
         'document_source_change_stream_unwind_transactions.cpp',
         'document_source_check_invalidate.cpp',

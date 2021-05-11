@@ -157,6 +157,12 @@ private:
     boost::optional<Document> _getNext();
 
     /**
+     * Obtains the next result from the pipeline, gracefully handling any known exceptions which may
+     * be thrown.
+     */
+    boost::optional<Document> _tryGetNext();
+
+    /**
      * For a change stream or resumable oplog scan, updates the scan state based on the latest
      * document returned by the underlying pipeline.
      */

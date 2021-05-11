@@ -352,9 +352,7 @@ public:
                 // to the resume token of the invalidating event, and mark the cursor response as
                 // invalidated. We always expect to have ExtraInfo for this error code.
                 const auto extraInfo = ex.extraInfo<ChangeStreamInvalidationInfo>();
-                tassert(5493700,
-                        "Missing ChangeStreamInvalidationInfo on exception",
-                        extraInfo != nullptr);
+                tassert(5493700, "Missing ChangeStreamInvalidationInfo on exception", extraInfo);
 
                 nextBatch->setPostBatchResumeToken(extraInfo->getInvalidateResumeToken());
                 nextBatch->setInvalidated();

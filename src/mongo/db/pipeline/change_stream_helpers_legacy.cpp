@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_close_cursor.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
+#include "mongo/db/pipeline/document_source_change_stream_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transactions.h"
 #include "mongo/db/pipeline/document_source_check_invalidate.h"
@@ -119,6 +120,14 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
     stages.push_back(DocumentSourceChangeStreamUnwindTransaction::create(expCtx));
     stages.push_back(transformStage);
 
+    const bool csOptFeatureFlag =
+        feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV();
+
+    // The 'DocumentSourceChangeStreamTopologyChange' only runs in a cluster, and will be dispatched
+    // by mongoS to the shards.
+    if (csOptFeatureFlag && expCtx->inMongos) {
+        stages.push_back(DocumentSourceChangeStreamTopologyChange::create(expCtx));
+    }
 
     // The resume stage must come after the check invalidate stage so that the former can determine
     // whether the event that matches the resume token should be followed by an "invalidate" event.
@@ -145,7 +154,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
     }
 
     if (!expCtx->needsMerge) {
-        if (!feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
+        if (!csOptFeatureFlag) {
             // There should only be one close cursor stage. If we're on the shards and producing
             // input to be merged, do not add a close cursor stage, since the mongos will already
             // have one.
@@ -222,6 +231,11 @@ Value DocumentSourceLookupChangePreImage::serializeLegacy(
 }
 
 Value DocumentSourceLookupChangePostImage::serializeLegacy(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
+    return (explain ? Value{Document{{kStageName, Document()}}} : Value());
+}
+
+Value DocumentSourceChangeStreamTopologyChange::serializeLegacy(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return (explain ? Value{Document{{kStageName, Document()}}} : Value());
 }

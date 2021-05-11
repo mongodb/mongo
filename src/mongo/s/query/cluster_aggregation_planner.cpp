@@ -296,8 +296,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
             // to the resume token of the invalidating event, and mark the cursor response as
             // invalidated. We always expect to have ExtraInfo for this error code.
             const auto extraInfo = ex.extraInfo<ChangeStreamInvalidationInfo>();
-            tassert(
-                5493706, "Missing ChangeStreamInvalidationInfo on exception", extraInfo != nullptr);
+            tassert(5493706, "Missing ChangeStreamInvalidationInfo on exception", extraInfo);
 
             responseBuilder.setPostBatchResumeToken(extraInfo->getInvalidateResumeToken());
             responseBuilder.setInvalidated();

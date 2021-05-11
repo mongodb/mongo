@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 
+#include "mongo/db/pipeline/change_stream_topology_change_info.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
@@ -112,7 +113,7 @@ bool PlanExecutorPipeline::isEOF() {
 }
 
 boost::optional<Document> PlanExecutorPipeline::_getNext() {
-    auto nextDoc = _pipeline->getNext();
+    auto nextDoc = _tryGetNext();
     if (!nextDoc) {
         _pipelineIsEof = true;
     }
@@ -121,6 +122,15 @@ boost::optional<Document> PlanExecutorPipeline::_getNext() {
         _updateResumableScanState(nextDoc);
     }
     return nextDoc;
+}
+
+boost::optional<Document> PlanExecutorPipeline::_tryGetNext() try {
+    return _pipeline->getNext();
+} catch (const ExceptionFor<ErrorCodes::ChangeStreamTopologyChange>& ex) {
+    // This exception contains the next document to be returned by the pipeline.
+    const auto extraInfo = ex.extraInfo<ChangeStreamTopologyChangeInfo>();
+    tassert(5669600, "Missing ChangeStreamTopologyChangeInfo on exception", extraInfo);
+    return Document::fromBsonWithMetaData(extraInfo->getTopologyChangeEvent());
 }
 
 void PlanExecutorPipeline::_updateResumableScanState(const boost::optional<Document>& document) {

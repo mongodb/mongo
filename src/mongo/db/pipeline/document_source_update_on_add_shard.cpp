@@ -31,6 +31,7 @@
 
 #include <algorithm>
 
+#include "mongo/db/pipeline/change_stream_topology_change_info.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -40,9 +41,13 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/s/query/establish_cursors.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
+
+// Failpoint to throw an exception when the 'kNewShardDetected' event is observed.
+MONGO_FAIL_POINT_DEFINE(throwChangeStreamTopologyChangeExceptionToClient);
 
 // Returns true if the change stream document is an event in 'config.shards'.
 bool isShardConfigEvent(const Document& eventDoc) {
@@ -52,8 +57,19 @@ bool isShardConfigEvent(const Document& eventDoc) {
     // where a change stream is targeted to a subset of shards. See SERVER-44039 for details.
     if (eventDoc[DocumentSourceChangeStream::kOperationTypeField].getStringData() ==
         DocumentSourceChangeStream::kNewShardDetectedOpType) {
+        // If the failpoint is enabled, throw the 'ChangeStreamToplogyChange' exception to the
+        // client. This is used in testing to confirm that the swallowed 'kNewShardDetected' event
+        // has reached the mongoS.
+        // TODO SERVER-30784: remove this failpoint when the 'kNewShardDetected' event is the only
+        // way we detect a new shard.
+        if (MONGO_unlikely(throwChangeStreamTopologyChangeExceptionToClient.shouldFail())) {
+            uasserted(ChangeStreamTopologyChangeInfo(eventDoc.toBsonWithMetaData()),
+                      "Collection migrated to new shard");
+        }
+
         return true;
     }
+
     auto nsObj = eventDoc[DocumentSourceChangeStream::kNamespaceField];
     return nsObj.getType() == BSONType::Object &&
         nsObj["db"_sd].getStringData() == ShardType::ConfigNS.db() &&
