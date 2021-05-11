@@ -132,7 +132,7 @@ void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
             // primary.
             auto removeIndexBuildsToo = false;
             auto filteredIndexes = collection->getIndexCatalog()->removeExistingIndexes(
-                opCtx, indexSpecs, removeIndexBuildsToo);
+                opCtx, collection.get(), indexSpecs, removeIndexBuildsToo);
             if (filteredIndexes.empty()) {
                 return;
             }

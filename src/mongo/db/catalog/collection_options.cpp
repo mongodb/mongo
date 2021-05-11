@@ -312,14 +312,14 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
     return options;
 }
 
-BSONObj CollectionOptions::toBSON() const {
+BSONObj CollectionOptions::toBSON(bool includeUUID) const {
     BSONObjBuilder b;
-    appendBSON(&b);
+    appendBSON(&b, includeUUID);
     return b.obj();
 }
 
-void CollectionOptions::appendBSON(BSONObjBuilder* builder) const {
-    if (uuid) {
+void CollectionOptions::appendBSON(BSONObjBuilder* builder, bool includeUUID) const {
+    if (uuid && includeUUID) {
         builder->appendElements(uuid->toBSON());
     }
 

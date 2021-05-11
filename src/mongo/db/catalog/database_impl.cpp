@@ -230,9 +230,7 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
     };
 
     CollectionCatalog::CollectionInfoFn predicate = [&](const CollectionPtr& collection) {
-        return DurableCatalog::get(opCtx)
-            ->getCollectionOptions(opCtx, collection->getCatalogId())
-            .temp;
+        return collection->getCollectionOptions().temp;
     };
 
     catalog::forEachCollectionFromDb(opCtx, name(), MODE_X, callback, predicate);
@@ -515,10 +513,9 @@ void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,
     invariant(_name == nss.db());
     LOGV2_DEBUG(
         20316, 1, "dropCollection: {namespace} - dropAllIndexes start", "namespace"_attr = nss);
-    collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
+    collection->getIndexCatalog()->dropAllIndexes(opCtx, collection, true);
 
-    invariant(DurableCatalog::get(opCtx)->getTotalIndexCount(opCtx, collection->getCatalogId()) ==
-              0);
+    invariant(collection->getTotalIndexCount() == 0);
     LOGV2_DEBUG(
         20317, 1, "dropCollection: {namespace} - dropAllIndexes done", "namespace"_attr = nss);
 }
@@ -577,16 +574,15 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
     Top::get(opCtx->getServiceContext()).collectionDropped(fromNss);
 
-    Status status = DurableCatalog::get(opCtx)->renameCollection(
-        opCtx, collToRename->getCatalogId(), toNss, stayTemp);
-
     // Set the namespace of 'collToRename' from within the CollectionCatalog. This is necessary
-    // because the CollectionCatalog mutex synchronizes concurrent access to the collection's
-    // namespace for callers that may not hold a collection lock.
+    // because the CollectionCatalog manages the necessary isolation for this Collection until the
+    // WUOW commits.
     auto writableCollection = collToRename.getWritableCollection();
+    Status status = writableCollection->rename(opCtx, toNss, stayTemp);
+    if (!status.isOK())
+        return status;
 
-    CollectionCatalog::get(opCtx)->setCollectionNamespace(
-        opCtx, writableCollection, fromNss, toNss);
+    CollectionCatalog::get(opCtx)->onCollectionRename(opCtx, writableCollection, fromNss);
 
     opCtx->recoveryUnit()->onCommit([writableCollection](boost::optional<Timestamp> commitTime) {
         // Ban reading from this collection on committed reads on snapshots before now.
@@ -746,7 +742,9 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                 // initialized, so use the unsafe fCV getter here.
                 IndexCatalog* ic = collection->getIndexCatalog();
                 fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
-                    opCtx, !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec()));
+                    opCtx,
+                    collection,
+                    !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec(collection)));
             } else {
                 // autoIndexId: false is only allowed on unreplicated collections.
                 uassert(50001,

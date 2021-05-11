@@ -249,7 +249,8 @@ public:
             {
                 WriteUnitOfWork wunit(_opCtx);
                 // Drop all indexes including id index.
-                coll.getWritableCollection()->getIndexCatalog()->dropAllIndexes(_opCtx, true);
+                coll.getWritableCollection()->getIndexCatalog()->dropAllIndexes(
+                    _opCtx, coll.getWritableCollection(), true);
                 // Insert some documents.
                 int32_t nDocs = 1000;
                 OpDebug* const nullOpDebug = nullptr;
@@ -299,7 +300,7 @@ public:
             options.capped = true;
             options.cappedSize = 10 * 1024;
             Collection* coll = db->createCollection(_opCtx, _nss, options);
-            coll->getIndexCatalog()->dropAllIndexes(_opCtx, true);
+            coll->getIndexCatalog()->dropAllIndexes(_opCtx, coll, true);
             // Insert some documents.
             int32_t nDocs = 1000;
             OpDebug* const nullOpDebug = nullptr;

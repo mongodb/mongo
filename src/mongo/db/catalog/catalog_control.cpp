@@ -127,12 +127,12 @@ void openCatalog(OperationContext* opCtx,
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.
     StringMap<IndexNameObjs> nsToIndexNameObjMap;
+    auto catalog = CollectionCatalog::get(opCtx);
     for (StorageEngine::IndexIdentifier indexIdentifier : reconcileResult.indexesToRebuild) {
         auto indexName = indexIdentifier.indexName;
-        auto indexSpecs =
-            getIndexNameObjs(opCtx,
-                             indexIdentifier.catalogId,
-                             [&indexName](const std::string& name) { return name == indexName; });
+        auto coll = catalog->lookupCollectionByNamespace(opCtx, indexIdentifier.nss);
+        auto indexSpecs = getIndexNameObjs(
+            coll, [&indexName](const std::string& name) { return name == indexName; });
         if (!indexSpecs.isOK() || indexSpecs.getValue().first.empty()) {
             fassert(40689,
                     {ErrorCodes::InternalError,
@@ -154,7 +154,6 @@ void openCatalog(OperationContext* opCtx,
         ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
     }
 
-    auto catalog = CollectionCatalog::get(opCtx);
     for (const auto& entry : nsToIndexNameObjMap) {
         NamespaceString collNss(entry.first);
 

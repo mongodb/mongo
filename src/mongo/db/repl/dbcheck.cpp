@@ -43,7 +43,6 @@
 #include "mongo/db/repl/dbcheck_gen.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/storage/durable_catalog.h"
 
 namespace mongo {
 
@@ -355,12 +354,11 @@ std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, const Collecti
     std::vector<std::string> names;
 
     // List the indices,
-    auto durableCatalog = DurableCatalog::get(opCtx);
-    durableCatalog->getAllIndexes(opCtx, collection->getCatalogId(), &names);
+    collection->getAllIndexes(&names);
 
     // and get the info for each one.
     for (const auto& name : names) {
-        result.push_back(durableCatalog->getIndexSpec(opCtx, collection->getCatalogId(), name));
+        result.push_back(collection->getIndexSpec(name));
     }
 
     auto comp = std::make_unique<SimpleBSONObjComparator>();
@@ -371,9 +369,7 @@ std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, const Collecti
 }
 
 BSONObj collectionOptions(OperationContext* opCtx, const CollectionPtr& collection) {
-    return DurableCatalog::get(opCtx)
-        ->getCollectionOptions(opCtx, collection->getCatalogId())
-        .toBSON();
+    return collection->getCollectionOptions().toBSON();
 }
 
 AutoGetDbForDbCheck::AutoGetDbForDbCheck(OperationContext* opCtx, const NamespaceString& nss)

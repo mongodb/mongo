@@ -57,7 +57,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -424,7 +423,7 @@ CollectionOptions _getCollectionOptions(OperationContext* opCtx, const Namespace
     AutoGetCollectionForRead collection(opCtx, nss);
     ASSERT_TRUE(collection) << "Unable to get collections options for " << nss
                             << " because collection does not exist.";
-    return DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->getCatalogId());
+    return collection->getCollectionOptions();
 }
 
 /**
@@ -472,7 +471,10 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
 
         WriteUnitOfWork wuow(opCtx);
         auto indexCatalog = collection.getWritableCollection()->getIndexCatalog();
-        ASSERT_OK(indexCatalog->createIndexOnEmptyCollection(opCtx, indexInfoObj).getStatus());
+        ASSERT_OK(indexCatalog
+                      ->createIndexOnEmptyCollection(
+                          opCtx, collection.getWritableCollection(), indexInfoObj)
+                      .getStatus());
         wuow.commit();
     });
 

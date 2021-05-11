@@ -48,7 +48,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl_index_build_state.h"
 #include "mongo/db/resumable_index_builds_gen.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/platform/mutex.h"

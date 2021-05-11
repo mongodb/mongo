@@ -83,9 +83,7 @@ auto removeEmptyDirectory =
 
 void removeIndex(OperationContext* opCtx,
                  StringData indexName,
-                 RecordId collectionCatalogId,
-                 UUID collectionUUID,
-                 const NamespaceString& nss,
+                 Collection* collection,
                  std::shared_ptr<Ident> ident) {
     auto durableCatalog = DurableCatalog::get(opCtx);
 
@@ -94,11 +92,11 @@ void removeIndex(OperationContext* opCtx,
     // to wait for existing users to finish.
     if (!ident) {
         ident = std::make_shared<Ident>(
-            durableCatalog->getIndexIdent(opCtx, collectionCatalogId, indexName));
+            durableCatalog->getIndexIdent(opCtx, collection->getCatalogId(), indexName));
     }
 
     // Run the first phase of drop to remove the catalog entry.
-    durableCatalog->removeIndex(opCtx, collectionCatalogId, indexName);
+    collection->removeIndex(opCtx, indexName);
 
     // The OperationContext may not be valid when the RecoveryUnit executes the onCommit handlers.
     // Therefore, anything that would normally be fetched from the opCtx must be passed in
@@ -114,8 +112,8 @@ void removeIndex(OperationContext* opCtx,
     opCtx->recoveryUnit()->onCommit([svcCtx = opCtx->getServiceContext(),
                                      recoveryUnit,
                                      storageEngine,
-                                     collectionUUID,
-                                     nss,
+                                     uuid = collection->uuid(),
+                                     nss = collection->ns(),
                                      indexNameStr = indexName.toString(),
                                      ident](boost::optional<Timestamp> commitTimestamp) {
         StorageEngine::DropIdentCallback onDrop = [svcCtx, storageEngine, nss] {
@@ -131,7 +129,7 @@ void removeIndex(OperationContext* opCtx,
                   "Deferring table drop for index",
                   "index"_attr = indexNameStr,
                   logAttrs(nss),
-                  "uuid"_attr = collectionUUID,
+                  "uuid"_attr = uuid,
                   "ident"_attr = ident->getIdent(),
                   "commitTimestamp"_attr = commitTimestamp);
             storageEngine->addDropPendingIdent(*commitTimestamp, ident, std::move(onDrop));

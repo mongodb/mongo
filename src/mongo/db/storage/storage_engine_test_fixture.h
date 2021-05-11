@@ -32,7 +32,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -69,7 +69,12 @@ public:
                 _storageEngine->getCatalog()->createCollection(opCtx, ns, options, true));
             wuow.commit();
         }
-        std::shared_ptr<Collection> coll = std::make_shared<CollectionMock>(ns, catalogId);
+        std::shared_ptr<Collection> coll = std::make_shared<CollectionImpl>(
+            opCtx,
+            ns,
+            catalogId,
+            _storageEngine->getCatalog()->getMetaData(opCtx, catalogId),
+            std::move(rs));
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(opCtx, options.uuid.get(), std::move(coll));
         });
@@ -159,22 +164,22 @@ public:
         }
         BSONObj spec = builder.append("name", key).append("v", 2).done();
 
-        CollectionPtr collection =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collNs);
+        Collection* collection =
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
+                opCtx, CollectionCatalog::LifetimeMode::kInplace, collNs);
         auto descriptor = std::make_unique<IndexDescriptor>(IndexNames::findPluginName(spec), spec);
 
-        auto ret = DurableCatalog::get(opCtx)->prepareForIndexBuild(opCtx,
-                                                                    collection->getCatalogId(),
-                                                                    descriptor.get(),
-                                                                    buildUUID,
-                                                                    isBackgroundSecondaryBuild);
+        auto ret = collection->prepareForIndexBuild(
+            opCtx, descriptor.get(), buildUUID, isBackgroundSecondaryBuild);
         return ret;
     }
 
     void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, std::string key) {
-        CollectionPtr collection =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collNs);
-        DurableCatalog::get(opCtx)->indexBuildSuccess(opCtx, collection->getCatalogId(), key);
+        Collection* collection =
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
+                opCtx, CollectionCatalog::LifetimeMode::kInplace, collNs);
+        auto descriptor = collection->getIndexCatalog()->findIndexByName(opCtx, key, true);
+        collection->indexBuildSuccess(opCtx, descriptor->getEntry());
     }
 
     Status removeEntry(OperationContext* opCtx, StringData collNs, DurableCatalog* catalog) {

@@ -34,7 +34,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace IndexCatalogTests {
@@ -202,22 +201,22 @@ public:
         ASSERT(desc);
         ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
 
-        // Change value of "expireAfterSeconds" on disk.
+        // Change value of "expireAfterSeconds" on disk. This will update the metadata for the
+        // Collection but not propagate the change to the IndexCatalog
         {
             WriteUnitOfWork wuow(&opCtx);
-            opCtx.getServiceContext()->getStorageEngine()->getCatalog()->updateTTLSetting(
-                &opCtx, _coll->getCatalogId(), "x_1", 10);
+            _coll->updateTTLSetting(&opCtx, "x_1", 10);
             wuow.commit();
         }
 
-        // Verify that the catalog does not yet know of the change.
+        // Confirm that the index catalog does not yet know of the change.
         desc = _catalog->findIndexByName(&opCtx, indexName);
         ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
 
         {
             // Notify the catalog of the change.
             WriteUnitOfWork wuow(&opCtx);
-            desc = _catalog->refreshEntry(&opCtx, desc);
+            desc = _catalog->refreshEntry(&opCtx, _coll, desc);
             wuow.commit();
         }
 

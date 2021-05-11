@@ -57,7 +57,7 @@ class IndexCatalogEntryImpl : public IndexCatalogEntry {
 
 public:
     IndexCatalogEntryImpl(OperationContext* opCtx,
-                          RecordId catalogId,
+                          const CollectionPtr& collection,
                           const std::string& ident,
                           std::unique_ptr<IndexDescriptor> descriptor,  // ownership passes to me
                           bool isFrozen);
@@ -77,10 +77,7 @@ public:
         return _descriptor.get();
     }
 
-    IndexAccessMethod* accessMethod() final {
-        return _accessMethod.get();
-    }
-    const IndexAccessMethod* accessMethod() const final {
+    IndexAccessMethod* accessMethod() const final {
         return _accessMethod.get();
     }
 
@@ -158,14 +155,14 @@ public:
     void setMultikey(OperationContext* opCtx,
                      const CollectionPtr& coll,
                      const KeyStringSet& multikeyMetadataKeys,
-                     const MultikeyPaths& multikeyPaths) final;
+                     const MultikeyPaths& multikeyPaths) const final;
 
     void forceSetMultikey(OperationContext* const opCtx,
                           const CollectionPtr& coll,
                           bool isMultikey,
-                          const MultikeyPaths& multikeyPaths) final;
+                          const MultikeyPaths& multikeyPaths) const final;
 
-    bool isReady(OperationContext* opCtx) const final;
+    bool isReady(OperationContext* opCtx, const CollectionPtr& collection) const final;
 
     bool isFrozen() const final;
 
@@ -194,21 +191,23 @@ private:
      */
     Status _setMultikeyInMultiDocumentTransaction(OperationContext* opCtx,
                                                   const CollectionPtr& collection,
-                                                  const MultikeyPaths& multikeyPaths);
+                                                  const MultikeyPaths& multikeyPaths) const;
 
     /**
      * Retrieves the multikey information associated with this index from '_collection',
      *
      * See CollectionCatalogEntry::isIndexMultikey() for more details.
      */
-    bool _catalogIsMultikey(OperationContext* opCtx, MultikeyPaths* multikeyPaths) const;
+    bool _catalogIsMultikey(OperationContext* opCtx,
+                            const CollectionPtr& collection,
+                            MultikeyPaths* multikeyPaths) const;
 
     /**
      * Sets on-disk multikey flag for this index.
      */
     void _catalogSetMultikey(OperationContext* opCtx,
                              const CollectionPtr& collection,
-                             const MultikeyPaths& multikeyPaths);
+                             const MultikeyPaths& multikeyPaths) const;
 
     // -----
 
@@ -234,16 +233,20 @@ private:
     bool _isFrozen;
     AtomicWord<bool> _isDropped;  // Whether the index drop is committed.
 
+    // Members for multikey are mutable so they can be changed in const functions. They are
+    // synchronized with the '_indexMultikeyPathsMutex' mutex or are atomic. We don't have the ABA
+    // problem as multikey may only go from disabled to enabled. When multikey it stays multikey.
+
     // Set to true if this index can track path-level multikey information in the catalog. This
     // member is effectively const after IndexCatalogEntry::init() is called.
-    bool _indexTracksMultikeyPathsInCatalog = false;
+    mutable bool _indexTracksMultikeyPathsInCatalog = false;
 
     // Set to true if this index may contain multikey data.
-    AtomicWord<bool> _isMultikeyForRead;
+    mutable AtomicWord<bool> _isMultikeyForRead;
 
     // Set to true after a transaction commit successfully updates multikey on the catalog data. At
     // this point, future writers do not need to update the catalog.
-    AtomicWord<bool> _isMultikeyForWrite;
+    mutable AtomicWord<bool> _isMultikeyForWrite;
 
     // Controls concurrent access to '_indexMultikeyPathsForRead' and '_indexMultikeyPathsForWrite'.
     // We acquire this mutex rather than the RESOURCE_METADATA lock as a performance optimization
@@ -258,8 +261,10 @@ private:
     // in the index key pattern. Each element in the vector is an ordered set of positions (starting
     // at 0) into the corresponding indexed field that represent what prefixes of the indexed field
     // causes the index to be multikey.
-    MultikeyPaths _indexMultikeyPathsForRead;   // May include paths not committed to catalog.
-    MultikeyPaths _indexMultikeyPathsForWrite;  // Paths in catalog updated by a transaction commit.
+    mutable MultikeyPaths
+        _indexMultikeyPathsForRead;  // May include paths not committed to catalog.
+    mutable MultikeyPaths
+        _indexMultikeyPathsForWrite;  // Paths in catalog updated by a transaction commit.
 
     // The earliest snapshot that is allowed to read this index.
     boost::optional<Timestamp> _minVisibleSnapshot;

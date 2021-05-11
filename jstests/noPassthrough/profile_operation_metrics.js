@@ -418,8 +418,8 @@ const operations = [
         profileFilter: {op: 'command', 'command.listIndexes': collName},
         profileAssert: (db, profileDoc) => {
             // This reads from the collection catalog.
-            assert.gt(profileDoc.docBytesRead, 0);
-            assert.gt(profileDoc.docUnitsRead, 0);
+            assert.eq(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.docUnitsRead, 0);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docBytesWritten, 0);

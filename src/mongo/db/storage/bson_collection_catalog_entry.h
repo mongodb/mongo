@@ -61,6 +61,30 @@ public:
     struct IndexMetaData {
         IndexMetaData() {}
 
+        IndexMetaData(const IndexMetaData& other)
+            : spec(other.spec),
+              ready(other.ready),
+              isBackgroundSecondaryBuild(other.isBackgroundSecondaryBuild),
+              buildUUID(other.buildUUID) {
+            // We need to hold the multikey mutex when copying, someone else might be modifying this
+            stdx::lock_guard lock(other.multikeyMutex);
+            multikey = other.multikey;
+            multikeyPaths = other.multikeyPaths;
+        }
+
+        IndexMetaData& operator=(IndexMetaData&& rhs) {
+            spec = std::move(rhs.spec);
+            ready = std::move(rhs.ready);
+            isBackgroundSecondaryBuild = std::move(rhs.isBackgroundSecondaryBuild);
+            buildUUID = std::move(rhs.buildUUID);
+
+            // No need to hold mutex on move, there are no concurrent readers while we're moving the
+            // instance.
+            multikey = std::move(rhs.multikey);
+            multikeyPaths = std::move(rhs.multikeyPaths);
+            return *this;
+        }
+
         void updateTTLSetting(long long newExpireSeconds);
 
         void updateHiddenSetting(bool hidden);
@@ -71,7 +95,6 @@ public:
 
         BSONObj spec;
         bool ready = false;
-        bool multikey = false;
         bool isBackgroundSecondaryBuild = false;
 
         // If initialized, a two-phase index build is in progress.
@@ -81,12 +104,20 @@ public:
         // the index key pattern. Each element in the vector is an ordered set of positions
         // (starting at 0) into the corresponding indexed field that represent what prefixes of the
         // indexed field cause the index to be multikey.
-        MultikeyPaths multikeyPaths;
+        // multikeyMutex must be held when accessing multikey or multikeyPaths
+        mutable Mutex multikeyMutex;
+        mutable bool multikey = false;
+        mutable MultikeyPaths multikeyPaths;
     };
 
     struct MetaData {
         void parse(const BSONObj& obj);
-        BSONObj toBSON() const;
+
+        /**
+         * If we have exclusive access to this MetaData (holding a unique copy). We don't need to
+         * hold mutexes when reading internal data.
+         */
+        BSONObj toBSON(bool hasExclusiveAccess = false) const;
 
         int findIndexOffset(StringData name) const;
 

@@ -78,7 +78,6 @@
 #include "mongo/db/storage/checkpointer.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/control/storage_control.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/oplog_cap_maintainer_thread.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -261,7 +260,8 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
             if (!idIndexSpec.isEmpty()) {
                 auto status = autoColl->getWritableCollection()
                                   ->getIndexCatalog()
-                                  ->createIndexOnEmptyCollection(opCtx.get(), idIndexSpec);
+                                  ->createIndexOnEmptyCollection(
+                                      opCtx.get(), autoColl->getWritableCollection(), idIndexSpec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
@@ -269,7 +269,8 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
             for (auto&& spec : secondaryIndexSpecs) {
                 auto status = autoColl->getWritableCollection()
                                   ->getIndexCatalog()
-                                  ->createIndexOnEmptyCollection(opCtx.get(), spec);
+                                  ->createIndexOnEmptyCollection(
+                                      opCtx.get(), autoColl->getWritableCollection(), spec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
@@ -454,26 +455,16 @@ Status StorageInterfaceImpl::createOplog(OperationContext* opCtx, const Namespac
 }
 
 StatusWith<size_t> StorageInterfaceImpl::getOplogMaxSize(OperationContext* opCtx) {
-    // This writeConflictRetry loop protects callers from WriteConflictExceptions thrown by the
-    // storage engine running out of cache space, despite this operation not performing any writes.
-    return writeConflictRetry(
-        opCtx,
-        "StorageInterfaceImpl::getOplogMaxSize",
-        NamespaceString::kRsOplogNamespace.ns(),
-        [&]() -> StatusWith<size_t> {
-            AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
-            const auto& oplog = oplogRead.getCollection();
-            if (!oplog) {
-                return {ErrorCodes::NamespaceNotFound, "Your oplog doesn't exist."};
-            }
-            const auto options =
-                DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, oplog->getCatalogId());
-            if (!options.capped)
-                return {ErrorCodes::BadValue,
-                        str::stream()
-                            << NamespaceString::kRsOplogNamespace.ns() << " isn't capped"};
-            return options.cappedSize;
-        });
+    AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+    const auto& oplog = oplogRead.getCollection();
+    if (!oplog) {
+        return {ErrorCodes::NamespaceNotFound, "Your oplog doesn't exist."};
+    }
+    const auto options = oplog->getCollectionOptions();
+    if (!options.capped)
+        return {ErrorCodes::BadValue,
+                str::stream() << NamespaceString::kRsOplogNamespace.ns() << " isn't capped"};
+    return options.cappedSize;
 }
 
 Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,

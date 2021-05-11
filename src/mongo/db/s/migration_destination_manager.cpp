@@ -808,7 +808,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         auto checkEmptyOrGetMissingIndexesFromDonor = [&](const CollectionPtr& collection) {
             auto indexCatalog = collection->getIndexCatalog();
             auto indexSpecs = indexCatalog->removeExistingIndexesNoChecks(
-                opCtx, collectionOptionsAndIndexes.indexSpecs);
+                opCtx, collection, collectionOptionsAndIndexes.indexSpecs);
             if (!indexSpecs.empty()) {
                 // Only allow indexes to be copied if the collection does not have any documents.
                 uassert(ErrorCodes::CannotCreateCollection,

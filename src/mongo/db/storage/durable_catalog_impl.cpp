@@ -604,15 +604,16 @@ BSONObj DurableCatalogImpl::_findEntry(OperationContext* opCtx, RecordId catalog
     return data.releaseToBson().getOwned();
 }
 
-BSONCollectionCatalogEntry::MetaData DurableCatalogImpl::getMetaData(OperationContext* opCtx,
-                                                                     RecordId catalogId) const {
+std::shared_ptr<BSONCollectionCatalogEntry::MetaData> DurableCatalogImpl::getMetaData(
+    OperationContext* opCtx, RecordId catalogId) const {
     BSONObj obj = _findEntry(opCtx, catalogId);
     LOGV2_DEBUG(22209, 3, " fetched CCE metadata: {obj}", "obj"_attr = obj);
-    BSONCollectionCatalogEntry::MetaData md;
+    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md;
     const BSONElement mdElement = obj["md"];
     if (mdElement.isABSONObj()) {
         LOGV2_DEBUG(22210, 3, "returning metadata: {mdElement}", "mdElement"_attr = mdElement);
-        md.parse(mdElement.Obj());
+        md = std::make_shared<BSONCollectionCatalogEntry::MetaData>();
+        md->parse(mdElement.Obj());
     }
     return md;
 }
@@ -638,7 +639,7 @@ void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
             string name = index.name();
 
             // All indexes with buildUUIDs must be ready:false.
-            invariant(!(index.buildUUID && index.ready), str::stream() << md.toBSON());
+            invariant(!(index.buildUUID && index.ready), str::stream() << md.toBSON(true));
 
             // fix ident map
             BSONElement e = oldIdentMap[name];
@@ -665,44 +666,15 @@ void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
     fassert(28521, status);
 }
 
-Status DurableCatalogImpl::checkMetaDataForIndex(OperationContext* opCtx,
-                                                 RecordId catalogId,
-                                                 const std::string& indexName,
-                                                 const BSONObj& spec) {
-    auto md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(indexName);
-    if (offset < 0) {
-        return {ErrorCodes::IndexNotFound,
-                str::stream() << "Index [" << indexName
-                              << "] not found in metadata for recordId: " << catalogId};
-    }
-
-    if (spec.woCompare(md.indexes[offset].spec)) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Spec for index [" << indexName
-                              << "] does not match spec in the metadata for recordId: " << catalogId
-                              << ". Spec: " << spec
-                              << " metadata's spec: " << md.indexes[offset].spec};
-    }
-
-    return Status::OK();
-}
-
 Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
                                          RecordId catalogId,
                                          const NamespaceString& toNss,
-                                         bool stayTemp) {
+                                         BSONCollectionCatalogEntry::MetaData& md) {
     BSONObj old = _findEntry(opCtx, catalogId).getOwned();
     {
         BSONObjBuilder b;
 
         b.append("ns", toNss.ns());
-
-        BSONCollectionCatalogEntry::MetaData md;
-        md.parse(old["md"].Obj());
-        md.ns = toNss.ns();
-        if (!stayTemp)
-            md.options.temp = false;
         b.append("md", md.toBSON());
 
         b.appendElementsUnique(old);
@@ -887,6 +859,21 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
     return std::pair<RecordId, std::unique_ptr<RecordStore>>(entry.catalogId, std::move(rs));
 }
 
+Status DurableCatalogImpl::createIndex(OperationContext* opCtx,
+                                       RecordId catalogId,
+                                       const CollectionOptions& collOptions,
+                                       const IndexDescriptor* spec) {
+    std::string ident = getIndexIdent(opCtx, catalogId, spec->indexName());
+
+    auto kvEngine = _engine->getEngine();
+    const Status status = kvEngine->createSortedDataInterface(opCtx, collOptions, ident, spec);
+    if (status.isOK()) {
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<AddIndexChange>(opCtx->recoveryUnit(), _engine, ident));
+    }
+    return status;
+}
+
 StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -996,8 +983,8 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
 Status DurableCatalogImpl::renameCollection(OperationContext* opCtx,
                                             RecordId catalogId,
                                             const NamespaceString& toNss,
-                                            bool stayTemp) {
-    return _replaceEntry(opCtx, catalogId, toNss, stayTemp);
+                                            BSONCollectionCatalogEntry::MetaData& md) {
+    return _replaceEntry(opCtx, catalogId, toNss, md);
 }
 
 Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, RecordId catalogId) {
@@ -1019,102 +1006,11 @@ Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, RecordId cata
     return Status::OK();
 }
 
-void DurableCatalogImpl::updateCappedSize(OperationContext* opCtx,
-                                          RecordId catalogId,
-                                          long long size) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    md.options.cappedSize = size;
-    putMetaData(opCtx, catalogId, md);
-}
-
-void DurableCatalogImpl::updateClusteredIndexTTLSetting(
-    OperationContext* opCtx, RecordId catalogId, boost::optional<int64_t> expireAfterSeconds) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    uassert(5401000, "The collection doesn't have a clustered index", md.options.clusteredIndex);
-
-    md.options.clusteredIndex->setExpireAfterSeconds(expireAfterSeconds);
-    putMetaData(opCtx, catalogId, md);
-}
-
-void DurableCatalogImpl::updateTTLSetting(OperationContext* opCtx,
-                                          RecordId catalogId,
-                                          StringData idxName,
-                                          long long newExpireSeconds) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(idxName);
-    invariant(offset >= 0,
-              str::stream() << "cannot update TTL setting for index " << idxName << " @ "
-                            << catalogId << " : " << md.toBSON());
-    md.indexes[offset].updateTTLSetting(newExpireSeconds);
-    putMetaData(opCtx, catalogId, md);
-}
-
-void DurableCatalogImpl::updateHiddenSetting(OperationContext* opCtx,
-                                             RecordId catalogId,
-                                             StringData idxName,
-                                             bool hidden) {
-
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(idxName);
-    invariant(offset >= 0);
-    md.indexes[offset].updateHiddenSetting(hidden);
-    putMetaData(opCtx, catalogId, md);
-}
-
-
-bool DurableCatalogImpl::isEqualToMetadataUUID(OperationContext* opCtx,
-                                               RecordId catalogId,
-                                               const UUID& uuid) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    invariant(md.options.uuid,
-              str::stream() << "UUID missing for catalog entry " << catalogId << " : "
-                            << md.toBSON());
-    return *md.options.uuid == uuid;
-}
-
-void DurableCatalogImpl::setIsTemp(OperationContext* opCtx, RecordId catalogId, bool isTemp) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    md.options.temp = isTemp;
-    putMetaData(opCtx, catalogId, md);
-}
-
-void DurableCatalogImpl::setRecordPreImages(OperationContext* opCtx, RecordId catalogId, bool val) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    md.options.recordPreImages = val;
-    putMetaData(opCtx, catalogId, md);
-}
-
-void DurableCatalogImpl::updateValidator(OperationContext* opCtx,
-                                         RecordId catalogId,
-                                         const BSONObj& validator,
-                                         boost::optional<ValidationLevelEnum> newLevel,
-                                         boost::optional<ValidationActionEnum> newAction) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    md.options.validator = validator;
-    md.options.validationLevel = newLevel;
-    md.options.validationAction = newAction;
-    putMetaData(opCtx, catalogId, md);
-}
-
-void DurableCatalogImpl::removeIndex(OperationContext* opCtx,
-                                     RecordId catalogId,
-                                     StringData indexName) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-
-    if (md.findIndexOffset(indexName) < 0)
-        return;  // never had the index so nothing to do.
-
-    md.eraseIndex(indexName);
-    putMetaData(opCtx, catalogId, md);
-}
-
-Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
-                                                RecordId catalogId,
-                                                const IndexDescriptor* spec,
-                                                boost::optional<UUID> buildUUID,
-                                                bool isBackgroundSecondaryBuild) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-
+BSONCollectionCatalogEntry::IndexMetaData DurableCatalogImpl::prepareIndexMetaDataForIndexBuild(
+    OperationContext* opCtx,
+    const IndexDescriptor* spec,
+    boost::optional<UUID> buildUUID,
+    bool isBackgroundSecondaryBuild) {
     BSONCollectionCatalogEntry::IndexMetaData imd;
     imd.spec = spec->infoObj();
     imd.ready = false;
@@ -1132,245 +1028,77 @@ Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
 
     // Mark collation feature as in use if the index has a non-simple collation.
     if (imd.spec["collation"]) {
-        const auto feature = DurableCatalogImpl::FeatureTracker::NonRepairableFeature::kCollation;
+        const auto feature = FeatureTracker::NonRepairableFeature::kCollation;
         if (!getFeatureTracker()->isNonRepairableFeatureInUse(opCtx, feature)) {
             getFeatureTracker()->markNonRepairableFeatureAsInUse(opCtx, feature);
         }
     }
 
-    // Confirm that our index is not already in the current metadata.
-    invariant(-1 == md.findIndexOffset(imd.name()));
-
-    md.indexes.push_back(imd);
-    putMetaData(opCtx, catalogId, md);
-
-    string ident = getIndexIdent(opCtx, catalogId, spec->indexName());
-
-    auto kvEngine = _engine->getEngine();
-    const Status status = kvEngine->createSortedDataInterface(
-        opCtx, getCollectionOptions(opCtx, catalogId), ident, spec);
-    if (status.isOK()) {
-        opCtx->recoveryUnit()->registerChange(
-            std::make_unique<AddIndexChange>(opCtx->recoveryUnit(), _engine, ident));
-    }
-
-    return status;
+    return imd;
 }
 
 Status DurableCatalogImpl::dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
-                                                              RecordId catalogId,
+                                                              const CollectionOptions& collOptions,
                                                               const IndexDescriptor* spec,
                                                               StringData ident) {
     auto status = _engine->getEngine()->dropSortedDataInterface(opCtx, ident);
     if (!status.isOK())
         return status;
 
-    status = _engine->getEngine()->createSortedDataInterface(
-        opCtx, getCollectionOptions(opCtx, catalogId), ident, spec);
+    status = _engine->getEngine()->createSortedDataInterface(opCtx, collOptions, ident, spec);
 
     return status;
-}
-
-boost::optional<UUID> DurableCatalogImpl::getIndexBuildUUID(OperationContext* opCtx,
-                                                            RecordId catalogId,
-                                                            StringData indexName) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0,
-              str::stream() << "cannot get build UUID for index " << indexName << " @ " << catalogId
-                            << " : " << md.toBSON());
-    return md.indexes[offset].buildUUID;
-}
-
-void DurableCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
-                                           RecordId catalogId,
-                                           StringData indexName) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0,
-              str::stream() << "cannot mark index " << indexName << " as ready @ " << catalogId
-                            << " : " << md.toBSON());
-    md.indexes[offset].ready = true;
-    md.indexes[offset].buildUUID = boost::none;
-    putMetaData(opCtx, catalogId, md);
 }
 
 bool DurableCatalogImpl::isIndexMultikey(OperationContext* opCtx,
                                          RecordId catalogId,
                                          StringData indexName,
                                          MultikeyPaths* multikeyPaths) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
+    auto md = getMetaData(opCtx, catalogId);
 
-    int offset = md.findIndexOffset(indexName);
+    int offset = md->findIndexOffset(indexName);
     invariant(offset >= 0,
               str::stream() << "cannot get multikey for index " << indexName << " @ " << catalogId
-                            << " : " << md.toBSON());
+                            << " : " << md->toBSON());
 
-    if (multikeyPaths && !md.indexes[offset].multikeyPaths.empty()) {
-        *multikeyPaths = md.indexes[offset].multikeyPaths;
+    if (multikeyPaths && !md->indexes[offset].multikeyPaths.empty()) {
+        *multikeyPaths = md->indexes[offset].multikeyPaths;
     }
 
-    return md.indexes[offset].multikey;
-}
-
-bool DurableCatalogImpl::setIndexIsMultikey(OperationContext* opCtx,
-                                            RecordId catalogId,
-                                            StringData indexName,
-                                            const MultikeyPaths& multikeyPaths) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-
-    int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0,
-              str::stream() << "cannot set index " << indexName << " as multikey @ " << catalogId
-                            << " : " << md.toBSON());
-
-    const bool tracksPathLevelMultikeyInfo = !md.indexes[offset].multikeyPaths.empty();
-    if (tracksPathLevelMultikeyInfo) {
-        invariant(!multikeyPaths.empty());
-        invariant(multikeyPaths.size() == md.indexes[offset].multikeyPaths.size());
-    } else {
-        invariant(multikeyPaths.empty());
-
-        if (md.indexes[offset].multikey) {
-            // The index is already set as multikey and we aren't tracking path-level multikey
-            // information for it. We return false to indicate that the index metadata is unchanged.
-            return false;
-        }
-    }
-
-    md.indexes[offset].multikey = true;
-
-    if (tracksPathLevelMultikeyInfo) {
-        bool newPathIsMultikey = false;
-        bool somePathIsMultikey = false;
-
-        // Store new path components that cause this index to be multikey in catalog's index
-        // metadata.
-        for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-            MultikeyComponents& indexMultikeyComponents = md.indexes[offset].multikeyPaths[i];
-            for (const auto multikeyComponent : multikeyPaths[i]) {
-                auto result = indexMultikeyComponents.insert(multikeyComponent);
-                newPathIsMultikey = newPathIsMultikey || result.second;
-                somePathIsMultikey = true;
-            }
-        }
-
-        // If all of the sets in the multikey paths vector were empty, then no component of any
-        // indexed field caused the index to be multikey. setIndexIsMultikey() therefore shouldn't
-        // have been called.
-        invariant(somePathIsMultikey);
-
-        if (!newPathIsMultikey) {
-            // We return false to indicate that the index metadata is unchanged.
-            return false;
-        }
-    }
-
-    putMetaData(opCtx, catalogId, md);
-    return true;
-}
-
-void DurableCatalogImpl::forceSetIndexIsMultikey(OperationContext* opCtx,
-                                                 RecordId catalogId,
-                                                 const IndexDescriptor* desc,
-                                                 bool isMultikey,
-                                                 const MultikeyPaths& multikeyPaths) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-
-    int offset = md.findIndexOffset(desc->indexName());
-    invariant(offset >= 0,
-              str::stream() << "cannot set index " << desc->indexName() << " multikey state @ "
-                            << catalogId << " : " << md.toBSON());
-
-    md.indexes[offset].multikey = isMultikey;
-    if (indexTypeSupportsPathLevelMultikeyTracking(desc->getAccessMethodName())) {
-        if (isMultikey) {
-            md.indexes[offset].multikeyPaths = multikeyPaths;
-        } else {
-            md.indexes[offset].multikeyPaths =
-                MultikeyPaths{static_cast<size_t>(desc->keyPattern().nFields())};
-        }
-    }
-    putMetaData(opCtx, catalogId, md);
-}
-
-
-CollectionOptions DurableCatalogImpl::getCollectionOptions(OperationContext* opCtx,
-                                                           RecordId catalogId) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    return md.options;
+    return md->indexes[offset].multikey;
 }
 
 int DurableCatalogImpl::getTotalIndexCount(OperationContext* opCtx, RecordId catalogId) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
+    auto md = getMetaData(opCtx, catalogId);
+    if (!md)
+        return 0;
 
-    return static_cast<int>(md.indexes.size());
-}
-
-int DurableCatalogImpl::getCompletedIndexCount(OperationContext* opCtx, RecordId catalogId) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-
-    int num = 0;
-    for (unsigned i = 0; i < md.indexes.size(); i++) {
-        if (md.indexes[i].ready)
-            num++;
-    }
-    return num;
-}
-
-BSONObj DurableCatalogImpl::getIndexSpec(OperationContext* opCtx,
-                                         RecordId catalogId,
-                                         StringData indexName) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-
-    int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0,
-              str::stream() << "cannot get index spec for " << indexName << " @ " << catalogId
-                            << " : " << md.toBSON());
-
-    BSONObj spec = md.indexes[offset].spec.getOwned();
-    return spec;
-}
-
-void DurableCatalogImpl::getAllIndexes(OperationContext* opCtx,
-                                       RecordId catalogId,
-                                       std::vector<std::string>* names) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-
-    for (unsigned i = 0; i < md.indexes.size(); i++) {
-        names->push_back(md.indexes[i].spec["name"].String());
-    }
-}
-
-void DurableCatalogImpl::getReadyIndexes(OperationContext* opCtx,
-                                         RecordId catalogId,
-                                         std::vector<std::string>* names) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-
-    for (unsigned i = 0; i < md.indexes.size(); i++) {
-        if (md.indexes[i].ready)
-            names->push_back(md.indexes[i].spec["name"].String());
-    }
+    return static_cast<int>(md->indexes.size());
 }
 
 bool DurableCatalogImpl::isIndexPresent(OperationContext* opCtx,
                                         RecordId catalogId,
                                         StringData indexName) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(indexName);
+    auto md = getMetaData(opCtx, catalogId);
+    if (!md)
+        return false;
+
+    int offset = md->findIndexOffset(indexName);
     return offset >= 0;
 }
 
 bool DurableCatalogImpl::isIndexReady(OperationContext* opCtx,
                                       RecordId catalogId,
                                       StringData indexName) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
+    auto md = getMetaData(opCtx, catalogId);
+    if (!md)
+        return false;
 
-    int offset = md.findIndexOffset(indexName);
+    int offset = md->findIndexOffset(indexName);
     invariant(offset >= 0,
               str::stream() << "cannot get ready status for index " << indexName << " @ "
-                            << catalogId << " : " << md.toBSON());
-    return md.indexes[offset].ready;
+                            << catalogId << " : " << md->toBSON());
+    return md->indexes[offset].ready;
 }
 
 void DurableCatalogImpl::setRand_forTest(const std::string& rand) {

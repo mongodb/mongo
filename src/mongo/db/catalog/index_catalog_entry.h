@@ -73,9 +73,7 @@ public:
 
     virtual const IndexDescriptor* descriptor() const = 0;
 
-    virtual IndexAccessMethod* accessMethod() = 0;
-
-    virtual const IndexAccessMethod* accessMethod() const = 0;
+    virtual IndexAccessMethod* accessMethod() const = 0;
 
     virtual bool isHybridBuilding() const = 0;
 
@@ -137,7 +135,7 @@ public:
     virtual void setMultikey(OperationContext* const opCtx,
                              const CollectionPtr& coll,
                              const KeyStringSet& multikeyMetadataKeys,
-                             const MultikeyPaths& multikeyPaths) = 0;
+                             const MultikeyPaths& multikeyPaths) const = 0;
 
     /**
      * Sets the index to be multikey with the provided paths. This performs minimal validation of
@@ -150,14 +148,14 @@ public:
     virtual void forceSetMultikey(OperationContext* const opCtx,
                                   const CollectionPtr& coll,
                                   bool isMultikey,
-                                  const MultikeyPaths& multikeyPaths) = 0;
+                                  const MultikeyPaths& multikeyPaths) const = 0;
 
     /**
      * Returns whether this index is ready for queries. This is potentially unsafe in that it does
      * not consider whether the index is visible or ready in the current storage snapshot. For
      * that, use isReadyInMySnapshot() or isPresentInMySnapshot().
      */
-    virtual bool isReady(OperationContext* const opCtx) const = 0;
+    virtual bool isReady(OperationContext* opCtx, const CollectionPtr& collection) const = 0;
 
     /**
      * Safely check whether this index is visible in the durable catalog in the current storage

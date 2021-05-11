@@ -98,8 +98,6 @@ public:
             if (auto sizeMB = params.getSize()) {
                 const long long sizeBytes = *sizeMB * 1024 * 1024;
                 uassertStatusOK(coll.getWritableCollection()->updateCappedSize(opCtx, sizeBytes));
-                DurableCatalog::get(opCtx)->updateCappedSize(
-                    opCtx, coll->getCatalogId(), sizeBytes);
             }
 
             if (auto minRetentionHoursOpt = params.getMinRetentionHours()) {
@@ -109,9 +107,7 @@ public:
 
             LOGV2(20497,
                   "replSetResizeOplog success",
-                  "size"_attr = DurableCatalog::get(opCtx)
-                                    ->getCollectionOptions(opCtx, coll->getCatalogId())
-                                    .cappedSize,
+                  "size"_attr = coll->getCollectionOptions().cappedSize,
                   "minRetentionHours"_attr = storageGlobalParams.oplogMinRetentionHours.load());
             return true;
         });

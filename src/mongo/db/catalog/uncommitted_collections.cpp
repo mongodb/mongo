@@ -33,7 +33,6 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

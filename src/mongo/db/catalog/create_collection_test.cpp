@@ -41,7 +41,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -128,7 +127,7 @@ CollectionOptions getCollectionOptions(OperationContext* opCtx, const NamespaceS
     AutoGetCollectionForRead collection(opCtx, nss);
     ASSERT_TRUE(collection) << "Unable to get collections options for " << nss
                             << " because collection does not exist.";
-    return DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->getCatalogId());
+    return collection->getCollectionOptions();
 }
 
 /**

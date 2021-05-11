@@ -37,7 +37,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -444,7 +443,7 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(&opCtx, uuid), collection);
 
     NamespaceString newNss(nss.db(), "newcol");
-    collection->setNs(newNss);
+    ASSERT_OK(collection->rename(&opCtx, newNss, false));
     ASSERT_EQ(collection->ns(), newNss);
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(&opCtx, uuid), collection);
 }
@@ -704,9 +703,7 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
             [&](const CollectionPtr& collection) {
                 ASSERT_TRUE(
                     opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_NONE));
-                return DurableCatalog::get(opCtx)
-                    ->getCollectionOptions(opCtx, collection->getCatalogId())
-                    .temp;
+                return collection->getCollectionOptions().temp;
             });
 
         ASSERT_EQUALS(numCollectionsTraversed, 2);
@@ -728,9 +725,7 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
             [&](const CollectionPtr& collection) {
                 ASSERT_TRUE(
                     opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_NONE));
-                return !DurableCatalog::get(opCtx)
-                            ->getCollectionOptions(opCtx, collection->getCatalogId())
-                            .temp;
+                return !collection->getCollectionOptions().temp;
             });
 
         ASSERT_EQUALS(numCollectionsTraversed, 1);

@@ -98,7 +98,7 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
         // A bulk cursor can only be opened on a fresh table, so we drop the table that was created
         // before shutdown and recreate it.
         auto status = DurableCatalog::get(opCtx)->dropAndRecreateIndexIdentForResume(
-            opCtx, collection->getCatalogId(), descriptor, indexCatalogEntry->getIdent());
+            opCtx, collection->getCollectionOptions(), descriptor, indexCatalogEntry->getIdent());
         if (!status.isOK())
             return status;
     }
@@ -145,16 +145,13 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
     }
 
     // Setup on-disk structures.
-    Status status = DurableCatalog::get(opCtx)->prepareForIndexBuild(opCtx,
-                                                                     collection->getCatalogId(),
-                                                                     descriptor.get(),
-                                                                     _buildUUID,
-                                                                     isBackgroundSecondaryBuild);
+    Status status = collection->prepareForIndexBuild(
+        opCtx, descriptor.get(), _buildUUID, isBackgroundSecondaryBuild);
     if (!status.isOK())
         return status;
 
     auto indexCatalogEntry = collection->getIndexCatalog()->createIndexEntry(
-        opCtx, std::move(descriptor), CreateIndexEntryFlags::kNone);
+        opCtx, collection, std::move(descriptor), CreateIndexEntryFlags::kNone);
 
     if (_method == IndexBuildMethod::kHybrid) {
         _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(opCtx, indexCatalogEntry);
@@ -184,8 +181,6 @@ void IndexBuildBlock::fail(OperationContext* opCtx, Collection* collection) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
-
     // Audit that the index build is being aborted.
     audit::logCreateIndex(opCtx->getClient(),
                           &_spec,
@@ -196,12 +191,14 @@ void IndexBuildBlock::fail(OperationContext* opCtx, Collection* collection) {
 
     auto indexCatalogEntry = getEntry(opCtx, collection);
     if (indexCatalogEntry) {
-        invariant(collection->getIndexCatalog()->dropIndexEntry(opCtx, indexCatalogEntry).isOK());
+        invariant(collection->getIndexCatalog()
+                      ->dropIndexEntry(opCtx, collection, indexCatalogEntry)
+                      .isOK());
         if (_indexBuildInterceptor) {
             indexCatalogEntry->setIndexBuildInterceptor(nullptr);
         }
     } else {
-        collection->getIndexCatalog()->deleteIndexFromDisk(opCtx, _indexName);
+        collection->getIndexCatalog()->deleteIndexFromDisk(opCtx, collection, _indexName);
     }
 }
 

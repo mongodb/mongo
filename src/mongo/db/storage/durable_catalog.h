@@ -38,7 +38,6 @@
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
-
 /**
  * An interface to modify the on-disk catalog metadata.
  */
@@ -82,8 +81,8 @@ public:
 
     virtual BSONObj getCatalogEntry(OperationContext* opCtx, RecordId catalogId) const = 0;
 
-    virtual BSONCollectionCatalogEntry::MetaData getMetaData(OperationContext* opCtx,
-                                                             RecordId id) const = 0;
+    virtual std::shared_ptr<BSONCollectionCatalogEntry::MetaData> getMetaData(
+        OperationContext* opCtx, RecordId id) const = 0;
 
     /**
      * Updates the catalog entry for the collection 'nss' with the fields specified in 'md'. If
@@ -94,14 +93,6 @@ public:
                              RecordId id,
                              BSONCollectionCatalogEntry::MetaData& md) = 0;
 
-    /**
-     * Checks that the metadata for the index exists and matches the given spec.
-     */
-    virtual Status checkMetaDataForIndex(OperationContext* opCtx,
-                                         RecordId catalogId,
-                                         const std::string& indexName,
-                                         const BSONObj& spec) = 0;
-
     virtual std::vector<std::string> getAllIdents(OperationContext* opCtx) const = 0;
 
     virtual bool isUserDataIdent(StringData ident) const = 0;
@@ -109,6 +100,7 @@ public:
     virtual bool isInternalIdent(StringData ident) const = 0;
 
     virtual bool isCollectionIdent(StringData ident) const = 0;
+
 
     virtual RecordStore* getRecordStore() = 0;
 
@@ -143,6 +135,17 @@ public:
         const CollectionOptions& options,
         bool allocateDefaultSpace) = 0;
 
+    virtual Status createIndex(OperationContext* opCtx,
+                               RecordId catalogId,
+                               const CollectionOptions& collOptions,
+                               const IndexDescriptor* spec) = 0;
+
+    virtual BSONCollectionCatalogEntry::IndexMetaData prepareIndexMetaDataForIndexBuild(
+        OperationContext* opCtx,
+        const IndexDescriptor* spec,
+        boost::optional<UUID> buildUUID,
+        bool isBackgroundSecondaryBuild) = 0;
+
     /**
      * Import a collection by inserting the given metadata into the durable catalog and instructing
      * the storage engine to import the corresponding idents. The metadata object should be a valid
@@ -175,7 +178,7 @@ public:
     virtual Status renameCollection(OperationContext* opCtx,
                                     RecordId catalogId,
                                     const NamespaceString& toNss,
-                                    bool stayTemp) = 0;
+                                    BSONCollectionCatalogEntry::MetaData& md) = 0;
 
     /**
      * Deletes the persisted collection catalog entry identified by 'catalogId'.
@@ -186,105 +189,22 @@ public:
     virtual Status dropCollection(OperationContext* opCtx, RecordId catalogId) = 0;
 
     /**
-     * Updates size of a capped Collection.
-     */
-    virtual void updateCappedSize(OperationContext* opCtx, RecordId catalogId, long long size) = 0;
-
-    /**
-     * Updates the expireAfterSeconds option on the clustered index. If no expireAfterSeconds value
-     * is passed in then TTL deletions will be stopped on the clustered index.
-     */
-    virtual void updateClusteredIndexTTLSetting(OperationContext* opCtx,
-                                                RecordId catalogId,
-                                                boost::optional<int64_t> expireAfterSeconds) = 0;
-
-    /*
-     * Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
-     * The specified index must already contain an expireAfterSeconds field, and the value in
-     * that field and newExpireSecs must both be numeric.
-     */
-    virtual void updateTTLSetting(OperationContext* opCtx,
-                                  RecordId catalogId,
-                                  StringData idxName,
-                                  long long newExpireSeconds) = 0;
-
-    /*
-     * Hide or unhide the given index. A hidden index will not be considered for use by the
-     * query planner.
-     */
-    virtual void updateHiddenSetting(OperationContext* opCtx,
-                                     RecordId catalogId,
-                                     StringData idxName,
-                                     bool hidden) = 0;
-
-    /**
-     * Compares the UUID argument to the UUID obtained from the metadata. Returns true if they are
-     * equal, false otherwise.
-     */
-    virtual bool isEqualToMetadataUUID(OperationContext* opCtx,
-                                       RecordId catalogId,
-                                       const UUID& uuid) = 0;
-
-    /**
-     * Updates the 'temp' setting for this collection.
-     */
-    virtual void setIsTemp(OperationContext* opCtx, RecordId catalogId, bool isTemp) = 0;
-
-    /**
-     * Updates whether updates/deletes should store their pre-images in the opLog.
-     */
-    virtual void setRecordPreImages(OperationContext* opCtx, RecordId catalogId, bool val) = 0;
-
-    /**
-     * Updates the validator for this collection.
-     *
-     * An empty validator removes all validation.
-     */
-    virtual void updateValidator(OperationContext* opCtx,
-                                 RecordId catalogId,
-                                 const BSONObj& validator,
-                                 boost::optional<ValidationLevelEnum> newLevel,
-                                 boost::optional<ValidationActionEnum> newAction) = 0;
-
-    /**
-     * Removes the index 'indexName' from the persisted collection catalog entry identified by
-     * 'catalogId'.
-     */
-    virtual void removeIndex(OperationContext* opCtx, RecordId catalogId, StringData indexName) = 0;
-
-    /**
-     * Updates the persisted catalog entry for 'ns' with the new index and creates the index on
-     * disk.
-     *
-     * A passed 'buildUUID' implies that the index is part of a two-phase index build.
-     */
-    virtual Status prepareForIndexBuild(OperationContext* opCtx,
-                                        RecordId catalogId,
-                                        const IndexDescriptor* spec,
-                                        boost::optional<UUID> buildUUID,
-                                        bool isBackgroundSecondaryBuild) = 0;
-
-    /**
      * Drops the provided ident and recreates it as empty for use in resuming an index build.
      */
     virtual Status dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
-                                                      RecordId catalogId,
+                                                      const CollectionOptions& collOptions,
                                                       const IndexDescriptor* spec,
                                                       StringData ident) = 0;
 
-    /**
-     * Returns a UUID if the index is being built with the two-phase index build procedure.
-     */
-    virtual boost::optional<UUID> getIndexBuildUUID(OperationContext* opCtx,
-                                                    RecordId catalogId,
-                                                    StringData indexName) const = 0;
+    virtual int getTotalIndexCount(OperationContext* opCtx, RecordId catalogId) const = 0;
 
-    /**
-     * Indicate that an index build is completed and the index is ready to use.
-     */
-    virtual void indexBuildSuccess(OperationContext* opCtx,
-                                   RecordId catalogId,
-                                   StringData indexName) = 0;
+    virtual bool isIndexPresent(OperationContext* opCtx,
+                                RecordId catalogId,
+                                StringData indexName) const = 0;
+
+    virtual bool isIndexReady(OperationContext* opCtx,
+                              RecordId catalogId,
+                              StringData indexName) const = 0;
 
     /**
      * Returns true if the index identified by 'indexName' is multikey, and returns false otherwise.
@@ -302,62 +222,6 @@ public:
                                  StringData indexName,
                                  MultikeyPaths* multikeyPaths) const = 0;
 
-    /**
-     * Sets the index identified by 'indexName' to be multikey.
-     *
-     * If 'multikeyPaths' is non-empty, then it must be a vector with size equal to the number of
-     * elements in the index key pattern. Additionally, at least one path component of the indexed
-     * fields must cause this index to be multikey.
-     *
-     * This function returns true if the index metadata has changed, and returns false otherwise.
-     */
-    virtual bool setIndexIsMultikey(OperationContext* opCtx,
-                                    RecordId catalogId,
-                                    StringData indexName,
-                                    const MultikeyPaths& multikeyPaths) = 0;
-
-    /**
-     * Sets the index to be multikey with the provided paths. This performs minimal validation of
-     * the inputs and is intended to be used internally to "correct" multikey metadata that drifts
-     * from the underlying collection data.
-     *
-     * When isMultikey is false, ignores multikeyPaths and resets the metadata appropriately based
-     * on the index descriptor. Otherwise, overwrites the existing multikeyPaths with the ones
-     * provided. This only writes multikey paths if the index type supports path-level tracking, and
-     * only sets the multikey boolean flag otherwise.
-     */
-    virtual void forceSetIndexIsMultikey(OperationContext* opCtx,
-                                         RecordId catalogId,
-                                         const IndexDescriptor* desc,
-                                         bool isMultikey,
-                                         const MultikeyPaths& multikeyPaths) = 0;
-
-    virtual CollectionOptions getCollectionOptions(OperationContext* opCtx,
-                                                   RecordId catalogId) const = 0;
-
-    virtual int getTotalIndexCount(OperationContext* opCtx, RecordId catalogId) const = 0;
-
-    virtual int getCompletedIndexCount(OperationContext* opCtx, RecordId catalogId) const = 0;
-
-    virtual BSONObj getIndexSpec(OperationContext* opCtx,
-                                 RecordId catalogId,
-                                 StringData indexName) const = 0;
-
-    virtual void getAllIndexes(OperationContext* opCtx,
-                               RecordId catalogId,
-                               std::vector<std::string>* names) const = 0;
-
-    virtual void getReadyIndexes(OperationContext* opCtx,
-                                 RecordId catalogId,
-                                 std::vector<std::string>* names) const = 0;
-
-    virtual bool isIndexPresent(OperationContext* opCtx,
-                                RecordId catalogId,
-                                StringData indexName) const = 0;
-
-    virtual bool isIndexReady(OperationContext* opCtx,
-                              RecordId catalogId,
-                              StringData indexName) const = 0;
 
     virtual void setRand_forTest(const std::string& rand) = 0;
 

@@ -231,7 +231,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         for (size_t i = 0; i < indexSpecs.size(); i++) {
             BSONObj info = indexSpecs[i];
             StatusWith<BSONObj> statusWithInfo =
-                collection->getIndexCatalog()->prepareSpecForCreate(opCtx, info, resumeInfo);
+                collection->getIndexCatalog()->prepareSpecForCreate(
+                    opCtx, collection.get(), info, resumeInfo);
             Status status = statusWithInfo.getStatus();
             if (!status.isOK()) {
                 // If we were given two identical indexes to build, we will run into an error trying
