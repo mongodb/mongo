@@ -33,6 +33,16 @@ imports:
     - "mongo/db/repl/read_concern_args.idl"
     - "mongo/db/write_concern_options.idl"
 
+enums:
+    DefaultWriteConcernSource:
+        description: "The source of the default write concern"
+        type: string
+        values:
+            # The default write concern was set implicitly by the server
+            kImplicit: "implicit"
+            # The default write concern was set globally through setDefaultRWConcern
+            kGlobal: "global"
+
 structs:
     RWConcernDefault:
         description: "Represents a set of read/write concern defaults, and associated metadata"
@@ -57,4 +67,8 @@ structs:
                               by an administrator. This value is only informational and must not be
                               used for any recency comparisons."
                 type: date
+                optional: true
+            defaultWriteConcernSource:
+                description: "The source of the default write concern."
+                type: DefaultWriteConcernSource
                 optional: true
