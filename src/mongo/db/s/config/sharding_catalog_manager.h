@@ -195,13 +195,16 @@ public:
      * merged into a single larger chunk.
      * If 'validAfter' is not set, this means the commit request came from an older server version,
      * which is not history-aware.
+     *
+     * Returns a BSON object with the newly produced chunk version after the merge:
+     *   - shardVersion - The new shard version of the source shard
      */
-    Status commitChunkMerge(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            const OID& requestEpoch,
-                            const std::vector<BSONObj>& chunkBoundaries,
-                            const std::string& shardName,
-                            const boost::optional<Timestamp>& validAfter);
+    StatusWith<BSONObj> commitChunkMerge(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const OID& requestEpoch,
+                                         const std::vector<BSONObj>& chunkBoundaries,
+                                         const std::string& shardName,
+                                         const boost::optional<Timestamp>& validAfter);
 
     /**
      * Updates metadata in config.chunks collection to show the given chunk in its new shard.

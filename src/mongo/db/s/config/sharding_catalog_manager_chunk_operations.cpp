@@ -530,12 +530,13 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
     return result.obj();
 }
 
-Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const OID& requestEpoch,
-                                                const std::vector<BSONObj>& chunkBoundaries,
-                                                const std::string& shardName,
-                                                const boost::optional<Timestamp>& validAfter) {
+StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const OID& requestEpoch,
+    const std::vector<BSONObj>& chunkBoundaries,
+    const std::string& shardName,
+    const boost::optional<Timestamp>& validAfter) {
     // This method must never be called with empty chunks to merge
     invariant(!chunkBoundaries.empty());
 
@@ -674,7 +675,10 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     ShardingLogging::get(opCtx)->logChange(
         opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions());
 
-    return Status::OK();
+    BSONObjBuilder result;
+    mergeVersion.appendToCommand(&result);
+
+    return result.obj();
 }
 
 StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
