@@ -33,7 +33,6 @@
 
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/delete.h"
-#include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -62,6 +61,26 @@ long long deleteObjects(OperationContext* opCtx,
     uassertStatusOK(exec->executePlan());
 
     return DeleteStage::getNumDeleted(*exec);
+}
+
+boost::optional<BSONObj> deleteObject(OperationContext* opCtx,
+                                      Collection* collection,
+                                      const DeleteRequest& request) {
+    ParsedDelete parsedDelete(opCtx, &request);
+    uassertStatusOK(parsedDelete.parseRequest());
+
+    // This method doesn't support multi-deletes.
+    invariant(!request.isMulti());
+
+    auto exec = uassertStatusOK(getExecutorDelete(
+        &CurOp::get(opCtx)->debug(), collection, &parsedDelete, boost::none /* verbosity */));
+
+    BSONObj docImage;
+    if (exec->getNext(&docImage, nullptr) == PlanExecutor::IS_EOF) {
+        return boost::none;
+    }
+
+    return {request.shouldReturnDeleted() ? docImage.getOwned() : BSONObj()};
 }
 
 }  // namespace mongo
