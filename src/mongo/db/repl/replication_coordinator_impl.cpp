@@ -3451,6 +3451,34 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
         return status;
     ReplSetConfig newConfig = newConfigStatus.getValue();
 
+    const bool isDefaultWCMajorityFeatureFlagEnabled =
+        repl::feature_flags::gDefaultWCMajority.isEnabled(serverGlobalParams.featureCompatibility);
+    auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx);
+    bool currIDWC = oldConfig.isImplicitDefaultWriteConcernMajority();
+    bool newIDWC = newConfig.isImplicitDefaultWriteConcernMajority();
+
+    auto defaults = rwcDefaults.getDefault(opCtx);
+    // If the 'featureFlagDefaultWriteConcernMajority' flag is enabled, we need to examine the
+    // 'defaultWriteConcernSource' to determine if CWWC is set. If the flag is disabled, we can just
+    // get the 'defaultWriteConcern' from 'defaults' as this is set by setting the CWWC.
+    bool isCWWCSet =
+        (isDefaultWCMajorityFeatureFlagEnabled &&
+         defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal) ||
+        (!isDefaultWCMajorityFeatureFlagEnabled && defaults.getDefaultWriteConcern());
+    // If the new config changes the replica set's implicit default write concern, we fail the
+    // reconfig command. This includes force reconfigs. The user should set a cluster-wide write
+    // concern and attempt the reconfig command again. We also need to exclude shard servers
+    // from this validation, as shard servers don't store the cluster-wide write concern.
+    if (!repl::enableDefaultWriteConcernUpdatesForInitiate.load() && !isCWWCSet &&
+        currIDWC != newIDWC && serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+        return Status(
+            ErrorCodes::NewReplicaSetConfigurationIncompatible,
+            str::stream()
+                << "Reconfig attempted to install a config that would change the "
+                   "implicit default write concern. Use the setDefaultRWConcern command to "
+                   "set a cluster-wide write concern and try the reconfig again.");
+    }
+
     BSONObj oldConfigObj = oldConfig.toBSON();
     BSONObj newConfigObj = newConfig.toBSON();
     audit::logReplSetReconfig(opCtx->getClient(), &oldConfigObj, &newConfigObj);

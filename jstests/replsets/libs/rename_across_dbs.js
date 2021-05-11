@@ -48,6 +48,15 @@ var RenameAcrossDatabasesTest = function(options) {
         replTest.startSet();
         replTest.initiate();
 
+        // This test performs a reconfig that will change the implicit default write concern
+        // from {w: "majority"} to {w: 1}. In order for this reconfig to succeed, we must first
+        // set the cluster-wide write concern.
+        assert.commandWorked(replTest.getPrimary().adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: "majority"},
+            writeConcern: {w: "majority"}
+        }));
+
         // If provided in 'options', we set the featureCompatibilityVersion. We do this prior to
         // adding any other members to the replica set.
         if (options.setFeatureCompatibilityVersion) {
