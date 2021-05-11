@@ -347,6 +347,10 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
             curator_path, "jasper", "service", "run", "rpc", "--port",
             str(jasper_port)
         ]
+        if sys.platform == "win32" or sys.platform == "cygwin":
+            # If running on windows, we need to add the `--interactive` flag
+            # for jasper to run.
+            jasper_command.append("--interactive")
         self._jasper_server = process.Process(self._resmoke_logger, jasper_command)
         self._jasper_server.start()
         config.JASPER_CONNECTION_STR = jasper_conn_str
