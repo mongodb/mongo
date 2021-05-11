@@ -6,19 +6,14 @@
  *
  * @tags: [
  *   requires_sharding,
- *   # TODO (SERVER-54881): ensure the new DDL paths work with balancer, autosplit
- *   # and causal consistency.
- *   assumes_balancer_off,
- *   assumes_autosplit_off,
- *   does_not_support_causal_consistency,
- *   # TODO (SERVER-54881): ensure the new DDL paths work with add/remove shards
+ *   # TODO (SERVER-56879) Support add/remove shards in new DDL paths
  *   does_not_support_add_remove_shards,
  *   # TODO (SERVER-56789) Enable stepdown on DDL FSM workloads
  *   does_not_support_stepdowns,
- *   # Can be removed once PM-1965-Milestone-1 is completed.
- *   does_not_support_transactions,
  *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
+ *   # Can be removed once PM-1965-Milestone-1 is completed.
+ *   featureFlagShardingFullDDLSupport
  *  ]
  */
 

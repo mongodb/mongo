@@ -6,12 +6,10 @@
  *
  * @tags: [
  *   requires_sharding,
- *   # TODO (SERVER-54881): ensure the new DDL paths work with balancer, autosplit
- *   # and causal consistency.
  *   assumes_balancer_off,
  *   assumes_autosplit_off,
  *   does_not_support_causal_consistency,
- *   # TODO (SERVER-54881): ensure the new DDL paths work with add/remove shards
+ *   # TODO (SERVER-56879): Support add/remove shards in new DDL paths
  *   does_not_support_add_remove_shards,
  *   # The mutex mechanism used in CRUD and drop states does not support stepdown
  *   does_not_support_stepdowns,

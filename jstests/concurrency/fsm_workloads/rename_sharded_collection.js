@@ -12,7 +12,7 @@
  *
  * @tags: [
  *   requires_sharding,
- *   # TODO (SERVER-54881): ensure the new DDL paths work with add/remove shards
+ *   # TODO (SERVER-56879): Support add/remove shards in new DDL paths
  *   does_not_support_add_remove_shards,
  *   # TODO (SERVER-56838): investigate timeout of this FSM with transactions
  *   does_not_support_transactions,
