@@ -6712,14 +6712,13 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 12
 
-- <<: *task_template
-  name: replica_sets
+- name: replica_sets_gen
   tags: ["replica_sets", "san", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=replica_sets --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 5
 
 - name: replica_sets_ese_gen
   tags: ["replica_sets", "encrypt", "san"]
@@ -8688,7 +8687,7 @@ buildvariants:
   - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough
   - name: .sharding .txns
   - name: sharding_gen
@@ -8815,7 +8814,7 @@ buildvariants:
   - name: .jscore .common !.auth
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
   - name: sharding_gen
@@ -8899,7 +8898,7 @@ buildvariants:
   - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   # - name: multiversion_gen
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough
   - name: .sharding .txns
   - name: sharding_gen
@@ -9005,7 +9004,7 @@ buildvariants:
   - name: .jscore .common !.auth
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
   - name: sharding_gen
@@ -9145,7 +9144,7 @@ buildvariants:
   - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.op_query !.csrs
@@ -9253,7 +9252,7 @@ buildvariants:
   - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.op_query !.csrs
@@ -9354,7 +9353,7 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
   - name: .sharding .common !.op_query !.csrs !.multiversion
@@ -9678,7 +9677,7 @@ buildvariants:
   - name: powercycle_kill_mongod
   - name: .query_fuzzer
   - name: .read_write_concern
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
@@ -9742,7 +9741,7 @@ buildvariants:
   - name: powercycle_kill_mongod
   - name: .query_fuzzer
   - name: .read_write_concern
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
@@ -9822,7 +9821,7 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: .query_fuzzer
   - name: .read_write_concern !.linearize
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: replica_sets_large_txns_format_gen
   - name: .replica_sets .common !.auth
@@ -10848,7 +10847,7 @@ buildvariants:
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
   - name: .sharding .common !.op_query !.csrs
@@ -10898,7 +10897,7 @@ buildvariants:
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
   - name: .sharding .common !.op_query !.csrs
@@ -10945,7 +10944,7 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
   - name: .sharding .common !.op_query !.csrs !.multiversion
@@ -11013,7 +11012,7 @@ buildvariants:
   - name: .jscore .common !.auth
   - name: jsCore_op_query
   - name: .read_write_concern
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: sasl
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -11094,7 +11093,7 @@ buildvariants:
   - name: .jscore .common !.auth
   - name: jsCore_op_query
   - name: .read_write_concern
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: sasl
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -11246,7 +11245,7 @@ buildvariants:
   - name: .jstestfuzz .common
   - name: multiversion_gen
   - name: .logical_session_cache .one_sec
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
   - name: .sharding .common !.op_query !.csrs
@@ -11332,7 +11331,7 @@ buildvariants:
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
   - name: .sharding .common !.op_query !.csrs !.multiversion
@@ -11429,7 +11428,7 @@ buildvariants:
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.op_query !.csrs
@@ -11525,7 +11524,7 @@ buildvariants:
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.op_query !.csrs
@@ -11598,7 +11597,7 @@ buildvariants:
   - name: .multi_shard .common
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: .read_write_concern !.durable_history
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .replica_sets .multi_oplog
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
@@ -11656,7 +11655,7 @@ buildvariants:
   # - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: .read_write_concern .linearize
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   # SERVER-49428: Disabled due to writeConcernMajorityJournalDefault is not off
   # rollback_fuzzer_gen
@@ -11689,7 +11688,7 @@ buildvariants:
   - name: .jscore .common !.decimal
   - name: jsCore_op_query
   - name: .read_write_concern !.durable_history
-  - name: replica_sets
+  - name: replica_sets_gen
   - name: .replica_sets .common
   - name: sasl
   - name: secondary_reads_passthrough_gen
