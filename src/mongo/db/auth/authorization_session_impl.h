@@ -202,12 +202,5 @@ private:
     // of authorization checks they perform. After a command completes running, MongoDB verifies the
     // set of checks performed is a subset of the checks declared in the contract.
     AuthorizationContract _contract;
-
-    // Contract checking is feature guarded. As such we may decide at the start of command to not
-    // track it but reach a different decision after the command has been run because the FCV has
-    // changed. We must record our first decision.
-    //
-    // TODO SERVER-55908 - remove this variable after the feature flag is removed.
-    bool _checkContracts;
 };
 }  // namespace mongo

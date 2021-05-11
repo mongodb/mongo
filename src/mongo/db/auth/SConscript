@@ -143,7 +143,6 @@ env.Library(
 env.Library(
     target='auth_impl_internal',
     source=[
-        'authorization_contract.idl',
         'authorization_manager_impl.cpp',
         'authorization_session_impl.cpp',
         'authz_manager_external_state.cpp',

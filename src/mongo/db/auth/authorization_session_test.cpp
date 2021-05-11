@@ -126,7 +126,6 @@ protected:
     AuthorizationManager* authzManager;
     std::unique_ptr<AuthorizationSessionForTest> authzSession;
     BSONObj credentials;
-    RAIIServerParameterControllerForTest controller{"featureFlagAuthorizationContract", 1};
 };
 
 const NamespaceString testFooNss("test.foo");
