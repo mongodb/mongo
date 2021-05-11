@@ -76,7 +76,6 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.transitions = {
-        init: {create: 0.30, drop: 0.30, rename: 0.30, setFCV: 0.10},
         create: {create: 0.30, drop: 0.30, rename: 0.30, setFCV: 0.10},
         drop: {create: 0.30, drop: 0.30, rename: 0.30, setFCV: 0.10},
         rename: {create: 0.30, drop: 0.30, rename: 0.30, setFCV: 0.10},
