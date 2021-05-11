@@ -610,6 +610,9 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
             prepare = PREPARE_INITIALIZED;
         }
 
+        /* Make sure that there is no in-memory update for this key. */
+        WT_ASSERT(session, page->modify->mod_row_update[WT_ROW_SLOT(page, rip - 1)] == NULL);
+
         /* Take the value from the page cell. */
         WT_ERR(__wt_page_cell_data_ref(session, page, &unpack, value));
 

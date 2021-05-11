@@ -281,6 +281,9 @@ struct __wt_txn {
     WT_TXN_OP *mod;
     size_t mod_alloc;
     u_int mod_count;
+#ifdef HAVE_DIAGNOSTIC
+    u_int prepare_count;
+#endif
 
     /* Scratch buffer for in-memory log records. */
     WT_ITEM *logrec;

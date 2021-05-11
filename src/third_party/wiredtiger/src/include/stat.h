@@ -624,7 +624,10 @@ struct __wt_connection_stats {
     int64_t page_sleep;
     int64_t page_del_rollback_blocked;
     int64_t child_modify_blocked_page;
-    int64_t txn_prepared_updates_count;
+    int64_t txn_prepared_updates;
+    int64_t txn_prepared_updates_committed;
+    int64_t txn_prepared_updates_key_repeated;
+    int64_t txn_prepared_updates_rolledback;
     int64_t txn_prepare;
     int64_t txn_prepare_commit;
     int64_t txn_prepare_active;

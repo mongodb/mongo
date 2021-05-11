@@ -1082,7 +1082,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
      * we rolled back all associated updates in the previous iteration of this function.
      */
     if (upd == NULL || upd->prepare_state != WT_PREPARE_INPROGRESS)
-        return (0);
+        goto prepare_verify;
 
     WT_ERR(__txn_commit_timestamps_usage_check(session, op, upd));
     /*
@@ -1140,6 +1140,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
 
         if (!commit) {
             upd->txnid = WT_TXN_ABORTED;
+            WT_STAT_CONN_INCR(session, txn_prepared_updates_rolledback);
             continue;
         }
 
@@ -1172,6 +1173,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
          * Resolve the prepared update to be committed update.
          */
         __txn_resolve_prepared_update(session, upd);
+        WT_STAT_CONN_INCR(session, txn_prepared_updates_committed);
     }
 
     /*
@@ -1183,14 +1185,16 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     if (fix_upd != NULL)
         WT_ERR(__txn_fixup_prepared_update(session, hs_cursor, fix_upd, commit));
 
+prepare_verify:
 #ifdef HAVE_DIAGNOSTIC
     for (; head_upd != NULL; head_upd = head_upd->next) {
         /*
-         * Assert if we still have an update from the current transaction that hasn't been aborted.
-         * Only perform this check if aborting the prepared transaction.
+         * Assert if we still have an update from the current transaction that hasn't been resolved
+         * or aborted.
          */
-        WT_ASSERT(
-          session, commit || head_upd->txnid == WT_TXN_ABORTED || head_upd->txnid != txn->id);
+        WT_ASSERT(session,
+          head_upd->txnid == WT_TXN_ABORTED || head_upd->prepare_state == WT_PREPARE_RESOLVED ||
+            head_upd->txnid != txn->id);
 
         if (head_upd->txnid == WT_TXN_ABORTED)
             continue;
@@ -1407,12 +1411,18 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     wt_timestamp_t candidate_durable_timestamp, prev_durable_timestamp;
     uint32_t fileid;
     u_int i;
+#ifdef HAVE_DIAGNOSTIC
+    u_int prepare_count;
+#endif
     bool locked, prepare, readonly, update_durable_ts;
 
     txn = session->txn;
     conn = S2C(session);
     cursor = NULL;
     txn_global = &conn->txn_global;
+#ifdef HAVE_DIAGNOSTIC
+    prepare_count = 0;
+#endif
     locked = false;
     prepare = F_ISSET(txn, WT_TXN_PREPARE);
     readonly = txn->mod_count == 0;
@@ -1572,6 +1582,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
                  */
                 if (!F_ISSET(op, WT_TXN_OP_KEY_REPEATED))
                     WT_ERR(__txn_resolve_prepared_op(session, op, true, &cursor));
+#ifdef HAVE_DIAGNOSTIC
+                ++prepare_count;
+#endif
             }
             break;
         case WT_TXN_OP_REF_DELETE:
@@ -1589,6 +1602,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
             WT_CLEAR(cursor->key);
     }
     txn->mod_count = 0;
+#ifdef HAVE_DIAGNOSTIC
+    WT_ASSERT(session, txn->prepare_count == prepare_count);
+    txn->prepare_count = 0;
+#endif
 
     if (cursor != NULL) {
         WT_ERR(cursor->close(cursor));
@@ -1680,11 +1697,10 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TXN *txn;
     WT_TXN_OP *op;
     WT_UPDATE *upd, *tmp;
-    int64_t txn_prepared_updates_count;
-    u_int i;
+    u_int i, prepared_updates, prepared_updates_key_repeated;
 
     txn = session->txn;
-    txn_prepared_updates_count = 0;
+    prepared_updates = prepared_updates_key_repeated = 0;
 
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
     WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR));
@@ -1749,7 +1765,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
                 break;
             }
 
-            ++txn_prepared_updates_count;
+            ++prepared_updates;
 
             /* Set prepare timestamp. */
             upd->start_ts = txn->prepare_timestamp;
@@ -1776,6 +1792,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
                 if (tmp->type != WT_UPDATE_RESERVE &&
                   !F_ISSET(tmp, WT_UPDATE_RESTORED_FAST_TRUNCATE)) {
                     F_SET(op, WT_TXN_OP_KEY_REPEATED);
+                    ++prepared_updates_key_repeated;
                     break;
                 }
             break;
@@ -1788,7 +1805,11 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
             break;
         }
     }
-    WT_STAT_CONN_INCR(session, txn_prepared_updates_count);
+    WT_STAT_CONN_INCRV(session, txn_prepared_updates, prepared_updates);
+    WT_STAT_CONN_INCRV(session, txn_prepared_updates_key_repeated, prepared_updates_key_repeated);
+#ifdef HAVE_DIAGNOSTIC
+    txn->prepare_count = prepared_updates;
+#endif
 
     /* Set transaction state to prepare. */
     F_SET(session->txn, WT_TXN_PREPARE);
@@ -1819,10 +1840,16 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TXN_OP *op;
     WT_UPDATE *upd;
     u_int i;
+#ifdef HAVE_DIAGNOSTIC
+    u_int prepare_count;
+#endif
     bool prepare, readonly;
 
     cursor = NULL;
     txn = session->txn;
+#ifdef HAVE_DIAGNOSTIC
+    prepare_count = 0;
+#endif
     prepare = F_ISSET(txn, WT_TXN_PREPARE);
     readonly = txn->mod_count == 0;
 
@@ -1874,6 +1901,9 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
                  */
                 if (!F_ISSET(op, WT_TXN_OP_KEY_REPEATED))
                     WT_TRET(__txn_resolve_prepared_op(session, op, false, &cursor));
+#ifdef HAVE_DIAGNOSTIC
+                ++prepare_count;
+#endif
             }
             break;
         case WT_TXN_OP_REF_DELETE:
@@ -1895,6 +1925,10 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
             WT_CLEAR(cursor->key);
     }
     txn->mod_count = 0;
+#ifdef HAVE_DIAGNOSTIC
+    WT_ASSERT(session, txn->prepare_count == prepare_count);
+    txn->prepare_count = 0;
+#endif
 
     if (cursor != NULL) {
         WT_TRET(cursor->close(cursor));
