@@ -298,12 +298,13 @@ StatusWith<ChunkVersion> getMaxChunkVersionFromQueryResponse(
 
 }  // namespace
 
-Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const OID& requestEpoch,
-                                                const ChunkRange& range,
-                                                const std::vector<BSONObj>& splitPoints,
-                                                const std::string& shardName) {
+StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const OID& requestEpoch,
+    const ChunkRange& range,
+    const std::vector<BSONObj>& splitPoints,
+    const std::string& shardName) {
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
@@ -546,7 +547,9 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         }
     }
 
-    return applyOpsStatus;
+    BSONObjBuilder result;
+    currentMaxVersion.appendToCommand(&result);
+    return result.obj();
 }
 
 Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,

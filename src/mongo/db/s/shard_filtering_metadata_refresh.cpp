@@ -78,8 +78,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
     }();
 
     if (currentShardVersion) {
-        if (currentShardVersion->epoch() == shardVersionReceived.epoch() &&
-            currentShardVersion->majorVersion() >= shardVersionReceived.majorVersion()) {
+        if (shardVersionReceived.isOlderThan(*currentShardVersion)) {
             // Don't need to remotely reload if we're in the same epoch and the requested version is
             // smaller than the one we know about. This means that the remote side is behind.
             return;

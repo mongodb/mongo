@@ -49,6 +49,7 @@ class StatusWith;
  * Attempts to split a chunk with the specified parameters. If the split fails, then the StatusWith
  * object returned will contain a Status with an ErrorCode regarding the cause of failure. If the
  * split succeeds, then the StatusWith object returned will contain Status::Ok().
+ * Will update the shard's filtering metadata.
  *
  * Additionally, splitChunk will attempt to perform top-chunk optimization. If top-chunk
  * optimization is performed, then the function will also return a ChunkRange, which contains the

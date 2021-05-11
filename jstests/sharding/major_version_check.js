@@ -97,18 +97,6 @@
 
         printjson(staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}));
 
-        assert.eq(Timestamp(1, 0),
-                  staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}).version);
-
-        // See if our stale mongos is required to catch up to run a findOne on a new connection
-        staleMongos = new Mongo(staleMongos.host);
-        staleMongos.getCollection(coll + "").findOne();
-
-        printjson(staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}));
-
-        assert.eq(Timestamp(1, 0),
-                  staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}).version);
-
         // Run another split on the original chunk, which does not exist anymore (but the stale
         // mongos thinks it exists). This should fail and cause a refresh on
         // the shard, updating its shard version.

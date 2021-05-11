@@ -92,15 +92,15 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
                               << " parts at a time."};
     }
 
-    const auto status = splitChunk(opCtx,
-                                   nss,
-                                   shardKeyPattern.toBSON(),
-                                   chunkRange,
-                                   splitPoints,
-                                   shardId.toString(),
-                                   collectionVersion.epoch());
-
-    return status.getStatus().withContext("split failed");
+    return splitChunk(opCtx,
+                      nss,
+                      shardKeyPattern.toBSON(),
+                      chunkRange,
+                      splitPoints,
+                      shardId.toString(),
+                      collectionVersion.epoch())
+        .getStatus()
+        .withContext("split failed");
 }
 
 /**
