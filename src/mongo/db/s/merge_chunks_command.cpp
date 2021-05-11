@@ -214,9 +214,17 @@ void mergeChunks(OperationContext* opCtx,
             configCmdObj,
             Shard::RetryPolicy::kIdempotent));
 
-    // Refresh metadata to pick up new chunk definitions (regardless of the results returned from
-    // running _configsvrCommitChunkMerge).
-    forceShardFilteringMetadataRefresh(opCtx, nss, true /* forceRefreshFromThisThread */);
+    // old versions might not have the shardVersion field
+    if (cmdResponse.response[ChunkVersion::kShardVersionField]) {
+        const auto cv = uassertStatusOK(
+            ChunkVersion::parseWithField(cmdResponse.response, ChunkVersion::kShardVersionField));
+        uassertStatusOK(onShardVersionMismatchNoExcept(
+            opCtx, nss, std::move(cv), true /* forceRefreshFromThisThread */));
+    } else {
+        // Refresh metadata to pick up new chunk definitions (regardless of the results returned
+        // from running _configsvrCommitChunkMerge).
+        forceShardFilteringMetadataRefresh(opCtx, nss, true /* forceRefreshFromThisThread */);
+    }
 
     // If _configsvrCommitChunkMerge returned an error, look at this shard's metadata to determine
     // if the merge actually did happen. This can happen if there's a network error getting the

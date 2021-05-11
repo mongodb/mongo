@@ -591,12 +591,13 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
     return result.obj();
 }
 
-Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const OID& requestEpoch,
-                                                const std::vector<BSONObj>& chunkBoundaries,
-                                                const std::string& shardName,
-                                                const boost::optional<Timestamp>& validAfter) {
+StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const OID& requestEpoch,
+    const std::vector<BSONObj>& chunkBoundaries,
+    const std::string& shardName,
+    const boost::optional<Timestamp>& validAfter) {
     // This method must never be called with empty chunks to merge
     invariant(!chunkBoundaries.empty());
 
@@ -647,7 +648,14 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     // Check if the chunk(s) have already been merged. If so, return success.
     auto minChunkOnDisk = uassertStatusOK(_findChunkOnConfig(opCtx, nss, chunkBoundaries.front()));
     if (minChunkOnDisk.getMax().woCompare(chunkBoundaries.back()) == 0) {
-        return Status::OK();
+        BSONObjBuilder result;
+        collVersion.appendToCommand(&result);
+        // Makes sure that the last thing we read in getCurrentChunk and
+        // getShardAndCollectionVersion gets majority written before to return from this command,
+        // otherwise next RoutingInfo cache refresh from the shard may not see those newest
+        // information.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        return result.obj();
     }
 
     // Build chunks to be merged
@@ -719,7 +727,10 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     ShardingLogging::get(opCtx)->logChange(
         opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions());
 
-    return Status::OK();
+    BSONObjBuilder result;
+    mergeVersion.appendToCommand(&result);
+
+    return result.obj();
 }
 
 StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
