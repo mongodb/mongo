@@ -57,8 +57,11 @@ public:
         WindowBounds::Bound<int> upper,
         boost::optional<std::string> sortByPath = boost::none) {
         _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
-        _iter = std::make_unique<PartitionIterator>(
-            getExpCtx().get(), _docSource.get(), boost::none, boost::none);
+        _iter = std::make_unique<PartitionIterator>(getExpCtx().get(),
+                                                    _docSource.get(),
+                                                    boost::none,
+                                                    boost::none,
+                                                    100 * 1024 * 1024 /* default memory limit */);
         auto input = ExpressionFieldPath::parse(
             getExpCtx().get(), inputPath, getExpCtx()->variablesParseState);
         if (sortByPath) {
@@ -140,7 +143,8 @@ TEST_F(WindowFunctionExecNonRemovableTest, AccumulateOnlyWithMultiplePartitions)
     auto iter = PartitionIterator(getExpCtx().get(),
                                   mock.get(),
                                   boost::optional<boost::intrusive_ptr<Expression>>(key),
-                                  boost::none);
+                                  boost::none,
+                                  100 * 1024 * 1024 /* default memory limit */);
     auto input =
         ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
     auto mgr = WindowFunctionExecNonRemovable<AccumulatorState>(
@@ -171,8 +175,11 @@ TEST_F(WindowFunctionExecNonRemovableTest, InputExpressionAllowedToCreateVariabl
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}};
     auto docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
-    auto iter = std::make_unique<PartitionIterator>(
-        getExpCtx().get(), docSource.get(), boost::none, boost::none);
+    auto iter = std::make_unique<PartitionIterator>(getExpCtx().get(),
+                                                    docSource.get(),
+                                                    boost::none,
+                                                    boost::none,
+                                                    100 * 1024 * 1024 /* default memory limit */);
     auto filterBSON =
         fromjson("{$filter: {input: [1, 2, 3], as: 'num', cond: {$gte: ['$$num', 2]}}}");
     auto input = ExpressionFilter::parse(

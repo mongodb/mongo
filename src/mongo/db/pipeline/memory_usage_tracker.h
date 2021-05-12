@@ -85,6 +85,15 @@ public:
         update(total - oldFuncUsage);
     }
 
+    void setInternal(StringData functionName, uint64_t total) {
+        auto oldFuncUsage = _internalMemoryTracker[functionName].currentMemoryBytes();
+        _internalMemoryTracker[functionName].set(total);
+        _memoryUsageBytes += total - oldFuncUsage;
+        if (_memoryUsageBytes > _maxMemoryUsageBytes) {
+            _maxMemoryUsageBytes = _memoryUsageBytes;
+        }
+    }
+
     /**
      * Sets the new current memory usage in bytes.
      */
@@ -104,6 +113,9 @@ public:
         for (auto& [_, funcTracker] : _functionMemoryTracker) {
             funcTracker.set(0);
         }
+        for (auto& [_, funcTracker] : _internalMemoryTracker) {
+            funcTracker.set(0);
+        }
     }
 
     /**
@@ -115,6 +127,15 @@ public:
                               << name,
                 _functionMemoryTracker.find(name) != _functionMemoryTracker.end());
         return _functionMemoryTracker.at(name);
+        MONGO_UNREACHABLE;
+    }
+
+    auto readInternal(StringData name) const {
+        tassert(5643009,
+                str::stream() << "Invalid call to memory usage tracker, could not find function "
+                              << name,
+                _internalMemoryTracker.find(name) != _internalMemoryTracker.end());
+        return _internalMemoryTracker.at(name);
     }
 
     /**
@@ -131,6 +152,10 @@ public:
      */
     void update(int diff) {
         set(_memoryUsageBytes + diff);
+    }
+    void updateInternal(StringData name, int diff) {
+        _internalMemoryTracker[name].update(diff);
+        _memoryUsageBytes += diff;
     }
 
     auto currentMemoryBytes() const {
@@ -150,6 +175,9 @@ private:
 
     // Tracks memory consumption per function using the output field name as a key.
     StringMap<PerFunctionMemoryTracker> _functionMemoryTracker;
+    // Tracks memory consumption of internal values so there is no worry of colliding with a user
+    // field name.
+    StringMap<PerFunctionMemoryTracker> _internalMemoryTracker;
 };
 
 }  // namespace mongo

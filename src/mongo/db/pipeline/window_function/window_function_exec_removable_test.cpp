@@ -55,8 +55,11 @@ public:
         const std::string& inputPath,
         WindowBounds::DocumentBased bounds) {
         _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
-        _iter = std::make_unique<PartitionIterator>(
-            getExpCtx().get(), _docSource.get(), boost::none, boost::none);
+        _iter = std::make_unique<PartitionIterator>(getExpCtx().get(),
+                                                    _docSource.get(),
+                                                    boost::none,
+                                                    boost::none,
+                                                    100 * 1024 * 1024 /* default memory limit */);
         auto input = ExpressionFieldPath::parse(
             getExpCtx().get(), inputPath, getExpCtx()->variablesParseState);
         std::unique_ptr<WindowFunctionState> maxFunc =
@@ -71,8 +74,11 @@ public:
         const std::string& sortByPath,
         WindowBounds::DocumentBased bounds) {
         _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
-        _iter = std::make_unique<PartitionIterator>(
-            getExpCtx().get(), _docSource.get(), boost::none, boost::none);
+        _iter = std::make_unique<PartitionIterator>(getExpCtx().get(),
+                                                    _docSource.get(),
+                                                    boost::none,
+                                                    boost::none,
+                                                    100 * 1024 * 1024 /* default memory limit */);
         auto input = ExpressionFieldPath::parse(
             getExpCtx().get(), inputPath, getExpCtx()->variablesParseState);
         auto sortBy = ExpressionFieldPath::parse(
@@ -282,7 +288,8 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, CanResetFunction) {
         auto iter = PartitionIterator{getExpCtx().get(),
                                       mock.get(),
                                       boost::optional<boost::intrusive_ptr<Expression>>(key),
-                                      boost::none};
+                                      boost::none,
+                                      100 * 1024 * 1024 /* default memory limit */};
         auto input =
             ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
         CollatorInterfaceMock collator = CollatorInterfaceMock::MockType::kToLowerString;
@@ -315,7 +322,8 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, CanResetFunction) {
         auto iter = PartitionIterator{getExpCtx().get(),
                                       mockTwo.get(),
                                       boost::optional<boost::intrusive_ptr<Expression>>(keyTwo),
-                                      boost::none};
+                                      boost::none,
+                                      100 * 1024 * 1024 /* default memory limit */};
         auto input =
             ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
         auto maxFunc = std::make_unique<WindowFunctionMax>(getExpCtx().get());
@@ -336,8 +344,11 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, InputExpressionAllowedToCreateVa
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}};
     auto docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
-    auto iter = std::make_unique<PartitionIterator>(
-        getExpCtx().get(), docSource.get(), boost::none, boost::none);
+    auto iter = std::make_unique<PartitionIterator>(getExpCtx().get(),
+                                                    docSource.get(),
+                                                    boost::none,
+                                                    boost::none,
+                                                    100 * 1024 * 1024 /* default memory limit */);
     auto filterBSON =
         fromjson("{$filter: {input: [1, 2, 3], as: 'num', cond: {$gte: ['$$num', 2]}}}");
     auto input = ExpressionFilter::parse(

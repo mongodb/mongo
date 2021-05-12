@@ -47,8 +47,11 @@ public:
     auto makeDefaultAccessor(
         boost::intrusive_ptr<DocumentSourceMock> mock,
         boost::optional<boost::intrusive_ptr<Expression>> partExpr = boost::none) {
-        _iter = std::make_unique<PartitionIterator>(
-            getExpCtx().get(), mock.get(), partExpr, boost::none);
+        _iter = std::make_unique<PartitionIterator>(getExpCtx().get(),
+                                                    mock.get(),
+                                                    partExpr,
+                                                    boost::none,
+                                                    100 * 1024 * 1024 /* default memory limit */);
         return PartitionAccessor(_iter.get(), PartitionAccessor::Policy::kDefaultSequential);
     }
 
@@ -273,7 +276,11 @@ TEST_F(PartitionIteratorTest, OutsideOfPartitionAccessShouldNotTassert) {
     const auto docs =
         std::deque<DocumentSource::GetNextResult>{Document{{"a", 1}}, Document{{"a", 2}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none, boost::none);
+    auto partIter = PartitionIterator(getExpCtx().get(),
+                                      mock.get(),
+                                      boost::none,
+                                      boost::none,
+                                      100 * 1024 * 1024 /* default memory limit */);
     auto accessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
 
     // Test that an accessor that attempts to read off the end of the partition returns boost::none
@@ -282,29 +289,33 @@ TEST_F(PartitionIteratorTest, OutsideOfPartitionAccessShouldNotTassert) {
     ASSERT_FALSE(accessor[2]);
 }
 
-DEATH_TEST_F(PartitionIteratorTest,
-             SingleConsumerDefaultPolicy,
-             "Invalid access of expired document") {
+DEATH_TEST_F(PartitionIteratorTest, SingleConsumerDefaultPolicy, "Requested expired document") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none, boost::none);
+    auto partIter = PartitionIterator(getExpCtx().get(),
+                                      mock.get(),
+                                      boost::none,
+                                      boost::none,
+                                      100 * 1024 * 1024 /* default memory limit */);
     auto accessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
     // Access the first document, which marks it as expired.
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *accessor[0]);
     // Advance the iterator which frees the first expired document.
     partIter.advance();
     // Attempting to access the first doc results in a tripwire assertion.
-    ASSERT_THROWS_CODE(accessor[-1], AssertionException, 5371202);
+    ASSERT_THROWS_CODE(accessor[-1], AssertionException, 5643005);
 }
 
-DEATH_TEST_F(PartitionIteratorTest,
-             MultipleConsumerDefaultPolicy,
-             "Invalid access of expired document") {
+DEATH_TEST_F(PartitionIteratorTest, MultipleConsumerDefaultPolicy, "Requested expired document") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none, boost::none);
+    auto partIter = PartitionIterator(getExpCtx().get(),
+                                      mock.get(),
+                                      boost::none,
+                                      boost::none,
+                                      100 * 1024 * 1024 /* default memory limit */);
     auto laggingAccessor =
         PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
     auto leadingAccessor =
@@ -325,17 +336,19 @@ DEATH_TEST_F(PartitionIteratorTest,
     ASSERT_FALSE(leadingAccessor[1]);
 
     // The first document should now be expired.
-    ASSERT_THROWS_CODE(laggingAccessor[-2], AssertionException, 5371202);
-    ASSERT_THROWS_CODE(leadingAccessor[-2], AssertionException, 5371202);
+    ASSERT_THROWS_CODE(laggingAccessor[-2], AssertionException, 5643005);
+    ASSERT_THROWS_CODE(leadingAccessor[-2], AssertionException, 5643005);
 }
 
-DEATH_TEST_F(PartitionIteratorTest,
-             SingleConsumerEndpointPolicy,
-             "Invalid access of expired document") {
+DEATH_TEST_F(PartitionIteratorTest, SingleConsumerEndpointPolicy, "Requested expired document") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none, boost::none);
+    auto partIter = PartitionIterator(getExpCtx().get(),
+                                      mock.get(),
+                                      boost::none,
+                                      boost::none,
+                                      100 * 1024 * 1024 /* default memory limit */);
     auto accessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kEndpoints);
     // Mock a window with documents [1, 2].
     auto bounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(1 << 2)),
@@ -355,17 +368,19 @@ DEATH_TEST_F(PartitionIteratorTest,
     endpoints = accessor.getEndpoints(bounds);
     // Now the second document, currently at index 0 in the cache, will be released.
     partIter.advance();
-    ASSERT_THROWS_CODE(accessor[-1], AssertionException, 5371202);
-    ASSERT_THROWS_CODE(accessor[-2], AssertionException, 5371202);
+    ASSERT_THROWS_CODE(accessor[-1], AssertionException, 5643005);
+    ASSERT_THROWS_CODE(accessor[-2], AssertionException, 5643005);
 }
 
-DEATH_TEST_F(PartitionIteratorTest,
-             MultipleConsumerEndpointPolicy,
-             "Invalid access of expired document") {
+DEATH_TEST_F(PartitionIteratorTest, MultipleConsumerEndpointPolicy, "Requested expired document") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none, boost::none);
+    auto partIter = PartitionIterator(getExpCtx().get(),
+                                      mock.get(),
+                                      boost::none,
+                                      boost::none,
+                                      100 * 1024 * 1024 /* default memory limit */);
 
     // Create two endpoint accessors, one at [-1, 0] and another at [0, 1]. Since the first one may
     // access the document at (current - 1), the only expiration that can happen on advance() would
@@ -408,16 +423,20 @@ DEATH_TEST_F(PartitionIteratorTest,
     // the other docs.
     partIter.advance();
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *lookBehindAccessor[-2]);
-    ASSERT_THROWS_CODE(lookBehindAccessor[-3], AssertionException, 5371202);
+    ASSERT_THROWS_CODE(lookBehindAccessor[-3], AssertionException, 5643005);
 }
 
 DEATH_TEST_F(PartitionIteratorTest,
              SingleConsumerRightEndpointPolicy,
-             "Invalid access of expired document") {
+             "Requested expired document") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none, boost::none);
+    auto partIter = PartitionIterator(getExpCtx().get(),
+                                      mock.get(),
+                                      boost::none,
+                                      boost::none,
+                                      100 * 1024 * 1024 /* default memory limit */);
     auto accessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kRightEndpoint);
     // Use a window of 'documents: [-2, -1]'.
     auto bounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(-2 << -1)),
@@ -444,14 +463,18 @@ DEATH_TEST_F(PartitionIteratorTest,
     ASSERT_DOCUMENT_EQ(docs[3].getDocument(), *accessor[0]);
     ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *accessor[-1]);
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *accessor[-2]);
-    ASSERT_THROWS_CODE(accessor[-3], AssertionException, 5371202);
+    ASSERT_THROWS_CODE(accessor[-3], AssertionException, 5643005);
 }
 
-DEATH_TEST_F(PartitionIteratorTest, MixedPolicy, "Invalid access of expired document") {
+DEATH_TEST_F(PartitionIteratorTest, MixedPolicy, "Requested expired document") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none, boost::none);
+    auto partIter = PartitionIterator(getExpCtx().get(),
+                                      mock.get(),
+                                      boost::none,
+                                      boost::none,
+                                      100 * 1024 * 1024 /* default memory limit */);
     auto endpointAccessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kEndpoints);
     auto defaultAccessor =
         PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
@@ -484,7 +507,7 @@ DEATH_TEST_F(PartitionIteratorTest, MixedPolicy, "Invalid access of expired docu
     ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *defaultAccessor[-1]);
 
     // The iterator is currently at {a: 4}, with {a: 1} and {a: 2} both being released.
-    ASSERT_THROWS_CODE(defaultAccessor[-2], AssertionException, 5371202);
+    ASSERT_THROWS_CODE(defaultAccessor[-2], AssertionException, 5643005);
 }
 
 }  // namespace

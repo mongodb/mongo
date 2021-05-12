@@ -42,7 +42,10 @@
 namespace mongo {
 
 TemporaryKVRecordStore::~TemporaryKVRecordStore() {
-    invariant(_recordStoreHasBeenFinalized);
+    if (!_recordStoreHasBeenFinalized) {
+        LOGV2_WARNING(
+            5643013, "Temporary record store was not finalized", "ident"_attr = _rs->getIdent());
+    }
 }
 
 void TemporaryKVRecordStore::finalizeTemporaryTable(OperationContext* opCtx,

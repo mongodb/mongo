@@ -1270,7 +1270,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
 
     if (_keyFormat == KeyFormat::Long) {
         // Non-clustered record stores will extract the RecordId key for the oplog and generate
-        // unique int64_t RecordId's for everything else.
+        // unique int64_t RecordIds if RecordIds are not set.
         for (size_t i = 0; i < nRecords; i++) {
             auto& record = records[i];
             if (_isOplog) {
@@ -1280,7 +1280,11 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                     return status.getStatus();
                 record.id = status.getValue();
             } else {
-                record.id = _nextId(opCtx);
+                // Some RecordStores, like TemporaryRecordStores, may want to set their own
+                // RecordIds.
+                if (record.id.isNull()) {
+                    record.id = _nextId(opCtx);
+                }
             }
             dassert(record.id > highestIdRecord.id);
             highestIdRecord = record;

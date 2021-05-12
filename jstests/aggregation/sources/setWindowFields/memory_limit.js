@@ -17,6 +17,7 @@ if (!featureEnabled) {
     jsTestLog("Skipping test because the window function feature flag is disabled");
     return;
 }
+
 const coll = db[jsTestName()];
 coll.drop();
 
@@ -35,12 +36,12 @@ assert.commandFailedWithCode(coll.runCommand({
     pipeline: [{$setWindowFields: {sortBy: {partitionKey: 1}, output: {val: {$sum: "$_id"}}}}],
     cursor: {}
 }),
-                             5414201);
+                             5643011);
 
 // The same query passes with a higher memory limit.
 setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
                        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-                       2900);
+                       3150);
 assert.commandWorked(coll.runCommand({
     aggregate: coll.getName(),
     pipeline: [{$setWindowFields: {sortBy: {partitionKey: 1}, output: {val: {$sum: "$_id"}}}}],
@@ -66,7 +67,7 @@ assert.commandFailedWithCode(coll.runCommand({
         $setWindowFields: {
             sortBy: {partitionKey: 1},
             partitionBy: "$partitionKey",
-            output: {val: {$max: "$_id", window: {documents: [-9, 9]}}}
+            output: {val: {$push: "$_id", window: {documents: [-9, 9]}}}
         }
     }],
     cursor: {}

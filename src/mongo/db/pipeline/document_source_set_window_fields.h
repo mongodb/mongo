@@ -112,8 +112,8 @@ public:
           _partitionBy(partitionBy),
           _sortBy(std::move(sortBy)),
           _outputFields(std::move(outputFields)),
-          _iterator(expCtx.get(), pSource, std::move(partitionBy), _sortBy),
-          _memoryTracker{false /* allowDiskUse */, maxMemoryBytes} {};
+          _iterator(expCtx.get(), pSource, std::move(partitionBy), _sortBy, maxMemoryBytes),
+          _memoryTracker{pExpCtx->allowDiskUse, maxMemoryBytes} {};
 
     GetModPathsReturn getModifiedPaths() const final {
         std::set<std::string> outputPaths;
@@ -126,15 +126,14 @@ public:
 
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        StageConstraints constraints(StreamType::kBlocking,
-                                     PositionRequirement::kNone,
-                                     HostTypeRequirement::kNone,
-                                     DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kAllowed,
-                                     TransactionRequirement::kAllowed,
-                                     LookupRequirement::kAllowed,
-                                     UnionRequirement::kAllowed);
-        return constraints;
+        return StageConstraints(StreamType::kBlocking,
+                                PositionRequirement::kNone,
+                                HostTypeRequirement::kNone,
+                                DiskUseRequirement::kWritesTmpData,
+                                FacetRequirement::kAllowed,
+                                TransactionRequirement::kAllowed,
+                                LookupRequirement::kAllowed,
+                                UnionRequirement::kAllowed);
     }
 
     const char* getSourceName() const {
@@ -172,6 +171,10 @@ public:
         pSource = source;
         _iterator.setSource(source);
     }
+
+    bool usedDisk() final {
+        return _iterator.usedDisk();
+    };
 
 private:
     void initialize();

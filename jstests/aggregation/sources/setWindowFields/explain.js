@@ -16,7 +16,9 @@ coll.drop();
 const bigStr = Array(1025).toString();  // 1KB of ','
 const nDocs = 1000;
 const nPartitions = 50;
-const docSize = 8 + 8 + 1024;
+// Initial docSize is 1292, after fields are loaded into Document's cache they are 2332.
+// Not const because post-cache doc size changes based on the number of fields accessed.
+let docSize = 2332;
 
 const featureEnabled =
     assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagWindowFunctions: 1}))
@@ -53,19 +55,21 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
                 // Ensures that the expected functions are all included and the corresponding
                 // memory usage is in a reasonable range.
                 if (expectedFunctionMemUsages.hasOwnProperty(field)) {
-                    assert.gt(maxFunctionMemUsages[field],
-                              expectedFunctionMemUsages[field],
-                              "mismatch for function '" + field + "': " + tojson(stage));
+                    // The estimates being passed in are as close as possible to accurate. Leave 10%
+                    // wiggle room for variants that use different amounts of memory.
+                    assert.gte(maxFunctionMemUsages[field],
+                               expectedFunctionMemUsages[field] * .9,
+                               "mismatch for function '" + field + "': " + tojson(stage));
                     assert.lt(maxFunctionMemUsages[field],
-                              2 * expectedFunctionMemUsages[field],
+                              2.2 * expectedFunctionMemUsages[field],
                               "mismatch for function '" + field + "': " + tojson(stage));
                 }
             }
             assert.gt(stage["maxTotalMemoryUsageBytes"],
-                      expectedTotalMemUsage,
+                      expectedTotalMemUsage * .9,
                       "Incorrect total mem usage: " + tojson(stage));
             assert.lt(stage["maxTotalMemoryUsageBytes"],
-                      2 * expectedTotalMemUsage,
+                      2.2 * expectedTotalMemUsage,
                       "Incorrect total mem usage: " + tojson(stage));
         } else {
             assert(!stage.hasOwnProperty("maxFunctionMemoryUsageBytes"), stage);
@@ -123,11 +127,14 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
         },
     ];
     expectedFunctionMemUsages = {
-        count: 60,
-        push: (nDocs / nPartitions) * 1024,
-        set: 1024,
+        count: 72,
+        push: (nDocs / nPartitions) * 1056 + 56,  // 56 constant state size. Uses 1056 per document.
+        set: 1144,                                // 1024 for the string, rest is constant state.
     };
-    expectedTotal = (nDocs / nPartitions) * docSize;
+    // Add one document for the NextPartitionState structure.
+    // TODO SERVER-55786: Fix memory tracking so that the PartitionIterator max memory is correctly
+    // recorded, remove the '-1' in this line.
+    expectedTotal = (nDocs / nPartitions - 1) * docSize;
     for (let func in expectedFunctionMemUsages) {
         expectedTotal += expectedFunctionMemUsages[func];
     }
@@ -138,6 +145,11 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
 
 (function testSlidingWindowMemUsage() {
     const windowSize = 10;
+    // The partition iterator will only hold five documents at once. After they are added to the
+    // removable document executor they will be released.
+    const numDocsHeld = 5;
+    // This test accesses fewer fields, reduce docSize accordingly.
+    docSize = 1292;
     let pipeline = [
         {
             $setWindowFields: {
@@ -147,18 +159,17 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
         },
     ];
     const expectedFunctionMemUsages = {
-        runningSum: windowSize * 16 +
-            160,  // 10x64-bit integer values per window, and 160 for the $sum state.
+        // 10x64-bit integer values per window, and 72 and 144 for the $sum accumulator and executor
+        // state.
+        runningSum: windowSize * 16 + 136 + 144,
     };
 
-    // TODO SERVER-55786: Fix memory tracking in PartitionIterator when documents are
-    // released from the in-memory cache. This should be proportional to the size of the window not
-    // the number of documents in the partition.
-    let expectedTotal = nDocs * docSize;
+    // TODO SERVER-55786: Fix memory tracking so that the PartitionIterator max memory is correctly
+    // recorded, remove the '-1' in this line.
+    let expectedTotal = (numDocsHeld - 1) * docSize;
     for (let func in expectedFunctionMemUsages) {
         expectedTotal += expectedFunctionMemUsages[func];
     }
-
     checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "executionStats");
     checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "allPlansExecution");
 
@@ -173,13 +184,6 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
         },
     ];
 
-    // TODO SERVER-55786: This should not be needed once the memory tracking is fixed in the
-    // iterator. For now, the iterator handles the tracking correctly across partition boundaries so
-    // we need to adjust the expected total.
-    expectedTotal = (nDocs / nPartitions) * docSize;
-    for (let func in expectedFunctionMemUsages) {
-        expectedTotal += expectedFunctionMemUsages[func];
-    }
     checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "executionStats");
     checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "allPlansExecution");
 })();
@@ -198,10 +202,9 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
     // large string.
     const expectedFunctionMemUsages = {pushArray: 1024 * maxDocsInWindow * 2};
 
-    // TODO SERVER-55786: Fix memory tracking in PartitionIterator when documents are
-    // released from the in-memory cache. This should be proportional to the size of the window not
-    // the number of documents in the partition.
-    let expectedTotal = nDocs * docSize;
+    // TODO SERVER-55786: Fix memory tracking so that the PartitionIterator max memory is correctly
+    // recorded, remove the '-1' in this line.
+    let expectedTotal = (maxDocsInWindow - 1) * docSize;
     for (let func in expectedFunctionMemUsages) {
         expectedTotal += expectedFunctionMemUsages[func];
     }

@@ -265,5 +265,38 @@ public:
                                  boost::optional<ChunkVersion> chunkVersion) override {
         // Do nothing.
     }
+
+    std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+        MONGO_UNREACHABLE;
+    }
+
+    void writeRecordsToRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                   RecordStore* rs,
+                                   std::vector<Record>* records,
+                                   const std::vector<Timestamp>& ts) const {
+        MONGO_UNREACHABLE;
+    }
+
+    Document readRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                       RecordStore* rs,
+                                       RecordId rID) const {
+        MONGO_UNREACHABLE;
+    }
+
+    void deleteRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                     RecordStore* rs,
+                                     RecordId rID) const {
+        MONGO_UNREACHABLE;
+    }
+
+    void truncateRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                             RecordStore* rs) const {
+        MONGO_UNREACHABLE;
+    }
+    void deleteTemporaryRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                    std::unique_ptr<TemporaryRecordStore> rs) const {
+        MONGO_UNREACHABLE;
+    }
 };
 }  // namespace mongo

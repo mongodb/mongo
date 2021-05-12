@@ -133,8 +133,7 @@ protected:
     // Keep track of values in the window function that will need to be removed later.
     std::queue<Value> _values;
 
-    // Track the byte size of the values being stored by this class. Does not include the constant
-    // size objects being held or the overhead of the data structures.
+    // Track the byte size of the values being stored by this class.
     size_t _memUsageBytes = 0;
 
 private:

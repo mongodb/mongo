@@ -236,6 +236,38 @@ public:
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
         Pipeline* pipeline, bool allowTargetingShards) final;
 
+    std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const final {
+        MONGO_UNREACHABLE;
+    }
+    void writeRecordsToRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                   RecordStore* rs,
+                                   std::vector<Record>* records,
+                                   const std::vector<Timestamp>& ts) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    Document readRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                       RecordStore* rs,
+                                       RecordId rID) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    void deleteRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                     RecordStore* rs,
+                                     RecordId rID) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    void truncateRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                             RecordStore* rs) const final {
+        MONGO_UNREACHABLE;
+    }
+    void deleteTemporaryRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                    std::unique_ptr<TemporaryRecordStore> rs) const final {
+        MONGO_UNREACHABLE;
+    }
+
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,

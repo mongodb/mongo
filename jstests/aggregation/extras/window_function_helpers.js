@@ -162,7 +162,8 @@ function assertResultsEqual(wfRes, index, groupRes, accum) {
     } else if (accum == "$addToSet") {
         // Order doesn't matter for $addToSet.
         assert(arrayEq(groupRes, wfRes.res),
-               "Window function $addToSet results for index " + index + ": " + tojson(wfRes));
+               "Window function $addToSet results for index " + index + ": " + tojson(wfRes) +
+                   "\nexpected:\n " + tojson(groupRes));
     } else
         assert.eq(groupRes,
                   wfRes.res,
@@ -187,15 +188,17 @@ function testAccumAgainstGroup(coll, accum, onNoResults = null, disableRemovable
             jsTestLog("Testing accumulator " + accum + " against " + tojson(partition) +
                       " partition and [" + bounds + "] bounds");
             const wfResults =
-                coll.aggregate([
-                        {
-                            $setWindowFields: {
-                                partitionBy: partition,
-                                sortBy: {_id: 1},
-                                output: {res: {[accum]: "$price", window: {documents: bounds}}}
+                coll.aggregate(
+                        [
+                            {
+                                $setWindowFields: {
+                                    partitionBy: partition,
+                                    sortBy: {_id: 1},
+                                    output: {res: {[accum]: "$price", window: {documents: bounds}}}
+                                },
                             },
-                        },
-                    ])
+                        ],
+                        {allowDiskUse: true})
                     .toArray();
             for (let index = 0; index < wfResults.length; index++) {
                 const wfRes = wfResults[index];
@@ -248,7 +251,9 @@ function testAccumAgainstGroup(coll, accum, onNoResults = null, disableRemovable
                 outputFields["res" + index] = {[accum]: "$price", window: {documents: bounds}};
             });
             let specWithOutput = Object.merge(baseSpec, {output: outputFields});
-            const wfResults = coll.aggregate([{$setWindowFields: specWithOutput}]).toArray();
+            const wfResults =
+                coll.aggregate([{$setWindowFields: specWithOutput}], {allowDiskUse: true})
+                    .toArray();
             assert.gt(wfResults.length, 0);
             jsTestLog("Done");
         });

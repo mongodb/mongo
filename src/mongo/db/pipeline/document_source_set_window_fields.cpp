@@ -264,6 +264,7 @@ Value DocumentSourceInternalSetWindowFields::serialize(
         out["maxFunctionMemoryUsageBytes"] = Value(md.freezeToValue());
         out["maxTotalMemoryUsageBytes"] =
             Value(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
+        out["usedDisk"] = Value(_iterator.usedDisk());
     }
 
     return Value(out.freezeToValue());
@@ -323,6 +324,8 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
         return DocumentSource::GetNextResult::makeEOF();
 
     auto curDoc = _iterator.current();
+    _memoryTracker.setInternal("PartitionIterator", _iterator.getApproximateSize());
+
     // The only way we hit this case is if there are no documents, since otherwise _eof will be set.
     if (!curDoc) {
         _eof = true;
@@ -332,18 +335,29 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
     // Populate the output document with the result from each window function.
     MutableDocument addFieldsSpec;
     for (auto&& [fieldName, function] : _executableOutputs) {
-        auto oldIteratorMemUsage = _iterator.getApproximateSize();
-        addFieldsSpec.addField(fieldName, function->getNext());
+        try {
+            // If we hit a uassert while evaluating expressions on user data, delete the temporary
+            // table before aborting the operation.
+            addFieldsSpec.addField(fieldName, function->getNext());
+        } catch (const DBException&) {
+            _iterator.finalize();
+            throw;
+        }
 
         // Update the memory usage for this function after getNext().
         _memoryTracker.set(fieldName, function->getApproximateSize());
         // Account for the additional memory in the iterator cache.
-        _memoryTracker.set(_memoryTracker.currentMemoryBytes() +
-                           (_iterator.getApproximateSize() - oldIteratorMemUsage));
-
-        uassert(5414201,
-                "Exceeded memory limit in DocumentSourceSetWindowFields",
-                _memoryTracker.currentMemoryBytes() < _memoryTracker._maxAllowedMemoryUsageBytes);
+        _memoryTracker.setInternal("PartitionIterator", _iterator.getApproximateSize());
+        if (_memoryTracker.currentMemoryBytes() >= _memoryTracker._maxAllowedMemoryUsageBytes &&
+            _memoryTracker._allowDiskUse) {
+            // Attempt to spill where possible.
+            _iterator.spillToDisk();
+            _memoryTracker.setInternal("PartitionIterator", _iterator.getApproximateSize());
+        }
+        if (_memoryTracker.currentMemoryBytes() > _memoryTracker._maxAllowedMemoryUsageBytes) {
+            _iterator.finalize();
+            uasserted(5414201, "Exceeded memory limit in DocumentSourceSetWindowFields");
+        }
     }
 
     // Advance the iterator and handle partition/EOF edge cases.
@@ -360,6 +374,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
             break;
         case PartitionIterator::AdvanceResult::kEOF:
             _eof = true;
+            _iterator.finalize();
             break;
     }
     auto projExec = projection_executor::AddFieldsProjectionExecutor::create(

@@ -48,10 +48,12 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/storage_stats_spec_gen.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/resource_yielder.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/backup_cursor_state.h"
+#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/chunk_version.h"
 
@@ -446,6 +448,50 @@ public:
                                            const NamespaceString& outputNs) const = 0;
 
     std::shared_ptr<executor::TaskExecutor> taskExecutor;
+
+    /**
+     * Create a temporary record store.
+     */
+    virtual std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const = 0;
+
+    /**
+     * Write the records in 'records' to the record store. Record store must already exist. Asserts
+     * that the writes succeeded.
+     */
+    virtual void writeRecordsToRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           RecordStore* rs,
+                                           std::vector<Record>* records,
+                                           const std::vector<Timestamp>& ts) const = 0;
+
+    /**
+     * Search for the RecordId 'rID' in 'rs'. RecordStore must already exist and be populated.
+     * Asserts that a document was found.
+     */
+    virtual Document readRecordFromRecordStore(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        RecordStore* rs,
+        RecordId rID) const = 0;
+
+    /**
+     * Deletes the record with RecordId `rID` from `rs`. RecordStore must already exist.
+     */
+    virtual void deleteRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                             RecordStore* rs,
+                                             RecordId rID) const = 0;
+
+    /**
+     * Deletes all Records from `rs`. RecordStore must already exist.
+     */
+    virtual void truncateRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                     RecordStore* rs) const = 0;
+
+    /**
+     * Takes ownership of and deletes the record store `rs`. It is invalid to perform more
+     * operations on `rs` after this has been called.
+     */
+    virtual void deleteTemporaryRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                            std::unique_ptr<TemporaryRecordStore> rs) const = 0;
 };
 
 }  // namespace mongo
