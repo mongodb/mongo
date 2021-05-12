@@ -898,7 +898,8 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
 
     const uint64_t collectionAverageObjectSize = collection->averageObjectSize(opCtx);
 
-    uint64_t averageObjectIdSize = OID::kOIDSize;
+    uint64_t averageObjectIdSize = 0;
+    const uint64_t defaultObjectIdSize = OID::kOIDSize;
     if (totalRecs > 0) {
         const auto idIdx = collection->getIndexCatalog()->findIdIndex(opCtx)->getEntry();
         if (!idIdx) {
@@ -921,8 +922,8 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
     }
 
     stdx::lock_guard<Latch> lk(_mutex);
-    _averageObjectSizeForCloneLocs = collectionAverageObjectSize + 12;
-    _averageObjectIdSize = averageObjectIdSize;
+    _averageObjectSizeForCloneLocs = collectionAverageObjectSize + defaultObjectIdSize;
+    _averageObjectIdSize = std::max(averageObjectIdSize, defaultObjectIdSize);
     return Status::OK();
 }
 
