@@ -161,10 +161,6 @@ private:
                                           int64_t bytesToClone,
                                           int64_t documentsToClone);
 
-    // Transitions the on-disk and in-memory state to DonorStateEnum::kDone, releasing the
-    // recoverable critical section.
-    void _transitionToDone();
-
     // Transitions the on-disk and in-memory state to DonorStateEnum::kError.
     void _transitionToError(Status abortReason);
 
@@ -239,6 +235,10 @@ private:
     SharedPromise<void> _coordinatorHasDecisionPersisted;
 
     SharedPromise<void> _completionPromise;
+
+    // Promises used to synchronize the acquisition/promotion of the recoverable critical section.
+    SharedPromise<void> _critSecWasAcquired;
+    SharedPromise<void> _critSecWasPromoted;
 };
 
 /**

@@ -263,6 +263,12 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                   "reshardingUUID"_attr = _metadata.getReshardingUUID(),
                   "error"_attr = status);
 
+            {
+                stdx::lock_guard<Latch> lk(_mutex);
+                ensureFulfilledPromise(lk, _critSecWasAcquired, status);
+                ensureFulfilledPromise(lk, _critSecWasPromoted, status);
+            }
+
             return withAutomaticRetry(**executor, abortToken, [this, status] {
                 // It is illegal to transition into kError if the state is in or has already
                 // surpassed kBlockingWrites.
@@ -280,6 +286,10 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& abortToken) noexcept {
     if (_donorCtx.getState() == DonorStateEnum::kDone) {
+        {
+            stdx::lock_guard<Latch> lk(_mutex);
+            ensureFulfilledPromise(lk, _critSecWasPromoted);
+        }
         return ExecutorFuture(**executor);
     }
 
@@ -310,7 +320,16 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
             _dropOriginalCollectionThenTransitionToDone();
         } else if (_donorCtx.getState() != DonorStateEnum::kDone) {
             // If aborted, the donor must be allowed to transition to done from any state.
-            _transitionToDone();
+            _transitionState(DonorStateEnum::kDone);
+        }
+
+        {
+            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+            RecoverableCriticalSectionService::get(opCtx.get())
+                ->releaseRecoverableCriticalSection(opCtx.get(),
+                                                    _metadata.getSourceNss(),
+                                                    _critSecReason,
+                                                    ShardingCatalogClient::kLocalWriteConcern);
         }
 
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
@@ -327,9 +346,11 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
 void ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(Status status) {
     if (!status.isOK()) {
         stdx::lock_guard<Latch> lk(_mutex);
-        if (!_completionPromise.getFuture().isReady()) {
-            _completionPromise.setError(status);
-        }
+
+        ensureFulfilledPromise(lk, _critSecWasAcquired, status);
+        ensureFulfilledPromise(lk, _critSecWasPromoted, status);
+
+        ensureFulfilledPromise(lk, _completionPromise, status);
     }
 }
 
@@ -408,31 +429,28 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
         return;
     }
 
-    stdx::lock_guard<Latch> lk(_mutex);
-    auto coordinatorState = reshardingFields.getState();
-    if (coordinatorState >= CoordinatorStateEnum::kApplying) {
-        ensureFulfilledPromise(lk, _allRecipientsDoneCloning);
+    const CoordinatorStateEnum coordinatorState = reshardingFields.getState();
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
+        if (coordinatorState >= CoordinatorStateEnum::kApplying) {
+            ensureFulfilledPromise(lk, _allRecipientsDoneCloning);
+        }
+
+        if (coordinatorState >= CoordinatorStateEnum::kBlockingWrites) {
+            ensureFulfilledPromise(lk, _allRecipientsDoneApplying);
+        }
+
+        if (coordinatorState >= CoordinatorStateEnum::kDecisionPersisted) {
+            ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
+        }
     }
 
     if (coordinatorState >= CoordinatorStateEnum::kBlockingWrites) {
-        RecoverableCriticalSectionService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
-            opCtx,
-            _metadata.getSourceNss(),
-            _critSecReason,
-            ShardingCatalogClient::kLocalWriteConcern);
-
-        ensureFulfilledPromise(lk, _allRecipientsDoneApplying);
+        _critSecWasAcquired.getFuture().wait(opCtx);
     }
 
     if (coordinatorState >= CoordinatorStateEnum::kDecisionPersisted) {
-        RecoverableCriticalSectionService::get(opCtx)
-            ->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                opCtx,
-                _metadata.getSourceNss(),
-                _critSecReason,
-                ShardingCatalogClient::kLocalWriteConcern);
-
-        ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
+        _critSecWasPromoted.getFuture().wait(opCtx);
     }
 }
 
@@ -533,7 +551,24 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_awaitAllRecipie
 void ReshardingDonorService::DonorStateMachine::
     _writeTransactionOplogEntryThenTransitionToBlockingWrites() {
     if (_donorCtx.getState() > DonorStateEnum::kDonatingOplogEntries) {
+        stdx::lock_guard<Latch> lk(_mutex);
+        ensureFulfilledPromise(lk, _critSecWasAcquired);
         return;
+    }
+
+    {
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        RecoverableCriticalSectionService::get(opCtx.get())
+            ->acquireRecoverableCriticalSectionBlockWrites(
+                opCtx.get(),
+                _metadata.getSourceNss(),
+                _critSecReason,
+                ShardingCatalogClient::kLocalWriteConcern);
+    }
+
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
+        ensureFulfilledPromise(lk, _critSecWasAcquired);
     }
 
     {
@@ -611,7 +646,25 @@ SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitFinalOplo
 
 void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTransitionToDone() {
     if (_donorCtx.getState() > DonorStateEnum::kBlockingWrites) {
+        {
+            stdx::lock_guard<Latch> lk(_mutex);
+            ensureFulfilledPromise(lk, _critSecWasPromoted);
+        }
         return;
+    }
+    {
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        RecoverableCriticalSectionService::get(opCtx.get())
+            ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                opCtx.get(),
+                _metadata.getSourceNss(),
+                _critSecReason,
+                ShardingCatalogClient::kLocalWriteConcern);
+    }
+
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
+        ensureFulfilledPromise(lk, _critSecWasPromoted);
     }
 
     if (_isAlsoRecipient) {
@@ -623,7 +676,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
             opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
     }
 
-    _transitionToDone();
+    _transitionState(DonorStateEnum::kDone);
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionState(DonorStateEnum newState) {
@@ -659,20 +712,6 @@ void ReshardingDonorService::DonorStateMachine::_transitionToDonatingInitialData
     newDonorCtx.setBytesToClone(bytesToClone);
     newDonorCtx.setDocumentsToClone(documentsToClone);
     _transitionState(std::move(newDonorCtx));
-}
-
-void ReshardingDonorService::DonorStateMachine::_transitionToDone() {
-
-    {
-        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-        RecoverableCriticalSectionService::get(opCtx.get())
-            ->releaseRecoverableCriticalSection(opCtx.get(),
-                                                _metadata.getSourceNss(),
-                                                _critSecReason,
-                                                ShardingCatalogClient::kLocalWriteConcern);
-    }
-
-    _transitionState(DonorStateEnum::kDone);
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionToError(Status abortReason) {
