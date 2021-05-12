@@ -121,8 +121,6 @@ variables:
 - &powercycle_remote_credentials
   private_key_file: src/powercycle.pem
   private_key_remote: ${__project_aws_ssh_key_value}
-  aws_key_remote: ${powercycle_aws_key}
-  aws_secret_remote: ${powercycle_aws_secret}
 
 - &libfuzzertests
   name: libfuzzertests!
@@ -891,12 +889,68 @@ functions:
     - *f_expansions_write
     - *do_multiversion_setup
 
-  "move multiversion binaries": &move_multiversion_binaries
+  # Used by generator
+  "get compiled binaries":
     command: subprocess.exec
     params:
       binary: bash
       args:
-        - "./src/evergreen/move_multiversion_binaries.sh"
+        - "./src/evergreen/compiled_binaries_get.sh"
+      env:
+        workdir: ${workdir}
+
+  "generate powercycle tasks":
+    - *set_task_expansion_macros
+    - *f_expansions_write
+    - *set_up_venv
+    - *upload_pip_requirements
+
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/powercycle_tasks_generate.sh"
+        env:
+          workdir: ${workdir}
+
+    - command: archive.targz_pack
+      params:
+        target: powercycle_tasks_config.tgz
+        source_dir: "./"
+        include:
+          - "powercycle_tasks.json"
+
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: powercycle_tasks_config.tgz
+        remote_file: ${project}/${build_variant}/${revision}/powercycle_tasks/${task_name}-${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/gzip
+        display_name: Generated Task Config - Execution ${execution}
+
+    - command: generate.tasks
+      params:
+        files:
+          - powercycle_tasks.json
+
+  "run powercycle sentinel":
+    - *set_task_expansion_macros
+    - *f_expansions_write
+    - *set_up_venv
+    - *upload_pip_requirements
+    - *configure_evergreen_api_credentials
+
+    - command: subprocess.exec
+      type: system
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/powercycle_sentinel_run.sh"
+        env:
+          workdir: ${workdir}
 
   "execute resmoke tests": &execute_resmoke_tests
     command: subprocess.exec
@@ -1607,6 +1661,7 @@ functions:
       params:
         provider: ec2
         distro: ${distro_id}
+        timeout_teardown_secs: 604800 # 7 days
         security_group_ids:
         - sg-097bff6dd0d1d31d0
 
@@ -6075,26 +6130,24 @@ tasks:
       resmoke_args: --suites=json_schema --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
-- name: powercycle_smoke_skip_compile
-  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+- name: powercycle_smoke_skip_compile_gen
   commands:
-    - *f_expansions_write
-    - func: "set task expansion macros"
-    - *f_expansions_write
-    - func: "set up venv"
-    - func: "upload pip requirements"
-    - *f_expansions_write
-    - func: "configure evergreen api credentials"
-    - func: "do multiversion setup"
+    - func: "generate powercycle tasks"
       vars:
-        install_master_bin: true
-    - *move_multiversion_binaries
-    - func: "set up remote credentials"
+        task_names: >-
+          powercycle_smoke_skip_compile
+        num_tasks: 20
+        exec_timeout_secs: 604800 # 7 days
+        timeout_secs: 604800 # 7 days
+        set_up_retry_count: 1000000
+        run_powercycle_args: --sshAccessRetryCount=1000000
+
+- name: powercycle_sentinel
+  exec_timeout_secs: 604800 # 7 days
+  commands:
+    - func: "run powercycle sentinel"
       vars:
-        <<: *powercycle_remote_credentials
-    - func: "set up EC2 instance"
-    - func: "run powercycle test"
-      timeout_secs: 1800 # 30 minute timeout for no output
+        gen_task: powercycle_smoke_skip_compile_gen
 
 - name: powercycle_smoke
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
@@ -8225,14 +8278,13 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions:
-    multiversion_platform: amazon2
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
   stepback: false
   tasks:
   - name: lint_fuzzer_sanity_all
-  - name: powercycle_smoke_skip_compile
-    distros:
-    - amazon2-test
+  - name: powercycle_sentinel
+  - name: powercycle_smoke_skip_compile_gen
 
 - name: security-daily-cron
   modules:

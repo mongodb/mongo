@@ -25,9 +25,7 @@ class PowercycleCommand(Subcommand):
     def __init__(self):
         """Initialize PowercycleCommand."""
         self.expansions = yaml.safe_load(open(powercycle_constants.EXPANSIONS_FILE))
-        self.ssh_identity = self._get_ssh_identity()
-        self.ssh_connection_options = \
-            f"{self.ssh_identity} {powercycle_constants.DEFAULT_SSH_CONNECTION_OPTIONS}"
+        self.ssh_connection_options = f"-i powercycle.pem {powercycle_constants.DEFAULT_SSH_CONNECTION_OPTIONS}"
         self.sudo = "" if self.is_windows() else "sudo"
         # The username on the Windows image that powercycle uses is currently the default user.
         self.user = "Administrator" if self.is_windows() else getpass.getuser()
@@ -51,14 +49,6 @@ class PowercycleCommand(Subcommand):
         buff_stdout, _ = process.communicate()
         buff = buff_stdout.decode("utf-8", "replace")
         return process.poll(), buff
-
-    def _get_ssh_identity(self) -> str:
-        workdir = self.expansions['workdir']
-        if self.is_windows():
-            workdir = workdir.replace("\\", "/")
-        pem_file = '/'.join([workdir, 'src', 'powercycle.pem'])
-
-        return f"-i {pem_file}"
 
 
 def execute_cmd(cmd, use_file=False):

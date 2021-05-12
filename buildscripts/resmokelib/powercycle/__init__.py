@@ -156,6 +156,9 @@ MongoDB Powercycle Tests. To run a powercycle test locally, use the following st
             f" config values will be used from '{powercycle_config.POWERCYCLE_TASKS_CONFIG}'."
             f" [default: '%(default)s']", default="powercycle")
 
+        test_options.add_argument("--sshAccessRetryCount", dest="ssh_access_retry_count",
+                                  help=argparse.SUPPRESS, type=int, default=5)
+
         # MongoDB options
         mongodb_options.add_argument(
             "--downloadUrl", dest="tarball_url",

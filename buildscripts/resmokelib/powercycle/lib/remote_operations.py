@@ -51,7 +51,7 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
 
     def __init__(  # pylint: disable=too-many-arguments
             self, user_host, ssh_connection_options=None, ssh_options=None, scp_options=None,
-            shell_binary="/bin/bash", use_shell=False, ignore_ret=False):
+            shell_binary="/bin/bash", use_shell=False, ignore_ret=False, access_retry_count=5):
         """Initialize RemoteOperations."""
 
         self.user_host = user_host
@@ -62,6 +62,7 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         self.ignore_ret = ignore_ret
         self.shell_binary = shell_binary
         self.use_shell = use_shell
+        self.access_retry_count = access_retry_count
         # Check if we can remotely access the host.
         self._access_code, self._access_buff = self._remote_access()
 
@@ -99,7 +100,7 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         """Check if a remote session is possible."""
         cmd = "ssh {} {} {} date".format(self.ssh_connection_options, self.ssh_options,
                                          self.user_host)
-        return self._call_retries(cmd, 5)
+        return self._call_retries(cmd, self.access_retry_count)
 
     def _perform_operation(self, cmd, retry, retry_count):
         if retry:

@@ -724,13 +724,13 @@ class LocalToRemoteOperations(object):
 
     def __init__(  # pylint: disable=too-many-arguments
             self, user_host, ssh_connection_options=None, ssh_options=None,
-            shell_binary="/bin/bash", use_shell=False):
+            shell_binary="/bin/bash", use_shell=False, access_retry_count=5):
         """Initialize LocalToRemoteOperations."""
 
         self.remote_op = remote_operations.RemoteOperations(
             user_host=user_host, ssh_connection_options=ssh_connection_options,
             ssh_options=ssh_options, shell_binary=shell_binary, use_shell=use_shell,
-            ignore_ret=True)
+            ignore_ret=True, access_retry_count=access_retry_count)
 
     def shell(self, cmds, remote_dir=None):
         """Return tuple (ret, output) from performing remote shell operation."""
@@ -1332,7 +1332,7 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
 
     LOGGER.info("powercycle invocation: %s", " ".join(sys.argv))
 
-    task_name = options.task_name
+    task_name = re.sub(r"(_[0-9]+)(_[\w-]+)?$", "", options.task_name)
     task_config = powercycle_config.get_task_config(task_name, options.remote_operation)
 
     LOGGER.info("powercycle task config: %s", task_config)
@@ -1450,9 +1450,9 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
     ssh_options = "" if _IS_WINDOWS else "-tt"
 
     # Instantiate the local handler object.
-    local_ops = LocalToRemoteOperations(user_host=ssh_user_host,
-                                        ssh_connection_options=ssh_connection_options,
-                                        ssh_options=ssh_options, use_shell=True)
+    local_ops = LocalToRemoteOperations(
+        user_host=ssh_user_host, ssh_connection_options=ssh_connection_options,
+        ssh_options=ssh_options, use_shell=True, access_retry_count=options.ssh_access_retry_count)
     verify_remote_access(local_ops)
 
     # Pass client_args to the remote script invocation.
@@ -1662,7 +1662,8 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
         # Reestablish remote access after crash.
         local_ops = LocalToRemoteOperations(user_host=ssh_user_host,
                                             ssh_connection_options=ssh_connection_options,
-                                            ssh_options=ssh_options, use_shell=True)
+                                            ssh_options=ssh_options, use_shell=True,
+                                            access_retry_count=options.ssh_access_retry_count)
         verify_remote_access(local_ops)
         ret, output = call_remote_operation(local_ops, remote_python, script_name, client_args,
                                             "--remoteOperation noop")

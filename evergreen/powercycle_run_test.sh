@@ -18,5 +18,6 @@ trap 'echo $? > error_exit.txt; exit 0' EXIT
 set +o errexit
 eval $python -u buildscripts/resmoke.py powercycle run \
   "--sshUserHost=$(printf "%s@%s" "$user" "${private_ip_address}") \
-  --sshConnection=\"-i ${private_key_file}\" \
-  --taskName=${task_name}"
+  --sshConnection=\"-i powercycle.pem\" \
+  --taskName=${task_name} \
+  ${run_powercycle_args}"
