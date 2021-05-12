@@ -1123,6 +1123,13 @@ def to_local_args(input_args=None):  # pylint: disable=too-many-branches,too-man
     if origin_suite is not None:
         setattr(parsed_args, "suite_files", origin_suite)
 
+    # Replace --runAllFeatureFlagTests with an explicit list of feature flags. The former relies on
+    # all_feature_flags.txt which may not exist in the local dev environment.
+    run_all_feature_flag_tests = getattr(parsed_args, "run_all_feature_flag_tests", None)
+    if run_all_feature_flag_tests is not None:
+        setattr(parsed_args, "additional_feature_flags", config.ENABLED_FEATURE_FLAGS)
+        del parsed_args.run_all_feature_flag_tests
+
     # The top-level parser has one subparser that contains all subcommand parsers.
     command_subparser = [
         action for action in parser._actions  # pylint: disable=protected-access

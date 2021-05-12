@@ -356,6 +356,9 @@ INSTALL_DIR = None
 # Whether to run tests for feature flags.
 RUN_ALL_FEATURE_FLAG_TESTS = None
 
+# List of enabled feature flags.
+ENABLED_FEATURE_FLAGS = []
+
 # The path to the mongo executable used by resmoke.py.
 MONGO_EXECUTABLE = None
 
