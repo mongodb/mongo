@@ -357,6 +357,9 @@ private:
     // pre-allocation (initial clone).
     uint64_t _averageObjectSizeForCloneLocs{0};
 
+    // The estimated average object _id size during the clone phase.
+    uint64_t _averageObjectIdSize{0};
+
     // Represents all of the requested but not yet fulfilled operations to be tracked, with regards
     // to the chunk being cloned.
     uint64_t _outstandingOperationTrackRequests{0};
