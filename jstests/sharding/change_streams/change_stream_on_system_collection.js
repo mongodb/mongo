@@ -8,6 +8,7 @@
  * requires_fcv_50,
  * uses_change_streams,
  * requires_majority_read_concern,
+ * requires_find_command,
  *]
  */
 (function() {
