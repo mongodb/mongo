@@ -656,18 +656,36 @@ public:
 
             hangTimeseriesInsertBeforeWrite.pauseWhileSet();
 
-            auto result = batch->numPreviouslyCommittedMeasurements() == 0
-                ? _performTimeseriesInsert(opCtx, batch, metadata, std::move(stmtIds))
-                : _performTimeseriesUpdate(opCtx, batch, metadata, std::move(stmtIds));
+            const auto docId = batch->bucket()->id();
+            const bool performInsert = batch->numPreviouslyCommittedMeasurements() == 0;
+            if (performInsert) {
+                auto result = _performTimeseriesInsert(opCtx, batch, metadata, std::move(stmtIds));
 
-            if (auto error = generateError(opCtx, result, start + index, errors->size())) {
-                errors->push_back(*error);
-                bucketCatalog.abort(batch, result.getStatus());
-                batchGuard.dismiss();
-                return;
+                if (auto error = generateError(opCtx, result, start + index, errors->size())) {
+                    errors->push_back(*error);
+                    bucketCatalog.abort(batch, result.getStatus());
+                    batchGuard.dismiss();
+                    return;
+                }
+
+                invariant(result.getValue().getN() == 1,
+                          str::stream() << "Expected 1 insertion of document with _id '" << docId
+                                        << "', but found " << result.getValue().getN() << ".");
+            } else {
+                auto result = _performTimeseriesUpdate(opCtx, batch, metadata, std::move(stmtIds));
+
+                if (auto error = generateError(opCtx, result, start + index, errors->size())) {
+                    errors->push_back(*error);
+                    bucketCatalog.abort(batch, result.getStatus());
+                    batchGuard.dismiss();
+                    return;
+                }
+
+                invariant(result.getValue().getNModified() == 1,
+                          str::stream()
+                              << "Expected 1 update of document with _id '" << docId
+                              << "', but found " << result.getValue().getNModified() << ".");
             }
-
-            invariant(result.getValue().getN() == 1 || result.getValue().getNModified() == 1);
 
             getOpTimeAndElectionId(opCtx, opTime, electionId);
 
