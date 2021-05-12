@@ -43,7 +43,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -99,10 +98,8 @@ void profile(OperationContext* opCtx, NetworkOp op) {
     b.appendDate("ts", jsTime());
     b.append("client", opCtx->getClient()->clientAddress());
 
-    const auto& clientMetadata =
-        ClientMetadataIsMasterState::get(opCtx->getClient()).getClientMetadata();
-    if (clientMetadata) {
-        auto appName = clientMetadata.get().getApplicationName();
+    if (auto clientMetadata = ClientMetadata::get(opCtx->getClient())) {
+        auto appName = clientMetadata->getApplicationName();
         if (!appName.empty()) {
             b.append("appName", appName);
         }

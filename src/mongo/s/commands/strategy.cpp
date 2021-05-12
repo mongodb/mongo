@@ -62,6 +62,7 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
@@ -354,6 +355,8 @@ void runCommand(OperationContext* opCtx,
         return;
     }
 
+    const auto isHello = command->getName() == "hello"_sd || command->getName() == "isMaster"_sd;
+
     CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
 
     // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
@@ -418,6 +421,13 @@ void runCommand(OperationContext* opCtx,
 
     boost::optional<RouterOperationContextSession> routerSession;
     try {
+        if (isHello) {
+            // Preload generic ClientMetadata ahead of our first hello request. After the first
+            // request, metaElement should always be empty.
+            auto metaElem = request.body[kMetadataDocumentName];
+            ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem);
+        }
+
         CommandHelpers::evaluateFailCommandFailPoint(opCtx, invocation.get());
         if (osi.getAutocommit()) {
             routerSession.emplace(opCtx);

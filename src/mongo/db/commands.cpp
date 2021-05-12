@@ -53,7 +53,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/factory.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/write_concern_error_detail.h"
@@ -476,6 +476,11 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     if (cmd->getName() == "configureFailPoint"_sd)  // Banned even if in failCommands.
         return false;
 
+    auto appName = StringData();
+    if (auto clientMetadata = ClientMetadata::get(client)) {
+        appName = clientMetadata->getApplicationName();
+    }
+
     if (data.hasField("threadName") &&
         (client->desc() !=
          data.getStringField(
@@ -483,12 +488,8 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
         return false;
     }
 
-    if (data.hasField("appName")) {
-        const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
-        if (clientMetadata &&
-            clientMetadata.get().getApplicationName() != data.getStringField("appName")) {
-            return false;  // only activate failpoint on connection with a certain appName
-        }
+    if (data.hasField("appName") && (appName != data.getStringField("appName"))) {
+        return false;  // only activate failpoint on connection with a certain appName
     }
 
     if (client->session() && (client->session()->getTags() & transport::Session::kInternalClient)) {
@@ -577,10 +578,8 @@ void CommandHelpers::handleMarkKillOnClientDisconnect(OperationContext* opCtx,
 
     MONGO_FAIL_POINT_BLOCK_IF(
         waitInCommandMarkKillOnClientDisconnect, options, [&](const BSONObj& obj) {
-            const auto& clientMetadata =
-                ClientMetadataIsMasterState::get(opCtx->getClient()).getClientMetadata();
-
-            return clientMetadata && (clientMetadata->getApplicationName() == obj["appName"].str());
+            auto md = ClientMetadata::get(opCtx->getClient());
+            return md && (md->getApplicationName() == obj["appName"].str());
         }) {
         MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
                                                         waitInCommandMarkKillOnClientDisconnect);

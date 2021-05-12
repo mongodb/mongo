@@ -85,6 +85,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -682,11 +683,19 @@ void execCommandDatabase(OperationContext* opCtx,
     auto invocation = command->parse(opCtx, request);
 
     OperationSessionInfoFromClient sessionOptions;
+    const auto isHello = command->getName() == "hello"_sd || command->getName() == "isMaster"_sd;
 
     try {
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             CurOp::get(opCtx)->setCommand_inlock(command);
+        }
+
+        if (isHello) {
+            // Preload generic ClientMetadata ahead of our first hello request. After the first
+            // request, metaElement should always be empty.
+            auto metaElem = request.body[kMetadataDocumentName];
+            ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem);
         }
 
         MONGO_FAIL_POINT_BLOCK(sleepMillisAfterCommandExecutionBegins, arg) {

@@ -49,7 +49,6 @@
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
@@ -248,15 +247,13 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
     infoBuilder->append("host", hostName);
 
     client->reportState(*infoBuilder);
-    const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
-
-    if (clientMetadata) {
-        auto appName = clientMetadata.get().getApplicationName();
+    if (auto clientMetadata = ClientMetadata::get(client)) {
+        auto appName = clientMetadata->getApplicationName();
         if (!appName.empty()) {
             infoBuilder->append("appName", appName);
         }
 
-        auto clientMetadataDocument = clientMetadata.get().getDocument();
+        auto clientMetadataDocument = clientMetadata->getDocument();
         infoBuilder->append("clientMetadata", clientMetadataDocument);
     }
 
@@ -649,9 +646,8 @@ string OpDebug::report(Client* client,
 
     s << curop.getNS();
 
-    const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
-    if (clientMetadata) {
-        auto appName = clientMetadata.get().getApplicationName();
+    if (auto clientMetadata = ClientMetadata::get(client)) {
+        auto appName = clientMetadata->getApplicationName();
         if (!appName.empty()) {
             s << " appName: \"" << str::escape(appName) << '\"';
         }

@@ -39,7 +39,6 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/net/socket_utils.h"
@@ -84,34 +83,8 @@ public:
              BSONObjBuilder& result) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-        auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
-        bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
-        if (!seenIsMaster) {
-            clientMetadataIsMasterState.setSeenIsMaster();
-        }
-
-        BSONElement element = cmdObj[kMetadataDocumentName];
-        if (!element.eoo()) {
-            if (seenIsMaster) {
-                uasserted(ErrorCodes::ClientMetadataCannotBeMutated,
-                          "The client metadata document may only be sent in the first isMaster");
-            }
-
-            auto swParseClientMetadata = ClientMetadata::parse(element);
-            uassertStatusOK(swParseClientMetadata.getStatus());
-
-            invariant(swParseClientMetadata.getValue());
-
-            swParseClientMetadata.getValue().get().logClientMetadata(opCtx->getClient());
-
-            swParseClientMetadata.getValue().get().setMongoSMetadata(
-                getHostNameCachedAndPort(),
-                opCtx->getClient()->clientAddress(true),
-                VersionInfoInterface::instance().version());
-
-            clientMetadataIsMasterState.setClientMetadata(
-                opCtx->getClient(), std::move(swParseClientMetadata.getValue()));
-        }
+        auto client = opCtx->getClient();
+        ClientMetadata::tryFinalize(client);
 
         if (useLegacyResponseFields()) {
             result.appendBool("ismaster", true);
