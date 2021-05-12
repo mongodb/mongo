@@ -65,6 +65,7 @@ namespace {
 
 using namespace fmt::literals;
 
+MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorAfterPreparingToDonate);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCloning);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorInSteadyState);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
@@ -1034,8 +1035,20 @@ ReshardingCoordinatorService::ReshardingCoordinator::_runUntilReadyToPersistDeci
             // transition to kPreparingToDonate, participants are aware of the resharding operation
             // and their state machines are created.
             return ExecutorFuture<void>(**executor)
+                .then([this] {
+                    // Ensure the flushes to create participant state machines don't get interrupted
+                    // upon abort.
+                    _cancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(),
+                                                    _markKilledExecutor);
+                })
                 .then([this, executor] { _tellAllDonorsToRefresh(executor); })
                 .then([this, executor] { _tellAllRecipientsToRefresh(executor); })
+                .then([this] {
+                    // Swap back to using operation contexts canceled upon abort until ready to
+                    // persist the decision or unrecoverable error.
+                    _cancelableOpCtxFactory.emplace(_ctHolder->getAbortToken(),
+                                                    _markKilledExecutor);
+                })
                 .then([status] { return status; });
         })
         .then([this, executor] { return _awaitAllDonorsReadyToDonate(executor); })
@@ -1296,6 +1309,9 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
         std::move(shardsAndChunks.initialChunks),
         std::move(zones));
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
+
+    reshardingPauseCoordinatorAfterPreparingToDonate.pauseWhileSetAndNotCanceled(
+        opCtx.get(), _ctHolder->getAbortToken());
 }
 
 ReshardingApproxCopySize computeApproxCopySize(ReshardingCoordinatorDocument& coordinatorDoc) {
