@@ -165,14 +165,16 @@
     assert(!initialSyncTest.step());
     checkLogForOplogApplicationMsg(secondary, 9);
     assert(!initialSyncTest.step());
-    checkLogForOplogApplicationMsg(secondary, 1);
+    // Stepping up in FCV4.0 creates the `config.image_collection` table which adds to the batch
+    // size.
+    checkLogForOplogApplicationMsg(secondary, 3);
 
     assert(initialSyncTest.step(), "Expected initial sync to have completed, but it did not");
 
     // Confirm that node can be read from and that it has the inserts that were made while the node
     // was in initial sync.
-    assert.eq(secondary.getDB("test").foo.find().count(), 6);
-    assert.eq(secondary.getDB("test").bar.find().count(), 6);
+    assert.eq(secondary.getDB("test").foo.find().count(), 7);
+    assert.eq(secondary.getDB("test").bar.find().count(), 7);
 
     // Do data consistency checks at the end.
     initialSyncTest.stop();

@@ -43,6 +43,7 @@
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -60,6 +61,40 @@
 namespace mongo {
 
 namespace {
+
+void dropImageCollectionOnDowngrade(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+
+    BSONObj result;
+    client.dropCollection(
+        NamespaceString::kConfigImagesNamespace.ns(), WriteConcernOptions(), &result);
+    const auto status = getStatusFromCommandResult(result);
+    if (status != ErrorCodes::NamespaceNotFound) {
+        uassertStatusOKWithContext(status,
+                                   str::stream() << "Failed to drop the "
+                                                 << NamespaceString::kConfigImagesNamespace.ns()
+                                                 << " collection");
+    }
+}
+
+void createImageCollectionOnUpgrade(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+
+    const size_t initialExtentSize = 0;
+    const bool capped = false;
+    const bool maxSize = 0;
+
+    BSONObj result;
+    client.createCollection(
+        NamespaceString::kConfigImagesNamespace.ns(), initialExtentSize, capped, maxSize, &result);
+    const auto status = getStatusFromCommandResult(result);
+    if (status != ErrorCodes::NamespaceExists) {
+        uassertStatusOKWithContext(status,
+                                   str::stream() << "Failed to create the "
+                                                 << NamespaceString::kConfigImagesNamespace.ns()
+                                                 << " collection");
+    }
+}
 
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityDowngrade);
 MONGO_FAIL_POINT_DEFINE(featureCompatibilityUpgrade);
@@ -179,6 +214,7 @@ public:
             }
 
             updateUniqueIndexesOnUpgrade(opCtx);
+            createImageCollectionOnUpgrade(opCtx);
 
             // Upgrade shards before config finishes its upgrade.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
@@ -266,6 +302,8 @@ public:
                 //     this.
                 Lock::GlobalLock lk(opCtx, MODE_S);
             }
+
+            dropImageCollectionOnDowngrade(opCtx);
 
             // Downgrade shards before config finishes its downgrade.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {

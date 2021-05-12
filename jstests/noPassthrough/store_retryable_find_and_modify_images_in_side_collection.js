@@ -1,6 +1,8 @@
 /**
  * Test that retryable findAndModify commands will store pre- and post- images in the appropriate
  * collections according to the parameter value of `storeFindAndModifyImagesInSideCollection`.
+ *
+ * @tags: [requires_replication]
  */
 (function() {
     "use strict";
@@ -284,13 +286,7 @@
     const lsid = UUID();
     // Test that retryable findAndModifys will store pre- and post- images in the oplog when
     // 'storeFindAndModifyImagesInSideCollection'=false.
-    // Initiate the replica set with 'storeFindAndModifyImagesInSideCollection'=true to guarantee
-    // that the 'config.image_collection' exists. This is needed until we commit to a contract
-    // between the lifetime of this side collection, the parameter value, and FCV.
-    const rst = new ReplSetTest({
-        nodes: numNodes,
-        nodeOptions: {setParameter: {storeFindAndModifyImagesInSideCollection: true}}
-    });
+    const rst = new ReplSetTest({nodes: numNodes});
     rst.startSet();
     rst.initiate();
     runTests(lsid, rst.getPrimary(), rst.getPrimary(), rst.getSecondary(), true, 40);
@@ -298,12 +294,15 @@
     rst.stopSet();
     // Test that retryable findAndModifys will store pre- and post- images in the
     // 'config.image_collection' table.
-    // TODO: Uncomment this block to get code coverage for sharded clusters. Shard servers will
-    // start with downgraded FCV, meaning the 'image_collection' won't be available on startup.
-    // const st = new ShardingTest({shards: {rs0: {nodes: numNodes, setParameter:
-    // {storeFindAndModifyImagesInSideCollection: true}}}});
-    // runTests(lsid, st.s, st.rs0.getPrimary(), st.rs0.getSecondary(), true, 60);
-    // runTests(lsid, st.s, st.rs0.getPrimary(), st.rs0.getSecondary(), true, 70);
-    // st.stop();
-    // runTests(true);
+    const st = new ShardingTest({
+        shards: {
+            rs0: {
+                nodes: numNodes,
+                setParameter: {storeFindAndModifyImagesInSideCollection: true}
+            }
+        }
+    });
+    runTests(lsid, st.s, st.rs0.getPrimary(), st.rs0.getSecondary(), true, 60);
+    runTests(lsid, st.s, st.rs0.getPrimary(), st.rs0.getSecondary(), true, 70);
+    st.stop();
 })();
