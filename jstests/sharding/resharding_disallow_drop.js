@@ -25,13 +25,7 @@ var st = new ShardingTest({
     config: 1,
     mongos: 1,
     other: {
-        mongosOptions: {setParameter: {featureFlagResharding: true}},
-        configOptions: {
-            setParameter: {
-                featureFlagResharding: true,
-                reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000
-            }
-        }
+        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}}
     }
 });
 

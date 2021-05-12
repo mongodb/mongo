@@ -214,6 +214,7 @@ let testCases = {
         checkWriteConcern: true,
     },
     collStats: {skip: "does not accept read or write concern"},
+    commitReshardCollection: {skip: "does not accept read or write concern"},
     commitTransaction: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));

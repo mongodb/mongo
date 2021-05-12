@@ -107,6 +107,7 @@ let testCases = {
     cloneCollectionAsCapped: {skip: "primary only"},
     collMod: {skip: "primary only"},
     collStats: {skip: "does not return user data"},
+    commitReshardCollection: {skip: "primary only"},
     commitTransaction: {skip: "primary only"},
     compact: {skip: "does not return user data"},
     configureFailPoint: {skip: "does not return user data"},

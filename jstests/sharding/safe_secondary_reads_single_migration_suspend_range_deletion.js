@@ -123,6 +123,7 @@ let testCases = {
     clearLog: {skip: "does not return user data"},
     clone: {skip: "primary only"},
     cloneCollectionAsCapped: {skip: "primary only"},
+    commitReshardCollection: {skip: "primary only"},
     commitTransaction: {skip: "primary only"},
     collMod: {skip: "primary only"},
     collStats: {skip: "does not return user data"},

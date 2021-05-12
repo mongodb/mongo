@@ -76,7 +76,7 @@ public:
         }
 
         bool supportsWriteConcern() const override {
-            return true;
+            return false;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

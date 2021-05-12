@@ -38,4 +38,5 @@ feature_flags:
     featureFlagResharding:
         description: When enabled, allows users to reshard their sharded collections.
         cpp_varname: gFeatureFlagResharding
-        default: false
+        default: true
+        version: 5.0

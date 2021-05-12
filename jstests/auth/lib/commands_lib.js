@@ -2620,6 +2620,35 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "commitReshardCollection",
+          command: {commitReshardCollection: "test.x"},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: Object.extend({enableSharding: 1}, roles_clusterManager),
+                privileges:
+                [{resource: {db: "test", collection: "x"}, actions: ["reshardCollection"]}],
+                  expectFail: true
+              },
+          ]
+        },
+        {
+          testname: "_configsvrCommitReshardCollection",
+          command: {_configsvrCommitReshardCollection: "test.x"},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "commitTxn",
           command: {commitTransaction: 1},
           // TODO (SERVER-53497): Enable auth testing for abortTransaction and commitTransaction.

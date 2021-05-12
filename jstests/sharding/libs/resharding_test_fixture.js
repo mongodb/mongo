@@ -88,35 +88,36 @@ var ReshardingTest = class {
     }
 
     setup() {
-        let config = {setParameter: {featureFlagResharding: true}};
+        const mongosOptions = {setParameter: {}};
+        const configOptions = {setParameter: {}};
+        const rsOptions = {setParameter: {}};
 
         if (this._minimumOperationDurationMS !== undefined) {
-            config.setParameter.reshardingMinimumOperationDurationMillis =
+            configOptions.setParameter.reshardingMinimumOperationDurationMillis =
                 this._minimumOperationDurationMS;
         }
 
         if (this._criticalSectionTimeoutMS !== -1) {
-            config.setParameter.reshardingCriticalSectionTimeoutMillis =
+            configOptions.setParameter.reshardingCriticalSectionTimeoutMillis =
                 this._criticalSectionTimeoutMS;
         }
 
-        let rsConfig = {setParameter: {featureFlagResharding: true}};
         if (this._periodicNoopIntervalSecs !== undefined) {
-            rsConfig.setParameter.periodicNoopIntervalSecs = this._periodicNoopIntervalSecs;
+            rsOptions.setParameter.periodicNoopIntervalSecs = this._periodicNoopIntervalSecs;
         }
 
         if (this._writePeriodicNoops !== undefined) {
-            rsConfig.setParameter.writePeriodicNoops = this._writePeriodicNoops;
+            rsOptions.setParameter.writePeriodicNoops = this._writePeriodicNoops;
         }
 
         this._st = new ShardingTest({
             mongos: 1,
-            mongosOptions: {setParameter: {featureFlagResharding: true}},
+            mongosOptions,
             config: 1,
-            configOptions: config,
+            configOptions,
             shards: this._numShards,
             rs: {nodes: 2},
-            rsOptions: rsConfig,
+            rsOptions,
             manualAddShard: true,
         });
 

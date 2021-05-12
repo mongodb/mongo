@@ -112,6 +112,7 @@ const allCommands = {
         expectFailure: true,
         expectedErrorCode: ErrorCodes.NotPrimaryOrSecondary,
     },
+    commitReshardCollection: {skip: isPrimaryOnly},
     commitTransaction: {skip: isPrimaryOnly},
     compact: {skip: isNotAUserDataRead},
     configureFailPoint: {skip: isNotAUserDataRead},
