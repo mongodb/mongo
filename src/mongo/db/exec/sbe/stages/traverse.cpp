@@ -144,11 +144,10 @@ void TraverseStage::openInner(value::TypeTags tag, value::Value val) {
 PlanState TraverseStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
-    auto state = _children[0]->getNext();
+    auto state = getNextOuterSide();
     if (state != PlanState::ADVANCED) {
         return trackPlanState(state);
     }
-
     [[maybe_unused]] auto earlyExit = traverse(_inFieldAccessor, &_outFieldOutputAccessor, 0);
 
     return trackPlanState(PlanState::ADVANCED);
@@ -269,6 +268,17 @@ void TraverseStage::close() {
 }
 
 void TraverseStage::doSaveState() {
+    if (_isReadingLeftSide) {
+        // If we yield while reading the left side, there is no need to makeOwned() data held in
+        // the right side, since we will have to re-open it anyway.
+        const bool recursive = true;
+        _children[1]->disableSlotAccess(recursive);
+
+        // As part of reading the left side we're about to reset the out field accessor anyway.
+        // No point in keeping its data around.
+        _outFieldOutputAccessor.reset();
+    }
+
     if (!slotsAccessible()) {
         return;
     }

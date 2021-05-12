@@ -171,14 +171,16 @@ void SortStage::open(bool reOpen) {
 
         size_t idx = 0;
         for (auto accessor : _inKeyAccessors) {
-            auto [tag, val] = accessor->copyOrMoveValue();
-            keys.reset(idx++, true, tag, val);
+            auto [tag, val] = accessor->getViewOfValue();
+            auto [cTag, cVal] = copyValue(tag, val);
+            keys.reset(idx++, true, cTag, cVal);
         }
 
         idx = 0;
         for (auto accessor : _inValueAccessors) {
-            auto [tag, val] = accessor->copyOrMoveValue();
-            vals.reset(idx++, true, tag, val);
+            auto [tag, val] = accessor->getViewOfValue();
+            auto [cTag, cVal] = copyValue(tag, val);
+            vals.reset(idx++, true, cTag, cVal);
         }
 
         _sorter->emplace(std::move(keys), std::move(vals));

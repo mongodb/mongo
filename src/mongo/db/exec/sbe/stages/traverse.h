@@ -79,6 +79,12 @@ private:
     bool traverse(value::SlotAccessor* inFieldAccessor,
                   value::OwnedValueAccessor* outFieldOutputAccessor,
                   size_t level);
+    PlanState getNextOuterSide() {
+        _isReadingLeftSide = true;
+        auto ret = _children[0]->getNext();
+        _isReadingLeftSide = false;
+        return ret;
+    }
 
     // The input slot holding value being traversed.
     const value::SlotId _inField;
@@ -116,5 +122,9 @@ private:
     bool _compiled{false};
     bool _reOpenInner{false};
     TraverseStats _specificStats;
+
+    // Tracks whether or not we're reading from the left child or the right child.
+    // This is necessary for yielding.
+    bool _isReadingLeftSide = false;
 };
 }  // namespace mongo::sbe

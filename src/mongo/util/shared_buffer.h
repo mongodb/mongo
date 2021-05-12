@@ -36,6 +36,7 @@
 
 #include "mongo/platform/atomic_word.h"
 
+#include "mongo/base/data_view.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 
@@ -268,24 +269,25 @@ public:
         other._data = nullptr;
     }
     ~UniqueBuffer() {
-        freeBuffer();
+        free(_data);
     }
 
     UniqueBuffer& operator=(const UniqueBuffer&) = delete;
     UniqueBuffer& operator=(UniqueBuffer&& other) {
-        freeBuffer();
-        _data = other._data;
-        other._data = nullptr;
+        UniqueBuffer temp(std::move(other));
+        swap(*this, temp);
         return *this;
     }
 
-    void swap(UniqueBuffer& other) {
-        std::swap(_data, other._data);
+    friend void swap(UniqueBuffer& lhs, UniqueBuffer& rhs) {
+        using std::swap;
+        swap(lhs._data, rhs._data);
     }
 
     void realloc(uint32_t size) {
         size_t realSize = size + SharedBuffer::kHolderSize;
         _data = reinterpret_cast<char*>(mongoRealloc(_data, realSize));
+        DataView(_data).write<uint32_t>(size);
     }
 
     char* get() const {
@@ -297,7 +299,7 @@ public:
     }
 
     size_t capacity() const {
-        return _data ? *reinterpret_cast<const uint32_t*>(_data) : 0;
+        return _data ? ConstDataView(_data).read<uint32_t>() : 0;
     }
 
     /**
@@ -317,14 +319,7 @@ private:
     UniqueBuffer(void* buffer) : _data(static_cast<char*>(buffer)) {}
 
     UniqueBuffer(void* buffer, uint32_t sz) : _data(static_cast<char*>(buffer)) {
-        *reinterpret_cast<uint32_t*>(_data) = sz;
-    }
-
-    void freeBuffer() {
-        if (_data) {
-            free(_data);
-            _data = nullptr;
-        }
+        DataView(_data).write<uint32_t>(sz);
     }
 
     char* _data = nullptr;

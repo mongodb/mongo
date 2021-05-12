@@ -102,8 +102,10 @@ void UnionStage::open(bool reOpen) {
 
     _commonStats.opens++;
     if (reOpen) {
-        std::queue<UnionBranch> emptyQueue;
-        swap(_remainingBranchesToDrain, emptyQueue);
+        // If we are re-opening, it is important to close() any active branches. If kept open, one
+        // of these branch's slots may soon hold pointers to stale (potentially freed) data. A
+        // yield would then cause the branch to attempt to copy the stale(unowned) data.
+        clearBranches();
     }
 
     for (auto& child : _children) {
@@ -151,11 +153,7 @@ void UnionStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
-    _currentStage = nullptr;
-    while (!_remainingBranchesToDrain.empty()) {
-        _remainingBranchesToDrain.front().close();
-        _remainingBranchesToDrain.pop();
-    }
+    clearBranches();
 }
 
 std::unique_ptr<PlanStageStats> UnionStage::getStats(bool includeDebugInfo) const {
@@ -217,5 +215,15 @@ std::vector<DebugPrinter::Block> UnionStage::debugPrint() const {
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     return ret;
+}
+
+void UnionStage::clearBranches() {
+    while (!_remainingBranchesToDrain.empty()) {
+        auto& branch = _remainingBranchesToDrain.front();
+        if (branch.isOpen) {
+            branch.close();
+        }
+        _remainingBranchesToDrain.pop();
+    }
 }
 }  // namespace mongo::sbe

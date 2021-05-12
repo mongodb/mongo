@@ -108,7 +108,7 @@ PlanState LoopJoinStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
     if (_outerGetNext) {
-        auto state = _children[0]->getNext();
+        auto state = getNextOuterSide();
         if (state != PlanState::ADVANCED) {
             return trackPlanState(state);
         }
@@ -137,7 +137,7 @@ PlanState LoopJoinStage::getNext() {
         }
         invariant(state == PlanState::IS_EOF);
 
-        state = _children[0]->getNext();
+        state = getNextOuterSide();
         if (state != PlanState::ADVANCED) {
             return trackPlanState(state);
         }
@@ -159,6 +159,15 @@ void LoopJoinStage::close() {
     }
 
     _children[0]->close();
+}
+
+void LoopJoinStage::doSaveState() {
+    if (_isReadingLeftSide || _outerGetNext) {
+        // If we yield while reading the left side, there is no need to makeOwned() data held in
+        // the right side, since we will have to re-open it anyway.
+        const bool recursive = true;
+        _children[1]->disableSlotAccess(recursive);
+    }
 }
 
 std::unique_ptr<PlanStageStats> LoopJoinStage::getStats(bool includeDebugInfo) const {

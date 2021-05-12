@@ -250,6 +250,16 @@ public:
         }
     }
 
+    void disableSlotAccess(bool recursive = false) {
+        auto stage = static_cast<T*>(this);
+        stage->_slotsAccessible = false;
+        if (recursive) {
+            for (auto& child : stage->_children) {
+                child->disableSlotAccess(true);
+            }
+        }
+    }
+
 protected:
     PlanState trackPlanState(PlanState state) {
         if (state == PlanState::IS_EOF) {
@@ -271,10 +281,6 @@ protected:
 
     bool slotsAccessible() const {
         return _slotsAccessible;
-    }
-
-    void disableSlotAccess() {
-        _slotsAccessible = false;
     }
 
     /**

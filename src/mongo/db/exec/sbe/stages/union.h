@@ -74,6 +74,8 @@ private:
         }
     };
 
+    void clearBranches();
+
     const std::vector<value::SlotVector> _inputVals;
     const value::SlotVector _outputVals;
     std::vector<value::SwitchAccessor> _outValueAccessors;

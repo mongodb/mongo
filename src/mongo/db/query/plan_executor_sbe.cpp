@@ -89,6 +89,10 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
 
     if (!winner.results.empty()) {
         _stash = std::move(winner.results);
+        // The PlanExecutor keeps an extra reference to the last object pulled out of the PlanStage
+        // tree. This is because we want to ensure that the caller of PlanExecutor::getNext() does
+        // not free the object and leave a dangling pointer in the PlanStage tree.
+        _lastGetNext = _stash.back().first;
     }
 
     // Callers are allowed to disable yielding for this plan by passing a null yield policy.

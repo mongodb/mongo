@@ -50,12 +50,20 @@ public:
     void open(bool reOpen) final;
     PlanState getNext() final;
     void close() final;
+    void doSaveState() final;
 
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
 private:
+    PlanState getNextOuterSide() {
+        _isReadingLeftSide = true;
+        auto ret = _children[0]->getNext();
+        _isReadingLeftSide = false;
+        return ret;
+    }
+
     // Set of variables coming from the outer side.
     const value::SlotVector _outerProjects;
     // Set of correlated variables from the outer side that are visible on the inner side.
@@ -72,6 +80,10 @@ private:
     bool _reOpenInner{false};
     bool _outerGetNext{false};
     LoopJoinStats _specificStats;
+
+    // Tracks whether or not we're reading from the left child or the right child.
+    // This is necessary for yielding.
+    bool _isReadingLeftSide = false;
 
     void openInner();
 };
