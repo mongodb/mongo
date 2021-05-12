@@ -143,7 +143,7 @@ if (fp) {
 
 restartServerReplication(initialSyncNode);
 
-assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 tenantMigrationTest.stop();
 })();

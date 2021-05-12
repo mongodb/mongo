@@ -84,9 +84,8 @@ function testDonorRetryRecipientSyncDataCmdOnError(errorCode, failMode) {
     }
     fp.off();
 
-    const stateRes =
-        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
     return migrationId;
@@ -115,8 +114,7 @@ function testDonorRetryRecipientForgetMigrationCmdOnError(errorCode) {
                                 },
                                 {times: 1});
 
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
     // Verify that the initial recipientForgetMigration command failed.
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
@@ -222,7 +220,7 @@ const kWriteErrorTimeMS = 50;
     fp.off();
 
     migrationThread.join();
-    assert.commandWorked(migrationThread.returnData());
+    TenantMigrationTest.assertCommitted(migrationThread.returnData());
 
     const configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
     const donorStateDoc = configDonorsColl.findOne({_id: migrationId});

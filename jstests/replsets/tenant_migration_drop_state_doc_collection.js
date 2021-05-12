@@ -71,7 +71,7 @@ function testDroppingStateDocCollections(tenantMigrationTest, fpName, {
                                                false /* automaticForgetMigration */));
         fp.wait();
     } else {
-        assert.commandWorked(
+        TenantMigrationTest.assertCommitted(
             tenantMigrationTest.runMigration(migrationOptsBeforeDrop,
                                              false /* retryOnRetryableErrors */,
                                              false /* automaticForgetMigration */));

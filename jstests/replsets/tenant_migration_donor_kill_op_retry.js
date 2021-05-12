@@ -78,8 +78,7 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         fp.off();
         runMigrationThread.join();
 
-        const stateRes = assert.commandWorked(runMigrationThread.returnData());
-        assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+        TenantMigrationTest.assertCommitted(runMigrationThread.returnData());
         assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
     }
 }
@@ -138,8 +137,7 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     fp.off();
     runMigrationThread.join();
 
-    const stateRes = assert.commandWorked(runMigrationThread.returnData());
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(runMigrationThread.returnData());
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
@@ -188,8 +186,7 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
 
         runMigrationThread.join();
 
-        const stateRes = assert.commandWorked(runMigrationThread.returnData());
-        assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+        TenantMigrationTest.assertCommitted(runMigrationThread.returnData());
         assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
     }
 }
@@ -229,11 +226,10 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
 
         let fp = configureFailPoint(tenantMigrationTest.getDonorPrimary(), fpName);
 
-        const stateRes = assert.commandWorked(
+        TenantMigrationTest.assertCommitted(
             tenantMigrationTest.runMigration(migrationOpts,
                                              false /* retry on retriable errors */,
                                              false /* Automatically forget migration */));
-        assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
         const donorPrimary = tenantMigrationTest.getDonorPrimary();
         const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());

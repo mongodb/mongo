@@ -180,7 +180,7 @@ assert.eq(0, recipientOplogBuffer.find({"entry.o._id": "bulkRetryableWrite1"}).i
 fpAfterRetrievingRetryableWrites.off();
 
 jsTestLog("Wait for migration to complete");
-assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
 tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);

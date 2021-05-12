@@ -160,9 +160,7 @@ donorRst.awaitReplication();
 hangAfterPersistingTenantMigrationRecipientInstanceStateDoc.off();
 
 // Verify that the migration eventually commits successfully.
-const migrationRes =
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-assert.eq(migrationRes.state, TenantMigrationTest.DonorState.kCommitted);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
 donorRst.stopSet();
 tenantMigrationTest.stop();

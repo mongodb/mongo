@@ -128,8 +128,7 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     bulkWriteThread.start();
     writeFp.wait();
 
-    const migrationRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(migrationRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
     writeFp.off();
     bulkWriteThread.join();
@@ -210,8 +209,7 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     bulkWriteThread.join();
     migrationThread.join();
 
-    const migrationRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(migrationRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(migrationThread.returnData());
 
     let bulkWriteRes = bulkWriteThread.returnData();
     let writeErrors = bulkWriteRes.res.writeErrors;
@@ -296,8 +294,7 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     abortFp.off();
 
-    const migrationRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(migrationRes.state, TenantMigrationTest.DonorState.kAborted);
+    TenantMigrationTest.assertAborted(migrationThread.returnData());
 
     const bulkWriteRes = bulkWriteThread.returnData();
     const writeErrors = bulkWriteRes.res.writeErrors;
@@ -358,8 +355,7 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     bulkWriteThread.start();
     writeFp.wait();
 
-    const migrationRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(migrationRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
     writeFp.off();
     bulkWriteThread.join();
@@ -436,9 +432,7 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     bulkWriteThread.join();
     migrationThread.join();
 
-    const migrationRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(migrationRes.state, TenantMigrationTest.DonorState.kCommitted);
-
+    TenantMigrationTest.assertCommitted(migrationThread.returnData());
     const bulkWriteRes = bulkWriteThread.returnData();
     const writeErrors = bulkWriteRes.res.writeErrors;
 
@@ -517,8 +511,7 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     abortFp.off();
 
-    const migrationRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(migrationRes.state, TenantMigrationTest.DonorState.kAborted);
+    TenantMigrationTest.assertAborted(migrationThread.returnData());
 
     const bulkWriteRes = bulkWriteThread.returnData();
     const writeErrors = bulkWriteRes.res.writeErrors;

@@ -36,8 +36,7 @@ const migrationOpts = {
     tenantId,
 };
 
-const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
 for (const db of [...tenantDBs, ...nonTenantDBs]) {
     for (const coll of collNames) {

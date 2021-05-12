@@ -86,7 +86,7 @@ function testDonorForgetMigrationInterrupt(interruptFunc, verifyCmdResponseFunc)
 
     const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
 
-    assert.commandWorked(tenantMigrationTest.runMigration(
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
     const forgetMigrationThread = new Thread(
         TenantMigrationUtil.forgetMigrationAsync, migrationOpts.migrationIdString, donorRstArgs);

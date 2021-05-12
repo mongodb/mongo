@@ -36,8 +36,8 @@ const migrationOpts = {
     readPreference: kReadPreference
 };
 
-tenantMigrationTest.runMigration(
-    migrationOpts, true /* retryOnRetryableErrors */, false /* automaticForgetMigration */);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
+    migrationOpts, true /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
 
 const fpBeforeDroppingOplogBufferCollection =
     configureFailPoint(tenantMigrationTest.getRecipientPrimary(),

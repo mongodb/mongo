@@ -95,7 +95,7 @@ const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
     tenantId,
 };
-assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
 // Verify that the recipient has fetched and written only the first committed transaction entry from
 // the donor.

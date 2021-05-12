@@ -34,8 +34,7 @@ const migrationOpts = {
     tenantId: kTenantId,
 };
 
-const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
 tenantMigrationTest.stop();

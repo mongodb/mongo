@@ -177,9 +177,8 @@ function testStats(node, {
 
     // Allow the migration to complete.
     blockingFp.off();
-    const stateRes =
-        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
     donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
     let commitOplogEntry = donorPrimary.getDB("local").oplog.rs.findOne(
@@ -219,9 +218,8 @@ function testStats(node, {
         configureFailPoint(recipientPrimary,
                            "fpBeforeFulfillingDataConsistentPromise",
                            {action: "stop", stopErrorCode: ErrorCodes.InternalError});
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     abortRecipientFp.off();
 
     const donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
@@ -262,9 +260,8 @@ function testStats(node, {
 
     let abortDonorFp =
         configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     abortDonorFp.off();
 
     const donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
@@ -312,9 +309,8 @@ configDonorsColl.dropIndex({expireAt: 1});
         donorPrimary.adminCommand({donorForgetMigration: 1, migrationId: migrationId}),
         ErrorCodes.NoSuchTenantMigration);
 
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
     assert.commandWorked(
         donorPrimary.adminCommand({donorForgetMigration: 1, migrationId: migrationId}));
 

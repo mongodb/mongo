@@ -85,7 +85,7 @@ assert.soon(
     () => tenantMigrationTest.getTenantMigrationAccessBlocker(donorPrimary, kTenantId).state ===
         TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
 logApplyOpsForTxnFp.off();
-assert.commandWorked(migrationThread.returnData());
+TenantMigrationTest.assertCommitted(migrationThread.returnData());
 
 // Verify that the transaction commits successfully since both applyOps have oplog timestamp <
 // blockingTimestamp .

@@ -138,8 +138,7 @@ function testRollbackInitialState() {
 
     let steadyStateFunc = (tenantMigrationTest) => {
         // Verify that the migration restarted successfully on the new primary despite rollback.
-        const stateRes = assert.commandWorked(migrationThread.returnData());
-        assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+        TenantMigrationTest.assertCommitted(migrationThread.returnData());
         tenantMigrationTest.assertRecipientNodesInExpectedState(
             tenantMigrationTest.getRecipientRst().nodes,
             migrationId,
@@ -196,8 +195,7 @@ function testRollBackStateTransition(pauseFailPoint, setUpFailPoints, nextState,
 
     let steadyStateFunc = (tenantMigrationTest) => {
         // Verify that the migration resumed successfully on the new primary despite the rollback.
-        const stateRes = assert.commandWorked(migrationThread.returnData());
-        assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+        TenantMigrationTest.assertCommitted(migrationThread.returnData());
         tenantMigrationTest.waitForRecipientNodesToReachState(
             tenantMigrationTest.getRecipientRst().nodes,
             migrationId,
@@ -224,11 +222,10 @@ function testRollBackMarkingStateGarbageCollectable() {
     let setUpFunc = (tenantMigrationTest, donorRstArgs) => {
         migrationOpts = makeMigrationOpts(
             tenantMigrationTest, migrationId, kTenantId + "-markGarbageCollectable");
-        const stateRes = assert.commandWorked(
+        TenantMigrationTest.assertCommitted(
             tenantMigrationTest.runMigration(migrationOpts,
                                              false /* retryOnRetryableErrors */,
                                              false /* automaticForgetMigration */));
-        assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
     };
 
     let rollbackOpsFunc = (tenantMigrationTest, donorRstArgs) => {

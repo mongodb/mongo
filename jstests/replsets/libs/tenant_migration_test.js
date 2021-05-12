@@ -576,6 +576,29 @@ function TenantMigrationTest({
     };
 }
 
+/**
+ * Takes in the response to the donarStartMigration command and asserts the command
+ * works and the state is 'committed'.
+ */
+TenantMigrationTest.assertCommitted = function(stateRes) {
+    assert.commandWorked(stateRes);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted, tojson(stateRes));
+    return stateRes;
+};
+
+/**
+ * Takes in the response to the donarStartMigration command and asserts the command
+ * works and the state is 'aborted', with optional errorCode.
+ */
+TenantMigrationTest.assertAborted = function(stateRes, errorCode) {
+    assert.commandWorked(stateRes);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted, tojson(stateRes));
+    if (errorCode !== undefined) {
+        assert.eq(stateRes.abortReason.code, errorCode, tojson(stateRes));
+    }
+    return stateRes;
+};
+
 TenantMigrationTest.DonorState = {
     kCommitted: "committed",
     kAborted: "aborted",

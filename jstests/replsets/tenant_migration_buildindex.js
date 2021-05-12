@@ -131,7 +131,7 @@ assert.soon(() => {
     return state === TenantMigrationTest.DonorAccessState.kBlockWritesAndReads ||
         state === TenantMigrationTest.DonorAccessState.kReject;
 });
-assert.commandWorked(migrationThread.returnData());
+TenantMigrationTest.assertCommitted(migrationThread.returnData());
 
 // The index creation threads should be done.
 racyIndexThread.join();

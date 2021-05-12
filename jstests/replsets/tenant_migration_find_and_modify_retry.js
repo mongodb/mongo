@@ -83,9 +83,7 @@ jsTestLog("Second findAndModify: " + tojson(res));
 // Resume the tenant migration.
 hangAfterRetrievingStartOpTime.off();
 
-const stateRes =
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
 res = assert.commandWorked(recipientPrimary.getDB(kDbName).runCommand({
     findAndModify: kCollName,

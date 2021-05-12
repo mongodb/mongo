@@ -87,6 +87,6 @@ notRejectReadsFp.off();
 // Restart secondary replication in the donor replica set and complete the migration.
 restartReplicationOnSecondaries(donorRst);
 waitAfterCloning.off();
-assert.commandWorked(migrationThread.returnData());
+TenantMigrationTest.assertCommitted(migrationThread.returnData());
 tenantMigrationTest.stop();
 })();

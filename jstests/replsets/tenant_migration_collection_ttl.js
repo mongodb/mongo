@@ -133,9 +133,8 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
 
     hangDuringCollectionClone.off();
 
-    const stateRes =
-        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
     // Data should be consistent after the migration commits.
     assertTTLDeleteExpiredDocs(dbName, recipientPrimary);
@@ -192,9 +191,8 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
 
     blockFp.off();
 
-    const stateRes =
-        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
     // Tests that the TTL cleanup was suspended during the tenant migration.
     waitForOneTTLPassAtNode(donorPrimary);

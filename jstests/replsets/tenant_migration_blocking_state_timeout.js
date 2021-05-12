@@ -63,9 +63,7 @@ function testTimeoutBlockingState() {
     tenantMigrationTest.waitForDonorNodesToReachState(
         donorRst.nodes, migrationId, tenantId, TenantMigrationTest.DonorState.kAborted);
 
-    const stateRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
-    assert.eq(stateRes.abortReason.code, ErrorCodes.ExceededTimeLimit);
+    TenantMigrationTest.assertAborted(migrationThread.returnData(), ErrorCodes.ExceededTimeLimit);
 
     // This fail point is pausing all calls to recipient, so it has to be disabled to make
     // the 'forget migration' command to work.

@@ -64,7 +64,8 @@ const kReadPreference = {
     assert(res.inprog[0].migrationStart instanceof Date);
 
     fp.off();
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     tenantMigrationTest.stop();
 })();
 
@@ -103,7 +104,8 @@ const kReadPreference = {
     assert(res.inprog[0].migrationStart instanceof Date);
 
     fp.off();
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     tenantMigrationTest.stop();
 })();
 
@@ -142,7 +144,8 @@ const kReadPreference = {
     assert(res.inprog[0].migrationStart instanceof Date);
 
     fp.off();
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     tenantMigrationTest.stop();
 })();
 
@@ -162,7 +165,7 @@ const kReadPreference = {
         readPreference: kReadPreference
     };
     configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
-    assert.commandWorked(tenantMigrationTest.runMigration(
+    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
 
     const res = assert.commandWorked(

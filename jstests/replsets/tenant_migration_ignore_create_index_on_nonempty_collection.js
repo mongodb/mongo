@@ -54,9 +54,7 @@ assert.commandWorked(donorColl.insert({x: 1}, {writeConcern: {w: "majority"}}));
 hangAfterRetrievingStartOpTime.off();
 
 // Test that the recipient ignores the createIndex and the migration should succeed.
-const stateRes =
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
 tenantMigrationTest.stop();
 })();

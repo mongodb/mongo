@@ -63,14 +63,11 @@ const kTenantIdPrefix = "testTenantId";
     assert.commandWorked(tenantMigrationTest0.startMigration(migrationOpts0));
     assert.commandWorked(tenantMigrationTest1.startMigration(migrationOpts1));
 
-    const stateRes0 =
-        assert.commandWorked(tenantMigrationTest0.waitForMigrationToComplete(migrationOpts0));
-    const stateRes1 =
-        assert.commandWorked(tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
-
-    // Verify that both migrations succeeded.
-    assert.eq(stateRes0.state, TenantMigrationTest.DonorState.kCommitted);
-    assert.eq(stateRes1.state, TenantMigrationTest.DonorState.kCommitted);
+    // Wait for both migration to finish and verify they succeeded.
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest0.waitForMigrationToComplete(migrationOpts0));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
 
     const connPoolStatsAfter0 = assert.commandWorked(donorPrimary.adminCommand({connPoolStats: 1}));
     // Donor targeted two different replica sets.
@@ -115,14 +112,11 @@ const kTenantIdPrefix = "testTenantId";
     assert.commandWorked(tenantMigrationTest0.startMigration(migrationOpts0));
     assert.commandWorked(tenantMigrationTest1.startMigration(migrationOpts1));
 
-    const stateRes0 =
-        assert.commandWorked(tenantMigrationTest0.waitForMigrationToComplete(migrationOpts0));
-    const stateRes1 =
-        assert.commandWorked(tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
-
-    // Verify that both migrations succeeded.
-    assert.eq(stateRes0.state, TenantMigrationTest.DonorState.kCommitted);
-    assert.eq(stateRes1.state, TenantMigrationTest.DonorState.kCommitted);
+    // Wait for both migration to finish and verify they succeeded.
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest0.waitForMigrationToComplete(migrationOpts0));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
 
     // Cleanup.
     assert.commandWorked(tenantMigrationTest0.forgetMigration(migrationOpts0.migrationIdString));
@@ -174,9 +168,8 @@ const kTenantIdPrefix = "testTenantId";
 
     // Wait migration1 to pause in the blocking state and for migration0 to commit.
     blockFp.wait();
-    const stateRes0 =
-        assert.commandWorked(tenantMigrationTest0.waitForMigrationToComplete(migrationOpts0));
-    assert(stateRes0.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest0.waitForMigrationToComplete(migrationOpts0));
 
     // Verify that exactly one RSM was created.
     const connPoolStatsDuringMigration =
@@ -194,9 +187,8 @@ const kTenantIdPrefix = "testTenantId";
 
     // Let the migration1 to finish.
     blockFp.off();
-    const stateRes1 =
-        assert.commandWorked(tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
-    assert(stateRes1.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
 
     // Verify that now the RSM is garbage collected after the migration1 is cleaned.
     assert.commandWorked(tenantMigrationTest1.forgetMigration(migrationOpts1.migrationIdString));

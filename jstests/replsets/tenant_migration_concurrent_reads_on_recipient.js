@@ -92,8 +92,7 @@ function testRejectAllReadsAfterCloningDone(testCase, dbName, collName) {
     });
 
     clonerDoneFp.off();
-    const stateRes = assert.commandWorked(runMigrationThread.returnData());
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(runMigrationThread.returnData());
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
@@ -152,8 +151,7 @@ function testRejectOnlyReadsWithAtClusterTimeLessThanBlockTimestamp(testCase, db
     });
 
     waitForRejectReadsBeforeTsFp.off();
-    const stateRes = assert.commandWorked(runMigrationThread.returnData());
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(runMigrationThread.returnData());
 
     nodes.forEach(node => {
         const db = node.getDB(dbName);
@@ -194,9 +192,8 @@ function testDoNotRejectReadsAfterMigrationAbortedBeforeReachingBlockTimestamp(
     let abortFp = configureFailPoint(recipientPrimary,
                                      "fpBeforeFulfillingDataConsistentPromise",
                                      {action: "stop", stopErrorCode: ErrorCodes.InternalError});
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     abortFp.off();
 
     const nodes = testCase.isSupportedOnSecondaries ? recipientRst.nodes : [recipientPrimary];
@@ -265,9 +262,8 @@ function testDoNotRejectReadsAfterMigrationAbortedAfterReachingBlockTimestamp(
     // recipientSyncData (i.e. after it has reached the returnAfterReachingTimestamp).
     let abortFp =
         configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     abortFp.off();
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of

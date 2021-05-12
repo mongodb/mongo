@@ -42,7 +42,7 @@ const migrationOpts = {
     tenantId: kTenantId,
 };
 
-assert.commandWorked(tenantMigrationTest.runMigration(
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
     migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
 
 let fp = configureFailPoint(donorPrimary,

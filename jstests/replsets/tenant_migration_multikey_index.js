@@ -121,9 +121,7 @@ verifyMultiKeyIndex(donorColl2, true, {"a.b": ["a", "a.b"], "a.c": ["a"]});
 fpBeforeFulfillingDataConsistentPromise.off();
 
 // Wait for tenant migration to finish.
-const stateRes =
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
 // Recipient now should have fetched the newly updated data, and changed the multi-key path
 // on "a.c" in collection 1.

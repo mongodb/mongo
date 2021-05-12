@@ -109,9 +109,8 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
     recipientRst.getPrimary();
 
     // The migration should go through after recipient failover.
-    const stateRes =
-        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
     // Check that recipient has cloned all documents in the collection.
     recipientColl = newRecipientPrimary.getDB(dbName).getCollection(collName);

@@ -56,8 +56,7 @@ const migrationOpts = {
     recipientConnString: tenantMigrationTest.getRecipientConnString()
 };
 
-const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
 verifyServerStatus(tenantMigrationTest.getDonorPrimary());
 verifyFTDCOutput(tenantMigrationTest.getDonorPrimary());

@@ -57,7 +57,7 @@ function testAbortInitialState(donorRst) {
     opObserverFp.off();
 
     // Verify that the migration completes successfully.
-    assert.commandWorked(migrationThread.returnData());
+    TenantMigrationTest.assertCommitted(migrationThread.returnData());
     tenantMigrationTest.waitForDonorNodesToReachState(
         donorRst.nodes, migrationId, tenantId, TenantMigrationTest.DonorState.kCommitted);
 

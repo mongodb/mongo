@@ -59,9 +59,8 @@ hangDuringCollectionClone.off();
 
 migrationOptsArray.forEach((migrationOpts) => {
     jsTestLog("Waiting for migration for tenant: " + migrationOpts.tenantId + " to complete");
-    const stateRes =
-        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 });
 
 tenantMigrationTest.stop();

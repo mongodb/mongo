@@ -49,8 +49,7 @@ const migrationOpts = {
     tenantId,
 };
 
-const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-assert.eq(TenantMigrationTest.DonorState.kCommitted, stateRes.state);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
 // Verify that the view was cloned correctly.
 const recipientView = recipientPrimary.getDB(tenantDBName)[viewName];

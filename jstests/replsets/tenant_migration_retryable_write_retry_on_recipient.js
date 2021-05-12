@@ -173,7 +173,7 @@ assert.commandWorked(
 // Wait for the migration to complete.
 jsTest.log("Waiting for migration to complete");
 waitAfterCloning.off();
-migrationThread.join();
+TenantMigrationTest.assertCommitted(migrationThread.returnData());
 
 // Print the no-op oplog entries for debugging purposes.
 jsTestLog("Recipient oplog migration entries.");
@@ -270,7 +270,7 @@ const migrationOpts2 = {
     tenantId: kTenantId,
 };
 
-assert.commandWorked(tenantMigrationTest2.runMigration(migrationOpts2));
+TenantMigrationTest.assertCommitted(tenantMigrationTest2.runMigration(migrationOpts2));
 
 // Print the no-op oplog entries for debugging purposes.
 jsTestLog("Second recipient oplog migration entries.");

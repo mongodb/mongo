@@ -70,9 +70,7 @@ function runTest(downgradeFCV) {
     recipientRst.getPrimary();
 
     // The migration will not be able to continue in the downgraded version.
-    const data = migrationThread.returnData();
-    assert.commandWorked(data);
-    assert.eq(data.state, TenantMigrationTest.DonorState.kAborted);
+    TenantMigrationTest.assertAborted(migrationThread.returnData());
     checkLog.containsJson(newRecipientPrimary, 5356200);  // Change-of-FCV detection message.
 
     tenantMigrationTest.stop();

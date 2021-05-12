@@ -115,7 +115,8 @@ function runTest(failPoint) {
     assert.eq(donorSecondary.host, currOp.donorSyncSource, currOp);
     hangOnRetry.off();
 
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     // Remove 'donorPrimary' so that the test can complete properly.
     donorRst.remove(donorPrimary);
     recipientRst.stopSet();

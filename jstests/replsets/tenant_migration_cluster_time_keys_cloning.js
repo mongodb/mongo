@@ -50,7 +50,7 @@ function runMigrationAndAssertExternalKeysCopied(tenantMigrationTest, tenantId) 
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
     };
-    assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
     assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 }
 
@@ -78,7 +78,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: kTenantId1,
     };
-    assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
     assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 
     // After another migration, the first's keys should still exist.
@@ -117,7 +117,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
         tenantId: kTenantId1,
         readPreference: {mode: "secondary"}
     };
-    assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
     assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 
     // After another migration, the first's keys should still exist.
@@ -161,9 +161,8 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     assert.commandWorked(donorPrimary.adminCommand({replSetFreeze: 0}));
 
     fp.off();
-    const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(
         migrationOpts, true /* retryOnRetryableErrors */));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 
@@ -209,9 +208,8 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     assert.commandWorked(recipientPrimary.adminCommand({replSetFreeze: 0}));
 
     fp.off();
-    const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(
         migrationOpts, true /* retryOnRetryableErrors */));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 

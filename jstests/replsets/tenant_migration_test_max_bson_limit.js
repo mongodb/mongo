@@ -65,8 +65,7 @@ const bulkWriteThread =
 bulkWriteThread.start();
 writeFp.wait();
 
-const migrationRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-assert.eq(migrationRes.state, TenantMigrationTest.DonorState.kCommitted);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
 writeFp.off();
 bulkWriteThread.join();
