@@ -76,9 +76,8 @@ components:
     homepage_url: https://www.boost.org/
     open_hub_url: https://www.openhub.net/p/boost
     release_monitoring_id: 6845
-    local_directory_path: src/third_party/boost-1.70.0
+    local_directory_path: src/third_party/boost
     team_owner: "Service Architecture"
-    upgrade_suppression: TODO SERVER-44079
 
   concurrencytest:
     homepage_url: https://github.com/cgoldberg/concurrencytest

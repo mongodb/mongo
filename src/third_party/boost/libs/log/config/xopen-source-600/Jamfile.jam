@@ -1,0 +1,17 @@
+#
+#             Copyright Andrey Semashev 2017.
+# Distributed under the Boost Software License, Version 1.0.
+#    (See accompanying file LICENSE_1_0.txt or copy at
+#          http://www.boost.org/LICENSE_1_0.txt)
+#
+
+import project ;
+
+project /boost/log/xopen-source-600
+    : source-location .
+    : requirements
+        <pch>off
+    ;
+
+obj xopen_source_600 : xopen_source_600.cpp ;
+explicit xopen_source_600 ;
