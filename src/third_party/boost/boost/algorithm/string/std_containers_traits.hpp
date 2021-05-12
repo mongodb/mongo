@@ -19,7 +19,10 @@
 #include <boost/algorithm/string/std/string_traits.hpp>
 #include <boost/algorithm/string/std/list_traits.hpp>
 
-#ifdef BOOST_HAS_SLIST
+// MONGODB MODIFICATION: The computed include in slist_straits breaks
+// icecream with clang due to -frewrite-includes. We don't use <slist>
+// anywhere, so we don't need these traits.
+#if 0 // def BOOST_HAS_SLIST
 #   include <boost/algorithm/string/std/slist_traits.hpp>
 #endif
 
