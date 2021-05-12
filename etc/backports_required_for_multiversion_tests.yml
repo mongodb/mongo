@@ -142,6 +142,8 @@ all:
     test_file: jstests/core/sort_spill_estimate_data_size.js
   - ticket: SERVER-56772
     test_file: jstests/concurrency/fsm_workloads/collmod_writeconflict.js
+  - ticket: SERVER-55111
+    test_file: jstests/sharding/transactions_reject_writes_for_moved_chunks.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

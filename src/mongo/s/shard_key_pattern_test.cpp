@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/json.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -782,6 +783,124 @@ TEST_F(ShardKeyPatternTest, ExtractShardKeyFromIndexKeyData_FromMultipleIndexesP
                            << "a.secondIndex"
                            << "a_sec_val"
                            << "a.thirdIndex" << hashedValue << "null" << BSONNULL));
+}
+
+BSONObj getDocumentKey(const BSONObj& obj, const ShardKeyPattern& shardKeyPattern) {
+    return dotted_path_support::extractElementsBasedOnTemplate(obj, shardKeyPattern.toBSON());
+}
+
+TEST_F(ShardKeyPatternTest, ExtractShardKeyFromDocumentKey_Single) {
+    ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(BSON("_id" << 10), shardKeyPattern)),
+                      BSON("_id" << 10));
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(BSON("_id" << 10 << "a" << 20), shardKeyPattern)),
+                      BSON("_id" << 10));
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(BSON("b" << 30), shardKeyPattern)),
+                      BSON("_id" << BSONNULL));
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(BSON("_id" << BSON_ARRAY(10)), shardKeyPattern)),
+                      BSONObj());
+}
+
+TEST_F(ShardKeyPatternTest, ExtractShardKeyFromDocumentKey_Compound) {
+    ShardKeyPattern shardKeyPattern(BSON("a" << 1 << "b" << 1));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(BSON("a" << 10 << "b" << 20), shardKeyPattern)),
+                      BSON("a" << 10 << "b" << 20));
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(getDocumentKey(
+                          BSON("a" << 10 << "b" << 20 << "c" << 30), shardKeyPattern)),
+                      BSON("a" << 10 << "b" << 20));
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(BSON("b" << 20), shardKeyPattern)),
+                      BSON("a" << BSONNULL << "b" << 20));
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(BSON("c" << 30), shardKeyPattern)),
+                      BSON("a" << BSONNULL << "b" << BSONNULL));
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(getDocumentKey(
+                          BSON("a" << BSON_ARRAY(10) << "b" << 20), shardKeyPattern)),
+                      BSONObj());
+}
+
+TEST_F(ShardKeyPatternTest, ExtractShardKeyFromDocumentKey_Nested) {
+    ShardKeyPattern shardKeyPattern(BSON("a.b" << 1 << "c" << 1));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(fromjson("{a:{b:10}, c:20}"), shardKeyPattern)),
+                      fromjson("{'a.b':10, c:20}"));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(fromjson("{d:30}"), shardKeyPattern)),
+                      fromjson("{'a.b':null, c:null}"));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(fromjson("{a:{b:10}}"), shardKeyPattern)),
+                      fromjson("{'a.b':10, c:null}"));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(fromjson("{c:20}"), shardKeyPattern)),
+                      fromjson("{'a.b':null, c:20}"));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(fromjson("{a:10, c:20}"), shardKeyPattern)),
+                      fromjson("{'a.b':null, c:20}"));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(fromjson("{a:{d:10}, c:20}"), shardKeyPattern)),
+                      fromjson("{'a.b':null, c:20}"));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(fromjson("{a:{b:10, d:30}, c:20}"), shardKeyPattern)),
+                      fromjson("{'a.b':10, c:20}"));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(getDocumentKey(
+                          fromjson("{a:{b:{y:10,z:11}}, c:20, d:30}"), shardKeyPattern)),
+                      fromjson("{'a.b':{y:10,z:11}, c:20}"));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(fromjson("{a:{b:[10,11]}, c:20, d:30}"), shardKeyPattern)),
+                      BSONObj());
+}
+
+TEST_F(ShardKeyPatternTest, ExtractShardKeyFromDocumentKey_Hashed) {
+    const std::string value = "12345";
+    const BSONObj bsonValue = BSON("" << value);
+    const long long hashValue =
+        BSONElementHasher::hash64(bsonValue.firstElement(), BSONElementHasher::DEFAULT_HASH_SEED);
+
+    const BSONObj nullBsonValue = BSON("" << BSONNULL);
+    const long long nullHashValue = BSONElementHasher::hash64(nullBsonValue.firstElement(),
+                                                              BSONElementHasher::DEFAULT_HASH_SEED);
+
+    ShardKeyPattern shardKeyPattern(BSON("a.b"
+                                         << "hashed"
+                                         << "c" << 1));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(getDocumentKey(
+                          BSON("a" << BSON("b" << value) << "c" << 20), shardKeyPattern)),
+                      BSON("a.b" << hashValue << "c" << 20));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(getDocumentKey(
+                          BSON("a" << BSON("b" << value << "z" << 11) << "c" << 20 << "d" << 30),
+                          shardKeyPattern)),
+                      BSON("a.b" << hashValue << "c" << 20));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(
+                          getDocumentKey(BSON("c" << 20), shardKeyPattern)),
+                      BSON("a.b" << nullHashValue << "c" << 20));
+
+    ASSERT_BSONOBJ_EQ(shardKeyPattern.extractShardKeyFromDocumentKey(getDocumentKey(
+                          BSON("a" << BSON("z" << value) << "c" << 20), shardKeyPattern)),
+                      BSON("a.b" << nullHashValue << "c" << 20));
+
+    ASSERT_BSONOBJ_EQ(
+        shardKeyPattern.extractShardKeyFromDocumentKey(getDocumentKey(
+            BSON("a" << BSON("b" << BSON_ARRAY(value)) << "c" << 20), shardKeyPattern)),
+        BSONObj());
 }
 
 }  // namespace

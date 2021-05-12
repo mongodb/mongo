@@ -7,6 +7,7 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
+
 (function() {
 "use strict";
 
@@ -21,77 +22,13 @@ function expectChunks(st, ns, chunks) {
     }
 }
 
-const dbName = "test";
-
-const st = new ShardingTest({shards: 3, mongos: 1});
-
-//////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Ranged Sharding Test
-
-// Set up one sharded collection with 2 chunks, both on the primary shard.
-const rangedCollName = "not_hashed";
-const rangedNs = dbName + '.' + rangedCollName;
-
-assert.commandWorked(
-    st.s.getDB(dbName)[rangedCollName].insert({_id: -3}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(
-    st.s.getDB(dbName)[rangedCollName].insert({_id: 11}, {writeConcern: {w: "majority"}}));
-
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
-
-assert.commandWorked(st.s.adminCommand({shardCollection: rangedNs, key: {_id: 1}}));
-assert.commandWorked(st.s.adminCommand({split: rangedNs, middle: {_id: 0}}));
-
-expectChunks(st, rangedNs, [2, 0, 0]);
-
-// Force a routing table refresh on Shard2, to avoid picking a global read timestamp before the
-// sharding metadata cache collections are created.
-assert.commandWorked(st.rs2.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: rangedNs}));
-
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: rangedNs, find: {_id: 11}, to: st.shard1.shardName}));
-
-expectChunks(st, rangedNs, [1, 1, 0]);
-
-// The command should target only the second chunk.
-let commandTestCases = function(collName) {
-    return [
-        {
-            name: "insert",
-            command: {insert: collName, documents: [{_id: 3}]},
-        },
-        {
-            name: "update_query",
-            command: {update: collName, updates: [{q: {_id: 11}, u: {$set: {x: 1}}}]},
-        },
-        {
-            name: "update_replacement",
-            command: {update: collName, updates: [{q: {_id: 11}, u: {_id: 11, x: 1}}]},
-        },
-        {
-            name: "delete",
-            command: {delete: collName, deletes: [{q: {_id: 11}, limit: 1}]},
-        },
-        {
-            name: "findAndModify_update",
-            command: {findAndModify: collName, query: {_id: 11}, update: {$set: {x: 1}}},
-        },
-        {
-            name: "findAndModify_delete",
-            command: {findAndModify: collName, query: {_id: 11}, remove: true},
-        }
-    ];
-};
-
-function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack) {
+function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack, hashed, docs) {
     const testCaseName = testCase.name;
     const cmdTargetChunk2 = testCase.command;
 
     jsTestLog("Testing " + testCaseName + ", moveChunkBack: " + moveChunkBack);
 
-    if (ns === rangedNs) {
+    if (!hashed) {
         expectChunks(st, ns, [1, 1, 0]);
     } else {  // hashed ns
         expectChunks(st, ns, [2, 2, 2]);
@@ -106,7 +43,7 @@ function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack) {
     session.startTransaction({readConcern: {level: "snapshot"}});
 
     // Start a transaction on Shard0 which will select and pin a global read timestamp.
-    assert.eq(sessionColl.find({_id: -3}).itcount(), 1, "expected to find document in first chunk");
+    assert.eq(sessionColl.find(docs[0]).itcount(), 1, "expected to find document in first chunk");
 
     // Move a chunk from Shard1 to Shard2 outside of the transaction. This will happen at a
     // later logical time than the transaction's read timestamp.
@@ -129,7 +66,7 @@ function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack) {
 
     // The find should target shard0 and find the doc. If it targets shard1, it will not be able to
     // find the doc because it is using the snapshot for the pinned global read timestamp.
-    assert.eq(sessionColl.find({_id: -3}).itcount(),
+    assert.eq(sessionColl.find(docs[0]).itcount(),
               1,
               "expected find to target the right shard even after moveChunk");
 
@@ -179,19 +116,111 @@ function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack) {
         assert.commandWorked(moveChunkToFunc(st.shard1.shardName));
     }
     assert.commandWorked(sessionColl.remove({}));
-    assert.commandWorked(sessionColl.insert([{_id: -3}, {_id: 11}]));
+    assert.commandWorked(sessionColl.insert([docs[0], docs[1]]));
 }
 
-let moveNotHashed = function(toShard) {
-    return st.s.adminCommand({moveChunk: rangedNs, find: {_id: 11}, to: toShard});
-};
+const dbName = "test";
 
-commandTestCases(rangedCollName)
-    .forEach(testCase => runTest(
-                 testCase, rangedNs, rangedCollName, moveNotHashed, false /*moveChunkBack*/));
-commandTestCases(rangedCollName)
-    .forEach(testCase => runTest(
-                 testCase, rangedNs, rangedCollName, moveNotHashed, true /*moveChunkBack*/));
+const st = new ShardingTest({shards: 3, mongos: 1, config: 1});
+
+var fixtures = [
+    {collName: "not_hashed", shardKey: "_id", docs: [{_id: -3}, {_id: 11}, {_id: 3}]},
+    {
+        collName: "not_hashed_nested",
+        shardKey: "a.b",
+        docs: [{a: {b: -3}}, {a: {b: 11}}, {a: {b: 1}}]
+    }
+];
+fixtures.forEach(function(fixture) {
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Ranged Sharding Test
+
+    const rangedCollName = fixture.collName;
+    const rangedNs = dbName + '.' + rangedCollName;
+
+    // Set up one sharded collection with 2 chunks, both on the primary shard.
+    assert.commandWorked(st.s.getDB(dbName)[rangedCollName].insert(
+        fixture.docs[0], {writeConcern: {w: "majority"}}));
+    assert.commandWorked(st.s.getDB(dbName)[rangedCollName].insert(
+        fixture.docs[1], {writeConcern: {w: "majority"}}));
+
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+    st.ensurePrimaryShard(dbName, st.shard0.shardName);
+
+    assert.commandWorked(st.s.getDB(dbName)[rangedCollName].createIndex({[fixture.shardKey]: 1}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: rangedNs, key: {[fixture.shardKey]: 1}}));
+    assert.commandWorked(st.s.adminCommand({split: rangedNs, middle: {[fixture.shardKey]: 0}}));
+
+    expectChunks(st, rangedNs, [2, 0, 0]);
+
+    // Force a routing table refresh on Shard2, to avoid picking a global read timestamp before the
+    // sharding metadata cache collections are created.
+    assert.commandWorked(
+        st.rs2.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: rangedNs}));
+
+    assert.commandWorked(st.s.adminCommand(
+        {moveChunk: rangedNs, find: {[fixture.shardKey]: 11}, to: st.shard1.shardName}));
+
+    expectChunks(st, rangedNs, [1, 1, 0]);
+
+    // The command should target only the second chunk.
+    let commandTestCases = function(collName) {
+        return [
+            {
+                name: "insert",
+                command: {insert: collName, documents: [fixture.docs[2]]},
+            },
+            {
+                name: "update_query",
+                command: {update: collName, updates: [{q: fixture.docs[1], u: {$set: {x: 1}}}]},
+            },
+            {
+                name: "update_replacement",
+                command: {
+                    update: collName,
+                    updates: [{q: fixture.docs[1], u: {[fixture.shardKey]: 11, x: 1}}]
+                },
+            },
+            {
+                name: "delete",
+                command: {delete: collName, deletes: [{q: fixture.docs[1], limit: 1}]},
+            },
+            {
+                name: "findAndModify_update",
+                command: {findAndModify: collName, query: fixture.docs[1], update: {$set: {x: 1}}},
+            },
+            {
+                name: "findAndModify_delete",
+                command: {findAndModify: collName, query: fixture.docs[1], remove: true},
+            }
+        ];
+    };
+
+    let moveNotHashed = function(toShard) {
+        return st.s.adminCommand({moveChunk: rangedNs, find: fixture.docs[1], to: toShard});
+    };
+
+    commandTestCases(rangedCollName)
+        .forEach(testCase => runTest(testCase,
+                                     rangedNs,
+                                     rangedCollName,
+                                     moveNotHashed,
+                                     false /*moveChunkBack*/,
+                                     false /*hashed*/,
+                                     fixture.docs));
+    commandTestCases(rangedCollName)
+        .forEach(testCase => runTest(testCase,
+                                     rangedNs,
+                                     rangedCollName,
+                                     moveNotHashed,
+                                     true /*moveChunkBack*/,
+                                     false /*hashed*/,
+                                     fixture.docs));
+
+    st.s.getDB(dbName)[rangedCollName].drop();
+});
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -222,12 +251,54 @@ let moveHashed = function(toShard) {
     });
 };
 
+var hashedDocs = [{_id: -3}, {_id: 11}];
+
+// The command should target only the second chunk.
+let commandTestCases = function(collName) {
+    return [
+        {
+            name: "insert",
+            command: {insert: collName, documents: [{_id: 3}]},
+        },
+        {
+            name: "update_query",
+            command: {update: collName, updates: [{q: {_id: 11}, u: {$set: {x: 1}}}]},
+        },
+        {
+            name: "update_replacement",
+            command: {update: collName, updates: [{q: {_id: 11}, u: {_id: 11, x: 1}}]},
+        },
+        {
+            name: "delete",
+            command: {delete: collName, deletes: [{q: {_id: 11}, limit: 1}]},
+        },
+        {
+            name: "findAndModify_update",
+            command: {findAndModify: collName, query: {_id: 11}, update: {$set: {x: 1}}},
+        },
+        {
+            name: "findAndModify_delete",
+            command: {findAndModify: collName, query: {_id: 11}, remove: true},
+        }
+    ];
+};
+
 commandTestCases(hashedCollName)
-    .forEach(testCase =>
-                 runTest(testCase, hashedNs, hashedCollName, moveHashed, false /*moveChunkBack*/));
+    .forEach(testCase => runTest(testCase,
+                                 hashedNs,
+                                 hashedCollName,
+                                 moveHashed,
+                                 false /*moveChunkBack*/,
+                                 true /*hashed*/,
+                                 hashedDocs));
 commandTestCases(hashedCollName)
-    .forEach(testCase =>
-                 runTest(testCase, hashedNs, hashedCollName, moveHashed, true /*moveChunkBack*/));
+    .forEach(testCase => runTest(testCase,
+                                 hashedNs,
+                                 hashedCollName,
+                                 moveHashed,
+                                 true /*moveChunkBack*/,
+                                 true /*hashed*/,
+                                 hashedDocs));
 
 st.stop();
 })();

@@ -58,16 +58,11 @@ const auto getIsMigrating = OperationContext::declareDecoration<bool>();
  */
 void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
                                         const CollectionMetadata& metadata,
-                                        const BSONObj& doc) {
-    const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-    if (!atClusterTime)
-        return;
-
-    auto shardKey = metadata.getShardKeyPattern().extractShardKeyFromDocThrows(doc);
-
+                                        const BSONObj& shardKey,
+                                        const LogicalTime& atClusterTime) {
     // We can assume the simple collation because shard keys do not support non-simple collations.
     auto cmAtTimeOfWrite =
-        ChunkManager::makeAtTime(*metadata.getChunkManager(), atClusterTime->asTimestamp());
+        ChunkManager::makeAtTime(*metadata.getChunkManager(), atClusterTime.asTimestamp());
     auto chunk = cmAtTimeOfWrite.findIntersectingChunkWithSimpleCollation(shardKey);
 
     // Throws if the chunk has moved since the timestamp of the running transaction's atClusterTime
@@ -140,7 +135,14 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
     }
 
     if (inMultiDocumentTransaction) {
-        assertIntersectingChunkHasNotMoved(opCtx, *metadata, insertedDoc);
+        const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+
+        if (atClusterTime) {
+            const auto shardKey =
+                metadata->getShardKeyPattern().extractShardKeyFromDocThrows(insertedDoc);
+            assertIntersectingChunkHasNotMoved(opCtx, *metadata, shardKey, *atClusterTime);
+        }
+
         return;
     }
 
@@ -169,7 +171,14 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
     }
 
     if (inMultiDocumentTransaction) {
-        assertIntersectingChunkHasNotMoved(opCtx, *metadata, postImageDoc);
+        const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+
+        if (atClusterTime) {
+            const auto shardKey =
+                metadata->getShardKeyPattern().extractShardKeyFromDocThrows(postImageDoc);
+            assertIntersectingChunkHasNotMoved(opCtx, *metadata, shardKey, *atClusterTime);
+        }
+
         return;
     }
 
@@ -197,7 +206,14 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
     }
 
     if (inMultiDocumentTransaction) {
-        assertIntersectingChunkHasNotMoved(opCtx, *metadata, documentKey);
+        const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+
+        if (atClusterTime) {
+            const auto shardKey =
+                metadata->getShardKeyPattern().extractShardKeyFromDocumentKeyThrows(documentKey);
+            assertIntersectingChunkHasNotMoved(opCtx, *metadata, shardKey, *atClusterTime);
+        }
+
         return;
     }
 

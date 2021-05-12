@@ -159,6 +159,31 @@ public:
     BSONObj extractShardKeyFromIndexKeyData(const std::vector<IndexKeyData>& indexKeyData) const;
 
     /**
+     * Given a document key expressed in dotted notation, extracts its shard key, applying hashing
+     * if necessary.
+     * Note: For a shardKeyPattern {a.b: 1, c: 1}
+     *  The documentKey for the document {a: {b: 10}, c: 20} is {a.b: 10, c: 20}
+     *  The documentKey for the document {a: {b: 10, d: 20}, c: 30} is {a.b: 10, c: 30}
+     *  The documentKey for the document {a: {b: {d: 10}}, c: 30} is {a.b: {d: 10}, c: 30}
+     *
+     * Examples:
+     *  If 'this' KeyPattern is {a: 1}
+     *   {a: 10, b: 20} --> returns {a: 10}
+     *   {b: 20} --> returns {a: null}
+     *   {a: {b: 10}} --> returns {a: {b: 10}}
+     *   {a: [1,2]} --> returns {}
+     *  If 'this' KeyPattern is {a.b: 1, c: 1}
+     *   {a.b: 10, c: 20} --> returns {a.b: 10, c: 20}
+     *   {a.b: 10} --> returns {a.b: 10, c: null}
+     *   {a.b: {z: 10}, c: 20} --> returns {a.b: {z: 10}, c: 20}
+     *  If 'this' KeyPattern is {a : "hashed"}
+     *   {a: 10, b: 20} --> returns {a: NumberLong("7766103514953448109")}
+     *   {b: 20} --> returns {a: NumberLong("2338878944348059895")}
+     */
+    BSONObj extractShardKeyFromDocumentKey(const BSONObj& documentKey) const;
+    BSONObj extractShardKeyFromDocumentKeyThrows(const BSONObj& documentKey) const;
+
+    /**
      * Given a document, extracts the shard key corresponding to the key pattern. Paths to shard key
      * fields must not contain arrays at any level, and shard keys may not be array fields or
      * non-storable sub-documents.  If the shard key pattern is a hashed key pattern, this method
