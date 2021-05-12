@@ -226,18 +226,15 @@ class MongodLauncher(object):
         """
         executable = self.fixturelib.default_if_none(executable,
                                                      self.config.DEFAULT_MONGOD_EXECUTABLE)
-        mongod_options = self.fixturelib.default_if_none(mongod_options,
-                                                         self.fixturelib.make_historic({})).copy()
+        mongod_options = self.fixturelib.default_if_none(mongod_options, {}).copy()
 
         # Apply the --setParameter command line argument. Command line options to resmoke.py override
         # the YAML configuration.
         # We leave the parameters attached for now so the top-level dict tracks its history.
-        suite_set_parameters = mongod_options.setdefault("set_parameters",
-                                                         self.fixturelib.make_historic({}))
+        suite_set_parameters = mongod_options.setdefault("set_parameters", {})
 
         if self.config.MONGOD_SET_PARAMETERS is not None:
-            suite_set_parameters.update(
-                self.fixturelib.make_historic(yaml.safe_load(self.config.MONGOD_SET_PARAMETERS)))
+            suite_set_parameters.update(yaml.safe_load(self.config.MONGOD_SET_PARAMETERS))
 
         # Set default log verbosity levels if none were specified.
         if "logComponentVerbosity" not in suite_set_parameters:
@@ -326,9 +323,9 @@ class MongodLauncher(object):
 
         if ("failpoint.flowControlTicketOverride" not in suite_set_parameters
                 and self.config.FLOW_CONTROL_TICKETS is not None):
-            suite_set_parameters[
-                "failpoint.flowControlTicketOverride"] = self.fixturelib.make_historic(
-                    {"mode": "alwaysOn", "data": {"numTickets": self.config.FLOW_CONTROL_TICKETS}})
+            suite_set_parameters["failpoint.flowControlTicketOverride"] = {
+                "mode": "alwaysOn", "data": {"numTickets": self.config.FLOW_CONTROL_TICKETS}
+            }
 
         _add_testing_set_parameters(suite_set_parameters)
 
@@ -392,15 +389,14 @@ class MongodLauncher(object):
     def default_mongod_log_component_verbosity(self):
         """Return the default 'logComponentVerbosity' value to use for mongod processes."""
         if self.config.EVERGREEN_TASK_ID:
-            return self.fixturelib.make_historic(DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY)
-        return self.fixturelib.make_historic(DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY)
+            return DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY
+        return DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY
 
     def default_last_lts_mongod_log_component_verbosity(self):
         """Return the default 'logComponentVerbosity' value to use for last-lts mongod processes."""
         if self.config.EVERGREEN_TASK_ID:
-            return self.fixturelib.make_historic(
-                DEFAULT_EVERGREEN_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY)
-        return self.fixturelib.make_historic(DEFAULT_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY)
+            return DEFAULT_EVERGREEN_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY
+        return DEFAULT_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY
 
 
 def _add_testing_set_parameters(suite_set_parameters):

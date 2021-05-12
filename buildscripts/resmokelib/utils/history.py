@@ -116,9 +116,10 @@ class Subscriber:
     key: 'typing.Any'
 
 
-# We only allow immutable types or types that have special logic
-# for being inside a HistoryDict, or else we may miss changes and
-# have difficulty converting to yaml.
+# 1. We only allow immutable types or types that have special logic
+#    for being inside a HistoryDict, or else we may miss changes and
+#    have difficulty converting to yaml.
+# 2. Dictionaries are allowed to be passed in but are implicitly converted to Historic.
 ALLOWED_TYPES = (bool, int, float, str, type(None), Historic)
 
 
@@ -270,6 +271,12 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
         return self._value_store[key]
 
     def __setitem__(self, key, value):
+        # Implicitly convert dictionaries to HistoricDicts to avoid users having to manually wrap dictionaries.
+        # This should only used when assigning a dictionary directly to a key in HistoryDict and not a standalone
+        # variable, as its history will not be recorded.
+        if isinstance(value, dict):
+            value = make_historic(value)
+
         if not isinstance(value, ALLOWED_TYPES):
             raise ValueError(f"HistoryDict cannot store type {type(value)}."
                              " Please use a different type or create a Historic wrapper.")

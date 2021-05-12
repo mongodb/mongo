@@ -62,7 +62,7 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
 
     if "port" not in mongod_options:
         mongod_options["port"] = network.PortAllocator.next_fixture_port(job_num)
-    suite_set_parameters = mongod_options.get("set_parameters", make_historic({}))
+    suite_set_parameters = mongod_options.get("set_parameters", {})
     _apply_set_parameters(args, suite_set_parameters)
     mongod_options.pop("set_parameters")
 

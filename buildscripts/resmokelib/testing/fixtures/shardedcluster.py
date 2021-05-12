@@ -543,8 +543,8 @@ class MongosLauncher(object):
     def default_mongos_log_component_verbosity(self):
         """Return the default 'logComponentVerbosity' value to use for mongos processes."""
         if self.config.EVERGREEN_TASK_ID:
-            return self.fixturelib.make_historic(DEFAULT_EVERGREEN_MONGOS_LOG_COMPONENT_VERBOSITY)
-        return self.fixturelib.make_historic(DEFAULT_MONGOS_LOG_COMPONENT_VERBOSITY)
+            return DEFAULT_EVERGREEN_MONGOS_LOG_COMPONENT_VERBOSITY
+        return DEFAULT_MONGOS_LOG_COMPONENT_VERBOSITY
 
     def launch_mongos_program(  # pylint: disable=too-many-arguments
             self, logger, job_num, test_id=None, executable=None, process_kwargs=None,
@@ -556,8 +556,7 @@ class MongosLauncher(object):
 
         # Apply the --setParameter command line argument. Command line options to resmoke.py override
         # the YAML configuration.
-        suite_set_parameters = mongos_options.setdefault("set_parameters",
-                                                         self.fixturelib.make_historic({}))
+        suite_set_parameters = mongos_options.setdefault("set_parameters", {})
 
         if self.config.MONGOS_SET_PARAMETERS is not None:
             suite_set_parameters.update(yaml.safe_load(self.config.MONGOS_SET_PARAMETERS))
