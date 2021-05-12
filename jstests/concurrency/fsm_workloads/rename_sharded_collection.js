@@ -14,7 +14,7 @@
  *   requires_sharding,
  *   # TODO (SERVER-56879): Support add/remove shards in new DDL paths
  *   does_not_support_add_remove_shards,
- *   # TODO (SERVER-56838): investigate timeout of this FSM with transactions
+ *   # This test just performs rename operations that can't be executed in transactions
  *   does_not_support_transactions,
  *   # Can be removed once PM-1965-Milestone-1 is completed.
  *   featureFlagShardingFullDDLSupport
