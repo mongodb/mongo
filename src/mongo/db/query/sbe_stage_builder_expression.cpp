@@ -2532,7 +2532,7 @@ public:
         generateTrigonometricExpression("atan");
     }
     void visit(ExpressionArcTangent2* expr) final {
-        generateTrigonometricExpression("atan2");
+        generateTrigonometricExpressionBinary("atan2");
     }
     void visit(ExpressionHyperbolicArcTangent* expr) final {
         generateTrigonometricExpressionWithBounds(
@@ -2906,6 +2906,36 @@ private:
 
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
             frameId, std::move(binds), std::move(genericTrignomentricExpr)));
+    }
+
+    /**
+     * Shared expression building logic for binary trigonometric expressions to make sure the
+     * operands are numeric and are not null.
+     */
+    void generateTrigonometricExpressionBinary(StringData exprName) {
+        _context->ensureArity(2);
+
+        auto genericTrignomentricExpr = makeLocalBind(
+            _context->state.frameIdGenerator,
+            [&](sbe::EVariable lhs, sbe::EVariable rhs) {
+                return buildMultiBranchConditional(
+                    CaseValuePair{makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                               generateNullOrMissing(lhs),
+                                               generateNullOrMissing(rhs)),
+                                  makeConstant(sbe::value::TypeTags::Null, 0)},
+                    CaseValuePair{
+                        makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                                     makeFunction("isNumber", lhs.clone()),
+                                     makeFunction("isNumber", rhs.clone())),
+                        makeFunction(exprName.toString(), lhs.clone(), rhs.clone()),
+                    },
+                    sbe::makeE<sbe::EFail>(ErrorCodes::Error{5688500},
+                                           str::stream() << "$" << exprName
+                                                         << " supports only numeric types"));
+            },
+            _context->popExpr(),
+            _context->popExpr());
+        _context->pushExpr(std::move(genericTrignomentricExpr));
     }
 
     /**

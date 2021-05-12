@@ -5,6 +5,7 @@
 
 // For assertErrorCode.
 load("jstests/aggregation/extras/utils.js");
+load('jstests/libs/sbe_assert_error_override.js');  // Override error-code-checking APIs.
 
 var coll = db.server19548;
 coll.drop();

@@ -428,7 +428,6 @@ function testRegexAggException(inputObj, exceptionCode) {
     testRegexAggException({input: "$text", regex: "valid", options: 'a'}, 51108);
     // 'options' are case-sensitive.
     testRegexAggException({input: "$text", regex: "valid", options: "I"}, 51108);
-    testRegexAggException({options: "I", regex: null, input: null}, 51108);
     // Options specified in both 'regex' and 'options'.
     testRegexAggException({input: "$text", regex: /(m(p))/i, options: "i"}, 51107);
     testRegexAggException({input: "$text", regex: /(m(p))/i, options: "x"}, 51107);
