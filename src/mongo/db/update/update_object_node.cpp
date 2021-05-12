@@ -147,6 +147,8 @@ void applyChild(const UpdateNode& child,
 
     applyResult->indexesAffected = applyResult->indexesAffected || childApplyResult.indexesAffected;
     applyResult->noop = applyResult->noop && childApplyResult.noop;
+    applyResult->containsDotsAndDollarsField =
+        applyResult->containsDotsAndDollarsField || childApplyResult.containsDotsAndDollarsField;
 
     // Pop 'field' off of 'pathToCreate' or 'pathTaken'.
     if (!updateNodeApplyParams->pathToCreate->empty()) {

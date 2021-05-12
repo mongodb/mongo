@@ -312,4 +312,5 @@ OpCounters replOpCounters;
 NetworkCounter networkCounter;
 AuthCounter authCounter;
 AggStageCounters aggStageCounters;
+DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 }  // namespace mongo

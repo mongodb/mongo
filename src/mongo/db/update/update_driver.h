@@ -186,6 +186,14 @@ public:
         return _positional;
     }
 
+    bool containsDotsAndDollarsField() const {
+        return _containsDotsAndDollarsField;
+    }
+
+    void setContainsDotsAndDollarsField(const bool containsDotsAndDollarsField) {
+        _containsDotsAndDollarsField = containsDotsAndDollarsField;
+    }
+
     /**
      * Serialize the update expression to Value. Output of this method is expected to, when parsed,
      * produce a logically equivalent update expression.
@@ -237,6 +245,9 @@ private:
 
     // Do any of the mods require positional match details when calling 'prepare'?
     bool _positional = false;
+
+    // True if the updated document contains any '.'/'$' field name.
+    bool _containsDotsAndDollarsField = false;
 
     // The document used to represent or store the object being updated.
     mutablebson::Document _objDoc;

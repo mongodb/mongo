@@ -51,6 +51,7 @@
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/trial_stage.h"
+#include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/mock_yield_policies.h"
@@ -503,19 +504,21 @@ UpdateResult PlanExecutorImpl::executeUpdate() {
 }
 
 UpdateResult PlanExecutorImpl::getUpdateResult() const {
-    auto updateStatsToResult = [](const UpdateStats& updateStats) -> UpdateResult {
+    auto updateStatsToResult = [](const UpdateStats& updateStats,
+                                  bool containsDotsAndDollarsField) -> UpdateResult {
         return UpdateResult(updateStats.nMatched > 0 /* Did we update at least one obj? */,
                             updateStats.isModUpdate /* Is this a $mod update? */,
                             updateStats.nModified /* number of modified docs, no no-ops */,
                             updateStats.nMatched /* # of docs matched/updated, even no-ops */,
-                            updateStats.objInserted);
+                            updateStats.objInserted,
+                            containsDotsAndDollarsField);
     };
 
     // If we're updating a non-existent collection, then the delete plan may have an EOF as the
     // root stage.
     if (_root->stageType() == STAGE_EOF) {
         const auto stats = std::make_unique<UpdateStats>();
-        return updateStatsToResult(static_cast<const UpdateStats&>(*stats));
+        return updateStatsToResult(static_cast<const UpdateStats&>(*stats), false);
     }
 
     // If the collection exists, then we expect the root of the plan tree to either be an update
@@ -527,12 +530,16 @@ UpdateResult PlanExecutorImpl::getUpdateResult() const {
             invariant(_root->getChildren().size() == 1U);
             invariant(StageType::STAGE_UPDATE == _root->child()->stageType());
             const SpecificStats* stats = _root->child()->getSpecificStats();
-            return updateStatsToResult(static_cast<const UpdateStats&>(*stats));
+            return updateStatsToResult(
+                static_cast<const UpdateStats&>(*stats),
+                static_cast<UpdateStage*>(_root->child().get())->containsDotsAndDollarsField());
         }
         default:
             invariant(StageType::STAGE_UPDATE == _root->stageType());
             const auto stats = _root->getSpecificStats();
-            return updateStatsToResult(static_cast<const UpdateStats&>(*stats));
+            return updateStatsToResult(
+                static_cast<const UpdateStats&>(*stats),
+                static_cast<UpdateStage*>(_root.get())->containsDotsAndDollarsField());
     }
 }
 

@@ -80,19 +80,22 @@ Status validateDepth(const BSONObj& obj) {
 }
 }  // namespace
 
-StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx, const BSONObj& doc) {
-    if (DocumentValidationSettings::get(opCtx).isInternalValidationDisabled())
-        return StatusWith<BSONObj>(BSONObj());
+StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
+                                         const BSONObj& doc,
+                                         bool* containsDotsAndDollarsField) {
+    bool validationDisabled = DocumentValidationSettings::get(opCtx).isInternalValidationDisabled();
 
-    if (doc.objsize() > BSONObjMaxUserSize)
-        return StatusWith<BSONObj>(ErrorCodes::BadValue,
-                                   str::stream() << "object to insert too large"
-                                                 << ". size in bytes: " << doc.objsize()
-                                                 << ", max size: " << BSONObjMaxUserSize);
+    if (!validationDisabled) {
+        if (doc.objsize() > BSONObjMaxUserSize)
+            return StatusWith<BSONObj>(ErrorCodes::BadValue,
+                                       str::stream() << "object to insert too large"
+                                                     << ". size in bytes: " << doc.objsize()
+                                                     << ", max size: " << BSONObjMaxUserSize);
 
-    auto depthStatus = validateDepth(doc);
-    if (!depthStatus.isOK()) {
-        return depthStatus;
+        auto depthStatus = validateDepth(doc);
+        if (!depthStatus.isOK()) {
+            return depthStatus;
+        }
     }
 
     bool firstElementIsId = false;
@@ -103,62 +106,75 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx, const BSONObj&
         for (bool isFirstElement = true; i.more(); isFirstElement = false) {
             BSONElement e = i.next();
 
-            if (e.type() == bsonTimestamp && e.timestampValue() == 0) {
-                // we replace Timestamp(0,0) at the top level with a correct value
-                // in the fast pass, we just mark that we want to swap
-                hasTimestampToFix = true;
-            }
-
             auto fieldName = e.fieldNameStringData();
 
-            if (!feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV() &&
-                fieldName[0] == '$') {
-                return StatusWith<BSONObj>(
-                    ErrorCodes::BadValue,
-                    str::stream() << "Document can't have $ prefixed field names: " << fieldName);
+            if (fieldName[0] == '$') {
+                if (!feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV()) {
+                    return StatusWith<BSONObj>(ErrorCodes::BadValue,
+                                               str::stream()
+                                                   << "Document can't have $ prefixed field names: "
+                                                   << fieldName);
+                } else if (containsDotsAndDollarsField) {
+                    *containsDotsAndDollarsField = true;
+                    // If the internal validation is disabled and we confirm this doc contains
+                    // dots/dollars field name, we can skip other validations below.
+                    if (validationDisabled)
+                        return StatusWith<BSONObj>(BSONObj());
+                }
             }
 
-            // check no regexp for _id (SERVER-9502)
-            // also, disallow undefined and arrays
-            // Make sure _id isn't duplicated (SERVER-19361).
-            if (fieldName == "_id") {
-                if (e.type() == RegEx) {
-                    return StatusWith<BSONObj>(ErrorCodes::BadValue, "can't use a regex for _id");
+            if (!validationDisabled) {
+                if (e.type() == bsonTimestamp && e.timestampValue() == 0) {
+                    // we replace Timestamp(0,0) at the top level with a correct value
+                    // in the fast pass, we just mark that we want to swap
+                    hasTimestampToFix = true;
                 }
-                if (e.type() == Undefined) {
-                    return StatusWith<BSONObj>(ErrorCodes::BadValue,
-                                               "can't use a undefined for _id");
-                }
-                if (e.type() == Array) {
-                    return StatusWith<BSONObj>(ErrorCodes::BadValue, "can't use an array for _id");
-                }
-                if (e.type() == Object) {
-                    BSONObj o = e.Obj();
-                    Status s = o.storageValidEmbedded();
-                    if (!s.isOK()) {
-                        if (feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV() &&
-                            s.code() == ErrorCodes::DollarPrefixedFieldName) {
-                            return StatusWith<BSONObj>(
-                                s.code(),
-                                str::stream() << "_id fields may not contain '$'-prefixed fields: "
-                                              << s.reason());
-                        } else {
-                            return StatusWith<BSONObj>(s);
+
+                // check no regexp for _id (SERVER-9502)
+                // also, disallow undefined and arrays
+                // Make sure _id isn't duplicated (SERVER-19361).
+                if (fieldName == "_id") {
+                    if (e.type() == RegEx) {
+                        return StatusWith<BSONObj>(ErrorCodes::BadValue,
+                                                   "can't use a regex for _id");
+                    }
+                    if (e.type() == Undefined) {
+                        return StatusWith<BSONObj>(ErrorCodes::BadValue,
+                                                   "can't use a undefined for _id");
+                    }
+                    if (e.type() == Array) {
+                        return StatusWith<BSONObj>(ErrorCodes::BadValue,
+                                                   "can't use an array for _id");
+                    }
+                    if (e.type() == Object) {
+                        BSONObj o = e.Obj();
+                        Status s = o.storageValidEmbedded();
+                        if (!s.isOK()) {
+                            if (feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV() &&
+                                s.code() == ErrorCodes::DollarPrefixedFieldName) {
+                                return StatusWith<BSONObj>(
+                                    s.code(),
+                                    str::stream()
+                                        << "_id fields may not contain '$'-prefixed fields: "
+                                        << s.reason());
+                            } else {
+                                return StatusWith<BSONObj>(s);
+                            }
                         }
                     }
-                }
-                if (hadId) {
-                    return StatusWith<BSONObj>(ErrorCodes::BadValue,
-                                               "can't have multiple _id fields in one document");
-                } else {
-                    hadId = true;
-                    firstElementIsId = isFirstElement;
+                    if (hadId) {
+                        return StatusWith<BSONObj>(
+                            ErrorCodes::BadValue, "can't have multiple _id fields in one document");
+                    } else {
+                        hadId = true;
+                        firstElementIsId = isFirstElement;
+                    }
                 }
             }
         }
     }
 
-    if (firstElementIsId && !hasTimestampToFix)
+    if (validationDisabled || (firstElementIsId && !hasTimestampToFix))
         return StatusWith<BSONObj>(BSONObj());
 
     BSONObjIterator i(doc);

@@ -288,4 +288,26 @@ public:
 };
 
 extern AggStageCounters aggStageCounters;
+
+class DotsAndDollarsFieldsCounters {
+public:
+    DotsAndDollarsFieldsCounters()
+        : insertMetric("dotsAndDollarsFields.inserts", &inserts),
+          updateMetric("dotsAndDollarsFields.updates", &updates) {}
+
+    void incrementForUpsert(bool didInsert) {
+        if (didInsert) {
+            inserts.increment();
+        } else {
+            updates.increment();
+        }
+    }
+
+    Counter64 inserts;
+    Counter64 updates;
+    ServerStatusMetricField<Counter64> insertMetric;
+    ServerStatusMetricField<Counter64> updateMetric;
+};
+
+extern DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 }  // namespace mongo

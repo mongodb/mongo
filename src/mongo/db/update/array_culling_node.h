@@ -52,7 +52,9 @@ public:
                         mutablebson::ConstElement leftSibling,
                         mutablebson::ConstElement rightSibling,
                         std::uint32_t recursionLevel,
-                        ModifyResult modifyResult) const final;
+                        ModifyResult modifyResult,
+                        const bool validateForStorage,
+                        bool* containsDotsAndDollarsField) const final;
 
     void setCollator(const CollatorInterface* collator) final {
         _matcher->setCollator(collator);

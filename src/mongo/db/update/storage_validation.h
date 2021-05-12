@@ -43,8 +43,17 @@ namespace storage_validation {
  * When the dots and dollars feature flag is off, always reject $-prefixed fields. Otherwise, reject
  * only $-prefixed fields at the top-level of a document. If 'allowTopLevelDollarPrefixes' is set to
  * true, do not reject $-prefixed fields at the top-level of a document.
+ *
+ * 'shouldValidate' is true if the caller wants to validate for storage, otherwise this helper will
+ * only check top-level $-prefixed field names skipping all the validations.
+ *
+ * 'containsDotsAndDollarsField' is set to true if there exists any field name containing '.'/'$'
+ * during validation.
  */
-void storageValid(const mutablebson::Document& doc, const bool allowTopLevelDollarPrefixes = false);
+void storageValid(const mutablebson::Document& doc,
+                  const bool allowTopLevelDollarPrefixes,
+                  const bool shouldValidate,
+                  bool* containsDotsAndDollarsField);
 
 /**
  * Validates that the MutableBSON element 'elem' is acceptable for storage in a collection. If
@@ -54,11 +63,19 @@ void storageValid(const mutablebson::Document& doc, const bool allowTopLevelDoll
  * When the dots and dollars feature flag is off, always reject $-prefixed fields. Otherwise, reject
  * only $-prefixed fields at the top-level of a document. If 'allowTopLevelDollarPrefixes' is set to
  * true, do not reject $-prefixed fields at the top-level of a document.
+ *
+ * 'shouldValidate' is true if the caller wants to validate for storage, otherwise this helper will
+ * only check top-level $-prefixed field names skipping all the validations.
+ *
+ * 'containsDotsAndDollarsField' is set to true if there exists any field name containing '.'/'$'
+ * during validation.
  */
 void storageValid(mutablebson::ConstElement elem,
                   const bool deep,
                   std::uint32_t recursionLevel,
-                  const bool allowTopLevelDollarPrefixes = false);
+                  const bool allowTopLevelDollarPrefixes,
+                  const bool shouldValidate,
+                  bool* containsDotsAndDollarsField);
 
 }  // namespace storage_validation
 

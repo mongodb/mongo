@@ -38,7 +38,8 @@ struct UpdateResult {
                  bool modifiers,
                  unsigned long long numDocsModified,
                  unsigned long long numMatched,
-                 const BSONObj& upsertedObject);
+                 const BSONObj& upsertedObject,
+                 bool dotsAndDollarsField = false);
 
     std::string toString() const;
 
@@ -59,6 +60,9 @@ struct UpdateResult {
     BSONObj upsertedId;
 
     BSONObj requestedDocImage;
+
+    // True if the documents updated/inserted contain '.'/'$' field.
+    const bool containsDotsAndDollarsField;
 };
 
 }  // namespace mongo

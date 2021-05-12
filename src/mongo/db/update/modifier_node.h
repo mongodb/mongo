@@ -116,12 +116,17 @@ protected:
      * - 'recursionLevel' is the document nesting depth of the 'updatedElement' field.
      * - 'modifyResult' is either the value returned by updateExistingElement() or the value
      *    ModifyResult::kCreated.
+     * - If 'validateForStorage' is true, we should verify that the updated element is valid for
+     *   storage.
+     * - 'containsDotsAndDollarsField' is true if 'updatedElement' contains any dots/dollars field.
      */
     virtual void validateUpdate(mutablebson::ConstElement updatedElement,
                                 mutablebson::ConstElement leftSibling,
                                 mutablebson::ConstElement rightSibling,
                                 std::uint32_t recursionLevel,
-                                ModifyResult modifyResult) const;
+                                ModifyResult modifyResult,
+                                const bool validateForStorage,
+                                bool* containsDotsAndDollarsField) const;
 
     /**
      * ModifierNode::apply() calls this method after validation to create an oplog entry for the

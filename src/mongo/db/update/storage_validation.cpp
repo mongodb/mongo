@@ -47,14 +47,21 @@ const StringData idFieldName = "_id"_sd;
 void storageValidChildren(mutablebson::ConstElement elem,
                           const bool deep,
                           std::uint32_t recursionLevel,
-                          const bool allowTopLevelDollarPrefixes) {
+                          const bool allowTopLevelDollarPrefixes,
+                          const bool shouldValidate,
+                          bool* containsDotsAndDollarsField) {
     if (!elem.hasChildren()) {
         return;
     }
 
     auto curr = elem.leftChild();
     while (curr.ok()) {
-        storageValid(curr, deep, recursionLevel + 1, allowTopLevelDollarPrefixes);
+        storageValid(curr,
+                     deep,
+                     recursionLevel + 1,
+                     allowTopLevelDollarPrefixes,
+                     shouldValidate,
+                     containsDotsAndDollarsField);
         curr = curr.rightSibling();
     }
 }
@@ -118,10 +125,13 @@ void validateDollarPrefixElement(mutablebson::ConstElement elem) {
 }
 }  // namespace
 
-void storageValid(const mutablebson::Document& doc, const bool allowTopLevelDollarPrefixes) {
+void storageValid(const mutablebson::Document& doc,
+                  const bool allowTopLevelDollarPrefixes,
+                  const bool shouldValidate,
+                  bool* containsDotsAndDollarsField) {
     auto currElem = doc.root().leftChild();
     while (currElem.ok()) {
-        if (currElem.getFieldName() == idFieldName) {
+        if (currElem.getFieldName() == idFieldName && shouldValidate) {
             switch (currElem.getType()) {
                 case BSONType::RegEx:
                 case BSONType::Array:
@@ -137,7 +147,12 @@ void storageValid(const mutablebson::Document& doc, const bool allowTopLevelDoll
         // Validate this child element.
         const auto deep = true;
         const uint32_t recursionLevel = 1;
-        storageValid(currElem, deep, recursionLevel, allowTopLevelDollarPrefixes);
+        storageValid(currElem,
+                     deep,
+                     recursionLevel,
+                     allowTopLevelDollarPrefixes,
+                     shouldValidate,
+                     containsDotsAndDollarsField);
 
         currElem = currElem.rightSibling();
     }
@@ -146,13 +161,17 @@ void storageValid(const mutablebson::Document& doc, const bool allowTopLevelDoll
 void storageValid(mutablebson::ConstElement elem,
                   const bool deep,
                   std::uint32_t recursionLevel,
-                  const bool allowTopLevelDollarPrefixes) {
-    uassert(ErrorCodes::BadValue, "Invalid elements cannot be stored.", elem.ok());
+                  const bool allowTopLevelDollarPrefixes,
+                  const bool shouldValidate,
+                  bool* containsDotsAndDollarsField) {
+    if (shouldValidate) {
+        uassert(ErrorCodes::BadValue, "Invalid elements cannot be stored.", elem.ok());
 
-    uassert(ErrorCodes::Overflow,
-            str::stream() << "Document exceeds maximum nesting depth of "
-                          << BSONDepth::getMaxDepthForUserStorage(),
-            recursionLevel <= BSONDepth::getMaxDepthForUserStorage());
+        uassert(ErrorCodes::Overflow,
+                str::stream() << "Document exceeds maximum nesting depth of "
+                              << BSONDepth::getMaxDepthForUserStorage(),
+                recursionLevel <= BSONDepth::getMaxDepthForUserStorage());
+    }
 
     // Field names of elements inside arrays are not meaningful in mutable bson,
     // so we do not want to validate them.
@@ -163,14 +182,20 @@ void storageValid(mutablebson::ConstElement elem,
     // check top-level fields if 'allowTopLevelDollarPrefixes' is false, and don't validate any
     // fields for '$'-prefixes if 'allowTopLevelDollarPrefixes' is true.
     const bool checkTopLevelFields = !allowTopLevelDollarPrefixes && (recursionLevel == 1);
-    const bool checkFields =
-        !feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV() || checkTopLevelFields;
+    const bool dotsAndDollarsFeatureEnabled =
+        feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV();
+    const bool checkFields = !dotsAndDollarsFeatureEnabled || checkTopLevelFields;
 
-    if (!childOfArray && checkFields) {
-        auto fieldName = elem.getFieldName();
-
-        // Cannot start with "$", unless dbref.
-        if (fieldName[0] == '$') {
+    auto fieldName = elem.getFieldName();
+    if (fieldName[0] == '$') {
+        if (dotsAndDollarsFeatureEnabled && containsDotsAndDollarsField) {
+            *containsDotsAndDollarsField = true;
+            // If we are not validating for storage, return once a $-prefixed field is found.
+            if (!shouldValidate)
+                return;
+        }
+        if (!childOfArray && checkFields && shouldValidate) {
+            // Cannot start with "$", unless dbref.
             validateDollarPrefixElement(elem);
         }
     }
@@ -178,7 +203,12 @@ void storageValid(mutablebson::ConstElement elem,
     if (deep) {
 
         // Check children if there are any.
-        storageValidChildren(elem, deep, recursionLevel, allowTopLevelDollarPrefixes);
+        storageValidChildren(elem,
+                             deep,
+                             recursionLevel,
+                             allowTopLevelDollarPrefixes,
+                             shouldValidate,
+                             containsDotsAndDollarsField);
     }
 }
 

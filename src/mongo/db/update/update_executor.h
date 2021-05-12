@@ -110,11 +110,13 @@ public:
             ApplyResult applyResult;
             applyResult.indexesAffected = false;
             applyResult.noop = true;
+            applyResult.containsDotsAndDollarsField = false;
             return applyResult;
         }
 
         bool indexesAffected = true;
         bool noop = false;
+        bool containsDotsAndDollarsField = false;
 
         // The oplog entry to log. This is only populated if the operation is not considered a
         // noop and if the 'logMode' provided in ApplyParams indicates that an oplog entry should

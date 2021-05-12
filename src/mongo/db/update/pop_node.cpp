@@ -32,6 +32,7 @@
 #include "mongo/db/update/pop_node.h"
 
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/update/storage_validation.h"
 
 namespace mongo {
 
@@ -72,11 +73,21 @@ void PopNode::validateUpdate(mutablebson::ConstElement updatedElement,
                              mutablebson::ConstElement leftSibling,
                              mutablebson::ConstElement rightSibling,
                              std::uint32_t recursionLevel,
-                             ModifyResult modifyResult) const {
+                             ModifyResult modifyResult,
+                             const bool validateForStorage,
+                             bool* containsDotsAndDollarsField) const {
     invariant(modifyResult == ModifyResult::kNormalUpdate);
 
     // Removing elements from an array cannot increase BSON depth or modify a DBRef, so we can
-    // override validateUpdate to do nothing.
+    // override validateUpdate to not validate storage constraints but we still want to know if
+    // there is any field name containing '.'/'$'.
+    bool doRecursiveCheck = true;
+    storage_validation::storageValid(updatedElement,
+                                     doRecursiveCheck,
+                                     recursionLevel,
+                                     false, /* allowTopLevelDollarPrefixedFields */
+                                     false, /* Should validate for storage */
+                                     containsDotsAndDollarsField);
 }
 
 }  // namespace mongo

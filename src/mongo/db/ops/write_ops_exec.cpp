@@ -618,7 +618,8 @@ WriteResult performInserts(OperationContext* opCtx,
 
     for (auto&& doc : wholeOp.getDocuments()) {
         const bool isLastDoc = (&doc == &wholeOp.getDocuments().back());
-        auto fixedDoc = fixDocumentForInsert(opCtx, doc);
+        bool containsDotsAndDollarsField = false;
+        auto fixedDoc = fixDocumentForInsert(opCtx, doc, &containsDotsAndDollarsField);
         const StmtId stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         const bool wasAlreadyExecuted = opCtx->getTxnNumber() &&
             !opCtx->inMultiDocumentTransaction() &&
@@ -633,6 +634,9 @@ WriteResult performInserts(OperationContext* opCtx,
             // current batch to preserve the error results order.
         } else {
             BSONObj toInsert = fixedDoc.getValue().isEmpty() ? doc : std::move(fixedDoc.getValue());
+
+            if (containsDotsAndDollarsField)
+                dotsAndDollarsFieldsCounters.inserts.increment();
 
             // A time-series insert can combine multiple writes into a single operation, and thus
             // can have multiple statement ids associated with it if it is retryable.
@@ -692,7 +696,8 @@ WriteResult performInserts(OperationContext* opCtx,
 static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                const UpdateRequest& updateRequest,
-                                               OperationSource source) {
+                                               OperationSource source,
+                                               bool* containsDotsAndDollarsField) {
     const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
     ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
     uassertStatusOK(parsedUpdate.parseRequest());
@@ -784,6 +789,10 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     result.setNModified(updateResult.numDocsModified);
     result.setUpsertedId(updateResult.upsertedId);
 
+    if (containsDotsAndDollarsField && updateResult.containsDotsAndDollarsField) {
+        *containsDotsAndDollarsField = true;
+    }
+
     return result;
 }
 
@@ -831,7 +840,16 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
         ++numAttempts;
 
         try {
-            return performSingleUpdateOp(opCtx, ns, request, source);
+            bool containsDotsAndDollarsField = false;
+            const auto ret =
+                performSingleUpdateOp(opCtx, ns, request, source, &containsDotsAndDollarsField);
+
+            if (containsDotsAndDollarsField) {
+                // If it's an upsert, increment 'inserts' metric, otherwise increment 'updates'.
+                dotsAndDollarsFieldsCounters.incrementForUpsert(!ret.getUpsertedId().isEmpty());
+            }
+
+            return ret;
         } catch (ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
             const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
             ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);

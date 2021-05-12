@@ -68,6 +68,7 @@
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -480,8 +481,15 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
     if (collection) {
         CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
     }
-    write_ops_exec::recordUpdateResultInOpDebug(exec->getUpdateResult(), opDebug);
+    auto updateResult = exec->getUpdateResult();
+    write_ops_exec::recordUpdateResultInOpDebug(updateResult, opDebug);
     opDebug->setPlanSummaryMetrics(summaryStats);
+
+    if (feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV() &&
+        updateResult.containsDotsAndDollarsField) {
+        // If it's an upsert, increment 'inserts' metric, otherwise increment 'updates'.
+        dotsAndDollarsFieldsCounters.incrementForUpsert(!updateResult.upsertedId.isEmpty());
+    }
 
     if (curOp->shouldDBProfile(opCtx)) {
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);

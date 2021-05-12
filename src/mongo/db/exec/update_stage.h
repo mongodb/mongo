@@ -100,6 +100,10 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
+    bool containsDotsAndDollarsField() const {
+        return _params.driver->containsDotsAndDollarsField();
+    }
+
 protected:
     UpdateStage(ExpressionContext* expCtx,
                 const UpdateStageParams& params,

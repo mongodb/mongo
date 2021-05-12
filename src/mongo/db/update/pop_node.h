@@ -47,7 +47,9 @@ public:
                         mutablebson::ConstElement leftSibling,
                         mutablebson::ConstElement rightSibling,
                         std::uint32_t recursionLevel,
-                        ModifyResult modifyResult) const final;
+                        ModifyResult modifyResult,
+                        const bool validateForStorage,
+                        bool* containsDotsAndDollarsField) const final;
 
     std::unique_ptr<UpdateNode> clone() const final {
         return std::make_unique<PopNode>(*this);

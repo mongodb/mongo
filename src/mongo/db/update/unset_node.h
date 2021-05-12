@@ -56,7 +56,9 @@ public:
                         mutablebson::ConstElement leftSibling,
                         mutablebson::ConstElement rightSibling,
                         std::uint32_t recursionLevel,
-                        ModifyResult modifyResult) const final;
+                        ModifyResult modifyResult,
+                        bool validateForStorage,
+                        bool* containsDotsAndDollarsField) const final;
 
     void logUpdate(LogBuilderInterface* logBuilder,
                    const RuntimeUpdatePath& pathTaken,

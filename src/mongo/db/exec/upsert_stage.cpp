@@ -275,8 +275,14 @@ void UpsertStage::_assertDocumentToBeInsertedIsValid(const mb::Document& documen
         // Shard key values are permitted to be missing, and so the only required field is _id. We
         // should always have an _id here, since we generated one earlier if not already present.
         invariant(document.root().ok() && document.root()[idFieldName].ok());
+        bool containsDotsAndDollarsField = false;
         storage_validation::storageValid(
-            document, feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV());
+            document,
+            feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV(),
+            true, /* Should validate for storage */
+            &containsDotsAndDollarsField);
+        if (containsDotsAndDollarsField)
+            _params.driver->setContainsDotsAndDollarsField(true);
 
         //  Neither _id nor the shard key fields may have arrays at any point along their paths.
         _assertPathsNotArray(document, {{&idFieldRef}});

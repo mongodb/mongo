@@ -197,11 +197,14 @@ UpdateExecutor::ApplyResult ModifierNode::applyToExistingElement(
         applyResult.indexesAffected = false;
     }
 
-    if (applyParams.validateForStorage) {
-        const uint32_t recursionLevel = updateNodeApplyParams.pathTaken->size();
-        validateUpdate(
-            applyParams.element, leftSibling, rightSibling, recursionLevel, updateResult);
-    }
+    const uint32_t recursionLevel = updateNodeApplyParams.pathTaken->size();
+    validateUpdate(applyParams.element,
+                   leftSibling,
+                   rightSibling,
+                   recursionLevel,
+                   updateResult,
+                   applyParams.validateForStorage,
+                   &applyResult.containsDotsAndDollarsField);
 
     if (auto logBuilder = updateNodeApplyParams.logBuilder) {
         logUpdate(logBuilder,
@@ -248,15 +251,17 @@ UpdateExecutor::ApplyResult ModifierNode::applyToNonexistentElement(
             MONGO_UNREACHABLE;  // The previous uassertStatusOK should always throw.
         }
 
-        if (applyParams.validateForStorage) {
-            const uint32_t recursionLevel = updateNodeApplyParams.pathTaken->size() + 1;
-            mutablebson::ConstElement elementForValidation = statusWithFirstCreatedElem.getValue();
-            validateUpdate(elementForValidation,
-                           elementForValidation.leftSibling(),
-                           elementForValidation.rightSibling(),
-                           recursionLevel,
-                           ModifyResult::kCreated);
-        }
+        ApplyResult applyResult;
+
+        const uint32_t recursionLevel = updateNodeApplyParams.pathTaken->size() + 1;
+        mutablebson::ConstElement elementForValidation = statusWithFirstCreatedElem.getValue();
+        validateUpdate(elementForValidation,
+                       elementForValidation.leftSibling(),
+                       elementForValidation.rightSibling(),
+                       recursionLevel,
+                       ModifyResult::kCreated,
+                       applyParams.validateForStorage,
+                       &applyResult.containsDotsAndDollarsField);
 
         for (auto immutablePath = applyParams.immutablePaths.begin();
              immutablePath != applyParams.immutablePaths.end();
@@ -303,8 +308,6 @@ UpdateExecutor::ApplyResult ModifierNode::applyToNonexistentElement(
             }
         }
         invariant(fullPathTypes.size() == fullPathFr.numParts());
-
-        ApplyResult applyResult;
 
         // Determine if indexes are affected. If we did not create a new element in an array, check
         // whether the full path affects indexes. If we did create a new element in an array, check
@@ -367,9 +370,17 @@ void ModifierNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                   mutablebson::ConstElement leftSibling,
                                   mutablebson::ConstElement rightSibling,
                                   std::uint32_t recursionLevel,
-                                  ModifyResult modifyResult) const {
+                                  ModifyResult modifyResult,
+                                  const bool validateForStorage,
+                                  bool* containsDotsAndDollarsField) const {
     const bool doRecursiveCheck = true;
-    storage_validation::storageValid(updatedElement, doRecursiveCheck, recursionLevel);
+
+    storage_validation::storageValid(updatedElement,
+                                     doRecursiveCheck,
+                                     recursionLevel,
+                                     false, /* allowTopLevelDollarPrefixedFields */
+                                     validateForStorage,
+                                     containsDotsAndDollarsField);
 }
 
 void ModifierNode::logUpdate(LogBuilderInterface* logBuilder,

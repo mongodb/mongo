@@ -44,11 +44,13 @@ UpdateResult::UpdateResult(bool existing,
                            bool modifiers,
                            unsigned long long numDocsModified,
                            unsigned long long numMatched,
-                           const BSONObj& upsertedObject)
+                           const BSONObj& upsertedObject,
+                           bool dotsAndDollarsField)
     : existing(existing),
       modifiers(modifiers),
       numDocsModified(numDocsModified),
-      numMatched(numMatched) {
+      numMatched(numMatched),
+      containsDotsAndDollarsField(dotsAndDollarsField) {
     BSONElement id = upsertedObject["_id"];
     if (!existing && numMatched == 0 && !id.eoo()) {
         upsertedId = id.wrap(kUpsertedFieldName);

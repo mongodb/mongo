@@ -41,9 +41,13 @@ class OperationContext;
  *  - a non-OK status if 'doc' is not valid;
  *  - an empty BSONObj if 'doc' can be inserted as-is; or
  *  - a non-empty BSONObj representing what should be inserted instead of 'doc'.
+ *
+ * If the inserted doc has any top-level $-prefixed field name , 'containsDotsOrDollarsField' is set
+ * to true.
  */
-StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx, const BSONObj& doc);
-
+StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
+                                         const BSONObj& doc,
+                                         bool* containsDotsOrDollarsField = nullptr);
 
 /**
  * Returns Status::OK() if this namespace is valid for user write operations.  If not, returns

@@ -301,6 +301,9 @@ Status UpdateDriver::update(OperationContext* opCtx,
         *logOpRec = applyResult.oplogEntry;
     }
 
+    _containsDotsAndDollarsField =
+        (_containsDotsAndDollarsField || applyResult.containsDotsAndDollarsField);
+
     return Status::OK();
 }
 
