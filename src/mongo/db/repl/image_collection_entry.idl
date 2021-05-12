@@ -45,6 +45,9 @@ structs:
             _id:
                 cpp_name: _id
                 type: LogicalSessionId
+            txnNum:
+                cpp_name: txnNumber
+                type: TxnNumber
             ts:
                 cpp_name: ts
                 type: timestamp
@@ -54,3 +57,11 @@ structs:
             image:
                 cpp_name: image
                 type: object_owned
+            invalidated:
+                cpp_name: invalidated
+                type: bool
+                default: false
+            invalidatedReason:
+                cpp_name: invalidatedReason
+                type: string
+                optional: true

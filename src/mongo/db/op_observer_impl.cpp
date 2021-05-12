@@ -265,9 +265,9 @@ void writeToImageCollection(OperationContext* opCtx,
                             const Timestamp timestamp,
                             repl::RetryImageEnum imageKind,
                             const BSONObj& dataImage) {
-    AutoGetCollection autoColl(opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
     repl::ImageEntry imageEntry;
     imageEntry.set_id(sessionId);
+    imageEntry.setTxnNumber(opCtx->getTxnNumber().get());
     imageEntry.setTs(timestamp);
     imageEntry.setImageKind(imageKind);
     imageEntry.setImage(dataImage);
@@ -616,9 +616,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                                 collDesc);
 
         // Check if we're in a retryable write that should save the image to
-        // `config.image_collection`. This is the only time `storeFindAndModifyImagesInOplog` may be
-        // queried for this update.
-        if (opCtx->getTxnNumber() && !repl::gStoreFindAndModifyImagesInOplog.load() &&
+        // `config.image_collection`. This is the only time
+        // `storeFindAndModifyImagesInSideCollection` may be queried for this update.
+        if (opCtx->getTxnNumber() && repl::gStoreFindAndModifyImagesInSideCollection.load() &&
             repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCV()) {
             // If we've stored a preImage:
             if (args.updateArgs.storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage &&
@@ -736,7 +736,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         MutableOplogEntry oplogEntry;
         if (args.deletedDoc &&
             repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCV() &&
-            !repl::gStoreFindAndModifyImagesInOplog.load() &&
+            repl::gStoreFindAndModifyImagesInSideCollection.load() &&
             !args.preImageRecordingEnabledForCollection) {
             // If we have a deleted document and the image should be saved to
             // `config.image_collection`...

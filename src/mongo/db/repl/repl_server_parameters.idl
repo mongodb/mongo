@@ -503,13 +503,13 @@ server_parameters:
         cpp_varname: startupRecoveryForRestore
         default: false
 
-    storeFindAndModifyImagesInOplog:
+    storeFindAndModifyImagesInSideCollection:
         description: >-
             Determines where document images for retryable find and modifies are to be stored.
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<bool>
-        cpp_varname: gStoreFindAndModifyImagesInOplog
-        default: true
+        cpp_varname: gStoreFindAndModifyImagesInSideCollection
+        default: false
 
     enableReconfigRollbackCommittedWritesCheck:
         description: >-

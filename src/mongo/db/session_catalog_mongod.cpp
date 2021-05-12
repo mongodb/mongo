@@ -40,6 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -189,6 +190,22 @@ void createTransactionTable(OperationContext* opCtx) {
                       << NamespaceString::kSessionTransactionsTableNamespace.ns() << " collection");
 }
 
+void createRetryableFindAndModifyTable(OperationContext* opCtx) {
+    auto serviceCtx = opCtx->getServiceContext();
+    CollectionOptions options;
+    auto status = repl::StorageInterface::get(serviceCtx)
+                      ->createCollection(opCtx, NamespaceString::kConfigImagesNamespace, options);
+    if (status == ErrorCodes::NamespaceExists) {
+        return;
+    }
+
+    uassertStatusOKWithContext(status,
+                               str::stream() << "Failed to create the "
+                                             << NamespaceString::kConfigImagesNamespace.ns()
+                                             << " collection");
+}
+
+
 void abortInProgressTransactions(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     Query query(BSON(SessionTxnRecord::kStateFieldName
@@ -267,6 +284,9 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     abortInProgressTransactions(opCtx);
 
     createTransactionTable(opCtx);
+    if (repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCV()) {
+        createRetryableFindAndModifyTable(opCtx);
+    }
 }
 
 boost::optional<UUID> MongoDSessionCatalog::getTransactionTableUUID(OperationContext* opCtx) {

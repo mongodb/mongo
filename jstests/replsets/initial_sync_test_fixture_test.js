@@ -248,7 +248,27 @@ checkLogForOplogApplicationMsg(secondary, 1);
 assert(!initialSyncTest.step());
 checkLogForOplogApplicationMsg(secondary, 9);
 assert(!initialSyncTest.step());
-checkLogForOplogApplicationMsg(secondary, 3);
+
+// To compensate for multiversion where the feature flag doesn't exist, we use this expression
+// to evaluate as:
+//
+// * Parameter does not exist error (i.e: old version) -> false
+// * Parameter exists and is false -> false
+// * Parameter exists and is true -> true
+const newConfigImageCollectionExists =
+    (db.adminCommand({getParameter: 1, featureFlagRetryableFindAndModify: 1})
+         .featureFlagRetryableFindAndModify ||
+     {
+         value: false
+     }).value;
+if (newConfigImageCollectionExists) {
+    // This test writes two documents per collection in the system. The collection that
+    // `featureFlagRetryableFindAndModify` creates results in bumping the expected value of the
+    // third batch from 3 to 5. It's unclear why those show up in the third batch.
+    checkLogForOplogApplicationMsg(secondary, 5);
+} else {
+    checkLogForOplogApplicationMsg(secondary, 3);
+}
 
 assert(initialSyncTest.step(), "Expected initial sync to have completed, but it did not");
 
@@ -260,10 +280,17 @@ assert.commandWorked(primary.getDB("otherDB").otherColl.insert({x: 1}, {writeCon
 
 // Confirm that node can be read from and that it has the inserts that were made while the node
 // was in initial sync.
-assert.eq(secondary.getDB("test").foo.find().count(), 7);
-assert.eq(secondary.getDB("test").bar.find().count(), 7);
-assert.eq(secondary.getDB("test").foo.find().itcount(), 7);
-assert.eq(secondary.getDB("test").bar.find().itcount(), 7);
+if (newConfigImageCollectionExists) {
+    assert.eq(secondary.getDB("test").foo.find().count(), 8);
+    assert.eq(secondary.getDB("test").bar.find().count(), 8);
+    assert.eq(secondary.getDB("test").foo.find().itcount(), 8);
+    assert.eq(secondary.getDB("test").bar.find().itcount(), 8);
+} else {
+    assert.eq(secondary.getDB("test").foo.find().count(), 7);
+    assert.eq(secondary.getDB("test").bar.find().count(), 7);
+    assert.eq(secondary.getDB("test").foo.find().itcount(), 7);
+    assert.eq(secondary.getDB("test").bar.find().itcount(), 7);
+}
 
 // Do data consistency checks at the end.
 initialSyncTest.stop();
