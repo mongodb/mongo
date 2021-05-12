@@ -36,7 +36,7 @@ def shell_exec_explicit_shell(yaml: dict) -> List[LintError]:
     return out
 
 
-SHELL_COMMANDS = ["subprocess.exec", "shell.exec"]
+SHELL_COMMANDS = ["subprocess.exec", "subprocess.scripting", "shell.exec"]
 
 
 def no_working_dir_on_shell(yaml: dict) -> List[LintError]:
@@ -331,7 +331,7 @@ RULES: Dict[str, LintRule] = {
     # TODO: after SERVER-54315
     #"no-keyval-inc": no_keyval_inc,
     "no-working-dir-on-shell": no_working_dir_on_shell,
-    #"no-shell-exec": no_shell_exec,
+    "no-shell-exec": no_shell_exec,
     "no-multiline-expansions-update": no_multiline_expansions_update,
     "invalid-build-parameter": invalid_build_parameter,
     "required-expansions-write": required_expansions_write,

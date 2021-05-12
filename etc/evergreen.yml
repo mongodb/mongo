@@ -614,53 +614,19 @@ functions:
         env:
           workdir: ${workdir}
 
-  "set up remote credentials": &set_up_remote_credentials
-    command: shell.exec
+  "f_remote_credentials_setup_exec": &set_up_remote_credentials
+    command: subprocess.exec
     params:
-      silent: true
-      shell: bash
-      script: |
-        set -o errexit
+      binary: bash
+      args:
+        - "./src/evergreen/functions/remote_credentials_setup.sh"
+      env:
+        workdir: ${workdir}
+        private_key_remote_bash_var: ${private_key_remote}
 
-        # Since the macros 'private_key_remote' and 'private_key_file' are not always defined
-        # we default to /dev/null to avoid syntax errors of an empty expansion.
-        if [ ! -z "${private_key_remote}" ] && [ ! -z "${private_key_file}" ] ; then
-          mkdir -p ~/.ssh
-          echo -n "${private_key_remote}" > ${private_key_file|/dev/null}
-          chmod 0600 ${private_key_file|/dev/null}
-        fi
-
-        # Ensure a clean aws configuration state
-        rm -rf ~/.aws
-        mkdir -p ~/.aws
-
-        # If ${aws_profile_remote} is not specified then the config & credentials are
-        # stored in the 'default' profile.
-        aws_profile="${aws_profile_remote|default}"
-
-        # The profile in the config file is specified as [profile <profile>], except
-        # for [default], see http://boto3.readthedocs.io/en/latest/guide/configuration.html
-        if [ $aws_profile = "default" ] ; then
-          aws_profile_config="[default]"
-        else
-          aws_profile_config="[profile $aws_profile]"
-        fi
-        cat <<EOF >> ~/.aws/config
-        $aws_profile_config
-        region = us-east-1
-        EOF
-
-        # The profile in the credentials file is specified as [<profile>].
-        cat <<EOF >> ~/.aws/credentials
-        [$aws_profile]
-        aws_access_key_id = ${aws_key_remote}
-        aws_secret_access_key = ${aws_secret_remote}
-        EOF
-
-        cat <<EOF > ~/.boto
-        [Boto]
-        https_validate_certificates = False
-        EOF
+  "set up remote credentials":
+    - *f_expansions_write
+    - *set_up_remote_credentials
 
   "call BF Suggestion service":
     - *f_expansions_write
