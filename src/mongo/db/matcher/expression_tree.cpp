@@ -243,7 +243,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                         // regexp, we create a RegexMatchExpression with an empty path.
                         regexExpressionPtr->setPath({});
                         auto status = inExpression->addRegex(std::move(regexExpressionPtr));
-                        tassert(3401203,  // TODO SERVER-55449 convert to tassertStatusOK.
+                        tassert(3401203,  // TODO SERVER-53380 convert to tassertStatusOK.
                                 "Conversion from OR to IN should always succeed.",
                                 status == Status::OK());
                     } else {
@@ -265,7 +265,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                                 countEquivEqPaths);
 
                 auto status = inExpression->setEqualities(std::move(inEqualities));
-                tassert(3401206,  // TODO SERVER-55449 convert to tassertStatusOK.
+                tassert(3401206,  // TODO SERVER-53380 convert to tassertStatusOK.
                         "Conversion from OR to IN should always succeed.",
                         status == Status::OK());
 
