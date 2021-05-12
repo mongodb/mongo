@@ -96,6 +96,7 @@ public:
      *   (b) the cancellation token was canceled due to a stepdown or abort.
      */
     SemiFuture<void> run(std::shared_ptr<executor::TaskExecutor> executor,
+                         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
                          CancellationToken cancelToken,
                          CancelableOperationContextFactory factory);
 

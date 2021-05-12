@@ -212,6 +212,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
             _pipeline = pipeline->getContext()
                             ->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
                                 pipeline.release());
+            _pipeline.get_deleter().dismissDisposal();
         }
         ON_BLOCK_EXIT([this] {
             if (_pipeline) {
@@ -222,7 +223,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
         auto batch = _fillBatch(*_pipeline);
 
         if (batch.empty()) {
-            _pipeline.reset();
+            dispose(opCtx.get());
         } else {
             const auto& lastEntryInBatch = batch.back();
             _resumeToken = getId(lastEntryInBatch);
@@ -231,7 +232,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
                 _hasSeenFinalOplogEntry = true;
                 // Skip returning the final oplog entry because it is known to be a no-op.
                 batch.pop_back();
-                _pipeline.reset();
+                dispose(opCtx.get());
             }
         }
 
@@ -250,6 +251,13 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
     }
 
     return ExecutorFuture(std::move(executor), std::move(batch));
+}
+
+void ReshardingDonorOplogIterator::dispose(OperationContext* opCtx) {
+    if (_pipeline) {
+        _pipeline->dispose(opCtx);
+        _pipeline.reset();
+    }
 }
 
 }  // namespace mongo

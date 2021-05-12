@@ -288,7 +288,8 @@ SemiFuture<void> ReshardingDataReplication::runUntilStrictlyConsistent(
 
     // Calling _runOplogAppliers() won't actually immediately start performing oplog application.
     // Only after the _startOplogApplication promise is fulfilled will oplog application begin.
-    auto oplogApplierFutures = _runOplogAppliers(executor, errorSource.token(), opCtxFactory);
+    auto oplogApplierFutures =
+        _runOplogAppliers(executor, cleanupExecutor, errorSource.token(), opCtxFactory);
 
     // We must additionally wait for fulfillCloningDoneFuture to become ready to ensure their
     // corresponding promises aren't being fulfilled while the .onCompletion() is running.
@@ -380,6 +381,7 @@ std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runOplogFetchers
 
 std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runOplogAppliers(
     std::shared_ptr<executor::TaskExecutor> executor,
+    std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
     CancelableOperationContextFactory opCtxFactory) {
     std::vector<SharedSemiFuture<void>> oplogApplierFutures;
@@ -391,8 +393,12 @@ std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runOplogAppliers
         oplogApplierFutures.emplace_back(
             future_util::withCancellation(_startOplogApplication.getFuture(), cancelToken)
                 .thenRunOn(executor)
-                .then([applier = applier.get(), executor, cancelToken, opCtxFactory] {
-                    return applier->run(executor, cancelToken, opCtxFactory);
+                .then([applier = applier.get(),
+                       executor,
+                       cleanupExecutor,
+                       cancelToken,
+                       opCtxFactory] {
+                    return applier->run(executor, cleanupExecutor, cancelToken, opCtxFactory);
                 })
                 .share());
     }

@@ -342,7 +342,7 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->run(executor, cancelToken, factory);
+    auto future = applier->run(executor, executor, cancelToken, factory);
     ASSERT_OK(future.getNoThrow());
 }
 
@@ -378,7 +378,7 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->run(executor, cancelToken, factory);
+    auto future = applier->run(executor, executor, cancelToken, factory);
     ASSERT_OK(future.getNoThrow());
 
     DBDirectClient client(operationContext());
@@ -427,7 +427,7 @@ TEST_F(ReshardingOplogApplierTest, CanceledApplyingBatch) {
     auto cancelToken = abortSource.token();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
 
-    auto future = applier->run(executor, cancelToken, factory);
+    auto future = applier->run(executor, executor, cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
 }
 
@@ -454,7 +454,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->run(executor, cancelToken, factory);
+    auto future = applier->run(executor, executor, cancelToken, factory);
     ASSERT_OK(future.getNoThrow());
 
     DBDirectClient client(operationContext());
@@ -495,7 +495,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringFirstBatchApply) {
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->run(executor, cancelToken, factory);
+    auto future = applier->run(executor, executor, cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::FailedToParse);
 
     DBDirectClient client(operationContext());
@@ -538,7 +538,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringSecondBatchApply) {
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->run(executor, cancelToken, factory);
+    auto future = applier->run(executor, executor, cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::FailedToParse);
 
     DBDirectClient client(operationContext());
@@ -580,7 +580,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplog) {
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->run(executor, cancelToken, factory);
+    auto future = applier->run(executor, executor, cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::InternalError);
 
     DBDirectClient client(operationContext());
@@ -617,7 +617,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatch) {
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->run(executor, cancelToken, factory);
+    auto future = applier->run(executor, executor, cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::InternalError);
 
     DBDirectClient client(operationContext());
@@ -658,7 +658,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatch) {
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->run(executor, cancelToken, factory);
+    auto future = applier->run(executor, executor, cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::InternalError);
 
     DBDirectClient client(operationContext());
@@ -700,7 +700,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDown) {
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->run(executor, cancelToken, factory);
+    auto future = applier->run(executor, executor, cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::ShutdownInProgress);
 
     DBDirectClient client(operationContext());
@@ -740,7 +740,7 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldError) {
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->run(executor, cancelToken, factory);
+    auto future = applier->run(executor, executor, cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::OplogOperationUnsupported);
 
     DBDirectClient client(operationContext());
@@ -777,7 +777,7 @@ TEST_F(ReshardingOplogApplierTest, DropSourceCollectionCmdShouldError) {
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->run(executor, cancelToken, factory);
+    auto future = applier->run(executor, executor, cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::OplogOperationUnsupported);
 
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
@@ -811,7 +811,7 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier.run(executor, cancelToken, factory);
+    auto future = applier.run(executor, executor, cancelToken, factory);
     ASSERT_OK(future.getNoThrow());
 
     // The in-memory metrics should show the 5 ops above + the final oplog entry, but on disk should

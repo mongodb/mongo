@@ -111,11 +111,20 @@ SemiFuture<void> ReshardingOplogApplier::_applyBatch(
         .semi();
 }
 
-SemiFuture<void> ReshardingOplogApplier::run(std::shared_ptr<executor::TaskExecutor> executor,
-                                             CancellationToken cancelToken,
-                                             CancelableOperationContextFactory factory) {
-    return AsyncTry([this, executor, cancelToken, factory] {
-               return _oplogIter->getNextBatch(executor, cancelToken, factory)
+SemiFuture<void> ReshardingOplogApplier::run(
+    std::shared_ptr<executor::TaskExecutor> executor,
+    std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
+    CancellationToken cancelToken,
+    CancelableOperationContextFactory factory) {
+    struct ChainContext {
+        std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIter;
+    };
+
+    auto chainCtx = std::make_shared<ChainContext>();
+    chainCtx->oplogIter = std::move(_oplogIter);
+
+    return AsyncTry([this, chainCtx, executor, cancelToken, factory] {
+               return chainCtx->oplogIter->getNextBatch(executor, cancelToken, factory)
                    .thenRunOn(executor)
                    .then([this, executor, cancelToken, factory](OplogBatch batch) {
                        LOGV2_DEBUG(5391002, 3, "Starting batch", "batchSize"_attr = batch.size());
@@ -141,11 +150,26 @@ SemiFuture<void> ReshardingOplogApplier::run(std::shared_ptr<executor::TaskExecu
         })
         .on(executor, cancelToken)
         .ignoreValue()
-        // There isn't a guarantee that the reference count to `executor` has been decremented after
-        // .on() returns. We schedule a trivial task on the task executor to ensure the callback's
-        // destructor has run. Otherwise `executor` could end up outliving the ServiceContext and
-        // triggering an invariant due to the task executor's thread having a Client still.
-        .onCompletion([](auto x) { return x; })
+        .thenRunOn(std::move(cleanupExecutor))
+        // It is unsafe to capture `this` once the task is running on the cleanupExecutor because
+        // RecipientStateMachine, along with its ReshardingOplogApplier member, may have already
+        // been destructed.
+        .onCompletion([chainCtx](Status status) {
+            if (chainCtx->oplogIter) {
+                // Use a separate Client to make a better effort of calling dispose() even when the
+                // CancellationToken has been canceled.
+                auto client =
+                    cc().getServiceContext()->makeClient("ReshardingOplogApplierCleanupClient");
+
+                AlternativeClientRegion acr(client);
+                auto opCtx = cc().makeOperationContext();
+
+                chainCtx->oplogIter->dispose(opCtx.get());
+                chainCtx->oplogIter.reset();
+            }
+
+            return status;
+        })
         .semi();
 }
 

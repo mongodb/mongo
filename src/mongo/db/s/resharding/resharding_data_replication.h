@@ -235,6 +235,7 @@ private:
 
     std::vector<SharedSemiFuture<void>> _runOplogAppliers(
         std::shared_ptr<executor::TaskExecutor> executor,
+        std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
         CancelableOperationContextFactory opCtxFactory);
 
