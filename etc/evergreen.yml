@@ -780,7 +780,7 @@ functions:
   "update task timeout": &update_task_timeout
     command: timeout.update
     params:
-      exec_timeout_secs: ${timeout_secs}
+      exec_timeout_secs: ${exec_timeout_secs}
 
   ### Set expansion macros used in each task.
   ### Note that this function will override task expansions set in update_bypass_expansions
@@ -3026,6 +3026,7 @@ tasks:
   - func: "do benchmark setup"
   - func: "run tests"
     vars:
+      exec_timeout_secs: 10800  # 3 hour timeout.
       resmoke_args: --suites=benchmarks
       resmoke_jobs_max: 1
   - func: "send benchmark results"
