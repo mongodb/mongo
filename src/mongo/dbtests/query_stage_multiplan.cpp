@@ -424,12 +424,12 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
 
     // We should have picked the index intersection plan due to forcing ixisect.
     auto soln = static_cast<const MultiPlanStage*>(mps.get())->bestSolution();
-    ASSERT(
-        QueryPlannerTestLib::solutionMatches("{sort: {pattern: {b: 1}, limit: 0, node:"
-                                             "{fetch: {node: {andSorted: {nodes: ["
-                                             "{ixscan: {filter: null, pattern: {a:1}}},"
-                                             "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
-                                             soln->root()));
+    ASSERT(QueryPlannerTestLib::solutionMatches("{sort: {pattern: {b: 1}, limit: 0, node:"
+                                                "{fetch: {node: {andSorted: {nodes: ["
+                                                "{ixscan: {filter: null, pattern: {a:1}}},"
+                                                "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
+                                                soln->root())
+               .isOK());
 
     // Get the resulting document.
     PlanStage::StageState state = PlanStage::NEED_TIME;
@@ -448,12 +448,12 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     // and the winning plan should still be the index intersection one.
     ASSERT(!mps->hasBackupPlan());
     soln = static_cast<const MultiPlanStage*>(mps.get())->bestSolution();
-    ASSERT(
-        QueryPlannerTestLib::solutionMatches("{sort: {pattern: {b: 1}, limit: 0, node:"
-                                             "{fetch: {node: {andSorted: {nodes: ["
-                                             "{ixscan: {filter: null, pattern: {a:1}}},"
-                                             "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
-                                             soln->root()));
+    ASSERT(QueryPlannerTestLib::solutionMatches("{sort: {pattern: {b: 1}, limit: 0, node:"
+                                                "{fetch: {node: {andSorted: {nodes: ["
+                                                "{ixscan: {filter: null, pattern: {a:1}}},"
+                                                "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
+                                                soln->root())
+               .isOK());
 
     // Restore index intersection force parameter.
     internalQueryForceIntersectionPlans.store(forceIxisectOldValue);

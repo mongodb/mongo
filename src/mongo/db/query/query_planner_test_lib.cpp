@@ -58,11 +58,11 @@ using namespace mongo;
 using std::string;
 
 
-bool filterMatches(const BSONObj& testFilter,
-                   const BSONObj& testCollation,
-                   const QuerySolutionNode* trueFilterNode) {
+Status filterMatches(const BSONObj& testFilter,
+                     const BSONObj& testCollation,
+                     const QuerySolutionNode* trueFilterNode) {
     if (nullptr == trueFilterNode->filter) {
-        return false;
+        return {ErrorCodes::Error{5619210}, "No filter found in query solution node"};
     }
 
     std::unique_ptr<CollatorInterface> testCollator;
@@ -70,7 +70,8 @@ bool filterMatches(const BSONObj& testFilter,
         CollatorFactoryMock collatorFactoryMock;
         auto collator = collatorFactoryMock.makeFromBSON(testCollation);
         if (!collator.isOK()) {
-            return false;
+            return collator.getStatus().withContext(
+                "collation provided by the test did not parse successfully");
         }
         testCollator = std::move(collator.getValue());
     }
@@ -79,13 +80,20 @@ bool filterMatches(const BSONObj& testFilter,
     expCtx->setCollator(std::move(testCollator));
     StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(testFilter, expCtx);
     if (!statusWithMatcher.isOK()) {
-        return false;
+        return statusWithMatcher.getStatus().withContext(
+            "match expression provided by the test did not parse successfully");
     }
     const std::unique_ptr<MatchExpression> root = std::move(statusWithMatcher.getValue());
     MatchExpression::sortTree(root.get());
     std::unique_ptr<MatchExpression> trueFilter(trueFilterNode->filter->shallowClone());
     MatchExpression::sortTree(trueFilter.get());
-    return trueFilter->equivalent(root.get());
+    if (trueFilter->equivalent(root.get())) {
+        return Status::OK();
+    }
+    return {
+        ErrorCodes::Error{5619211},
+        str::stream() << "Provided filter did not match filter on query solution node. Expected: "
+                      << root->toString() << ". Found: " << trueFilter->toString()};
 }
 
 void appendIntervalBound(BSONObjBuilder& bob, BSONElement& el) {
@@ -103,33 +111,47 @@ void appendIntervalBound(BSONObjBuilder& bob, BSONElement& el) {
     }
 }
 
-bool intervalMatches(const BSONObj& testInt, const Interval trueInt) {
+Status intervalMatches(const BSONObj& testInt, const Interval trueInt) {
     BSONObjIterator it(testInt);
     if (!it.more()) {
-        return false;
+        return {ErrorCodes::Error{5619212},
+                "Interval has no elements, expected 4 (start, end, inclusiveStart, inclusiveEnd)"};
     }
     BSONElement low = it.next();
     if (!it.more()) {
-        return false;
+        return {
+            ErrorCodes::Error{5619213},
+            "Interval has only 1 element, expected 4 (start, end, inclusiveStart, inclusiveEnd)"};
     }
     BSONElement high = it.next();
     if (!it.more()) {
-        return false;
+        return {
+            ErrorCodes::Error{5619214},
+            "Interval has only 2 elements, expected 4 (start, end, inclusiveStart, inclusiveEnd)"};
     }
     bool startInclusive = it.next().Bool();
     if (!it.more()) {
-        return false;
+        return {
+            ErrorCodes::Error{5619215},
+            "Interval has only 3 elements, expected 4 (start, end, inclusiveStart, inclusiveEnd)"};
     }
     bool endInclusive = it.next().Bool();
     if (it.more()) {
-        return false;
+        return {ErrorCodes::Error{5619216},
+                "Interval has >4 elements, expected exactly 4: (start, end, inclusiveStart, "
+                "inclusiveEnd)"};
     }
 
     BSONObjBuilder bob;
     appendIntervalBound(bob, low);
     appendIntervalBound(bob, high);
     Interval toCompare(bob.obj(), startInclusive, endInclusive);
-    return trueInt.equals(toCompare);
+    if (trueInt.equals(toCompare)) {
+        return Status::OK();
+    }
+    return {ErrorCodes::Error{5619217},
+            str::stream() << "provided interval did not match. Expected: " << toCompare.toString()
+                          << " Found: " << trueInt.toString()};
 }
 
 bool bsonObjFieldsAreInSet(BSONObj obj, const std::set<std::string>& allowedFields) {
@@ -157,12 +179,15 @@ namespace mongo {
  * true as long as the set of subtrees in testSoln's 'nodes' matches
  * the set of subtrees in trueSoln's 'children' vector.
  */
-static bool childrenMatch(const BSONObj& testSoln,
-                          const QuerySolutionNode* trueSoln,
-                          bool relaxBoundsCheck) {
+static Status childrenMatch(const BSONObj& testSoln,
+                            const QuerySolutionNode* trueSoln,
+                            bool relaxBoundsCheck) {
+
     BSONElement children = testSoln["nodes"];
     if (children.eoo() || !children.isABSONObj()) {
-        return false;
+        return {ErrorCodes::Error{5619218},
+                "found a stage in the solution which was expected to have 'nodes' children, but no "
+                "'nodes' object in the provided JSON"};
     }
 
     // The order of the children array in testSoln might not match
@@ -173,9 +198,14 @@ static bool childrenMatch(const BSONObj& testSoln,
     while (i.more()) {
         BSONElement child = i.next();
         if (child.eoo() || !child.isABSONObj()) {
-            return false;
+            return {
+                ErrorCodes::Error{5619219},
+                str::stream() << "found a child which was expected to be an object but was not: "
+                              << child};
         }
 
+        LOGV2_DEBUG(
+            5619201, 2, "Attempting to find matching child for {plan}", "plan"_attr = child.Obj());
         // try to match against one of the QuerySolutionNode's children
         bool found = false;
         for (size_t j = 0; j < trueSoln->children.size(); ++j) {
@@ -183,68 +213,97 @@ static bool childrenMatch(const BSONObj& testSoln,
                 // Do not match a child of the QuerySolutionNode more than once.
                 continue;
             }
-            if (QueryPlannerTestLib::solutionMatches(
-                    child.Obj(), trueSoln->children[j], relaxBoundsCheck)) {
+            auto matchStatus = QueryPlannerTestLib::solutionMatches(
+                child.Obj(), trueSoln->children[j], relaxBoundsCheck);
+            if (matchStatus.isOK()) {
+                LOGV2_DEBUG(5619202, 2, "Found a matching child");
                 found = true;
                 matchedNodeIndexes.insert(j);
                 break;
             }
+            LOGV2_DEBUG(5619203,
+                        2,
+                        "Child at index {j} did not match test solution: {reason}",
+                        "j"_attr = j,
+                        "reason"_attr = matchStatus.reason());
         }
 
         // we couldn't match child
         if (!found) {
-            return false;
+            return {ErrorCodes::Error{5619220},
+                    str::stream() << "could not find a matching plan for child: " << child};
         }
     }
 
     // Ensure we've matched all children of the QuerySolutionNode.
-    return matchedNodeIndexes.size() == trueSoln->children.size();
+    if (matchedNodeIndexes.size() == trueSoln->children.size()) {
+        return Status::OK();
+    }
+    return {ErrorCodes::Error{5619221},
+            str::stream() << "Did not match the correct number of children. Found "
+                          << matchedNodeIndexes.size() << " matching children but "
+                          << trueSoln->children.size() << " children in the observed plan"};
 }
 
-bool QueryPlannerTestLib::boundsMatch(const BSONObj& testBounds,
-                                      const IndexBounds trueBounds,
-                                      bool relaxBoundsCheck) {
+Status QueryPlannerTestLib::boundsMatch(const BSONObj& testBounds,
+                                        const IndexBounds trueBounds,
+                                        bool relaxBoundsCheck) {
     // Iterate over the fields on which we have index bounds.
     BSONObjIterator fieldIt(testBounds);
     size_t fieldItCount = 0;
     while (fieldIt.more()) {
         BSONElement arrEl = fieldIt.next();
         if (arrEl.fieldNameStringData() != trueBounds.getFieldName(fieldItCount)) {
-            return false;
+            return {ErrorCodes::Error{5619222},
+                    str::stream() << "mismatching field name at index " << fieldItCount
+                                  << ": expected '" << arrEl.fieldNameStringData()
+                                  << "' but found '" << trueBounds.getFieldName(fieldItCount)
+                                  << "'"};
         }
         if (arrEl.type() != Array) {
-            return false;
+            return {ErrorCodes::Error{5619223},
+                    str::stream() << "bounds are expected to be arrays. Found: " << arrEl
+                                  << " (type " << arrEl.type() << ")"};
         }
-        // Iterate over an ordered interval list for
-        // a particular field.
+        // Iterate over an ordered interval list for a particular field.
         BSONObjIterator oilIt(arrEl.Obj());
         size_t oilItCount = 0;
         while (oilIt.more()) {
             BSONElement intervalEl = oilIt.next();
             if (intervalEl.type() != Array) {
-                return false;
+                return {ErrorCodes::Error{5619224},
+                        str::stream()
+                            << "intervals within bounds are expected to be arrays. Found: "
+                            << intervalEl << " (type " << intervalEl.type() << ")"};
             }
             Interval trueInt = trueBounds.getInterval(fieldItCount, oilItCount);
-            if (!intervalMatches(intervalEl.Obj(), trueInt)) {
-                return false;
+            if (auto matchStatus = intervalMatches(intervalEl.Obj(), trueInt);
+                !matchStatus.isOK()) {
+                return matchStatus.withContext(
+                    str::stream() << "mismatching interval found at index " << oilItCount
+                                  << " within the bounds at index " << fieldItCount);
             }
             ++oilItCount;
         }
 
         if (!relaxBoundsCheck && oilItCount != trueBounds.getNumIntervals(fieldItCount)) {
-            return false;
+            return {
+                ErrorCodes::Error{5619225},
+                str::stream() << "true bounds have more intervals than provided (bounds at index "
+                              << fieldItCount << "). Expected: " << oilItCount
+                              << " Found: " << trueBounds.getNumIntervals(fieldItCount)};
         }
 
         ++fieldItCount;
     }
 
-    return true;
+    return Status::OK();
 }
 
 // static
-bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
-                                          const QuerySolutionNode* trueSoln,
-                                          bool relaxBoundsCheck) {
+Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
+                                            const QuerySolutionNode* trueSoln,
+                                            bool relaxBoundsCheck) {
     //
     // leaf nodes
     //
@@ -252,42 +311,67 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(trueSoln);
         BSONElement el = testSoln["cscan"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619226},
+                    "found a collection scan in the solution but no corresponding 'cscan' object "
+                    "in the provided JSON"};
         }
         BSONObj csObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(csObj, {"dir", "filter", "collation"}));
 
         BSONElement dir = csObj["dir"];
         if (dir.eoo() || !dir.isNumber()) {
-            return false;
+            return {ErrorCodes::Error{5619227},
+                    "found a collection scan in the solution but no numeric 'dir' in the provided "
+                    "JSON"};
         }
         if (dir.numberInt() != csn->direction) {
-            return false;
+            return {ErrorCodes::Error{5619228},
+                    str::stream() << "Solution does not match: found a collection scan in "
+                                     "the solution but in the wrong direction. Found "
+                                  << csn->direction << " but was expecting " << dir.numberInt()};
         }
 
         BSONElement filter = csObj["filter"];
         if (filter.eoo()) {
-            return true;
+            LOGV2(3155103,
+                  "Found a collection scan which was expected. No filter provided to check");
+            return Status::OK();
         } else if (filter.isNull()) {
-            return nullptr == csn->filter;
+            if (csn->filter == nullptr) {
+                return Status::OK();
+            }
+            return {
+                ErrorCodes::Error{5619209},
+                str::stream() << "Expected a collection scan without a filter, but found a filter: "
+                              << csn->filter->toString()};
         } else if (!filter.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619229},
+                    str::stream() << "Provided JSON gave a 'cscan' with a 'filter', but the filter "
+                                     "was not an object."
+                                  << filter};
         }
 
         BSONObj collation;
         if (BSONElement collationElt = csObj["collation"]) {
             if (!collationElt.isABSONObj()) {
-                return false;
+                return {ErrorCodes::Error{5619230},
+                        str::stream()
+                            << "Provided JSON gave a 'cscan' with a 'collation', but the collation "
+                               "was not an object:"
+                            << collationElt};
             }
             collation = collationElt.Obj();
         }
 
-        return filterMatches(filter.Obj(), collation, trueSoln);
+        return filterMatches(filter.Obj(), collation, trueSoln)
+            .withContext("mismatching 'filter' for 'cscan' node");
     } else if (STAGE_IXSCAN == trueSoln->getType()) {
         const IndexScanNode* ixn = static_cast<const IndexScanNode*>(trueSoln);
         BSONElement el = testSoln["ixscan"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619231},
+                    "found an index scan in the solution but no corresponding 'ixscan' object in "
+                    "the provided JSON"};
         }
         BSONObj ixscanObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(
@@ -296,103 +380,169 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONElement pattern = ixscanObj["pattern"];
         if (!pattern.eoo()) {
             if (!pattern.isABSONObj()) {
-                return false;
+                return {ErrorCodes::Error{5619232},
+                        str::stream()
+                            << "Provided JSON gave a 'ixscan' with a 'pattern', but the pattern "
+                               "was not an object: "
+                            << pattern};
             }
             if (SimpleBSONObjComparator::kInstance.evaluate(pattern.Obj() !=
                                                             ixn->index.keyPattern)) {
-                return false;
+                return {ErrorCodes::Error{5619233},
+                        str::stream() << "Provided JSON gave a 'ixscan' with a 'pattern' which did "
+                                         "not match. Expected: "
+                                      << pattern.Obj() << " Found: " << ixn->index.keyPattern};
             }
         }
 
         BSONElement name = ixscanObj["name"];
         if (!name.eoo()) {
             if (name.type() != BSONType::String) {
-                return false;
+                return {ErrorCodes::Error{5619234},
+                        str::stream()
+                            << "Provided JSON gave a 'ixscan' with a 'name', but the name "
+                               "was not an string: "
+                            << name};
             }
             if (name.valueStringData() != ixn->index.identifier.catalogName) {
-                return false;
+                return {ErrorCodes::Error{5619235},
+                        str::stream() << "Provided JSON gave a 'ixscan' with a 'name' which did "
+                                         "not match. Expected: "
+                                      << name << " Found: " << ixn->index.identifier.catalogName};
             }
         }
 
         if (name.eoo() && pattern.eoo()) {
-            return false;
+            return {ErrorCodes::Error{5619236},
+                    "Provided JSON gave a 'ixscan' without a 'name' or a 'pattern.'"};
         }
 
         BSONElement bounds = ixscanObj["bounds"];
         if (!bounds.eoo()) {
             if (!bounds.isABSONObj()) {
-                return false;
-            } else if (!boundsMatch(bounds.Obj(), ixn->bounds, relaxBoundsCheck)) {
-                return false;
+                return {ErrorCodes::Error{5619237},
+                        str::stream()
+                            << "Provided JSON gave a 'ixscan' with a 'bounds', but the bounds "
+                               "was not an object: "
+                            << bounds};
+            } else if (auto boundsStatus = boundsMatch(bounds.Obj(), ixn->bounds, relaxBoundsCheck);
+                       !boundsStatus.isOK()) {
+                return boundsStatus.withContext(
+                    "Provided JSON gave a 'ixscan' with 'bounds' which did not match");
             }
         }
 
         BSONElement dir = ixscanObj["dir"];
-        if (!dir.eoo() && NumberInt == dir.type()) {
+        if (!dir.eoo() && dir.isNumber()) {
             if (dir.numberInt() != ixn->direction) {
-                return false;
+                return {ErrorCodes::Error{5619238},
+                        str::stream()
+                            << "Solution does not match: found an index scan in "
+                               "the solution but in the wrong direction. Found "
+                            << ixn->direction << " but was expecting " << dir.numberInt()};
             }
         }
 
         BSONElement filter = ixscanObj["filter"];
         if (filter.eoo()) {
-            return true;
+            return Status::OK();
         } else if (filter.isNull()) {
-            return nullptr == ixn->filter;
+            if (ixn->filter == nullptr) {
+                return Status::OK();
+            }
+            return {ErrorCodes::Error{5619239},
+                    str::stream() << "Expected an index scan without a filter, but found a filter: "
+                                  << ixn->filter->toString()};
         } else if (!filter.isABSONObj()) {
-            return false;
+            return {
+                ErrorCodes::Error{5619240},
+                str::stream() << "Provided JSON gave an 'ixscan' with a 'filter', but the filter "
+                                 "was not an object: "
+                              << filter};
         }
 
         BSONObj collation;
         if (BSONElement collationElt = ixscanObj["collation"]) {
             if (!collationElt.isABSONObj()) {
-                return false;
+                return {
+                    ErrorCodes::Error{5619241},
+                    str::stream()
+                        << "Provided JSON gave an 'ixscan' with a 'collation', but the collation "
+                           "was not an object:"
+                        << collationElt};
             }
             collation = collationElt.Obj();
         }
 
-        return filterMatches(filter.Obj(), collation, trueSoln);
+        return filterMatches(filter.Obj(), collation, trueSoln)
+            .withContext("mismatching 'filter' for 'ixscan' node");
     } else if (STAGE_GEO_NEAR_2D == trueSoln->getType()) {
         const GeoNear2DNode* node = static_cast<const GeoNear2DNode*>(trueSoln);
         BSONElement el = testSoln["geoNear2d"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619242},
+                    "found a geoNear2d stage in the solution but no "
+                    "corresponding 'geoNear2d' object in the provided JSON"};
         }
         BSONObj geoObj = el.Obj();
-        return SimpleBSONObjComparator::kInstance.evaluate(geoObj == node->index.keyPattern);
+        if (SimpleBSONObjComparator::kInstance.evaluate(geoObj == node->index.keyPattern)) {
+            return Status::OK();
+        }
+        return {
+            ErrorCodes::Error{5619243},
+            str::stream()
+                << "found a geoNear2d stage in the solution with mismatching keyPattern. Expected: "
+                << geoObj << " Found: " << node->index.keyPattern};
     } else if (STAGE_GEO_NEAR_2DSPHERE == trueSoln->getType()) {
         const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(trueSoln);
         BSONElement el = testSoln["geoNear2dsphere"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619244},
+                    "found a geoNear2dsphere stage in the solution but no "
+                    "corresponding 'geoNear2dsphere' object in the provided JSON"};
         }
         BSONObj geoObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(geoObj, {"pattern", "bounds"}));
 
         BSONElement pattern = geoObj["pattern"];
         if (pattern.eoo() || !pattern.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619245},
+                    "found a geoNear2dsphere stage in the solution but no 'pattern' object "
+                    "in the provided JSON"};
         }
         if (SimpleBSONObjComparator::kInstance.evaluate(pattern.Obj() != node->index.keyPattern)) {
-            return false;
+            return {ErrorCodes::Error{5619246},
+                    str::stream() << "found a geoNear2dsphere stage in the solution with "
+                                     "mismatching keyPattern. Expected: "
+                                  << pattern.Obj() << " Found: " << node->index.keyPattern};
         }
 
         BSONElement bounds = geoObj["bounds"];
         if (!bounds.eoo()) {
             if (!bounds.isABSONObj()) {
-                return false;
-            } else if (!boundsMatch(bounds.Obj(), node->baseBounds, relaxBoundsCheck)) {
-                return false;
+                return {
+                    ErrorCodes::Error{5619247},
+                    str::stream()
+                        << "Provided JSON gave a 'geoNear2dsphere' with a 'bounds', but the bounds "
+                           "was not an object: "
+                        << bounds};
+            } else if (auto boundsStatus =
+                           boundsMatch(bounds.Obj(), node->baseBounds, relaxBoundsCheck);
+                       !boundsStatus.isOK()) {
+                return boundsStatus.withContext(
+                    "Provided JSON gave a 'geoNear2dsphere' with 'bounds' which did not match");
             }
         }
 
-        return true;
+        return Status::OK();
     } else if (STAGE_TEXT_MATCH == trueSoln->getType()) {
         // {text: {search: "somestr", language: "something", filter: {blah: 1}}}
         const TextMatchNode* node = static_cast<const TextMatchNode*>(trueSoln);
         BSONElement el = testSoln["text"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619248},
+                    "found a text stage in the solution but no "
+                    "corresponding 'text' object in the provided JSON"};
         }
         BSONObj textObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(textObj,
@@ -408,46 +558,72 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONElement searchElt = textObj["search"];
         if (!searchElt.eoo()) {
             if (searchElt.String() != node->ftsQuery->getQuery()) {
-                return false;
+                return {ErrorCodes::Error{5619249},
+                        str::stream()
+                            << "found a text stage in the solution with "
+                               "mismatching 'search'. Expected: "
+                            << searchElt.String() << " Found: " << node->ftsQuery->getQuery()};
             }
         }
 
         BSONElement languageElt = textObj["language"];
         if (!languageElt.eoo()) {
             if (languageElt.String() != node->ftsQuery->getLanguage()) {
-                return false;
+                return {ErrorCodes::Error{5619250},
+                        str::stream()
+                            << "found a text stage in the solution with "
+                               "mismatching 'language'. Expected: "
+                            << languageElt.String() << " Found: " << node->ftsQuery->getLanguage()};
             }
         }
 
         BSONElement caseSensitiveElt = textObj["caseSensitive"];
         if (!caseSensitiveElt.eoo()) {
             if (caseSensitiveElt.trueValue() != node->ftsQuery->getCaseSensitive()) {
-                return false;
+                return {ErrorCodes::Error{5619251},
+                        str::stream() << "found a text stage in the solution with "
+                                         "mismatching 'caseSensitive'. Expected: "
+                                      << caseSensitiveElt.trueValue()
+                                      << " Found: " << node->ftsQuery->getCaseSensitive()};
             }
         }
 
         BSONElement diacriticSensitiveElt = textObj["diacriticSensitive"];
         if (!diacriticSensitiveElt.eoo()) {
             if (diacriticSensitiveElt.trueValue() != node->ftsQuery->getDiacriticSensitive()) {
-                return false;
+                return {ErrorCodes::Error{5619252},
+                        str::stream() << "found a text stage in the solution with "
+                                         "mismatching 'diacriticSensitive'. Expected: "
+                                      << diacriticSensitiveElt.trueValue()
+                                      << " Found: " << node->ftsQuery->getDiacriticSensitive()};
             }
         }
 
         BSONElement indexPrefix = textObj["prefix"];
         if (!indexPrefix.eoo()) {
             if (!indexPrefix.isABSONObj()) {
-                return false;
+                return {ErrorCodes::Error{5619253},
+                        str::stream()
+                            << "Provided JSON gave a 'text' with a 'prefix', but the prefix "
+                               "was not an object: "
+                            << indexPrefix};
             }
 
             if (0 != indexPrefix.Obj().woCompare(node->indexPrefix)) {
-                return false;
+                return {ErrorCodes::Error{5619254},
+                        str::stream() << "found a text stage in the solution with "
+                                         "mismatching 'prefix'. Expected: "
+                                      << indexPrefix.Obj() << " Found: " << node->indexPrefix};
             }
         }
 
         BSONObj collation;
         if (BSONElement collationElt = textObj["collation"]) {
             if (!collationElt.isABSONObj()) {
-                return false;
+                return {ErrorCodes::Error{5619255},
+                        str::stream() << "Provided JSON gave a 'text' stage with a 'collation', "
+                                         "but the collation was not an object:"
+                                      << collationElt};
             }
             collation = collationElt.Obj();
         }
@@ -456,16 +632,24 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         if (!filter.eoo()) {
             if (filter.isNull()) {
                 if (nullptr != node->filter) {
-                    return false;
+                    return {ErrorCodes::Error{5619256},
+                            str::stream()
+                                << "Expected a text stage without a filter, but found a filter: "
+                                << node->filter->toString()};
                 }
             } else if (!filter.isABSONObj()) {
-                return false;
-            } else if (!filterMatches(filter.Obj(), collation, trueSoln)) {
-                return false;
+                return {ErrorCodes::Error{5619257},
+                        str::stream()
+                            << "Provided JSON gave a 'text' stage with a 'filter', but the filter "
+                               "was not an object."
+                            << filter};
+            } else {
+                return filterMatches(filter.Obj(), collation, trueSoln)
+                    .withContext("mismatching 'filter' for 'text' node");
             }
         }
 
-        return true;
+        return Status::OK();
     }
 
     //
@@ -476,7 +660,9 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
 
         BSONElement el = testSoln["fetch"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619258},
+                    "found a fetch in the solution but no corresponding 'fetch' object in "
+                    "the provided JSON"};
         }
         BSONObj fetchObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(fetchObj, {"collation", "filter", "node"}));
@@ -484,7 +670,11 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONObj collation;
         if (BSONElement collationElt = fetchObj["collation"]) {
             if (!collationElt.isABSONObj()) {
-                return false;
+                return {ErrorCodes::Error{5619259},
+                        str::stream()
+                            << "Provided JSON gave a 'fetch' with a 'collation', but the collation "
+                               "was not an object:"
+                            << collationElt};
             }
             collation = collationElt.Obj();
         }
@@ -493,33 +683,48 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         if (!filter.eoo()) {
             if (filter.isNull()) {
                 if (nullptr != fn->filter) {
-                    return false;
+                    return {ErrorCodes::Error{5619260},
+                            str::stream()
+                                << "Expected a fetch stage without a filter, but found a filter: "
+                                << fn->filter->toString()};
                 }
             } else if (!filter.isABSONObj()) {
-                return false;
-            } else if (!filterMatches(filter.Obj(), collation, trueSoln)) {
-                return false;
+                return {ErrorCodes::Error{5619261},
+                        str::stream()
+                            << "Provided JSON gave a 'fetch' stage with a 'filter', but the filter "
+                               "was not an object."
+                            << filter};
+            } else if (auto filterStatus = filterMatches(filter.Obj(), collation, trueSoln);
+                       !filterStatus.isOK()) {
+                return filterStatus.withContext("mismatching 'filter' for 'fetch' node");
             }
         }
 
         BSONElement child = fetchObj["node"];
         if (child.eoo() || !child.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619262},
+                    "found a fetch stage in the solution but no 'node' sub-object in the provided "
+                    "JSON"};
         }
-        return solutionMatches(child.Obj(), fn->children[0], relaxBoundsCheck);
+        return solutionMatches(child.Obj(), fn->children[0], relaxBoundsCheck)
+            .withContext("mismatch beneath fetch node");
     } else if (STAGE_OR == trueSoln->getType()) {
         const OrNode* orn = static_cast<const OrNode*>(trueSoln);
         BSONElement el = testSoln["or"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619263},
+                    "found an OR stage in the solution but no "
+                    "corresponding 'or' object in the provided JSON"};
         }
         BSONObj orObj = el.Obj();
-        return childrenMatch(orObj, orn, relaxBoundsCheck);
+        return childrenMatch(orObj, orn, relaxBoundsCheck).withContext("mismatch beneath or node");
     } else if (STAGE_AND_HASH == trueSoln->getType()) {
         const AndHashNode* ahn = static_cast<const AndHashNode*>(trueSoln);
         BSONElement el = testSoln["andHash"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619264},
+                    "found an AND_HASH stage in the solution but no "
+                    "corresponding 'andHash' object in the provided JSON"};
         }
         BSONObj andHashObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(andHashObj, {"collation", "filter", "nodes"}));
@@ -527,7 +732,11 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONObj collation;
         if (BSONElement collationElt = andHashObj["collation"]) {
             if (!collationElt.isABSONObj()) {
-                return false;
+                return {ErrorCodes::Error{5619265},
+                        str::stream()
+                            << "Provided JSON gave an 'andHash' stage with a 'collation', "
+                               "but the collation was not an object:"
+                            << collationElt};
             }
             collation = collationElt.Obj();
         }
@@ -536,21 +745,34 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         if (!filter.eoo()) {
             if (filter.isNull()) {
                 if (nullptr != ahn->filter) {
-                    return false;
+                    return {
+                        ErrorCodes::Error{5619266},
+                        str::stream()
+                            << "Expected an AND_HASH stage without a filter, but found a filter: "
+                            << ahn->filter->toString()};
                 }
             } else if (!filter.isABSONObj()) {
-                return false;
-            } else if (!filterMatches(filter.Obj(), collation, trueSoln)) {
-                return false;
+                return {
+                    ErrorCodes::Error{5619267},
+                    str::stream()
+                        << "Provided JSON gave an AND_HASH stage with a 'filter', but the filter "
+                           "was not an object."
+                        << filter};
+            } else if (auto matchStatus = filterMatches(filter.Obj(), collation, trueSoln);
+                       !matchStatus.isOK()) {
+                return matchStatus.withContext("mismatching 'filter' for AND_HASH node");
             }
         }
 
-        return childrenMatch(andHashObj, ahn, relaxBoundsCheck);
+        return childrenMatch(andHashObj, ahn, relaxBoundsCheck)
+            .withContext("mismatching children beneath AND_HASH node");
     } else if (STAGE_AND_SORTED == trueSoln->getType()) {
         const AndSortedNode* asn = static_cast<const AndSortedNode*>(trueSoln);
         BSONElement el = testSoln["andSorted"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619268},
+                    "found an AND_SORTED stage in the solution but no "
+                    "corresponding 'andSorted' object in the provided JSON"};
         }
         BSONObj andSortedObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(andSortedObj, {"collation", "filter", "nodes"}));
@@ -558,7 +780,11 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONObj collation;
         if (BSONElement collationElt = andSortedObj["collation"]) {
             if (!collationElt.isABSONObj()) {
-                return false;
+                return {ErrorCodes::Error{5619269},
+                        str::stream()
+                            << "Provided JSON gave an 'andSorted' stage with a 'collation', "
+                               "but the collation was not an object:"
+                            << collationElt};
             }
             collation = collationElt.Obj();
         }
@@ -567,22 +793,35 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         if (!filter.eoo()) {
             if (filter.isNull()) {
                 if (nullptr != asn->filter) {
-                    return false;
+                    return {
+                        ErrorCodes::Error{5619270},
+                        str::stream()
+                            << "Expected an AND_SORTED stage without a filter, but found a filter: "
+                            << asn->filter->toString()};
                 }
             } else if (!filter.isABSONObj()) {
-                return false;
-            } else if (!filterMatches(filter.Obj(), collation, trueSoln)) {
-                return false;
+                return {
+                    ErrorCodes::Error{5619271},
+                    str::stream()
+                        << "Provided JSON gave an AND_SORTED stage with a 'filter', but the filter "
+                           "was not an object."
+                        << filter};
+            } else if (auto matchStatus = filterMatches(filter.Obj(), collation, trueSoln);
+                       !matchStatus.isOK()) {
+                return matchStatus.withContext("mismatching 'filter' for AND_SORTED node");
             }
         }
 
-        return childrenMatch(andSortedObj, asn, relaxBoundsCheck);
+        return childrenMatch(andSortedObj, asn, relaxBoundsCheck)
+            .withContext("mismatching children beneath AND_SORTED node");
     } else if (isProjectionStageType(trueSoln->getType())) {
         const ProjectionNode* pn = static_cast<const ProjectionNode*>(trueSoln);
 
         BSONElement el = testSoln["proj"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619272},
+                    "found a projection stage in the solution but no "
+                    "corresponding 'proj' object in the provided JSON"};
         }
         BSONObj projObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(projObj, {"type", "spec", "node"}));
@@ -593,15 +832,24 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
             switch (pn->getType()) {
                 case StageType::STAGE_PROJECTION_DEFAULT:
                     if (projTypeStr != "default")
-                        return false;
+                        return {ErrorCodes::Error{5619273},
+                                str::stream() << "found a projection stage in the solution with "
+                                                 "mismatching 'type'. Expected: "
+                                              << projTypeStr << " Found: 'default'"};
                     break;
                 case StageType::STAGE_PROJECTION_COVERED:
                     if (projTypeStr != "coveredIndex")
-                        return false;
+                        return {ErrorCodes::Error{5619274},
+                                str::stream() << "found a projection stage in the solution with "
+                                                 "mismatching 'type'. Expected: "
+                                              << projTypeStr << " Found: 'coveredIndex'"};
                     break;
                 case StageType::STAGE_PROJECTION_SIMPLE:
                     if (projTypeStr != "simple")
-                        return false;
+                        return {ErrorCodes::Error{5619275},
+                                str::stream() << "found a projection stage in the solution with "
+                                                 "mismatching 'type'. Expected: "
+                                              << projTypeStr << " Found: 'simple'"};
                     break;
                 default:
                     MONGO_UNREACHABLE;
@@ -610,11 +858,16 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
 
         BSONElement spec = projObj["spec"];
         if (spec.eoo() || !spec.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619276},
+                    "found a projection stage in the solution but no 'spec' object in the provided "
+                    "JSON"};
         }
         BSONElement child = projObj["node"];
         if (child.eoo() || !child.isABSONObj()) {
-            return false;
+            return {
+                ErrorCodes::Error{5619277},
+                "found a projection stage in the solution but no 'node' sub-object in the provided "
+                "JSON"};
         }
 
         // Create an empty/dummy expression context without access to the operation context and
@@ -625,43 +878,70 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
             projection_ast::parse(expCtx, spec.Obj(), ProjectionPolicies::findProjectionPolicies());
         auto specProjObj = projection_ast::astToDebugBSON(projection.root());
         auto solnProjObj = projection_ast::astToDebugBSON(pn->proj.root());
-        return SimpleBSONObjComparator::kInstance.evaluate(specProjObj == solnProjObj) &&
-            solutionMatches(child.Obj(), pn->children[0], relaxBoundsCheck);
+        if (!SimpleBSONObjComparator::kInstance.evaluate(specProjObj == solnProjObj)) {
+            return {ErrorCodes::Error{5619278},
+                    str::stream() << "found a projection stage in the solution with "
+                                     "mismatching 'spec'. Expected: "
+                                  << specProjObj << " Found: " << solnProjObj};
+        }
+        return solutionMatches(child.Obj(), pn->children[0], relaxBoundsCheck)
+            .withContext("mismatch below projection stage");
     } else if (isSortStageType(trueSoln->getType())) {
         const SortNode* sn = static_cast<const SortNode*>(trueSoln);
         BSONElement el = testSoln["sort"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619279},
+                    "found a sort stage in the solution but no "
+                    "corresponding 'sort' object in the provided JSON"};
         }
         BSONObj sortObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(sortObj, {"pattern", "limit", "type", "node"}));
 
         BSONElement patternEl = sortObj["pattern"];
         if (patternEl.eoo() || !patternEl.isABSONObj()) {
-            return false;
+            return {
+                ErrorCodes::Error{5619280},
+                "found a sort stage in the solution but no 'pattern' object in the provided JSON"};
         }
         BSONElement limitEl = sortObj["limit"];
+        if (limitEl.eoo()) {
+            return {ErrorCodes::Error{5619281},
+                    "found a sort stage in the solution but no 'limit' was provided. Specify '0' "
+                    "for no limit."};
+        }
         if (!limitEl.isNumber()) {
-            return false;
+            return {
+                ErrorCodes::Error{5619282},
+                str::stream() << "found a sort stage in the solution but 'limit' was not numeric: "
+                              << limitEl};
         }
 
         BSONElement sortType = sortObj["type"];
         if (sortType) {
             if (sortType.type() != BSONType::String) {
-                return false;
+                return {ErrorCodes::Error{5619283},
+                        str::stream()
+                            << "found a sort stage in the solution but 'type' was not a string: "
+                            << sortType};
             }
 
             auto sortTypeString = sortType.valueStringData();
             switch (sn->getType()) {
                 case StageType::STAGE_SORT_DEFAULT: {
                     if (sortTypeString != "default") {
-                        return false;
+                        return {ErrorCodes::Error{5619284},
+                                str::stream() << "found a sort stage in the solution with "
+                                                 "mismatching 'type'. Expected: "
+                                              << sortTypeString << " Found: 'default'"};
                     }
                     break;
                 }
                 case StageType::STAGE_SORT_SIMPLE: {
                     if (sortTypeString != "simple") {
-                        return false;
+                        return {ErrorCodes::Error{5619285},
+                                str::stream() << "found a sort stage in the solution with "
+                                                 "mismatching 'type'. Expected: "
+                                              << sortTypeString << " Found: 'simple'"};
                     }
                     break;
                 }
@@ -671,117 +951,180 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
 
         BSONElement child = sortObj["node"];
         if (child.eoo() || !child.isABSONObj()) {
-            return false;
+            return {
+                ErrorCodes::Error{5619286},
+                "found a sort stage in the solution but no 'node' sub-object in the provided JSON"};
         }
 
         size_t expectedLimit = limitEl.numberInt();
-        return SimpleBSONObjComparator::kInstance.evaluate(patternEl.Obj() == sn->pattern) &&
-            (expectedLimit == sn->limit) &&
-            solutionMatches(child.Obj(), sn->children[0], relaxBoundsCheck);
+        if (!SimpleBSONObjComparator::kInstance.evaluate(patternEl.Obj() == sn->pattern)) {
+            return {ErrorCodes::Error{5619287},
+                    str::stream() << "found a sort stage in the solution with "
+                                     "mismatching 'pattern'. Expected: "
+                                  << patternEl << " Found: " << sn->pattern};
+        }
+        if (expectedLimit != sn->limit) {
+            return {ErrorCodes::Error{5619288},
+                    str::stream() << "found a projection stage in the solution with "
+                                     "mismatching 'limit'. Expected: "
+                                  << expectedLimit << " Found: " << sn->limit};
+        }
+        return solutionMatches(child.Obj(), sn->children[0], relaxBoundsCheck)
+            .withContext("mismatch below sort stage");
     } else if (STAGE_SORT_KEY_GENERATOR == trueSoln->getType()) {
         const SortKeyGeneratorNode* keyGenNode = static_cast<const SortKeyGeneratorNode*>(trueSoln);
         BSONElement el = testSoln["sortKeyGen"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619289},
+                    "found a sort key generator stage in the solution but no "
+                    "corresponding 'sortKeyGen' object in the provided JSON"};
         }
         BSONObj keyGenObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(keyGenObj, {"node"}));
 
         BSONElement child = keyGenObj["node"];
         if (child.eoo() || !child.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619290},
+                    "found a sort key generator stage in the solution but no 'node' sub-object in "
+                    "the provided JSON"};
         }
 
-        return solutionMatches(child.Obj(), keyGenNode->children[0], relaxBoundsCheck);
+        return solutionMatches(child.Obj(), keyGenNode->children[0], relaxBoundsCheck)
+            .withContext("mismatch below sortKeyGen");
     } else if (STAGE_SORT_MERGE == trueSoln->getType()) {
         const MergeSortNode* msn = static_cast<const MergeSortNode*>(trueSoln);
         BSONElement el = testSoln["mergeSort"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619291},
+                    "found a merge sort stage in the solution but no "
+                    "corresponding 'mergeSort' object in the provided JSON"};
         }
         BSONObj mergeSortObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(mergeSortObj, {"nodes"}));
-        return childrenMatch(mergeSortObj, msn, relaxBoundsCheck);
+        return childrenMatch(mergeSortObj, msn, relaxBoundsCheck)
+            .withContext("mismatching children below merge sort");
     } else if (STAGE_SKIP == trueSoln->getType()) {
         const SkipNode* sn = static_cast<const SkipNode*>(trueSoln);
         BSONElement el = testSoln["skip"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619292},
+                    "found a skip stage in the solution but no "
+                    "corresponding 'skip' object in the provided JSON"};
         }
         BSONObj skipObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(skipObj, {"n", "node"}));
 
         BSONElement skipEl = skipObj["n"];
         if (!skipEl.isNumber()) {
-            return false;
+            return {ErrorCodes::Error{5619293},
+                    str::stream() << "found a skip stage in the solution but 'n' was not numeric: "
+                                  << skipEl};
         }
         BSONElement child = skipObj["node"];
         if (child.eoo() || !child.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619294},
+                    "found a skip stage in the solution but no 'node' sub-object in "
+                    "the provided JSON"};
         }
 
-        return (skipEl.numberInt() == sn->skip) &&
-            solutionMatches(child.Obj(), sn->children[0], relaxBoundsCheck);
+        if (skipEl.numberInt() != sn->skip) {
+            return {ErrorCodes::Error{5619295},
+                    str::stream() << "found a skip stage in the solution with "
+                                     "mismatching 'n'. Expected: "
+                                  << skipEl.numberInt() << " Found: " << sn->skip};
+        }
+        return solutionMatches(child.Obj(), sn->children[0], relaxBoundsCheck)
+            .withContext("mismatch below skip stage");
     } else if (STAGE_LIMIT == trueSoln->getType()) {
         const LimitNode* ln = static_cast<const LimitNode*>(trueSoln);
         BSONElement el = testSoln["limit"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619296},
+                    "found a limit stage in the solution but no "
+                    "corresponding 'limit' object in the provided JSON"};
         }
         BSONObj limitObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(limitObj, {"n", "node"}));
 
         BSONElement limitEl = limitObj["n"];
         if (!limitEl.isNumber()) {
-            return false;
+            return {ErrorCodes::Error{5619297},
+                    str::stream() << "found a limit stage in the solution but 'n' was not numeric: "
+                                  << limitEl};
         }
         BSONElement child = limitObj["node"];
         if (child.eoo() || !child.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619298},
+                    "found a limit stage in the solution but no 'node' sub-object in "
+                    "the provided JSON"};
         }
 
-        return (limitEl.numberInt() == ln->limit) &&
-            solutionMatches(child.Obj(), ln->children[0], relaxBoundsCheck);
+        if (limitEl.numberInt() != ln->limit) {
+            return {ErrorCodes::Error{5619299},
+                    str::stream() << "found a limit stage in the solution with "
+                                     "mismatching 'n'. Expected: "
+                                  << limitEl.numberInt() << " Found: " << ln->limit};
+        }
+        return solutionMatches(child.Obj(), ln->children[0], relaxBoundsCheck)
+            .withContext("mismatch below limit stage");
     } else if (STAGE_SHARDING_FILTER == trueSoln->getType()) {
         const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(trueSoln);
 
         BSONElement el = testSoln["sharding_filter"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619206},
+                    "found a sharding filter stage in the solution but no "
+                    "corresponding 'sharding_filter' object in the provided JSON"};
         }
         BSONObj keepObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(keepObj, {"node"}));
 
         BSONElement child = keepObj["node"];
         if (child.eoo() || !child.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619207},
+                    "found a sharding filter stage in the solution but no 'node' sub-object in "
+                    "the provided JSON"};
         }
 
-        return solutionMatches(child.Obj(), fn->children[0], relaxBoundsCheck);
+        return solutionMatches(child.Obj(), fn->children[0], relaxBoundsCheck)
+            .withContext("mismatch below shard filter stage");
     } else if (STAGE_ENSURE_SORTED == trueSoln->getType()) {
         const EnsureSortedNode* esn = static_cast<const EnsureSortedNode*>(trueSoln);
 
         BSONElement el = testSoln["ensureSorted"];
         if (el.eoo() || !el.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5619208},
+                    "found a ensureSorted stage in the solution but no "
+                    "corresponding 'ensureSorted' object in the provided JSON"};
         }
         BSONObj esObj = el.Obj();
         invariant(bsonObjFieldsAreInSet(esObj, {"node", "pattern"}));
 
         BSONElement patternEl = esObj["pattern"];
         if (patternEl.eoo() || !patternEl.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5676407},
+                    "found an ensureSorted stage in the solution but no 'pattern' object in the "
+                    "provided JSON"};
         }
         BSONElement child = esObj["node"];
         if (child.eoo() || !child.isABSONObj()) {
-            return false;
+            return {ErrorCodes::Error{5676406},
+                    "found an ensureSorted stage in the solution but no 'node' sub-object in "
+                    "the provided JSON"};
         }
 
-        return SimpleBSONObjComparator::kInstance.evaluate(patternEl.Obj() == esn->pattern) &&
-            solutionMatches(child.Obj(), esn->children[0], relaxBoundsCheck);
+        if (!SimpleBSONObjComparator::kInstance.evaluate(patternEl.Obj() == esn->pattern)) {
+            return {ErrorCodes::Error{5698302},
+                    str::stream() << "found an ensureSorted stage in the solution with "
+                                     "mismatching 'pattern'. Expected: "
+                                  << patternEl << " Found: " << esn->pattern};
+        }
+        return solutionMatches(child.Obj(), esn->children[0], relaxBoundsCheck)
+            .withContext("mismatch below ensureSorted stage");
     }
 
-    return false;
-}
+    return {ErrorCodes::Error{5698301},
+            str::stream() << "Unknown query solution node found: " << trueSoln->toString()};
+}  // namespace mongo
 
 }  // namespace mongo

@@ -50,7 +50,8 @@ void assertCorrectMultikeyMetadataPathBoundsGenerated(StringData field,
 
     const bool kDoNotRelaxBoundsCheck = false;
     ASSERT(QueryPlannerTestLib::boundsMatch(
-        expectedBounds, std::move(indexBounds), kDoNotRelaxBoundsCheck));
+               expectedBounds, std::move(indexBounds), kDoNotRelaxBoundsCheck)
+               .isOK());
 }
 
 TEST(WildcardAccessMethodTest, FieldGeneratesExpectedMultikeyPathBounds) {

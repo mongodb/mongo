@@ -517,7 +517,8 @@ void QueryPlannerTest::assertNumSolutions(size_t expectSolutions) const {
     }
     str::stream ss;
     ss << "expected " << expectSolutions << " solutions but got " << getNumSolutions()
-       << " instead. solutions generated: " << '\n';
+       << " instead. Run with --verbose=vv to see reasons for mismatch. Solutions generated: "
+       << '\n';
     dumpSolutions(ss);
     FAIL(ss);
 }
@@ -526,8 +527,13 @@ size_t QueryPlannerTest::numSolutionMatches(const std::string& solnJson) const {
     BSONObj testSoln = fromjson(solnJson);
     size_t matches = 0;
     for (auto&& soln : solns) {
-        if (QueryPlannerTestLib::solutionMatches(testSoln, soln->root(), relaxBoundsCheck)) {
+        auto matchStatus =
+            QueryPlannerTestLib::solutionMatches(testSoln, soln->root(), relaxBoundsCheck);
+        if (matchStatus.isOK()) {
             ++matches;
+        } else {
+            LOGV2_DEBUG(
+                5676408, 2, "Mismatching solution: {reason}", "reason"_attr = matchStatus.reason());
         }
     }
     return matches;
@@ -540,7 +546,9 @@ void QueryPlannerTest::assertSolutionExists(const std::string& solnJson, size_t 
     }
     str::stream ss;
     ss << "expected " << numMatches << " matches for solution " << solnJson << " but got "
-       << matches << " instead. all solutions generated: " << '\n';
+       << matches
+       << " instead. Run with --verbose=vv to see reasons for mismatch. All solutions generated: "
+       << '\n';
     dumpSolutions(ss);
     FAIL(ss);
 }
@@ -558,7 +566,9 @@ void QueryPlannerTest::assertHasOneSolutionOf(const std::vector<std::string>& so
     }
     str::stream ss;
     ss << "assertHasOneSolutionOf expected one matching solution"
-       << " but got " << matches << " instead. all solutions generated: " << '\n';
+       << " but got " << matches
+       << " instead. Run with --verbose=vv to see reasons for mismatch. All solutions generated: "
+       << '\n';
     dumpSolutions(ss);
     FAIL(ss);
 }

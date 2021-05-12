@@ -31,6 +31,8 @@
  * This file contains tests for mongo/db/query/plan_cache.h
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 #include "mongo/db/query/plan_cache.h"
 
 #include <algorithm>
@@ -51,6 +53,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -1110,8 +1113,14 @@ protected:
         BSONObj testSoln = fromjson(solnJson);
         size_t matches = 0;
         for (auto&& soln : solns) {
-            if (QueryPlannerTestLib::solutionMatches(testSoln, soln->root())) {
+            auto matchStatus = QueryPlannerTestLib::solutionMatches(testSoln, soln->root());
+            if (matchStatus.isOK()) {
                 ++matches;
+            } else {
+                LOGV2_DEBUG(5619204,
+                            2,
+                            "Mismatching solution: {reason}",
+                            "reason"_attr = matchStatus.reason());
             }
         }
         return matches;
@@ -1192,8 +1201,14 @@ protected:
     QuerySolution* firstMatchingSolution(const string& solnJson) const {
         BSONObj testSoln = fromjson(solnJson);
         for (auto&& soln : solns) {
-            if (QueryPlannerTestLib::solutionMatches(testSoln, soln->root())) {
+            auto matchStatus = QueryPlannerTestLib::solutionMatches(testSoln, soln->root());
+            if (matchStatus.isOK()) {
                 return soln.get();
+            } else {
+                LOGV2_DEBUG(5619205,
+                            2,
+                            "Mismatching solution: {reason}",
+                            "reason"_attr = matchStatus.reason());
             }
         }
 
@@ -1214,10 +1229,12 @@ protected:
      */
     void assertSolutionMatches(QuerySolution* trueSoln, const string& solnJson) const {
         BSONObj testSoln = fromjson(solnJson);
-        if (!QueryPlannerTestLib::solutionMatches(testSoln, trueSoln->root())) {
+        auto matchStatus = QueryPlannerTestLib::solutionMatches(testSoln, trueSoln->root());
+        if (!matchStatus.isOK()) {
             str::stream ss;
             ss << "Expected solution " << solnJson
-               << " did not match true solution: " << trueSoln->toString() << '\n';
+               << " did not match true solution: " << trueSoln->toString()
+               << ". Reason: " << matchStatus.reason() << '\n';
             FAIL(ss);
         }
     }
