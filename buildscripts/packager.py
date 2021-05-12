@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """Packager module.
 
 This program makes Debian and RPM repositories for MongoDB, by
@@ -28,6 +28,8 @@ apt-get install dpkg-dev rpm debhelper fakeroot ia32-libs createrepo git-core
 echo "Now put the dist gnupg signing keys in ~root/.gnupg"
 
 """
+
+from __future__ import print_function
 
 import argparse
 import errno
@@ -409,7 +411,7 @@ def main():
     prefix = args.prefix
     if prefix is None:
         prefix = tempfile.mkdtemp()
-    print "Working in directory %s" % prefix
+    print("Working in directory %s" % prefix)
 
     os.chdir(prefix)
     try:
@@ -449,7 +451,7 @@ def crossproduct(*seqs):
 
 def sysassert(argv):
     """Run argv and assert that it exited with status 0."""
-    print "In %s, running %s" % (os.getcwd(), " ".join(argv))
+    print("In %s, running %s" % (os.getcwd(), " ".join(argv)))
     sys.stdout.flush()
     sys.stderr.flush()
     assert subprocess.Popen(argv).wait() == 0
@@ -457,7 +459,7 @@ def sysassert(argv):
 
 def backtick(argv):
     """Run argv and return its output string."""
-    print "In %s, running %s" % (os.getcwd(), " ".join(argv))
+    print("In %s, running %s" % (os.getcwd(), " ".join(argv)))
     sys.stdout.flush()
     sys.stderr.flush()
     return subprocess.Popen(argv, stdout=subprocess.PIPE).communicate()[0]
@@ -493,11 +495,11 @@ def unpack_binaries_into(build_os, arch, spec, where):
         sysassert(["tar", "xvzf", rootdir + "/" + tarfile(build_os, arch, spec)])
         release_dir = glob('mongodb-linux-*')[0]
         for releasefile in "bin", "LICENSE-Community.txt", "README", "THIRD-PARTY-NOTICES", "THIRD-PARTY-NOTICES.gotools", "MPL-2":
-            print "moving file: %s/%s" % (release_dir, releasefile)
+            print("moving file: %s/%s" % (release_dir, releasefile))
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
         os.rmdir(release_dir)
     except Exception:
-        exc = sys.exc_value
+        exc = sys.exc_info()[1]
         os.chdir(rootdir)
         raise exc
     os.chdir(rootdir)
@@ -515,7 +517,7 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # directory, so the debian directory is needed in all cases (and
     # innocuous in the debianoids' sdirs).
     for pkgdir in ["debian", "rpm"]:
-        print "Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir)
+        print("Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir))
         # FIXME: sh-dash-cee is bad. See if tarfile can do this.
         sysassert([
             "sh", "-c",
@@ -609,11 +611,13 @@ def make_deb_repo(repo, distro, build_os):
     oldpwd = os.getcwd()
     os.chdir(repo + "../../../../../../")
     try:
-        dirs = set(
-            [os.path.dirname(deb)[2:] for deb in backtick(["find", ".", "-name", "*.deb"]).split()])
+        dirs = {
+            os.path.dirname(deb)[2:]
+            for deb in backtick(["find", ".", "-name", "*.deb"]).decode('utf-8').split()
+        }
         for directory in dirs:
             st = backtick(["dpkg-scanpackages", directory, "/dev/null"])
-            with open(directory + "/Packages", "w") as fh:
+            with open(directory + "/Packages", "wb") as fh:
                 fh.write(st)
             bt = backtick(["gzip", "-9c", directory + "/Packages"])
             with open(directory + "/Packages.gz", "wb") as fh:
@@ -639,8 +643,8 @@ Description: MongoDB packages
     os.chdir(repo + "../../")
     s2 = backtick(["apt-ftparchive", "release", "."])
     try:
-        with open("Release", 'w') as fh:
-            fh.write(s1)
+        with open("Release", 'wb') as fh:
+            fh.write(s1.encode('utf-8'))
             fh.write(s2)
     finally:
         os.chdir(oldpwd)
@@ -662,7 +666,7 @@ def move_repos_into_place(src, dst):  # pylint: disable=too-many-branches
             os.mkdir(dname)
             break
         except OSError:
-            exc = sys.exc_value
+            exc = sys.exc_info()[1]
             if exc.errno == errno.EEXIST:
                 pass
             else:
@@ -682,7 +686,7 @@ def move_repos_into_place(src, dst):  # pylint: disable=too-many-branches
             os.symlink(dname, tmpnam)
             break
         except OSError:  # as exc: # Python >2.5
-            exc = sys.exc_value
+            exc = sys.exc_info()[1]
             if exc.errno == errno.EEXIST:
                 pass
             else:
@@ -700,7 +704,7 @@ def move_repos_into_place(src, dst):  # pylint: disable=too-many-branches
                 os.symlink(os.readlink(dst), oldnam)
                 break
             except OSError:  # as exc: # Python >2.5
-                exc = sys.exc_value
+                exc = sys.exc_info()[1]
                 if exc.errno == errno.EEXIST:
                     pass
                 else:
@@ -717,9 +721,10 @@ def write_debian_changelog(path, spec, srcdir):
     os.chdir(srcdir)
     preamble = ""
     try:
-        sb = preamble + backtick(
-            ["sh", "-c",
-             "git archive %s debian/changelog | tar xOf -" % spec.metadata_gitspec()])
+        sb = preamble + backtick([
+            "sh", "-c",
+            "git archive %s debian/changelog | tar xOf -" % spec.metadata_gitspec()
+        ]).decode('utf-8')
     finally:
         os.chdir(oldcwd)
     lines = sb.split("\n")
@@ -769,49 +774,7 @@ def make_rpm(distro, build_os, arch, spec, srcdir):  # pylint: disable=too-many-
     for subdir in ["BUILD", "RPMS", "SOURCES", "SPECS", "SRPMS"]:
         ensure_dir("%s/%s/" % (topdir, subdir))
     distro_arch = distro.archname(arch)
-    # RPM tools take these macro files that define variables in
-    # RPMland.  Unfortunately, there's no way to tell RPM tools to use
-    # a given file *in addition* to the files that it would already
-    # load, so we have to figure out what it would normally load,
-    # augment that list, and tell RPM to use the augmented list.  To
-    # figure out what macrofiles ordinarily get loaded, older RPM
-    # versions had a parameter called "macrofiles" that could be
-    # extracted from "rpm --showrc".  But newer RPM versions don't
-    # have this.  To tell RPM what macros to use, older versions of
-    # RPM have a --macros option that doesn't work; on these versions,
-    # you can put a "macrofiles" parameter into an rpmrc file.  But
-    # that "macrofiles" setting doesn't do anything for newer RPM
-    # versions, where you have to use the --macros flag instead.  And
-    # all of this is to let us do our work with some guarantee that
-    # we're not clobbering anything that doesn't belong to us.
-    #
-    # On RHEL systems, --rcfile will generally be used and
-    # --macros will be used in Ubuntu.
-    #
-    macrofiles = [
-        l for l in backtick(["rpm", "--showrc"]).split("\n") if l.startswith("macrofiles")
-    ]
-    flags = []
-    macropath = os.getcwd() + "/macros"
 
-    write_rpm_macros_file(macropath, topdir, distro.release_dist(build_os))
-    if macrofiles:
-        macrofiles = macrofiles[0] + ":" + macropath
-        rcfile = os.getcwd() + "/rpmrc"
-        write_rpmrc_file(rcfile, macrofiles)
-        flags = ["--rcfile", rcfile]
-    else:
-        # This hard-coded hooey came from some box running RPM
-        # 4.4.2.3.  It may not work over time, but RPM isn't sanely
-        # configurable.
-        flags = [
-            "--macros",
-            "/usr/lib/rpm/macros:/usr/lib/rpm/%s-linux/macros:/usr/lib/rpm/suse/macros:/etc/rpm/macros.*:/etc/rpm/macros:/etc/rpm/%s-linux/macros:~/.rpmmacros:%s"
-            % (distro_arch, distro_arch, macropath)
-        ]
-    # Put the specfile and the tar'd up binaries and stuff in
-    # place.
-    #
     # The version of rpm and rpm tools in RHEL 5.5 can't interpolate the
     # %{dynamic_version} macro, so do it manually
     with open(specfile, "r") as spec_source:
@@ -833,10 +796,18 @@ def make_rpm(distro, build_os, arch, spec, srcdir):  # pylint: disable=too-many-
         os.chdir(oldcwd)
     # Do the build.
 
-    flags.extend([
-        "-D", "dynamic_version " + spec.pversion(distro), "-D",
-        "dynamic_release " + spec.prelease(), "-D", "_topdir " + topdir
-    ])
+    flags = [
+        "-D",
+        "_topdir " + topdir,
+        "-D",
+        "dist ." + distro.release_dist(build_os),
+        "-D",
+        "_use_internal_dependency_generator 0",
+        "-D",
+        "dynamic_version " + spec.pversion(distro),
+        "-D",
+        "dynamic_release " + spec.prelease(),
+    ]
 
     # Versions of RPM after 4.4 ignore our BuildRoot tag so we need to
     # specify it on the command line args to rpmbuild
@@ -867,27 +838,13 @@ def make_rpm_repo(repo):
         os.chdir(oldpwd)
 
 
-def write_rpmrc_file(path, string):
-    """Write the RPM rc file."""
-    with open(path, 'w') as fh:
-        fh.write(string)
-
-
-def write_rpm_macros_file(path, topdir, release_dist):
-    """Write the RPM macros file."""
-    with open(path, 'w') as fh:
-        fh.write("%%_topdir	%s\n" % topdir)
-        fh.write("%%dist	.%s\n" % release_dist)
-        fh.write("%_use_internal_dependency_generator 0\n")
-
-
 def ensure_dir(filename):
     """Ensure that the dirname directory of filename exists, and return filename."""
     dirpart = os.path.dirname(filename)
     try:
         os.makedirs(dirpart)
     except OSError:  # as exc: # Python >2.5
-        exc = sys.exc_value
+        exc = sys.exc_info()[1]
         if exc.errno == errno.EEXIST:
             pass
         else:
