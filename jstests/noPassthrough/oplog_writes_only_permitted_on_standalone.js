@@ -23,10 +23,12 @@ let oplog = conn.getDB("local").oplog.rs;
 // Construct a valid oplog entry.
 function constructOplogEntry(oplog) {
     const lastOplogEntry = oplog.find().sort({ts: -1}).limit(1).toArray()[0];
+    const testCollOplogEntry =
+        oplog.find({op: "i", ns: "test.coll"}).sort({ts: -1}).limit(1).toArray()[0];
     const highestTS = lastOplogEntry.ts;
     const toInsertTS = Timestamp(highestTS.getTime(), highestTS.getInc() + 1);
     return Object.extend(
-        lastOplogEntry,
+        testCollOplogEntry,
         {op: "u", ns: "test.coll", o: {$set: {a: 1}}, o2: {_id: 0}, ts: toInsertTS});
 }
 
