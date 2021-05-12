@@ -47,7 +47,8 @@ function runTest(crashAfterRollbackTruncation) {
         {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
     rst.awaitReplication();
 
-    const [secondary1, secondary2, secondary3, secondary4] = rst.getSecondaries();
+    let secondary1 = rst.getSecondaries()[0];
+    const [, secondary2, secondary3, secondary4] = rst.getSecondaries();
 
     // Disable replication on all of the secondaries to manually control the replication progress.
     const stopReplProducerFailpoints = [secondary1, secondary2, secondary3, secondary4].map(
@@ -114,14 +115,13 @@ function runTest(crashAfterRollbackTruncation) {
     // Step up one of the other secondaries and do a write which becomes majority committed to force
     // secondary1 to go into rollback.
     rst.freeze(secondary1);
-    assert.commandWorked(secondary2.adminCommand({replSetStepUp: 1}));
-    rst.freeze(primary);
-    rst.awaitNodesAgreeOnPrimary(undefined, undefined, secondary2);
-
     let hangAfterTruncate;
     if (crashAfterRollbackTruncation) {
         hangAfterTruncate = configureFailPoint(secondary1, 'hangAfterOplogTruncationInRollback');
     }
+    assert.commandWorked(secondary2.adminCommand({replSetStepUp: 1}));
+    rst.freeze(primary);
+    rst.awaitNodesAgreeOnPrimary(undefined, undefined, secondary2);
 
     for (const fp of stopReplProducerOnDocumentFailpoints) {
         fp.off();
@@ -144,7 +144,7 @@ function runTest(crashAfterRollbackTruncation) {
 
         // Crash the node after it performs oplog truncation.
         rst.stop(secondary1, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
-        node = rst.restart(secondary1, {
+        secondary1 = rst.restart(secondary1, {
             "noReplSet": false,
             setParameter: 'failpoint.stopReplProducer=' + tojson({mode: 'alwaysOn'})
         });
@@ -160,7 +160,7 @@ function runTest(crashAfterRollbackTruncation) {
     // Reconnect to secondary1 after it completes its rollback and step it up to be the new primary.
     rst.awaitNodesAgreeOnPrimary(undefined, undefined, secondary2);
     assert.commandWorked(secondary1.adminCommand({replSetFreeze: 0}));
-    rst.stepUp(secondary1, {awaitWritablePrimary: false});
+    rst.stepUp(secondary1);
 
     const docBeforeRetry = secondary1.getCollection(ns).findOne({_id: 0});
     assert.eq(docBeforeRetry, {_id: 0, counter: counterMajorityCommitted});
