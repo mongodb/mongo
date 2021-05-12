@@ -46,8 +46,7 @@ const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
     tenantId: kTenantId,
 };
-const migrationRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-assert.eq(migrationRes.state, TenantMigrationTest.State.kCommitted);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
 // Test that getMore works after the migration has committed.
 jsTestLog(`Testing getMore on cursor id ${cursor.id} on the donor after the migration`);

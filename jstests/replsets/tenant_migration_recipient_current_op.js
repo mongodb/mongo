@@ -228,7 +228,7 @@ assert.gte(currOp.numOpsApplied, 1, tojson(res));
 fpAfterDataConsistent.off();
 
 jsTestLog("Waiting for migration to complete.");
-assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
 jsTestLog("Issuing a forget migration command.");
 const forgetMigrationThread =

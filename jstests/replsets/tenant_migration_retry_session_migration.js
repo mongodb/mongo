@@ -86,8 +86,7 @@ for (const lsid of [lsid1, lsid2]) {
 const abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
 waitAfterCloning.off();
 
-let res = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-assert.eq(res.state, TenantMigrationTest.State.kAborted);
+TenantMigrationTest.assertAborted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
 tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);
 
@@ -123,8 +122,7 @@ assert.commandWorked(donorPrimary.getDB(kDbName).runCommand({
 
 waitAfterCloning.off();
 
-res = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-assert.eq(res.state, TenantMigrationTest.State.kCommitted);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
 // Retrying commitTransaction against the recipient.
 assert.commandWorked(recipientPrimary.adminCommand({

@@ -54,9 +54,8 @@ function runTest(downgradeFCV) {
 
     // Upgrade again to check on the status of the migration from the donor's point of view.
     assert.commandWorked(donorPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-    const stateRes =
-        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
+    TenantMigrationTest.assertAborted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
     tenantMigrationTest.stop();
 }

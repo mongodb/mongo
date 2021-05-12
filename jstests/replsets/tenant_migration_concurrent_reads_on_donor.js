@@ -110,9 +110,8 @@ function testRejectReadsAfterMigrationCommitted(testCase, dbName, collName) {
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = donorRst.getPrimary();
 
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
     // the oplog on all the secondaries. This is to ensure that snapshot reads on secondaries with
@@ -164,9 +163,8 @@ function testDoNotRejectReadsAfterMigrationAborted(testCase, dbName, collName) {
 
     let abortFp =
         configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+    TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     abortFp.off();
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
@@ -244,9 +242,8 @@ function testBlockReadsAfterMigrationEnteredBlocking(testCase, dbName, collName)
     });
 
     blockingFp.off();
-    const stateRes =
-        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
@@ -308,9 +305,8 @@ function testRejectBlockedReadsAfterMigrationCommitted(testCase, dbName, collNam
 
     // Verify that the migration succeeded.
     resumeMigrationThread.join();
-    const stateRes =
-        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
@@ -376,9 +372,8 @@ function testUnblockBlockedReadsAfterMigrationAborted(testCase, dbName, collName
     // Verify that the migration failed due to the simulated error.
     resumeMigrationThread.join();
     abortFp.off();
-    const stateRes =
-        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
+    TenantMigrationTest.assertAborted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 

@@ -48,7 +48,7 @@ assert.eq(delayedSecondary.host,
 
 hangAfterCreatingConnections.off();
 
-assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
 // Remove 'donorSecondary' so that the test can complete properly.

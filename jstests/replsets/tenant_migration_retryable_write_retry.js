@@ -197,7 +197,7 @@ const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
     tenantId: kTenantId,
 };
-assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
 const donorDoc =
     donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({tenantId: kTenantId});

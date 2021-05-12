@@ -113,7 +113,7 @@ for (let i = 0; i < 10; i++) {
 waitAfterStartingOplogApplier.off();
 waitInOplogApplier.off();
 
-assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
 tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);
 

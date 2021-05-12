@@ -38,7 +38,7 @@ const runTest = (baseTenantId, dbName, shouldMatch) => {
         migrationIdString: extractUUIDFromObject(UUID()),
         tenantId: baseTenantId,
     };
-    tenantMigrationTest.runMigration(migrationOpts);
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
     // verifyRecipientDB calls isNamespaceForTenant() to determine if the data should have been
     // migrated, so we can directly call it here.

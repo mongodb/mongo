@@ -52,7 +52,7 @@ assert.eq(donorSecondary.host,
 hangAfterCreatingConnections.off();
 restartServerReplication(delayedSecondary);
 
-assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
 donorRst.stopSet();

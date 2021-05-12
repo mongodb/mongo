@@ -118,7 +118,7 @@ assert.soon(() => checkLog.checkContainsWithCountJson(donorPrimary, 4886202, und
 const abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
 blockingFp.off();
 
-assert.commandWorked(migrationThread.returnData());
+TenantMigrationTest.assertAborted(migrationThread.returnData());
 abortFp.off();
 
 // The index creation threads should be done.

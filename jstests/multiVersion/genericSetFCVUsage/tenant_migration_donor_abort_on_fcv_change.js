@@ -56,10 +56,8 @@ assert.commandWorked(donorPrimary.adminCommand({setFeatureCompatibilityVersion: 
 
 hangWhileMigratingFP.off();
 
-const stateRes =
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
-assert.eq(stateRes.abortReason.code, ErrorCodes.TenantMigrationAborted);
+TenantMigrationTest.assertAborted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts),
+                                  ErrorCodes.TenantMigrationAborted);
 
 tenantMigrationTest.waitForDonorNodesToReachState(
     donorRst.nodes, migrationId, tenantId, TenantMigrationTest.DonorState.kAborted);

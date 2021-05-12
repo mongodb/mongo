@@ -56,8 +56,7 @@ assert.lt(preMigrationTimestamp, donorDoc.blockTimestamp);
 waitForRejectReadsBeforeTsFp.off();
 // Wait for the migration to complete.
 jsTest.log("Waiting for migration to complete");
-const stateRes = assert.commandWorked(migrationThread.returnData());
-assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+TenantMigrationTest.assertCommitted(migrationThread.returnData());
 
 tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
 
@@ -151,7 +150,7 @@ newDonorRst.nodes.forEach(node => {
 });
 
 waitAfterCreatingMtab.off();
-migration2Thread.join();
+TenantMigrationTest.assertCommitted(migration2Thread.returnData());
 
 tenantMigrationTest2.stop();
 tenantMigrationTest.stop();

@@ -115,9 +115,7 @@ hangDuringCollectionClone.off();
 
 // After recipient syncs new documents, becomes consistent, and finishes migration,
 // verify the sync source is still the donor's old primary.
-const stateRes =
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 assert.eq(recipientColl.find().itcount(), docs1.length + docs2.length);
 assert.docEq(recipientColl.find().sort({_id: 1}).toArray(), docs1.concat(docs2));
 verifySyncSource(recipientPrimary, migrationId, donorPrimary.host);

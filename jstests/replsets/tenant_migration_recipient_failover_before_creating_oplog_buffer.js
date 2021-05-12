@@ -52,7 +52,7 @@ assert.commandWorked(tenantMigrationTest.getRecipientRst().getSecondaries()[0].a
 fpBeforeCreatingOplogBuffer.off();
 
 jsTestLog("Waiting for migration to complete.");
-assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
 tenantMigrationTest.stop();
 })();

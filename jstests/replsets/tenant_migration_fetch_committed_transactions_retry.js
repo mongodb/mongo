@@ -115,7 +115,8 @@ const assertTransactionEntries = (donorTxnEntries, recipientTxnEntries) => {
     fpAfterCollectionClonerDone.off();
 
     // Verify that the migration completes successfully.
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     recipientTxnEntries = recipientPrimary.getCollection(transactionsNS).find().toArray();
     assertTransactionEntries(donorTxnEntries, recipientTxnEntries);
 
@@ -180,7 +181,8 @@ const assertTransactionEntries = (donorTxnEntries, recipientTxnEntries) => {
     fpAfterCollectionClonerDone.off();
 
     // Verify that the migration completes successfully.
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
     recipientTxnEntries = recipientPrimary.getCollection(transactionsNS).find().toArray();
     assertTransactionEntries(donorTxnEntries, recipientTxnEntries);
@@ -256,7 +258,8 @@ const assertTransactionEntries = (donorTxnEntries, recipientTxnEntries) => {
     fpAfterCollectionClonerDone.off();
 
     // Verify that the migration completes successfully.
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
     recipientTxnEntries = recipientPrimary.getCollection(transactionsNS).find().toArray();
     assertTransactionEntries(updatedDonorTxnEntries, recipientTxnEntries);

@@ -98,7 +98,7 @@ const collNameRenamed = collName + "_renamed";
 assert.commandWorked(donorColl.renameCollection(collNameRenamed));
 
 // The migration should go through after recipient failover.
-assert.commandWorked(migrationThread.returnData());
+TenantMigrationTest.assertCommitted(migrationThread.returnData());
 
 // Check that recipient has cloned all documents in the renamed collection.
 recipientColl = newRecipientPrimary.getDB(dbName).getCollection(collNameRenamed);

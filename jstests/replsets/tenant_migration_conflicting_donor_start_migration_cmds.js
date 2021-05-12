@@ -76,8 +76,8 @@ let numRecipientSyncDataCmdSent = 0;
         tenantId,
     };
 
-    assert.commandWorked(tenantMigrationTest0.runMigration(migrationOpts));
-    assert.commandWorked(tenantMigrationTest0.runMigration(migrationOpts));
+    TenantMigrationTest.assertCommitted(tenantMigrationTest0.runMigration(migrationOpts));
+    TenantMigrationTest.assertCommitted(tenantMigrationTest0.runMigration(migrationOpts));
 
     // If the second donorStartMigration had started a duplicate migration, the recipient would have
     // received four recipientSyncData commands instead of two.
@@ -96,8 +96,10 @@ let numRecipientSyncDataCmdSent = 0;
     assert.commandWorked(tenantMigrationTest0.startMigration(migrationOpts));
     assert.commandWorked(tenantMigrationTest0.startMigration(migrationOpts));
 
-    assert.commandWorked(tenantMigrationTest0.waitForMigrationToComplete(migrationOpts));
-    assert.commandWorked(tenantMigrationTest0.waitForMigrationToComplete(migrationOpts));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest0.waitForMigrationToComplete(migrationOpts));
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest0.waitForMigrationToComplete(migrationOpts));
 
     // If the second donorStartMigration had started a duplicate migration, the recipient would have
     // received four recipientSyncData commands instead of two.
@@ -114,8 +116,8 @@ let numRecipientSyncDataCmdSent = 0;
  */
 function testStartingConflictingMigrationAfterInitialMigrationCommitted(
     tenantMigrationTest0, migrationOpts0, tenantMigrationTest1, migrationOpts1) {
-    tenantMigrationTest0.runMigration(
-        migrationOpts0, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */);
+    TenantMigrationTest.assertCommitted(tenantMigrationTest0.runMigration(
+        migrationOpts0, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
     const res1 = assert.commandFailedWithCode(tenantMigrationTest1.runMigration(migrationOpts1),
                                               ErrorCodes.ConflictingOperationInProgress);
     assertNoCertificateOrPrivateKey(res1.errmsg);
@@ -174,7 +176,8 @@ function testConcurrentConflictingMigrations(
                              tenantId: migrationOpts1.tenantId
                          }).length);
         }
-        assert.commandWorked(tenantMigrationTest0.waitForMigrationToComplete(migrationOpts0));
+        TenantMigrationTest.assertCommitted(
+            tenantMigrationTest0.waitForMigrationToComplete(migrationOpts0));
         assert.commandWorked(
             tenantMigrationTest0.forgetMigration(migrationOpts0.migrationIdString));
     } else {
@@ -195,7 +198,8 @@ function testConcurrentConflictingMigrations(
                              tenantId: migrationOpts0.tenantId
                          }).length);
         }
-        assert.commandWorked(tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
+        TenantMigrationTest.assertAborted(
+            tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
         assert.commandWorked(
             tenantMigrationTest1.forgetMigration(migrationOpts1.migrationIdString));
     }

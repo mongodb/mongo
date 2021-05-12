@@ -137,7 +137,7 @@ fpAfterCreatingCollectionOfSecondDB.off();
 
 // After the migration completes, the total bytes copied should be equal to the total data size.
 jsTestLog("Waiting for migration to complete.");
-assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 res = newRecipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
 currOp = res.inprog[0];
 assert.eq(currOp.approxTotalDataSize, db1Size + db2Size, res);

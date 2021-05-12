@@ -77,8 +77,7 @@ const migrationOpts1 = {
     migrationIdString: extractUUIDFromObject(migrationId1),
     tenantId,
 };
-let migrationRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts1));
-assert.eq(migrationRes.state, TenantMigrationTest.State.kCommitted);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts1));
 tenantMigrationTest.waitForMigrationGarbageCollection(migrationId1, tenantId);
 
 // Verify that the config.transaction entry was migrated successfully.
@@ -107,10 +106,10 @@ const migrationOpts2 = {
     migrationIdString: extractUUIDFromObject(migrationId2),
     tenantId,
 };
-migrationRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts2));
+
 // The migration should have committed successfully even though the in-memory transaction number was
 // higher, since the higher number should have been invalidated.
-assert.eq(migrationRes.state, TenantMigrationTest.State.kCommitted);
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts2));
 
 tenantMigrationTest.stop();
 })();

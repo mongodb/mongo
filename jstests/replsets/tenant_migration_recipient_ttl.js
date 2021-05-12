@@ -2,7 +2,8 @@
  * Tests to check whether the TTL index is being created and is functioning correctly on the tenant
  * migration recipient.
  *
- * @tags: [requires_fcv_49, incompatible_with_eft, incompatible_with_macos, requires_persistence]
+ * @tags: [requires_fcv_49, incompatible_with_eft, incompatible_with_macos, requires_persistence,
+ * incompatible_with_windows_tls]
  */
 
 (function() {
@@ -59,7 +60,7 @@ assert.neq(i, indexes.length, tojson(indexes));
 jsTestLog("Starting and completing a tenant migration with migrationId: " + kMigrationId +
           ", tenantId: " + kTenantId);
 assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
-assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
 // The migration's document will not be marked as garbage collectable until forgetMigration. The
 // document should exist in the collection now, without an expireAt field.

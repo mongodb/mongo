@@ -73,8 +73,7 @@ function testDonorStartMigrationInterrupt(interruptFunc, donorRestarted) {
     sleep(Math.random() * kMaxSleepTimeMS);
     interruptFunc(donorRst);
 
-    const stateRes = assert.commandWorked(runMigrationThread.returnData());
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+    TenantMigrationTest.assertCommitted(runMigrationThread.returnData());
     tenantMigrationTest.waitForDonorNodesToReachState(donorRst.nodes,
                                                       migrationId,
                                                       migrationOpts.tenantId,
@@ -153,9 +152,8 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
     };
     const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
 
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
     const forgetMigrationThread = new Thread(TenantMigrationUtil.forgetMigrationAsync,
                                              migrationOpts.migrationIdString,
                                              donorRstArgs,
@@ -316,7 +314,7 @@ function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = f
         assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
         fp.wait();
     } else {
-        assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+        TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
     }
 
     let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);

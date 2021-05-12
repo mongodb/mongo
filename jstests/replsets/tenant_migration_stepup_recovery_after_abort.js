@@ -49,20 +49,20 @@ assert.commandWorked(donorPrimary.getCollection(tenantId + "_testDb.testColl").i
 
 const donorFp = configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
 
-let stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
-    migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
-assert.eq(stateRes.abortReason.code, ErrorCodes.InternalError);
+TenantMigrationTest.assertAborted(
+    tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */),
+    ErrorCodes.InternalError);
 donorFp.off();
 
 assert.commandWorked(
     donorPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
 assert.commandWorked(donorPrimary.adminCommand({replSetFreeze: 0}));
 
-stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
-    migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
-assert.eq(stateRes.abortReason.code, ErrorCodes.InternalError);
+TenantMigrationTest.assertAborted(
+    tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */),
+    ErrorCodes.InternalError);
 
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, tenantId);

@@ -95,7 +95,7 @@ waitInOplogApplier.off();
 recipientRst.getPrimary();
 
 // The migration should go through after recipient failover.
-assert.commandWorked(migrationThread.returnData());
+TenantMigrationTest.assertCommitted(migrationThread.returnData());
 // Validate that the last no-op entry is applied.
 local = newRecipientPrimary.getDB("local");
 appliedNoOps = local.oplog.rs.find({fromTenantMigration: migrationId, op: "n"});

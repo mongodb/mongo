@@ -142,7 +142,7 @@ const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
     tenantId: kTenantId,
 };
-assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
 donorAdminDB.logout();
 recipientAdminDB.logout();

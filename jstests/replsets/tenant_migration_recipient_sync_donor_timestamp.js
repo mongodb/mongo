@@ -92,7 +92,7 @@ jsTestLog("Release the tenant oplog applier failpoint.");
 fpPauseOplogApplier.off();
 
 jsTestLog("Waiting for migration to complete.");
-assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
 tenantMigrationTest.stop();
 })();
