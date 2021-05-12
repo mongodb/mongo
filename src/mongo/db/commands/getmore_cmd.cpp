@@ -277,7 +277,8 @@ public:
             return false;
         }
 
-        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const override {
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const override {
             return kSupportsReadConcernResult;
         }
 

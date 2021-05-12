@@ -41,6 +41,14 @@ rst.awaitReplication();
 var primary = rst.getPrimary();
 var sec = rst.getSecondary();
 
+// Need to check secondaryOk=true first, since secondaryOk=false will destroy conn in pool when
+// primary is down.
+conn.setSecondaryOk();
+
+// Do a read concern "local" read so that the secondary refreshes its dbVersion before we shut down
+// the primary.
+coll.runCommand("find", {readConcern: {level: "local"}});
+
 // Data now inserted... stop the primary, since only two in set, other will still be secondary
 rst.stop(rst.getPrimary());
 printjson(rst.status());
@@ -50,10 +58,6 @@ awaitRSClientHosts(conn, sec, {ok: true, secondary: true});
 
 // Make sure that mongos realizes that primary is already down
 awaitRSClientHosts(conn, primary, {ok: false});
-
-// Need to check secondaryOk=true first, since secondaryOk=false will destroy conn in pool when
-// primary is down
-conn.setSecondaryOk();
 
 // count using the command path
 assert.eq(30, coll.find({i: 0}).count());

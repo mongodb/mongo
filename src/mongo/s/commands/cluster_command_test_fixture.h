@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/commands/strategy.h"
 
@@ -115,6 +116,8 @@ private:
     // errors for the duration of each test.
     // TODO SERVER-39704: Remove this failpoint block.
     std::unique_ptr<FailPointEnableBlock> _staleVersionAndSnapshotRetriesBlock;
+
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
 };
 
 }  // namespace mongo

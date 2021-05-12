@@ -192,7 +192,8 @@ public:
     /**
      * Verifies that this stage is allowed to run with the specified read concern level.
      */
-    virtual ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const {
+    virtual ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                         bool isImplicitDefault) const {
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }
 
@@ -224,11 +225,11 @@ protected:
                                 << "multi-document transaction.");
     }
 
-    ReadConcernSupportResult onlySingleReadConcernSupported(
-        StringData stageName,
-        repl::ReadConcernLevel supportedLevel,
-        repl::ReadConcernLevel candidateLevel) const {
-        return {{candidateLevel != supportedLevel,
+    ReadConcernSupportResult onlySingleReadConcernSupported(StringData stageName,
+                                                            repl::ReadConcernLevel supportedLevel,
+                                                            repl::ReadConcernLevel candidateLevel,
+                                                            bool isImplicitDefault) const {
+        return {{candidateLevel != supportedLevel && !isImplicitDefault,
                  {ErrorCodes::InvalidOptions,
                   str::stream() << "Aggregation stage " << stageName
                                 << " cannot run with a readConcern other than '"
@@ -241,9 +242,10 @@ protected:
     }
 
     ReadConcernSupportResult onlyReadConcernLocalSupported(StringData stageName,
-                                                           repl::ReadConcernLevel level) const {
+                                                           repl::ReadConcernLevel level,
+                                                           bool isImplicitDefault) const {
         return onlySingleReadConcernSupported(
-            stageName, repl::ReadConcernLevel::kLocalReadConcern, level);
+            stageName, repl::ReadConcernLevel::kLocalReadConcern, level, isImplicitDefault);
     }
 
 private:

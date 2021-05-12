@@ -69,6 +69,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -358,12 +359,28 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
 
     bool clientSuppliedReadConcern = readConcernArgs.isSpecified();
     bool customDefaultWasApplied = false;
-    auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
-    if (readConcernSupport.defaultReadConcernPermit.isOK() &&
-        (startTransaction || !opCtx->inMultiDocumentTransaction()) &&
-        repl::ReplicationCoordinator::get(opCtx)->isReplEnabled() &&
-        !opCtx->getClient()->isInDirectClient()) {
+    auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel(),
+                                                              readConcernArgs.isImplicitDefault());
 
+    auto applyDefaultReadConcern = [&](const repl::ReadConcernArgs rcDefault) -> void {
+        LOGV2_DEBUG(21955,
+                    2,
+                    "Applying default readConcern on {command} of {readConcernDefault} "
+                    "on {command}",
+                    "Applying default readConcern on command",
+                    "readConcernDefault"_attr = rcDefault,
+                    "command"_attr = invocation->definition()->getName());
+        readConcernArgs = std::move(rcDefault);
+        // Update the readConcernSupport, since the default RC was applied.
+        readConcernSupport =
+            invocation->supportsReadConcern(readConcernArgs.getLevel(), !customDefaultWasApplied);
+    };
+
+    auto shouldApplyDefaults = (startTransaction || !opCtx->inMultiDocumentTransaction()) &&
+        repl::ReplicationCoordinator::get(opCtx)->isReplEnabled() &&
+        !opCtx->getClient()->isInDirectClient();
+
+    if (readConcernSupport.defaultReadConcernPermit.isOK() && shouldApplyDefaults) {
         if (isInternalClient) {
             // ReadConcern should always be explicitly specified by operations received from
             // internal clients (ie. from a mongos or mongod), even if it is empty (ie.
@@ -386,24 +403,33 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
             // which is to apply the CWRWC defaults if present.  This means we just test isEmpty(),
             // since this covers both isSpecified() && !isSpecified()
             if (readConcernArgs.isEmpty()) {
-                const auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                                           .getDefaultReadConcern(opCtx);
+                const auto rwcDefaults =
+                    ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
+                const auto rcDefault = rwcDefaults.getDefaultReadConcern();
                 if (rcDefault) {
-                    customDefaultWasApplied = true;
-                    readConcernArgs = std::move(*rcDefault);
-                    LOGV2_DEBUG(21955,
-                                2,
-                                "Applying default readConcern on {command} of {readConcernDefault} "
-                                "on {command}",
-                                "Applying default readConcern on command",
-                                "readConcernDefault"_attr = *rcDefault,
-                                "command"_attr = invocation->definition()->getName());
-                    // Update the readConcernSupport, since the default RC was applied.
-                    readConcernSupport =
-                        invocation->supportsReadConcern(readConcernArgs.getLevel());
+                    const bool isDefaultRCLocalFeatureFlagEnabled =
+                        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                        repl::feature_flags::gDefaultRCLocal.isEnabled(
+                            serverGlobalParams.featureCompatibility);
+                    const auto readConcernSource = rwcDefaults.getDefaultReadConcernSource();
+                    customDefaultWasApplied = !isDefaultRCLocalFeatureFlagEnabled ||
+                        (readConcernSource &&
+                         readConcernSource.get() == DefaultReadConcernSourceEnum::kGlobal);
+
+                    applyDefaultReadConcern(*rcDefault);
                 }
             }
         }
+    }
+
+    // Apply the implicit default read concern even if the command does not support a cluster wide
+    // read concern.
+    if (!readConcernSupport.defaultReadConcernPermit.isOK() &&
+        readConcernSupport.implicitDefaultReadConcernPermit.isOK() && shouldApplyDefaults &&
+        !isInternalClient && readConcernArgs.isEmpty()) {
+        auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
+                             .getImplicitDefaultReadConcern();
+        applyDefaultReadConcern(rcDefault);
     }
 
     // It's fine for clients to provide any provenance value to mongod. But if they haven't, then an
@@ -987,7 +1013,8 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
         // `createIndexes` do not support readConcern inside transactions.
         // TODO(SERVER-46971): Consider how to extend this check to other commands.
         auto cmdName = command->getName();
-        auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
+        auto readConcernSupport = invocation->supportsReadConcern(
+            readConcernArgs.getLevel(), readConcernArgs.isImplicitDefault());
         if (readConcernArgs.hasLevel() &&
             (cmdName == "create"_sd || cmdName == "createIndexes"_sd)) {
             if (!readConcernSupport.readConcernSupport.isOK()) {

@@ -551,3 +551,11 @@ feature_flags:
             document images for retryable find and modifies.
         cpp_varname: feature_flags::gFeatureFlagRetryableFindAndModify
         default: false
+
+    featureFlagDefaultReadConcernLocal:
+        description: >-
+            When enabled, default read concern will be set to local if there is no cluster wide
+            read concern (CWRC).
+        cpp_varname: feature_flags::gDefaultRCLocal
+        default: true
+        version: 5.0

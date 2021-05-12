@@ -335,7 +335,8 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
                               CommandInvocation* invocation,
                               const BSONObj& cmdObj) {
     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    const auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
+    const auto readConcernSupport = invocation->supportsReadConcern(
+        readConcernArgs.getLevel(), readConcernArgs.isImplicitDefault());
     return applyReadWriteConcern(opCtx,
                                  readConcernSupport.readConcernSupport.isOK(),
                                  invocation->supportsWriteConcern(),
@@ -346,7 +347,8 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
                               BasicCommandWithReplyBuilderInterface* cmd,
                               const BSONObj& cmdObj) {
     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    const auto readConcernSupport = cmd->supportsReadConcern(cmdObj, readConcernArgs.getLevel());
+    const auto readConcernSupport = cmd->supportsReadConcern(
+        cmdObj, readConcernArgs.getLevel(), readConcernArgs.isImplicitDefault());
     return applyReadWriteConcern(opCtx,
                                  readConcernSupport.readConcernSupport.isOK(),
                                  cmd->supportsWriteConcern(cmdObj),

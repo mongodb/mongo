@@ -76,6 +76,11 @@ public:
     boost::optional<ReadConcern> getDefaultReadConcern(OperationContext* opCtx);
     boost::optional<WriteConcern> getDefaultWriteConcern(OperationContext* opCtx);
 
+    /**
+     * Returns the implicit default read concern.
+     */
+    repl::ReadConcernArgs getImplicitDefaultReadConcern();
+
     class RWConcernDefaultAndTime : public RWConcernDefault {
     public:
         RWConcernDefaultAndTime() = default;

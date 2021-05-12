@@ -378,6 +378,12 @@ let testCursorReadPreference = function(conn, isMongos, rsNodes, {readPref, expe
     const expectHedging =
         isHedgingExpected(isMongos, readPref.hedge, allowedOnSecondary.kAlways, true);
 
+    if (isMongos) {
+        // Do a read concern "local" read on each secondary so they refresh their metadata.
+        testColl.find().readPref("secondary", [{tag: "two"}]);
+        testColl.find().readPref("secondary", [{tag: "three"}]);
+    }
+
     let cursor =
         testColl.find({x: {$gte: 0}}).readPref(readPref.mode, readPref.tagSets, readPref.hedge);
     const cmdFunc = () => cursor.toArray();

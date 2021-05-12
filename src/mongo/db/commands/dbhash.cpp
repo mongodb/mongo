@@ -88,7 +88,8 @@ public:
     }
 
     ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
-                                                 repl::ReadConcernLevel level) const final {
+                                                 repl::ReadConcernLevel level,
+                                                 bool isImplicitDefault) const final {
 
         static const Status kReadConcernNotSupported{ErrorCodes::InvalidOptions,
                                                      "read concern not supported"};

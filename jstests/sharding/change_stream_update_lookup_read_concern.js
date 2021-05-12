@@ -73,6 +73,9 @@ const closestSecondary = rst.nodes[1];
 const closestSecondaryDB = closestSecondary.getDB(mongosDB.getName());
 assert.commandWorked(closestSecondaryDB.setProfilingLevel(2));
 
+// Do a read concern "local" read so that the secondary refreshes its metadata.
+mongosColl.find().readPref("secondary", [{tag: "closestSecondary"}]);
+
 // We expect the tag to ensure there is only one node to choose from, so the actual read
 // preference doesn't really matter - we use 'nearest' throughout.
 assert.eq(mongosColl.find()

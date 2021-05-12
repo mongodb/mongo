@@ -113,12 +113,15 @@ assert.commandWorked(testDB.runCommand(
     {count: collName, query: {x: {$gte: 0}}, $readPreference: {mode: "primaryPreferred"}}));
 checkServerStatusHedgingMetrics(testDB, expectedHedgingMetrics);
 
+jsTestLog("Run a command on the secondary with read concern local so it refreshes metadata");
+assert.commandWorked(testDB.runCommand({find: collName, $readPreference: {mode: "secondary"}}));
+
 jsTestLog("Run commands with hedging enabled, and verify the metrics are as expected");
 
 // Make the command slower on the first target host, and verify there is an advantageous
 // hedged read.
 try {
-    setCommandDelay(sortedNodes[0], "count", 1000, ns);
+    setCommandDelay(sortedNodes[0], "count", 5000, ns);
     assert.commandWorked(testDB.runCommand(
         {count: collName, query: {x: {$gte: 0}}, $readPreference: {mode: "nearest"}}));
 } finally {

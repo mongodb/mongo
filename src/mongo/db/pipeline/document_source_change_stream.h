@@ -87,13 +87,14 @@ public:
             }
         }
 
-        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const {
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const {
             // Change streams require "majority" readConcern. If the client did not specify an
             // explicit readConcern, change streams will internally upconvert the readConcern to
             // majority (so clients can always send aggregations without readConcern). We therefore
             // do not permit the cluster-wide default to be applied.
             return onlySingleReadConcernSupported(
-                kStageName, repl::ReadConcernLevel::kMajorityReadConcern, level);
+                kStageName, repl::ReadConcernLevel::kMajorityReadConcern, level, isImplicitDefault);
         }
 
         void assertSupportsMultiDocumentTransaction() const {

@@ -116,6 +116,13 @@ public:
     }
 
     /**
+     * Returns true if the RWC was an implicit default.
+     */
+    const bool isImplicitDefault() const {
+        return hasSource() && *getSource() == Source::implicitDefault;
+    }
+
+    /**
      * Sets the source of this provenance.  In order to prevent accidental clobbering of provenance
      * with incorrect values, a source cannot change during the provenance's lifetime, except for
      * the initial transition from kUnset to some other Source value.

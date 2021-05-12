@@ -95,7 +95,8 @@ public:
     }
 
     ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
-                                                 repl::ReadConcernLevel level) const override {
+                                                 repl::ReadConcernLevel level,
+                                                 bool isImplicitDefault) const override {
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }
 

@@ -101,6 +101,10 @@ bool ReadConcernArgs::isSpecified() const {
     return _specified;
 }
 
+bool ReadConcernArgs::isImplicitDefault() const {
+    return getProvenance().isImplicitDefault();
+}
+
 ReadConcernLevel ReadConcernArgs::getLevel() const {
     return _level.value_or(ReadConcernLevel::kLocalReadConcern);
 }

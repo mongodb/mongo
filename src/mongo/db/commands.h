@@ -658,7 +658,8 @@ public:
     /**
      * Returns this invocation's support for readConcern.
      */
-    virtual ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const {
+    virtual ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                         bool isImplicitDefault) const {
         static const Status kReadConcernNotSupported{ErrorCodes::InvalidOptions,
                                                      "read concern not supported"};
         static const Status kDefaultReadConcernNotPermitted{ErrorCodes::InvalidOptions,
@@ -686,7 +687,8 @@ public:
             return false;
         }
 
-        if (auto result = supportsReadConcern(repl::ReadConcernLevel::kMajorityReadConcern);
+        if (auto result = supportsReadConcern(repl::ReadConcernLevel::kMajorityReadConcern,
+                                              false /* isImplicitDefault */);
             result.readConcernSupport.isOK()) {
             // If the command supports read concern, it has storage and newtork implications.
             return false;
@@ -860,11 +862,12 @@ public:
      * cases where it isn't supported.
      */
     virtual ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
-                                                         repl::ReadConcernLevel level) const {
+                                                         repl::ReadConcernLevel level,
+                                                         bool isImplicitDefault) const {
         static const Status kReadConcernNotSupported{ErrorCodes::InvalidOptions,
                                                      "read concern not supported"};
-        static const Status kDefaultReadConcernNotPermitted{ErrorCodes::InvalidOptions,
-                                                            "default read concern not permitted"};
+        static const Status kDefaultReadConcernNotPermitted{
+            ErrorCodes::InvalidOptions, "cluster wide default read concern not permitted"};
         return {{level != repl::ReadConcernLevel::kLocalReadConcern, kReadConcernNotSupported},
                 {kDefaultReadConcernNotPermitted}};
     }

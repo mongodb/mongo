@@ -903,6 +903,7 @@ env.Library(
         'introspect',
         'lasterror',
         'query_exec',
+        'repl/repl_server_parameters',
         'repl/replica_set_messages',
         'shared_request_handling',
         'transaction',
