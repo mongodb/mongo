@@ -67,6 +67,8 @@ private:
 
     void _notifyNewStateAndWaitUntilUnpaused(OperationContext* opCtx, StateEnum newState);
 
+    void _resetReachedState();
+
     Mutex _mutex = MONGO_MAKE_LATCH("StateTransitionController::_mutex");
     stdx::condition_variable _pauseDuringTransitionCond;
     stdx::condition_variable _waitUntilUnpausedCond;

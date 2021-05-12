@@ -70,6 +70,12 @@ void StateTransitionController<StateEnum>::_notifyNewStateAndWaitUntilUnpaused(
     });
 }
 
+template <class StateEnum>
+void StateTransitionController<StateEnum>::_resetReachedState() {
+    stdx::lock_guard lk(_mutex);
+    _state = StateEnum::kUnused;
+}
+
 // -----------------------------------------------
 //  PauseDuringStateTransitions
 // -----------------------------------------------
@@ -83,6 +89,7 @@ template <class StateEnum>
 PauseDuringStateTransitions<StateEnum>::PauseDuringStateTransitions(
     StateTransitionController<StateEnum>* controller, std::vector<StateEnum> states)
     : _controller{controller}, _states{std::move(states)} {
+    _controller->_resetReachedState();
     for (auto state : _states) {
         _controller->_setPauseDuringTransition(state);
     }
