@@ -328,6 +328,10 @@ void writeToImageCollection(OperationContext* opCtx,
     imageEntry.setTs(op["ts"].timestamp());
     imageEntry.setImageKind(imageKind);
     imageEntry.setImage(image);
+    if (image.isEmpty()) {
+        imageEntry.setInvalidated(true);
+        imageEntry.setInvalidatedReason("initial sync"_sd);
+    }
 
     UpdateRequest request(NamespaceString::kConfigImagesNamespace);
     request.setQuery(
@@ -1483,10 +1487,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
             imageKind = repl::RetryImage_parse(
                 IDLParserErrorContext("applyUpdate"),
                 op.getField(OplogEntryBase::kNeedsRetryImageFieldName).String());
-            if (imageKind == repl::RetryImageEnum::kPreImage) {
-                request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
-            } else if (imageKind == repl::RetryImageEnum::kPostImage) {
-                request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_NEW);
+            if (mode != OplogApplication::Mode::kInitialSync) {
+                if (imageKind == repl::RetryImageEnum::kPreImage) {
+                    request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
+                } else if (imageKind == repl::RetryImageEnum::kPostImage) {
+                    request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_NEW);
+                }
             }
         }
 
@@ -1593,14 +1599,17 @@ Status applyOperation_inlock(OperationContext* opCtx,
             if (opType[1] == 0) {
                 DeleteRequest request(requestNss);
                 request.setQuery(deleteCriteria);
-                if (op.hasField(OplogEntryBase::kNeedsRetryImageFieldName)) {
+                if (mode != OplogApplication::Mode::kInitialSync &&
+                    op.hasField(OplogEntryBase::kNeedsRetryImageFieldName)) {
                     request.setReturnDeleted(true);
                 }
                 boost::optional<BSONObj> preImage = deleteObject(opCtx, collection, request);
                 if (op.hasField(OplogEntryBase::kNeedsRetryImageFieldName)) {
+                    // If preImage is boost::none, this indicates we did not request a preImage due
+                    // to being in initial sync.
                     writeToImageCollection(opCtx,
                                            op,
-                                           preImage.get(),
+                                           preImage.value_or(BSONObj()),
                                            repl::RetryImageEnum::kPreImage,
                                            &upsertConfigImage);
                 }

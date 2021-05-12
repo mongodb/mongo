@@ -44,8 +44,7 @@
 
     function checkImageCollection(conn, sessionInfo, expectedTs, expectedImage, expectedImageKind) {
         const coll = conn.getDB('config').image_collection;
-        const imageDoc =
-            coll.findOne({'_id.id': sessionInfo.sessionId});
+        const imageDoc = coll.findOne({'_id.id': sessionInfo.sessionId});
 
         assert.eq(sessionInfo.txnNum, imageDoc.txnNum, imageDoc);
         assert.eq(expectedImage, imageDoc.image, imageDoc);

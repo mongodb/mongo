@@ -29,3 +29,11 @@ structs:
             image:
                 cpp_name: image
                 type: object
+            invalidated:
+                cpp_name: invalidated
+                type: bool
+                default: false
+            invalidatedReason:
+                cpp_name: invalidatedReason
+                type: string
+                optional: true

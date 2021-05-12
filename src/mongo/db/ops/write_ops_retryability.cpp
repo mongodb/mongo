@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/ops/write_ops_retryability.h"
@@ -38,6 +40,7 @@
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/logger/redaction.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -126,7 +129,8 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
         // Extract image from side collection.
         auto sessionIdBson = oplog.getSessionId()->toBSON();
         const auto txnNumber = *oplog.getTxnNumber();
-        const auto query = BSON("_id" << sessionIdBson << "txnNum" << *oplog.getTxnNumber());
+        Timestamp ts = oplog.getTimestamp();
+        const auto query = BSON("_id" << sessionIdBson);
         auto imageDoc = client.findOne(NamespaceString::kConfigImagesNamespace.ns(), query);
         uassert(5637601,
                 str::stream()
@@ -137,6 +141,37 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
                     << txnNumber
                     << " cannot be found",
                 !imageDoc.isEmpty());
+
+        auto entry =
+            repl::ImageEntry::parse(IDLParserErrorContext("ImageEntryForRequest"), imageDoc);
+        if (entry.getInvalidated()) {
+            // This case is expected when a node could not correctly compute a retry image due
+            // to data inconsistency while in initial sync.
+            uasserted(ErrorCodes::IncompleteTransactionHistory,
+                      str::stream() << "Incomplete transaction history for sessionId: "
+                                    << sessionIdBson
+                                    << " txnNumber: "
+                                    << txnNumber);
+        }
+
+        if (entry.getTs() != oplog.getTimestamp() || entry.getTxnNumber() != oplog.getTxnNumber()) {
+            // We found a corresponding image document, but the timestamp and transaction number
+            // associated with the session record did not match the expected values from the oplog
+            // entry.
+            // Otherwise, it's unclear what went wrong.
+            warning() << "Image lookup for a retryable findAndModify was unable to be verified with"
+                         "sessionId "
+                      << sessionIdBson << ", txnNumberRequested " << txnNumber
+                      << ", timestampRequested " << ts << ", txnNumberFound "
+                      << entry.getTxnNumber() << ", timestampFound " << entry.getTs();
+            uasserted(
+                5637602,
+                str::stream()
+                    << "image collection no longer contains the complete write history of this "
+                       "transaction, record with sessionId: "
+                    << sessionIdBson
+                    << " cannot be found");
+        }
         return imageDoc.getField(repl::ImageEntry::kImageFieldName).Obj().getOwned();
     }
 

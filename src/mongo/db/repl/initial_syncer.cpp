@@ -97,6 +97,9 @@ MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCreatingOplog);
 // Failpoint which stops the applier.
 MONGO_FAIL_POINT_DEFINE(rsSyncApplyStop);
 
+// Failpoint which causes the initial sync function to hang after cloning all databases.
+MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterDataCloning);
+
 namespace {
 using namespace executor;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -901,7 +904,14 @@ void InitialSyncer::_databasesClonerCallback(const Status& databaseClonerFinishS
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
         return;
     }
-
+    if (MONGO_FAIL_POINT(initialSyncHangAfterDataCloning)) {
+        // This log output is used in js tests so please leave it.
+        log() << "initial sync - initialSyncHangAfterDataCloning fail point "
+                 "enabled. Blocking until fail point is disabled.";
+        while (MONGO_FAIL_POINT(initialSyncHangAfterDataCloning)) {
+            mongo::sleepsecs(1);
+        }
+    }
     status = _scheduleLastOplogEntryFetcher_inlock(
         [=](const StatusWith<mongo::Fetcher::QueryResponse>& status,
             mongo::Fetcher::NextAction*,
