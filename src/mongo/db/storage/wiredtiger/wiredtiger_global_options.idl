@@ -59,6 +59,15 @@ configs:
             gte: 0
             lte: 100000
         default: 0
+    "storage.wiredTiger.engineConfig.zstdCompressionLevel":
+        description: 'Default compression level for zstandard compressor'
+        arg_vartype: Int
+        cpp_varname: 'wiredTigerGlobalOptions.zstdCompressorLevel'
+        short_name: zstdDefaultCompressionLevel
+        validator:
+            gte: -5
+            lte: 22
+        default: 6
     "storage.wiredTiger.engineConfig.journalCompressor":
         description: 'Use a compressor for log records [none|snappy|zlib|zstd]'
         arg_vartype: String

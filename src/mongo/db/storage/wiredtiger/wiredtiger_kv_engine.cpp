@@ -364,6 +364,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     ss << "log=(enabled=true,archive=" << (_readOnly ? "false" : "true")
        << ",path=journal,compressor=";
     ss << wiredTigerGlobalOptions.journalCompressor << "),";
+    ss << "builtin_extension_config=(zstd=(compression_level="
+       << wiredTigerGlobalOptions.zstdCompressorLevel << ")),";
     ss << "file_manager=(close_idle_time=" << gWiredTigerFileHandleCloseIdleTime
        << ",close_scan_interval=" << gWiredTigerFileHandleCloseScanInterval
        << ",close_handle_minimum=" << gWiredTigerFileHandleCloseMinimum << "),";
