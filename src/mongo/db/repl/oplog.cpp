@@ -180,24 +180,6 @@ void abortTwoPhaseIndexBuilds(OperationContext* opCtx,
     }
 }
 
-/**
- * Remove this function when proper lifetime of the config.image_collection is in place.
- */
-void createConfigImagesIfNecessary_temporary(OperationContext* opCtx) {
-    AutoGetCollection configImages(
-        opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
-    if (configImages.getCollection()) {
-        return;
-    }
-
-    repl::UnreplicatedWritesBlock unreplicated(opCtx);
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-    invariant(DatabaseHolder::get(opCtx)
-                  ->getDb(opCtx, NamespaceString::kConfigImagesNamespace.db())
-                  ->createCollection(opCtx, NamespaceString::kConfigImagesNamespace, options));
-}
-
 }  // namespace
 
 void setOplogCollectionName(ServiceContext* service) {
@@ -265,19 +247,28 @@ void createIndexForApplyOps(OperationContext* opCtx,
     opCtx->recoveryUnit()->abandonSnapshot();
 }
 
+/**
+ * @param dataImage can be BSONObj::isEmpty to signal the node is in initial sync and must
+ *                  invalidate relevant image collection data.
+ */
 void writeToImageCollection(OperationContext* opCtx,
                             const LogicalSessionId& sessionId,
+                            const TxnNumber txnNum,
                             const Timestamp timestamp,
                             repl::RetryImageEnum imageKind,
                             const BSONObj& dataImage,
                             bool* upsertConfigImage) {
-    createConfigImagesIfNecessary_temporary(opCtx);
     AutoGetCollection autoColl(opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
     repl::ImageEntry imageEntry;
     imageEntry.set_id(sessionId);
+    imageEntry.setTxnNumber(txnNum);
     imageEntry.setTs(timestamp);
     imageEntry.setImageKind(imageKind);
     imageEntry.setImage(dataImage);
+    if (dataImage.isEmpty()) {
+        imageEntry.setInvalidated(true);
+        imageEntry.setInvalidatedReason("initial sync"_sd);
+    }
 
     UpdateRequest request(NamespaceString::kConfigImagesNamespace);
     request.setQuery(
@@ -1323,10 +1314,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
             request.setUpdateModification(o);
             request.setUpsert(upsert);
             request.setFromOplogApplication(true);
-            if (op.getNeedsRetryImage() == repl::RetryImageEnum::kPreImage) {
-                request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
-            } else if (op.getNeedsRetryImage() == repl::RetryImageEnum::kPostImage) {
-                request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_NEW);
+            if (mode != OplogApplication::Mode::kInitialSync) {
+                if (op.getNeedsRetryImage() == repl::RetryImageEnum::kPreImage) {
+                    request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
+                } else if (op.getNeedsRetryImage() == repl::RetryImageEnum::kPostImage) {
+                    request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_NEW);
+                }
             }
 
             Timestamp timestamp;
@@ -1417,8 +1410,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 if (op.getNeedsRetryImage()) {
                     writeToImageCollection(opCtx,
                                            op.getSessionId().get(),
+                                           op.getTxnNumber().get(),
                                            op.getTimestamp(),
                                            op.getNeedsRetryImage().get(),
+                                           // If we did not request an image because we're in
+                                           // initial sync, the value passed in here is conveniently
+                                           // the empty BSONObj.
                                            ur.requestedDocImage,
                                            &upsertConfigImage);
                 }
@@ -1469,17 +1466,23 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                 DeleteRequest request(requestNss);
                 request.setQuery(deleteCriteria);
-                if (op.getNeedsRetryImage() == repl::RetryImageEnum::kPreImage) {
+                if (mode != OplogApplication::Mode::kInitialSync &&
+                    op.getNeedsRetryImage() == repl::RetryImageEnum::kPreImage) {
+                    // When in initial sync, we'll pass an empty image into
+                    // `writeToImageCollection`.
                     request.setReturnDeleted(true);
                 }
 
-                boost::optional<BSONObj> result = deleteObject(opCtx, collection, request);
+                boost::optional<BSONObj> preImage = deleteObject(opCtx, collection, request);
                 if (op.getNeedsRetryImage()) {
+                    // If preImage is boost::none, this indicates we did not request a preImage due
+                    // to being in initial sync.
                     writeToImageCollection(opCtx,
                                            op.getSessionId().get(),
+                                           op.getTxnNumber().get(),
                                            op.getTimestamp(),
                                            repl::RetryImageEnum::kPreImage,
-                                           result.get(),
+                                           preImage.value_or(BSONObj()),
                                            &upsertConfigImage);
                 }
                 wuow.commit();

@@ -676,6 +676,7 @@ env.Library(
         'dbdirectclient',
         'index/index_access_method',
         'query_exec',
+        'repl/repl_server_parameters',
         'stats/fill_locker_info',
         'stats/top',
         'stats/transaction_stats',
@@ -1792,6 +1793,9 @@ env.Library(
         'repl/repl_coordinator_interface',
         'service_context',
         'update/update_driver',
+    ],
+    LIBDEPS_PRIVATE=[
+        'repl/image_collection_entry',
     ],
 )
 
