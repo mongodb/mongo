@@ -35,25 +35,3 @@ class TestFetch(unittest.TestCase):
 
         # calls to tarfile to extract the archive
         tarfile_open_mock.assert_called_once()
-
-    @patch.object(evergreen.RetryingEvergreenApi, "get_api")
-    @patch("buildscripts.resmokelib.undodb.fetch.urlopen")
-    @patch("buildscripts.resmokelib.undodb.fetch.copyfileobj")
-    @patch("tarfile.open")
-    def test_fetch_jira(self, tarfile_open_mock, copyfileobj_mock, urlopen_mock, get_api_mock):
-        api_mock = MagicMock()
-        get_api_mock.return_value = api_mock
-        api_mock.task_by_id.return_value = evergreen.task.Task({
-            "artifacts": [{
-                "name": "UndoDB Recordings - Execution 1",
-                "url": "fake://somewhere.over/the/rainbow.tgz",
-            }]
-        }, api_mock)
-
-        subcommand = fetch.Fetch("bf-123")
-        subcommand.execute()
-
-        # TODO: SERVER-50693
-        urlopen_mock.assert_not_called()
-        copyfileobj_mock.assert_not_called()
-        tarfile_open_mock.assert_not_called()
