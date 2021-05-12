@@ -270,6 +270,9 @@ private:
     // on this node. The future is set when the range deletion completes. Used if the moveChunk was
     // sent with waitForDelete.
     boost::optional<SemiFuture<void>> _cleanupCompleteFuture;
+
+    // Information about the moveChunk to be used in the critical section.
+    const BSONObj _critSecReason;
 };
 
 }  // namespace mongo

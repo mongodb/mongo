@@ -500,7 +500,11 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
 
         // From this point onward the collection can only be read, not written to, so it is safe to
         // construct the prerequisites and generate the target state.
-        ScopedShardVersionCriticalSection critSec(opCtx, nss);
+        ScopedShardVersionCriticalSection critSec(opCtx,
+                                                  nss,
+                                                  BSON("command"
+                                                       << "shardCollection"
+                                                       << "collection" << nss.ns()));
 
         pauseShardCollectionReadOnlyCriticalSection.pauseWhileSet();
 

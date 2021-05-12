@@ -113,7 +113,7 @@ class ScopedShardVersionCriticalSection {
     ScopedShardVersionCriticalSection& operator=(const ScopedShardVersionCriticalSection&) = delete;
 
 public:
-    ScopedShardVersionCriticalSection(OperationContext* opCtx, NamespaceString nss);
+    ScopedShardVersionCriticalSection(OperationContext* opCtx, NamespaceString nss, BSONObj reason);
     ~ScopedShardVersionCriticalSection();
 
     void enterCommitPhase();
@@ -121,6 +121,7 @@ public:
 private:
     OperationContext* const _opCtx;
     const NamespaceString _nss;
+    const BSONObj _reason;
 };
 
 }  // namespace mongo

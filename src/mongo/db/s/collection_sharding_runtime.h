@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -126,13 +127,13 @@ public:
      *
      * In these methods, the CSRLock ensures concurrent access to the critical section.
      */
-    void enterCriticalSectionCatchUpPhase(const CSRLock&);
-    void enterCriticalSectionCommitPhase(const CSRLock&);
+    void enterCriticalSectionCatchUpPhase(const CSRLock&, const BSONObj& reason);
+    void enterCriticalSectionCommitPhase(const CSRLock&, const BSONObj& reason);
 
     /**
      * It transitions the critical section back to the catch up phase.
      */
-    void rollbackCriticalSectionCommitPhaseToCatchUpPhase(const CSRLock&);
+    void rollbackCriticalSectionCommitPhaseToCatchUpPhase(const CSRLock&, const BSONObj& reason);
 
     /**
      * Method to control the collection's critical secion. Method listed below must be called with
@@ -140,13 +141,19 @@ public:
      *
      * In this method, the CSRLock ensures concurrent access to the critical section.
      */
-    void exitCriticalSection(const CSRLock&);
+    void exitCriticalSection(const CSRLock&, const BSONObj& reason);
+
+    /**
+     * Same semantics than 'exitCriticalSection' but without doing error-checking. Only meant to be
+     * used when recovering the critical sections in the RecoverableCriticalSectionService.
+     */
+    void exitCriticalSectionNoChecks(const CSRLock&);
 
     /**
      * If the collection is currently in a critical section, returns the critical section signal to
      * be waited on. Otherwise, returns nullptr.
      *
-     * This method internally acquires the CSRLock in IS to wait for eventual ongoing operations.
+     * This method internally acquires the CSRLock in MODE_IS.
      */
     boost::optional<SharedSemiFuture<void>> getCriticalSectionSignal(
         OperationContext* opCtx, ShardingMigrationCriticalSection::Operation op);
@@ -192,7 +199,7 @@ public:
      * If there an ongoing shard version recover/refresh, it returns the shared semifuture to be
      * waited on. Otherwise, returns boost::none.
      *
-     * This method internally acquires the CSRLock in IS to wait for eventual ongoing operations.
+     * This method internally acquires the CSRLock in MODE_IS.
      */
     boost::optional<SharedSemiFuture<void>> getShardVersionRecoverRefreshFuture(
         OperationContext* opCtx);
@@ -275,7 +282,7 @@ class CollectionCriticalSection {
     CollectionCriticalSection& operator=(const CollectionCriticalSection&) = delete;
 
 public:
-    CollectionCriticalSection(OperationContext* opCtx, NamespaceString nss);
+    CollectionCriticalSection(OperationContext* opCtx, NamespaceString nss, BSONObj reason);
     ~CollectionCriticalSection();
 
     /**
@@ -287,6 +294,7 @@ private:
     OperationContext* const _opCtx;
 
     NamespaceString _nss;
+    const BSONObj _reason;
 };
 
 }  // namespace mongo

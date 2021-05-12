@@ -64,7 +64,11 @@ MovePrimarySourceManager::MovePrimarySourceManager(OperationContext* opCtx,
     : _requestArgs(std::move(requestArgs)),
       _dbname(dbname),
       _fromShard(std::move(fromShard)),
-      _toShard(std::move(toShard)) {}
+      _toShard(std::move(toShard)),
+      _critSecReason(BSON("command"
+                          << "movePrimary"
+                          << "dbName" << _dbname << "fromShard" << fromShard << "toShard"
+                          << toShard)) {}
 
 MovePrimarySourceManager::~MovePrimarySourceManager() {}
 
@@ -175,7 +179,7 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
         auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
 
         // IMPORTANT: After this line, the critical section is in place and needs to be signaled
-        dss->enterCriticalSectionCatchUpPhase(opCtx, dssLock);
+        dss->enterCriticalSectionCatchUpPhase(opCtx, dssLock, _critSecReason);
     }
 
     _state = kCriticalSection;
@@ -225,7 +229,7 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
 
         // Read operations must begin to wait on the critical section just before we send the
         // commit operation to the config server
-        dss->enterCriticalSectionCommitPhase(opCtx, dssLock);
+        dss->enterCriticalSectionCommitPhase(opCtx, dssLock, _critSecReason);
     }
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -446,7 +450,7 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
         dss->clearMovePrimarySourceManager(opCtx);
         dss->clearDatabaseInfo(opCtx);
         // Leave the critical section if we're still registered.
-        dss->exitCriticalSection(opCtx);
+        dss->exitCriticalSection(opCtx, _critSecReason);
     }
 
     if (_state == kCriticalSection || _state == kCloneCompleted) {

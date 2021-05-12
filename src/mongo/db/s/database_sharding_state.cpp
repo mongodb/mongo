@@ -120,19 +120,23 @@ std::shared_ptr<DatabaseShardingState> DatabaseShardingState::getSharedForLockFr
     return databasesMap.getOrCreate(dbName);
 }
 
-void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx, DSSLock&) {
+void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
+                                                             DSSLock&,
+                                                             const BSONObj& reason) {
     invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
-    _critSec.enterCriticalSectionCatchUpPhase();
+    _critSec.enterCriticalSectionCatchUpPhase(reason);
 }
 
-void DatabaseShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx, DSSLock&) {
+void DatabaseShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx,
+                                                            DSSLock&,
+                                                            const BSONObj& reason) {
     invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
-    _critSec.enterCriticalSectionCommitPhase();
+    _critSec.enterCriticalSectionCommitPhase(reason);
 }
 
-void DatabaseShardingState::exitCriticalSection(OperationContext* opCtx) {
+void DatabaseShardingState::exitCriticalSection(OperationContext* opCtx, const BSONObj& reason) {
     const auto dssLock = DSSLock::lockExclusive(opCtx, this);
-    _critSec.exitCriticalSection();
+    _critSec.exitCriticalSection(reason);
 }
 
 DatabaseType DatabaseShardingState::getDatabaseInfo(OperationContext* opCtx,

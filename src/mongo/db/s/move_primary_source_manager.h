@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/s/request_types/move_primary_gen.h"
 #include "mongo/s/shard_id.h"
@@ -190,6 +191,9 @@ private:
 
     // The current state. Used only for diagnostics and validation.
     State _state{kCreated};
+
+    // Information about the movePrimary to be used in the critical section.
+    const BSONObj _critSecReason;
 };
 
 }  // namespace mongo

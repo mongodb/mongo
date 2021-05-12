@@ -347,53 +347,31 @@ void RecoverableCriticalSectionService::recoverRecoverableCriticalSections(
     OperationContext* opCtx) {
     LOGV2_DEBUG(5604000, 2, "Recovering all recoverable critical sections");
 
-    std::set<NamespaceString> nssPresentOnDisk;
-    PersistentTaskStore<CollectionCriticalSectionDocument> store(
-        NamespaceString::kCollectionCriticalSectionsNamespace);
-    store.forEach(
-        opCtx, Query{}, [&opCtx, &nssPresentOnDisk](const CollectionCriticalSectionDocument& doc) {
-            const auto& nss = doc.getNss();
-            {
-                AutoGetCollection collLock(opCtx, nss, MODE_X);
-                auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-                auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-
-                const bool blockingWritesCS = (bool)csr->getCriticalSectionSignal(
-                    opCtx, ShardingMigrationCriticalSection::Operation::kWrite);
-
-                const bool blockingReadsAndWritesCS = blockingWritesCS &&
-                    csr->getCriticalSectionSignal(
-                        opCtx, ShardingMigrationCriticalSection::Operation::kRead);
-
-                if (!doc.getBlockReads()) {
-                    if (!blockingWritesCS)
-                        csr->enterCriticalSectionCatchUpPhase(csrLock);
-                    else if (blockingReadsAndWritesCS)
-                        csr->rollbackCriticalSectionCommitPhaseToCatchUpPhase(csrLock);
-                } else {
-                    if (!blockingWritesCS)
-                        csr->enterCriticalSectionCatchUpPhase(csrLock);
-                    if (!blockingReadsAndWritesCS)
-                        csr->enterCriticalSectionCommitPhase(csrLock);
-                }
-
-                nssPresentOnDisk.insert(nss);
-
-                return true;
-            }
-        });
-
-    // Release in-memory CS that are not present on the disk
+    // Release all in-memory critical sections
     const auto collectionNames = CollectionShardingState::getCollectionNames(opCtx);
     for (const auto& collName : collectionNames) {
-        if (nssPresentOnDisk.find(collName) != nssPresentOnDisk.end())
-            continue;
-
         AutoGetCollection collLock(opCtx, collName, MODE_X);
         auto* const csr = CollectionShardingRuntime::get(opCtx, collName);
         auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-        csr->exitCriticalSection(csrLock);
+        csr->exitCriticalSectionNoChecks(csrLock);
     }
+
+    // Map the critical sections that are on disk to memory
+    PersistentTaskStore<CollectionCriticalSectionDocument> store(
+        NamespaceString::kCollectionCriticalSectionsNamespace);
+    store.forEach(opCtx, Query{}, [&opCtx](const CollectionCriticalSectionDocument& doc) {
+        const auto& nss = doc.getNss();
+        {
+            AutoGetCollection collLock(opCtx, nss, MODE_X);
+            auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+            auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+            csr->enterCriticalSectionCatchUpPhase(csrLock, doc.getReason());
+            if (doc.getBlockReads())
+                csr->enterCriticalSectionCommitPhase(csrLock, doc.getReason());
+
+            return true;
+        }
+    });
 
     LOGV2_DEBUG(5604001, 2, "Recovered all recoverable critical sections");
 }

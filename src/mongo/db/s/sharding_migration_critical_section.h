@@ -31,6 +31,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -57,22 +58,28 @@ public:
      *
      * NOTE: Must be called under the appropriate X lock (collection or database).
      */
-    void enterCriticalSectionCatchUpPhase();
+    void enterCriticalSectionCatchUpPhase(const BSONObj& reason);
 
     /**
      * Sets the critical section in a mode, which disallows reads.
      */
-    void enterCriticalSectionCommitPhase();
+    void enterCriticalSectionCommitPhase(const BSONObj& reason);
 
     /**
      * Leaves the critical section.
      */
-    void exitCriticalSection();
+    void exitCriticalSection(const BSONObj& reason);
+
+    /**
+     * Leaves the critical section without doing error-checking. Only meant to be used when
+     * recovering the critical sections in the RecoverableCriticalSectionService.
+     */
+    void exitCriticalSectionNoChecks();
 
     /**
      * Sets the critical section back to the catch up phase, which disallows reads.
      */
-    void rollbackCriticalSectionCommitPhaseToCatchUpPhase();
+    void rollbackCriticalSectionCommitPhaseToCatchUpPhase(const BSONObj& reason);
 
     /**
      * Retrieves a critical section future to wait on. Will return boost::none if the migration is
@@ -82,18 +89,30 @@ public:
     enum Operation { kRead, kWrite };
     boost::optional<SharedSemiFuture<void>> getSignal(Operation op) const;
 
-private:
-    // Whether the migration source is in a critical section. Tracked as a shared promise so that
-    // callers don't have to hold metadata locks in order to wait on it.
-    boost::optional<SharedPromise<void>> _critSecSignal;
+    boost::optional<BSONObj> getReason() const;
 
-    // Used to delay blocking reads up until the commit of the metadata on the config server needs
-    // to happen. This allows the shard to serve reads up until the config server metadata update
-    // needs to be committed.
-    //
-    // The transition from false to true is protected by the database or collection X-lock, which
-    // happens just before the config server metadata commit is scheduled.
-    bool _readsShouldWaitOnCritSec{false};
+private:
+    struct CriticalSectionContext {
+        CriticalSectionContext(BSONObj reason_) : reason(std::move(reason_)) {}
+        // Whether the migration source is in a critical section. Tracked as a shared promise so
+        // that callers don't have to hold metadata locks in order to wait on it.
+        SharedPromise<void> critSecSignal;
+
+        // Used to delay blocking reads up until the commit of the metadata on the config server
+        // needs to happen. This allows the shard to serve reads up until the config server metadata
+        // update needs to be committed.
+        //
+        // The transition from false to true is protected by the database or collection X-lock,
+        // which happens just before the config server metadata commit is scheduled.
+        bool readsShouldWaitOnCritSec{false};
+
+        // Information about the operation that originally acquired the critical section. Used to
+        // make the operations that modify the state of the CS idempotent and to provide more
+        // detailed error messages.
+        BSONObj reason;
+    };
+
+    boost::optional<CriticalSectionContext> _critSecCtx;
 };
 
 }  // namespace mongo

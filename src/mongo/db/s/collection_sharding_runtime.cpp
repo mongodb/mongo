@@ -158,20 +158,27 @@ void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx
     (void)_getMetadataWithVersionCheckAt(opCtx, boost::none);
 }
 
-void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const CSRLock&) {
-    _critSec.enterCriticalSectionCatchUpPhase();
+void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const CSRLock&,
+                                                                 const BSONObj& reason) {
+    _critSec.enterCriticalSectionCatchUpPhase(reason);
 }
 
-void CollectionShardingRuntime::enterCriticalSectionCommitPhase(const CSRLock&) {
-    _critSec.enterCriticalSectionCommitPhase();
+void CollectionShardingRuntime::enterCriticalSectionCommitPhase(const CSRLock&,
+                                                                const BSONObj& reason) {
+    _critSec.enterCriticalSectionCommitPhase(reason);
 }
 
-void CollectionShardingRuntime::rollbackCriticalSectionCommitPhaseToCatchUpPhase(const CSRLock&) {
-    _critSec.rollbackCriticalSectionCommitPhaseToCatchUpPhase();
+void CollectionShardingRuntime::rollbackCriticalSectionCommitPhaseToCatchUpPhase(
+    const CSRLock&, const BSONObj& reason) {
+    _critSec.rollbackCriticalSectionCommitPhaseToCatchUpPhase(reason);
 }
 
-void CollectionShardingRuntime::exitCriticalSection(const CSRLock&) {
-    _critSec.exitCriticalSection();
+void CollectionShardingRuntime::exitCriticalSection(const CSRLock&, const BSONObj& reason) {
+    _critSec.exitCriticalSection(reason);
+}
+
+void CollectionShardingRuntime::exitCriticalSectionNoChecks(const CSRLock&) {
+    _critSec.exitCriticalSectionNoChecks();
 }
 
 boost::optional<SharedSemiFuture<void>> CollectionShardingRuntime::getCriticalSectionSignal(
@@ -409,8 +416,10 @@ void CollectionShardingRuntime::resetShardVersionRecoverRefreshFuture(const CSRL
     _shardVersionInRecoverOrRefresh = boost::none;
 }
 
-CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, NamespaceString nss)
-    : _opCtx(opCtx), _nss(std::move(nss)) {
+CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
+                                                     NamespaceString nss,
+                                                     BSONObj reason)
+    : _opCtx(opCtx), _nss(std::move(nss)), _reason(std::move(reason)) {
     // This acquisition is performed with collection lock MODE_S in order to ensure that any ongoing
     // writes have completed and become visible
     AutoGetCollection autoColl(_opCtx,
@@ -422,7 +431,7 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, Na
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
     invariant(csr->getCurrentMetadataIfKnown());
-    csr->enterCriticalSectionCatchUpPhase(csrLock);
+    csr->enterCriticalSectionCatchUpPhase(csrLock, _reason);
 }
 
 CollectionCriticalSection::~CollectionCriticalSection() {
@@ -430,7 +439,7 @@ CollectionCriticalSection::~CollectionCriticalSection() {
     AutoGetCollection autoColl(_opCtx, _nss, MODE_IX);
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
-    csr->exitCriticalSection(csrLock);
+    csr->exitCriticalSection(csrLock, _reason);
 }
 
 void CollectionCriticalSection::enterCommitPhase() {
@@ -443,7 +452,7 @@ void CollectionCriticalSection::enterCommitPhase() {
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
     invariant(csr->getCurrentMetadataIfKnown());
-    csr->enterCriticalSectionCommitPhase(csrLock);
+    csr->enterCriticalSectionCommitPhase(csrLock, _reason);
 }
 
 }  // namespace mongo

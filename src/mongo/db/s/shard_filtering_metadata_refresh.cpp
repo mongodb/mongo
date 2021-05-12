@@ -269,8 +269,9 @@ void onShardVersionMismatch(OperationContext* opCtx,
 }
 
 ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationContext* opCtx,
-                                                                     NamespaceString nss)
-    : _opCtx(opCtx), _nss(std::move(nss)) {
+                                                                     NamespaceString nss,
+                                                                     BSONObj reason)
+    : _opCtx(opCtx), _nss(std::move(nss)), _reason(std::move(reason)) {
 
     while (true) {
         uassert(ErrorCodes::InvalidNamespace,
@@ -312,7 +313,7 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
 
         if (!joinShardVersionOperation(_opCtx, csr, &dbLock, &collLock, &csrLock)) {
             CollectionShardingRuntime::get(_opCtx, _nss)
-                ->enterCriticalSectionCatchUpPhase(*csrLock);
+                ->enterCriticalSectionCatchUpPhase(*csrLock, _reason);
             break;
         }
     }
@@ -328,7 +329,7 @@ ScopedShardVersionCriticalSection::~ScopedShardVersionCriticalSection() {
     Lock::CollectionLock collLock(_opCtx, _nss, MODE_IX);
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
-    csr->exitCriticalSection(csrLock);
+    csr->exitCriticalSection(csrLock, _reason);
 }
 
 void ScopedShardVersionCriticalSection::enterCommitPhase() {
@@ -340,7 +341,7 @@ void ScopedShardVersionCriticalSection::enterCommitPhase() {
     Lock::CollectionLock collLock(_opCtx, _nss, MODE_IS, deadline);
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
-    csr->enterCriticalSectionCommitPhase(csrLock);
+    csr->enterCriticalSectionCommitPhase(csrLock, _reason);
 }
 
 Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
