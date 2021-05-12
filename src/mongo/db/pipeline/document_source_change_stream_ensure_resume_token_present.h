@@ -58,7 +58,8 @@ public:
     }
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const DocumentSourceChangeStreamSpec& spec);
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 

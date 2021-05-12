@@ -57,8 +57,10 @@ public:
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
     static boost::intrusive_ptr<DocumentSourceChangeStreamOplogMatch> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, bool showMigrationEvents);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const DocumentSourceChangeStreamSpec& spec);
 
     const char* getSourceName() const final;
 

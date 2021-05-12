@@ -2094,9 +2094,9 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest,
 TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest,
        DSCSTransformStageEmptySpecSerializeResumeAfter) {
     auto expCtx = getExpCtx();
-    const auto serializedStageName = getCSOptimizationFeatureFlagValue()
-        ? DocumentSourceChangeStreamTransform::kStageName
-        : DSChangeStream::kStageName;
+    auto featureFlag = getCSOptimizationFeatureFlagValue();
+    const auto serializedStageName =
+        featureFlag ? DocumentSourceChangeStreamTransform::kStageName : DSChangeStream::kStageName;
 
     auto originalSpec = BSON(DSChangeStream::kStageName << BSONObj());
 
@@ -2107,18 +2107,25 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest,
         expCtx->initialPostBatchResumeToken = BSONObj();
     });
 
-    auto stage =
-        DocumentSourceChangeStreamTransform::createFromBson(originalSpec.firstElement(), expCtx);
+    auto result = DSChangeStream::createFromBson(originalSpec.firstElement(), expCtx);
     ASSERT(!expCtx->initialPostBatchResumeToken.isEmpty());
 
-    // Verify that an additional 'startAtOperationTime' is populated while serializing.
+    vector<intrusive_ptr<DocumentSource>> allStages(std::begin(result), std::end(result));
+    ASSERT_EQ(allStages.size(), 5);
+    auto transformStage = allStages[2];
+    ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(transformStage.get()));
+
+
+    // Verify that an additional start point field is populated while serializing.
     vector<Value> serialization;
-    stage->serializeToArray(serialization);
+    transformStage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::Object);
     ASSERT(!serialization[0]
                 .getDocument()[serializedStageName]
-                .getDocument()[DocumentSourceChangeStreamSpec::kResumeAfterFieldName]
+                .getDocument()[featureFlag
+                                   ? DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName
+                                   : DocumentSourceChangeStreamSpec::kResumeAfterFieldName]
                 .missing());
 }
 
@@ -2448,14 +2455,13 @@ TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
                         BSON("x" << 2 << "_id" << 1),
                         ResumeTokenData::FromInvalidate::kFromInvalidate);
 
-    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(
-                           BSON(DSChangeStream::kStageName
-                                << BSON("resumeAfter" << resumeTokenInvalidate
-                                                      << "startAtOperationTime" << kDefaultTs))
-                               .firstElement(),
-                           expCtx),
-                       AssertionException,
-                       ErrorCodes::InvalidResumeToken);
+    ASSERT_THROWS_CODE(
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName << BSON("resumeAfter" << resumeTokenInvalidate))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        ErrorCodes::InvalidResumeToken);
 }
 
 TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfNeedsMergeIsFalse) {

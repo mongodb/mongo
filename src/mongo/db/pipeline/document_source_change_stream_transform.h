@@ -41,6 +41,10 @@ public:
     /**
      * Creates a new transformation stage from the given specification.
      */
+    static boost::intrusive_ptr<DocumentSourceChangeStreamTransform> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const DocumentSourceChangeStreamSpec& spec);
+
     static boost::intrusive_ptr<DocumentSourceChangeStreamTransform> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -69,8 +73,8 @@ protected:
 
 private:
     // This constructor is private, callers should use the 'create()' method above.
-    DocumentSourceChangeStreamTransform(const boost::intrusive_ptr<ExpressionContext>&,
-                                        BSONObj changeStreamSpec);
+    DocumentSourceChangeStreamTransform(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                        DocumentSourceChangeStreamSpec spec);
 
     struct DocumentKeyCacheEntry {
         DocumentKeyCacheEntry() = default;

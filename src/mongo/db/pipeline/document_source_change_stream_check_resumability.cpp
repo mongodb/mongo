@@ -179,15 +179,23 @@ DocumentSourceChangeStreamCheckResumability::DocumentSourceChangeStreamCheckResu
 
 intrusive_ptr<DocumentSourceChangeStreamCheckResumability>
 DocumentSourceChangeStreamCheckResumability::create(const intrusive_ptr<ExpressionContext>& expCtx,
-                                                    Timestamp ts) {
-    // We are resuming from a point in time, not an event. Seed the stage with a high water mark.
-    return create(expCtx, ResumeToken::makeHighWaterMarkToken(ts).getData());
+                                                    const DocumentSourceChangeStreamSpec& spec) {
+    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(spec);
+    return new DocumentSourceChangeStreamCheckResumability(expCtx, std::move(resumeToken));
 }
 
 intrusive_ptr<DocumentSourceChangeStreamCheckResumability>
-DocumentSourceChangeStreamCheckResumability::create(const intrusive_ptr<ExpressionContext>& expCtx,
-                                                    ResumeTokenData token) {
-    return new DocumentSourceChangeStreamCheckResumability(expCtx, std::move(token));
+DocumentSourceChangeStreamCheckResumability::createFromBson(
+    BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(5467603,
+            str::stream() << "the '" << kStageName << "' object spec must be an object",
+            spec.type() == Object);
+
+    auto parsed = DocumentSourceChangeStreamCheckResumabilitySpec::parse(
+        IDLParserErrorContext("DocumentSourceChangeStreamCheckResumabilitySpec"),
+        spec.embeddedObject());
+    return new DocumentSourceChangeStreamCheckResumability(expCtx,
+                                                           parsed.getResumeToken().getData());
 }
 
 const char* DocumentSourceChangeStreamCheckResumability::getSourceName() const {

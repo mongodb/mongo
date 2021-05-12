@@ -40,12 +40,15 @@
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
+#include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_close_cursor.h"
+#include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
+#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_lookup_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_lookup_pre_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transactions.h"
-#include "mongo/db/pipeline/document_source_change_stream_update_on_add_shard.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
@@ -151,10 +154,41 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(const Namespac
     }
 }
 
+ResumeTokenData DocumentSourceChangeStream::resolveResumeTokenFromSpec(
+    const DocumentSourceChangeStreamSpec& spec) {
+    if (spec.getStartAfter()) {
+        return spec.getStartAfter()->getData();
+    } else if (spec.getResumeAfter()) {
+        return spec.getResumeAfter()->getData();
+    } else if (spec.getStartAtOperationTime()) {
+        return ResumeToken::makeHighWaterMarkToken(*spec.getStartAtOperationTime()).getData();
+    }
+    tasserted(5666901,
+              "Expected one of 'startAfter', 'resumeAfter' or 'startAtOperationTime' to be "
+              "populated in $changeStream spec");
+}
+
+Timestamp DocumentSourceChangeStream::getStartTimeForNewStream(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // If we do not have an explicit starting point, we should start from the latest majority
+    // committed operation. If we are on mongoS and do not have a starting point, set it to the
+    // current clusterTime so that all shards start in sync.
+    auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
+    const auto currentTime =
+        !expCtx->inMongos ? LogicalTime{replCoord->getMyLastAppliedOpTime().getTimestamp()} : [&] {
+            const auto currentTime = VectorClock::get(expCtx->opCtx)->getTime();
+            return currentTime.clusterTime();
+        }();
+
+    // We always start one tick beyond the most recent operation, to ensure that the stream does not
+    // return it.
+    return currentTime.addTicks(1).asTimestamp();
+}
+
 list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(50808,
-            "$changeStream stage expects a document as argument.",
+            "$changeStream stage expects a document as argument",
             elem.type() == BSONType::Object);
 
     auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
@@ -163,7 +197,79 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     // Make sure that it is legal to run this $changeStream before proceeding.
     DocumentSourceChangeStream::assertIsLegalSpecification(expCtx, spec);
 
-    return change_stream_legacy::buildPipeline(expCtx, spec, elem);
+    // If we see this stage on a shard, it means that the raw $changeStream stage was dispatched to
+    // us from an old mongoS. Build a legacy shard pipeline.
+    if (expCtx->needsMerge ||
+        !feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
+        return change_stream_legacy::buildPipeline(expCtx, spec);
+    }
+    return _buildPipeline(expCtx, spec);
+}
+
+std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_buildPipeline(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceChangeStreamSpec spec) {
+    std::list<boost::intrusive_ptr<DocumentSource>> stages;
+
+    // If the user did not specify an explicit starting point, set it to the current time.
+    if (!spec.getResumeAfter() && !spec.getStartAfter() && !spec.getStartAtOperationTime()) {
+        // Make sure we update the 'startAtOperationTime' in the 'spec' so that we serialize the
+        // correct start point when sending it to the shards.
+        spec.setStartAtOperationTime(DocumentSourceChangeStream::getStartTimeForNewStream(expCtx));
+    }
+
+    // Obtain the resume token from the spec. This will be used when building the pipeline.
+    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(spec);
+
+    // Unfold the $changeStream into its constituent stages and add them to the pipeline.
+    stages.push_back(DocumentSourceChangeStreamOplogMatch::create(expCtx, spec));
+    stages.push_back(DocumentSourceChangeStreamUnwindTransaction::create(expCtx));
+    stages.push_back(DocumentSourceChangeStreamTransform::create(expCtx, spec));
+    tassert(5666900,
+            "'DocumentSourceChangeStreamTransform' stage should populate "
+            "'initialPostBatchResumeToken' field",
+            !expCtx->initialPostBatchResumeToken.isEmpty());
+
+    // The resume stage must come after the check invalidate stage so that the former can determine
+    // whether the event that matches the resume token should be followed by an "invalidate" event.
+    stages.push_back(DocumentSourceChangeStreamCheckInvalidate::create(expCtx, spec));
+
+    // If the starting point is a high water mark, or if we will be splitting the pipeline for
+    // dispatch to the shards in a cluster, we must include a DSCSCheckResumability stage.
+    if (expCtx->inMongos || ResumeToken::isHighWaterMarkToken(resumeToken)) {
+        stages.push_back(DocumentSourceChangeStreamCheckResumability::create(expCtx, spec));
+    }
+
+    // If the pipeline is built on MongoS, then the stage 'DSCSHandleTopologyChange' acts as the
+    // split point for the pipline. All stages before this stages will run on shards and all stages
+    // after and inclusive of this stage will run on the MongoS.
+    if (expCtx->inMongos) {
+        stages.push_back(DocumentSourceChangeStreamCheckTopologyChange::create(expCtx));
+        stages.push_back(DocumentSourceChangeStreamHandleTopologyChange::create(expCtx));
+    }
+
+    // If the resume point is an event, we must include a DSCSEnsureResumeTokenPresent stage.
+    if (!ResumeToken::isHighWaterMarkToken(resumeToken)) {
+        stages.push_back(DocumentSourceChangeStreamEnsureResumeTokenPresent::create(expCtx, spec));
+    }
+
+    // We only create a pre-image lookup stage on a non-merging mongoD. We place this stage here
+    // so that any $match stages which follow the $changeStream pipeline prefix may be able to
+    // skip ahead of the DSCSLookupPreImage stage. This allows a whole-db or whole-cluster stream to
+    // run on an instance where only some collections have pre-images enabled, so long as the
+    // user filters for only those namespaces.
+    // TODO SERVER-36941: figure out how to get this to work in a sharded cluster.
+    if (spec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff) {
+        invariant(!expCtx->inMongos);
+        stages.push_back(DocumentSourceChangeStreamLookupPreImage::create(expCtx, spec));
+    }
+
+    // There should be only one post-image lookup stage.  If we're on the shards and producing
+    // input to be merged, the lookup is done on the mongos.
+    if (spec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup) {
+        stages.push_back(DocumentSourceChangeStreamLookupPostImage::create(expCtx));
+    }
+
+    return stages;
 }
 
 void DocumentSourceChangeStream::assertIsLegalSpecification(
@@ -212,6 +318,35 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     uassert(51771,
             "the 'fullDocumentBeforeChange' option is not supported in a sharded cluster",
             !(shouldLookupPreImage && (expCtx->inMongos || expCtx->needsMerge)));
+
+    uassert(31123,
+            "Change streams from mongos may not show migration events",
+            !(expCtx->inMongos && spec.getShowMigrationEvents()));
+
+    uassert(50865,
+            "Do not specify both 'resumeAfter' and 'startAfter' in a $changeStream stage",
+            !spec.getResumeAfter() || !spec.getStartAfter());
+
+    auto resumeToken = (spec.getResumeAfter() || spec.getStartAfter())
+        ? resolveResumeTokenFromSpec(spec)
+        : boost::optional<ResumeTokenData>();
+
+    uassert(40674,
+            "Only one type of resume option is allowed, but multiple were found",
+            !(spec.getStartAtOperationTime() && resumeToken));
+
+    uassert(ErrorCodes::InvalidResumeToken,
+            "Attempting to resume a change stream using 'resumeAfter' is not allowed from an "
+            "invalidate notification",
+            !(spec.getResumeAfter() && resumeToken->fromInvalidate));
+
+    // If we are resuming a single-collection stream, the resume token should always contain a
+    // UUID unless the token is a high water mark.
+    uassert(ErrorCodes::InvalidResumeToken,
+            "Attempted to resume a single-collection stream, but the resume token does not "
+            "include a UUID",
+            !resumeToken || resumeToken->uuid || !expCtx->isSingleNamespaceAggregation() ||
+                ResumeToken::isHighWaterMarkToken(*resumeToken));
 }
 
 }  // namespace mongo

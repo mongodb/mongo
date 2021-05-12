@@ -29,19 +29,19 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_change_stream_topology_change.h"
+#include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 
 #include "mongo/db/pipeline/change_stream_topology_change_info.h"
 
 namespace mongo {
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(
-    _internalChangeStreamTopologyChange,
+    _internalChangeStreamCheckTopologyChange,
     LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceChangeStreamTopologyChange::createFromBson,
+    DocumentSourceChangeStreamCheckTopologyChange::createFromBson,
     feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
 
-StageConstraints DocumentSourceChangeStreamTopologyChange::constraints(
+StageConstraints DocumentSourceChangeStreamCheckTopologyChange::constraints(
     Pipeline::SplitState pipeState) const {
     return {StreamType::kStreaming,
             PositionRequirement::kNone,
@@ -55,16 +55,16 @@ StageConstraints DocumentSourceChangeStreamTopologyChange::constraints(
 }
 
 
-boost::intrusive_ptr<DocumentSourceChangeStreamTopologyChange>
-DocumentSourceChangeStreamTopologyChange::createFromBson(
+boost::intrusive_ptr<DocumentSourceChangeStreamCheckTopologyChange>
+DocumentSourceChangeStreamCheckTopologyChange::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5669601,
             str::stream() << "the '" << kStageName << "' spec must be an object",
             elem.type() == Object && elem.Obj().isEmpty());
-    return new DocumentSourceChangeStreamTopologyChange(expCtx);
+    return new DocumentSourceChangeStreamCheckTopologyChange(expCtx);
 }
 
-DocumentSource::GetNextResult DocumentSourceChangeStreamTopologyChange::doGetNext() {
+DocumentSource::GetNextResult DocumentSourceChangeStreamCheckTopologyChange::doGetNext() {
     auto nextInput = pSource->getNext();
 
     if (!nextInput.isAdvanced()) {
@@ -87,7 +87,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamTopologyChange::doGetNex
     return nextInput;
 }
 
-Value DocumentSourceChangeStreamTopologyChange::serializeLatest(
+Value DocumentSourceChangeStreamCheckTopologyChange::serializeLatest(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {
         return Value(DOC(DocumentSourceChangeStream::kStageName

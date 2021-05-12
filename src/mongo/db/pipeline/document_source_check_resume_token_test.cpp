@@ -312,10 +312,13 @@ protected:
     /**
      * Convenience method to create the class under test with a given ResumeTokenData.
      */
+
     intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent>
     createDSEnsureResumeTokenPresent(ResumeTokenData tokenData) {
+        DocumentSourceChangeStreamSpec spec;
+        spec.setStartAfter(ResumeToken(tokenData));
         auto checkResumeToken =
-            DocumentSourceChangeStreamEnsureResumeTokenPresent::create(getExpCtx(), tokenData);
+            DocumentSourceChangeStreamEnsureResumeTokenPresent::create(getExpCtx(), spec);
         _mock->setResumeToken(std::move(tokenData));
         checkResumeToken->setSource(_mock.get());
         return checkResumeToken;
@@ -371,8 +374,10 @@ class CheckResumabilityTest : public CheckResumeTokenTest {
 protected:
     intrusive_ptr<DocumentSourceChangeStreamCheckResumability> createDSCheckResumability(
         ResumeTokenData tokenData) {
+        DocumentSourceChangeStreamSpec spec;
+        spec.setStartAfter(ResumeToken(tokenData));
         auto dsCheckResumability =
-            DocumentSourceChangeStreamCheckResumability::create(getExpCtx(), tokenData);
+            DocumentSourceChangeStreamCheckResumability::create(getExpCtx(), spec);
         _mock->setResumeToken(std::move(tokenData));
         dsCheckResumability->setSource(_mock.get());
         return dsCheckResumability;
@@ -497,8 +502,8 @@ TEST_F(CheckResumeTokenTest, ShouldSucceedWithBinaryCollation) {
 TEST_F(CheckResumeTokenTest, UnshardedTokenSucceedsForShardedResumeOnMongosIfIdMatchesFirstDoc) {
     // Verify that a resume token whose documentKey only contains _id can be used to resume a stream
     // on a sharded collection as long as its _id matches the first document. We set 'inMongos'
-    // since this behaviour is only applicable when
-    // DocumentSourceChangeStreamEnsureResumeTokenPresent is running on mongoS.
+    // since this behaviour is only applicable when DSCSEnsureResumeTokenPresent is running on
+    // mongoS.
     Timestamp resumeTimestamp(100, 1);
     getExpCtx()->inMongos = true;
 
@@ -537,8 +542,8 @@ TEST_F(CheckResumeTokenTest, UnshardedTokenFailsForShardedResumeOnMongosIfIdDoes
 TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfTokenHasSubsetOfDocumentKeyFields) {
     // Verify that the relaxed _id check only applies if _id is the sole field present in the
     // client's resume token, even if all the fields that are present match the first doc. We set
-    // 'inMongos' since this is only applicable when
-    // DocumentSourceChangeStreamEnsureResumeTokenPresent is running on mongoS.
+    // 'inMongos' since this is only applicable when DSCSEnsureResumeTokenPresent is running on
+    // mongoS.
     Timestamp resumeTimestamp(100, 1);
     getExpCtx()->inMongos = true;
 
@@ -980,8 +985,7 @@ TEST_F(CheckResumabilityTest, ShouldIgnoreOplogAfterFirstEOF) {
 TEST_F(CheckResumabilityTest, ShouldSwallowAllEventsAtSameClusterTimeUpToResumeToken) {
     Timestamp resumeTimestamp(100, 2);
 
-    // Set up the DocumentSourceChangeStreamCheckResumability to check for an exact event
-    // ResumeToken.
+    // Set up the DSCSCheckResumability to check for an exact event ResumeToken.
     ResumeTokenData token(resumeTimestamp, 0, 0, testUuid(), Value(Document{{"_id"_sd, "3"_sd}}));
     auto dsCheckResumability = createDSCheckResumability(token);
 
@@ -1010,8 +1014,7 @@ TEST_F(CheckResumabilityTest, ShouldSwallowAllEventsAtSameClusterTimeUpToResumeT
 TEST_F(CheckResumabilityTest, ShouldSwallowAllEventsAtSameClusterTimePriorToResumeToken) {
     Timestamp resumeTimestamp(100, 2);
 
-    // Set up the DocumentSourceChangeStreamCheckResumability to check for an exact event
-    // ResumeToken.
+    // Set up the DSCSCheckResumability to check for an exact event ResumeToken.
     ResumeTokenData token(resumeTimestamp, 0, 0, testUuid(), Value(Document{{"_id"_sd, "3"_sd}}));
     auto dsCheckResumability = createDSCheckResumability(token);
 

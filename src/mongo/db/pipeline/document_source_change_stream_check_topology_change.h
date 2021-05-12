@@ -45,18 +45,18 @@ namespace mongo {
  * that previously may not have held any data for the collection being watched, and they contain the
  * information necessary for the mongoS to include the new shard in the merged change stream.
  */
-class DocumentSourceChangeStreamTopologyChange final
+class DocumentSourceChangeStreamCheckTopologyChange final
     : public DocumentSource,
       public ChangeStreamStageSerializationInterface {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamTopologyChange"_sd;
+    static constexpr StringData kStageName = "$_internalChangeStreamCheckTopologyChange"_sd;
 
-    static boost::intrusive_ptr<DocumentSourceChangeStreamTopologyChange> createFromBson(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamCheckTopologyChange> createFromBson(
         const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    static boost::intrusive_ptr<DocumentSourceChangeStreamTopologyChange> create(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamCheckTopologyChange> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceChangeStreamTopologyChange(expCtx);
+        return new DocumentSourceChangeStreamCheckTopologyChange(expCtx);
     }
 
     const char* getSourceName() const final {
@@ -74,7 +74,8 @@ public:
     }
 
 private:
-    DocumentSourceChangeStreamTopologyChange(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    DocumentSourceChangeStreamCheckTopologyChange(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(kStageName, expCtx) {}
 
     GetNextResult doGetNext() final;

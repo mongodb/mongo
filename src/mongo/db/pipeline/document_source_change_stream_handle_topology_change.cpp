@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source_change_stream_update_on_add_shard.h"
+#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 
 #include <algorithm>
 
@@ -77,17 +77,17 @@ bool isShardConfigEvent(const Document& eventDoc) {
 }
 }  // namespace
 
-boost::intrusive_ptr<DocumentSourceChangeStreamUpdateOnAddShard>
-DocumentSourceChangeStreamUpdateOnAddShard::create(
+boost::intrusive_ptr<DocumentSourceChangeStreamHandleTopologyChange>
+DocumentSourceChangeStreamHandleTopologyChange::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceChangeStreamUpdateOnAddShard(expCtx);
+    return new DocumentSourceChangeStreamHandleTopologyChange(expCtx);
 }
 
-DocumentSourceChangeStreamUpdateOnAddShard::DocumentSourceChangeStreamUpdateOnAddShard(
+DocumentSourceChangeStreamHandleTopologyChange::DocumentSourceChangeStreamHandleTopologyChange(
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : DocumentSource(kStageName, expCtx) {}
 
-DocumentSource::GetNextResult DocumentSourceChangeStreamUpdateOnAddShard::doGetNext() {
+DocumentSource::GetNextResult DocumentSourceChangeStreamHandleTopologyChange::doGetNext() {
     // For the first call to the 'doGetNext', the '_mergeCursors' will be null and must be
     // populated. We also resolve the original aggregation command from the expression context.
     if (!_mergeCursors) {
@@ -113,13 +113,13 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamUpdateOnAddShard::doGetN
     return childResult;
 }
 
-void DocumentSourceChangeStreamUpdateOnAddShard::addNewShardCursors(
+void DocumentSourceChangeStreamHandleTopologyChange::addNewShardCursors(
     const Document& newShardDetectedObj) {
     _mergeCursors->addNewShardCursors(establishShardCursorsOnNewShards(newShardDetectedObj));
 }
 
 std::vector<RemoteCursor>
-DocumentSourceChangeStreamUpdateOnAddShard::establishShardCursorsOnNewShards(
+DocumentSourceChangeStreamHandleTopologyChange::establishShardCursorsOnNewShards(
     const Document& newShardDetectedObj) {
     // Reload the shard registry to see the new shard.
     auto* opCtx = pExpCtx->opCtx;
@@ -146,7 +146,7 @@ DocumentSourceChangeStreamUpdateOnAddShard::establishShardCursorsOnNewShards(
                             allowPartialResults);
 }
 
-BSONObj DocumentSourceChangeStreamUpdateOnAddShard::createUpdatedCommandForNewShard(
+BSONObj DocumentSourceChangeStreamHandleTopologyChange::createUpdatedCommandForNewShard(
     Timestamp shardAddedTime) {
     // We must start the new cursor from the moment at which the shard became visible.
     const auto newShardAddedTime = LogicalTime{shardAddedTime};
@@ -178,7 +178,7 @@ BSONObj DocumentSourceChangeStreamUpdateOnAddShard::createUpdatedCommandForNewSh
                                                                true /* needsMerge */);
 }
 
-BSONObj DocumentSourceChangeStreamUpdateOnAddShard::replaceResumeTokenInCommand(
+BSONObj DocumentSourceChangeStreamHandleTopologyChange::replaceResumeTokenInCommand(
     Document resumeToken) {
     Document originalCmd(_originalAggregateCommand);
     auto pipeline = originalCmd[AggregateCommandRequest::kPipelineFieldName].getArray();

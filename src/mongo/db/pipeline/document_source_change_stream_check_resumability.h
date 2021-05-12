@@ -95,22 +95,11 @@ public:
     }
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamCheckResumability> createFromBson(
-        BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        uassert(5467603,
-                str::stream() << "the '" << kStageName << "' object spec must be an object",
-                spec.type() == Object);
-
-        auto parsed = DocumentSourceChangeStreamCheckResumabilitySpec::parse(
-            IDLParserErrorContext("DocumentSourceChangeStreamCheckResumabilitySpec"),
-            spec.embeddedObject());
-        return create(expCtx, parsed.getResumeToken().getData());
-    }
+        BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamCheckResumability> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Timestamp ts);
-
-    static boost::intrusive_ptr<DocumentSourceChangeStreamCheckResumability> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const DocumentSourceChangeStreamSpec& spec);
 
 protected:
     /**

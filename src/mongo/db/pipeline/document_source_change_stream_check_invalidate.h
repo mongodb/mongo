@@ -72,12 +72,10 @@ public:
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamCheckInvalidate> createFromBson(
         BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
     static boost::intrusive_ptr<DocumentSourceChangeStreamCheckInvalidate> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        boost::optional<ResumeTokenData> startAfterInvalidate) {
-        return new DocumentSourceChangeStreamCheckInvalidate(expCtx,
-                                                             std::move(startAfterInvalidate));
-    }
+        const DocumentSourceChangeStreamSpec& spec);
 
 private:
     /**

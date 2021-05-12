@@ -189,20 +189,14 @@ BSONObj buildMatchFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     return BSON("$and" << BSON_ARRAY(BSON("ts" << GTE << startFromInclusive)
                                      << BSON(OR(opMatch, commandAndApplyOpsMatch))));
 }
-
 }  // namespace
 
 boost::intrusive_ptr<DocumentSourceChangeStreamOplogMatch>
 DocumentSourceChangeStreamOplogMatch::create(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                             bool showMigrationEvents) {
-    // TODO SERVER-56669: ensure that 'initialPostBatchResumeToken' is always populated at this
-    // point.
+                                             const DocumentSourceChangeStreamSpec& spec) {
+    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(spec);
     return make_intrusive<DocumentSourceChangeStreamOplogMatch>(
-        buildMatchFilter(
-            expCtx,
-            ResumeToken::parse(expCtx->initialPostBatchResumeToken).getData().clusterTime,
-            showMigrationEvents),
-        expCtx);
+        buildMatchFilter(expCtx, resumeToken.clusterTime, spec.getShowMigrationEvents()), expCtx);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceChangeStreamOplogMatch::createFromBson(

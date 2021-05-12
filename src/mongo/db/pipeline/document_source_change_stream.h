@@ -187,7 +187,25 @@ public:
      */
     static void checkValueType(const Value v, const StringData fieldName, BSONType expectedType);
 
+    /**
+     * Extracts the resume token from the given spec. If a 'startAtOperationTime' is specified,
+     * returns the equivalent high-watermark token. This method should only ever be called on a spec
+     * where one of 'resumeAfter', 'startAfter', or 'startAtOperationTime' is populated.
+     */
+    static ResumeTokenData resolveResumeTokenFromSpec(const DocumentSourceChangeStreamSpec& spec);
+
+    /**
+     * For a change stream with no resume information supplied by the user, returns the clusterTime
+     * at which the new stream should begin scanning the oplog.
+     */
+    static Timestamp getStartTimeForNewStream(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 private:
+    // Constructs and returns a series of stages representing the full change stream pipeline.
+    static std::list<boost::intrusive_ptr<DocumentSource>> _buildPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceChangeStreamSpec spec);
+
     // Helper function which throws if the $changeStream fails any of a series of semantic checks.
     // For instance, whether it is permitted to run given the current FCV, whether the namespace is
     // valid for the options specified in the spec, etc.

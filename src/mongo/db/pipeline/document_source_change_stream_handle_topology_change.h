@@ -45,15 +45,15 @@ namespace mongo {
  * the first time. When this event is detected, this stage will establish a new cursor on that
  * shard and add it to the cursors being merged.
  */
-class DocumentSourceChangeStreamUpdateOnAddShard final : public DocumentSource {
+class DocumentSourceChangeStreamHandleTopologyChange final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalUpdateOnAddShard"_sd;
+    static constexpr StringData kStageName = "$_internalChangeStreamHandleTopologyChange"_sd;
 
     /**
      * Creates a new stage which will establish a new cursor and add it to the cursors being merged
      * by 'mergeCursorsStage' whenever a new shard is detected by a change stream.
      */
-    static boost::intrusive_ptr<DocumentSourceChangeStreamUpdateOnAddShard> create(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamHandleTopologyChange> create(
         const boost::intrusive_ptr<ExpressionContext>&);
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
@@ -77,7 +77,7 @@ public:
     }
 
 private:
-    DocumentSourceChangeStreamUpdateOnAddShard(const boost::intrusive_ptr<ExpressionContext>&);
+    DocumentSourceChangeStreamHandleTopologyChange(const boost::intrusive_ptr<ExpressionContext>&);
 
     GetNextResult doGetNext() final;
 

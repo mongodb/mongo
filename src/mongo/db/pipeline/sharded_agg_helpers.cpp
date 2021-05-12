@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_change_stream_update_on_add_shard.h"
+#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"

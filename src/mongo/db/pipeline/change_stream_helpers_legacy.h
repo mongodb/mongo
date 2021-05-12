@@ -38,7 +38,6 @@ namespace mongo::change_stream_legacy {
  */
 std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const DocumentSourceChangeStreamSpec spec,
-    BSONElement rawSpec);
+    const DocumentSourceChangeStreamSpec spec);
 
 }  // namespace mongo::change_stream_legacy

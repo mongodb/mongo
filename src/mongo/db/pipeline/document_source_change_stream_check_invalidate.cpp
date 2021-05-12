@@ -66,6 +66,17 @@ bool isInvalidatingCommand(const boost::intrusive_ptr<ExpressionContext>& pExpCt
 }  // namespace
 
 boost::intrusive_ptr<DocumentSourceChangeStreamCheckInvalidate>
+DocumentSourceChangeStreamCheckInvalidate::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const DocumentSourceChangeStreamSpec& spec) {
+    // If resuming from an "invalidate" using "startAfter", pass along the resume token data to
+    // DSCSCheckInvalidate to signify that another invalidate should not be generated.
+    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(spec);
+    return new DocumentSourceChangeStreamCheckInvalidate(
+        expCtx, boost::make_optional(resumeToken.fromInvalidate, std::move(resumeToken)));
+}
+
+boost::intrusive_ptr<DocumentSourceChangeStreamCheckInvalidate>
 DocumentSourceChangeStreamCheckInvalidate::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5467602,
@@ -77,9 +88,8 @@ DocumentSourceChangeStreamCheckInvalidate::createFromBson(
         spec.embeddedObject());
     return new DocumentSourceChangeStreamCheckInvalidate(
         expCtx,
-        parsed.getStartAfterInvalidate()
-            ? boost::optional<ResumeTokenData>(parsed.getStartAfterInvalidate()->getData())
-            : boost::none);
+        parsed.getStartAfterInvalidate() ? parsed.getStartAfterInvalidate()->getData()
+                                         : boost::optional<ResumeTokenData>());
 }
 
 DocumentSource::GetNextResult DocumentSourceChangeStreamCheckInvalidate::doGetNext() {
