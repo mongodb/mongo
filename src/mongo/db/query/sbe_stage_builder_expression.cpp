@@ -151,8 +151,6 @@ std::pair<sbe::value::SlotId, EvalStage> generateTraverseHelper(
 
     // The field we will be traversing at the current nested level.
     auto fieldSlot{slotIdGenerator->generate()};
-    // The result coming from the 'in' branch of the traverse plan stage.
-    auto outputSlot{slotIdGenerator->generate()};
 
     // Generate the projection stage to read a sub-field at the current nested level and bind it
     // to 'fieldSlot'.
@@ -163,31 +161,24 @@ std::pair<sbe::value::SlotId, EvalStage> generateTraverseHelper(
                                           sbe::makeE<sbe::EVariable>(inputSlot),
                                           sbe::makeE<sbe::EConstant>(fp.getFieldName(level))));
 
-    EvalStage innerBranch;
     if (level == fp.getPathLength() - 1) {
-        innerBranch = makeProject(makeLimitCoScanStage(planNodeId),
-                                  planNodeId,
-                                  outputSlot,
-                                  sbe::makeE<sbe::EVariable>(fieldSlot));
-    } else {
-        // Generate nested traversal.
-        auto [slot, stage] = generateTraverseHelper(makeLimitCoScanStage(planNodeId),
-                                                    fieldSlot,
-                                                    fp,
-                                                    level + 1,
-                                                    planNodeId,
-                                                    slotIdGenerator);
-        innerBranch =
-            makeProject(std::move(stage), planNodeId, outputSlot, sbe::makeE<sbe::EVariable>(slot));
+        // For the last level, we can just return the field slot without the need for a
+        // traverse stage.
+        return {fieldSlot, std::move(inputStage)};
     }
 
-    // The final traverse stage for the current nested level.
+    // Generate nested traversal.
+    auto [innerResultSlot, innerBranch] = generateTraverseHelper(
+        makeLimitCoScanStage(planNodeId), fieldSlot, fp, level + 1, planNodeId, slotIdGenerator);
+
+    // Generate the traverse stage for the current nested level.
+    auto outputSlot{slotIdGenerator->generate()};
     return {outputSlot,
             makeTraverse(std::move(inputStage),
                          std::move(innerBranch),
                          fieldSlot,
                          outputSlot,
-                         outputSlot,
+                         innerResultSlot,
                          nullptr,
                          nullptr,
                          planNodeId,
