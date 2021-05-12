@@ -28,10 +28,15 @@
 #      define BOOST_FILESYSTEM_HAS_ARC4RANDOM
 #   endif
 #   if (defined(__linux__) || defined(__linux) || defined(linux)) && (!defined(__ANDROID__) || __ANDROID_API__ >= 28)
-#      include <sys/syscall.h>
-#      if defined(SYS_getrandom)
-#          define BOOST_FILESYSTEM_HAS_SYS_GETRANDOM
-#      endif // defined(SYS_getrandom)
+
+// MONGODB MODIFICATION: On our RHEL 7.0, we find that SYS_getrandom is defined, but the kernel
+// doesn't actually offer support. Don't look for syscall based support until that is fixed.
+//
+//#      include <sys/syscall.h>
+//#      if defined(SYS_getrandom)
+//#          define BOOST_FILESYSTEM_HAS_SYS_GETRANDOM
+//#      endif // defined(SYS_getrandom)
+
 #      if defined(__has_include)
 #          if __has_include(<sys/random.h>)
 #              define BOOST_FILESYSTEM_HAS_GETRANDOM
