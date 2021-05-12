@@ -70,7 +70,7 @@ class CmdHello : public BasicCommandWithReplyBuilderInterface {
 public:
     CmdHello() : CmdHello(kHelloString, {}) {}
 
-    const std::set<std::string>& apiVersions() const final {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
     }
 
@@ -262,6 +262,10 @@ protected:
 class CmdIsMaster : public CmdHello {
 public:
     CmdIsMaster() : CmdHello(kCamelCaseIsMasterString, {kLowerCaseIsMasterString}) {}
+
+    const std::set<std::string>& apiVersions() const final {
+        return kNoApiVersions;
+    }
 
 protected:
     bool useLegacyResponseFields() const final {

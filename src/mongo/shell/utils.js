@@ -441,7 +441,7 @@ jsTest.authenticateNodes = function(nodes) {
         for (var i = 0; i < nodes.length; i++) {
             // Don't try to authenticate to arbiters
             try {
-                res = nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
+                res = nodes[i].getDB("admin")._runCommandWithoutApiStrict({replSetGetStatus: 1});
             } catch (e) {
                 // ReplicaSet tests which don't use auth are allowed to have nodes crash during
                 // startup. To allow tests which use to behavior to work with auth,
@@ -461,7 +461,7 @@ jsTest.authenticateNodes = function(nodes) {
 };
 
 jsTest.isMongos = function(conn) {
-    return conn.getDB('admin').isMaster().msg == 'isdbgrid';
+    return conn.getDB('admin')._helloOrLegacyHello().msg == 'isdbgrid';
 };
 
 defaultPrompt = function() {
@@ -470,7 +470,7 @@ defaultPrompt = function() {
 
     if (typeof prefix == 'undefined') {
         prefix = "";
-        var buildInfo = db.runCommand({buildInfo: 1});
+        var buildInfo = db._runCommandWithoutApiStrict({buildInfo: 1});
         try {
             if (buildInfo.modules.indexOf("enterprise") > -1) {
                 prefix += "MongoDB Enterprise ";
@@ -478,9 +478,9 @@ defaultPrompt = function() {
         } catch (e) {
             // Don't do anything here. Just throw the error away.
         }
-        var isMasterRes = db.runCommand({isMaster: 1, forShell: 1});
+        var hello = db._helloOrLegacyHello({forShell: 1});
         try {
-            if (isMasterRes.hasOwnProperty("automationServiceDescriptor")) {
+            if (hello.hasOwnProperty("automationServiceDescriptor")) {
                 prefix += "[automated] ";
             }
         } catch (e) {
@@ -495,12 +495,12 @@ defaultPrompt = function() {
             try {
                 var prompt = replSetMemberStatePrompt();
                 // set our status that it was good
-                db.getMongo().authStatus = {replSetGetStatus: true, isMaster: true};
+                db.getMongo().authStatus = {replSetGetStatus: true, hello: true};
                 return prefix + prompt;
             } catch (e) {
                 // don't have permission to run that, or requires auth
                 // print(e);
-                status = {authRequired: true, replSetGetStatus: false, isMaster: true};
+                status = {authRequired: true, replSetGetStatus: false, hello: true};
             }
         }
         // auth detected
@@ -521,22 +521,22 @@ defaultPrompt = function() {
             }
         }
 
-        // try to use isMaster?
-        if (status.isMaster) {
+        // try to use hello?
+        if (status.hello) {
             try {
-                var prompt = isMasterStatePrompt(isMasterRes);
-                status.isMaster = true;
+                var prompt = helloStatePrompt(hello);
+                status.hello = true;
                 db.getMongo().authStatus = status;
                 return prefix + prompt;
             } catch (e) {
                 status.authRequired = true;
-                status.isMaster = false;
+                status.hello = false;
             }
         }
     } catch (ex) {
         printjson(ex);
         // reset status and let it figure it out next time.
-        status = {isMaster: true};
+        status = {hello: true};
     }
 
     db.getMongo().authStatus = status;
@@ -545,7 +545,8 @@ defaultPrompt = function() {
 
 replSetMemberStatePrompt = function() {
     var state = '';
-    var stateInfo = db.getSiblingDB('admin').runCommand({replSetGetStatus: 1, forShell: 1});
+    var stateInfo =
+        db.getSiblingDB('admin')._runCommandWithoutApiStrict({replSetGetStatus: 1, forShell: 1});
     if (stateInfo.ok) {
         // Report the self member's stateStr if it's present.
         stateInfo.members.forEach(function(member) {
@@ -569,31 +570,31 @@ replSetMemberStatePrompt = function() {
     return state + '> ';
 };
 
-isMasterStatePrompt = function(isMasterResponse) {
+helloStatePrompt = function(helloReply) {
     var state = '';
-    var isMaster = isMasterResponse || db.runCommand({isMaster: 1, forShell: 1});
-    if (isMaster.ok) {
+    var hello = helloReply || db._helloOrLegacyHello({forShell: 1});
+    if (hello.ok) {
         var role = "";
 
-        if (isMaster.msg == "isdbgrid") {
+        if (hello.msg == "isdbgrid") {
             role = "mongos";
         }
 
-        if (isMaster.setName) {
-            if (isMaster.ismaster)
+        if (hello.setName) {
+            if (hello.isWritablePrimary || hello.ismaster)
                 role = "PRIMARY";
-            else if (isMaster.secondary)
+            else if (hello.secondary)
                 role = "SECONDARY";
-            else if (isMaster.arbiterOnly)
+            else if (hello.arbiterOnly)
                 role = "ARBITER";
             else {
                 role = "OTHER";
             }
-            state = isMaster.setName + ':';
+            state = hello.setName + ':';
         }
         state = state + role;
     } else {
-        throw _getErrorWithCode(isMaster, "Failed: " + tojson(isMaster));
+        throw _getErrorWithCode(hello, "Failed: " + tojson(hello));
     }
     return state + '> ';
 };
@@ -1091,7 +1092,7 @@ shellHelper.show = function(what) {
         }
 
         if (dbDeclared) {
-            var res = db.runCommand({isMaster: 1, forShell: 1});
+            var res = db._helloOrLegacyHello({forShell: 1});
             if (!res.ok) {
                 print("Note: Cannot determine if automation is active");
                 return "";
@@ -1165,7 +1166,7 @@ shellHelper.show = function(what) {
         // A MongoDB emulation service offered by a company
         // responsible for a certain disk operating system.
         try {
-            const buildInfo = db.runCommand({buildInfo: 1});
+            const buildInfo = db._runCommandWithoutApiStrict({buildInfo: 1});
             if (buildInfo.hasOwnProperty('_t')) {
                 matchesKnownImposterSignature = true;
             }
@@ -1221,7 +1222,7 @@ __promptWrapper__ = function(promptFunction) {
     try {
         db = originalDB.getMongo().getDB(originalDB.getName());
         // Setting db._session to be a _DummyDriverSession instance makes it so that
-        // a logical session id isn't included in the isMaster and replSetGetStatus
+        // a logical session id isn't included in the hello and replSetGetStatus
         // commands and therefore won't interfere with the session associated with the
         // global "db" object.
         db._session = new _DummyDriverSession(db.getMongo());

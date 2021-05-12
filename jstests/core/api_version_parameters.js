@@ -53,10 +53,10 @@ assert.commandWorked(db.runCommand({ping: 1, apiVersion: "1"}));
 assert.commandWorked(db.runCommand({listCommands: 1, apiVersion: "1"}));
 // If the client passed apiStrict: true, but the command is not in V1, reply with
 // APIStrictError.
-assert.commandFailedWithCode(
-    db.runCommand({listCommands: 1, apiVersion: "1", apiStrict: true}),
-    ErrorCodes.APIStrictError,
-    "Provided apiStrict: true, but the invoked command's apiVersions() does not include \"1\"");
+assert.commandFailedWithCode(db.runCommand({listCommands: 1, apiVersion: "1", apiStrict: true}),
+                             ErrorCodes.APIStrictError);
+assert.commandFailedWithCode(db.runCommand({isMaster: 1, apiVersion: "1", apiStrict: true}),
+                             ErrorCodes.APIStrictError);
 assert.commandWorked(db.runCommand({listCommands: 1, apiVersion: "1", apiDeprecationErrors: true}));
 
 // Test parsing logic of command deprecated in API V1.

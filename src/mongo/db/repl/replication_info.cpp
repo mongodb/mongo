@@ -247,7 +247,7 @@ class CmdHello : public BasicCommandWithReplyBuilderInterface {
 public:
     CmdHello() : CmdHello(kHelloString, {}) {}
 
-    const std::set<std::string>& apiVersions() const final {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
     }
 
@@ -500,6 +500,10 @@ protected:
 class CmdIsMaster : public CmdHello {
 public:
     CmdIsMaster() : CmdHello(kCamelCaseIsMasterString, {kLowerCaseIsMasterString}) {}
+
+    const std::set<std::string>& apiVersions() const final {
+        return kNoApiVersions;
+    }
 
     std::string help() const final {
         return "Check if this server is primary for a replica set\n"

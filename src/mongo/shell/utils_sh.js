@@ -3,7 +3,7 @@ sh = function() {
 };
 
 sh._checkMongos = function() {
-    var x = db.runCommand("ismaster");
+    var x = db._helloOrLegacyHello();
     if (x.msg != "isdbgrid")
         throw Error("not connected to a mongos");
 };

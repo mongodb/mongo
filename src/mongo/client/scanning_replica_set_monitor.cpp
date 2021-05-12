@@ -988,7 +988,7 @@ void IsMasterReply::parse(const BSONObj& obj) {
         maxWireVersion = raw["maxWireVersion"].numberInt();
 
         // hidden nodes can't be master, even if they claim to be.
-        isMaster = !hidden && raw["ismaster"].trueValue();
+        isMaster = !hidden && (raw["isWritablePrimary"].trueValue() || raw["ismaster"].trueValue());
 
         if (isMaster && raw.hasField("electionId")) {
             electionId = raw["electionId"].OID();

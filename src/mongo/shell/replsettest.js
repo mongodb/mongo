@@ -126,8 +126,8 @@ var ReplSetTest = function(opts) {
     }
 
     /**
-     * Invokes the 'hello' command via it's alias 'ismaster' on each individual node and returns the
-     * current primary, or false if none is found. Populates the following cached values:
+     * Invokes the 'hello' command on each individual node and returns the current primary, or false
+     * if none is found. Populates the following cached values:
      * '_primary': the current primary
      * '_secondaries': all nodes other than '_primary' (note this includes arbiters)
      * '_liveNodes': all currently reachable nodes
@@ -143,7 +143,7 @@ var ReplSetTest = function(opts) {
         self.nodes.forEach(function(node) {
             try {
                 node.setSecondaryOk();
-                var n = node.getDB('admin').runCommand({ismaster: 1});
+                var n = node.getDB('admin')._helloOrLegacyHello();
                 self._liveNodes.push(node);
                 // We verify that the node has a valid config by checking if n.me exists. Then, we
                 // check to see if the node is in primary state.
@@ -152,13 +152,14 @@ var ReplSetTest = function(opts) {
                         twoPrimaries = true;
                     } else {
                         self._primary = node;
-                        canAcceptWrites = n.ismaster;
+                        canAcceptWrites = n.isWritablePrimary || n.ismaster;
                     }
                 } else {
                     self._secondaries.push(node);
                 }
             } catch (err) {
-                print("ReplSetTest Could not call ismaster on node " + node + ": " + tojson(err));
+                print("ReplSetTest Could not call hello/ismaster on node " + node + ": " +
+                      tojson(err));
                 self._secondaries.push(node);
             }
         });
@@ -733,10 +734,7 @@ var ReplSetTest = function(opts) {
             var ready = true;
 
             for (var i = 0; i < len; i++) {
-                // Our testing framework must be backwards compatible
-                // for multiversion testing, so we are using the 'hello'
-                // command's alias 'ismaster'.
-                var hello = secondariesToCheck[i].adminCommand({ismaster: 1});
+                var hello = secondariesToCheck[i].getDB('admin')._helloOrLegacyHello();
                 var arbiter = (hello.arbiterOnly === undefined ? false : hello.arbiterOnly);
                 ready = ready && (hello.secondary || arbiter);
             }
@@ -950,10 +948,7 @@ var ReplSetTest = function(opts) {
             var primary;
 
             for (var i = 0; i < nodes.length; i++) {
-                // Our testing framework must be backwards compatible
-                // for multiversion testing, so we are using the 'hello'
-                // command's alias 'ismaster'.
-                var hello = assert.commandWorked(nodes[i].adminCommand({ismaster: 1}));
+                var hello = assert.commandWorked(nodes[i].getDB('admin')._helloOrLegacyHello());
                 var nodesPrimary = hello.primary;
                 // Node doesn't see a primary.
                 if (!nodesPrimary) {
@@ -1086,7 +1081,7 @@ var ReplSetTest = function(opts) {
     };
 
     function isNodeArbiter(node) {
-        return node.getDB('admin').isMaster('admin').arbiterOnly;
+        return node.getDB('admin')._helloOrLegacyHello().arbiterOnly;
     }
 
     this.getArbiters = function() {
@@ -1099,7 +1094,7 @@ var ReplSetTest = function(opts) {
             assert.retryNoExcept(() => {
                 isArbiter = isNodeArbiter(node);
                 return true;
-            }, `Could not call 'isMaster' on ${node}.`, 3, 1000);
+            }, `Could not call hello/isMaster on ${node}.`, 3, 1000);
 
             if (isArbiter) {
                 arbiters.push(node);
@@ -1804,10 +1799,10 @@ var ReplSetTest = function(opts) {
         timeout = timeout || this.kDefaultTimeoutMS;
 
         assert.soonNoExcept(function() {
-            var primaryVersion = self.getPrimary().adminCommand({ismaster: 1}).setVersion;
+            var primaryVersion = self.getPrimary().getDB('admin')._helloOrLegacyHello().setVersion;
 
             for (var i = 0; i < self.nodes.length; i++) {
-                var version = self.nodes[i].adminCommand({ismaster: 1}).setVersion;
+                var version = self.nodes[i].getDB('admin')._helloOrLegacyHello().setVersion;
                 assert.eq(version,
                           primaryVersion,
                           "waiting for secondary node " + self.nodes[i].host +
@@ -2248,7 +2243,7 @@ var ReplSetTest = function(opts) {
         const sessions = [
             self._primary,
             ...secondaries.filter(conn => {
-                return !conn.adminCommand({isMaster: 1}).arbiterOnly;
+                return !conn.getDB('admin')._helloOrLegacyHello().arbiterOnly;
             })
         ].map(conn => conn.getDB('test').getSession());
 

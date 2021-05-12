@@ -580,7 +580,7 @@ void DBClientBase::logout(const string& dbname, BSONObj& info) {
 
 bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
     BSONObjBuilder bob;
-    bob.append("ismaster", 1);
+    bob.append(_apiParameters.getVersion() ? "hello" : "ismaster", 1);
     if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
         WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
     }
@@ -589,7 +589,8 @@ bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
     if (info == nullptr)
         info = &o;
     bool ok = runCommand("admin", bob.obj(), *info);
-    isPrimary = info->getField("ismaster").trueValue();
+    isPrimary =
+        info->getField(_apiParameters.getVersion() ? "isWritablePrimary" : "ismaster").trueValue();
     return ok;
 }
 

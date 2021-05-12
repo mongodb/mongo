@@ -189,8 +189,7 @@ function MongoBridge(options) {
     };
 
     // All *From functions require that test commands be enabled on the mongod
-    // instance (which populates the hostInfo field). Verify that they're
-    // enabled by sending isMaster
+    // instance (which populates the hostInfo field).
     function checkTestCommandsEnabled(fn_name) {
         return function(bridge) {
             assert(bridge._testCommandsEnabledAtInit,

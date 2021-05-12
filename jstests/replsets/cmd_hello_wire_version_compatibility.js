@@ -29,7 +29,7 @@ let testWireVersion = function(isSystem, compatibilityBounds) {
     }
 
     {  // Test deprecated isMaster command
-        let res = admin.runCommand({isMaster: 1, apiVersion: "1", apiStrict: true});
+        let res = admin.runCommand({isMaster: 1, apiVersion: "1"});
         assert.lte(res.minWireVersion, compatibilityBounds.minWireVersion);
         assert.gte(res.maxWireVersion, compatibilityBounds.maxWireVersion);
     }

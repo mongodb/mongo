@@ -197,6 +197,14 @@ DB.prototype.adminCommand = function(obj, extra) {
 
 DB.prototype._adminCommand = DB.prototype.adminCommand;  // alias old name
 
+DB.prototype._helloOrLegacyHello = function(args) {
+    let cmd = this.getMongo().getApiParameters().version ? {hello: 1} : {isMaster: 1};
+    if (args) {
+        Object.assign(cmd, args);
+    }
+    return this.runCommand(cmd);
+};
+
 DB.prototype._runCommandWithoutApiStrict = function(command) {
     let commandWithoutApiStrict = Object.assign({}, command);
     if (this.getMongo().getApiParameters().strict) {
@@ -1003,11 +1011,19 @@ DB.prototype.getReplicationInfo = function() {
 DB.prototype.printReplicationInfo = function() {
     var result = this.getReplicationInfo();
     if (result.errmsg) {
-        var isMaster = this.isMaster();
-        if (isMaster.arbiterOnly) {
+        let reply, isPrimary;
+        if (this.getMongo().getApiParameters().apiVersion) {
+            reply = this.hello();
+            isPrimary = reply.isWritablePrimary;
+        } else {
+            reply = this.isMaster();
+            isPrimary = reply.ismaster;
+        }
+
+        if (reply.arbiterOnly) {
             print("cannot provide replication status from an arbiter.");
             return;
-        } else if (!isMaster.ismaster) {
+        } else if (!isPrimary) {
             print("this is a secondary, printing secondary replication info.");
             this.printSecondaryReplicationInfo();
             return;
@@ -1475,7 +1491,7 @@ DB.prototype._defaultAuthenticationMechanism = null;
 DB.prototype._getDefaultAuthenticationMechanism = function(username, database) {
     if (username !== undefined) {
         const userid = database + "." + username;
-        const result = this.runCommand({isMaster: 1, saslSupportedMechs: userid});
+        const result = this._helloOrLegacyHello({saslSupportedMechs: userid});
         if (result.ok && (result.saslSupportedMechs !== undefined)) {
             const mechs = result.saslSupportedMechs;
             if (!Array.isArray(mechs)) {
@@ -1544,8 +1560,8 @@ DB.prototype._authOrThrow = function() {
     params.db = this.getName();
     var good = this.getMongo().auth(params);
     if (good) {
-        // auth enabled, and should try to use isMaster and replSetGetStatus to build prompt
-        this.getMongo().authStatus = {authRequired: true, isMaster: true, replSetGetStatus: true};
+        // auth enabled, and should try to use hello and replSetGetStatus to build prompt
+        this.getMongo().authStatus = {authRequired: true, hello: true, replSetGetStatus: true};
     }
 
     return good;
@@ -1798,8 +1814,16 @@ DB.prototype.getFreeMonitoringStatus = function() {
 
 DB.prototype.enableFreeMonitoring = function() {
     'use strict';
-    const isMaster = this.isMaster();
-    if (isMaster.ismaster == false) {
+    let reply, isPrimary;
+    if (this.getMongo().getApiParameters().apiVersion) {
+        reply = this.hello();
+        isPrimary = reply.isWritablePrimary;
+    } else {
+        reply = this.isMaster();
+        isPrimary = reply.ismaster;
+    }
+
+    if (!isPrimary) {
         print("ERROR: db.enableFreeMonitoring() may only be run on a primary");
         return;
     }

@@ -775,7 +775,7 @@ var ShardingTest = function(params) {
                 diff = (new Date()).getTime() - start.getTime();
                 var currNode = nodes[j];
                 // Skip arbiters
-                if (currNode.adminCommand({isMaster: 1}).arbiterOnly) {
+                if (currNode.getDB('admin')._helloOrLegacyHello().arbiterOnly) {
                     continue;
                 }
 

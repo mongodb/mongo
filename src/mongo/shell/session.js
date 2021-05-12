@@ -374,9 +374,9 @@ var {
                         throw e;
                     }
 
-                    // We run an "isMaster" command explicitly to force the underlying
+                    // We run a "hello" command explicitly to force the underlying
                     // DBClient to reconnect to the server.
-                    const res = client.adminCommand({isMaster: 1});
+                    const res = client.getDB('admin')._helloOrLegacyHello();
                     if (res.ok !== 1) {
                         throw e;
                     }

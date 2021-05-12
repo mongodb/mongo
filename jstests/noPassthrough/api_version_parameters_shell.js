@@ -177,6 +177,18 @@ runShellWithCommand(mongod.port, false, false, {ping: 1}, {strict: true});
 runShellWithCommand(mongod.port, false, false, {ping: 1}, {deprecationErrors: true});
 runShellWithCommand(mongod.port, false, false, {ping: 1}, {strict: true, deprecationErrors: true});
 
+if (m.adminCommand('buildinfo').modules.indexOf('enterprise') > -1) {
+    /*
+     * Test that we can call buildinfo while assembling the shell prompt, in order to determine that
+     * this is MongoDB Enterprise, although buildinfo is not in API Version 1 and the shell is
+     * running with --apiStrict.
+     */
+    const testPrompt = "assert(RegExp('MongoDB Enterprise').test(defaultPrompt()))";
+    const result = runMongoProgram(
+        'mongo', '--port', mongod.port, '--apiVersion', '1', '--apiStrict', '--eval', testPrompt);
+    assert.eq(result, 0, `Error running shell with script '${testPrompt}'`);
+}
+
 /*
  * Mongo-specific tests.
  */
