@@ -153,6 +153,11 @@ public:
     bool isSpecified() const;
 
     /**
+     * Returns true if this ReadConcernArgs represents an implicit default read concern.
+     */
+    bool isImplicitDefault() const;
+
+    /**
      *  Returns default kLocalReadConcern if _level is not set.
      */
     ReadConcernLevel getLevel() const;

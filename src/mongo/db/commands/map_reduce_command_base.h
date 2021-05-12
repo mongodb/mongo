@@ -51,7 +51,8 @@ public:
      * the aggregate command.
      */
     virtual ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
-                                                         repl::ReadConcernLevel level) const {
+                                                         repl::ReadConcernLevel level,
+                                                         bool isImplicitDefault) const {
         static const Status kReadConcernNotSupported{ErrorCodes::InvalidOptions,
                                                      "read concern not supported"};
         static const Status kDefaultReadConcernNotPermitted{ErrorCodes::InvalidOptions,

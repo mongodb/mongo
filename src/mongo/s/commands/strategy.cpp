@@ -60,6 +60,7 @@
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/stats/api_version_metrics.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/transaction_validation.h"
@@ -719,31 +720,55 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     bool clientSuppliedReadConcern = readConcernArgs.isSpecified();
     bool customDefaultReadConcernWasApplied = false;
 
-    auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
-    if (readConcernSupport.defaultReadConcernPermit.isOK() &&
-        (startTransaction || !TransactionRouter::get(opCtx))) {
+    auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel(),
+                                                              readConcernArgs.isImplicitDefault());
+
+    auto applyDefaultReadConcern = [&](const repl::ReadConcernArgs rcDefault) -> void {
+        // We must obtain the client lock to set ReadConcernArgs, because it's an
+        // in-place reference to the object on the operation context, which may be
+        // concurrently used elsewhere (eg. read by currentOp).
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        LOGV2_DEBUG(22767,
+                    2,
+                    "Applying default readConcern on {command} of {readConcern}",
+                    "Applying default readConcern on command",
+                    "command"_attr = invocation->definition()->getName(),
+                    "readConcern"_attr = rcDefault);
+        readConcernArgs = std::move(rcDefault);
+        // Update the readConcernSupport, since the default RC was applied.
+        readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel(),
+                                                             !customDefaultReadConcernWasApplied);
+    };
+
+    auto shouldApplyDefaults = startTransaction || !TransactionRouter::get(opCtx);
+    if (readConcernSupport.defaultReadConcernPermit.isOK() && shouldApplyDefaults) {
         if (readConcernArgs.isEmpty()) {
-            const auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                                       .getDefaultReadConcern(opCtx);
+            const auto rwcDefaults =
+                ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
+            const auto rcDefault = rwcDefaults.getDefaultReadConcern();
             if (rcDefault) {
-                {
-                    // We must obtain the client lock to set ReadConcernArgs, because it's an
-                    // in-place reference to the object on the operation context, which may be
-                    // concurrently used elsewhere (eg. read by currentOp).
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    readConcernArgs = std::move(*rcDefault);
-                }
-                customDefaultReadConcernWasApplied = true;
-                LOGV2_DEBUG(22767,
-                            2,
-                            "Applying default readConcern on {command} of {readConcern}",
-                            "Applying default readConcern on command",
-                            "command"_attr = invocation->definition()->getName(),
-                            "readConcern"_attr = *rcDefault);
-                // Update the readConcernSupport, since the default RC was applied.
-                readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
+                const bool isDefaultRCLocalFeatureFlagEnabled =
+                    serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                    repl::feature_flags::gDefaultRCLocal.isEnabled(
+                        serverGlobalParams.featureCompatibility);
+                const auto readConcernSource = rwcDefaults.getDefaultReadConcernSource();
+                customDefaultReadConcernWasApplied = !isDefaultRCLocalFeatureFlagEnabled ||
+                    (readConcernSource &&
+                     readConcernSource.get() == DefaultReadConcernSourceEnum::kGlobal);
+
+                applyDefaultReadConcern(*rcDefault);
             }
         }
+    }
+
+    // Apply the implicit default read concern even if the command does not support a cluster wide
+    // read concern.
+    if (!readConcernSupport.defaultReadConcernPermit.isOK() &&
+        readConcernSupport.implicitDefaultReadConcernPermit.isOK() && shouldApplyDefaults &&
+        readConcernArgs.isEmpty()) {
+        const auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
+                                   .getImplicitDefaultReadConcern();
+        applyDefaultReadConcern(rcDefault);
     }
 
     auto& provenance = readConcernArgs.getProvenance();

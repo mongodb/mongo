@@ -472,8 +472,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
  */
 void _adjustChangeStreamReadConcern(OperationContext* opCtx) {
     repl::ReadConcernArgs& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    // There is already a read concern level set. Do nothing.
-    if (readConcernArgs.hasLevel()) {
+    // There is already a non-default read concern level set. Do nothing.
+    if (readConcernArgs.hasLevel() && !readConcernArgs.getProvenance().isImplicitDefault()) {
         return;
     }
     // We upconvert an empty read concern to 'majority'.

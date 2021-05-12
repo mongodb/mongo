@@ -191,7 +191,8 @@ public:
     }
 
     ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
-                                                 repl::ReadConcernLevel level) const override {
+                                                 repl::ReadConcernLevel level,
+                                                 bool isImplicitDefault) const override {
         return {{level != repl::ReadConcernLevel::kLocalReadConcern &&
                      level != repl::ReadConcernLevel::kSnapshotReadConcern,
                  {ErrorCodes::InvalidOptions, "read concern not supported"}},

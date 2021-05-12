@@ -78,7 +78,8 @@ public:
     }
 
     ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
-                                                 repl::ReadConcernLevel level) const final {
+                                                 repl::ReadConcernLevel level,
+                                                 bool isImplicitDefault) const final {
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }
 

@@ -226,6 +226,16 @@ void ReadWriteConcernDefaults::refreshIfNecessary(OperationContext* opCtx) {
     }
 }
 
+repl::ReadConcernArgs ReadWriteConcernDefaults::getImplicitDefaultReadConcern() {
+    const bool isDefaultRCLocalFeatureFlagEnabled =
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        repl::feature_flags::gDefaultRCLocal.isEnabled(serverGlobalParams.featureCompatibility);
+    if (!isDefaultRCLocalFeatureFlagEnabled) {
+        return repl::ReadConcernArgs();
+    }
+    return repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+}
+
 boost::optional<ReadWriteConcernDefaults::RWConcernDefaultAndTime>
 ReadWriteConcernDefaults::_getDefaultCWRWCFromDisk(OperationContext* opCtx) {
     auto defaultsHandle = _defaults.acquire(opCtx, Type::kReadWriteConcernEntry);
@@ -243,6 +253,22 @@ ReadWriteConcernDefaults::_getDefaultCWRWCFromDisk(OperationContext* opCtx) {
 ReadWriteConcernDefaults::RWConcernDefaultAndTime ReadWriteConcernDefaults::getDefault(
     OperationContext* opCtx) {
     auto cached = _getDefaultCWRWCFromDisk(opCtx).value_or(RWConcernDefaultAndTime());
+
+    const bool isDefaultRCLocalFeatureFlagEnabled =
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        repl::feature_flags::gDefaultRCLocal.isEnabled(serverGlobalParams.featureCompatibility);
+
+    // Only overwrite the default read concern and its source if it has already been set on mongos.
+    if (isDefaultRCLocalFeatureFlagEnabled && !cached.getDefaultReadConcernSource()) {
+        if (!cached.getDefaultReadConcern() || cached.getDefaultReadConcern().get().isEmpty()) {
+            auto rcDefault = getImplicitDefaultReadConcern();
+            cached.setDefaultReadConcern(rcDefault);
+            cached.setDefaultReadConcernSource(DefaultReadConcernSourceEnum::kImplicit);
+        } else {
+            cached.setDefaultReadConcernSource(DefaultReadConcernSourceEnum::kGlobal);
+        }
+    }
+
     const bool isDefaultWCMajorityFeatureFlagEnabled =
         serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         repl::feature_flags::gDefaultWCMajority.isEnabled(serverGlobalParams.featureCompatibility);

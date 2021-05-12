@@ -81,7 +81,8 @@ public:
     }
 
     ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
-                                                 repl::ReadConcernLevel level) const override {
+                                                 repl::ReadConcernLevel level,
+                                                 bool isImplicitDefault) const override {
         // abortTransaction commences running inside a transaction (even though the transaction will
         // be ended by the time it completes).  Therefore it needs to accept any readConcern which
         // is valid within a transaction.  However it is not appropriate to apply the default

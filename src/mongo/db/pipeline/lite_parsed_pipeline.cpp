@@ -39,6 +39,7 @@ namespace mongo {
 
 ReadConcernSupportResult LiteParsedPipeline::supportsReadConcern(
     repl::ReadConcernLevel level,
+    bool isImplicitDefault,
     boost::optional<ExplainOptions::Verbosity> explain,
     bool enableMajorityReadConcern) const {
     // Start by assuming that we will support both readConcern and cluster-wide default.
@@ -77,7 +78,7 @@ ReadConcernSupportResult LiteParsedPipeline::supportsReadConcern(
         if (!result.readConcernSupport.isOK() && !result.defaultReadConcernPermit.isOK()) {
             break;
         }
-        result.merge(spec->supportsReadConcern(level));
+        result.merge(spec->supportsReadConcern(level, isImplicitDefault));
     }
 
     return result;

@@ -46,7 +46,7 @@ struct ReadConcernSupportResult {
      * given read concern and permits the default cluster-wide read concern to be applied.
      */
     static ReadConcernSupportResult allSupportedAndDefaultPermitted() {
-        return {Status::OK(), Status::OK()};
+        return {Status::OK(), Status::OK(), Status::OK()};
     }
 
     /**
@@ -59,13 +59,30 @@ struct ReadConcernSupportResult {
      */
     Status defaultReadConcernPermit;
 
+    /*
+     * Whether this permits the implicit default readConcern to be applied (and if not, why not).
+     */
+    Status implicitDefaultReadConcernPermit;
+
     /**
      * Construct with the given Statuses, or default to Status::OK if omitted.
      */
     ReadConcernSupportResult(boost::optional<Status> readConcernStatus,
                              boost::optional<Status> defaultReadConcernStatus)
         : readConcernSupport(readConcernStatus.value_or(Status::OK())),
-          defaultReadConcernPermit(defaultReadConcernStatus.value_or(Status::OK())) {}
+          defaultReadConcernPermit(defaultReadConcernStatus.value_or(Status::OK())),
+          implicitDefaultReadConcernPermit(Status::OK()) {}
+
+    /**
+     * Construct with the given Statuses, or default to Status::OK if omitted.
+     */
+    ReadConcernSupportResult(boost::optional<Status> readConcernStatus,
+                             boost::optional<Status> defaultReadConcernStatus,
+                             boost::optional<Status> implicitDefaultReadConcernStatus)
+        : readConcernSupport(readConcernStatus.value_or(Status::OK())),
+          defaultReadConcernPermit(defaultReadConcernStatus.value_or(Status::OK())),
+          implicitDefaultReadConcernPermit(
+              implicitDefaultReadConcernStatus.value_or(Status::OK())) {}
 
     /**
      * Combine the contents of another ReadConcernSupportResult with this one. The outcome is that,

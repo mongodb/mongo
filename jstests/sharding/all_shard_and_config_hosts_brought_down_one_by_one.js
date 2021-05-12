@@ -13,6 +13,10 @@ TestData.skipCheckOrphans = true;
 
 var st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
+// The default read concern is local, which is incompatible with secondary reads when the primary is
+// down.
+st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "available"}});
+
 jsTest.log('Config nodes up: 3 of 3, shard nodes up: 2 of 2: ' +
            'Insert test data to work with');
 assert.commandWorked(st.s0.getDB('TestDB').TestColl.update(

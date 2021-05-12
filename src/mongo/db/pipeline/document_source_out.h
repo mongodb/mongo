@@ -67,7 +67,8 @@ public:
             return {Privilege(ResourcePattern::forExactNamespace(_foreignNss), actions)};
         }
 
-        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const final {
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const final {
             return {
                 {level == repl::ReadConcernLevel::kLinearizableReadConcern,
                  {ErrorCodes::InvalidOptions,

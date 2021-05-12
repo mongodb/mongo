@@ -121,9 +121,11 @@ public:
             return true;
         }
 
-        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const override {
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const override {
             return _liteParsedPipeline.supportsReadConcern(
                 level,
+                isImplicitDefault,
                 _aggregationRequest.getExplain(),
                 serverGlobalParams.enableMajorityReadConcern);
         }

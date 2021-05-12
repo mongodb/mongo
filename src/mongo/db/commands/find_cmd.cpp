@@ -198,7 +198,8 @@ public:
             return false;
         }
 
-        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const final {
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const final {
             return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
         }
 

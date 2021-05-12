@@ -39,6 +39,7 @@
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/util/fail_point.h"
@@ -74,6 +75,10 @@ void ClusterCommandTestFixture::setUp() {
 
     _staleVersionAndSnapshotRetriesBlock = std::make_unique<FailPointEnableBlock>(
         "enableStaleVersionAndSnapshotRetriesWithinTransactions");
+
+    // The ReadWriteConcernDefaults decoration on the service context won't always be created,
+    // so we should manually instantiate it to ensure it exists in our tests.
+    ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
 }
 
 BSONObj ClusterCommandTestFixture::_makeCmd(BSONObj cmdObj, bool includeAfterClusterTime) {

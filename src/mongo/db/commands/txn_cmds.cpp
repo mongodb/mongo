@@ -185,7 +185,8 @@ public:
             return true;
         }
 
-        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const final {
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const final {
             // abortTransaction commences running inside a transaction (even though the transaction
             // will be ended by the time it completes).  Therefore it needs to accept any
             // readConcern which is valid within a transaction.  However it is not appropriate to

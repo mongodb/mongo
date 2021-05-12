@@ -7,6 +7,8 @@
 (function() {
 "use strict";
 
+load('jstests/replsets/rslib.js');  // For isDefaultReadConcernLocalFlagEnabled.
+
 // Verifies that the server status response has the fields that we expect.
 function verifyServerStatusFields(serverStatusResponse) {
     assert(serverStatusResponse.hasOwnProperty("readConcernCounters"),
@@ -74,7 +76,20 @@ function verifyServerStatusChange(initialStatus,
                                   newStatus,
                                   field,
                                   expectedIncrement,
+                                  isDefaultReadConcernLocalFlagEnabled,
                                   {isTransaction = false, atClusterTime = false} = {}) {
+    if (isDefaultReadConcernLocalFlagEnabled) {
+        // TODO SERVER-56860: remove once we update semantics for readConcernCounters.
+        if (field === "none") {
+            field = "local";
+        }
+    }
+
+    // TODO SERVER-56860: remove once we update semantics for readConcernCounters.
+    if (field === "legacy") {
+        field = "none";
+    }
+
     verifyServerStatusFields(newStatus);
     let initialCounters = initialStatus.readConcernCounters;
     let newCounters = newStatus.readConcernCounters;
@@ -130,6 +145,8 @@ testDB.runCommand({drop: collName});
 assert.commandWorked(testDB.createCollection(collName));
 assert.commandWorked(testColl.insert({_id: 0}, {writeConcern: {w: 'majority'}}));
 
+const isDefaultRCLocalFlagEnabled = isDefaultReadConcernLocalFlagEnabled(primary);
+
 const sessionOptions = {
     causalConsistency: false
 };
@@ -158,14 +175,14 @@ let newStatus;
 primary.forceReadMode("legacy");
 assert.eq(testColl.find().itcount(), 1);
 newStatus = getServerStatus(testDB);
-verifyServerStatusChange(serverStatus, newStatus, "none", 1);
+verifyServerStatusChange(serverStatus, newStatus, "legacy", 1, isDefaultRCLocalFlagEnabled);
 primary.forceReadMode("commands");
 serverStatus = newStatus;
 
 // Run a command without a readConcern.
 assert.eq(testColl.find().itcount(), 1);
 newStatus = getServerStatus(testDB);
-verifyServerStatusChange(serverStatus, newStatus, "none", 1);
+verifyServerStatusChange(serverStatus, newStatus, "none", 1, isDefaultRCLocalFlagEnabled);
 serverStatus = newStatus;
 
 // Non-transaction reads.
@@ -178,25 +195,25 @@ for (let level of ["none", "local", "available", "snapshot", "majority", "linear
 
     assert.commandWorked(testDB.runCommand({find: collName, readConcern: readConcern}));
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(serverStatus, newStatus, level, 1);
+    verifyServerStatusChange(serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled);
     serverStatus = newStatus;
 
     assert.commandWorked(testDB.runCommand(
         {aggregate: collName, pipeline: [], cursor: {}, readConcern: readConcern}));
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(serverStatus, newStatus, level, 1);
+    verifyServerStatusChange(serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled);
     serverStatus = newStatus;
 
     assert.commandWorked(
         testDB.runCommand({distinct: collName, key: "_id", readConcern: readConcern}));
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(serverStatus, newStatus, level, 1);
+    verifyServerStatusChange(serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled);
     serverStatus = newStatus;
 
     if (level !== "snapshot") {
         assert.commandWorked(testDB.runCommand({count: collName, readConcern: readConcern}));
         newStatus = getServerStatus(testDB);
-        verifyServerStatusChange(serverStatus, newStatus, level, 1);
+        verifyServerStatusChange(serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled);
         serverStatus = newStatus;
     }
 
@@ -214,7 +231,7 @@ for (let level of ["none", "local", "available", "snapshot", "majority", "linear
             readConcern: readConcern
         }));
         newStatus = getServerStatus(testDB);
-        verifyServerStatusChange(serverStatus, newStatus, level, 1);
+        verifyServerStatusChange(serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled);
         serverStatus = newStatus;
     }
 
@@ -225,7 +242,7 @@ for (let level of ["none", "local", "available", "snapshot", "majority", "linear
     serverStatus = getServerStatus(testDB);
     assert.commandWorked(testDB.runCommand({getMore: res.cursor.id, collection: collName}));
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(serverStatus, newStatus, level, 0);
+    verifyServerStatusChange(serverStatus, newStatus, level, 0, isDefaultRCLocalFlagEnabled);
 }
 
 // Test non-transaction snapshot with atClusterTime.
@@ -237,7 +254,8 @@ serverStatus = getServerStatus(testDB);
 assert.commandWorked(testDB.runCommand(
     {find: "atClusterTime", readConcern: {level: "snapshot", atClusterTime: insertTimestamp}}));
 newStatus = getServerStatus(testDB);
-verifyServerStatusChange(serverStatus, newStatus, "snapshot", 1, {atClusterTime: true});
+verifyServerStatusChange(
+    serverStatus, newStatus, "snapshot", 1, isDefaultRCLocalFlagEnabled, {atClusterTime: true});
 serverStatus = newStatus;
 
 // Transaction reads.
@@ -250,21 +268,24 @@ for (let level of ["none", "local", "snapshot", "majority"]) {
     }
     assert.eq(sessionColl.find().itcount(), 1);
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(serverStatus, newStatus, level, 1, {isTransaction: true});
+    verifyServerStatusChange(
+        serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled, {isTransaction: true});
     serverStatus = newStatus;
 
     // Run a second find in the same transaction. It will inherit the readConcern from the
     // transaction.
     assert.eq(sessionColl.find().itcount(), 1);
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(serverStatus, newStatus, level, 1, {isTransaction: true});
+    verifyServerStatusChange(
+        serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled, {isTransaction: true});
     serverStatus = newStatus;
 
     // Run an insert in the same transaction. This should not count toward the readConcern metrics.
     assert.commandWorked(
         sessionDb.runCommand({insert: "transaction", documents: [{level: level}]}));
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(serverStatus, newStatus, level, 0, {isTransaction: true});
+    verifyServerStatusChange(
+        serverStatus, newStatus, level, 0, isDefaultRCLocalFlagEnabled, {isTransaction: true});
     assert.commandWorked(session.abortTransaction_forTesting());
     serverStatus = newStatus;
 }
@@ -279,15 +300,19 @@ serverStatus = getServerStatus(testDB);
 
 assert.eq(sessionColl.find().itcount(), 1);
 newStatus = getServerStatus(testDB);
-verifyServerStatusChange(
-    serverStatus, newStatus, "snapshot", 1, {isTransaction: true, atClusterTime: true});
+verifyServerStatusChange(serverStatus, newStatus, "snapshot", 1, isDefaultRCLocalFlagEnabled, {
+    isTransaction: true,
+    atClusterTime: true
+});
 serverStatus = newStatus;
 
 // Perform another read in the same transaction.
 assert.eq(sessionColl.find().itcount(), 1);
 newStatus = getServerStatus(testDB);
-verifyServerStatusChange(
-    serverStatus, newStatus, "snapshot", 1, {isTransaction: true, atClusterTime: true});
+verifyServerStatusChange(serverStatus, newStatus, "snapshot", 1, isDefaultRCLocalFlagEnabled, {
+    isTransaction: true,
+    atClusterTime: true
+});
 assert.commandWorked(session.abortTransaction_forTesting());
 
 session.endSession();

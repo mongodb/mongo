@@ -128,6 +128,7 @@ public:
      * Verifies that this pipeline is allowed to run with the specified read concern level.
      */
     ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                 bool isImplicitDefault,
                                                  boost::optional<ExplainOptions::Verbosity> explain,
                                                  bool enableMajorityReadConcern) const;
 
