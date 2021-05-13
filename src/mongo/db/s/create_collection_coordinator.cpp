@@ -389,6 +389,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     // creation.
                     sharding_ddl_util::linearizeCSRSReads(opCtx);
                 }
+                // Log the start of the event only if we're not recovering.
+                _logStartCreateCollection(opCtx);
 
                 // Quick check (without critical section) to see if another create collection
                 // already succeeded.
@@ -400,7 +402,6 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             getCollation(opCtx, nss(), _doc.getCollation()),
                             _doc.getUnique().value_or(false))) {
                     _result = createCollectionResponseOpt;
-                    _collectionVersion = _result->getCollectionVersion();
                     // The collection was already created and commited but there was a
                     // stepdown after the commit.
                     RecoverableCriticalSectionService::get(opCtx)
@@ -461,7 +462,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
                 _createPolicyAndChunks(opCtx);
 
-                _logStartCreateCollection(opCtx);
+                audit::logShardCollection(opCtx->getClient(),
+                                          nss().ns(),
+                                          *_doc.getCreateCollectionRequest().getShardKey(),
+                                          *_doc.getCreateCollectionRequest().getUnique());
 
                 if (_splitPolicy->isOptimized()) {
                     // Block reads/writes from here on if we need to create
@@ -493,12 +497,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
 
-            ShardingLogging::get(opCtx)->logChange(
-                opCtx,
-                "shardCollection.end",
-                nss().ns(),
-                BSON("version" << _collectionVersion.toString() << "numChunks"
-                               << static_cast<int>(_initialChunks.chunks.size())));
+            _logEndCreateCollection(opCtx);
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (!status.isA<ErrorCategory::NotPrimaryError>() &&
@@ -632,7 +631,7 @@ void CreateCollectionCoordinator::_createPolicyAndChunks(OperationContext* opCtx
         _doc.getInitialSplitPoints(),
         getTagsAndValidate(opCtx, nss(), _shardKeyPattern->toBSON(), *_shardKeyPattern),
         getNumShards(opCtx),
-        _collectionEmpty);
+        *_collectionEmpty);
 
     _initialChunks = _splitPolicy->createFirstChunks(
         opCtx,
@@ -646,7 +645,7 @@ void CreateCollectionCoordinator::_createPolicyAndChunks(OperationContext* opCtx
     // There must be at least one chunk.
     invariant(!_initialChunks.chunks.empty());
 
-    _collectionVersion = _initialChunks.collVersion();
+    _numChunks = _initialChunks.chunks.size();
 }
 
 void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(OperationContext* opCtx) {
@@ -801,20 +800,24 @@ void CreateCollectionCoordinator::_finalize(OperationContext* opCtx) noexcept {
 }
 
 void CreateCollectionCoordinator::_logStartCreateCollection(OperationContext* opCtx) {
-    audit::logShardCollection(opCtx->getClient(),
-                              nss().ns(),
-                              *_doc.getCreateCollectionRequest().getShardKey(),
-                              *_doc.getCreateCollectionRequest().getUnique());
-
-    // Record start in changelog
     BSONObjBuilder collectionDetail;
     collectionDetail.append("shardKey", *_doc.getCreateCollectionRequest().getShardKey());
     collectionDetail.append("collection", nss().ns());
-    _collectionUUID->appendToBuilder(&collectionDetail, "uuid");
-    collectionDetail.append("empty", _collectionEmpty);
     collectionDetail.append("primary", ShardingState::get(opCtx)->shardId().toString());
     ShardingLogging::get(opCtx)->logChange(
         opCtx, "shardCollection.start", nss().ns(), collectionDetail.obj());
+}
+
+void CreateCollectionCoordinator::_logEndCreateCollection(OperationContext* opCtx) {
+    BSONObjBuilder collectionDetail;
+    _result->getCollectionUUID()->appendToBuilder(&collectionDetail, "uuid");
+    collectionDetail.append("version", _result->getCollectionVersion().toString());
+    if (_collectionEmpty)
+        collectionDetail.append("empty", *_collectionEmpty);
+    if (_numChunks)
+        collectionDetail.appendNumber("numChunks", static_cast<long long>(*_numChunks));
+    ShardingLogging::get(opCtx)->logChange(
+        opCtx, "shardCollection.end", nss().ns(), collectionDetail.obj());
 }
 
 // Phase change and document handling API.

@@ -128,6 +128,11 @@ private:
      */
     void _logStartCreateCollection(OperationContext* opCtx);
 
+    /**
+     * Helper function to log the end of the shard collection event.
+     */
+    void _logEndCreateCollection(OperationContext* opCtx);
+
     CreateCollectionCoordinatorDocument _doc;
     const BSONObj _critSecReason;
 
@@ -138,8 +143,8 @@ private:
     std::unique_ptr<InitialSplitPolicy> _splitPolicy;
     InitialSplitPolicy::ShardCollectionConfig _initialChunks;
     boost::optional<CreateCollectionResponse> _result;
-    bool _collectionEmpty;
-    ChunkVersion _collectionVersion;
+    boost::optional<bool> _collectionEmpty;
+    boost::optional<size_t> _numChunks;
 };
 
 }  // namespace mongo
