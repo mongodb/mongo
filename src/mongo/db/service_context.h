@@ -180,6 +180,10 @@ public:
 
         /**
          * Hook called on a "opCtx" created by a service before deleting "opCtx".
+         * Note that this hook is called before any other work is done in the
+         * OperationContext destructor, meaning the OperationContext is still
+         * valid and registered with the ServiceContext when this hook is
+         * executed.
          *
          * Like a destructor, must not throw exceptions.
          */

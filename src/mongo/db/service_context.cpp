@@ -305,10 +305,10 @@ void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx
     auto service = client->getServiceContext();
     invariant(service);
 
+    onDestroy(opCtx, service->_clientObservers);
     service->_delistOperation(opCtx);
     opCtx->getBaton()->detach();
 
-    onDestroy(opCtx, service->_clientObservers);
     delete opCtx;
 }
 
