@@ -233,7 +233,7 @@ selector:
   - jstests/sharding/mongos_get_shard_version.js
 
   exclude_with_any_tags:
-  - does_not_support_config_stepdowns
+  - does_not_support_stepdowns
 
 executor:
   config:

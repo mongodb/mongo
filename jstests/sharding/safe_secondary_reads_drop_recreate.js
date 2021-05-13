@@ -15,6 +15,11 @@
  *                 *when the the collection has been dropped and recreated as empty.*
  * - behavior: Must be "unshardedOnly", or "versioned". Determines what system profiler checks are
  * performed.
+ *
+ * @tags: [
+ *   # SERVER-56565
+ *   does_not_support_stepdowns
+ *  ]
  */
 (function() {
 "use strict";
