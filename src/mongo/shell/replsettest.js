@@ -1930,32 +1930,13 @@ var ReplSetTest = function(opts) {
         readAtClusterTime,
     } = {}) {
         return sessions.map(session => {
-            const commandObj = {dbHash: 1};
+            const commandObj = {dbHash: 1, filterCapped: filterCapped};
             if (readAtClusterTime !== undefined) {
                 commandObj.$_internalReadAtClusterTime = readAtClusterTime;
             }
 
             const db = session.getDatabase(dbName);
-            const res = assert.commandWorked(db.runCommand(commandObj));
-
-            // The "capped" field in the dbHash command response is new as of MongoDB 4.0.
-            const cappedCollections = new Set(filterCapped ? res.capped : []);
-
-            for (let collName of Object.keys(res.collections)) {
-                // Capped collections are not necessarily truncated at the same points across
-                // replica set members and may therefore not have the same md5sum. We remove them
-                // from the dbHash command response to avoid an already known case of a mismatch.
-                // See SERVER-16049 for more details.
-                if (cappedCollections.has(collName)) {
-                    delete res.collections[collName];
-                    // The "uuids" field in the dbHash command response is new as of MongoDB 4.0.
-                    if (res.hasOwnProperty("uuids")) {
-                        delete res.uuids[collName];
-                    }
-                }
-            }
-
-            return res;
+            return assert.commandWorked(db.runCommand(commandObj));
         });
     };
 

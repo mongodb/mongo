@@ -4,6 +4,7 @@
  * Checks that {full:true} cannot be run with {background:true}.
  * Checks that {background:true} runs.
  * Checks that {background:true} can run concurrently with CRUD ops on the same collection.
+ * Checks that {background:true} cannot run on a capped collection.
  *
  * @tags: [
  *   # Background validation is only supported by WT.
@@ -57,6 +58,15 @@ const doTest = replSet => {
     for (let i = 0; i < numDocs; ++i) {
         assert.commandWorked(testColl.insert({a: i, b: i, c: i}));
     }
+
+    /**
+     * Ensure {background:true} cannot be run on a capped collection.
+     */
+    assert.commandWorked(testDB.createCollection("capped", {capped: true, size: 4096}));
+    const cappedColl = testDB["capped"];
+    assert.commandFailedWithCode(cappedColl.validate({background: true}),
+                                 ErrorCodes.CommandNotSupported);
+    assert.commandWorked(cappedColl.validate({background: false}));
 
     /**
      * Ensure {full:true} and {background:true} cannot be run together.

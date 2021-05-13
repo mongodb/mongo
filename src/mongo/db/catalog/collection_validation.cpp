@@ -428,6 +428,13 @@ Status validate(OperationContext* opCtx,
     // constructor fail the cmd, as opposed to returning OK with valid:false.
     ValidateState validateState(opCtx, nss, background, options, turnOnExtraLoggingForTest);
 
+    // Capped collections perform un-timestamped writes to delete expired documents. As a result,
+    // background validation will fail when reading documents that have just been deleted.
+    uassert(ErrorCodes::CommandNotSupported,
+            str::stream() << "Cannot run background validation on capped collection '" << nss
+                          << "', use foreground validation instead",
+            !background || !validateState.getCollection()->isCapped());
+
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     // Check whether we are allowed to read from this node after acquiring our locks. If we are
     // in a state where we cannot read, we should not run validate.
