@@ -19,6 +19,18 @@
 
 load("jstests/libs/fail_point_util.js");
 
+const checkTimestamps = (cmp, a, b) => {
+    if (cmp === "gt") {
+        assert.gt(timestampCmp(a, b),
+                  0,
+                  `Expected timestamp to compare greater: ${tojson(a)} <= ${tojson(b)}`);
+        return;
+    }
+    assert.eq(cmp, "eq", "Expected 'cmp' to be one of {'eq', 'gt'}");
+    assert.eq(
+        timestampCmp(a, b), 0, `Expected timestamps to be equal: ${tojson(a)} != ${tojson(b)}`);
+};
+
 const rst = new ReplSetTest({name: jsTest.name(), nodes: 3});
 rst.startSet();
 // Make sure there are no election timeouts. This should prevent primary stepdown. Normally we would
@@ -41,9 +53,12 @@ const primaryReplSetStatus = assert.commandWorked(primary.adminCommand("replSetG
 const primaryPreFailPointDurableTs = primaryReplSetStatus.optimes.durableOpTime.ts;
 const primaryPreFailPointMajorityTs = primaryReplSetStatus.optimes.readConcernMajorityOpTime.ts;
 jsTestLog("Primary's optimes (initializing): " + tojson(primaryReplSetStatus.optimes));
-assert.neq(primaryPreFailPointDurableTs, null);
-assert.neq(primaryPreFailPointMajorityTs, null);
-assert.eq(primaryPreFailPointDurableTs, primaryPreFailPointMajorityTs);
+assert.neq(
+    primaryPreFailPointDurableTs, null, `Expected ${tojson(primaryPreFailPointDurableTs)} != null`);
+assert.neq(primaryPreFailPointMajorityTs,
+           null,
+           `Expected ${tojson(primaryPreFailPointMajorityTs)} != null`);
+checkTimestamps("eq", primaryPreFailPointDurableTs, primaryPreFailPointMajorityTs);
 
 // Configure the primary to stop moving the durable timestamp forward. The primary will no longer be
 // able to contribute to moving the replica set's majority timestamp forward because the replica
@@ -64,15 +79,15 @@ try {
     const primaryPostWritesDurableTs = primaryStatus.optimes.durableOpTime.ts;
     const primaryPostWritesMajorityTs = primaryStatus.optimes.readConcernMajorityOpTime.ts;
     jsTestLog("Primary's optimes (when 3 nodes): " + tojson(primaryStatus.optimes));
-    assert.eq(primaryPostWritesDurableTs, primaryPreFailPointDurableTs);
-    assert.gt(primaryPostWritesMajorityTs, primaryPreFailPointDurableTs);
+    checkTimestamps("eq", primaryPostWritesDurableTs, primaryPreFailPointDurableTs);
+    checkTimestamps("gt", primaryPostWritesMajorityTs, primaryPreFailPointDurableTs);
 
     // Check that the secondaries' durable timestamps have moved forward.
     rst.getSecondaries().forEach(function(secondary) {
         const secondaryStatus = assert.commandWorked(secondary.adminCommand("replSetGetStatus"));
         const secondaryDurableTs = secondaryStatus.optimes.durableOpTime.ts;
         jsTestLog("One secondary's optimes (when 3 nodes): " + tojson(secondaryStatus.optimes));
-        assert.gt(secondaryDurableTs, primaryPreFailPointDurableTs);
+        checkTimestamps("gt", secondaryDurableTs, primaryPreFailPointDurableTs);
     });
 
     // Shutdown a secondary so that there is no longer a majority able to confirm the durability of
@@ -103,16 +118,16 @@ try {
     const primaryPostFsyncDurableTs = primaryReplStatus.optimes.durableOpTime.ts;
     const primaryPostFsyncMajorityTs = primaryReplStatus.optimes.readConcernMajorityOpTime.ts;
     jsTestLog("Primary's optimes (when 2 nodes): " + tojson(primaryReplStatus.optimes));
-    assert.eq(primaryPostFsyncDurableTs, primaryPreFailPointDurableTs);
-    assert.eq(primaryPostFsyncMajorityTs, primaryPostWritesMajorityTs);
+    checkTimestamps("eq", primaryPostFsyncDurableTs, primaryPreFailPointDurableTs);
+    checkTimestamps("eq", primaryPostFsyncMajorityTs, primaryPostWritesMajorityTs);
 
     // Check that the secondary's durable timestamp has moved forward, but the majority has not.
     const secondaryStatus = assert.commandWorked(runningSecondary.adminCommand("replSetGetStatus"));
     const secondaryDurableTs = secondaryStatus.optimes.durableOpTime.ts;
     const secondaryMajorityTs = secondaryStatus.optimes.readConcernMajorityOpTime.ts;
     jsTestLog("Secondary's optimes (when 2 nodes): " + tojson(secondaryStatus.optimes));
-    assert.gt(secondaryDurableTs, primaryPostFsyncMajorityTs);
-    assert.eq(secondaryMajorityTs, primaryPostFsyncMajorityTs);
+    checkTimestamps("gt", secondaryDurableTs, primaryPostFsyncMajorityTs);
+    checkTimestamps("eq", secondaryMajorityTs, primaryPostFsyncMajorityTs);
 } finally {
     // Turn off the failpoint before allowing the test to end, so nothing hangs while the server
     // shuts down or in post-test hooks.
