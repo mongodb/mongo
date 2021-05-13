@@ -136,7 +136,7 @@ Status RecordStore::insertRecords(OperationContext* opCtx,
     {
         SizeAdjuster adjuster(opCtx, this);
         for (auto& record : *inOutRecords) {
-            int64_t thisRecordId = 0;
+            int64_t thisRecordId = record.id.getLong();
             if (_isOplog) {
                 StatusWith<RecordId> status =
                     record_id_helpers::extractKeyOptime(record.data.data(), record.data.size());
@@ -145,7 +145,10 @@ Status RecordStore::insertRecords(OperationContext* opCtx,
                 thisRecordId = status.getValue().getLong();
                 _visibilityManager->addUncommittedRecord(opCtx, this, RecordId(thisRecordId));
             } else {
-                thisRecordId = _nextRecordId(opCtx);
+                // If the record had an id already, keep it.
+                if (thisRecordId == 0) {
+                    thisRecordId = _nextRecordId(opCtx);
+                }
             }
             workingCopy->insert(
                 StringStore::value_type{createKey(_ident, thisRecordId),
