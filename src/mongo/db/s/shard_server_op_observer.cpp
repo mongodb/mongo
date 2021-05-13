@@ -274,12 +274,16 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
         }
 
         if (nss == NamespaceString::kCollectionCriticalSectionsNamespace) {
-            const auto collCSDoc = CollectionCriticalSectionDocument::parse(
-                IDLParserErrorContext("ShardServerOpObserver"), insertedDoc);
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            if (!replCoord->isReplEnabled() ||
+                (!replCoord->getMemberState().recovering() &&
+                 !replCoord->getMemberState().rollback())) {
+                const auto collCSDoc = CollectionCriticalSectionDocument::parse(
+                    IDLParserErrorContext("ShardServerOpObserver"), insertedDoc);
 
 
-            opCtx->recoveryUnit()->onCommit(
-                [opCtx, insertedNss = collCSDoc.getNss()](boost::optional<Timestamp>) {
+                opCtx->recoveryUnit()->onCommit([opCtx, insertedNss = collCSDoc.getNss()](
+                                                    boost::optional<Timestamp>) {
                     boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
                     if (!isStandaloneOrPrimary(opCtx))
                         lockCollectionIfNotPrimary.emplace(opCtx, insertedNss, MODE_IX);
@@ -289,6 +293,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                     auto csrLock = CollectionShardingRuntime ::CSRLock::lockExclusive(opCtx, csr);
                     csr->enterCriticalSectionCatchUpPhase(csrLock);
                 });
+            }
         }
 
         if (metadata && metadata->isSharded()) {
@@ -406,21 +411,26 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
     }
 
     if (args.nss == NamespaceString::kCollectionCriticalSectionsNamespace) {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (!replCoord->isReplEnabled() ||
+            (!replCoord->getMemberState().recovering() &&
+             !replCoord->getMemberState().rollback())) {
 
-        const auto collCSDoc = CollectionCriticalSectionDocument::parse(
-            IDLParserErrorContext("ShardServerOpObserver"), args.updateArgs.updatedDoc);
+            const auto collCSDoc = CollectionCriticalSectionDocument::parse(
+                IDLParserErrorContext("ShardServerOpObserver"), args.updateArgs.updatedDoc);
 
-        opCtx->recoveryUnit()->onCommit(
-            [opCtx, updatedNss = collCSDoc.getNss()](boost::optional<Timestamp>) {
-                boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
-                if (!isStandaloneOrPrimary(opCtx))
-                    lockCollectionIfNotPrimary.emplace(opCtx, updatedNss, MODE_IX);
+            opCtx->recoveryUnit()->onCommit(
+                [opCtx, updatedNss = collCSDoc.getNss()](boost::optional<Timestamp>) {
+                    boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
+                    if (!isStandaloneOrPrimary(opCtx))
+                        lockCollectionIfNotPrimary.emplace(opCtx, updatedNss, MODE_IX);
 
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                auto* const csr = CollectionShardingRuntime::get(opCtx, updatedNss);
-                auto csrLock = CollectionShardingRuntime ::CSRLock::lockExclusive(opCtx, csr);
-                csr->enterCriticalSectionCommitPhase(csrLock);
-            });
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    auto* const csr = CollectionShardingRuntime::get(opCtx, updatedNss);
+                    auto csrLock = CollectionShardingRuntime ::CSRLock::lockExclusive(opCtx, csr);
+                    csr->enterCriticalSectionCommitPhase(csrLock);
+                });
+        }
     }
 
     auto* const csr = CollectionShardingRuntime::get(opCtx, args.nss);
@@ -489,24 +499,29 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
     }
 
     if (nss == NamespaceString::kCollectionCriticalSectionsNamespace) {
-        const auto deletedNss([&] {
-            std::string coll;
-            fassert(5514801,
-                    bsonExtractStringField(
-                        documentId, CollectionCriticalSectionDocument::kNssFieldName, &coll));
-            return NamespaceString(coll);
-        }());
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (!replCoord->isReplEnabled() ||
+            (!replCoord->getMemberState().recovering() &&
+             !replCoord->getMemberState().rollback())) {
+            const auto deletedNss([&] {
+                std::string coll;
+                fassert(5514801,
+                        bsonExtractStringField(
+                            documentId, CollectionCriticalSectionDocument::kNssFieldName, &coll));
+                return NamespaceString(coll);
+            }());
 
-        opCtx->recoveryUnit()->onCommit([opCtx, deletedNss](boost::optional<Timestamp>) {
-            boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
-            if (!isStandaloneOrPrimary(opCtx))
-                lockCollectionIfNotPrimary.emplace(opCtx, deletedNss, MODE_IX);
+            opCtx->recoveryUnit()->onCommit([opCtx, deletedNss](boost::optional<Timestamp>) {
+                boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
+                if (!isStandaloneOrPrimary(opCtx))
+                    lockCollectionIfNotPrimary.emplace(opCtx, deletedNss, MODE_IX);
 
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-            auto* const csr = CollectionShardingRuntime::get(opCtx, deletedNss);
-            auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-            csr->exitCriticalSection(csrLock);
-        });
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                auto* const csr = CollectionShardingRuntime::get(opCtx, deletedNss);
+                auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+                csr->exitCriticalSection(csrLock);
+            });
+        }
     }
 }
 
