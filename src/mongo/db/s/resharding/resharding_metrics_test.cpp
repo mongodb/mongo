@@ -116,9 +116,12 @@ private:
     ClockSourceMock* _clockSource;
 };
 
+// TODO Re-enable once underlying invariants are re-enabled
+/*
 DEATH_TEST_F(ReshardingMetricsTest, RunOnCompletionBeforeOnStart, "No operation is in progress") {
     getMetrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess);
 }
+*/
 
 TEST_F(ReshardingMetricsTest, OperationStatus) {
     getMetrics()->onStart();
