@@ -536,11 +536,6 @@ public:
         return getNumMembers() == 3 && getNumDataBearingMembers() == 2;
     }
 
-    /**
-     * Returns true if the getLastErrorDefaults has been customized.
-     */
-    bool containsCustomizedGetLastErrorDefaults() const;
-
 private:
     /**
      * Sets replica set ID to 'defaultReplicaSetId' if 'cfg' does not contain an ID.

@@ -118,7 +118,10 @@ TEST(ReplSetConfig, ParseLargeConfigAndCheckAccessors) {
                                                            << BSON("NYC"
                                                                    << "NY")))
                                   << "protocolVersion" << 1 << "settings"
-                                  << BSON("getLastErrorModes"
+                                  << BSON("getLastErrorDefaults"
+                                          << BSON("w"
+                                                  << "majority")
+                                          << "getLastErrorModes"
                                           << BSON("eastCoast" << BSON("NYC" << 1))
                                           << "chainingAllowed" << false << "heartbeatIntervalMillis"
                                           << 5000 << "heartbeatTimeoutSecs" << 120
@@ -129,6 +132,8 @@ TEST(ReplSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_EQUALS(1, config.getConfigTerm());
     ASSERT_EQUALS(1, config.getNumMembers());
     ASSERT_EQUALS(MemberId(234), config.membersBegin()->getId());
+    ASSERT_EQUALS(0, config.getDefaultWriteConcern().wNumNodes);
+    ASSERT_EQUALS("majority", config.getDefaultWriteConcern().wMode);
     ASSERT_FALSE(config.isChainingAllowed());
     ASSERT_TRUE(config.getWriteConcernMajorityShouldJournal());
     ASSERT_FALSE(config.getConfigServer());
@@ -1225,6 +1230,59 @@ TEST(ReplSetConfig, HeartbeatTimeoutField) {
                   DBException);
 }
 
+TEST(ReplSetConfig, GleDefaultField) {
+    ReplSetConfig config(
+        ReplSetConfig::parse(BSON("_id"
+                                  << "rs0"
+                                  << "version" << 1 << "protocolVersion" << 1 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                           << "localhost:12345"))
+                                  << "settings"
+                                  << BSON("getLastErrorDefaults" << BSON("w"
+                                                                         << "majority")))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS("majority", config.getDefaultWriteConcern().wMode);
+
+    config = ReplSetConfig::parse(BSON("_id"
+                                       << "rs0"
+                                       << "version" << 1 << "protocolVersion" << 1 << "members"
+                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                << "localhost:12345"))
+                                       << "settings"
+                                       << BSON("getLastErrorDefaults" << BSON("w"
+                                                                              << "frim"))));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+
+    // Test that default write concern must have at least one member.
+    ASSERT_THROWS(
+        ReplSetConfig::parse(BSON("_id"
+                                  << "rs0"
+                                  << "version" << 1 << "protocolVersion" << 1 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                           << "localhost:12345"))
+                                  << "settings" << BSON("getLastErrorDefaults" << BSON("w" << 0)))),
+        DBException);
+
+
+    config = ReplSetConfig::parse(BSON("_id"
+                                       << "rs0"
+                                       << "version" << 1 << "protocolVersion" << 1 << "members"
+                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                << "localhost:12345"
+                                                                << "tags"
+                                                                << BSON("a"
+                                                                        << "v")))
+                                       << "settings"
+                                       << BSON("getLastErrorDefaults"
+                                               << BSON("w"
+                                                       << "frim")
+                                               << "getLastErrorModes"
+                                               << BSON("frim" << BSON("a" << 1)))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS("frim", config.getDefaultWriteConcern().wMode);
+    ASSERT_OK(config.findCustomWriteMode("frim").getStatus());
+}
+
 bool operator==(const MemberConfig& a, const MemberConfig& b) {
     // do tag comparisons
     for (MemberConfig::TagIterator itrA = a.tagsBegin(); itrA != a.tagsEnd(); ++itrA) {
@@ -1358,11 +1416,14 @@ TEST(ReplSetConfig, toBSONRoundTripAbilityLarge) {
                                             << "true")))
         << "protocolVersion" << 1 << "settings"
 
-        << BSON("heartbeatIntervalMillis"
-                << 5000 << "heartbeatTimeoutSecs" << 20 << "electionTimeoutMillis" << 4
-                << "chainingAllowed" << true << "getLastErrorModes"
-                << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1) << "coasts"
-                                << BSON("coast" << 2)))));
+        << BSON("heartbeatIntervalMillis" << 5000 << "heartbeatTimeoutSecs" << 20
+                                          << "electionTimeoutMillis" << 4 << "chainingAllowed"
+                                          << true << "getLastErrorDefaults"
+                                          << BSON("w"
+                                                  << "majority")
+                                          << "getLastErrorModes"
+                                          << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1)
+                                                          << "coasts" << BSON("coast" << 2)))));
     BSONObj configObjA = configA.toBSON();
     configB = ReplSetConfig::parse(configObjA);
     ASSERT_TRUE(configA == configB);
