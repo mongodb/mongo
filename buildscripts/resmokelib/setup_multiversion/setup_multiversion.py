@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import sys
+import time
 
 import structlog
 import yaml
@@ -186,9 +187,19 @@ class SetupMultiversion(Subcommand):
 
         for url in [artifacts_url, binaries_url, symbols_url]:
             if url is not None:
-                tarball = download.download_from_s3(url)
-                download.extract_archive(tarball, install_dir)
-                os.remove(tarball)
+
+                def try_download(download_url):
+                    tarball = download.download_from_s3(download_url)
+                    download.extract_archive(tarball, install_dir)
+                    os.remove(tarball)
+
+                try:
+                    try_download(url)
+                except Exception as err:  # pylint: disable=broad-except
+                    LOGGER.warning("Setting up tarball failed with error, retrying once...",
+                                   error=err)
+                    time.sleep(1)
+                    try_download(url)
 
         if binaries_url is not None:
             if not link_dir:
