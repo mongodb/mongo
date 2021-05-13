@@ -46,6 +46,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
@@ -306,18 +307,16 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
         throw;
     }
 
-    const RecordId kWildcardMultikeyMetadataRecordId =
-        RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId);
+    const auto keyFormat = index->accessMethod()->getSortedDataInterface()->rsKeyFormat();
+    const RecordId kWildcardMultikeyMetadataRecordId = record_id_helpers::reservedIdFor(
+        record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, keyFormat);
     while (indexEntry) {
         if (!isFirstEntry) {
             _validateKeyOrder(
                 opCtx, index, indexEntry->keyString, prevIndexKeyStringValue, &indexResults);
         }
 
-        bool isMetadataKey = indexEntry->loc.withFormat(
-            [](RecordId::Null) { return false; },
-            [&](int64_t val) { return val == kWildcardMultikeyMetadataRecordId.getLong(); },
-            [](const char* str, int len) { return false; });
+        bool isMetadataKey = indexEntry->loc == kWildcardMultikeyMetadataRecordId;
         if (descriptor->getIndexType() == IndexType::INDEX_WILDCARD && isMetadataKey) {
             _indexConsistency->removeMultikeyMetadataPath(indexEntry->keyString, &indexInfo);
         } else {

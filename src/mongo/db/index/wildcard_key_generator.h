@@ -57,7 +57,8 @@ public:
                          BSONObj pathProjection,
                          const CollatorInterface* collator,
                          KeyString::Version keyStringVersion,
-                         Ordering ordering);
+                         Ordering ordering,
+                         KeyFormat rsKeyFormat);
 
     /**
      * Returns a pointer to the key generator's underlying ProjectionExecutor.
@@ -118,5 +119,6 @@ private:
     const BSONObj _keyPattern;
     const KeyString::Version _keyStringVersion;
     const Ordering _ordering;
+    const KeyFormat _rsKeyFormat;
 };
 }  // namespace mongo

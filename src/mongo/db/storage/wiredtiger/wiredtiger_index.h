@@ -145,10 +145,6 @@ public:
         return _keyPattern;
     }
 
-    KeyFormat rsKeyFormat() const {
-        return _rsKeyFormat;
-    }
-
     virtual bool isIdIndex() const {
         return false;
     }
@@ -198,7 +194,6 @@ protected:
     const std::string _indexName;
     const BSONObj _keyPattern;
     const BSONObj _collation;
-    const KeyFormat _rsKeyFormat;
 };
 
 class WiredTigerIndexUnique : public WiredTigerIndex {

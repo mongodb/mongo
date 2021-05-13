@@ -1227,8 +1227,10 @@ Status SortedDataBuilderUnique::addKey(const KeyString::Value& keyString) {
 SortedDataInterfaceBase::SortedDataInterfaceBase(OperationContext* opCtx,
                                                  StringData ident,
                                                  const IndexDescriptor* desc)
-    : ::mongo::SortedDataInterface(
-          ident, KeyString::Version::kLatestVersion, Ordering::make(desc->keyPattern())),
+    : ::mongo::SortedDataInterface(ident,
+                                   KeyString::Version::kLatestVersion,
+                                   Ordering::make(desc->keyPattern()),
+                                   KeyFormat::Long),
       // All entries in this ident will have a prefix of ident + \1.
       _prefix(ident.toString().append(1, '\1')),
       // Therefore, the string ident + \2 will be greater than all elements in this ident.
@@ -1240,7 +1242,8 @@ SortedDataInterfaceBase::SortedDataInterfaceBase(OperationContext* opCtx,
       _isPartial(desc->isPartial()) {}
 
 SortedDataInterfaceBase::SortedDataInterfaceBase(const Ordering& ordering, StringData ident)
-    : ::mongo::SortedDataInterface(ident, KeyString::Version::kLatestVersion, ordering),
+    : ::mongo::SortedDataInterface(
+          ident, KeyString::Version::kLatestVersion, ordering, KeyFormat::Long),
       _prefix(ident.toString().append(1, '\1')),
       _identEnd(ident.toString().append(1, '\2')),
       _desc(nullptr),

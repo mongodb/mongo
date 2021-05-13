@@ -813,6 +813,13 @@ void AbstractIndexAccessMethod::getKeys(SharedBufferFragmentBuilder& pooledBuffe
                                         MultikeyPaths* multikeyPaths,
                                         boost::optional<RecordId> id,
                                         OnSuppressedErrorFn onSuppressedError) const {
+    invariant(!id || _newInterface->rsKeyFormat() != KeyFormat::String || id->isStr(),
+              fmt::format("RecordId is not in the same string format as its RecordStore; id: {}",
+                          id->toString()));
+    invariant(!id || _newInterface->rsKeyFormat() != KeyFormat::Long || id->isLong(),
+              fmt::format("RecordId is not in the same long format as its RecordStore; id: {}",
+                          id->toString()));
+
     try {
         doGetKeys(pooledBufferBuilder, obj, context, keys, multikeyMetadataKeys, multikeyPaths, id);
     } catch (const AssertionException& ex) {

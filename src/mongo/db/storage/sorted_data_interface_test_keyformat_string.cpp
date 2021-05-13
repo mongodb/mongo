@@ -31,6 +31,7 @@
 
 #include <memory>
 
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
@@ -238,5 +239,60 @@ TEST(SortedDataInterface, KeyFormatStringUnindex) {
     }
     ASSERT_EQUALS(0, sorted->numEntries(opCtx.get()));
 }
+
+TEST(SortedDataInterface, InsertReservedRecordIdStr) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
+        /*unique=*/false, /*partial=*/false, KeyFormat::String));
+    if (!sorted) {
+        // Not supported by this storage engine.
+        return;
+    }
+    const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    ASSERT(sorted->isEmpty(opCtx.get()));
+    WriteUnitOfWork uow(opCtx.get());
+    RecordId reservedLoc(record_id_helpers::reservedIdFor(
+        record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::String));
+    invariant(record_id_helpers::isReserved(reservedLoc));
+    ASSERT_OK(sorted->insert(opCtx.get(),
+                             makeKeyString(sorted.get(), key1, reservedLoc),
+                             /*dupsAllowed*/ true));
+    uow.commit();
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+}
+
+TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordIdStr) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
+        /*unique=*/false, /*partial=*/false, KeyFormat::String));
+    if (!sorted) {
+        // Not supported by this storage engine.
+        return;
+    }
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataBuilderInterface> builder(
+            sorted->makeBulkBuilder(opCtx.get(), true));
+
+        RecordId reservedLoc(record_id_helpers::reservedIdFor(
+            record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::String));
+        ASSERT(record_id_helpers::isReserved(reservedLoc));
+
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
+        wuow.commit();
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+    }
+}
+
 }  // namespace
 }  // namespace mongo

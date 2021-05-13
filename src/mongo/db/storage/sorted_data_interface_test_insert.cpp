@@ -31,6 +31,7 @@
 
 #include <memory>
 
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
@@ -700,16 +701,16 @@ TEST(SortedDataInterface, InsertMultipleCompoundKeys) {
     }
 }
 
-TEST(SortedDataInterface, InsertReservedRecordId) {
+TEST(SortedDataInterface, InsertReservedRecordIdLong) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     ASSERT(sorted->isEmpty(opCtx.get()));
     WriteUnitOfWork uow(opCtx.get());
-    RecordId reservedLoc(
-        RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
-    invariant(RecordIdReservations::isReserved(reservedLoc));
+    RecordId reservedLoc(record_id_helpers::reservedIdFor(
+        record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
+    invariant(record_id_helpers::isReserved(reservedLoc));
     ASSERT_OK(sorted->insert(opCtx.get(),
                              makeKeyString(sorted.get(), key1, reservedLoc),
                              /*dupsAllowed*/ true));

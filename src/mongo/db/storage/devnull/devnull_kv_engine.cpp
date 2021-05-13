@@ -174,8 +174,10 @@ public:
 class DevNullSortedDataInterface : public SortedDataInterface {
 public:
     DevNullSortedDataInterface(StringData identName)
-        : SortedDataInterface(
-              identName, KeyString::Version::kLatestVersion, Ordering::make(BSONObj())) {}
+        : SortedDataInterface(identName,
+                              KeyString::Version::kLatestVersion,
+                              Ordering::make(BSONObj()),
+                              KeyFormat::Long) {}
 
     virtual ~DevNullSortedDataInterface() {}
 

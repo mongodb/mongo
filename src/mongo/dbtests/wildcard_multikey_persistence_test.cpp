@@ -35,6 +35,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/logv2/log.h"
@@ -45,8 +46,8 @@ namespace {
 
 using namespace unittest;
 
-static const RecordId kMetadataId =
-    RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId);
+static const RecordId kMetadataId = record_id_helpers::reservedIdFor(
+    record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long);
 
 static const int kIndexVersion = static_cast<int>(IndexDescriptor::kLatestIndexVersion);
 static const NamespaceString kDefaultNSS{"wildcard_multikey_persistence.test"};

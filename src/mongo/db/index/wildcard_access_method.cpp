@@ -44,7 +44,8 @@ WildcardAccessMethod::WildcardAccessMethod(IndexCatalogEntry* wildcardState,
               _descriptor->pathProjection(),
               _indexCatalogEntry->getCollator(),
               getSortedDataInterface()->getKeyStringVersion(),
-              getSortedDataInterface()->getOrdering()) {
+              getSortedDataInterface()->getOrdering(),
+              getSortedDataInterface()->rsKeyFormat()) {
     // Normalize the 'wildcardProjection' index option to facilitate its comparison as part of
     // index signature.
     if (!_descriptor->pathProjection().isEmpty()) {

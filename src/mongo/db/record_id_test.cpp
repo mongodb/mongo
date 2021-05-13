@@ -143,13 +143,44 @@ TEST(RecordId, OidTestCompare) {
     ASSERT_GT(oidMax, rid0);
 }
 
-TEST(RecordId, Reservations) {
+TEST(RecordId, ReservationsLong) {
     // It's important that reserved IDs like this never change.
     RecordId ridReserved(RecordId::kMaxRepr - (1024 * 1024));
     ASSERT_EQ(ridReserved,
-              RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
-    ASSERT(RecordIdReservations::isReserved(ridReserved));
+              record_id_helpers::reservedIdFor(
+                  record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
+    ASSERT(record_id_helpers::isReserved(ridReserved));
     ASSERT(ridReserved.isValid());
+
+    // Create a new RecordId in the reserved range and ensure it is considered reserved and unique.
+    RecordId inReservedRange(RecordId::kMaxRepr - 1);
+    ASSERT(record_id_helpers::isReserved(inReservedRange));
+    ASSERT(inReservedRange.isValid());
+    ASSERT_NE(inReservedRange,
+              record_id_helpers::reservedIdFor(
+                  record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
+}
+
+TEST(RecordId, ReservationsStr) {
+    // It's important that reserved IDs like this never change.
+    constexpr char buf[] = {static_cast<char>(0xFF), 0};
+    RecordId ridReserved(buf, sizeof(buf));
+    ASSERT_EQ(
+        ridReserved,
+        record_id_helpers::reservedIdFor(
+            record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::String));
+    ASSERT(record_id_helpers::isReserved(ridReserved));
+    ASSERT(ridReserved.isValid());
+
+    // Create a new RecordId in the reserved range and ensure it is considered reserved and unique.
+    constexpr char buf2[] = {static_cast<char>(0xFF), static_cast<char>(0xFF)};
+    RecordId inReservedRange(buf2, sizeof(buf2));
+    ASSERT(record_id_helpers::isReserved(inReservedRange));
+    ASSERT(inReservedRange.isValid());
+    ASSERT_NE(
+        inReservedRange,
+        record_id_helpers::reservedIdFor(
+            record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::String));
 }
 
 TEST(RecordId, RoundTripSerialize) {

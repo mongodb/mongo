@@ -123,5 +123,36 @@ BSONObj toBSONAs(RecordId rid, StringData fieldName) {
     return builder.obj();
 }
 
+namespace {
+static constexpr int64_t kMinReservedLong = RecordId::kMaxRepr - (1024 * 1024);
+// All RecordId strings that start with FF are considered reserved. This also happens to be an
+// invalid start byte for a KeyString sequence, which is used to encode RecordId binary strings.
+static constexpr char kReservedStrPrefix = static_cast<char>(0xFF);
+}  // namespace
+
+RecordId reservedIdFor(ReservationId res, KeyFormat keyFormat) {
+    // There is only one reservation at the moment.
+    invariant(res == ReservationId::kWildcardMultikeyMetadataId);
+    if (keyFormat == KeyFormat::Long) {
+        return RecordId(kMinReservedLong);
+    } else {
+        invariant(keyFormat == KeyFormat::String);
+        constexpr char reservation[] = {kReservedStrPrefix, 0};
+        return RecordId(reservation, sizeof(reservation));
+    }
+}
+
+bool isReserved(RecordId id) {
+    if (id.isNull()) {
+        return false;
+    }
+    if (id.isLong()) {
+        return id.getLong() >= kMinReservedLong && id.getLong() < RecordId::kMaxRepr;
+    }
+    // All RecordId strings that start with FF are considered reserved.
+    auto strData = id.getStr();
+    return strData.rawData()[0] == kReservedStrPrefix;
+}
+
 }  // namespace record_id_helpers
 }  // namespace mongo

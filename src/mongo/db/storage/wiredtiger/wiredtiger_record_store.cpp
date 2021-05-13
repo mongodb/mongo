@@ -1294,6 +1294,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     for (size_t i = 0; i < nRecords; i++) {
         auto& record = records[i];
         invariant(!record.id.isNull());
+        invariant(!record_id_helpers::isReserved(record.id));
         Timestamp ts;
         if (timestamps[i].isNull() && _isOplog) {
             // If the timestamp is 0, that probably means someone inserted a document directly

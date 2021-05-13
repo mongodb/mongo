@@ -34,6 +34,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/record_id_helpers.h"
 
 namespace mongo {
 
@@ -41,10 +42,17 @@ namespace mongo {
  * Extracts the multikey path from a metadata key stored within a wildcard index.
  */
 static FieldRef extractMultikeyPathFromIndexKey(const IndexKeyEntry& entry) {
-    invariant(RecordIdReservations::isReserved(entry.loc));
+    invariant(record_id_helpers::isReserved(entry.loc));
     invariant(
-        entry.loc.getLong() ==
-        RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId).getLong());
+        !entry.loc.isLong() ||
+        entry.loc ==
+            record_id_helpers::reservedIdFor(
+                record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
+    invariant(
+        !entry.loc.isStr() ||
+        entry.loc ==
+            record_id_helpers::reservedIdFor(
+                record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::String));
 
     // Validate that the first piece of the key is the integer 1.
     BSONObjIterator iter(entry.key);

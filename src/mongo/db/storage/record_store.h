@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
 
 namespace mongo {
@@ -58,16 +59,6 @@ class ValidateAdaptor;
 struct Record {
     RecordId id;
     RecordData data;
-};
-
-/**
- * The data format of a RecordStore's RecordId keys.
- */
-enum class KeyFormat {
-    /** Signed 64-bit integer */
-    Long,
-    /** Variable-length binary comparable data */
-    String,
 };
 
 /**

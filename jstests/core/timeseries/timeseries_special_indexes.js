@@ -307,5 +307,33 @@ TimeseriesTest.run((insert) => {
                           wildcardBucketsIndexSpec,
                           {[metaFieldName + '.c.d']: 1} /* timeseriesFindQuery */,
                           {'meta.c.d': 1} /* bucketsFindQuery */);
+
+    // Test multikey with a wildcard index on the time-series collection.
+    // Wildcard indexes have special handling for multikey.
+
+    jsTestLog("Testing multikey with wildcard index on time-series collection.");
+
+    const wildcardMultikeyDoc = {
+        _id: 0,
+        [timeFieldName]: ISODate(),
+        [metaFieldName]: {
+            a: 3,
+            b: 3,
+            c: {d: 3, e: 3},
+            d: [{zip: '01234', town: 'nyc'}, {zip: '43210', town: 'sf'}]
+        },
+    };
+    assert.commandWorked(timeseriescoll.insert(wildcardMultikeyDoc));
+
+    assert.eq(1,
+              timeseriescoll.find({'mm.d.zip': '01234'}).hint(wildcardBucketsIndexSpec).itcount());
+    const wildcardFindExplain = assert.commandWorked(
+        bucketscoll.find({'meta.d.zip': '01234'}).hint(wildcardBucketsIndexSpec).explain());
+    const planWildcardStage =
+        getPlanStage(getWinningPlan(wildcardFindExplain.queryPlanner), "IXSCAN");
+    assert(planWildcardStage.isMultiKey,
+           "Index should have been marked as multikey: " + tojson(planWildcardStage));
+    assert(planWildcardStage.multiKeyPaths.hasOwnProperty("meta.d.zip"),
+           "Index has wrong multikey paths after insert; plan: " + tojson(planWildcardStage));
 });
 })();

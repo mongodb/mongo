@@ -36,6 +36,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string.h"
 
 #pragma once
@@ -54,8 +55,18 @@ struct IndexValidateResults;
  */
 class SortedDataInterface : public Ident {
 public:
-    SortedDataInterface(StringData ident, KeyString::Version keyStringVersion, Ordering ordering)
-        : Ident(ident.toString()), _keyStringVersion(keyStringVersion), _ordering(ordering) {}
+    /**
+     * Constructs a SortedDataInterface. The rsKeyFormat is the RecordId key format of the related
+     * RecordStore.
+     */
+    SortedDataInterface(StringData ident,
+                        KeyString::Version keyStringVersion,
+                        Ordering ordering,
+                        KeyFormat rsKeyFormat)
+        : Ident(ident.toString()),
+          _keyStringVersion(keyStringVersion),
+          _ordering(ordering),
+          _rsKeyFormat(rsKeyFormat) {}
 
     virtual ~SortedDataInterface() {}
 
@@ -181,6 +192,13 @@ public:
      */
     Ordering getOrdering() const {
         return _ordering;
+    }
+
+    /**
+     * Returns the format of the associated RecordStore's RecordId keys.
+     */
+    KeyFormat rsKeyFormat() const {
+        return _rsKeyFormat;
     }
 
     /**
@@ -373,6 +391,7 @@ public:
 protected:
     const KeyString::Version _keyStringVersion;
     const Ordering _ordering;
+    const KeyFormat _rsKeyFormat;
 };
 
 /**

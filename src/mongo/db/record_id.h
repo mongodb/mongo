@@ -124,6 +124,16 @@ public:
         }
     }
 
+    // Returns true if this RecordId is storing a long integer.
+    bool isLong() const {
+        return _format() == Format::kLong;
+    }
+
+    // Returns true if this RecordId is storing a binary string.
+    bool isStr() const {
+        return _format() == Format::kSmallStr;
+    }
+
     /**
      * Returns the raw value to be used as a key in a RecordStore. Requires that this RecordId was
      * constructed with a 64-bit integer value or null; invariants otherwise.
@@ -133,7 +143,7 @@ public:
         if (_format() == Format::kNull) {
             return 0;
         }
-        invariant(_format() == Format::kLong);
+        invariant(isLong());
         int64_t val;
         memcpy(&val, _buffer, sizeof(val));
         return val;
@@ -144,7 +154,7 @@ public:
      * constructed with a binary string value, and invariants otherwise.
      */
     const StringData getStr() const {
-        invariant(_format() == Format::kSmallStr);
+        invariant(isStr());
         char size = _buffer[0];
         invariant(size > 0);
         invariant(size < kBufMaxSize - 1);
@@ -279,40 +289,6 @@ private:
     // - For the kSmallStr type, the first byte encodes the length and the remaining bytes encode
     // the string.
     char _buffer[kBufMaxSize];
-};
-
-/**
- * Enumerates all reserved ids that have been allocated for a specific purpose. These IDs may not be
- * stored in RecordStores.
- */
-enum class ReservationId { kWildcardMultikeyMetadataId };
-
-/**
- * Reservations tracks RecordId values that are reserved for specific usages and may not be stored
- * in RecordStores.
- */
-class RecordIdReservations {
-public:
-    static constexpr int64_t kMinReservedLong = RecordId::kMaxRepr - (1024 * 1024);
-
-    /**
-     * Returns the reserved RecordId value for a given Reservation.
-     */
-    static RecordId reservedIdFor(ReservationId res) {
-        // There is only one reservation at the moment.
-        invariant(res == ReservationId::kWildcardMultikeyMetadataId);
-        return RecordId(kMinReservedLong);
-    }
-
-    /**
-     * Returns true if this RecordId falls within the reserved range for a given RecordId type.
-     */
-    static bool isReserved(RecordId id) {
-        if (id.isNull()) {
-            return false;
-        }
-        return id.getLong() >= kMinReservedLong && id.getLong() < RecordId::kMaxRepr;
-    }
 };
 
 inline bool operator==(RecordId lhs, RecordId rhs) {

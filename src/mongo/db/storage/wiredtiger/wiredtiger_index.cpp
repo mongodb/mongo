@@ -243,14 +243,14 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                                  bool isReadOnly)
     : SortedDataInterface(ident,
                           _handleVersionInfo(ctx, uri, desc, isReadOnly),
-                          Ordering::make(desc->keyPattern())),
+                          Ordering::make(desc->keyPattern()),
+                          rsKeyFormat),
       _uri(uri),
       _tableId(WiredTigerSession::genTableId()),
       _desc(desc),
       _indexName(desc->indexName()),
       _keyPattern(desc->keyPattern()),
-      _collation(desc->collation()),
-      _rsKeyFormat(rsKeyFormat) {}
+      _collation(desc->collation()) {}
 
 NamespaceString WiredTigerIndex::getCollectionNamespace(OperationContext* opCtx) const {
     return _desc->getEntry()->getNSSFromCatalog(opCtx);

@@ -31,6 +31,7 @@
 
 #include <memory>
 
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
 
@@ -96,7 +97,7 @@ TEST(SortedDataInterface, BuilderAddKeyString) {
 }
 
 // Add a reserved RecordId using a bulk builder.
-TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordId) {
+TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordIdLong) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
@@ -110,9 +111,9 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordId) {
         const std::unique_ptr<SortedDataBuilderInterface> builder(
             sorted->makeBulkBuilder(opCtx.get(), true));
 
-        RecordId reservedLoc(
-            RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
-        invariant(RecordIdReservations::isReserved(reservedLoc));
+        RecordId reservedLoc(record_id_helpers::reservedIdFor(
+            record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
+        ASSERT(record_id_helpers::isReserved(reservedLoc));
 
         WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));

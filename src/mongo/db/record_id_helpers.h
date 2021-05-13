@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/storage/key_format.h"
 
 namespace mongo {
 class Timestamp;
@@ -66,6 +67,22 @@ StatusWith<RecordId> extractKeyOptime(const char* data, int len);
  */
 void appendToBSONAs(RecordId rid, BSONObjBuilder* builder, StringData fieldName);
 BSONObj toBSONAs(RecordId rid, StringData fieldName);
+
+/**
+ * Enumerates all reserved ids that have been allocated for a specific purpose. These IDs may not be
+ * stored in RecordStores, but rather may be encoded as RecordIds as meaningful values in indexes.
+ */
+enum class ReservationId { kWildcardMultikeyMetadataId };
+
+/**
+ * Returns the reserved RecordId value for a given ReservationId and RecordStore KeyFormat.
+ */
+RecordId reservedIdFor(ReservationId res, KeyFormat keyFormat);
+
+/**
+ * Returns true if this RecordId falls within the reserved range for a given RecordId type.
+ */
+bool isReserved(RecordId id);
 
 }  // namespace record_id_helpers
 }  // namespace mongo

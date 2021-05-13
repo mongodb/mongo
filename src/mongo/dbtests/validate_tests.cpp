@@ -39,6 +39,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/execution_context.h"
@@ -960,8 +961,8 @@ public:
 
         // Insert additional multikey path metadata index keys.
         lockDb(MODE_X);
-        const RecordId recordId(
-            RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
+        const RecordId recordId(record_id_helpers::reservedIdFor(
+            record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
         const IndexCatalog* indexCatalog = coll->getIndexCatalog();
         auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
         auto accessMethod =
@@ -1089,8 +1090,8 @@ public:
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            RecordId recordId(
-                RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
+            RecordId recordId(record_id_helpers::reservedIdFor(
+                record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
             const KeyString::Value indexKey =
                 KeyString::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
                                        BSON("" << 1 << ""

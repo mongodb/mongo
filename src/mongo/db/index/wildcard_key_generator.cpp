@@ -36,6 +36,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/record_id_helpers.h"
 
 namespace mongo {
 namespace {
@@ -100,12 +101,14 @@ WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,
                                            BSONObj pathProjection,
                                            const CollatorInterface* collator,
                                            KeyString::Version keyStringVersion,
-                                           Ordering ordering)
+                                           Ordering ordering,
+                                           KeyFormat rsKeyFormat)
     : _proj(createProjectionExecutor(keyPattern, pathProjection)),
       _collator(collator),
       _keyPattern(keyPattern),
       _keyStringVersion(keyStringVersion),
-      _ordering(ordering) {}
+      _ordering(ordering),
+      _rsKeyFormat(rsKeyFormat) {}
 
 void WildcardKeyGenerator::generateKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                                         BSONObj inputDoc,
@@ -246,7 +249,8 @@ void WildcardKeyGenerator::_addMultiKey(SharedBufferFragmentBuilder& pooledBuffe
             _keyStringVersion,
             key,
             _ordering,
-            RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
+            record_id_helpers::reservedIdFor(
+                record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, _rsKeyFormat));
         multikeyPaths->push_back(keyString.release());
     }
 }
