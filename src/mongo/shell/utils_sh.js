@@ -649,10 +649,10 @@ function printShardingStatus(configDB, verbose) {
     }
 
     // Is the balancer currently enabled
-    output(2, "Currently enabled:  " + balancerEnabledString);
+    output(2, "Currently enabled: " + balancerEnabledString);
 
     // Is the balancer currently active
-    output(2, "Currently running:  " + balancerRunning ? "yes" : "no");
+    output(2, "Currently running: " + (balancerRunning ? "yes" : "no"));
 
     // Output the balancer window
     var balSettings = sh.getBalancerWindow(configDB);
@@ -688,15 +688,15 @@ function printShardingStatus(configDB, verbose) {
         // Review config.actionlog for errors
         var actionReport = sh.getRecentFailedRounds(configDB);
         // Always print the number of failed rounds
-        output(2, "Failed balancer rounds in last 5 attempts:  " + actionReport.count);
+        output(2, "Failed balancer rounds in last 5 attempts: " + actionReport.count);
 
         // Only print the errors if there are any
         if (actionReport.count > 0) {
-            output(2, "Last reported error:  " + actionReport.lastErr);
-            output(2, "Time of Reported error:  " + actionReport.lastTime);
+            output(2, "Last reported error: " + actionReport.lastErr);
+            output(2, "Time of reported error: " + actionReport.lastTime);
         }
 
-        output(2, "Migration Results for the last 24 hours: ");
+        output(2, "Migration results for the last 24 hours: ");
         var migrations = sh.getRecentMigrations(configDB);
         if (migrations.length > 0) {
             migrations.forEach(function(x) {
@@ -757,12 +757,16 @@ function printShardingStatus(configDB, verbose) {
                                    nonBooleanNote("noBalance", coll.noBalance));
                         output(4, "chunks:");
 
+                        const chunksMatchPredicate =
+                            coll.hasOwnProperty("timestamp") ? {uuid: coll.uuid} : {ns: coll._id};
+
                         res = configDB.chunks
-                                  .aggregate({$match: {ns: coll._id}},
+                                  .aggregate({$match: chunksMatchPredicate},
                                              {$group: {_id: "$shard", cnt: {$sum: 1}}},
                                              {$project: {_id: 0, shard: "$_id", nChunks: "$cnt"}},
                                              {$sort: {shard: 1}})
                                   .toArray();
+
                         var totalChunks = 0;
                         res.forEach(function(z) {
                             totalChunks += z.nChunks;
@@ -770,7 +774,7 @@ function printShardingStatus(configDB, verbose) {
                         });
 
                         if (totalChunks < 20 || verbose) {
-                            configDB.chunks.find({"ns": coll._id})
+                            configDB.chunks.find(chunksMatchPredicate)
                                 .sort({min: 1})
                                 .forEach(function(chunk) {
                                     output(4,
