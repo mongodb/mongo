@@ -46,6 +46,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_util.h"
 
 using namespace mongo;
 using namespace mongo::repl;
@@ -105,59 +106,66 @@ public:
                 TestServiceHangDuringInitialization.pauseWhileSet();
             }
 
-            token.onCancel()
-                .thenRunOn(_service->getInstanceCleanupExecutor())
-                .then([this, self = shared_from_this()] {
-                    stdx::lock_guard lk(_mutex);
+            auto cancelLogicFinishedRunning =
+                token.onCancel()
+                    .thenRunOn(_service->getInstanceCleanupExecutor())
+                    .then([this, self = shared_from_this()] {
+                        stdx::lock_guard lk(_mutex);
 
-                    if (_completionPromise.getFuture().isReady()) {
-                        // We already completed
-                        return;
-                    }
-                    _completionPromise.setError(Status(ErrorCodes::Interrupted, "Interrupted"));
-                })
-                .getAsync([](auto) {});
+                        if (_completionPromise.getFuture().isReady()) {
+                            // We already completed
+                            return;
+                        }
+                        _completionPromise.setError(Status(ErrorCodes::Interrupted, "Interrupted"));
+                    });
 
-            return SemiFuture<void>::makeReady()
-                .thenRunOn(**executor)
-                .then([self = shared_from_this()] {
-                    self->_runOnce(State::kInitializing, State::kOne);
+            auto testLogicFinishedRunning =
+                SemiFuture<void>::makeReady()
+                    .thenRunOn(**executor)
+                    .then([self = shared_from_this()] {
+                        self->_runOnce(State::kInitializing, State::kOne);
 
-                    if (MONGO_unlikely(TestServiceHangDuringStateOne.shouldFail())) {
-                        TestServiceHangDuringStateOne.pauseWhileSet();
-                    }
-                })
-                .then([self = shared_from_this()] {
-                    self->_runOnce(State::kOne, State::kTwo);
+                        if (MONGO_unlikely(TestServiceHangDuringStateOne.shouldFail())) {
+                            TestServiceHangDuringStateOne.pauseWhileSet();
+                        }
+                    })
+                    .then([self = shared_from_this()] {
+                        self->_runOnce(State::kOne, State::kTwo);
 
-                    if (MONGO_unlikely(TestServiceHangDuringStateTwo.shouldFail())) {
-                        TestServiceHangDuringStateTwo.pauseWhileSet();
-                    }
-                })
-                .then([self = shared_from_this()] {
-                    // After this line the shared_ptr maintaining the Instance object is deleted
-                    // from the PrimaryOnlyService's map.  Thus keeping the self reference is
-                    // critical to extend the instance lifetime until all the callbacks using it
-                    // have completed.
-                    self->_runOnce(State::kTwo, State::kDone);
+                        if (MONGO_unlikely(TestServiceHangDuringStateTwo.shouldFail())) {
+                            TestServiceHangDuringStateTwo.pauseWhileSet();
+                        }
+                    })
+                    .then([self = shared_from_this()] {
+                        // After this line the shared_ptr maintaining the Instance object is deleted
+                        // from the PrimaryOnlyService's map.  Thus keeping the self reference is
+                        // critical to extend the instance lifetime until all the callbacks using it
+                        // have completed.
+                        self->_runOnce(State::kTwo, State::kDone);
 
-                    if (MONGO_unlikely(TestServiceHangDuringCompletion.shouldFail())) {
-                        TestServiceHangDuringCompletion.pauseWhileSet();
-                    }
-                })
-                .onCompletion([self = shared_from_this()](Status status) {
-                    stdx::lock_guard lk(self->_mutex);
-                    if (self->_completionPromise.getFuture().isReady()) {
-                        // We were already interrupted
-                        return;
-                    }
+                        if (MONGO_unlikely(TestServiceHangDuringCompletion.shouldFail())) {
+                            TestServiceHangDuringCompletion.pauseWhileSet();
+                        }
+                    })
+                    .onCompletion([self = shared_from_this()](Status status) {
+                        stdx::lock_guard lk(self->_mutex);
+                        if (self->_completionPromise.getFuture().isReady()) {
+                            // We were already interrupted
+                            return;
+                        }
 
-                    if (status.isOK()) {
-                        self->_completionPromise.emplaceValue();
-                    } else {
-                        self->_completionPromise.setError(status);
-                    }
-                })
+                        if (status.isOK()) {
+                            self->_completionPromise.emplaceValue();
+                        } else {
+                            self->_completionPromise.setError(status);
+                        }
+                    });
+
+            // This instance is considered complete when both cancellation logic and test logic have
+            // finished running.
+            return whenAll(std::move(cancelLogicFinishedRunning),
+                           std::move(testLogicFinishedRunning))
+                .ignoreValue()
                 .semi();
         }
 
