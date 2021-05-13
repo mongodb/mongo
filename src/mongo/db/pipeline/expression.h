@@ -80,20 +80,20 @@ class DocumentSource;
 
 /**
  * Registers a Parser so it can be called from parseExpression and friends (but only if
- * 'featureFlag' is enabled).
+ * 'featureFlag' is enabled) in a feature compatibility version >= X.
  *
  * As an example, if your expression looks like {"$foo": [1,2,3]} and should be flag-guarded by
- * feature_flags::gFoo, you would add this line:
- * REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION(foo, ExpressionFoo::parse, feature_flags::gFoo);
- *
- * An expression registered this way can be used in any featureCompatibilityVersion.
+ * feature_flags::gFoo and version >= X, you would add this line:
+ * REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION_WITH_MIN_VERSION(
+ *     foo, ExpressionFoo::parse, feature_flags::gFoo, X);
  */
-#define REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION(key, parser, featureFlag)    \
+#define REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION_WITH_MIN_VERSION(            \
+    key, parser, featureFlag, minVersion)                                     \
     MONGO_INITIALIZER_GENERAL(                                                \
         addToExpressionParserMap_##key, ("default"), ("expressionParserMap")) \
     (InitializerContext*) {                                                   \
         if (featureFlag.isEnabledAndIgnoreFCV()) {                            \
-            Expression::registerExpression("$" #key, (parser), boost::none);  \
+            Expression::registerExpression("$" #key, (parser), (minVersion)); \
         }                                                                     \
     }
 

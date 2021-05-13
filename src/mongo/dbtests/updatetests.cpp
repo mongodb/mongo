@@ -44,6 +44,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/idl/server_parameter_test_util.h"
 
 namespace UpdateTests {
 
@@ -1740,8 +1741,17 @@ public:
 class CheckNoMods : public SetBase {
 public:
     void run() {
-        _client.update(ns(), BSONObj(), BSON("i" << 5 << "$set" << BSON("q" << 3)), true);
-        ASSERT(error());
+        {
+            RAIIServerParameterControllerForTest controller("featureFlagDotsAndDollars", false);
+            _client.update(ns(), BSONObj(), BSON("i" << 5 << "$set" << BSON("q" << 3)), true);
+            ASSERT(error());
+        }
+        {
+            RAIIServerParameterControllerForTest controller("featureFlagDotsAndDollars", true);
+            _client.update(ns(), BSONObj(), BSON("_id" << 52307 << "$set" << BSON("q" << 3)), true);
+            ASSERT_BSONOBJ_EQ(fromjson("{'_id':52307,$set:{q:3}}"),
+                              _client.findOne(ns(), Query(BSON("_id" << 52307))));
+        }
     }
 };
 

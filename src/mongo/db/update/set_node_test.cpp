@@ -1053,6 +1053,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInsideSetElement) {
 }
 
 TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtStartOfPath) {
+    RAIIServerParameterControllerForTest controller("featureFlagDotsAndDollars", false);
     auto update = fromjson("{$set: {'$bad.a': 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;

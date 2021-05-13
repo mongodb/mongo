@@ -36,6 +36,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/update_node_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -473,6 +474,7 @@ TEST_F(RenameNodeTest, RenameFromNonExistentPathIsNoOp) {
 }
 
 TEST_F(RenameNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
+    RAIIServerParameterControllerForTest controller("featureFlagDotsAndDollars", false);
     auto update = fromjson("{$rename: {'a.$id': 'b'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;
@@ -579,6 +581,7 @@ TEST_F(RenameNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
 }
 
 TEST_F(RenameNodeTest, ApplyCannotCreateDollarPrefixedField) {
+    RAIIServerParameterControllerForTest controller("featureFlagDotsAndDollars", false);
     auto update = fromjson("{$rename: {a: '$bad'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     RenameNode node;

@@ -7226,9 +7226,11 @@ void ExpressionDateTrunc::_doAddDependencies(DepsTracker* deps) const {
 }
 
 /* -------------------------- ExpressionGetField ------------------------------ */
-REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION(getField,
-                                         ExpressionGetField::parse,
-                                         feature_flags::gFeatureFlagDotsAndDollars);
+REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION_WITH_MIN_VERSION(
+    getField,
+    ExpressionGetField::parse,
+    feature_flags::gFeatureFlagDotsAndDollars,
+    ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
 
 intrusive_ptr<Expression> ExpressionGetField::parse(ExpressionContext* const expCtx,
                                                     BSONElement expr,
@@ -7335,14 +7337,18 @@ Value ExpressionGetField::serialize(const bool explain) const {
 }
 
 /* -------------------------- ExpressionSetField ------------------------------ */
-REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION(setField,
-                                         ExpressionSetField::parse,
-                                         feature_flags::gFeatureFlagDotsAndDollars);
+REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION_WITH_MIN_VERSION(
+    setField,
+    ExpressionSetField::parse,
+    feature_flags::gFeatureFlagDotsAndDollars,
+    ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
 
 // $unsetField is syntactic sugar for $setField where value is set to $$REMOVE.
-REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION(unsetField,
-                                         ExpressionSetField::parse,
-                                         feature_flags::gFeatureFlagDotsAndDollars);
+REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION_WITH_MIN_VERSION(
+    unsetField,
+    ExpressionSetField::parse,
+    feature_flags::gFeatureFlagDotsAndDollars,
+    ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
 
 intrusive_ptr<Expression> ExpressionSetField::parse(ExpressionContext* const expCtx,
                                                     BSONElement expr,
