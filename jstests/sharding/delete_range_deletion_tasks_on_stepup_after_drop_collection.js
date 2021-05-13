@@ -1,6 +1,12 @@
 /**
  * Tests that range deletion tasks are eventually deleted even if collection is dropped
  * before migration coordination is resumed.
+ *
+ * @tags: [
+ *     # (SERVER-56915) this test is artificially blocking refreshes, potentially resulting in a
+ *     # deadlock on shutdown in case of failure
+ *     does_not_support_stepdowns
+ * ]
  */
 
 (function() {
