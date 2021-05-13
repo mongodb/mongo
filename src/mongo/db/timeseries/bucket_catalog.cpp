@@ -195,13 +195,13 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
             return true;
         }
         auto bucketTime = (*bucket).getTime();
-        if (time - bucketTime >= Seconds(options.getBucketMaxSpanSeconds())) {
+        if (time - bucketTime >= Seconds(*options.getBucketMaxSpanSeconds())) {
             stats->numBucketsClosedDueToTimeForward.fetchAndAddRelaxed(1);
             return true;
         }
         if (time < bucketTime) {
             if (!(*bucket)->_hasBeenCommitted() &&
-                (*bucket)->_latestTime - time < Seconds(options.getBucketMaxSpanSeconds())) {
+                (*bucket)->_latestTime - time < Seconds(*options.getBucketMaxSpanSeconds())) {
                 (*bucket).setTime();
             } else {
                 stats->numBucketsClosedDueToTimeBackward.fetchAndAddRelaxed(1);

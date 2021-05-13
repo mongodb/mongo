@@ -24,13 +24,19 @@ if (!TimeseriesTest.supportsClusteredIndexes(db.getMongo())) {
 }
 
 TimeseriesTest.run((insert) => {
-    const now = new Date();
-    const dates = [];
-    for (let i = 0; i < 10; i++) {
-        let d = new Date();
-        d.setDate(now.getDate() + (i - 5));
-        dates.push(d);
-    }
+    // These dates will all be inserted into individual buckets.
+    const dates = [
+        ISODate("2021-04-01T00:00:00.000Z"),
+        ISODate("2021-04-02T00:00:00.000Z"),
+        ISODate("2021-04-03T00:00:00.000Z"),
+        ISODate("2021-04-04T00:00:00.000Z"),
+        ISODate("2021-04-05T00:00:00.000Z"),
+        ISODate("2021-04-06T00:00:00.000Z"),
+        ISODate("2021-04-07T00:00:00.000Z"),
+        ISODate("2021-04-08T00:00:00.000Z"),
+        ISODate("2021-04-09T00:00:00.000Z"),
+        ISODate("2021-04-10T00:00:00.000Z"),
+    ];
 
     const coll = db.timeseries_id_range;
     const timeFieldName = "time";

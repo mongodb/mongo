@@ -99,5 +99,5 @@ structs:
             bucketMaxSpanSeconds:
                 description: "The maximum range of time values for a bucket, in seconds"
                 type: safeInt
-                default: 3600
+                optional: true
                 validator: { gte: 1 }

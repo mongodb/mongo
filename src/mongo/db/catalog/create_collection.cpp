@@ -121,9 +121,27 @@ Status _createView(OperationContext* opCtx,
     });
 }
 
+namespace {
+int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity) {
+    switch (granularity) {
+        case BucketGranularityEnum::Seconds:
+            // 3600 seconds in an hour
+            return 60 * 60;
+        case BucketGranularityEnum::Minutes:
+            // 1440 minutes in a day
+            return 60 * 60 * 24;
+        case BucketGranularityEnum::Hours:
+            // 720 hours in an average month. Note that this only affects internal bucketing and
+            // query optimizations, but users should not depend on or be aware of this estimation.
+            return 60 * 60 * 24 * 30;
+    }
+    MONGO_UNREACHABLE;
+}
+}  // namespace
+
 Status _createTimeseries(OperationContext* opCtx,
                          const NamespaceString& ns,
-                         const CollectionOptions& options) {
+                         const CollectionOptions& optionsArg) {
     // This path should only be taken when a user creates a new time-series collection on the
     // primary. Secondaries replicate individual oplog entries.
     invariant(!ns.isTimeseriesBucketsCollection());
@@ -131,16 +149,19 @@ Status _createTimeseries(OperationContext* opCtx,
 
     auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
 
+    CollectionOptions options = optionsArg;
+
+    // Users may not pass a 'bucketMaxSpanSeconds' other than the default. Instead they should rely
+    // on the default behavior from the 'granularity'.
     auto granularity = options.timeseries->getGranularity();
-    uassert(ErrorCodes::InvalidOptions,
-            "Time-series 'granularity' is required to be 'seconds'",
-            granularity == BucketGranularityEnum::Seconds);
-
-    auto bucketMaxSpan = options.timeseries->getBucketMaxSpanSeconds();
-    uassert(ErrorCodes::InvalidOptions,
-            "Time-series 'bucketMaxSpanSeconds' is required to be 3600",
-            bucketMaxSpan == 3600);
-
+    auto maxSpanSeconds = getMaxSpanSecondsFromGranularity(granularity);
+    uassert(5510500,
+            fmt::format("Timeseries 'bucketMaxSpanSeconds' is not configurable to a value other "
+                        "than the default of {} for the provided granularity",
+                        maxSpanSeconds),
+            !options.timeseries->getBucketMaxSpanSeconds() ||
+                maxSpanSeconds == options.timeseries->getBucketMaxSpanSeconds());
+    options.timeseries->setBucketMaxSpanSeconds(maxSpanSeconds);
 
     // Set the validator option to a JSON schema enforcing constraints on bucket documents.
     // This validation is only structural to prevent accidental corruption by users and
@@ -370,13 +391,13 @@ Status _createTimeseries(OperationContext* opCtx,
                 "$_internalUnpackBucket"
                 << BSON("timeField" << options.timeseries->getTimeField() << "metaField"
                                     << *options.timeseries->getMetaField() << "bucketMaxSpanSeconds"
-                                    << options.timeseries->getBucketMaxSpanSeconds() << "exclude"
+                                    << *options.timeseries->getBucketMaxSpanSeconds() << "exclude"
                                     << BSONArray())));
         } else {
             viewOptions.pipeline = BSON_ARRAY(BSON(
                 "$_internalUnpackBucket"
                 << BSON("timeField" << options.timeseries->getTimeField() << "bucketMaxSpanSeconds"
-                                    << options.timeseries->getBucketMaxSpanSeconds() << "exclude"
+                                    << *options.timeseries->getBucketMaxSpanSeconds() << "exclude"
                                     << BSONArray())));
         }
 

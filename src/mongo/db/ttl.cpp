@@ -305,7 +305,7 @@ private:
                               const CollectionPtr& coll,
                               std::int64_t expireAfterSeconds) const {
         if (auto timeseries = coll->getTimeseriesOptions()) {
-            const auto bucketMaxSpan = Seconds(timeseries->getBucketMaxSpanSeconds());
+            const auto bucketMaxSpan = Seconds(*timeseries->getBucketMaxSpanSeconds());
 
             // Don't delete data unless it is safely out of range of the bucket maximum time
             // range. On time-series collections, the _id (and thus RecordId) is the minimum
