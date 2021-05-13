@@ -496,6 +496,9 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
 
     LOGV2_FOR_CATALOG_REFRESH(24102, 2, "Refreshing cached database entry", "db"_attr = dbName);
 
+    // This object will define the new time of the database info obtained by this refresh
+    auto newDbVersion = ComparableDatabaseVersion::makeComparableDatabaseVersion({});
+
     Timer t{};
     try {
         auto newDb = _catalogCacheLoader.getDatabase(dbName).get();
@@ -503,14 +506,7 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, newDb.getPrimary()),
             str::stream() << "The primary shard for database " << dbName << " does not exist");
 
-        const bool mustReplaceEntryDueToUpgradeOrDowngrade = previousDbType &&
-            (previousDbType->getVersion().getTimestamp().is_initialized() !=
-             newDb.getVersion().getTimestamp().is_initialized());
-
-        auto newDbVersion = mustReplaceEntryDueToUpgradeOrDowngrade
-            ? ComparableDatabaseVersion::makeComparableDatabaseVersionForForcedRefresh(
-                  newDb.getVersion())
-            : ComparableDatabaseVersion::makeComparableDatabaseVersion(newDb.getVersion());
+        newDbVersion.setDatabaseVersion(newDb.getVersion());
 
         LOGV2_FOR_CATALOG_REFRESH(24101,
                                   1,
@@ -528,7 +524,7 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
                                   "duration"_attr = Milliseconds(t.millis()),
                                   "error"_attr = redact(ex));
         if (ex.code() == ErrorCodes::NamespaceNotFound) {
-            return CatalogCache::DatabaseCache::LookupResult(boost::none, previousDbVersion);
+            return CatalogCache::DatabaseCache::LookupResult(boost::none, std::move(newDbVersion));
         }
         throw;
     }
@@ -592,6 +588,10 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
     _updateRefreshesStats(isIncremental, true);
     blockCollectionCacheLookup.pauseWhileSet(opCtx);
 
+    // This object will define the new time of the routing info obtained by this refresh
+    auto newComparableVersion =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNSHARDED());
+
     Timer t{};
     try {
         auto lookupVersion =
@@ -606,7 +606,6 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
 
         auto collectionAndChunks = _catalogCacheLoader.getChunksSince(nss, lookupVersion).get();
 
-        bool mustReplaceEntryDueToUpgradeOrDowngrade = false;
         auto newRoutingHistory = [&] {
             // If we have routing info already and it's for the same collection epoch, we're
             // updating. Otherwise, we're making a whole new routing table.
@@ -614,7 +613,6 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                 existingHistory->optRt->getVersion().epoch() == collectionAndChunks.epoch) {
                 if (existingHistory->optRt->getVersion().getTimestamp().is_initialized() !=
                     collectionAndChunks.creationTime.is_initialized()) {
-                    mustReplaceEntryDueToUpgradeOrDowngrade = true;
                     return existingHistory->optRt
                         ->makeUpdatedReplacingTimestamp(collectionAndChunks.creationTime)
                         .makeUpdated(collectionAndChunks.reshardingFields,
@@ -663,10 +661,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
 
         const ChunkVersion newVersion = newRoutingHistory.getVersion();
 
-        // This object will define the new time in store
-        auto newComparableVersion = (mustReplaceEntryDueToUpgradeOrDowngrade)
-            ? ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh(newVersion)
-            : ComparableChunkVersion::makeComparableChunkVersion(newVersion);
+        newComparableVersion.setChunkVersion(newVersion);
 
         if (isIncremental && existingHistory->optRt->getVersion() == newVersion) {
             invariant(newRoutingHistory.sameAllowMigrations(*existingHistory->optRt),
@@ -709,9 +704,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                       "namespace"_attr = nss,
                                       "duration"_attr = Milliseconds(t.millis()));
 
-            return LookupResult(
-                OptionalRoutingTableHistory(),
-                ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNSHARDED()));
+            return LookupResult(OptionalRoutingTableHistory(), std::move(newComparableVersion));
         }
 
         LOGV2_FOR_CATALOG_REFRESH(4619903,

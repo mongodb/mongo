@@ -398,14 +398,6 @@ public:
     static ComparableChunkVersion makeComparableChunkVersionForForcedRefresh();
 
     /**
-     * Creates a new instance which will artificially be greater than any
-     * previously created ComparableChunkVersion. Instances created afterwards
-     * will be compared as-if this object was a normal (i.e. non-forced) ComparableChunkVersion.
-     */
-    static ComparableChunkVersion makeComparableChunkVersionForForcedRefresh(
-        const ChunkVersion& version);
-
-    /**
      * Empty constructor needed by the ReadThroughCache.
      *
      * Instances created through this constructor will be always less then the ones created through
@@ -446,6 +438,8 @@ public:
     }
 
 private:
+    friend class CatalogCache;
+
     static AtomicWord<uint64_t> _epochDisambiguatingSequenceNumSource;
     static AtomicWord<uint64_t> _forcedRefreshSequenceNumSource;
 
@@ -455,6 +449,8 @@ private:
         : _forcedRefreshSequenceNum(forcedRefreshSequenceNum),
           _chunkVersion(std::move(version)),
           _epochDisambiguatingSequenceNum(epochDisambiguatingSequenceNum) {}
+
+    void setChunkVersion(const ChunkVersion& version);
 
     uint64_t _forcedRefreshSequenceNum{0};
 

@@ -825,11 +825,8 @@ ComparableChunkVersion ComparableChunkVersion::makeComparableChunkVersionForForc
                                   _epochDisambiguatingSequenceNumSource.fetchAndAdd(1));
 }
 
-ComparableChunkVersion ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh(
-    const ChunkVersion& version) {
-    return ComparableChunkVersion(_forcedRefreshSequenceNumSource.addAndFetch(1),
-                                  version,
-                                  _epochDisambiguatingSequenceNumSource.fetchAndAdd(1));
+void ComparableChunkVersion::setChunkVersion(const ChunkVersion& version) {
+    _chunkVersion = version;
 }
 
 BSONObj ComparableChunkVersion::toBSONForLogging() const {

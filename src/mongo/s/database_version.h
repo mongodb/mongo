@@ -126,14 +126,6 @@ public:
     static ComparableDatabaseVersion makeComparableDatabaseVersionForForcedRefresh();
 
     /**
-     * Creates a new instance which will artificially be greater than any
-     * previously created ComparableDatabaseVersion. Instances created afterwards
-     * will be compared as-if this object was a normal (i.e. non-forced) ComparableDatabaseVersion.
-     */
-    static ComparableDatabaseVersion makeComparableDatabaseVersionForForcedRefresh(
-        const DatabaseVersion& version);
-
-    /**
      * Empty constructor needed by the ReadThroughCache.
      *
      * Instances created through this constructor will be always less then the ones created through
@@ -169,6 +161,8 @@ public:
     }
 
 private:
+    friend class CatalogCache;
+
     static AtomicWord<uint64_t> _uuidDisambiguatingSequenceNumSource;
     static AtomicWord<uint64_t> _forcedRefreshSequenceNumSource;
 
@@ -178,6 +172,8 @@ private:
         : _dbVersion(std::move(version)),
           _uuidDisambiguatingSequenceNum(uuidDisambiguatingSequenceNum),
           _forcedRefreshSequenceNum(forcedRefreshSequenceNum) {}
+
+    void setDatabaseVersion(const DatabaseVersion& version);
 
     boost::optional<DatabaseVersion> _dbVersion;
 
