@@ -134,7 +134,8 @@ assert.commandFailedWithCode(db.runCommand({
                 }
             }
         },
-    ]
+    ],
+    cursor: {},
 }),
                              ErrorCodes.FailedToParse);
 assert.commandFailedWithCode(db.runCommand({
@@ -150,7 +151,8 @@ assert.commandFailedWithCode(db.runCommand({
                 }
             }
         },
-    ]
+    ],
+    cursor: {},
 }),
                              ErrorCodes.FailedToParse);
 assert.commandFailedWithCode(db.runCommand({
@@ -166,7 +168,8 @@ assert.commandFailedWithCode(db.runCommand({
                 }
             }
         },
-    ]
+    ],
+    cursor: {},
 }),
                              ErrorCodes.FailedToParse);
 assert.commandFailedWithCode(db.runCommand({
@@ -182,7 +185,8 @@ assert.commandFailedWithCode(db.runCommand({
                 }
             }
         },
-    ]
+    ],
+    cursor: {},
 }),
                              ErrorCodes.FailedToParse);
 assert.commandFailedWithCode(db.runCommand({
@@ -199,7 +203,8 @@ assert.commandFailedWithCode(db.runCommand({
                 }
             }
         },
-    ]
+    ],
+    cursor: {},
 }),
                              ErrorCodes.FailedToParse);
 assert.commandFailedWithCode(db.runCommand({
@@ -215,7 +220,78 @@ assert.commandFailedWithCode(db.runCommand({
                 }
             }
         },
-    ]
+    ],
+    cursor: {},
 }),
                              ErrorCodes.FailedToParse);
+
+// Fails if an explicit 'sortBy' is not given.
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: coll.getName(),
+    pipeline: [
+        {
+            $setWindowFields: {
+                output: {
+                    expMovAvg: {
+                        $expMovingAvg: {input: "$price", N: 1},
+                    },
+                }
+            }
+        },
+    ],
+    cursor: {},
+}),
+                             ErrorCodes.FailedToParse);
+
+// Fails if 'alpha' is not between 0 and 1, exclusive.
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: coll.getName(),
+    pipeline: [
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {
+                    expMovAvg: {
+                        $expMovingAvg: {input: "$price", alpha: 1.0},
+                    },
+                }
+            }
+        },
+    ],
+    cursor: {},
+}),
+                             ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: coll.getName(),
+    pipeline: [
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {
+                    expMovAvg: {
+                        $expMovingAvg: {input: "$price", alpha: 0.0},
+                    },
+                }
+            }
+        },
+    ],
+    cursor: {},
+}),
+                             ErrorCodes.FailedToParse);
+assert.commandWorked(db.runCommand({
+    aggregate: coll.getName(),
+    pipeline: [
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {
+                    expMovAvg: {
+                        $expMovingAvg: {input: "$price", alpha: NumberDecimal("1.0E-1")},
+                    },
+                }
+            }
+        },
+    ],
+    cursor: {},
+}));
 })();

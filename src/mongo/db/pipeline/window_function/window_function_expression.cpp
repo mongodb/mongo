@@ -86,6 +86,7 @@ boost::intrusive_ptr<Expression> ExpressionExpMovingAvg::parse(
                           << kInputArg << "' field, and either an '" << kNArg << "' field or an '"
                           << kAlphaArg << "' field",
             subObj.nFields() == 2 && subObj.hasField(kInputArg));
+    uassert(ErrorCodes::FailedToParse, "$expMovingAvg requires an explicit 'sortBy'", sortBy);
     input =
         ::mongo::Expression::parseOperand(expCtx, subObj[kInputArg], expCtx->variablesParseState);
     // ExpMovingAvg is always unbounded to current.
@@ -112,11 +113,13 @@ boost::intrusive_ptr<Expression> ExpressionExpMovingAvg::parse(
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "'" << kAlphaArg << "' must be a number",
                 subObj[kAlphaArg].isNumber());
-        return make_intrusive<ExpressionExpMovingAvg>(expCtx,
-                                                      std::string(kAccName),
-                                                      std::move(input),
-                                                      std::move(bounds),
-                                                      subObj[kAlphaArg].numberDecimal());
+        auto alpha = subObj[kAlphaArg].numberDecimal();
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "'" << kAlphaArg << "' must be between 0 and 1 (exclusive), found "
+                              << subObj[kAlphaArg],
+                alpha.isGreater(Decimal128(0)) && alpha.isLess(Decimal128(1.0)));
+        return make_intrusive<ExpressionExpMovingAvg>(
+            expCtx, std::string(kAccName), std::move(input), std::move(bounds), std::move(alpha));
     } else {
         uasserted(ErrorCodes::FailedToParse,
                   str::stream() << "Got unrecognized field in $expMovingAvg"
