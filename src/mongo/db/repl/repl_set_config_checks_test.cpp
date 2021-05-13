@@ -40,6 +40,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/unittest.h"
 
@@ -155,7 +156,9 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_SelfMustBeElectable) {
                       .getStatus());
 }
 
-TEST_F(ServiceContextTest, ValidateConfigForInitiate_WriteConcernMustBeSatisfiable) {
+DEATH_TEST_REGEX_F(ServiceContextTest,
+                   ValidateConfigForInitiate_NonDefaultGetLastErrorDefaults,
+                   "Fatal assertion.*5624101") {
     ReplSetConfig config;
     OID newReplSetId = OID::gen();
     config =
@@ -170,10 +173,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_WriteConcernMustBeSatisfiab
                                         newReplSetId);
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-
-    ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
-                  validateConfigForInitiate(&presentOnceExternalState, config, getServiceContext())
-                      .getStatus());
+    validateConfigForInitiate(&presentOnceExternalState, config, getServiceContext()).getStatus();
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOrOne) {
@@ -771,7 +771,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigInvalid) {
                   validateConfigForReconfig(oldConfig, newConfig, true, false, false));
 }
 
-TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigWriteConcernNotSatisifiable) {
+TEST_F(ServiceContextTest, ValidateConfigForReconfig_NonDefaultGetLastErrorDefaults) {
     // The new config is not valid due to an unsatisfiable write concern. This tests that if the
     // new config is invalid, validateConfigForReconfig will return a status indicating what is
     // wrong with the new config.
@@ -793,11 +793,13 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigWriteConcernNotSat
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
-                  validateConfigForReconfig(oldConfig, newConfig, false, false, false));
+    ASSERT_THROWS_CODE(validateConfigForReconfig(oldConfig, newConfig, false, false, false),
+                       AssertionException,
+                       5624102);
     // Forced reconfigs also do not allow this.
-    ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
-                  validateConfigForReconfig(oldConfig, newConfig, true, false, false));
+    ASSERT_THROWS_CODE(validateConfigForReconfig(oldConfig, newConfig, true, false, false),
+                       AssertionException,
+                       5624102);
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigInvalid) {
@@ -840,7 +842,9 @@ TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigValid) {
                   .getStatus());
 }
 
-TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigWriteConcernNotSatisfiable) {
+DEATH_TEST_REGEX_F(ServiceContextTest,
+                   ValidateConfigForStartUp_NewConfigNonDefaultGetLastErrorDefaults,
+                   "Fatal assertion.*5624100") {
     // The new config contains an unsatisfiable write concern.  We don't allow these configs to be
     // created anymore, but we allow any which exist to pass and the database to start up to
     // maintain backwards compatibility.
@@ -855,8 +859,7 @@ TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigWriteConcernNotSati
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_OK(validateConfigForStartUp(&presentOnceExternalState, newConfig, getServiceContext())
-                  .getStatus());
+    validateConfigForStartUp(&presentOnceExternalState, newConfig, getServiceContext()).getStatus();
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigInvalid) {
@@ -899,7 +902,9 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigValid) {
                   .getStatus());
 }
 
-TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigWriteConcernNotSatisfiable) {
+DEATH_TEST_REGEX_F(ServiceContextTest,
+                   ValidateConfigForHeartbeatReconfig_NonDefaultGetLastErrorDefaults,
+                   "Tripwire assertion.*5624103") {
     // The new config contains an unsatisfiable write concern.  We don't allow these configs to be
     // created anymore, but we allow any which exist to be received in a heartbeat.
     ReplSetConfig newConfig;
@@ -915,9 +920,11 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigWriteConc
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_OK(validateConfigForHeartbeatReconfig(
-                  &presentOnceExternalState, newConfig, getServiceContext())
-                  .getStatus());
+    ASSERT_THROWS_CODE(validateConfigForHeartbeatReconfig(
+                           &presentOnceExternalState, newConfig, getServiceContext())
+                           .getStatus(),
+                       AssertionException,
+                       5624103);
 }
 
 TEST_F(ServiceContextTest, ValidateForReconfig_ForceStillNeedsValidConfig) {

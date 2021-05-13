@@ -37,6 +37,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -60,6 +61,13 @@ public:
             uassert(50876,
                     "Cannot run addShard on a node started without --shardsvr",
                     serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+            tassert(5624104,
+                    "Cannot run addShard on a node that contains customized getLastErrorDefaults, "
+                    "which has been deprecated and is now ignored. Use setDefaultRWConcern instead "
+                    "to set a cluster-wide default writeConcern.",
+                    !repl::ReplicationCoordinator::get(opCtx)
+                         ->getConfig()
+                         .containsCustomizedGetLastErrorDefaults());
 
             auto addShardCmd = request();
             auto shardIdUpsertCmd =

@@ -4563,17 +4563,17 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
         }
     }
 
-    // Since the ReplSetConfig always has a WriteConcernOptions, the only way to know if it has been
-    // customized is if it's different to the implicit defaults of { w: 1, wtimeout: 0 }.
-    if (const auto& wc = newConfig.getDefaultWriteConcern();
-        !(wc.wNumNodes == 1 && wc.wTimeout == 0)) {
+    // Check that getLastErrorDefaults has not been changed from the default settings of
+    // { w: 1, wtimeout: 0 }.
+    if (newConfig.containsCustomizedGetLastErrorDefaults()) {
         LOGV2_OPTIONS(21387, {logv2::LogTag::kStartupWarnings}, "");
         LOGV2_OPTIONS(21388,
                       {logv2::LogTag::kStartupWarnings},
                       "** WARNING: Replica set config contains customized getLastErrorDefaults,");
         LOGV2_OPTIONS(21389,
                       {logv2::LogTag::kStartupWarnings},
-                      "**          which are deprecated. Use setDefaultRWConcern instead to set a");
+                      "**          which have been deprecated and are now ignored. Use "
+                      "setDefaultRWConcern instead to set a");
         LOGV2_OPTIONS(21390,
                       {logv2::LogTag::kStartupWarnings},
                       "**          cluster-wide default writeConcern.");
