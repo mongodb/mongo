@@ -214,14 +214,10 @@ void SingleServerDiscoveryMonitor::_doRemoteCommand() {
         return;
 
     StatusWith<executor::TaskExecutor::CallbackHandle> swCbHandle = [&]() {
-        try {
-            if (exhaustEnabled(_topologyVersion)) {
-                return _scheduleStreamableHello();
-            }
-            return _scheduleSingleHello();
-        } catch (ExceptionFor<ErrorCodes::NetworkInterfaceExceededTimeLimit>& ex) {
-            return StatusWith<executor::TaskExecutor::CallbackHandle>(ex.toStatus());
+        if (exhaustEnabled(_topologyVersion)) {
+            return _scheduleStreamableHello();
         }
+        return _scheduleSingleHello();
     }();
 
     if (!swCbHandle.isOK()) {
