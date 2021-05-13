@@ -272,9 +272,8 @@ const runAbortWithFailpoint = (failpointName, failpointNodeType, abortLocation, 
         assert.eq(reshardingSuccessesInitialCount, reshardingSuccessesFinalCount);
     }
 
-    reshardingTest.teardown();
-
     abortThread.join();
+    reshardingTest.teardown();
 };
 
 runAbortWithFailpoint("reshardingPauseRecipientBeforeCloning",
