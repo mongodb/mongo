@@ -62,6 +62,7 @@ namespace repl {
 MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceSkipRebuildingInstances);
 MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceHangBeforeRebuildingInstances);
 MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceFailRebuildingInstances);
+MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic);
 
 namespace {
 const auto _registryDecoration = ServiceContext::declareDecoration<PrimaryOnlyServiceRegistry>();
@@ -326,27 +327,31 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
     invariant(_getHasExecutor());
     auto newThenOldScopedExecutor =
         std::make_shared<executor::ScopedTaskExecutor>(_executor, kExecutorShutdownStatus);
-    {
-        stdx::lock_guard lk(_mutex);
 
-        if (_state == State::kShutdown) {
-            return;
-        }
+    stdx::unique_lock lk(_mutex);
 
-        auto newTerm = stepUpOpTime.getTerm();
-        invariant(newTerm > _term,
-                  str::stream() << "term " << newTerm << " is not greater than " << _term);
-        _term = newTerm;
-        _state = State::kRebuilding;
-        _source = CancellationSource();
-
-        // Install a new executor, while moving the old one into 'newThenOldScopedExecutor' so it
-        // can be accessed outside of _mutex.
-        using std::swap;
-        swap(newThenOldScopedExecutor, _scopedExecutor);
-        // Don't destroy the Instances until all outstanding tasks run against them are complete.
-        swap(savedInstances, _activeInstances);
+    if (_state == State::kShutdown) {
+        return;
     }
+
+    auto newTerm = stepUpOpTime.getTerm();
+    invariant(newTerm > _term,
+              str::stream() << "term " << newTerm << " is not greater than " << _term);
+    _term = newTerm;
+    _state = State::kRebuilding;
+    _source = CancellationSource();
+
+    // Install a new executor, while moving the old one into 'newThenOldScopedExecutor' so it
+    // can be accessed outside of _mutex.
+    using std::swap;
+    swap(newThenOldScopedExecutor, _scopedExecutor);
+    // Don't destroy the Instances until all outstanding tasks run against them are complete.
+    swap(savedInstances, _activeInstances);
+
+    // Save off the new executor temporarily.
+    auto newScopedExecutor = _scopedExecutor;
+
+    lk.unlock();
 
     // Ensure that all tasks from the previous term have completed before allowing tasks to be
     // scheduled on the new executor.
@@ -360,23 +365,42 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
         instance.second.waitForCompletion();
     }
 
+    PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic.pauseWhileSet();
+
     // Now wait for the first write of the new term to be majority committed, so that we know
     // all previous writes to state documents are also committed, and then schedule work to
     // rebuild Instances from their persisted state documents.
-    stdx::lock_guard lk(_mutex);
-    auto term = _term;
+    lk.lock();
     WaitForMajorityService::get(_serviceContext)
         .waitUntilMajority(stepUpOpTime, _source.token())
-        .thenRunOn(**_scopedExecutor)
-        .then([this] {
-            if (MONGO_unlikely(PrimaryOnlyServiceSkipRebuildingInstances.shouldFail())) {
-                return ExecutorFuture<void>(**_scopedExecutor, Status::OK());
+        .thenRunOn(**newScopedExecutor)
+        .then([this, newScopedExecutor, newTerm] {
+            // Note that checking both the state and the term are optimizations and are
+            // not strictly necessary. This is also true in the later continuation.
+            {
+                stdx::lock_guard lk(_mutex);
+                if (_state != State::kRebuilding || _term != newTerm) {
+                    return ExecutorFuture<void>(**newScopedExecutor, Status::OK());
+                }
             }
 
-            return _rebuildService(_scopedExecutor, _source.token());
+            if (MONGO_unlikely(PrimaryOnlyServiceSkipRebuildingInstances.shouldFail())) {
+                return ExecutorFuture<void>(**newScopedExecutor, Status::OK());
+            }
+
+            return _rebuildService(newScopedExecutor, _source.token());
         })
-        .then([this, term] { _rebuildInstances(term); })
+        .then([this, newScopedExecutor, newTerm] {
+            {
+                stdx::lock_guard lk(_mutex);
+                if (_state != State::kRebuilding || _term != newTerm) {
+                    return;
+                }
+            }
+            _rebuildInstances(newTerm);
+        })
         .getAsync([](auto&&) {});  // Ignore the result Future
+    lk.unlock();
 }
 
 void PrimaryOnlyService::_interruptInstances(WithLock, Status status) {
@@ -428,7 +452,6 @@ void PrimaryOnlyService::shutdown() {
     bool hasExecutor;
     {
         stdx::lock_guard lk(_mutex);
-
         LOGV2_INFO(
             5123006,
             "Shutting down PrimaryOnlyService {service} with {numInstances} currently running "

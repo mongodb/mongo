@@ -277,7 +277,6 @@ private:
         auto opCtxHolder = cc().makeOperationContext();
         auto opCtx = opCtxHolder.get();
         DBDirectClient client(opCtx);
-
         BSONObj result;
         client.runCommand(nss.db().toString(),
                           BSON("createIndexes"
@@ -287,7 +286,6 @@ private:
                                                         << "expireAfterSeconds" << 100000))),
                           result);
         uassertStatusOK(getStatusFromCommandResult(result));
-
         return ExecutorFuture<void>(**executor, Status::OK());
     };
 };
@@ -460,6 +458,25 @@ TEST_F(PrimaryOnlyServiceTest, StepUpAfterShutdown) {
 
     _registry->onShutdown();
     stepUp();
+}
+
+TEST_F(PrimaryOnlyServiceTest, ShutdownDuringStepUp) {
+    stepDown();
+
+    // Make the instance rebuild on stepUp hang
+    auto stepUpTimesEntered =
+        PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic.setMode(FailPoint::alwaysOn);
+
+    // Start an async task to step up, which will block on the fail point.
+    auto stepUpFuture = ExecutorFuture<void>(_testExecutor).then([this]() { stepUp(); });
+    PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic.waitForTimesEntered(++stepUpTimesEntered);
+    ASSERT_FALSE(stepUpFuture.isReady());
+
+    // Shutdown, interrupting the thread waiting for the step up.
+    shutdown();
+
+    // Let the previous stepUp attempt continue and realize that the node has since shutdown.
+    PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic.setMode(FailPoint::off);
 }
 
 TEST_F(PrimaryOnlyServiceTest, BasicCreateInstance) {
