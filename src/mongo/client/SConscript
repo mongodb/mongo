@@ -429,8 +429,9 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/dbtests/mocklib',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
         'clientdriver_network',
-        'replica_set_monitor_protocol_test_util',
+        'replica_set_monitor_test_helper',
     ],
 )
 

@@ -45,13 +45,14 @@
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_protocol_test_util.h"
-#include "mongo/client/scanning_replica_set_monitor.h"
+#include "mongo/client/streamable_replica_set_monitor_for_testing.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 namespace {
@@ -63,10 +64,6 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-MONGO_INITIALIZER(DisableReplicaSetMonitorRefreshRetries)(InitializerContext*) {
-    ScanningReplicaSetMonitor::disableRefreshRetries_forTest();
-}
-
 /**
  * Constructs a metadata object containing the passed server selection metadata.
  */
@@ -75,20 +72,26 @@ BSONObj makeMetadata(ReadPreference rp, TagSet tagSet) {
 }
 
 /**
- * Ensures a global ServiceContext exists and the ScanningReplicaSetMonitor is used for each test.
+ * Ensures a global ServiceContext exists.
  */
 class DBClientRSTest : public unittest::Test {
+public:
+    ClockSource* clock() {
+        return _clkSource.get();
+    }
+
+    sdam::MockTopologyManager* getTopologyManager() {
+        return _rsmMonitor.getTopologyManager();
+    }
+
 protected:
     void setUp() {
         auto serviceContext = ServiceContext::make();
         setGlobalServiceContext(std::move(serviceContext));
-
-        ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
     }
 
-    void tearDown() {
-        ReplicaSetMonitorProtocolTestUtil::resetRSMProtocol();
-    }
+    std::shared_ptr<ClockSourceMock> _clkSource = std::make_shared<ClockSourceMock>();
+    StreamableReplicaSetMonitorForTesting _rsmMonitor;
 };
 
 /**
@@ -101,6 +104,9 @@ protected:
         ReplicaSetMonitor::cleanup();
 
         _replSet.reset(new MockReplicaSet("test", 2));
+        _rsmMonitor.setup(_replSet->getURI());
+        getTopologyManager()->setTopologyDescription(_replSet->getTopologyDescription(clock()));
+
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
     }
 
@@ -125,7 +131,6 @@ void assertOneOfNodesSelected(MockReplicaSet* replSet,
                               ReadPreference rp,
                               const std::vector<std::string> hostNames) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
-    ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
     bool secondaryOk = (rp != ReadPreference::PrimaryOnly);
     auto tagSet = secondaryOk ? TagSet() : TagSet::primaryOnly();
     // We need the command to be a "SecOk command"
@@ -181,9 +186,6 @@ TEST_F(BasicRS, QueryPrimaryPreferred) {
     MockReplicaSet* replSet = getReplSet();
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
-    // Need up-to-date view, since either host is valid if view is stale.
-    ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
-
     Query query;
     query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
 
@@ -200,9 +202,6 @@ TEST_F(BasicRS, CommandPrimaryPreferred) {
 TEST_F(BasicRS, QuerySecondaryPreferred) {
     MockReplicaSet* replSet = getReplSet();
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
-
-    // Need up-to-date view, since either host is valid if view is stale.
-    ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
 
     Query query;
     query.readPref(mongo::ReadPreference::SecondaryPreferred, BSONArray());
@@ -235,6 +234,9 @@ protected:
              ++iter) {
             _replSet->kill(iter->toString());
         }
+
+        _rsmMonitor.setup(_replSet->getURI());
+        getTopologyManager()->setTopologyDescription(_replSet->getTopologyDescription(clock()));
     }
 
     void tearDown() {
@@ -340,6 +342,9 @@ protected:
         _replSet.reset(new MockReplicaSet("test", 2));
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
         _replSet->kill(_replSet->getPrimary());
+
+        _rsmMonitor.setup(_replSet->getURI());
+        getTopologyManager()->setTopologyDescription(_replSet->getTopologyDescription(clock()));
     }
 
     void tearDown() {
@@ -449,6 +454,9 @@ protected:
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
 
         _replSet->kill(_replSet->getSecondaries().front());
+
+        _rsmMonitor.setup(_replSet->getURI());
+        getTopologyManager()->setTopologyDescription(_replSet->getTopologyDescription(clock()));
     }
 
     void tearDown() {
@@ -557,9 +565,6 @@ protected:
     void setUp() {
         DBClientRSTest::setUp();
 
-        // Tests for pinning behavior require this.
-        ScanningReplicaSetMonitor::useDeterministicHostSelection = true;
-
         // This shuts down the background RSMWatcher thread and prevents it from running. These
         // tests depend on controlling when the RSMs are updated.
         ReplicaSetMonitor::cleanup();
@@ -657,11 +662,12 @@ protected:
             fassert(28568, newConfig.validate());
             _replSet->setConfig(newConfig);
         }
+
+        _rsmMonitor.setup(_replSet->getURI());
+        getTopologyManager()->setTopologyDescription(_replSet->getTopologyDescription(clock()));
     }
 
     void tearDown() {
-        ScanningReplicaSetMonitor::useDeterministicHostSelection = false;
-
         ConnectionString::setConnectionHook(_originalConnectionHook);
         ReplicaSetMonitor::cleanup();
         _replSet.reset();
@@ -728,79 +734,12 @@ TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfHostMarkedAsFailed) {
     // This is the only difference from ConnShouldPinIfSameSettings which tests that we *do* pin
     // in if the host is still marked as up. Note that this only notifies the RSM, and does not
     // directly effect the DBClientRS.
-    ReplicaSetMonitor::get(replSet->getSetName())
-        ->failedHost(HostAndPort(dest), {ErrorCodes::InternalError, "Test error"});
+    getReplSet()->getNode(dest)->shutdown();
+    getTopologyManager()->setTopologyDescription(getReplSet()->getTopologyDescription(clock()));
 
     {
         Query query;
         query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
-        unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
-        BSONObj doc = cursor->next();
-        const string newDest = doc[HostField.name()].str();
-        ASSERT_NOT_EQUALS(dest, newDest);
-    }
-}
-
-TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfDiffMode) {
-    MockReplicaSet* replSet = getReplSet();
-    vector<HostAndPort> seedList;
-    seedList.push_back(HostAndPort(replSet->getPrimary()));
-
-    DBClientReplicaSet replConn(replSet->getSetName(), seedList, StringData());
-
-    // Need up-to-date view to ensure there are multiple valid choices.
-    ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
-
-    string dest;
-    {
-        Query query;
-        query.readPref(mongo::ReadPreference::SecondaryPreferred, BSONArray());
-
-        // Note: IdentityNS contains the name of the server.
-        unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
-        BSONObj doc = cursor->next();
-        dest = doc[HostField.name()].str();
-        ASSERT_NOT_EQUALS(dest, replSet->getPrimary());
-    }
-
-    {
-        Query query;
-        query.readPref(mongo::ReadPreference::SecondaryOnly, BSONArray());
-        unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
-        BSONObj doc = cursor->next();
-        const string newDest = doc[HostField.name()].str();
-        ASSERT_NOT_EQUALS(dest, newDest);
-    }
-}
-
-TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfDiffTag) {
-    MockReplicaSet* replSet = getReplSet();
-    vector<HostAndPort> seedList;
-    seedList.push_back(HostAndPort(replSet->getPrimary()));
-
-    DBClientReplicaSet replConn(replSet->getSetName(), seedList, StringData());
-
-    // Need up-to-date view to ensure there are multiple valid choices.
-    ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
-
-    string dest;
-    {
-        Query query;
-        query.readPref(mongo::ReadPreference::SecondaryPreferred,
-                       BSON_ARRAY(BSON("dc"
-                                       << "sf")));
-
-        // Note: IdentityNS contains the name of the server.
-        unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
-        BSONObj doc = cursor->next();
-        dest = doc[HostField.name()].str();
-        ASSERT_NOT_EQUALS(dest, replSet->getPrimary());
-    }
-
-    {
-        Query query;
-        vector<pair<string, string>> tagSet;
-        query.readPref(mongo::ReadPreference::SecondaryPreferred, BSON_ARRAY(BSON("group" << 1)));
         unique_ptr<DBClientCursor> cursor = replConn.query(NamespaceString(IdentityNS), query);
         BSONObj doc = cursor->next();
         const string newDest = doc[HostField.name()].str();
@@ -815,10 +754,6 @@ TEST_F(TaggedFiveMemberRS, SecondaryConnReturnsSecConn) {
     seedList.push_back(HostAndPort(replSet->getPrimary()));
 
     DBClientReplicaSet replConn(replSet->getSetName(), seedList, StringData());
-
-    // Need up-to-date view since secondaryConn() uses SecondaryPreferred, and this test assumes it
-    // knows about at least one secondary.
-    ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
 
     string dest;
     mongo::DBClientConnection& secConn = replConn.secondaryConn();

@@ -106,6 +106,7 @@ public:
      *     NULL if host doesn't exists.
      */
     MockRemoteDBServer* getNode(const std::string& hostAndPort);
+    const MockRemoteDBServer* getNode(const std::string& hostAndPort) const;
 
     /**
      * Kills a node belonging to this set.

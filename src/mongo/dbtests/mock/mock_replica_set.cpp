@@ -174,6 +174,11 @@ MockRemoteDBServer* MockReplicaSet::getNode(const string& hostAndPort) {
     return iter == _nodeMap.end() ? nullptr : iter->second;
 }
 
+const MockRemoteDBServer* MockReplicaSet::getNode(const string& hostAndPort) const {
+    auto iter = _nodeMap.find(hostAndPort);
+    return iter == _nodeMap.end() ? nullptr : iter->second;
+}
+
 repl::ReplSetConfig MockReplicaSet::getReplConfig() const {
     return _replConfig;
 }
@@ -366,9 +371,16 @@ sdam::TopologyDescriptionPtr MockReplicaSet::getTopologyDescription(
     ClockSource* clockSource) const {
     sdam::TopologyDescriptionBuilder builder;
 
+    // Note: MockReplicaSet::hasPrimary means there is a server being recognized as primary,
+    // regardless of whether it is reachable. But for TopologyDescription, witPrimary also requires
+    // that it has the hello response for the primary which we don't send out if primary is down.
+    auto topologyType = sdam::TopologyType::kReplicaSetWithPrimary;
+    if (!hasPrimary() || !getNode(getPrimary())->isRunning()) {
+        topologyType = sdam::TopologyType::kReplicaSetNoPrimary;
+    }
+
     builder.withSetName(_setName);
-    builder.withTopologyType(hasPrimary() ? sdam::TopologyType::kReplicaSetWithPrimary
-                                          : sdam::TopologyType::kReplicaSetNoPrimary);
+    builder.withTopologyType(topologyType);
 
     std::vector<sdam::ServerDescriptionPtr> servers;
     for (const auto& nodeEntry : _nodeMap) {
