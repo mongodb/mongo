@@ -307,6 +307,10 @@ static int
 __tiered_switch(WT_SESSION_IMPL *session, const char *config)
 {
     WT_DECL_RET;
+#if 0
+    WT_FILE_SYSTEM *fs;
+    WT_STORAGE_SOURCE *storage_source;
+#endif
     WT_TIERED *tiered;
     bool need_object, need_tree, tracking;
 
@@ -357,10 +361,31 @@ __tiered_switch(WT_SESSION_IMPL *session, const char *config)
     /* We always need to create a local object. */
     WT_ERR(__tiered_create_local(session, tiered));
 
+#if 0
     /*
-     * Note that removal of overlapping local objects is not in the purview of this function. Some
-     * other mechanism will remove outdated tiers. Here's where it could be done though.
+     * We expect this part to be done asynchronously in its own thread. First flush the contents of
+     * the data file to the new cloud object.
      */
+    storage_source = tiered->bstorage->storage_source;
+    fs = tiered->bucket_storage->file_system;
+    WT_ASSERT(session, storage_source != NULL);
+
+    /* This call make take a while, and may fail due to network timeout. */
+    WT_ERR(storage_source->ss_flush(storage_source, &session->iface,
+            fs, old_filename, object_name, NULL));
+
+    /*
+     * The metadata for the old local object will be initialized with "flush=0". When the flush call
+     * completes, it can be marked as "flush=1". When that's done, we can finish the flush. The
+     * flush finish call moves the file from the home directory to the extension's cache. Then the
+     * extension will own it.
+     *
+     * We may need a way to restart flushes for those not completed (after a crash), or failed (due
+     * to previous network outage).
+     */
+    WT_ERR(storage_source->ss_flush_finish(storage_source, &session->iface,
+            fs, old_filename, object_name, NULL));
+#endif
 
     /* Update the tiered: metadata to new object number and tiered array. */
     WT_ERR(__tiered_update_metadata(session, tiered, config));

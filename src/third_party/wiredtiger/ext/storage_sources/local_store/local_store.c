@@ -66,7 +66,6 @@ typedef struct {
      * Locks are used to protect the file handle queue and flush queue.
      */
     pthread_rwlock_t file_handle_lock;
-    pthread_rwlock_t flush_lock;
 
     /*
      * Configuration values are set at startup.
@@ -87,7 +86,6 @@ typedef struct {
 
     /* Queue of file handles */
     TAILQ_HEAD(local_file_handle_qh, local_file_handle) fileq;
-    TAILQ_HEAD(local_flush_qh, local_flush_item) flushq;
 
 } LOCAL_STORAGE;
 
@@ -102,34 +100,13 @@ typedef struct {
     char *auth_token; /* Identifier for key management system */
     char *bucket_dir; /* Directory that stands in for cloud storage bucket */
     char *cache_dir;  /* Directory for pre-flushed objects and cached objects */
-    char *fs_prefix;  /* File system prefix, allowing for a "directory" within a bucket */
 } LOCAL_FILE_SYSTEM;
-
-/*
- * Indicates a object that has not yet been flushed.
- */
-typedef struct local_flush_item {
-    char *src_path; /* File name to copy from, object name and cache name derived from this */
-
-    /*
-     * These fields would be used in performing a flush.
-     */
-    char *auth_token;               /* Identifier for key management system */
-    char *bucket;                   /* Bucket name */
-    char *cache_dir;                /* Cache directory */
-    char *fs_prefix;                /* Prefix for file system */
-    WT_FS_OPEN_FILE_TYPE file_type; /* File type */
-
-    TAILQ_ENTRY(local_flush_item) q; /* Queue of items */
-} LOCAL_FLUSH_ITEM;
 
 typedef struct local_file_handle {
     WT_FILE_HANDLE iface; /* Must come first */
 
-    LOCAL_STORAGE *local;    /* Enclosing storage source */
-    WT_FILE_HANDLE *fh;      /* File handle */
-    char *path;              /* Path name of file */
-    LOCAL_FLUSH_ITEM *flush; /* Flush information, set if newly created */
+    LOCAL_STORAGE *local; /* Enclosing storage source */
+    WT_FILE_HANDLE *fh;   /* File handle */
 
     TAILQ_ENTRY(local_file_handle) q; /* Queue of handles */
 } LOCAL_FILE_HANDLE;
@@ -137,24 +114,28 @@ typedef struct local_file_handle {
 /*
  * Forward function declarations for internal functions
  */
+static int local_bucket_path(WT_FILE_SYSTEM *, const char *, char **);
+static int local_cache_path(WT_FILE_SYSTEM *, const char *, char **);
 static int local_configure(LOCAL_STORAGE *, WT_CONFIG_ARG *);
 static int local_configure_int(LOCAL_STORAGE *, WT_CONFIG_ARG *, const char *, uint32_t *);
 static int local_delay(LOCAL_STORAGE *);
 static int local_err(LOCAL_STORAGE *, WT_SESSION *, int, const char *, ...);
-static void local_flush_free(LOCAL_FLUSH_ITEM *);
+static int local_file_copy(
+  LOCAL_STORAGE *, WT_SESSION *, const char *, const char *, WT_FS_OPEN_FILE_TYPE);
 static int local_get_directory(const char *, ssize_t len, char **);
-static int local_location_path(WT_FILE_SYSTEM *, const char *, char **);
+static int local_path(WT_FILE_SYSTEM *, const char *, const char *, char **);
 static int local_writeable(LOCAL_STORAGE *, const char *name, bool *writeable);
 
 /*
  * Forward function declarations for storage source API implementation
  */
 static int local_exist(WT_FILE_SYSTEM *, WT_SESSION *, const char *, bool *);
-static int local_customize_file_system(WT_STORAGE_SOURCE *, WT_SESSION *, const char *,
-  const char *, const char *, const char *, WT_FILE_SYSTEM **);
+static int local_customize_file_system(
+  WT_STORAGE_SOURCE *, WT_SESSION *, const char *, const char *, const char *, WT_FILE_SYSTEM **);
 static int local_flush(
-  WT_STORAGE_SOURCE *, WT_SESSION *, WT_FILE_SYSTEM *, const char *, const char *);
-static int local_flush_one(LOCAL_STORAGE *, WT_SESSION *, LOCAL_FLUSH_ITEM *);
+  WT_STORAGE_SOURCE *, WT_SESSION *, WT_FILE_SYSTEM *, const char *, const char *, const char *);
+static int local_flush_finish(
+  WT_STORAGE_SOURCE *, WT_SESSION *, WT_FILE_SYSTEM *, const char *, const char *, const char *);
 static int local_terminate(WT_STORAGE_SOURCE *, WT_SESSION *);
 
 /*
@@ -296,23 +277,6 @@ local_err(LOCAL_STORAGE *local, WT_SESSION *session, int ret, const char *format
 }
 
 /*
- * local_flush_free --
- *     Free storage for a flush item.
- */
-static void
-local_flush_free(LOCAL_FLUSH_ITEM *flush)
-{
-    if (flush != NULL) {
-        free(flush->auth_token);
-        free(flush->bucket);
-        free(flush->cache_dir);
-        free(flush->fs_prefix);
-        free(flush->src_path);
-        free(flush);
-    }
-}
-
-/*
  * local_get_directory --
  *     Return a copy of a directory name after verifying that it is a directory.
  */
@@ -363,19 +327,37 @@ local_writeable(LOCAL_STORAGE *local, const char *name, bool *writeablep)
 }
 
 /*
- * local_location_path --
+ * local_bucket_path --
+ *     Construct the bucket pathname from the file system and local name.
+ */
+static int
+local_bucket_path(WT_FILE_SYSTEM *file_system, const char *name, char **pathp)
+{
+    return (local_path(file_system, ((LOCAL_FILE_SYSTEM *)file_system)->bucket_dir, name, pathp));
+}
+
+/*
+ * local_cache_path --
+ *     Construct the cache pathname from the file system and local name.
+ */
+static int
+local_cache_path(WT_FILE_SYSTEM *file_system, const char *name, char **pathp)
+{
+    return (local_path(file_system, ((LOCAL_FILE_SYSTEM *)file_system)->cache_dir, name, pathp));
+}
+
+/*
+ * local_path --
  *     Construct a pathname from the file system and local name.
  */
-int
-local_location_path(WT_FILE_SYSTEM *file_system, const char *name, char **pathp)
+static int
+local_path(WT_FILE_SYSTEM *file_system, const char *dir, const char *name, char **pathp)
 {
-    LOCAL_FILE_SYSTEM *local_fs;
     size_t len;
     int ret;
     char *p;
 
     ret = 0;
-    local_fs = (LOCAL_FILE_SYSTEM *)file_system;
 
     /* Skip over "./" and variations (".//", ".///./././//") at the beginning of the name. */
     while (*name == '.') {
@@ -385,10 +367,10 @@ local_location_path(WT_FILE_SYSTEM *file_system, const char *name, char **pathp)
         while (*name == '/')
             name++;
     }
-    len = strlen(local_fs->cache_dir) + strlen(local_fs->fs_prefix) + strlen(name) + 2;
+    len = strlen(dir) + strlen(name) + 2;
     if ((p = malloc(len)) == NULL)
-        return (local_err(FS2LOCAL(file_system), NULL, ENOMEM, "local_location_path"));
-    snprintf(p, len, "%s/%s%s", local_fs->cache_dir, local_fs->fs_prefix, name);
+        return (local_err(FS2LOCAL(file_system), NULL, ENOMEM, "local_path"));
+    snprintf(p, len, "%s/%s", dir, name);
     *pathp = p;
     return (ret);
 }
@@ -399,7 +381,7 @@ local_location_path(WT_FILE_SYSTEM *file_system, const char *name, char **pathp)
  */
 static int
 local_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
-  const char *bucket_name, const char *prefix, const char *auth_token, const char *config,
+  const char *bucket_name, const char *auth_token, const char *config,
   WT_FILE_SYSTEM **file_systemp)
 {
     LOCAL_STORAGE *local;
@@ -470,10 +452,6 @@ local_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sessi
           local_err(local, session, ret, "%*s: cache directory", (int)cachedir.len, cachedir.str);
         goto err;
     }
-    if ((fs->fs_prefix = strdup(prefix)) == NULL) {
-        ret = local_err(local, session, ENOMEM, "local_file_system.prefix");
-        goto err;
-    }
     fs->file_system.fs_directory_list = local_directory_list;
     fs->file_system.fs_directory_list_single = local_directory_list_single;
     fs->file_system.fs_directory_list_free = local_directory_list_free;
@@ -491,7 +469,6 @@ err:
         free(fs->auth_token);
         free(fs->bucket_dir);
         free(fs->cache_dir);
-        free(fs->fs_prefix);
         free(fs);
     }
     return (ret);
@@ -521,7 +498,7 @@ local_exist(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, 
         ret = local_err(local, session, errno, "%s: ss_exist stat", path);
 
     local->op_count++;
-    if ((ret = local_location_path(file_system, name, &path)) != 0)
+    if ((ret = local_cache_path(file_system, name, &path)) != 0)
         goto err;
 
     ret = stat(path, &sb);
@@ -539,149 +516,46 @@ err:
 }
 
 /*
- * local_flush --
- *     Return when the files have been flushed.
+ * local_file_copy --
+ *     Copy a file.
  */
 static int
-local_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_FILE_SYSTEM *file_system,
-  const char *name, const char *config)
-{
-    LOCAL_STORAGE *local;
-    LOCAL_FLUSH_ITEM *flush, *safe_flush;
-    int ret, t_ret;
-    char *match;
-
-    (void)config; /* Unused */
-
-    /*
-     * This implementation does not do anything meaningful on flush. However, we do track which
-     * objects have not yet been flushed and note which ones need to be flushed now.
-     */
-    ret = 0;
-    local = (LOCAL_STORAGE *)storage_source;
-    match = NULL;
-
-    if (file_system == NULL && name != NULL)
-        return local_err(local, session, EINVAL, "flush: cannot specify name without file system");
-
-    local->op_count++;
-    if (file_system != NULL) {
-        if ((ret = local_location_path(file_system, name == NULL ? "" : name, &match)) != 0)
-            goto err;
-    }
-    VERBOSE(local, "Flush: match=%s\n", SHOW_STRING(match));
-
-    /*
-     * Note: we retain the lock on the data structure while flushing all entries. This is fine for
-     * our local file implementation, when we don't have to do anything to flush, but for a cloud
-     * implementation, we'll want some way to not hold the lock while transferring data.
-     */
-    if ((ret = pthread_rwlock_wrlock(&local->flush_lock)) != 0) {
-        (void)local_err(local, session, ret, "flush: pthread_rwlock_wrlock");
-        goto err;
-    }
-
-    TAILQ_FOREACH_SAFE(flush, &local->flushq, q, safe_flush)
-    {
-        if (match != NULL) {
-            /*
-             * We must match against the bucket and the name if given.
-             * Our match string is of the form:
-             *   <bucket_name>/<fs_prefix><name>
-             *
-             * If name is given, we must match the entire path.
-             * If name is not given, we must match up to the beginning
-             * of the name.
-             */
-            if (name != NULL) {
-                /* Exact name match required. */
-                if (strcmp(flush->src_path, match) != 0)
-                    continue;
-            }
-            /* No name specified, everything up to the name must match. */
-            else if (strncmp(flush->src_path, match, strlen(match)) != 0)
-                continue;
-        }
-        if ((t_ret = local_flush_one(local, session, flush)) != 0 && ret == 0)
-            ret = t_ret;
-        TAILQ_REMOVE(&local->flushq, flush, q);
-        local_flush_free(flush);
-    }
-
-    if ((t_ret = pthread_rwlock_unlock(&local->flush_lock)) != 0) {
-        (void)local_err(local, session, t_ret, "flush: pthread_rwlock_unlock");
-        if (ret == 0)
-            ret = t_ret;
-    }
-
-err:
-    free(match);
-
-    return (ret);
-}
-
-/*
- * local_flush_one --
- *     Flush one item on the flush queue.
- */
-static int
-local_flush_one(LOCAL_STORAGE *local, WT_SESSION *session, LOCAL_FLUSH_ITEM *flush)
+local_file_copy(LOCAL_STORAGE *local, WT_SESSION *session, const char *src_path,
+  const char *dest_path, WT_FS_OPEN_FILE_TYPE type)
 {
     WT_FILE_HANDLE *dest, *src;
     WT_FILE_SYSTEM *wt_fs;
     wt_off_t copy_size, file_size, left;
-    int ret, t_ret;
-    char *object_name;
-    char buffer[1024 * 64];
-    char dest_path[1024];
     ssize_t pos;
+    int ret, t_ret;
+    char buffer[1024 * 64];
 
-    ret = 0;
-    src = dest = NULL;
-
-    object_name = strrchr(flush->src_path, '/');
-    if (object_name == NULL) {
-        ret = local_err(local, session, errno, "%s: unexpected src path", flush->src_path);
-        goto err;
-    }
-    object_name++;
-
-    /*
-     * Here's where we flush the file to the cloud. This "local" implementation copies the file to
-     * the bucket directory.
-     */
-    VERBOSE(local, "Flush object: from=%s, bucket=%s, object=%s, auth_token=%s, \n",
-      flush->src_path, flush->bucket, object_name, flush->auth_token);
-
-    if ((ret = local_delay(local)) != 0)
-        goto err;
+    dest = src = NULL;
 
     if ((ret = local->wt_api->file_system_get(local->wt_api, session, &wt_fs)) != 0) {
         ret =
           local_err(local, session, ret, "local_file_system: cannot get WiredTiger file system");
         goto err;
     }
-    snprintf(dest_path, sizeof(dest_path), "%s/%s", flush->bucket, object_name);
-
-    if ((ret = wt_fs->fs_open_file(
-           wt_fs, session, flush->src_path, flush->file_type, WT_FS_OPEN_READONLY, &src)) != 0) {
-        ret = local_err(local, session, ret, "%s: cannot open for read", flush->src_path);
+    if ((ret = wt_fs->fs_open_file(wt_fs, session, src_path, type, WT_FS_OPEN_READONLY, &src)) !=
+      0) {
+        ret = local_err(local, session, ret, "%s: cannot open for read", src_path);
         goto err;
     }
 
-    if ((ret = wt_fs->fs_open_file(
-           wt_fs, session, dest_path, flush->file_type, WT_FS_OPEN_CREATE, &dest)) != 0) {
+    if ((ret = wt_fs->fs_open_file(wt_fs, session, dest_path, type, WT_FS_OPEN_CREATE, &dest)) !=
+      0) {
         ret = local_err(local, session, ret, "%s: cannot create", dest_path);
         goto err;
     }
-    if ((ret = wt_fs->fs_size(wt_fs, session, flush->src_path, &file_size)) != 0) {
-        ret = local_err(local, session, ret, "%s: cannot get size", flush->src_path);
+    if ((ret = wt_fs->fs_size(wt_fs, session, src_path, &file_size)) != 0) {
+        ret = local_err(local, session, ret, "%s: cannot get size", src_path);
         goto err;
     }
     for (pos = 0, left = file_size; left > 0; pos += copy_size, left -= copy_size) {
         copy_size = left < (wt_off_t)sizeof(buffer) ? left : (wt_off_t)sizeof(buffer);
         if ((ret = src->fh_read(src, session, pos, (size_t)copy_size, buffer)) != 0) {
-            ret = local_err(local, session, ret, "%s: cannot read", flush->src_path);
+            ret = local_err(local, session, ret, "%s: cannot read", src_path);
             goto err;
         }
         if ((ret = dest->fh_write(dest, session, pos, (size_t)copy_size, buffer)) != 0) {
@@ -689,16 +563,7 @@ local_flush_one(LOCAL_STORAGE *local, WT_SESSION *session, LOCAL_FLUSH_ITEM *flu
             goto err;
         }
     }
-    if ((ret = dest->fh_sync(dest, session)) != 0) {
-        ret = local_err(local, session, ret, "%s: cannot sync", dest_path);
-        goto err;
-    }
-    local->object_flushes++;
-
 err:
-    /* When we're done with flushing this file, set the file to readonly. */
-    if (ret == 0 && (ret = chmod(flush->src_path, 0444)) < 0)
-        ret = local_err(local, session, errno, "%s: chmod flushed file failed", flush->src_path);
     if (src != NULL && (t_ret = src->close(src, session)) != 0)
         if (ret == 0)
             ret = t_ret;
@@ -706,6 +571,79 @@ err:
         if (ret == 0)
             ret = t_ret;
 
+    return (ret);
+}
+
+/*
+ * local_flush --
+ *     Return when the file has been flushed.
+ */
+static int
+local_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_FILE_SYSTEM *file_system,
+  const char *source, const char *object, const char *config)
+{
+    LOCAL_STORAGE *local;
+    int ret;
+    char *dest_path;
+
+    (void)config; /* unused */
+    dest_path = NULL;
+    local = (LOCAL_STORAGE *)storage_source;
+    ret = 0;
+
+    if (file_system == NULL || source == NULL || object == NULL)
+        return local_err(local, session, EINVAL, "ss_flush_finish: required arguments missing");
+
+    if ((ret = local_bucket_path(file_system, object, &dest_path)) != 0)
+        goto err;
+
+    if ((ret = local_delay(local)) != 0)
+        goto err;
+
+    if ((ret = local_file_copy(local, session, source, dest_path, WT_FS_OPEN_FILE_TYPE_DATA)) != 0)
+        goto err;
+
+    local->object_flushes++;
+
+err:
+    free(dest_path);
+    return (ret);
+}
+
+/*
+ * local_flush_finish --
+ *     Move a file from the default file system to the cache in the new file system.
+ */
+static int
+local_flush_finish(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
+  WT_FILE_SYSTEM *file_system, const char *source, const char *object, const char *config)
+{
+    LOCAL_STORAGE *local;
+    int ret;
+    char *dest_path;
+
+    (void)config; /* unused */
+    dest_path = NULL;
+    local = (LOCAL_STORAGE *)storage_source;
+    ret = 0;
+
+    if (file_system == NULL || source == NULL || object == NULL)
+        return local_err(local, session, EINVAL, "ss_flush_finish: required arguments missing");
+
+    if ((ret = local_cache_path(file_system, object, &dest_path)) != 0)
+        goto err;
+
+    local->op_count++;
+    if ((ret = rename(source, dest_path)) != 0) {
+        ret = local_err(
+          local, session, errno, "ss_flush_finish rename %s to %s failed", source, dest_path);
+        goto err;
+    }
+    /* Set the file to readonly in the cache. */
+    if (ret == 0 && (ret = chmod(dest_path, 0444)) < 0)
+        ret = local_err(local, session, errno, "%s: ss_flush_finish chmod failed", dest_path);
+err:
+    free(dest_path);
     return (ret);
 }
 
@@ -791,9 +729,8 @@ local_directory_list_internal(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
     struct dirent *dp;
     DIR *dirp;
     LOCAL_FILE_SYSTEM *local_fs;
-    LOCAL_FLUSH_ITEM *flush;
     LOCAL_STORAGE *local;
-    size_t dir_len, fs_prefix_len, prefix_len;
+    size_t dir_len, prefix_len;
     uint32_t allocated, count;
     int ret, t_ret;
     char **entries;
@@ -803,7 +740,6 @@ local_directory_list_internal(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
     local = local_fs->local_storage;
     entries = NULL;
     allocated = count = 0;
-    fs_prefix_len = strlen(local_fs->fs_prefix);
     dir_len = (directory == NULL ? 0 : strlen(directory));
     prefix_len = (prefix == NULL ? 0 : strlen(prefix));
     ret = 0;
@@ -811,6 +747,9 @@ local_directory_list_internal(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
     *dirlistp = NULL;
     *countp = 0;
 
+    /*
+     * We list items in the cache directory (these have 'finished' flushing).
+     */
     if ((dirp = opendir(local_fs->cache_dir)) == NULL) {
         ret = errno;
         if (ret == 0)
@@ -819,9 +758,6 @@ local_directory_list_internal(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
           local_err(local, session, ret, "%s: ss_directory_list: opendir", local_fs->cache_dir));
     }
 
-    /*
-     * We list items in the cache directory as well as items in the "to be flushed" list.
-     */
     for (count = 0; (dp = readdir(dirp)) != NULL && (limit == 0 || count < limit);) {
         /* Skip . and .. */
         basename = dp->d_name;
@@ -832,36 +768,6 @@ local_directory_list_internal(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
         if (directory != NULL && strncmp(basename, directory, dir_len) != 0)
             continue;
         basename += dir_len;
-
-        /* Skip files not associated with our file system prefix. */
-        if (strncmp(basename, local_fs->fs_prefix, fs_prefix_len) != 0)
-            continue;
-
-        basename += fs_prefix_len;
-        /* The list of files is optionally filtered by a prefix. */
-        if (prefix != NULL && strncmp(basename, prefix, prefix_len) != 0)
-            continue;
-
-        if ((ret = local_directory_list_add(local, &entries, basename, count, &allocated)) != 0)
-            goto err;
-        count++;
-    }
-
-    TAILQ_FOREACH (flush, &local->flushq, q) {
-        if (limit != 0 && count >= limit)
-            break;
-
-        /* Skip files not associated with this file system. */
-        if (strcmp(local_fs->bucket_dir, flush->bucket) != 0 ||
-          strcmp(local_fs->cache_dir, flush->cache_dir) != 0 ||
-          strcmp(local_fs->fs_prefix, flush->fs_prefix) != 0)
-            continue;
-
-        basename = strrchr(flush->src_path, '/');
-        if (basename == NULL)
-            basename = flush->src_path;
-        else
-            basename++;
 
         /* The list of files is optionally filtered by a prefix. */
         if (prefix != NULL && strncmp(basename, prefix, prefix_len) != 0)
@@ -909,7 +815,6 @@ local_fs_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *session)
     free(local_fs->auth_token);
     free(local_fs->bucket_dir);
     free(local_fs->cache_dir);
-    free(local_fs->fs_prefix);
     free(file_system);
 
     return (0);
@@ -925,12 +830,13 @@ local_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
 {
     LOCAL_FILE_HANDLE *local_fh;
     LOCAL_FILE_SYSTEM *local_fs;
-    LOCAL_FLUSH_ITEM *flush;
     LOCAL_STORAGE *local;
     WT_FILE_HANDLE *file_handle, *wt_fh;
     WT_FILE_SYSTEM *wt_fs;
     struct stat sb;
     int ret;
+    char *alloced_path;
+    const char *path;
     bool create, exists;
 
     (void)flags; /* Unused */
@@ -941,6 +847,7 @@ local_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
     local_fs = (LOCAL_FILE_SYSTEM *)file_system;
     local = local_fs->local_storage;
     wt_fs = local_fs->wt_fs;
+    alloced_path = NULL;
 
     /*
      * We expect that the local file system will be used narrowly, like when creating or opening a
@@ -972,18 +879,16 @@ local_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
         exists = (ret == 0);
     } else
         exists = false;
-    if (create || exists) {
+    if (create || exists)
         /* The file has not been flushed, use the file directly in the file system. */
-        if ((local_fh->path = strdup(name)) == NULL) {
-            ret = local_err(local, session, ENOMEM, "local_open");
+        path = name;
+    else {
+        if ((ret = local_cache_path(file_system, name, &alloced_path)) != 0)
             goto err;
-        }
-    } else {
-        if ((ret = local_location_path(file_system, name, &local_fh->path)) != 0)
-            goto err;
-        ret = stat(local_fh->path, &sb);
+        path = alloced_path;
+        ret = stat(path, &sb);
         if (ret != 0 && errno != ENOENT) {
-            ret = local_err(local, session, errno, "%s: local_open stat", local_fh->path);
+            ret = local_err(local, session, errno, "%s: local_open stat", path);
             goto err;
         }
         exists = (ret == 0);
@@ -997,35 +902,8 @@ local_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
     }
 #endif
 
-    if (create && !exists) {
-        if ((flush = calloc(1, sizeof(LOCAL_FLUSH_ITEM))) == NULL) {
-            ret = ENOMEM;
-            goto err;
-        }
-        local_fh->flush = flush;
-
-        if ((flush->auth_token = strdup(local_fs->auth_token)) == NULL) {
-            ret = local_err(local, session, ENOMEM, "open.auth_token");
-            goto err;
-        }
-        if ((flush->bucket = strdup(local_fs->bucket_dir)) == NULL) {
-            ret = local_err(local, session, ENOMEM, "open.bucket");
-            goto err;
-        }
-        if ((flush->cache_dir = strdup(local_fs->cache_dir)) == NULL) {
-            ret = local_err(local, session, ENOMEM, "open.cache_dir");
-            goto err;
-        }
-        if ((flush->fs_prefix = strdup(local_fs->fs_prefix)) == NULL) {
-            ret = local_err(local, session, ENOMEM, "open.fs_prefix");
-            goto err;
-        }
-        flush->file_type = file_type;
-    }
-
-    if ((ret = wt_fs->fs_open_file(wt_fs, session, local_fh->path, file_type, flags, &wt_fh)) !=
-      0) {
-        ret = local_err(local, session, ret, "ss_open_object: open: %s", local_fh->path);
+    if ((ret = wt_fs->fs_open_file(wt_fs, session, path, file_type, flags, &wt_fh)) != 0) {
+        ret = local_err(local, session, ret, "ss_open_object: open: %s", path);
         goto err;
     }
     local_fh->fh = wt_fh;
@@ -1071,9 +949,10 @@ local_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
     *file_handlep = file_handle;
 
     VERBOSE(
-      local, "File opened: %s final path=%s\n", SHOW_STRING(name), SHOW_STRING(local_fh->path));
+      local, "File opened: %s final path=%s\n", SHOW_STRING(name), SHOW_STRING(local_fh->fh->name));
 
 err:
+    free(alloced_path);
     if (ret != 0) {
         if (local_fh != NULL)
             local_file_close_internal(local, session, local_fh);
@@ -1093,11 +972,9 @@ local_rename(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *from,
   uint32_t flags)
 {
     LOCAL_FILE_SYSTEM *local_fs;
-    LOCAL_FLUSH_ITEM *flush;
     LOCAL_STORAGE *local;
     WT_FILE_SYSTEM *wt_fs;
-    int ret, t_ret;
-    char *copy;
+    int ret;
     bool writeable;
 
     local = FS2LOCAL(file_system);
@@ -1117,33 +994,6 @@ local_rename(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *from,
         goto err;
     }
 
-    /*
-     * Find any flush entry that matches, and rename that too.
-     */
-    if ((ret = pthread_rwlock_wrlock(&local->flush_lock)) != 0) {
-        ret = local_err(local, session, ret, "ss_remove: pthread_rwlock_wrlock");
-        goto err;
-    }
-
-    TAILQ_FOREACH (flush, &local->flushq, q) {
-        if (strcmp(flush->src_path, from) == 0) {
-            if ((copy = strdup(to)) == NULL)
-                ret = ENOMEM;
-            else {
-                free(flush->src_path);
-                flush->src_path = copy;
-            }
-            break;
-        }
-    }
-
-    if ((t_ret = pthread_rwlock_unlock(&local->flush_lock)) != 0) {
-        (void)local_err(local, session, t_ret, "ss_remove: pthread_rwlock_unlock");
-        if (ret == 0)
-            ret = t_ret;
-        goto err;
-    }
-
 err:
     return (ret);
 }
@@ -1157,7 +1007,6 @@ err:
 static int
 local_remove(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, uint32_t flags)
 {
-    LOCAL_FLUSH_ITEM *flush;
     LOCAL_STORAGE *local;
     int ret;
     bool writeable;
@@ -1177,27 +1026,6 @@ local_remove(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
     ret = unlink(name);
     if (ret != 0) {
         ret = local_err(local, session, errno, "%s: ss_remove unlink", name);
-        goto err;
-    }
-
-    /*
-     * Find any flush entry that matches, and remove that too.
-     */
-    if ((ret = pthread_rwlock_wrlock(&local->flush_lock)) != 0) {
-        ret = local_err(local, session, ret, "ss_remove: pthread_rwlock_wrlock");
-        goto err;
-    }
-
-    TAILQ_FOREACH (flush, &local->flushq, q) {
-        if (strcmp(flush->src_path, name) == 0) {
-            TAILQ_REMOVE(&local->flushq, flush, q);
-            local_flush_free(flush);
-            break;
-        }
-    }
-
-    if ((ret = pthread_rwlock_unlock(&local->flush_lock)) != 0) {
-        ret = local_err(local, session, ret, "ss_remove: pthread_rwlock_unlock");
         goto err;
     }
 
@@ -1226,7 +1054,7 @@ local_size(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, w
     ret = stat(name, &sb);
     if (ret == ENOENT) {
         /* Otherwise, we'll see if it's in the cache directory. */
-        if ((ret = local_location_path(file_system, name, &path)) != 0)
+        if ((ret = local_cache_path(file_system, name, &path)) != 0)
             goto err;
 
         ret = stat(path, &sb);
@@ -1282,7 +1110,6 @@ local_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *session)
 {
     LOCAL_STORAGE *local;
     LOCAL_FILE_HANDLE *local_fh;
-    LOCAL_FLUSH_ITEM *flush;
     int ret, t_ret;
 
     ret = 0;
@@ -1298,28 +1125,6 @@ local_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *session)
 
     if ((ret = pthread_rwlock_unlock(&local->file_handle_lock)) != 0)
         (void)local_err(local, session, ret, "file handle close: pthread_rwlock_unlock");
-
-    /*
-     * If we need to track flushes for this file, save the flush item on our queue.
-     */
-    if (ret == 0 && ((flush = local_fh->flush)) != NULL) {
-        if ((ret = pthread_rwlock_wrlock(&local->flush_lock)) != 0)
-            (void)local_err(local, session, ret, "file handle close: pthread_rwlock_wrlock2");
-
-        if (ret == 0) {
-            /*
-             * Move the flush object from the file handle and to the flush queue. It is now owned by
-             * the flush queue and will be freed when that item is flushed.
-             */
-            TAILQ_INSERT_HEAD(&local->flushq, flush, q);
-            local_fh->flush = NULL;
-
-            if ((ret = pthread_rwlock_unlock(&local->flush_lock)) != 0)
-                (void)local_err(local, session, ret, "file handle close: pthread_rwlock_unlock2");
-            if (ret == 0 && ((flush->src_path = strdup(local_fh->path)) == NULL))
-                ret = ENOMEM;
-        }
-    }
 
     if ((t_ret = local_file_close_internal(local, session, local_fh)) != 0) {
         if (ret == 0)
@@ -1344,8 +1149,6 @@ local_file_close_internal(LOCAL_STORAGE *local, WT_SESSION *session, LOCAL_FILE_
     if (wt_fh != NULL && (ret = wt_fh->close(wt_fh, session)) != 0)
         ret = local_err(local, session, ret, "WT_FILE_HANDLE->close: close");
 
-    local_flush_free(local_fh->flush);
-    free(local_fh->path);
     free(local_fh->iface.name);
     free(local_fh);
 
@@ -1451,8 +1254,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
     if ((local = calloc(1, sizeof(LOCAL_STORAGE))) == NULL)
         return (errno);
     local->wt_api = connection->get_extension_api(connection);
-    if ((ret = pthread_rwlock_init(&local->file_handle_lock, NULL)) != 0 ||
-      (ret = pthread_rwlock_init(&local->flush_lock, NULL)) != 0) {
+    if ((ret = pthread_rwlock_init(&local->file_handle_lock, NULL)) != 0) {
         (void)local_err(local, NULL, ret, "pthread_rwlock_init");
         free(local);
         return (ret);
@@ -1464,6 +1266,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
      */
     local->storage_source.ss_customize_file_system = local_customize_file_system;
     local->storage_source.ss_flush = local_flush;
+    local->storage_source.ss_flush_finish = local_flush_finish;
     local->storage_source.terminate = local_terminate;
 
     if ((ret = local_configure(local, config)) != 0) {

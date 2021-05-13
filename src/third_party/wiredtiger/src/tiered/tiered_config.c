@@ -115,8 +115,8 @@ __wt_tiered_bucket_config(
     WT_ERR(__wt_strndup(session, prefix.str, prefix.len, &new->bucket_prefix));
 
     storage = nstorage->storage_source;
-    WT_ERR(storage->ss_customize_file_system(storage, &session->iface, new->bucket,
-      new->bucket_prefix, new->auth_token, NULL, &new->file_system));
+    WT_ERR(storage->ss_customize_file_system(
+      storage, &session->iface, new->bucket, new->auth_token, NULL, &new->file_system));
     new->storage_source = storage;
 
     /* If we're creating a new bucket storage, parse the other settings into it.  */

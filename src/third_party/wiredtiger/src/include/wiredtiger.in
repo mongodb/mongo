@@ -4778,35 +4778,49 @@ struct __wt_storage_source {
 	 * @param storage_source the WT_STORAGE_SOURCE
 	 * @param session the current WiredTiger session
 	 * @param bucket_name the name of the bucket.  Use of '/' is implementation dependent.
-	 * @param prefix a prefix for each file.  If used, the prefix will be added to the
-	 *    name of each object created or otherwise accessed in the bucket.  Also, only
-	 *    objects with this prefix will be visible, and the prefix will be removed when
-	 *    listed. Prefixes may contain '/' as a separator.
 	 * @param auth_token the authorization identifier.
-	 * @param config additional configuration, currently must be NULL.
+	 * @param config additional configuration. The only allowable value is \c cache_directory,
+	 *    the name of a directory holding cached objects. Its default is
+	 *    \c "<home>/cache-<bucket>" with \c <home> replaced by the @ref home, and
+	 *    \c <bucket> replaced by the bucket_name.
 	 * @param[out] file_system the customized file system returned
 	 */
 	int (*ss_customize_file_system)(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
-	    const char *bucket_name, const char *prefix, const char *auth_token, const char *config,
+	    const char *bucket_name, const char *auth_token, const char *config,
 	    WT_FILE_SYSTEM **file_system);
 
 	/*!
-	 * Flush any existing objects that match the location and name from
-	 * local storage to shared object storage.  The implementation guarantees
-	 * that all objects that are in a created state (see WT_STORAGE_SOURCE::ss_open_object)
-	 * at the beginning of this call have been transferred when this call returns.
+	 * Copy a file from the default file system to an object name in shared object storage.
 	 *
 	 * @errors
 	 *
 	 * @param storage_source the WT_STORAGE_SOURCE
 	 * @param session the current WiredTiger session
-	 * @param file_system if NULL, all objects are considered, otherwise only objects
-	 *    managed by the given file system.
-	 * @param name the name of the object to flush (or NULL for all)
+	 * @param file_system the destination bucket and credentials
+	 * @param source the name of the source input file
+	 * @param object the name of the destination object
 	 * @param config additional configuration, currently must be NULL
 	 */
 	int (*ss_flush)(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
-	    WT_FILE_SYSTEM *file_system, const char *name, const char *config);
+	    WT_FILE_SYSTEM *file_system, const char *source, const char *object,
+	    const char *config);
+
+	/*!
+	 * After a flush, rename the source file from the default file system to be cached in
+	 * the shared object storage.
+	 *
+	 * @errors
+	 *
+	 * @param storage_source the WT_STORAGE_SOURCE
+	 * @param session the current WiredTiger session
+	 * @param file_system the destination bucket and credentials
+	 * @param source the name of the source input file
+	 * @param object the name of the destination object
+	 * @param config additional configuration, currently must be NULL
+	 */
+	int (*ss_flush_finish)(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
+	    WT_FILE_SYSTEM *file_system, const char *source, const char *object,
+	    const char *config);
 
 	/*!
 	 * A callback performed when the storage source is closed and will no
