@@ -800,7 +800,7 @@ def update_scanner(env, builder_name=None, debug=False):
     else:
         path_function = None
 
-    def new_scanner(node, env, path=(), old_scanner=None):
+    def new_scanner(node, env, path=()):
         if debug:
             print(f"LIBDEPS SCANNER: {str(node)}")
             print(f"  Declared dependencies:")
