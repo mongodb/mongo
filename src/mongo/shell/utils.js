@@ -1568,13 +1568,38 @@ rs.reconfig = function(cfg, options) {
     }
     return this._runCmd(cmd);
 };
+
+_validateMemberIndex = function(memberIndex, newConfig) {
+    const newMemberConfig = newConfig.members[memberIndex];
+    assert(newMemberConfig, `Node at index ${memberIndex} does not exist in the new config`);
+    assert.eq(1,
+              newMemberConfig.votes,
+              `Node at index ${memberIndex} must have {votes: 1} in the new config`);
+
+    // Use memberId to compare nodes across configs.
+    const memberId = newMemberConfig._id;
+    const oldConfig = rs.conf();
+    const oldMemberConfig = oldConfig.members.find(member => member._id === memberId);
+
+    // If the node doesn't exist in the old config, we are adding it as a new node. Skip validating
+    // the node in the old config.
+    if (!oldMemberConfig) {
+        return;
+    }
+
+    assert(!oldMemberConfig.votes,
+           `Node at index ${memberIndex} must have {votes: 0} in the old config`);
+};
+
 rs.reconfigForPSASet = function(memberIndex, cfg, options) {
+    _validateMemberIndex(memberIndex, cfg);
+
     const memberPriority = cfg.members[memberIndex].priority;
     print(
         `Running first reconfig to give member at index ${memberIndex} { votes: 1, priority: 0 }`);
     cfg.members[memberIndex].votes = 1;
     cfg.members[memberIndex].priority = 0;
-    const res = rs.reconfig(cfg, options);
+    let res = rs.reconfig(cfg, options);
     if (!res.ok) {
         return res;
     }
@@ -1582,7 +1607,15 @@ rs.reconfigForPSASet = function(memberIndex, cfg, options) {
     print(`Running second reconfig to give member at index ${memberIndex} { priority: ${
         memberPriority} }`);
     cfg.members[memberIndex].priority = memberPriority;
-    return rs.reconfig(cfg, options);
+
+    // If the first reconfig added a new node, the second config will not succeed until the
+    // automatic reconfig to remove the 'newlyAdded' field is completed. Retry the second reconfig
+    // until it succeeds in that case.
+    assert.soon(() => {
+        res = rs.reconfig(cfg, options);
+        return res.ok;
+    });
+    return res;
 };
 rs.add = function(hostport, arb) {
     let res;
