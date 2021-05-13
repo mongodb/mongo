@@ -47,8 +47,7 @@ function runTest(crashAfterRollbackTruncation) {
         {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
     rst.awaitReplication();
 
-    let secondary1 = rst.getSecondaries()[0];
-    const [, secondary2, secondary3, secondary4] = rst.getSecondaries();
+    let [secondary1, secondary2, secondary3, secondary4] = rst.getSecondaries();
 
     // Disable replication on all of the secondaries to manually control the replication progress.
     const stopReplProducerFailpoints = [secondary1, secondary2, secondary3, secondary4].map(
