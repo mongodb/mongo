@@ -156,6 +156,9 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
     boost::optional<DistributedPlanLogic> distributedPlanLogic() {
         // Force to run on the merging half for now.
         return DistributedPlanLogic{nullptr, this, boost::none};

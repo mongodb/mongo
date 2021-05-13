@@ -55,6 +55,9 @@ public:
             return isAscending == other.isAscending && fieldPath == other.fieldPath &&
                 expression == other.expression;
         }
+        bool operator!=(const SortPatternPart& other) const {
+            return !(*this == other);
+        }
     };
 
     SortPattern(const BSONObj&, const boost::intrusive_ptr<ExpressionContext>&);
