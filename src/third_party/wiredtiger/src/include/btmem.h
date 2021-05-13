@@ -232,8 +232,8 @@ struct __wt_ovfl_reuse {
  * We also configure a larger than default internal page size to accommodate for larger history
  * store keys. We do that to reduce the chances of having to create overflow keys on the page.
  */
-#ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
-#define WT_HS_COMPRESSOR "snappy"
+#ifdef HAVE_BUILTIN_EXTENSION_ZSTD
+#define WT_HS_COMPRESSOR "zstd"
 #else
 #define WT_HS_COMPRESSOR "none"
 #endif
