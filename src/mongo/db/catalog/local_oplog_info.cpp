@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
-#include "mongo/platform/basic.h"
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCatalog
 
 #include "mongo/db/repl/local_oplog_info.h"
 
