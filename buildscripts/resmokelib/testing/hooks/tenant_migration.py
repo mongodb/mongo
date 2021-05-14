@@ -662,10 +662,14 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                     if db_name.startswith(self._tenant_id + "_"):
                         primary_client.drop_database(db_name)
                 return
-            except (pymongo.errors.AutoReconnect, pymongo.errors.NotMasterError):
+            # We retry on all write concern errors because we assume the only reason waiting for
+            # write concern should fail is because of a failover.
+            except (pymongo.errors.AutoReconnect, pymongo.errors.NotMasterError,
+                    pymongo.errors.WriteConcernError) as err:
                 primary = get_primary(rs, self.logger)
-                self.logger.info("Retrying dropDatabase commands against primary on port %d.",
-                                 primary.port)
+                self.logger.info(
+                    "Retrying dropDatabase commands against primary on port %d after error %s.",
+                    primary.port, str(err))
                 continue
             except pymongo.errors.PyMongoError:
                 self.logger.exception(
