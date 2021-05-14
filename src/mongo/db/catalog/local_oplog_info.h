@@ -32,16 +32,14 @@
 #include <cstddef>
 #include <vector>
 
-#include <mongo/bson/timestamp.h>
-#include <mongo/db/catalog/collection.h>
-#include <mongo/db/namespace_string.h>
-#include <mongo/db/operation_context.h>
-#include <mongo/db/repl/oplog.h>
-#include <mongo/db/service_context.h>
-#include <mongo/stdx/mutex.h>
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
-namespace repl {
 
 /**
  * This structure contains per-service-context state related to the oplog.
@@ -85,5 +83,4 @@ private:
     mutable Mutex _newOpMutex = MONGO_MAKE_LATCH("LocaloplogInfo::_newOpMutex");
 };
 
-}  // namespace repl
 }  // namespace mongo

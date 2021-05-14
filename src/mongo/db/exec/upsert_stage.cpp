@@ -155,7 +155,7 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx());
         if (collection()->isCapped() &&
             !replCoord->isOplogDisabledFor(opCtx(), collection()->ns())) {
-            auto oplogInfo = repl::LocalOplogInfo::get(opCtx());
+            auto oplogInfo = LocalOplogInfo::get(opCtx());
             auto oplogSlots = oplogInfo->getNextOpTimes(opCtx(), /*batchSize=*/1);
             insertStmt.oplogSlot = oplogSlots.front();
         }

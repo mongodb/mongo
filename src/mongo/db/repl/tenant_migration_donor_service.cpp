@@ -496,8 +496,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                        invariant(!originalRecordId.isNull());
 
                        // Reserve an opTime for the write.
-                       auto oplogSlot =
-                           repl::LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
+                       auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
                        {
                            stdx::lock_guard<Latch> lg(_mutex);
 

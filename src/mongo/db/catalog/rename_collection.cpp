@@ -688,7 +688,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
                 WriteUnitOfWork wunit(opCtx);
 
                 if (!isOplogDisabledForTmpColl) {
-                    auto oplogInfo = repl::LocalOplogInfo::get(opCtx);
+                    auto oplogInfo = LocalOplogInfo::get(opCtx);
                     auto slots = oplogInfo->getNextOpTimes(opCtx, stmts.size());
                     for (std::size_t i = 0; i < stmts.size(); ++i) {
                         stmts[i].oplogSlot = slots[i];

@@ -230,7 +230,7 @@ Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexB
 
             // Reserve a slot in the oplog as the storage engine is allowed to insert oplog
             // documents out-of-order into the oplog.
-            auto oplogInfo = repl::LocalOplogInfo::get(opCtx);
+            auto oplogInfo = LocalOplogInfo::get(opCtx);
             auto oplogSlot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
             Status status = collection->insertDocument(
                 opCtx,

@@ -444,7 +444,7 @@ public:
     /**
      * Return a pointer to the per-service-context LocalOplogInfo.
      */
-    repl::LocalOplogInfo* getOplogInfo() const {
+    LocalOplogInfo* getOplogInfo() const {
         return _oplogInfo;
     }
 
@@ -461,7 +461,7 @@ private:
     boost::optional<Lock::GlobalLock> _globalLock;
     boost::optional<Lock::DBLock> _dbWriteLock;
     boost::optional<Lock::CollectionLock> _collWriteLock;
-    repl::LocalOplogInfo* _oplogInfo;
+    LocalOplogInfo* _oplogInfo;
     const CollectionPtr* _oplog;
 };
 

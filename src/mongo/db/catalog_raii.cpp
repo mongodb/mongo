@@ -460,7 +460,7 @@ AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t
         _globalLock.emplace(opCtx, lockMode, deadline, Lock::InterruptBehavior::kThrow);
     }
 
-    _oplogInfo = repl::LocalOplogInfo::get(opCtx);
+    _oplogInfo = LocalOplogInfo::get(opCtx);
     _oplog = &_oplogInfo->getCollection();
 }
 

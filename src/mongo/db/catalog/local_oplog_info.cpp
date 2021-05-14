@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/local_oplog_info.h"
 
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/record_store.h"
@@ -39,7 +40,6 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-namespace repl {
 namespace {
 
 const auto localOplogInfo = ServiceContext::declareDecoration<LocalOplogInfo>();
@@ -79,11 +79,11 @@ void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& n
 }
 
 std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, std::size_t count) {
-    auto replCoord = ReplicationCoordinator::get(opCtx);
-    long long term = OpTime::kUninitializedTerm;
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    long long term = repl::OpTime::kUninitializedTerm;
 
     // Fetch term out of the newOpMutex.
-    if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet) {
+    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
         // Current term. If we're not a replset of pv=1, it remains kOldProtocolVersionTerm.
         term = replCoord->getTerm();
     }
@@ -125,5 +125,4 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
     return oplogSlots;
 }
 
-}  // namespace repl
 }  // namespace mongo

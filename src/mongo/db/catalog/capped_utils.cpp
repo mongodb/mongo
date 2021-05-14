@@ -237,7 +237,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             // Because of that, we acquire an optime for the insert now to ensure that the insert
             // oplog entry gets logged before any delete oplog entries.
             if (!isOplogDisabledForCappedCollection) {
-                auto oplogInfo = repl::LocalOplogInfo::get(opCtx);
+                auto oplogInfo = LocalOplogInfo::get(opCtx);
                 auto oplogSlots = oplogInfo->getNextOpTimes(opCtx, /*batchSize=*/1);
                 insertStmt.oplogSlot = oplogSlots.front();
             }
