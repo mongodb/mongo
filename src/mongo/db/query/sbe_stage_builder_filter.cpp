@@ -699,15 +699,12 @@ void generateComparison(MatchExpressionVisitorContext* context,
         auto [tagView, valView] = sbe::bson::convertFrom(
             true, rhs.rawdata(), rhs.rawdata() + rhs.size(), rhs.fieldNameSize() - 1);
 
-        // SBE EConstant assumes ownership of the value so we have to make a copy here.
-        auto [tag, val] = sbe::value::copyValue(tagView, valView);
-
         // Most commonly the comparison does not do any kind of type conversions (i.e. 12 > "10"
         // does not evaluate to true as we do not try to convert a string to a number). Internally,
         // SBE returns Nothing for mismatched types.
         // However, there is a wrinkle with MQL (and there always is one). We can compare any type
         // to MinKey or MaxKey type and expect a true/false answer.
-        if (tag == sbe::value::TypeTags::MinKey) {
+        if (tagView == sbe::value::TypeTags::MinKey) {
             switch (binaryOp) {
                 case sbe::EPrimBinary::eq:
                 case sbe::EPrimBinary::neq:
@@ -731,7 +728,7 @@ void generateComparison(MatchExpressionVisitorContext* context,
                 default:
                     break;
             }
-        } else if (tag == sbe::value::TypeTags::MaxKey) {
+        } else if (tagView == sbe::value::TypeTags::MaxKey) {
             switch (binaryOp) {
                 case sbe::EPrimBinary::eq:
                 case sbe::EPrimBinary::neq:
@@ -755,7 +752,7 @@ void generateComparison(MatchExpressionVisitorContext* context,
                 default:
                     break;
             }
-        } else if (tag == sbe::value::TypeTags::Null) {
+        } else if (tagView == sbe::value::TypeTags::Null) {
             // When comparing to null we have to consider missing and undefined.
             auto inputExpr = buildMultiBranchConditional(
                 CaseValuePair{generateNullOrMissing(sbe::EVariable(inputSlot)),
@@ -764,10 +761,10 @@ void generateComparison(MatchExpressionVisitorContext* context,
 
             return {makeFillEmptyFalse(makeBinaryOp(binaryOp,
                                                     std::move(inputExpr),
-                                                    sbe::makeE<sbe::EConstant>(tag, val),
+                                                    makeConstant(sbe::value::TypeTags::Null, 0),
                                                     context->state.env)),
                     std::move(inputStage)};
-        } else if (sbe::value::isNaN(tag, val)) {
+        } else if (sbe::value::isNaN(tagView, valView)) {
             // Construct an expression to perform a NaN check.
             switch (binaryOp) {
                 case sbe::EPrimBinary::eq:
@@ -788,6 +785,9 @@ void generateComparison(MatchExpressionVisitorContext* context,
                                             << expr->toString());
             }
         }
+
+        // SBE EConstant assumes ownership of the value so we have to make a copy here.
+        auto [tag, val] = sbe::value::copyValue(tagView, valView);
 
         // When 'rhs' is not NaN, return false if lhs is NaN. Otherwise, use usual comparison
         // semantics.
