@@ -173,6 +173,7 @@ selector:
   - jstests/core/field_name_validation.js
   - jstests/core/index_partial_read_ops.js
   - jstests/core/index_stats.js
+  - jstests/core/insert1.js
   - jstests/core/json_schema/misc_validation.js
   - jstests/core/noop_writes.js
   - jstests/core/operation_latency_histogram.js
