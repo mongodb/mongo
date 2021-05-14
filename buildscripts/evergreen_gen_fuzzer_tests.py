@@ -1,222 +1,178 @@
 #!/usr/bin/env python3
 """Generate fuzzer tests to run in evergreen in parallel."""
-import argparse
-from typing import Set, Optional, List, NamedTuple
+import os
+from typing import Optional
 
-from shrub.v2 import ShrubProject, FunctionCall, Task, TaskDependency, BuildVariant, ExistingTask
+import click
+import inject
+from pydantic import BaseModel
+from evergreen import EvergreenApi, RetryingEvergreenApi
 
-from buildscripts.evergreen_generate_resmoke_tasks import NO_LARGE_DISTRO_ERR, GenerationConfiguration, GENERATE_CONFIG_FILE
-from buildscripts.util.fileops import write_file_to_dir
-import buildscripts.util.read_config as read_config
-import buildscripts.util.taskname as taskname
+from buildscripts.task_generation.evg_config_builder import EvgConfigBuilder
+from buildscripts.task_generation.gen_config import GenerationConfiguration
+from buildscripts.task_generation.gen_task_service import GenTaskOptions, FuzzerGenTaskParams
+from buildscripts.task_generation.gen_task_validation import GenTaskValidationService
+from buildscripts.task_generation.generated_config import GeneratedConfiguration
+from buildscripts.task_generation.resmoke_proxy import ResmokeProxyConfig
+from buildscripts.task_generation.suite_split import SuiteSplitService
+from buildscripts.util.cmdutils import enable_logging
+from buildscripts.util.fileops import read_yaml_file
 
 CONFIG_DIRECTORY = "generated_resmoke_config"
 GEN_PARENT_TASK = "generator_tasks"
+GENERATE_CONFIG_FILE = "etc/generate_subtasks_config.yml"
+DEFAULT_TEST_SUITE_DIR = os.path.join("buildscripts", "resmokeconfig", "suites")
+EVG_CONFIG_FILE = "./.evergreen.yml"
 
 
-class ConfigOptions(NamedTuple):
-    """Configuration options populated by Evergreen expansions."""
+class EvgExpansions(BaseModel):
+    """
+    Evergreen expansions to read for configuration.
 
+    build_id: ID of build being run.
+    build_variant: Build Variant being run on.
+    continue_on_failure: Should tests continue after encountering a failure.
+    is_patch: Are tests being run in a patch build.
+    jstestfuzz_vars: Variable to pass to jstestfuzz command.
+    large_distro_name: Name of "large" distro to use.
+    name: Name of task to generate.
+    npm_command: NPM command to generate fuzzer tests.
+    num_files: Number of fuzzer files to generate.
+    num_tasks: Number of sub-tasks to generate.
+    resmoke_args: Arguments to pass to resmoke.
+    resmoke_jobs_max: Max number of jobs resmoke should execute in parallel.
+    revision: git revision being run against.
+    should_shuffle: Should remove shuffle tests before executing.
+    suite: Resmoke suite to run the tests.
+    task_id: ID of task currently being executed.
+    task_path_suffix: Multiversion configuration if needed.
+    timeout_secs: Timeout to set for task execution.
+    use_large_distro: Should tasks be generated to run on a large distro.
+    """
+
+    build_id: str
+    build_variant: str
+    continue_on_failure: bool
+    is_patch: Optional[bool]
+    jstestfuzz_vars: Optional[str]
+    large_distro_name: Optional[str]
+    name: str
+    npm_command: Optional[str]
     num_files: int
     num_tasks: int
     resmoke_args: str
-    npm_command: str
-    jstestfuzz_vars: str
-    name: str
-    variant: str
-    continue_on_failure: bool
     resmoke_jobs_max: int
+    revision: str
     should_shuffle: bool
-    timeout_secs: int
-    use_multiversion: str
     suite: str
-    large_distro_name: str
-    use_large_distro: bool
+    task_id: str
+    timeout_secs: int
+    use_large_distro: Optional[bool]
+    task_path_suffix: Optional[str]
+
+    @classmethod
+    def from_yaml_file(cls, path: str) -> "EvgExpansions":
+        """
+        Read the generation configuration from the given file.
+
+        :param path: Path to file.
+        :return: Parse evergreen expansions.
+        """
+        return cls(**read_yaml_file(path))
+
+    def gen_task_options(self) -> GenTaskOptions:
+        """Determine the options for generating tasks based on the given expansions."""
+        return GenTaskOptions(
+            is_patch=self.is_patch,
+            create_misc_suite=True,
+            generated_config_dir=CONFIG_DIRECTORY,
+            use_default_timeouts=False,
+        )
+
+    def fuzzer_gen_task_params(self) -> FuzzerGenTaskParams:
+        """Determine the parameters for generating fuzzer tasks based on the given expansions."""
+        return FuzzerGenTaskParams(
+            task_name=self.name, num_files=self.num_files, num_tasks=self.num_tasks,
+            resmoke_args=self.resmoke_args, npm_command=self.npm_command or "jstestfuzz",
+            jstestfuzz_vars=self.jstestfuzz_vars, variant=self.build_variant,
+            continue_on_failure=self.continue_on_failure, resmoke_jobs_max=self.resmoke_jobs_max,
+            should_shuffle=self.should_shuffle, timeout_secs=self.timeout_secs,
+            use_multiversion=self.task_path_suffix, suite=self.suite,
+            use_large_distro=self.use_large_distro, large_distro_name=self.large_distro_name,
+            config_location=
+            f"{self.build_variant}/{self.revision}/generate_tasks/{self.name}_gen-{self.build_id}.tgz"
+        )
 
 
-def _get_config_options(cmd_line_options, config_file):  # pylint: disable=too-many-locals
-    """
-    Get the configuration to use.
+class EvgGenFuzzerOrchestrator:
+    """Orchestrate the generation of fuzzer tasks."""
 
-    Command line options override config files options.
+    @inject.autoparams()
+    def __init__(self, validation_service: GenTaskValidationService) -> None:
+        """
+        Initialize the orchestrator.
 
-    :param cmd_line_options: Command line options specified.
-    :param config_file: config file to use.
-    :return: ConfigOptions to use.
-    """
-    config_file_data = read_config.read_config_file(config_file)
+        :param validation_service: Validation Service for generating tasks.
+        """
+        self.validation_service = validation_service
 
-    num_files = int(
-        read_config.get_config_value("num_files", cmd_line_options, config_file_data,
-                                     required=True))
-    num_tasks = int(
-        read_config.get_config_value("num_tasks", cmd_line_options, config_file_data,
-                                     required=True))
-    resmoke_args = read_config.get_config_value("resmoke_args", cmd_line_options, config_file_data,
-                                                default="")
-    npm_command = read_config.get_config_value("npm_command", cmd_line_options, config_file_data,
-                                               default="jstestfuzz")
-    jstestfuzz_vars = read_config.get_config_value("jstestfuzz_vars", cmd_line_options,
-                                                   config_file_data, default="")
-    name = read_config.get_config_value("name", cmd_line_options, config_file_data, required=True)
-    variant = read_config.get_config_value("build_variant", cmd_line_options, config_file_data,
-                                           required=True)
-    continue_on_failure = read_config.get_config_value("continue_on_failure", cmd_line_options,
-                                                       config_file_data, default="false")
-    resmoke_jobs_max = read_config.get_config_value("resmoke_jobs_max", cmd_line_options,
-                                                    config_file_data, default="0")
-    should_shuffle = read_config.get_config_value("should_shuffle", cmd_line_options,
-                                                  config_file_data, default="false")
-    timeout_secs = read_config.get_config_value("timeout_secs", cmd_line_options, config_file_data,
-                                                default="1800")
-    use_multiversion = read_config.get_config_value("task_path_suffix", cmd_line_options,
-                                                    config_file_data, default=False)
+    @staticmethod
+    def generate_config(fuzzer_params: FuzzerGenTaskParams) -> GeneratedConfiguration:
+        """
+        Generate a fuzzer task based on the given parameters.
 
-    suite = read_config.get_config_value("suite", cmd_line_options, config_file_data, required=True)
+        :param fuzzer_params: Parameters describing how fuzzer should be generated.
+        :return: Configuration to generate the specified fuzzer.
+        """
+        builder = EvgConfigBuilder()  # pylint: disable=no-value-for-parameter
 
-    large_distro_name = read_config.get_config_value("large_distro_name", cmd_line_options,
-                                                     config_file_data, default="")
-    use_large_distro = read_config.get_config_value("use_large_distro", cmd_line_options,
-                                                    config_file_data, default=False)
+        builder.generate_fuzzer(fuzzer_params)
+        builder.add_display_task(GEN_PARENT_TASK, {f"{fuzzer_params.task_name}_gen"},
+                                 fuzzer_params.variant)
+        return builder.build(fuzzer_params.task_name + ".json")
 
-    return ConfigOptions(num_files, num_tasks, resmoke_args, npm_command, jstestfuzz_vars, name,
-                         variant, continue_on_failure, resmoke_jobs_max, should_shuffle,
-                         timeout_secs, use_multiversion, suite, large_distro_name, use_large_distro)
+    def generate_fuzzer(self, task_id: str, fuzzer_params: FuzzerGenTaskParams) -> None:
+        """
+        Save the configuration to generate the specified fuzzer to disk.
+
+        :param task_id: ID of task doing the generation.
+        :param fuzzer_params: Parameters describing how fuzzer should be generated.
+        """
+        if not self.validation_service.should_task_be_generated(task_id):
+            print("Not generating configuration due to previous successful generation.")
+            return
+
+        generated_config = self.generate_config(fuzzer_params)
+        generated_config.write_all_to_dir(CONFIG_DIRECTORY)
 
 
-def build_fuzzer_sub_task(task_name: str, task_index: int, options: ConfigOptions) -> Task:
-    """
-    Build a shrub task to run the fuzzer.
-
-    :param task_name: Parent name of task.
-    :param task_index: Index of sub task being generated.
-    :param options: Options to use for task.
-    :return: Shrub task to run the fuzzer.
-    """
-    sub_task_name = taskname.name_generated_task(task_name, task_index, options.num_tasks,
-                                                 options.variant)
-
-    run_jstestfuzz_vars = {
-        "jstestfuzz_vars":
-            "--numGeneratedFiles {0} {1}".format(options.num_files, options.jstestfuzz_vars),
-        "npm_command":
-            options.npm_command,
-    }
-    suite_arg = f"--suites={options.suite}"
-    run_tests_vars = {
-        "continue_on_failure": options.continue_on_failure,
-        "resmoke_args": f"{suite_arg} {options.resmoke_args}",
-        "resmoke_jobs_max": options.resmoke_jobs_max,
-        "should_shuffle": options.should_shuffle,
-        "task_path_suffix": options.use_multiversion,
-        "timeout_secs": options.timeout_secs,
-        "task": options.name
-    }  # yapf: disable
-
-    commands = [
-        FunctionCall("do setup"),
-        FunctionCall("configure evergreen api credentials") if options.use_multiversion else None,
-        FunctionCall("do multiversion setup") if options.use_multiversion else None,
-        FunctionCall("setup jstestfuzz"),
-        FunctionCall("run jstestfuzz", run_jstestfuzz_vars),
-        FunctionCall("run generated tests", run_tests_vars)
-    ]
-    commands = [command for command in commands if command is not None]
-
-    return Task(sub_task_name, commands, {TaskDependency("archive_dist_test_debug")})
-
-
-def generate_fuzzer_sub_tasks(task_name: str, options: ConfigOptions) -> Set[Task]:
-    """
-    Generate evergreen tasks for fuzzers based on the options given.
-
-    :param task_name: Parent name for tasks being generated.
-    :param options: task options.
-    :return: Set of shrub tasks.
-    """
-    sub_tasks = {
-        build_fuzzer_sub_task(task_name, index, options)
-        for index in range(options.num_tasks)
-    }
-    return sub_tasks
-
-
-def get_distro(options: ConfigOptions, build_variant: str) -> Optional[List[str]]:
-    """
-    Get the distros that the tasks should be run on.
-
-    :param options: ConfigOptions instance
-    :param build_variant: Name of build variant being generated.
-    :return: List of distros to run on.
-    """
-    if options.use_large_distro:
-        if options.large_distro_name:
-            return [options.large_distro_name]
-
-        generate_config = GenerationConfiguration.from_yaml_file(GENERATE_CONFIG_FILE)
-        if build_variant not in generate_config.build_variant_large_distro_exceptions:
-            print(NO_LARGE_DISTRO_ERR.format(build_variant=build_variant))
-            raise ValueError("Invalid Evergreen Configuration")
-
-    return None
-
-
-def create_fuzzer_task(options: ConfigOptions, build_variant: BuildVariant) -> None:
-    """
-    Generate an evergreen configuration for fuzzers and add it to the given build variant.
-
-    :param options: task options.
-    :param build_variant: Build variant to add tasks to.
-    """
-    task_name = options.name
-    sub_tasks = generate_fuzzer_sub_tasks(task_name, options)
-
-    build_variant.display_task(GEN_PARENT_TASK,
-                               execution_existing_tasks={ExistingTask(f"{options.name}_gen")})
-
-    distros = get_distro(options, build_variant.name)
-    build_variant.display_task(task_name, sub_tasks, distros=distros)
-
-
-def main():
+@click.command()
+@click.option("--expansion-file", type=str, required=True,
+              help="Location of expansions file generated by evergreen.")
+@click.option("--evergreen-config", type=str, default=EVG_CONFIG_FILE,
+              help="Location of evergreen configuration file.")
+@click.option("--verbose", is_flag=True, default=False, help="Enable verbose logging.")
+def main(expansion_file: str, evergreen_config: str, verbose: bool) -> None:
     """Generate fuzzer tests to run in evergreen."""
-    parser = argparse.ArgumentParser(description=main.__doc__)
+    enable_logging(verbose)
 
-    parser.add_argument("--expansion-file", dest="expansion_file", type=str,
-                        help="Location of expansions file generated by evergreen.")
-    parser.add_argument("--num-files", dest="num_files", type=int,
-                        help="Number of files to generate per task.")
-    parser.add_argument("--num-tasks", dest="num_tasks", type=int,
-                        help="Number of tasks to generate.")
-    parser.add_argument("--resmoke-args", dest="resmoke_args", help="Arguments to pass to resmoke.")
-    parser.add_argument("--npm-command", dest="npm_command", help="npm command to run for fuzzer.")
-    parser.add_argument("--jstestfuzz-vars", dest="jstestfuzz_vars",
-                        help="options to pass to jstestfuzz.")
-    parser.add_argument("--name", dest="name", help="name of task to generate.")
-    parser.add_argument("--variant", dest="build_variant", help="build variant to generate.")
-    parser.add_argument("--use-multiversion", dest="task_path_suffix",
-                        help="Task path suffix for multiversion generated tasks.")
-    parser.add_argument("--continue-on-failure", dest="continue_on_failure",
-                        help="continue_on_failure value for generated tasks.")
-    parser.add_argument("--resmoke-jobs-max", dest="resmoke_jobs_max",
-                        help="resmoke_jobs_max value for generated tasks.")
-    parser.add_argument("--should-shuffle", dest="should_shuffle",
-                        help="should_shuffle value for generated tasks.")
-    parser.add_argument("--timeout-secs", dest="timeout_secs",
-                        help="timeout_secs value for generated tasks.")
-    parser.add_argument("--suite", dest="suite", help="Suite to run using resmoke.")
+    evg_expansions = EvgExpansions.from_yaml_file(expansion_file)
 
-    options = parser.parse_args()
+    def dependencies(binder: inject.Binder) -> None:
+        binder.bind(SuiteSplitService, None)
+        binder.bind(GenTaskOptions, evg_expansions.gen_task_options())
+        binder.bind(EvergreenApi, RetryingEvergreenApi.get_api(config_file=evergreen_config))
+        binder.bind(GenerationConfiguration,
+                    GenerationConfiguration.from_yaml_file(GENERATE_CONFIG_FILE))
+        binder.bind(ResmokeProxyConfig,
+                    ResmokeProxyConfig(resmoke_suite_dir=DEFAULT_TEST_SUITE_DIR))
 
-    config_options = _get_config_options(options, options.expansion_file)
-    build_variant = BuildVariant(config_options.variant)
-    create_fuzzer_task(config_options, build_variant)
+    inject.configure(dependencies)
 
-    shrub_project = ShrubProject.empty()
-    shrub_project.add_build_variant(build_variant)
-
-    write_file_to_dir(CONFIG_DIRECTORY, f"{config_options.name}.json", shrub_project.json())
+    gen_fuzzer_orchestrator = EvgGenFuzzerOrchestrator()  # pylint: disable=no-value-for-parameter
+    gen_fuzzer_orchestrator.generate_fuzzer(evg_expansions.task_id,
+                                            evg_expansions.fuzzer_gen_task_params())
 
 
 if __name__ == '__main__':
-    main()
+    main()  # pylint: disable=no-value-for-parameter

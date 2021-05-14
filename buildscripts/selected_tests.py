@@ -1,31 +1,41 @@
 #!/usr/bin/env python3
 """Command line utility for determining what jstests should run for the given changed files."""
-import logging
 import os
 import re
 import sys
-from typing import Any, Dict, List, Set
+from datetime import datetime, timedelta
+from functools import partial
+from typing import Any, Dict, List, Set, Optional
 
 import click
+import inject
 import structlog
+from pydantic import BaseModel
 from structlog.stdlib import LoggerFactory
 from git import Repo
-
-from shrub.v2 import ShrubProject, BuildVariant
 from evergreen.api import EvergreenApi, RetryingEvergreenApi
-
-# Get relative imports to work when the package is not installed on the PYTHONPATH.
-from buildscripts.patch_builds.change_data import find_changed_files_in_repos
-from buildscripts.patch_builds.evg_change_data import generate_revision_map_from_manifest
 
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # pylint: disable=wrong-import-position
-import buildscripts.resmokelib.parser
-import buildscripts.util.read_config as read_config
+# Get relative imports to work when the package is not installed on the PYTHONPATH.
+from buildscripts.patch_builds.change_data import find_changed_files_in_repos
+from buildscripts.patch_builds.evg_change_data import generate_revision_map_from_manifest
+from buildscripts.patch_builds.selected_tests.selected_tests_client import SelectedTestsClient
+from buildscripts.task_generation.evg_config_builder import EvgConfigBuilder
+from buildscripts.task_generation.gen_config import GenerationConfiguration
+from buildscripts.task_generation.generated_config import GeneratedConfiguration
+from buildscripts.task_generation.resmoke_proxy import ResmokeProxyConfig
+from buildscripts.task_generation.suite_split import SuiteSplitParameters, SuiteSplitConfig
+from buildscripts.task_generation.suite_split_strategies import SplitStrategy, FallbackStrategy, \
+    greedy_division, round_robin_fallback
+from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
+from buildscripts.task_generation.task_types.resmoke_tasks import ResmokeGenTaskParams
+from buildscripts.util.cmdutils import enable_logging
+from buildscripts.util.fileops import read_yaml_file
 from buildscripts.burn_in_tests import DEFAULT_REPO_LOCATIONS, create_task_list_for_tests, \
-    is_file_a_test_file, TaskInfo
+    TaskInfo
 from buildscripts.ciconfig.evergreen import (
     EvergreenProjectConfig,
     ResmokeArgs,
@@ -34,16 +44,10 @@ from buildscripts.ciconfig.evergreen import (
     Variant,
 )
 from buildscripts.evergreen_generate_resmoke_tasks import (
-    CONFIG_FORMAT_FN,
-    DEFAULT_CONFIG_VALUES,
-    REQUIRED_CONFIG_KEYS,
-    ConfigOptions,
-    GenerateSubSuites,
-    remove_gen_suffix,
-    write_file_dict,
-    Suite,
+    DEFAULT_TEST_SUITE_DIR,
+    GENERATE_CONFIG_FILE,
 )
-from buildscripts.patch_builds.selected_tests_service import SelectedTestsService
+from buildscripts.patch_builds.selected_tests.selected_tests_service import SelectedTestsService
 
 structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.getLogger(__name__)
@@ -51,13 +55,9 @@ LOGGER = structlog.getLogger(__name__)
 TASK_ID_EXPANSION = "task_id"
 EVERGREEN_FILE = "etc/evergreen.yml"
 EVG_CONFIG_FILE = ".evergreen.yml"
-EXTERNAL_LOGGERS = {
-    "evergreen",
-    "git",
-    "urllib3",
-}
-SELECTED_TESTS_CONFIG_DIR = "selected_tests_config"
+SELECTED_TESTS_CONFIG_DIR = "generated_resmoke_config"
 RELATION_THRESHOLD = 0
+LOOKBACK_DURATION_DAYS = 14
 
 COMPILE_TASK_PATTERN = re.compile(".*compile.*")
 CONCURRENCY_TASK_PATTERN = re.compile("concurrency.*")
@@ -75,7 +75,7 @@ EXCLUDE_TASK_PATTERNS = [
 CPP_TASK_NAMES = [
     "dbtest",
     "idl_tests",
-    "unittests",
+    "run_unittests",
 ]
 PUBLISH_TASK_NAMES = [
     "package",
@@ -88,97 +88,145 @@ EXCLUDE_TASK_LIST = [
     *PYTHON_TESTS,
     *PUBLISH_TASK_NAMES,
 ]
+POSSIBLE_RUN_TASK_FUNCS = [
+    "generate resmoke tasks",
+    "generate randomized multiversion tasks",
+    "run tests",
+    "generate explicit multiversion tasks",
+]
 
 
-class SelectedTestsConfigOptions(ConfigOptions):
-    """Retrieve configuration from a config file."""
+class EvgExpansions(BaseModel):
+    """
+    Evergreen expansions needed for selected tests.
+
+    task_id: ID of task being run.
+    task_name: Name of task being run.
+    build_variant: Name of build variant being run on.
+    build_id: ID of build being run.
+    is_patch: Is this task run as part of a patch build.
+    project: Evergreen project being run.
+    revision: git revision being run against.
+    version_id: ID of version being run.
+    """
+
+    task_id: str
+    task_name: str
+    build_variant: str
+    build_id: str
+    is_patch: Optional[bool] = None
+    project: str
+    revision: str
+    version_id: str
 
     @classmethod
-    # pylint: disable=too-many-arguments,W0221
-    def from_file(cls, origin_variant_expansions: Dict[str, str],
-                  selected_tests_variant_expansions: Dict[str, str], overwrites: Dict[str, Any],
-                  required_keys: Set[str], defaults: Dict[str, Any], formats: Dict[str, type]):
+    def from_yaml_file(cls, path: str) -> "EvgExpansions":
+        """Read the generation configuration from the given file."""
+        return cls(**read_yaml_file(path))
+
+    def build_gen_task_options(self) -> GenTaskOptions:
+        """Build options needed to generate tasks."""
+        return GenTaskOptions(create_misc_suite=False,
+                              generated_config_dir=SELECTED_TESTS_CONFIG_DIR, is_patch=self.is_patch
+                              or False, use_default_timeouts=False)
+
+    def build_suite_split_config(self, start_date: datetime,
+                                 end_date: datetime) -> SuiteSplitConfig:
         """
-        Create an instance of SelectedTestsConfigOptions based on the given config file.
+        Build options need to split suite into sub-suites.
 
-        :param origin_variant_expansions: Expansions of the origin build variant.
-        :param selected_tests_variant_expansions: Expansions of the selected-tests variant.
-        :param overwrites: Dict of configuration values to overwrite those listed in expansions.
-        :param required_keys: Set of keys required by this config.
-        :param defaults: Dict of default values for keys.
-        :param formats: Dict with functions to format values before returning.
-        :return: Instance of SelectedTestsConfigOptions.
+        :param start_date: Start date to look at historic results.
+        :param end_date: End date to look at historic results.
+        :return: Options for splitting suites.
         """
-        return cls({**origin_variant_expansions, **selected_tests_variant_expansions, **overwrites},
-                   required_keys, defaults, formats)
+        return SuiteSplitConfig(
+            evg_project=self.project,
+            target_resmoke_time=60,
+            max_sub_suites=5,
+            max_tests_per_suite=100,
+            start_date=start_date,
+            end_date=end_date,
+            include_build_variant_in_name=True,
+        )
 
-    @property
-    def run_tests_task(self):
-        """Return name of task name for s3 folder containing generated tasks config."""
-        return remove_gen_suffix(self.name_of_generating_task)
-
-    @property
-    def run_tests_build_variant(self):
-        """Return name of build_variant for s3 folder containing generated tasks config."""
-        return self.name_of_generating_build_variant
-
-    @property
-    def run_tests_build_id(self):
-        """Return name of build_id for s3 folder containing generated tasks config."""
-        return self.name_of_generating_build_id
-
-    @property
-    def create_misc_suite(self):
-        """Whether or not a _misc suite file should be created."""
-        return not self.selected_tests_to_run
-
-    @property
-    def display_task_name(self):
-        """Return the name to use as the display task."""
-        return f"{self.task}_{self.variant}"
-
-    @property
-    def generated_suite_filename(self):
-        """Filename for the generated suite file."""
-        return f"{self.suite}_{self.variant}"
-
-    @property
-    def gen_task_set(self):
-        """Return the set of tasks used to generate this configuration."""
-        return set()
+    def get_config_location(self) -> str:
+        """Get the location the generated configuration will be stored."""
+        return f"{self.build_variant}/{self.revision}/generate_tasks/{self.task_name}-{self.build_id}.tgz"
 
 
-def _configure_logging(verbose: bool):
-    """
-    Configure logging for the application.
+class TaskConfigService:
+    """Service for generating selected tests task configuration."""
 
-    :param verbose: If True set log level to DEBUG.
-    """
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
-        level=level,
-        stream=sys.stdout,
-    )
-    for log_name in EXTERNAL_LOGGERS:
-        logging.getLogger(log_name).setLevel(logging.WARNING)
+    @staticmethod
+    def get_evg_task_config(task: Task, build_variant_config: Variant) -> Dict[str, Any]:
+        """
+        Look up task config of the task to be generated.
 
+        :param task: Task to get info for.
+        :param build_variant_config: Config of build variant to collect task info from.
+        :return: Task configuration values.
+        """
+        LOGGER.info("Calculating evg_task_config values for task", task=task.name)
+        task_vars = {}
+        for run_task_func in POSSIBLE_RUN_TASK_FUNCS:
+            task_def = task.find_func_command(run_task_func)
+            if task_def:
+                task_vars = task_def["vars"]
+                break
 
-def _find_selected_test_files(selected_tests_service: SelectedTestsService,
-                              changed_files: Set[str]) -> Set[str]:
-    """
-    Request related test files from selected-tests service and filter invalid files.
+        suite_name = ResmokeArgs.get_arg(task_vars["resmoke_args"], "suites")
+        if suite_name:
+            task_vars.update({"suite": suite_name})
 
-    :param selected_tests_service: Selected-tests service.
-    :param changed_files: Set of changed_files.
-    :return: Set of test files returned by selected-tests service that are valid test files.
-    """
-    test_mappings = selected_tests_service.get_test_mappings(RELATION_THRESHOLD, changed_files)
-    return {
-        test_file["name"]
-        for test_mapping in test_mappings for test_file in test_mapping["test_files"]
-        if is_file_a_test_file(test_file["name"])
-    }
+        # the suites argument will run all tests in a suite even when individual
+        # tests are specified in resmoke_args, so we remove it
+        resmoke_args_without_suites = ResmokeArgs.remove_arg(task_vars["resmoke_args"], "suites")
+        task_vars["resmoke_args"] = resmoke_args_without_suites
+
+        task_name = task.name[:-4] if task.name.endswith("_gen") else task.name
+        return {
+            "task_name": task_name,
+            "build_variant": build_variant_config.name,
+            **task_vars,
+            "large_distro_name": build_variant_config.expansion("large_distro_name"),
+        }
+
+    def get_task_configs_for_test_mappings(self, tests_by_task: Dict[str, TaskInfo],
+                                           build_variant_config: Variant) -> Dict[str, dict]:
+        """
+        For test mappings, generate a dict containing task names and their config settings.
+
+        :param tests_by_task: Dictionary of tests and tasks to run.
+        :param build_variant_config: Config of build variant to collect task info from.
+        :return: Dict of task names and their config settings.
+        """
+        evg_task_configs = {}
+        for task_name, test_list_info in tests_by_task.items():
+            task = _find_task(build_variant_config, task_name)
+            if task and not _exclude_task(task):
+                evg_task_config = self.get_evg_task_config(task, build_variant_config)
+                evg_task_config.update({"selected_tests_to_run": set(test_list_info.tests)})
+                evg_task_configs[task.name] = evg_task_config
+
+        return evg_task_configs
+
+    def get_task_configs_for_task_mappings(self, related_tasks: List[str],
+                                           build_variant_config: Variant) -> Dict[str, dict]:
+        """
+        For task mappings, generate a dict containing task names and their config settings.
+
+        :param related_tasks: List of tasks to run.
+        :param build_variant_config: Config of build variant to collect task info from.
+        :return: Dict of task names and their config settings.
+        """
+        evg_task_configs = {}
+        for task_name in related_tasks:
+            task = _find_task(build_variant_config, task_name)
+            if task and not _exclude_task(task):
+                evg_task_config = self.get_evg_task_config(task, build_variant_config)
+                evg_task_configs[task.name] = evg_task_config
+
+        return evg_task_configs
 
 
 def _exclude_task(task: Task) -> bool:
@@ -195,19 +243,6 @@ def _exclude_task(task: Task) -> bool:
     return False
 
 
-def _find_selected_tasks(selected_tests_service: SelectedTestsService, changed_files: Set[str]) -> \
-        Set[str]:
-    """
-    Request tasks from selected-tests and filter out tasks that don't exist or should be excluded.
-
-    :param selected_tests_service: Selected-tests service.
-    :param changed_files: Set of changed_files.
-    :return: Set of tasks returned by selected-tests service that should not be excluded.
-    """
-    task_mappings = selected_tests_service.get_task_mappings(RELATION_THRESHOLD, changed_files)
-    return {task["name"] for task_mapping in task_mappings for task in task_mapping["tasks"]}
-
-
 def _find_task(build_variant_config: Variant, task_name: str) -> Task:
     """
     Look up shrub config for task.
@@ -220,124 +255,6 @@ def _find_task(build_variant_config: Variant, task_name: str) -> Task:
     if not task:
         task = build_variant_config.get_task(task_name + "_gen")
     return task
-
-
-def _get_selected_tests_task_config(
-        selected_tests_variant_expansions: Dict[str, str]) -> Dict[str, str]:
-    """
-    Look up task config of the selected tests task.
-
-    :param selected_tests_variant_expansions: Expansions of the selected-tests variant.
-    :return: Task configuration values.
-    """
-    return {
-        "name_of_generating_task": selected_tests_variant_expansions["task_name"],
-        "name_of_generating_build_variant": selected_tests_variant_expansions["build_variant"],
-        "name_of_generating_build_id": selected_tests_variant_expansions["build_id"]
-    }
-
-
-def _get_evg_task_config(
-        selected_tests_variant_expansions: Dict[str, str],
-        task: Task,
-        build_variant_config: Variant,
-) -> Dict[str, Any]:
-    """
-    Look up task config of the task to be generated.
-
-    :param selected_tests_variant_expansions: Expansions of the selected-tests variant.
-    :param task: Task to get info for.
-    :param build_variant_config: Config of build variant to collect task info from.
-    :return: Task configuration values.
-    """
-    LOGGER.info("Calculating evg_task_config values for task", task=task.name)
-    if task.is_generate_resmoke_task:
-        task_vars = task.generate_resmoke_tasks_command["vars"]
-    else:
-        task_vars = task.run_tests_command["vars"]
-        task_vars.update({"fallback_num_sub_suites": "1"})
-
-    suite_name = ResmokeArgs.get_arg(task_vars["resmoke_args"], "suites")
-    if suite_name:
-        task_vars.update({"suite": suite_name})
-
-    # the suites argument will run all tests in a suite even when individual
-    # tests are specified in resmoke_args, so we remove it
-    resmoke_args_without_suites = ResmokeArgs.remove_arg(task_vars["resmoke_args"], "suites")
-    task_vars["resmoke_args"] = resmoke_args_without_suites
-
-    selected_tests_task_config = _get_selected_tests_task_config(selected_tests_variant_expansions)
-
-    return {
-        "task_name": task.name, "build_variant": build_variant_config.name, **task_vars,
-        **selected_tests_task_config
-    }
-
-
-def _update_config_with_task(evg_api: EvergreenApi, build_variant: BuildVariant,
-                             config_options: SelectedTestsConfigOptions,
-                             config_dict_of_suites_and_tasks: Dict[str, str]) -> None:
-    """
-    Generate the suites config and the task shrub config for a given task config.
-
-    :param evg_api: Evergreen API object.
-    :param build_variant: Build variant to add tasks to.
-    :param shrub_project: Shrub configuration for task.
-    :param config_options: Task configuration options.
-    :param config_dict_of_suites_and_tasks: Dict of shrub configs and suite file contents.
-    """
-    task_generator = GenerateSubSuites(evg_api, config_options)
-    suites = task_generator.get_suites()
-
-    config_dict_of_suites = task_generator.generate_suites_config(suites)
-    config_dict_of_suites_and_tasks.update(config_dict_of_suites)
-
-    task_generator.add_suites_to_build_variant(suites, build_variant)
-
-
-def _get_task_configs_for_test_mappings(selected_tests_variant_expansions: Dict[str, str],
-                                        tests_by_task: Dict[str, TaskInfo],
-                                        build_variant_config: Variant) -> Dict[str, dict]:
-    """
-    For test mappings, generate a dict containing task names and their config settings.
-
-    :param selected_tests_variant_expansions: Expansions of the selected-tests variant.
-    :param tests_by_task: Dictionary of tests and tasks to run.
-    :param build_variant_config: Config of build variant to collect task info from.
-    :return: Dict of task names and their config settings.
-    """
-    evg_task_configs = {}
-    for task_name, test_list_info in tests_by_task.items():
-        task = _find_task(build_variant_config, task_name)
-        if task and not _exclude_task(task):
-            evg_task_config = _get_evg_task_config(selected_tests_variant_expansions, task,
-                                                   build_variant_config)
-            evg_task_config.update({"selected_tests_to_run": set(test_list_info.tests)})
-            evg_task_configs[task.name] = evg_task_config
-
-    return evg_task_configs
-
-
-def _get_task_configs_for_task_mappings(selected_tests_variant_expansions: Dict[str, str],
-                                        related_tasks: List[str],
-                                        build_variant_config: Variant) -> Dict[str, dict]:
-    """
-    For task mappings, generate a dict containing task names and their config settings.
-
-    :param selected_tests_variant_expansions: Expansions of the selected-tests variant.
-    :param related_tasks: List of tasks to run.
-    :param build_variant_config: Config of build variant to collect task info from.
-    :return: Dict of task names and their config settings.
-    """
-    evg_task_configs = {}
-    for task_name in related_tasks:
-        task = _find_task(build_variant_config, task_name)
-        if task and not _exclude_task(task):
-            evg_task_config = _get_evg_task_config(selected_tests_variant_expansions, task,
-                                                   build_variant_config)
-            evg_task_configs[task.name] = evg_task_config
-
-    return evg_task_configs
 
 
 def _remove_repo_path_prefix(file_path: str) -> str:
@@ -355,129 +272,184 @@ def _remove_repo_path_prefix(file_path: str) -> str:
     return file_path
 
 
-def _get_task_configs(evg_conf: EvergreenProjectConfig,
-                      selected_tests_service: SelectedTestsService,
-                      selected_tests_variant_expansions: Dict[str, str],
-                      build_variant_config: Variant, changed_files: Set[str]) -> Dict[str, Dict]:
+def filter_set(item: str, input_set: Set[str]) -> bool:
     """
-    Get task configurations for the tasks to be generated.
+    Filter to determine if the given item is in the given set.
 
-    :param evg_conf: Evergreen configuration.
-    :param selected_tests_service: Selected-tests service.
-    :param selected_tests_variant_expansions: Expansions of the selected-tests variant.
-    :param build_variant_config: Config of build variant to collect task info from.
-    :param changed_files: Set of changed_files.
-    :return: Task configurations.
+    :param item: Item to search for.
+    :param input_set: Set to search.
+    :return: True if the item is contained in the list.
     """
-    task_configs = {}
-
-    related_test_files = _find_selected_test_files(selected_tests_service, changed_files)
-    LOGGER.info("related test files found", related_test_files=related_test_files,
-                variant=build_variant_config.name)
-
-    if related_test_files:
-        tests_by_task = create_task_list_for_tests(related_test_files, build_variant_config.name,
-                                                   evg_conf)
-        LOGGER.info("tests and tasks found", tests_by_task=tests_by_task)
-
-        test_mapping_task_configs = _get_task_configs_for_test_mappings(
-            selected_tests_variant_expansions, tests_by_task, build_variant_config)
-        task_configs.update(test_mapping_task_configs)
-
-    related_tasks = _find_selected_tasks(selected_tests_service, changed_files)
-    LOGGER.info("related tasks found", related_tasks=related_tasks,
-                variant=build_variant_config.name)
-    if related_tasks:
-        task_mapping_task_configs = _get_task_configs_for_task_mappings(
-            selected_tests_variant_expansions, related_tasks, build_variant_config)
-        # task_mapping_task_configs will overwrite test_mapping_task_configs
-        # because task_mapping_task_configs will run all tests rather than a subset of tests and we
-        # should err on the side of running all tests
-        task_configs.update(task_mapping_task_configs)
-
-    return task_configs
+    return item in input_set
 
 
-def remove_task_configs_already_in_build(task_configs: Dict[str, Dict], evg_api: EvergreenApi,
-                                         build_variant_config: Variant, version_id: str) -> None:
-    """
-    Remove the task_configs that exist for tasks that have been pulled into the build manually.
+class SelectedTestsOrchestrator:
+    """Orchestrator for generating selected test builds."""
 
-    :param task_configs: The task configurations for the tasks to be generated.
-    :param evg_api: Evergreen API object.
-    :param build_variant_config: Config of build variant to collect task info from.
-    :param version_id: The version_id of the version running selected tests.
-    """
-    version = evg_api.version_by_id(version_id)
+    # pylint: disable=too-many-arguments
+    @inject.autoparams()
+    def __init__(self, evg_api: EvergreenApi, evg_conf: EvergreenProjectConfig,
+                 selected_tests_service: SelectedTestsService,
+                 task_config_service: TaskConfigService, evg_expansions: EvgExpansions) -> None:
+        """
+        Initialize the orchestrator.
 
-    try:
-        build = version.build_by_variant(build_variant_config.name)
-    except KeyError:
-        LOGGER.debug("No build exists on this build variant for this version yet",
-                     variant=build_variant_config.name)
-        build = None
+        :param evg_api: Evergreen API client.
+        :param evg_conf: Evergreen Project configuration.
+        :param selected_tests_service: Selected tests service.
+        :param task_config_service: Task Config service.
+        :param evg_expansions: Evergreen expansions.
+        """
+        self.evg_api = evg_api
+        self.evg_conf = evg_conf
+        self.selected_tests_service = selected_tests_service
+        self.task_config_service = task_config_service
+        self.evg_expansions = evg_expansions
 
-    if build:
-        tasks_already_in_build = build.get_tasks()
-        for task in tasks_already_in_build:
-            if task.display_name in task_configs:
-                LOGGER.info(
-                    "Will not generate task that has already been pulled into the build manually",
-                    variant=build_variant_config.name, task_already_in_build=task.display_name)
-                del task_configs[task.display_name]
+    def find_changed_files(self, repos: List[Repo], task_id: str) -> Set[str]:
+        """
+        Determine what files have changed in the given repos.
 
+        :param repos: List of git repos to query.
+        :param task_id: ID of task being run.
+        :return: Set of files that contain changes.
+        """
+        revision_map = generate_revision_map_from_manifest(repos, task_id, self.evg_api)
+        changed_files = find_changed_files_in_repos(repos, revision_map)
+        changed_files = {_remove_repo_path_prefix(file_path) for file_path in changed_files}
+        changed_files = {
+            file_path
+            for file_path in changed_files if not file_path.startswith("src/third_party")
+        }
+        LOGGER.info("Found changed files", files=changed_files)
+        return changed_files
 
-def run(evg_api: EvergreenApi, evg_conf: EvergreenProjectConfig,
-        selected_tests_service: SelectedTestsService,
-        selected_tests_variant_expansions: Dict[str, str], repos: List[Repo]) -> Dict[str, str]:
-    # pylint: disable=too-many-locals
-    """
-    Run code to select tasks to run based on test and task mappings for each of the build variants.
+    def get_task_config(self, build_variant_config: Variant,
+                        changed_files: Set[str]) -> Dict[str, Dict]:
+        """
+        Get task configurations for the tasks to be generated.
 
-    :param evg_api: Evergreen API object.
-    :param evg_conf: Evergreen configuration.
-    :param selected_tests_service: Selected-tests service.
-    :param selected_tests_variant_expansions: Expansions of the selected-tests variant.
-    :param repos: List of repos containing changed files.
-    :return: Dict of files and file contents for generated tasks.
-    """
-    config_dict_of_suites_and_tasks = {}
+        :param build_variant_config: Config of build variant to collect task info from.
+        :param changed_files: Set of changed_files.
+        :return: Task configurations.
+        """
+        existing_tasks = self.get_existing_tasks(self.evg_expansions.version_id,
+                                                 build_variant_config.name)
+        task_configs = {}
 
-    task_id = selected_tests_variant_expansions[TASK_ID_EXPANSION]
-    revision_map = generate_revision_map_from_manifest(repos, task_id, evg_api)
-    changed_files = find_changed_files_in_repos(repos, revision_map)
-    changed_files = {_remove_repo_path_prefix(file_path) for file_path in changed_files}
-    LOGGER.info("Found changed files", files=changed_files)
+        related_test_files = self.selected_tests_service.find_selected_test_files(changed_files)
+        LOGGER.info("related test files found", related_test_files=related_test_files,
+                    variant=build_variant_config.name)
 
-    shrub_project = ShrubProject()
-    for build_variant_config in evg_conf.get_required_variants():
-        shrub_build_variant = BuildVariant(build_variant_config.name)
-        origin_variant_expansions = build_variant_config.expansions
+        if related_test_files:
+            tests_by_task = create_task_list_for_tests(related_test_files,
+                                                       build_variant_config.name, self.evg_conf)
+            LOGGER.info("tests and tasks found", tests_by_task=tests_by_task)
+            tests_by_task = {
+                task: tests
+                for task, tests in tests_by_task.items() if task not in existing_tasks
+            }
 
-        task_configs = _get_task_configs(evg_conf, selected_tests_service,
-                                         selected_tests_variant_expansions, build_variant_config,
-                                         changed_files)
+            test_mapping_task_configs = self.task_config_service.get_task_configs_for_test_mappings(
+                tests_by_task, build_variant_config)
+            task_configs.update(test_mapping_task_configs)
 
-        remove_task_configs_already_in_build(task_configs, evg_api, build_variant_config,
-                                             selected_tests_variant_expansions["version_id"])
+        related_tasks = self.selected_tests_service.find_selected_tasks(changed_files)
+        LOGGER.info("related tasks found", related_tasks=related_tasks,
+                    variant=build_variant_config.name)
+        related_tasks = {task for task in related_tasks if task not in existing_tasks}
+        if related_tasks:
+            task_mapping_task_configs = self.task_config_service.get_task_configs_for_task_mappings(
+                list(related_tasks), build_variant_config)
+            # task_mapping_task_configs will overwrite test_mapping_task_configs
+            # because task_mapping_task_configs will run all tests rather than a subset of tests
+            # and we should err on the side of running all tests
+            task_configs.update(task_mapping_task_configs)
+
+        return task_configs
+
+    def get_existing_tasks(self, version_id: str, build_variant: str) -> Set[str]:
+        """
+        Get the set of tasks that already exist in the given build.
+
+        :param version_id: ID of version to query.
+        :param build_variant: Name of build variant to query.
+        :return: Set of task names that already exist in the specified build.
+        """
+        version = self.evg_api.version_by_id(version_id)
+
+        try:
+            build = version.build_by_variant(build_variant)
+        except KeyError:
+            LOGGER.debug("No build exists on this build variant for this version yet",
+                         variant=build_variant)
+            return set()
+
+        if build:
+            tasks_already_in_build = build.get_tasks()
+            return {task.display_name for task in tasks_already_in_build}
+
+        return set()
+
+    def generate_build_variant(self, build_variant_config: Variant, changed_files: Set[str],
+                               builder: EvgConfigBuilder) -> None:
+        """
+        Generate the selected tasks on the specified build variant.
+
+        :param build_variant_config: Configuration of build variant to generate.
+        :param changed_files: List of file changes to determine what to run.
+        :param builder: Builder to create new configuration.
+        """
+        build_variant_name = build_variant_config.name
+        LOGGER.info("Generating build variant", build_variant=build_variant_name)
+        task_configs = self.get_task_config(build_variant_config, changed_files)
 
         for task_config in task_configs.values():
-            Suite.reset_current_index()
-            config_options = SelectedTestsConfigOptions.from_file(
-                origin_variant_expansions,
-                selected_tests_variant_expansions,
-                task_config,
-                REQUIRED_CONFIG_KEYS,
-                DEFAULT_CONFIG_VALUES,
-                CONFIG_FORMAT_FN,
+            test_filter = None
+            if "selected_tests_to_run" in task_config:
+                test_filter = partial(filter_set, input_set=task_config["selected_tests_to_run"])
+            split_params = SuiteSplitParameters(
+                build_variant=build_variant_name,
+                task_name=task_config["task_name"],
+                suite_name=task_config.get("suite", task_config["task_name"]),
+                filename=task_config.get("suite", task_config["task_name"]),
+                test_file_filter=test_filter,
+                is_asan=build_variant_config.is_asan_build(),
             )
-            _update_config_with_task(evg_api, shrub_build_variant, config_options,
-                                     config_dict_of_suites_and_tasks)
+            gen_params = ResmokeGenTaskParams(
+                use_large_distro=task_config.get("use_large_distro", False),
+                large_distro_name=task_config.get("large_distro_name"),
+                use_multiversion=task_config.get("use_multiversion"),
+                repeat_suites=task_config.get("repeat_suites", 1),
+                resmoke_args=task_config["resmoke_args"],
+                resmoke_jobs_max=task_config.get("resmoke_jobs_max"),
+                config_location=self.evg_expansions.get_config_location(),
+            )
+            builder.generate_suite(split_params, gen_params)
 
-        shrub_project.add_build_variant(shrub_build_variant)
+    def generate(self, repos: List[Repo], task_id: str) -> None:
+        """
+        Build and generate the configuration to create selected tests.
 
-    config_dict_of_suites_and_tasks["selected_tests_config.json"] = shrub_project.json()
-    return config_dict_of_suites_and_tasks
+        :param repos: List of git repos containing changes to check.
+        :param task_id: ID of task being run.
+        """
+        changed_files = self.find_changed_files(repos, task_id)
+        generated_config = self.generate_version(changed_files)
+        generated_config.write_all_to_dir(SELECTED_TESTS_CONFIG_DIR)
+
+    def generate_version(self, changed_files: Set[str]) -> GeneratedConfiguration:
+        """
+        Generate selected tests configuration for the given file changes.
+
+        :param changed_files: Set of files that contain changes.
+        :return: Configuration to generate selected-tests tasks.
+        """
+        builder = EvgConfigBuilder()  # pylint: disable=no-value-for-parameter
+        for build_variant_config in self.evg_conf.get_required_variants():
+            self.generate_build_variant(build_variant_config, changed_files, builder)
+
+        return builder.build("selected_tests_config.json")
 
 
 @click.command()
@@ -517,20 +489,32 @@ def main(
     :param evg_api_config: Location of configuration file to connect to evergreen.
     :param selected_tests_config: Location of config file to connect to elected-tests service.
     """
-    _configure_logging(verbose)
+    enable_logging(verbose)
 
-    evg_api = RetryingEvergreenApi.get_api(config_file=evg_api_config)
-    evg_conf = parse_evergreen_file(EVERGREEN_FILE)
-    selected_tests_service = SelectedTestsService.from_file(selected_tests_config)
+    end_date = datetime.utcnow().replace(microsecond=0)
+    start_date = end_date - timedelta(days=LOOKBACK_DURATION_DAYS)
+
+    evg_expansions = EvgExpansions.from_yaml_file(expansion_file)
+
+    def dependencies(binder: inject.Binder) -> None:
+        binder.bind(EvgExpansions, evg_expansions)
+        binder.bind(EvergreenApi, RetryingEvergreenApi.get_api(config_file=evg_api_config))
+        binder.bind(EvergreenProjectConfig, parse_evergreen_file(EVERGREEN_FILE))
+        binder.bind(SelectedTestsClient, SelectedTestsClient.from_file(selected_tests_config))
+        binder.bind(SuiteSplitConfig, evg_expansions.build_suite_split_config(start_date, end_date))
+        binder.bind(SplitStrategy, greedy_division)
+        binder.bind(FallbackStrategy, round_robin_fallback)
+        binder.bind(GenTaskOptions, evg_expansions.build_gen_task_options())
+        binder.bind(GenerationConfiguration,
+                    GenerationConfiguration.from_yaml_file(GENERATE_CONFIG_FILE))
+        binder.bind(ResmokeProxyConfig,
+                    ResmokeProxyConfig(resmoke_suite_dir=DEFAULT_TEST_SUITE_DIR))
+
+    inject.configure(dependencies)
+
     repos = [Repo(x) for x in DEFAULT_REPO_LOCATIONS if os.path.isdir(x)]
-
-    buildscripts.resmokelib.parser.set_run_options()
-
-    task_expansions = read_config.read_config_file(expansion_file)
-
-    config_dict_of_suites_and_tasks = run(evg_api, evg_conf, selected_tests_service,
-                                          task_expansions, repos)
-    write_file_dict(SELECTED_TESTS_CONFIG_DIR, config_dict_of_suites_and_tasks)
+    selected_tests = SelectedTestsOrchestrator()  # pylint: disable=no-value-for-parameter
+    selected_tests.generate(repos, evg_expansions.task_id)
 
 
 if __name__ == "__main__":

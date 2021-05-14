@@ -17,6 +17,6 @@ fi
 
 burn_in_args="$burn_in_args"
 # Evergreen executable is in $HOME.
-PATH="$PATH:$HOME" eval $python buildscripts/burn_in_tests_multiversion.py --task_id=${task_id} --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_multiversion_gen.json $burn_in_args --verbose
+PATH="$PATH:$HOME" eval $python buildscripts/burn_in_tests_multiversion.py --task_id=${task_id} --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_multiversion_gen.json $burn_in_args --verbose --revision=${revision} --build-id=${build_id}
 PATH="$PATH:/data/multiversion"
 $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags
