@@ -145,14 +145,15 @@ class SetupMultiversion(Subcommand):
         evg_versions = evergreen_conn.get_evergreen_versions(self.evg_api, evg_project)
 
         for evg_version in evg_versions:
-            if buildvariant_name not in evg_version.build_variants_map:
-                buildvariant_name = self.fallback_to_generic_buildvariant(major_minor_version)
+            if hasattr(evg_version, "build_variants_map"):
+                if buildvariant_name not in evg_version.build_variants_map:
+                    buildvariant_name = self.fallback_to_generic_buildvariant(major_minor_version)
 
-            curr_urls = evergreen_conn.get_compile_artifact_urls(self.evg_api, evg_version,
-                                                                 buildvariant_name)
-            if "Binaries" in curr_urls:
-                urls = curr_urls
-                break
+                curr_urls = evergreen_conn.get_compile_artifact_urls(self.evg_api, evg_version,
+                                                                     buildvariant_name)
+                if "Binaries" in curr_urls:
+                    urls = curr_urls
+                    break
 
         return urls
 
