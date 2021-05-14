@@ -40,6 +40,7 @@
 
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -54,7 +55,6 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/retryable_writes_stats.h"

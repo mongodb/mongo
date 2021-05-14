@@ -32,10 +32,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/views/view.h"
 
 namespace mongo {

@@ -35,7 +35,6 @@
 #include "mongo/db/pipeline/document_source_lookup_change_pre_image.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/util/intrusive_counter.h"
 

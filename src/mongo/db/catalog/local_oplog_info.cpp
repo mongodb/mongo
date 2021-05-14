@@ -29,7 +29,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCatalog
 
-#include "mongo/db/repl/local_oplog_info.h"
+#include "mongo/db/catalog/local_oplog_info.h"
 
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/flow_control.h"
