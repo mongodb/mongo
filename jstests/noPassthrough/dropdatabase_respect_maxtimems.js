@@ -11,11 +11,11 @@ rst.initiate();
 const dropDB = rst.getPrimary().getDB("drop");
 
 (function assertCollectionDropCanBeInterrupted() {
-    assert.commandWorked(dropDB.bar.insert({}));
+    assert.commandWorked(dropDB.bar.insert({_id: 0}, {writeConcern: {w: 'majority'}}));
     const session = dropDB.getMongo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase("drop");
     session.startTransaction();
-    assert.commandWorked(sessionDB.bar.insert({}));
+    assert.commandWorked(sessionDB.bar.insert({_id: 1}));
     assert.commandFailedWithCode(dropDB.runCommand({dropDatabase: 1, maxTimeMS: 100}),
                                  ErrorCodes.MaxTimeMSExpired);
 
