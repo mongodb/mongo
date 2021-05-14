@@ -4,8 +4,6 @@
  * @tags: [
  *   requires_sharding,
  *   featureFlagShardingFullDDLSupport,
- *   # TODO SERVER-56646 enable this test in stepdown suites
- *   does_not_support_stepdowns,
  * ]
  */
 'use strict';
