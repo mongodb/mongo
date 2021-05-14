@@ -182,7 +182,8 @@ void TimeZoneDatabase::loadTimeZoneInfo(
                                << entry.id << "\": " << timelib_get_error_message(errorCode)});
         }
 
-        invariant(errorCode == TIMELIB_ERROR_NO_ERROR);
+        invariant(errorCode == TIMELIB_ERROR_NO_ERROR ||
+                  errorCode == TIMELIB_ERROR_EMPTY_POSIX_STRING);
         _timeZones[entry.id] = TimeZone{tzInfo};
     }
 }
@@ -191,7 +192,7 @@ TimeZone TimeZoneDatabase::utcZone() {
     return TimeZone{nullptr};
 }
 
-static timelib_tzinfo* timezonedatabase_gettzinfowrapper(char* tz_id,
+static timelib_tzinfo* timezonedatabase_gettzinfowrapper(const char* tz_id,
                                                          const _timelib_tzdb* db,
                                                          int* error) {
     return nullptr;
