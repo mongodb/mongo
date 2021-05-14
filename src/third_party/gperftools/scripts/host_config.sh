@@ -22,11 +22,9 @@ function set_define () {
 }
 
 NAME=gperftools
-VERSION=2.7
-REVISION=$VERSION-mongodb
-MACOSX_VERSION_MIN=10.12
+MACOSX_VERSION_MIN=10.14
 
-DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME-$VERSION
+DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME
 
 UNAME=$(uname | tr A-Z a-z)
 UNAME_PROCESSOR=$(uname -m)
@@ -65,6 +63,12 @@ ENV_CXXFLAGS="CXXFLAGS=$COMMON_FLAGS -std=c++17"
 PLATFORM_DIR="$DEST_DIR/platform"
 HOST_CONFIG="$PLATFORM_DIR/$TARGET_UNAME"
 
+if [[ -d $HOST_CONFIG ]]; then
+    echo "You should 'rm -r $HOST_CONFIG' before running host_config.sh" >&2
+    exit 1
+fi
+
+
 mkdir -p $HOST_CONFIG/internal
 pushd $HOST_CONFIG/internal
 
@@ -102,6 +106,12 @@ popd  # $HOST_CONFIG/internal
 # Pseudo-configure Windows.
 function configure_windows() {
     local WINDOWS_CONFIG_DIR="$PLATFORM_DIR/windows_x86_64"
+
+    if [[ -d $WINDOWS_CONFIG_DIR ]]; then
+        echo "You should 'rm -r $WINDOWS_CONFIG_DIR' before running host_config.sh" >&2
+        exit 1
+    fi
+
     # Editing with sed is the best we can reasonably do, as gperftools doesn't
     # ship with a Windows configuration mechanism.
     local WINDOWS_CONFIG_H="$WINDOWS_CONFIG_DIR/internal/src/config.h"

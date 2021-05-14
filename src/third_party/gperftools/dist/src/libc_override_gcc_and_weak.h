@@ -126,9 +126,9 @@ void operator delete[](void *p, size_t size) CPP_NOTHROW
 #else /* !ENABLE_SIZED_DELETE && !ENABLE_DYN_SIZED_DELETE */
 
 void operator delete(void *p, size_t size) CPP_NOTHROW
-  ALIAS(tc_delete);
+  ALIAS(tc_delete_sized);
 void operator delete[](void *p, size_t size) CPP_NOTHROW
-  ALIAS(tc_deletearray);
+  ALIAS(tc_deletearray_sized);
 
 #endif /* !ENABLE_SIZED_DELETE && !ENABLE_DYN_SIZED_DELETE */
 
@@ -197,9 +197,9 @@ void operator delete[](void *p, size_t size, std::align_val_t al) CPP_NOTHROW
 #else /* defined(ENABLE_DYN_SIZED_DELETE) */
 
 void operator delete(void *p, size_t size, std::align_val_t al) CPP_NOTHROW
-  ALIAS(tc_delete);
+  ALIAS(tc_delete_sized_aligned);
 void operator delete[](void *p, size_t size, std::align_val_t al) CPP_NOTHROW
-  ALIAS(tc_deletearray);
+  ALIAS(tc_deletearray_sized_aligned);
 
 #endif /* defined(ENABLE_DYN_SIZED_DELETE) */
 

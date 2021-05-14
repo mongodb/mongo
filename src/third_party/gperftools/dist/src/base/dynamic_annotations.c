@@ -1,3 +1,4 @@
+// -*- Mode: c; c-basic-offset: 2; indent-tabs-mode: nil -*-
 /* Copyright (c) 2008-2009, Google Inc.
  * All rights reserved.
  *
@@ -42,101 +43,6 @@
 #include "base/dynamic_annotations.h"
 #include "getenv_safe.h" // for TCMallocGetenvSafe
 
-#ifdef __GNUC__
-/* valgrind.h uses gcc extensions so it won't build with other compilers */
-# ifdef HAVE_VALGRIND_H    /* prefer the user's copy if they have it */
-#  include <valgrind.h>
-# else                     /* otherwise just use the copy that we have */
-#  include "third_party/valgrind.h"
-# endif
-#endif
-
-/* Compiler-based ThreadSanitizer defines
-   DYNAMIC_ANNOTATIONS_EXTERNAL_IMPL = 1
-   and provides its own definitions of the functions. */
-
-#ifndef DYNAMIC_ANNOTATIONS_EXTERNAL_IMPL
-# define DYNAMIC_ANNOTATIONS_EXTERNAL_IMPL 0
-#endif
-
-/* Each function is empty and called (via a macro) only in debug mode.
-   The arguments are captured by dynamic tools at runtime. */
-
-#if DYNAMIC_ANNOTATIONS_ENABLED == 1 \
-    && DYNAMIC_ANNOTATIONS_EXTERNAL_IMPL == 0
-
-void AnnotateRWLockCreate(const char *file, int line,
-                          const volatile void *lock){}
-void AnnotateRWLockDestroy(const char *file, int line,
-                           const volatile void *lock){}
-void AnnotateRWLockAcquired(const char *file, int line,
-                            const volatile void *lock, long is_w){}
-void AnnotateRWLockReleased(const char *file, int line,
-                            const volatile void *lock, long is_w){}
-void AnnotateBarrierInit(const char *file, int line,
-                         const volatile void *barrier, long count,
-                         long reinitialization_allowed) {}
-void AnnotateBarrierWaitBefore(const char *file, int line,
-                               const volatile void *barrier) {}
-void AnnotateBarrierWaitAfter(const char *file, int line,
-                              const volatile void *barrier) {}
-void AnnotateBarrierDestroy(const char *file, int line,
-                            const volatile void *barrier) {}
-
-void AnnotateCondVarWait(const char *file, int line,
-                         const volatile void *cv,
-                         const volatile void *lock){}
-void AnnotateCondVarSignal(const char *file, int line,
-                           const volatile void *cv){}
-void AnnotateCondVarSignalAll(const char *file, int line,
-                              const volatile void *cv){}
-void AnnotatePublishMemoryRange(const char *file, int line,
-                                const volatile void *address,
-                                long size){}
-void AnnotateUnpublishMemoryRange(const char *file, int line,
-                                  const volatile void *address,
-                                  long size){}
-void AnnotatePCQCreate(const char *file, int line,
-                       const volatile void *pcq){}
-void AnnotatePCQDestroy(const char *file, int line,
-                        const volatile void *pcq){}
-void AnnotatePCQPut(const char *file, int line,
-                    const volatile void *pcq){}
-void AnnotatePCQGet(const char *file, int line,
-                    const volatile void *pcq){}
-void AnnotateNewMemory(const char *file, int line,
-                       const volatile void *mem,
-                       long size){}
-void AnnotateExpectRace(const char *file, int line,
-                        const volatile void *mem,
-                        const char *description){}
-void AnnotateBenignRace(const char *file, int line,
-                        const volatile void *mem,
-                        const char *description){}
-void AnnotateBenignRaceSized(const char *file, int line,
-                             const volatile void *mem,
-                             long size,
-                             const char *description) {}
-void AnnotateMutexIsUsedAsCondVar(const char *file, int line,
-                                  const volatile void *mu){}
-void AnnotateTraceMemory(const char *file, int line,
-                         const volatile void *arg){}
-void AnnotateThreadName(const char *file, int line,
-                        const char *name){}
-void AnnotateIgnoreReadsBegin(const char *file, int line){}
-void AnnotateIgnoreReadsEnd(const char *file, int line){}
-void AnnotateIgnoreWritesBegin(const char *file, int line){}
-void AnnotateIgnoreWritesEnd(const char *file, int line){}
-void AnnotateEnableRaceDetection(const char *file, int line, int enable){}
-void AnnotateNoOp(const char *file, int line,
-                  const volatile void *arg){}
-void AnnotateFlushState(const char *file, int line){}
-
-#endif  /* DYNAMIC_ANNOTATIONS_ENABLED == 1
-    && DYNAMIC_ANNOTATIONS_EXTERNAL_IMPL == 0 */
-
-#if DYNAMIC_ANNOTATIONS_EXTERNAL_IMPL == 0
-
 static int GetRunningOnValgrind(void) {
 #ifdef RUNNING_ON_VALGRIND
   if (RUNNING_ON_VALGRIND) return 1;
@@ -152,28 +58,7 @@ static int GetRunningOnValgrind(void) {
 int RunningOnValgrind(void) {
   static volatile int running_on_valgrind = -1;
   int local_running_on_valgrind = running_on_valgrind;
-  /* C doesn't have thread-safe initialization of statics, and we
-     don't want to depend on pthread_once here, so hack it. */
-  ANNOTATE_BENIGN_RACE(&running_on_valgrind, "safe hack");
   if (local_running_on_valgrind == -1)
     running_on_valgrind = local_running_on_valgrind = GetRunningOnValgrind();
   return local_running_on_valgrind;
-}
-
-#endif  /* DYNAMIC_ANNOTATIONS_EXTERNAL_IMPL == 0 */
-
-/* See the comments in dynamic_annotations.h */
-double ValgrindSlowdown(void) {
-  /* Same initialization hack as in RunningOnValgrind(). */
-  static volatile double slowdown = 0.0;
-  double local_slowdown = slowdown;
-  ANNOTATE_BENIGN_RACE(&slowdown, "safe hack");
-  if (RunningOnValgrind() == 0) {
-    return 1.0;
-  }
-  if (local_slowdown == 0.0) {
-    char *env = getenv("VALGRIND_SLOWDOWN");
-    slowdown = local_slowdown = env ? atof(env) : 50.0;
-  }
-  return local_slowdown;
 }

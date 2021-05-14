@@ -136,10 +136,10 @@ static inline int PosixMemalign(void** ptr, size_t align, size_t size) {
 #else
 static bool kOSSupportsMemalign = true;
 static inline void* Memalign(size_t align, size_t size) {
-  return memalign(align, size);
+  return noopt(memalign(align, noopt(size)));
 }
 static inline int PosixMemalign(void** ptr, size_t align, size_t size) {
-  return posix_memalign(ptr, align, size);
+  return noopt(posix_memalign(ptr, align, noopt(size)));
 }
 
 #endif
@@ -372,7 +372,7 @@ class AllocatorState : public TestHarness {
         }
       }
     }
-    return malloc(size);
+    return noopt(malloc(size));
   }
 
  private:
@@ -602,7 +602,7 @@ static void RunThread(int thread_id) {
 }
 
 static void TryHugeAllocation(size_t s, AllocatorState* rnd) {
-  void* p = rnd->alloc(s);
+  void* p = rnd->alloc(noopt(s));
   CHECK(p == NULL);   // huge allocation s should fail!
 }
 
@@ -634,7 +634,7 @@ static void TestHugeAllocations(AllocatorState* rnd) {
 static void TestCalloc(size_t n, size_t s, bool ok) {
   char* p = reinterpret_cast<char*>(calloc(n, s));
   if (FLAGS_verbose)
-    fprintf(LOGSTREAM, "calloc(%" PRIxS ", %" PRIxS "): %p\n", n, s, p);
+    fprintf(LOGSTREAM, "calloc(%zx, %zx): %p\n", n, s, p);
   if (!ok) {
     CHECK(p == NULL);  // calloc(n, s) should not succeed
   } else {
@@ -661,16 +661,16 @@ static void TestRealloc() {
   int deltas[] = { 1, -2, 4, -8, 16, -32, 64, -128 };
 
   for (int s = 0; s < sizeof(start_sizes)/sizeof(*start_sizes); ++s) {
-    void* p = malloc(start_sizes[s]);
+    void* p = noopt(malloc(start_sizes[s]));
     CHECK(p);
     // The larger the start-size, the larger the non-reallocing delta.
     for (int d = 0; d < (s+1) * 2; ++d) {
-      void* new_p = realloc(p, start_sizes[s] + deltas[d]);
+      void* new_p = noopt(realloc(p, start_sizes[s] + deltas[d]));
       CHECK(p == new_p);  // realloc should not allocate new memory
     }
     // Test again, but this time reallocing smaller first.
     for (int d = 0; d < s*2; ++d) {
-      void* new_p = realloc(p, start_sizes[s] - deltas[d]);
+      void* new_p = noopt(realloc(p, start_sizes[s] - deltas[d]));
       CHECK(p == new_p);  // realloc should not allocate new memory
     }
     free(p);
@@ -685,6 +685,7 @@ static void TestNewHandler() {
 }
 
 static void TestOneNew(void* (*func)(size_t)) {
+  func = noopt(func);
   // success test
   try {
     void* ptr = (*func)(kNotTooBig);
@@ -729,6 +730,7 @@ static void TestNew(void* (*func)(size_t)) {
 }
 
 static void TestOneNothrowNew(void* (*func)(size_t, const std::nothrow_t&)) {
+  func = noopt(func);
   // success test
   try {
     void* ptr = (*func)(kNotTooBig, std::nothrow);
@@ -955,8 +957,8 @@ static void TestReleaseToSystem() {
   AggressiveDecommitChanger disabler(0);
 
   static const int MB = 1048576;
-  void* a = malloc(MB);
-  void* b = malloc(MB);
+  void* a = noopt(malloc(MB));
+  void* b = noopt(malloc(MB));
   MallocExtension::instance()->ReleaseFreeMemory();
   size_t starting_bytes = GetUnmappedBytes();
 
@@ -992,7 +994,7 @@ static void TestReleaseToSystem() {
   MallocExtension::instance()->ReleaseFreeMemory();
   EXPECT_EQ(starting_bytes + 2*MB, GetUnmappedBytes());
 
-  a = malloc(MB);
+  a = noopt(malloc(MB));
   free(a);
   EXPECT_EQ(starting_bytes + MB, GetUnmappedBytes());
 
@@ -1017,8 +1019,8 @@ static void TestAggressiveDecommit() {
   AggressiveDecommitChanger enabler(1);
 
   static const int MB = 1048576;
-  void* a = malloc(MB);
-  void* b = malloc(MB);
+  void* a = noopt(malloc(MB));
+  void* b = noopt(malloc(MB));
 
   size_t starting_bytes = GetUnmappedBytes();
 
@@ -1039,7 +1041,7 @@ static void TestAggressiveDecommit() {
   MallocExtension::instance()->ReleaseFreeMemory();
   EXPECT_EQ(starting_bytes + 2*MB, GetUnmappedBytes());
 
-  a = malloc(MB);
+  a = noopt(malloc(MB));
   free(a);
 
   EXPECT_EQ(starting_bytes + 2*MB, GetUnmappedBytes());
@@ -1064,19 +1066,19 @@ static void TestSetNewMode() {
 
   g_old_handler = std::set_new_handler(&OnNoMemory);
   g_no_memory = false;
-  void* ret = malloc(kTooBig);
+  void* ret = noopt(malloc(noopt(kTooBig)));
   EXPECT_EQ(NULL, ret);
   EXPECT_TRUE(g_no_memory);
 
   g_old_handler = std::set_new_handler(&OnNoMemory);
   g_no_memory = false;
-  ret = calloc(1, kTooBig);
+  ret = noopt(calloc(1, noopt(kTooBig)));
   EXPECT_EQ(NULL, ret);
   EXPECT_TRUE(g_no_memory);
 
   g_old_handler = std::set_new_handler(&OnNoMemory);
   g_no_memory = false;
-  ret = realloc(NULL, kTooBig);
+  ret = noopt(realloc(nullptr, noopt(kTooBig)));
   EXPECT_EQ(NULL, ret);
   EXPECT_TRUE(g_no_memory);
 
@@ -1112,7 +1114,7 @@ static void TestErrno(void) {
   }
 
   errno = 0;
-  ret = malloc(kTooBig);
+  ret = noopt(malloc(noopt(kTooBig)));
   EXPECT_EQ(NULL, ret);
   EXPECT_EQ(ENOMEM, errno);
 
@@ -1181,7 +1183,7 @@ static ATTRIBUTE_NOINLINE void TestNewOOMHandling() {
   ASSERT_EQ(saw_new_handler_runs, 0);
 
   for (int i = 0; i < 10240; i++) {
-    oom_test_last_ptr = new char [512];
+    oom_test_last_ptr = noopt(new char [512]);
     ASSERT_NE(oom_test_last_ptr, NULL);
     if (saw_new_handler_runs) {
       break;
@@ -1266,6 +1268,23 @@ static int RunAllTests(int argc, char** argv) {
     std::stable_sort(v.begin(), v.end());
   }
 
+#ifdef ENABLE_SIZED_DELETE
+  {
+    fprintf(LOGSTREAM, "Testing large sized delete is not crashing\n");
+    // Large sized delete
+    // case. https://github.com/gperftools/gperftools/issues/1254
+    std::vector<char*> addresses;
+    constexpr int kSizedDepth = 1024;
+    addresses.reserve(kSizedDepth);
+    for (int i = 0; i < kSizedDepth; i++) {
+      addresses.push_back(noopt(new char[12686]));
+    }
+    for (int i = 0; i < kSizedDepth; i++) {
+      ::operator delete[](addresses[i], 12686);
+    }
+  }
+#endif
+
   // Test each of the memory-allocation functions once, just as a sanity-check
   fprintf(LOGSTREAM, "Sanity-testing all the memory allocation functions\n");
   {
@@ -1328,64 +1347,64 @@ static int RunAllTests(int argc, char** argv) {
     VerifyDeleteHookWasCalled();
 #endif
 
-    p1 = valloc(60);
+    p1 = noopt(valloc(60));
     CHECK(p1 != NULL);
     VerifyNewHookWasCalled();
     free(p1);
     VerifyDeleteHookWasCalled();
 
-    p1 = pvalloc(70);
+    p1 = noopt(pvalloc(70));
     CHECK(p1 != NULL);
     VerifyNewHookWasCalled();
     free(p1);
     VerifyDeleteHookWasCalled();
 
-    char* p2 = new char;
+    char* p2 = noopt(new char);
     CHECK(p2 != NULL);
     VerifyNewHookWasCalled();
     delete p2;
     VerifyDeleteHookWasCalled();
 
-    p2 = new char[100];
+    p2 = noopt(new char[100]);
     CHECK(p2 != NULL);
     VerifyNewHookWasCalled();
     delete[] p2;
     VerifyDeleteHookWasCalled();
 
-    p2 = new(std::nothrow) char;
+    p2 = noopt(new (std::nothrow) char);
     CHECK(p2 != NULL);
     VerifyNewHookWasCalled();
     delete p2;
     VerifyDeleteHookWasCalled();
 
-    p2 = new(std::nothrow) char[100];
+    p2 = noopt(new (std::nothrow) char[100]);
     CHECK(p2 != NULL);
     VerifyNewHookWasCalled();
     delete[] p2;
     VerifyDeleteHookWasCalled();
 
     // Another way of calling operator new
-    p2 = static_cast<char*>(::operator new(100));
+    p2 = noopt(static_cast<char*>(::operator new(100)));
     CHECK(p2 != NULL);
     VerifyNewHookWasCalled();
     ::operator delete(p2);
     VerifyDeleteHookWasCalled();
 
     // Try to call nothrow's delete too.  Compilers use this.
-    p2 = static_cast<char*>(::operator new(100, std::nothrow));
+    p2 = noopt(static_cast<char*>(::operator new(100, std::nothrow)));
     CHECK(p2 != NULL);
     VerifyNewHookWasCalled();
     ::operator delete(p2, std::nothrow);
     VerifyDeleteHookWasCalled();
 
 #ifdef ENABLE_SIZED_DELETE
-    p2 = new char;
+    p2 = noopt(new char);
     CHECK(p2 != NULL);
     VerifyNewHookWasCalled();
     ::operator delete(p2, sizeof(char));
     VerifyDeleteHookWasCalled();
 
-    p2 = new char[100];
+    p2 = noopt(new char[100]);
     CHECK(p2 != NULL);
     VerifyNewHookWasCalled();
     ::operator delete[](p2, sizeof(char) * 100);
@@ -1394,28 +1413,28 @@ static int RunAllTests(int argc, char** argv) {
 
 #if defined(ENABLE_ALIGNED_NEW_DELETE)
 
-    overaligned_type* poveraligned = new overaligned_type;
+    overaligned_type* poveraligned = noopt(new overaligned_type);
     CHECK(poveraligned != NULL);
     CHECK((((size_t)poveraligned) % OVERALIGNMENT) == 0u);
     VerifyNewHookWasCalled();
     delete poveraligned;
     VerifyDeleteHookWasCalled();
 
-    poveraligned = new overaligned_type[10];
+    poveraligned = noopt(new overaligned_type[10]);
     CHECK(poveraligned != NULL);
     CHECK((((size_t)poveraligned) % OVERALIGNMENT) == 0u);
     VerifyNewHookWasCalled();
     delete[] poveraligned;
     VerifyDeleteHookWasCalled();
 
-    poveraligned = new(std::nothrow) overaligned_type;
+    poveraligned = noopt(new(std::nothrow) overaligned_type);
     CHECK(poveraligned != NULL);
     CHECK((((size_t)poveraligned) % OVERALIGNMENT) == 0u);
     VerifyNewHookWasCalled();
     delete poveraligned;
     VerifyDeleteHookWasCalled();
 
-    poveraligned = new(std::nothrow) overaligned_type[10];
+    poveraligned = noopt(new(std::nothrow) overaligned_type[10]);
     CHECK(poveraligned != NULL);
     CHECK((((size_t)poveraligned) % OVERALIGNMENT) == 0u);
     VerifyNewHookWasCalled();
@@ -1423,14 +1442,14 @@ static int RunAllTests(int argc, char** argv) {
     VerifyDeleteHookWasCalled();
 
     // Another way of calling operator new
-    p2 = static_cast<char*>(::operator new(100, std::align_val_t(OVERALIGNMENT)));
+    p2 = noopt(static_cast<char*>(::operator new(100, std::align_val_t(OVERALIGNMENT))));
     CHECK(p2 != NULL);
     CHECK((((size_t)p2) % OVERALIGNMENT) == 0u);
     VerifyNewHookWasCalled();
     ::operator delete(p2, std::align_val_t(OVERALIGNMENT));
     VerifyDeleteHookWasCalled();
 
-    p2 = static_cast<char*>(::operator new(100, std::align_val_t(OVERALIGNMENT), std::nothrow));
+    p2 = noopt(static_cast<char*>(::operator new(100, std::align_val_t(OVERALIGNMENT), std::nothrow)));
     CHECK(p2 != NULL);
     CHECK((((size_t)p2) % OVERALIGNMENT) == 0u);
     VerifyNewHookWasCalled();
@@ -1438,14 +1457,14 @@ static int RunAllTests(int argc, char** argv) {
     VerifyDeleteHookWasCalled();
 
 #ifdef ENABLE_SIZED_DELETE
-    poveraligned = new overaligned_type;
+    poveraligned = noopt(new overaligned_type);
     CHECK(poveraligned != NULL);
     CHECK((((size_t)poveraligned) % OVERALIGNMENT) == 0u);
     VerifyNewHookWasCalled();
     ::operator delete(poveraligned, sizeof(overaligned_type), std::align_val_t(OVERALIGNMENT));
     VerifyDeleteHookWasCalled();
 
-    poveraligned = new overaligned_type[10];
+    poveraligned = noopt(new overaligned_type[10]);
     CHECK(poveraligned != NULL);
     CHECK((((size_t)poveraligned) % OVERALIGNMENT) == 0u);
     VerifyNewHookWasCalled();
@@ -1457,7 +1476,7 @@ static int RunAllTests(int argc, char** argv) {
 
     // Try strdup(), which the system allocates but we must free.  If
     // all goes well, libc will use our malloc!
-    p2 = strdup("in memory of James Golick");
+    p2 = noopt(strdup("in memory of James Golick"));
     CHECK(p2 != NULL);
     VerifyNewHookWasCalled();
     free(p2);
@@ -1503,7 +1522,7 @@ static int RunAllTests(int argc, char** argv) {
 
     // Test sbrk
     SetSbrkHook();
-#if defined(HAVE_SBRK) && defined(__linux) && \
+#if defined(HAVE___SBRK) && defined(__linux) && \
        (defined(__i386__) || defined(__x86_64__))
     p1 = sbrk(8192);
     CHECK(p1 != NULL);
@@ -1598,11 +1617,16 @@ static int RunAllTests(int argc, char** argv) {
   // Check that large allocations fail with NULL instead of crashing
 #ifndef DEBUGALLOCATION    // debug allocation takes forever for huge allocs
   fprintf(LOGSTREAM, "Testing out of memory\n");
+  size_t old_limit;
+  CHECK(MallocExtension::instance()->GetNumericProperty("tcmalloc.heap_limit_mb", &old_limit));
+  // Don't exercise more than 1 gig, no need to.
+  CHECK(MallocExtension::instance()->SetNumericProperty("tcmalloc.heap_limit_mb", 1 << 10));
   for (int s = 0; ; s += (10<<20)) {
     void* large_object = rnd.alloc(s);
     if (large_object == NULL) break;
     free(large_object);
   }
+  CHECK(MallocExtension::instance()->SetNumericProperty("tcmalloc.heap_limit_mb", old_limit));
 #endif
 
   TestHugeThreadCache();

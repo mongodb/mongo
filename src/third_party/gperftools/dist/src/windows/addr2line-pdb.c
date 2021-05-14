@@ -1,10 +1,11 @@
+/* -*- Mode: c; c-basic-offset: 2; indent-tabs-mode: nil -*- */
 /* Copyright (c) 2008, Google Inc.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above
@@ -14,7 +15,7 @@
  *     * Neither the name of Google Inc. nor the names of its
  * contributors may be used to endorse or promote products derived from
  * this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -35,9 +36,17 @@
  * c:\websymbols without asking.
  */
 
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
+
+#ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#endif
+
+#ifndef _CRT_SECURE_NO_DEPRECATE
 #define _CRT_SECURE_NO_DEPRECATE
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,8 +58,8 @@
 #define WEBSYM "SRV*c:\\websymbols*http://msdl.microsoft.com/download/symbols"
 
 void usage() {
-  fprintf(stderr, "usage: "
-          "addr2line-pdb [-f|--functions] [-C|--demangle] [-e filename]\n");
+  fprintf(stderr, "usage: addr2line-pdb "
+          "[-f|--functions] [-C|--demangle] [-e|--exe filename]\n");
   fprintf(stderr, "(Then list the hex addresses on stdin, one per line)\n");
 }
 
@@ -73,7 +82,8 @@ int main(int argc, char *argv[]) {
     } else if (strcmp(argv[i], "--demangle") == 0 ||
                strcmp(argv[i], "-C") == 0) {
       symopts |= SYMOPT_UNDNAME;
-    } else if (strcmp(argv[i], "-e") == 0) {
+    } else if (strcmp(argv[i], "--exe") == 0 ||
+               strcmp(argv[i], "-e") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "FATAL ERROR: -e must be followed by a filename\n");
         return 1;
@@ -93,7 +103,7 @@ int main(int argc, char *argv[]) {
 
   if (!SymInitialize(process, NULL, FALSE)) {
     error = GetLastError();
-    fprintf(stderr, "SymInitialize returned error : %d\n", error);
+    fprintf(stderr, "SymInitialize returned error : %lu\n", error);
     return 1;
   }
 
@@ -107,13 +117,13 @@ int main(int argc, char *argv[]) {
     strcat(search, ";" WEBSYM);
   } else {
     error = GetLastError();
-    fprintf(stderr, "SymGetSearchPath returned error : %d\n", error);
+    fprintf(stderr, "SymGetSearchPath returned error : %lu\n", error);
     rv = 1;                   /* An error, but not a fatal one */
     strcpy(search, WEBSYM);   /* Use a default value */
   }
   if (!SymSetSearchPath(process, search)) {
     error = GetLastError();
-    fprintf(stderr, "SymSetSearchPath returned error : %d\n", error);
+    fprintf(stderr, "SymSetSearchPath returned error : %lu\n", error);
     rv = 1;                   /* An error, but not a fatal one */
   }
 
@@ -122,7 +132,7 @@ int main(int argc, char *argv[]) {
   if (!module_base) {
     /* SymLoadModuleEx failed */
     error = GetLastError();
-    fprintf(stderr, "SymLoadModuleEx returned error : %d for %s\n",
+    fprintf(stderr, "SymLoadModuleEx returned error : %lu for %s\n",
             error, filename);
     SymCleanup(process);
     return 1;
@@ -133,25 +143,35 @@ int main(int argc, char *argv[]) {
     /* GNU addr2line seems to just do a strtol and ignore any
      * weird characters it gets, so we will too.
      */
-    unsigned __int64 addr = _strtoui64(buf, NULL, 16);
+    unsigned __int64 reladdr = _strtoui64(buf, NULL, 16);
     ULONG64 buffer[(sizeof(SYMBOL_INFO) +
                     MAX_SYM_NAME*sizeof(TCHAR) +
                     sizeof(ULONG64) - 1)
                    / sizeof(ULONG64)];
+    memset(buffer, 0, sizeof(buffer));
     PSYMBOL_INFO pSymbol = (PSYMBOL_INFO)buffer;
     IMAGEHLP_LINE64 line;
     DWORD dummy;
+
+    // Just ignore overflow. In an overflow scenario, the resulting address
+    // will be lower than module_base which hasn't been mapped by any prior
+    // SymLoadModuleEx() command. This will cause SymFromAddr() and
+    // SymGetLineFromAddr64() both to return failures and print the correct
+    // ?? and ??:0 message variant.
+    ULONG64 absaddr = reladdr + module_base;
+
     pSymbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-    pSymbol->MaxNameLen = MAX_SYM_NAME;
+    // The length of the name is not including the null-terminating character.
+    pSymbol->MaxNameLen = MAX_SYM_NAME - 1;
     if (print_function_name) {
-      if (SymFromAddr(process, (DWORD64)addr, NULL, pSymbol)) {
+      if (SymFromAddr(process, (DWORD64)absaddr, NULL, pSymbol)) {
         printf("%s\n", pSymbol->Name);
       } else {
         printf("??\n");
       }
     }
     line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
-    if (SymGetLineFromAddr64(process, (DWORD64)addr, &dummy, &line)) {
+    if (SymGetLineFromAddr64(process, (DWORD64)absaddr, &dummy, &line)) {
       printf("%s:%d\n", line.FileName, (int)line.LineNumber);
     } else {
       printf("??:0\n");

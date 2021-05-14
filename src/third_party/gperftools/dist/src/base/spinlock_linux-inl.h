@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 /* Copyright (c) 2009, Google Inc.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
  *     * Neither the name of Google Inc. nor the names of its
  * contributors may be used to endorse or promote products derived from
  * this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -33,14 +33,18 @@
  */
 
 #include <errno.h>
-#include <sched.h>
-#include <time.h>
 #include <limits.h>
-#include "base/linux_syscall_support.h"
+#include <sched.h>
+#include <sys/syscall.h>
+#include <time.h>
+#include <unistd.h>
 
 #define FUTEX_WAIT 0
 #define FUTEX_WAKE 1
 #define FUTEX_PRIVATE_FLAG 128
+
+// Note: Instead of making direct system calls that are inlined, we rely
+//       on the syscall() function in glibc to do the right thing.
 
 static bool have_futex;
 static int futex_private_flag = FUTEX_PRIVATE_FLAG;
@@ -51,10 +55,10 @@ static struct InitModule {
     int x = 0;
     // futexes are ints, so we can use them only when
     // that's the same size as the lockword_ in SpinLock.
-    have_futex = (sizeof (Atomic32) == sizeof (int) &&
-                  sys_futex(&x, FUTEX_WAKE, 1, NULL, NULL, 0) >= 0);
-    if (have_futex &&
-        sys_futex(&x, FUTEX_WAKE | futex_private_flag, 1, NULL, NULL, 0) < 0) {
+    have_futex = (sizeof(Atomic32) == sizeof(int) &&
+                  syscall(__NR_futex, &x, FUTEX_WAKE, 1, NULL, NULL, 0) >= 0);
+    if (have_futex && syscall(__NR_futex, &x, FUTEX_WAKE | futex_private_flag,
+                              1, NULL, NULL, 0) < 0) {
       futex_private_flag = 0;
     }
   }
@@ -78,10 +82,9 @@ void SpinLockDelay(volatile Atomic32 *w, int32 value, int loop) {
     }
     if (have_futex) {
       tm.tv_nsec *= 16;  // increase the delay; we expect explicit wakeups
-      sys_futex(reinterpret_cast<int *>(const_cast<Atomic32 *>(w)),
-                FUTEX_WAIT | futex_private_flag,
-                value, reinterpret_cast<struct kernel_timespec *>(&tm),
-                NULL, 0);
+      syscall(__NR_futex, reinterpret_cast<int*>(const_cast<Atomic32*>(w)),
+              FUTEX_WAIT | futex_private_flag, value,
+              reinterpret_cast<struct kernel_timespec*>(&tm), NULL, 0);
     } else {
       nanosleep(&tm, NULL);
     }
@@ -91,9 +94,8 @@ void SpinLockDelay(volatile Atomic32 *w, int32 value, int loop) {
 
 void SpinLockWake(volatile Atomic32 *w, bool all) {
   if (have_futex) {
-    sys_futex(reinterpret_cast<int *>(const_cast<Atomic32 *>(w)),
-              FUTEX_WAKE | futex_private_flag, all? INT_MAX : 1,
-              NULL, NULL, 0);
+    syscall(__NR_futex, reinterpret_cast<int*>(const_cast<Atomic32*>(w)),
+            FUTEX_WAKE | futex_private_flag, all ? INT_MAX : 1, NULL, NULL, 0);
   }
 }
 

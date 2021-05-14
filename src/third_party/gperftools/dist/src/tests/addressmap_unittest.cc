@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2005, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -34,6 +34,7 @@
 #include <stdlib.h>   // for rand()
 #include <vector>
 #include <set>
+#include <random>
 #include <algorithm>
 #include <utility>
 #include "addressmap-inl.h"
@@ -47,7 +48,7 @@ using std::pair;
 using std::make_pair;
 using std::vector;
 using std::set;
-using std::random_shuffle;
+using std::shuffle;
 
 struct UniformRandomNumberGenerator {
   size_t Uniform(size_t max_size) {
@@ -91,7 +92,9 @@ int main(int argc, char** argv) {
     RAW_LOG(INFO, "Iteration %d/%d...\n", x, FLAGS_iters);
 
     // Permute pointers to get rid of allocation order issues
-    random_shuffle(ptrs_and_sizes.begin(), ptrs_and_sizes.end());
+    std::random_device rd;
+    std::mt19937 g(rd());
+    shuffle(ptrs_and_sizes.begin(), ptrs_and_sizes.end(), g);
 
     AddressMap<ValueT> map(malloc, free);
     const ValueT* result;

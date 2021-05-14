@@ -56,6 +56,9 @@
 //#define _XOPEN_SOURCE 500
 
 #include <string.h>         // for memcmp
+#ifdef HAVE_ASM_PTRACE_H
+#include <asm/ptrace.h>
+#endif
 #if defined(HAVE_SYS_UCONTEXT_H)
 #include <sys/ucontext.h>
 #elif defined(HAVE_UCONTEXT_H)

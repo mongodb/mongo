@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2007, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -30,7 +30,7 @@
 //
 // ---
 // Author: Mike Belshe
-// 
+//
 // To link tcmalloc into a EXE or DLL statically without using the patching
 // facility, we can take a stock libcmt and remove all the allocator functions.
 // When we relink the EXE/DLL with the modified libcmt and tcmalloc, a few
@@ -66,10 +66,25 @@ void* _calloc_base(size_t n, size_t size) {
   return calloc(n, size);
 }
 
-void* _recalloc(void* p, size_t n, size_t size) {
-  void* result = realloc(p, n * size);
-  memset(result, 0, n * size);
-  return result;
+void* _recalloc(void* old_ptr, size_t n, size_t size) {
+  // Ensure that (n * size) does not overflow
+  if (!(n == 0 || (std::numeric_limits<size_t>::max)() / n >= size)) {
+    errno = ENOMEM;
+    return NULL;
+  }
+
+  const size_t old_size = tc_malloc_size(old_ptr);
+  const size_t new_size = n * size;
+
+  void* new_ptr = realloc(old_ptr, new_size);
+
+  // If the reallocation succeeded and the new block is larger, zero-fill the
+  // new bytes:
+  if (new_ptr != NULL && new_size > old_size) {
+    memset(static_cast<char*>(new_ptr) + old_size, 0, tc_nallocx(new_size, 0) - old_size);
+  }
+
+  return new_ptr;
 }
 
 void* _calloc_impl(size_t n, size_t size) {

@@ -192,7 +192,7 @@ void ProfileData::Stop() {
   DumpProcSelfMaps(out_);
 
   Reset();
-  fprintf(stderr, "PROFILE: interrupts/evictions/bytes = %d/%d/%" PRIuS "\n",
+  fprintf(stderr, "PROFILE: interrupts/evictions/bytes = %d/%d/%zu\n",
           count_, evictions_, total_bytes_);
 }
 

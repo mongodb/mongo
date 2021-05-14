@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2003, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -93,9 +93,9 @@ static void TestIdleUsage() {
   CHECK_LE(post_idle, original);
 
   // Log after testing because logging can allocate heap memory.
-  VLOG(0, "Original usage: %" PRIuS "\n", original);
-  VLOG(0, "Post allocation: %" PRIuS "\n", post_allocation);
-  VLOG(0, "Post idle: %" PRIuS "\n", post_idle);
+  VLOG(0, "Original usage: %zu\n", original);
+  VLOG(0, "Post allocation: %zu\n", post_allocation);
+  VLOG(0, "Post idle: %zu\n", post_idle);
 }
 
 static void TestTemporarilyIdleUsage() {
@@ -110,9 +110,9 @@ static void TestTemporarilyIdleUsage() {
   CHECK_EQ(post_idle, 0);
 
   // Log after testing because logging can allocate heap memory.
-  VLOG(0, "Original usage: %" PRIuS "\n", original);
-  VLOG(0, "Post allocation: %" PRIuS "\n", post_allocation);
-  VLOG(0, "Post idle: %" PRIuS "\n", post_idle);
+  VLOG(0, "Original usage: %zu\n", original);
+  VLOG(0, "Post allocation: %zu\n", post_allocation);
+  VLOG(0, "Post idle: %zu\n", post_idle);
 }
 
 int main(int argc, char** argv) {

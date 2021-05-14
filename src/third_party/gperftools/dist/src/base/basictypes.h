@@ -117,7 +117,7 @@ const  int64 kint64min =  ( (((uint64) kint32min) << 32) | 0 );
 #define PRINTABLE_PTHREAD(pthreadt) pthreadt
 #endif
 
-#ifdef HAVE_BUILTIN_EXPECT
+#if defined(__GNUC__)
 #define PREDICT_TRUE(x) __builtin_expect(!!(x), 1)
 #define PREDICT_FALSE(x) __builtin_expect(!!(x), 0)
 #else
@@ -383,6 +383,10 @@ class AssignAttributeStartEnd {
     // implementation specific, Cortex-A53 and 57 should have 64 bytes
 # elif (defined(__s390__))
 #   define CACHELINE_ALIGNED __attribute__((aligned(256)))
+# elif (defined(__riscv) && __riscv_xlen == 64)
+#   define CACHELINE_ALIGNED __attribute__((aligned(64)))
+# elif (defined(__e2k__))
+#   define CACHELINE_ALIGNED __attribute__((aligned(64)))
 # else
 #   error Could not determine cache line length - unknown architecture
 # endif

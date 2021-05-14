@@ -1,10 +1,11 @@
+// -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2007, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -14,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -193,7 +194,9 @@ class LibcInfo {
     // These are windows-only functions from malloc.h
     k_Msize, k_Expand,
     // A MS CRT "internal" function, implemented using _calloc_impl
-    k_CallocCrt, kFreeBase,
+    k_CallocCrt,
+    // Underlying deallocation functions called by CRT internal functions or operator delete
+    kFreeBase, kFreeDbg,
     kNumFunctions
   };
 
@@ -277,6 +280,7 @@ template<int> class LibcInfoWithPatchFunctions : public LibcInfo {
   static void* Perftools_malloc(size_t size) __THROW;
   static void Perftools_free(void* ptr) __THROW;
   static void Perftools_free_base(void* ptr) __THROW;
+  static void Perftools_free_dbg(void* ptr, int block_use) __THROW;
   static void* Perftools_realloc(void* ptr, size_t size) __THROW;
   static void* Perftools_calloc(size_t nmemb, size_t size) __THROW;
   static void* Perftools_new(size_t size);
@@ -418,7 +422,7 @@ const char* const LibcInfo::function_name_[] = {
   NULL,  // kMangledNewArrayNothrow,
   NULL,  // kMangledDeleteNothrow,
   NULL,  // kMangledDeleteArrayNothrow,
-  "_msize", "_expand", "_calloc_crt", "_free_base"
+  "_msize", "_expand", "_calloc_crt", "_free_base", "_free_dbg"
 };
 
 // For mingw, I can't patch the new/delete here, because the
@@ -450,6 +454,7 @@ const GenericFnPtr LibcInfo::static_fn_[] = {
   (GenericFnPtr)&::_msize,
   (GenericFnPtr)&::_expand,
   (GenericFnPtr)&::calloc,
+  (GenericFnPtr)&::free,
   (GenericFnPtr)&::free
 };
 
@@ -474,7 +479,8 @@ const GenericFnPtr LibcInfoWithPatchFunctions<T>::perftools_fn_[] = {
   (GenericFnPtr)&Perftools__msize,
   (GenericFnPtr)&Perftools__expand,
   (GenericFnPtr)&Perftools_calloc,
-  (GenericFnPtr)&Perftools_free_base
+  (GenericFnPtr)&Perftools_free_base,
+  (GenericFnPtr)&Perftools_free_dbg
 };
 
 /*static*/ WindowsInfo::FunctionInfo WindowsInfo::function_info_[] = {
@@ -826,6 +832,17 @@ void LibcInfoWithPatchFunctions<T>::Perftools_free_base(void* ptr) __THROW{
   // *this* templatized instance of LibcInfo.  See "template
   // trickiness" above.
   do_free_with_callback(ptr, (void(*)(void*))origstub_fn_[kFreeBase], false, 0);
+}
+
+template<int T>
+void LibcInfoWithPatchFunctions<T>::Perftools_free_dbg(void* ptr, int block_use) __THROW {
+  MallocHook::InvokeDeleteHook(ptr);
+  // The windows _free_dbg is called if ptr isn't owned by tcmalloc.
+  if (MallocExtension::instance()->GetOwnership(ptr) == MallocExtension::kOwned) {
+    do_free(ptr);
+  } else {
+    reinterpret_cast<void (*)(void*, int)>(origstub_fn_[kFreeDbg])(ptr, block_use);
+  }
 }
 
 template<int T>

@@ -78,7 +78,7 @@ static const size_t kPageShift  = TCMALLOC_PAGE_SIZE_SHIFT;
 static const size_t kPageShift  = 13;
 #endif
 
-static const size_t kClassSizesMax = 96;
+static const size_t kClassSizesMax = 128;
 
 static const size_t kMaxThreadCacheSize = 4 << 20;
 

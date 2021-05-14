@@ -221,12 +221,10 @@ Span* PageHeap::Split(Span* span, Length n) {
   ASSERT(n < span->length);
   ASSERT(span->location == Span::IN_USE);
   ASSERT(span->sizeclass == 0);
-  Event(span, 'T', n);
 
   const int extra = span->length - n;
   Span* leftover = NewSpan(span->start + n, extra);
   ASSERT(leftover->location == Span::IN_USE);
-  Event(leftover, 'U', extra);
   RecordSpan(leftover);
   pagemap_.set(span->start + n - 1, span); // Update map from pageid to span
   span->length = n;
@@ -262,14 +260,12 @@ Span* PageHeap::Carve(Span* span, Length n) {
   const int old_location = span->location;
   RemoveFromFreeList(span);
   span->location = Span::IN_USE;
-  Event(span, 'A', n);
 
   const int extra = span->length - n;
   ASSERT(extra >= 0);
   if (extra > 0) {
     Span* leftover = NewSpan(span->start + n, extra);
     leftover->location = old_location;
-    Event(leftover, 'S', extra);
     RecordSpan(leftover);
 
     // The previous span of |leftover| was just splitted -- no need to
@@ -309,7 +305,6 @@ void PageHeap::Delete(Span* span) {
   span->sizeclass = 0;
   span->sample = 0;
   span->location = Span::ON_NORMAL_FREELIST;
-  Event(span, 'D', span->length);
   MergeIntoFreeList(span);  // Coalesces if possible
   IncrementalScavenge(n);
   ASSERT(stats_.unmapped_bytes+ stats_.committed_bytes==stats_.system_bytes);
@@ -379,7 +374,6 @@ void PageHeap::MergeIntoFreeList(Span* span) {
     span->start -= len;
     span->length += len;
     pagemap_.set(span->start, span);
-    Event(span, 'L', len);
   }
   Span* next = CheckAndHandlePreMerge(span, GetDescriptor(p+n));
   if (next != NULL) {
@@ -389,7 +383,6 @@ void PageHeap::MergeIntoFreeList(Span* span) {
     DeleteSpan(next);
     span->length += len;
     pagemap_.set(span->start + span->length - 1, span);
-    Event(span, 'R', len);
   }
 
   PrependToFreeList(span);
@@ -554,7 +547,6 @@ void PageHeap::RegisterSizeClass(Span* span, uint32 sc) {
   ASSERT(span->location == Span::IN_USE);
   ASSERT(GetDescriptor(span->start) == span);
   ASSERT(GetDescriptor(span->start+span->length-1) == span);
-  Event(span, 'C', sc);
   span->sizeclass = sc;
   for (Length i = 1; i < span->length-1; i++) {
     pagemap_.set(span->start+i, span);

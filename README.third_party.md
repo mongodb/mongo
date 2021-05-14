@@ -27,7 +27,7 @@ a notice will be included in
 | [benchmark]                | Apache-2.0        | 1.5.2            | 1.5.2             |                      |                                 |
 | [Boost]                    | BSL-1.0           | 1.76.0           | 1.76.0            |                      |                ✗                |
 | [fmt]                      | BSD-2-Clause      | 7.1.3            | 7.1.3             |                      |                ✗                |
-| [GPerfTools]               | BSD-3-Clause      | 2.8              | 2.8               |                      |                ✗                |
+| [GPerfTools]               | BSD-3-Clause      | 2.9.1            | 2.9.1             |                      |                ✗                |
 | [ICU4]                     | ICU               | 67.1             | 57.1              |          ✗           |                ✗                |
 | [Intel Decimal FP Library] | BSD-3-Clause      | 2.0 Update 2     | 2.0 Update 1      |                      |                ✗                |
 | [JSON-Schema-Test-Suite]   | MIT               |                  | 728066f9c5        |                      |                                 |

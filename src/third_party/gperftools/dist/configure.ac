@@ -4,14 +4,16 @@
 # make sure we're interpreted by some minimal autoconf
 AC_PREREQ([2.59])
 
-AC_INIT([gperftools],[2.7],[gperftools@googlegroups.com])
+AC_INIT([gperftools],[2.9.1],[gperftools@googlegroups.com])
 # Update this value for every release!  (A:B:C will map to foo.so.(A-C).C.B)
 # http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
-TCMALLOC_SO_VERSION=9:3:5
-PROFILER_SO_VERSION=4:18:4
+TCMALLOC_SO_VERSION=9:9:5
+PROFILER_SO_VERSION=5:4:5
+TCMALLOC_AND_PROFILER_SO_VERSION=10:4:6
 
 AC_SUBST(TCMALLOC_SO_VERSION)
 AC_SUBST(PROFILER_SO_VERSION)
+AC_SUBST(TCMALLOC_AND_PROFILER_SO_VERSION)
 
 # The argument here is just something that should be in the current directory
 # (for sanity checking)
@@ -58,8 +60,13 @@ case "$host" in
    *-darwin*) default_enable_heap_checker=no;;
 esac
 
-# Currently only backtrace works on s390.
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM(, [return __s390__])],
+# Currently only backtrace works on s390 and OSX.
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM(, [
+#if !defined(__s390__) && !defined(__APPLE__)
+#error not s390 and not osx
+#endif
+return 1
+])],
                   [default_enable_libunwind=no
                    default_enable_backtrace=yes],
                   [default_enable_libunwind=yes
@@ -226,6 +233,8 @@ AC_PROG_CPP
 AM_CONDITIONAL(GCC, test "$GCC" = yes)   # let the Makefile know if we're gcc
 AM_PROG_CC_C_O      # shrug: autogen.sh suddenly needs this for some reason
 
+AX_CXX_COMPILE_STDCXX(11, ext, mandatory)
+
 # Check if we have an objcopy installed that supports -W
 AC_CHECK_TOOL([OBJCOPY], [objcopy], [])
 AS_IF([test -n "$OBJCOPY"], [dnl
@@ -239,7 +248,6 @@ AM_CONDITIONAL(HAVE_OBJCOPY_WEAKEN, test $gpt_cv_objcopy_weaken = yes)
 
 AC_PROG_LIBTOOL
 
-AC_C_INLINE
 AX_C___ATTRIBUTE__
 
 AC_MSG_CHECKING(for __attribute__((aligned(N))) on functions)
@@ -262,15 +270,15 @@ AC_MSG_RESULT($ac_cv___attribute__aligned_fn)
 AC_HEADER_STDC
 
 # TODO(csilvers): we could remove a lot when WITH_CPU_PROFILER etc is "no".
-AC_CHECK_TYPES([__int64])       # defined in some windows platforms
 AS_IF([test "x$enable_tcmalloc_mallinfo" = "xyes"],
       [AC_CHECK_TYPES([struct mallinfo],,, [#include <malloc.h>])],
       [])
 AC_CHECK_TYPES([Elf32_Versym],,, [#include <elf.h>])   # for vdso_support.h
 AC_CHECK_FUNCS(sbrk)            # for tcmalloc to get memory
+AC_CHECK_FUNCS(__sbrk)          # for tcmalloc to get memory
 AC_CHECK_FUNCS(geteuid)         # for turning off services when run as root
 AC_CHECK_FUNCS(fork)            # for the pthread_atfork setup
-AC_CHECK_HEADERS(features.h)    # for vdso_support.h
+AC_CHECK_HEADERS(features.h)    # for vdso_support.h, __GLIBC__ macros
 AC_CHECK_HEADERS(malloc.h)      # some systems define stuff there, others not
 AC_CHECK_HEADERS(glob.h)        # for heap-profile-table (cleaning up profiles)
 AC_CHECK_HEADERS(execinfo.h)    # for stacktrace? and heapchecker_unittest
@@ -287,9 +295,7 @@ AC_CHECK_HEADERS(fcntl.h)       # for tcmalloc_unittest
 AC_CHECK_HEADERS(grp.h)         # for heapchecker_unittest
 AC_CHECK_HEADERS(pwd.h)         # for heapchecker_unittest
 AC_CHECK_HEADERS(sys/resource.h)         # for memalign_unittest.cc
-AC_CHECK_HEADERS(valgrind.h)    # we have a local copy if this isn't found
 AC_CHECK_HEADERS(sys/cdefs.h)   # Where glibc defines __THROW
-AC_CHECK_HEADERS(features.h)    # Where __GLIBC__ is defined
 # We also need <ucontext.h>/<sys/ucontext.h>, but we get those from
 # AC_PC_FROM_UCONTEXT, below.
 
@@ -310,30 +316,14 @@ else
   AC_SUBST(ac_cv_have_struct_mallinfo, 0)
 fi
 
-# We need to check for mmap.  cygwin supports mmap, but the autoconf
-# test doesn't work on cygwin:
-#    http://www.cygwin.com/ml/cygwin/2002-04/msg00412.html
-# This workaround comes from
-#    http://cygwin.com/ml/cygwin/2004-11/msg00138.html
+# We hardcode HAVE_MMAP to 1. There are no interesting systems anymore
+# without functional mmap. And our windows (except mingw) builds
+# aren't using autoconf. So we keep HAVE_MMAP define, but only to
+# distingush windows and rest.
 case "$host" in
-  *-*-mingw*)
-               dnl mingw doesn't have mmap, not worth
-               dnl checking. Especially given that mingw can be a
-               dnl cross-compiler
-               ;;
-  *-*-cygwin*)
-	       ac_cv_func_mmap_fixed_mapped=yes
-               AC_DEFINE(HAVE_MMAP, 1,
-                         [Define to 1 if you have a working `mmap' system call.])
-               ;;
-            *) if test "$cross_compiling" = yes; then
-                 ac_cv_func_mmap_fixed_mapped=yes
-                 AC_DEFINE(HAVE_MMAP, 1,
-                           [Define to 1 if you have a working `mmap' system call.])
-               else
-                 AC_FUNC_MMAP
-               fi
-               ;;
+   *-mingw*) default_emergency_malloc=no;;
+   *) default_emergency_malloc=yes
+      AC_DEFINE(HAVE_MMAP, 1, [Define to 1 if you have a working `mmap' system call.])
 esac
 
 # If AtomicWord != Atomic32, we need to define two versions of all the
@@ -374,24 +364,13 @@ AC_ARG_ENABLE(frame_pointers,
 AM_CONDITIONAL(ENABLE_FRAME_POINTERS, test "$enable_frame_pointers" = yes)
 
 AC_MSG_CHECKING([for x86 without frame pointers])
-# Some x86_64 systems do not insert frame pointers by default.
-# We want to see if the current system is one of those.
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM(, [return __x86_64__ == 1 ? 0 : 1])],
                   [is_x86_64=yes], [is_x86_64=no])
-OLD_CFLAGS="$CFLAGS"
-CFLAGS="$CFLAGS -S -O2 -o fp.s"
-# This test will always fail because we don't name our output file properly.
-# We do our own determination of success/failure in the grep, below.
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([int f(int x) {return x;}], [return f(0);])],
-                  [:], [:])
-x86_no_fp_by_default=no
-AS_IF([test "$is_x86_64" = yes && ! grep 'mov.*rsp.*rbp' fp.s >/dev/null 2>&1], [x86_no_fp_by_default=yes])
-AM_CONDITIONAL(X86_64_AND_NO_FP_BY_DEFAULT,
-               test "$x86_no_fp_by_default" = yes)
-rm fp.s
-CFLAGS="$OLD_CFLAGS"
-AC_MSG_RESULT([$x86_no_fp_by_default])
-
+omit_fp_by_default=no
+AS_IF([test "$is_x86_64" = yes], [omit_fp_by_default=yes])
+AM_CONDITIONAL(OMIT_FP_BY_DEFAULT,
+               test "$omit_fp_by_default" = yes)
+AC_MSG_RESULT([$omit_fp_by_default])
 
 # We need to know if we're i386 so we can turn on -mmms, which is not
 # on by default for i386 (it is for x86_64).
@@ -422,6 +401,16 @@ AC_CACHE_CHECK([if the compiler supports -Wno-unused-result],
 	        CFLAGS="$OLD_CFLAGS"])
 AM_CONDITIONAL(HAVE_W_NO_UNUSED_RESULT,
 	       test "$perftools_cv_w_no_unused_result" = yes)
+
+AC_ARG_ENABLE([deprecated-pprof],
+              [AS_HELP_STRING([--disable-deprecated-pprof],
+                [do not install old deprecated and unmaintained bundled pprof
+(see github.com/google/pprof for supported version)])],
+              [enable_pprof="$enableval"],
+              [enable_pprof=yes])
+
+AM_CONDITIONAL(INSTALL_PPROF,
+               [test "x$enable_pprof" = xyes])
 
 AC_ARG_ENABLE([dynamic-sized-delete-support],
               [AS_HELP_STRING([--enable-dynamic-sized-delete-support],
@@ -504,17 +493,17 @@ AC_CACHE_CHECK([if target has _Unwind_Backtrace],
                [perftools_cv_have_unwind_backtrace],
                [AC_LANG_PUSH(C++)
                 AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
-                    [[#include <unwind.h>]],
+                    [[#include <unwind.h>
+#if defined(__APPLE__)
+#error OSX _Unwind_Backtrace recurses back to malloc
+#endif
+]],
                     [[&_Unwind_Backtrace]])],
                  [perftools_cv_have_unwind_backtrace=yes],
                  [perftools_cv_have_unwind_backtrace=no])
                 AC_LANG_POP(C++)])
 AS_IF([test "x$perftools_cv_have_unwind_backtrace" = xyes],
       [AC_DEFINE(HAVE_UNWIND_BACKTRACE, 1, [Whether <unwind.h> contains _Unwind_Backtrace])])
-
-AS_IF([test "x$enable_backtrace" = xyes],
-      [default_emergency_malloc=yes],
-      [default_emergency_malloc=no])
 
 AS_IF([test "x$will_use_libunwind" = xyes],
       [AC_COMPILE_IFELSE([AC_LANG_PROGRAM(, [return __arm__])],
@@ -528,9 +517,6 @@ AC_ARG_ENABLE([emergency-malloc],
 
 AM_CONDITIONAL(BUILD_EMERGENCY_MALLOC, [test "x$enable_emergency_malloc" = xyes])
 
-# Defines PRIuS
-AC_COMPILER_CHARACTERISTICS
-
 # Also make sure we get standard PRI... definitions, even with glibc.
 # We have to use AH_VERBATIM because we need the #ifdef guard (gcc buglet)
 AH_VERBATIM([__STDC_FORMAT_MACROS],
@@ -538,22 +524,6 @@ AH_VERBATIM([__STDC_FORMAT_MACROS],
 #ifndef __STDC_FORMAT_MACROS
 # define __STDC_FORMAT_MACROS 1
 #endif])
-
-# Check if __builtin_stack_pointer() is available (for elfcore.h)
-AC_MSG_CHECKING([for __builtin_stack_pointer()])
-AC_LINK_IFELSE([AC_LANG_PROGRAM(, [void *sp = __builtin_stack_pointer()])],
-               [AC_DEFINE(HAVE_BUILTIN_STACK_POINTER, 1,
-                      Define to 1 if compiler supports __builtin_stack_pointer)
-                AC_MSG_RESULT([yes])],
-               [AC_MSG_RESULT([no])])
-
-# Check for __builtin_expect()
-AC_MSG_CHECKING([for __builtin_expect()])
-AC_LINK_IFELSE([AC_LANG_PROGRAM(, return __builtin_expect(main != 0, 1))],
-               [AC_DEFINE(HAVE_BUILTIN_EXPECT, 1,
-                          Define to 1 if compiler supports __builtin_expect)
-                AC_MSG_RESULT([yes])],
-               [AC_MSG_RESULT([no])])
 
 # Check if __environ is available (for GetenvBeforeMain)
 AC_MSG_CHECKING([for __environ])
@@ -606,9 +576,6 @@ then
 fi
 AC_SUBST(LIBSTDCXX_LA_LINKER_FLAG)
 
-# We also need to check if the kernel supports __thread, which requires uname()
-AC_CHECK_DECLS(uname,,, [#include <sys/utsname.h>])
-
 # In fact, a lot of the code in this directory depends on pthreads
 ACX_PTHREAD
 
@@ -631,9 +598,6 @@ AC_MSG_RESULT([$acx_pthread_despite_asking_for])
 AC_LANG_RESTORE
 
 AM_CONDITIONAL(HAVE_PTHREAD_DESPITE_ASKING_FOR, test x"$acx_pthread_despite_asking_for" = xyes)
-
-# Find out what namespace 'normal' STL code lives in
-AC_CXX_STL_NAMESPACE
 
 # Figure out where libc has program_invocation_name
 AC_PROGRAM_INVOCATION_NAME
@@ -732,12 +696,32 @@ AC_COMPILE_IFELSE(
          AC_MSG_RESULT([yes])],
         [AC_MSG_RESULT([no])])
 
+# Disable large allocation report by default.
+AC_ARG_ENABLE([large-alloc-report],
+              [AS_HELP_STRING([--enable-large-alloc-report],
+                              [report very large allocations to stderr])],
+              [enable_large_alloc_report="$enableval"],
+              [enable_large_alloc_report=no])
+AS_IF([test "x$enable_large_alloc_report" = xyes],
+      [AC_DEFINE([ENABLE_LARGE_ALLOC_REPORT], 1, [report large allocation])])
+
+# Enable aggressive decommit by default
+AC_ARG_ENABLE([aggressive-decommit-by-default],
+              [AS_HELP_STRING([--enable-aggressive-decommit-by-default],
+                              [enable aggressive decommit by default])],
+              [enable_aggressive_decommit_by_default="$enableval"],
+              [enable_aggressive_decommit_by_default=no])
+AS_IF([test "x$enable_aggressive_decommit_by_default" = xyes],
+      [AC_DEFINE([ENABLE_AGGRESSIVE_DECOMMIT_BY_DEFAULT],
+                 1,
+                 [enable aggressive decommit by default])])
+
 # Write generated configuration file
 AC_CONFIG_FILES([Makefile
                  src/gperftools/tcmalloc.h src/windows/gperftools/tcmalloc.h])
 AC_OUTPUT
 
-AS_IF([test "$x86_no_fp_by_default" = yes && test "x$enable_frame_pointers" != xyes && test "x$UNWIND_LIBS" = x && test "x$enable_minimal" != xyes],
+AS_IF([test "$omit_fp_by_default" = yes && test "x$enable_frame_pointers" != xyes && test "x$UNWIND_LIBS" = x && test "x$enable_minimal" != xyes],
   [AS_IF([test "x$perftools_cv_have_unwind_backtrace" = xyes],
     [AC_MSG_WARN([No frame pointers and no libunwind. Using experimental backtrace capturing via libgcc. Expect crashy cpu profiler.])],
     [AS_IF([test "x$enable_backtrace" = xyes],

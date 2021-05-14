@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2009, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -67,15 +67,17 @@
 using std::string;
 using tcmalloc::DumpProcSelfMaps;   // from sysinfo.h
 
-
-DEFINE_string(symbolize_pprof,
-              EnvToString("PPROF_PATH", "pprof"),
-              "Path to pprof to call for reporting function names.");
-
-// heap_profile_table_pprof may be referenced after destructors are
+// pprof may be used after destructors are
 // called (since that's when leak-checking is done), so we make
 // a more-permanent copy that won't ever get destroyed.
-static string* g_pprof_path = new string(FLAGS_symbolize_pprof);
+static char* get_pprof_path() {
+  static char* result = ([] () {
+      string pprof_string = EnvToString("PPROF_PATH", "pprof-symbolize");
+      return strdup(pprof_string.c_str());
+    })();
+
+  return result;
+}
 
 // Returns NULL if we're on an OS where we can't get the invocation name.
 // Using a static var is ok because we're not called from a thread.
@@ -144,7 +146,7 @@ int SymbolTable::Symbolize() {
     PrintError("Cannot figure out the name of this executable (argv0)");
     return 0;
   }
-  if (access(g_pprof_path->c_str(), R_OK) != 0) {
+  if (access(get_pprof_path(), R_OK) != 0) {
     PrintError("Cannot find 'pprof' (is PPROF_PATH set correctly?)");
     return 0;
   }
@@ -206,7 +208,7 @@ int SymbolTable::Symbolize() {
       unsetenv("HEAPPROFILE");
       unsetenv("HEAPCHECK");
       unsetenv("PERFTOOLS_VERBOSE");
-      execlp(g_pprof_path->c_str(), g_pprof_path->c_str(),
+      execlp(get_pprof_path(), get_pprof_path(),
              "--symbols", argv0, NULL);
       _exit(3);  // if execvp fails, it's bad news for us
     }

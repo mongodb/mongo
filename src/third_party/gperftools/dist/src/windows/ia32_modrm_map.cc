@@ -1,10 +1,11 @@
+// -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 /* Copyright (c) 2007, Google Inc.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above
@@ -14,7 +15,7 @@
  *     * Neither the name of Google Inc. nor the names of its
  * contributors may be used to endorse or promote products derived from
  * this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -31,8 +32,8 @@
  * Author: Joi Sigurdsson
  *
  * Table of relevant information about how to decode the ModR/M byte.
- * Based on information in the IA-32 Intel® Architecture
- * Software Developer’s Manual Volume 2: Instruction Set Reference.
+ * Based on information in the IA-32 IntelÂ® Architecture
+ * Software Developer's Manual Volume 2: Instruction Set Reference.
  */
 
 #include "mini_disassembler.h"
@@ -49,7 +50,7 @@ const ModrmEntry MiniDisassembler::s_ia16_modrm_map_[] = {
   /* r/m == 100 */ { false, false, OS_ZERO },
   /* r/m == 101 */ { false, false, OS_ZERO },
   /* r/m == 110 */ { true, false, OS_WORD },
-  /* r/m == 111 */ { false, false, OS_ZERO }, 
+  /* r/m == 111 */ { false, false, OS_ZERO },
 // mod == 01
   /* r/m == 000 */ { true, false, OS_BYTE },
   /* r/m == 001 */ { true, false, OS_BYTE },
@@ -58,7 +59,7 @@ const ModrmEntry MiniDisassembler::s_ia16_modrm_map_[] = {
   /* r/m == 100 */ { true, false, OS_BYTE },
   /* r/m == 101 */ { true, false, OS_BYTE },
   /* r/m == 110 */ { true, false, OS_BYTE },
-  /* r/m == 111 */ { true, false, OS_BYTE }, 
+  /* r/m == 111 */ { true, false, OS_BYTE },
 // mod == 10
   /* r/m == 000 */ { true, false, OS_WORD },
   /* r/m == 001 */ { true, false, OS_WORD },
@@ -67,7 +68,7 @@ const ModrmEntry MiniDisassembler::s_ia16_modrm_map_[] = {
   /* r/m == 100 */ { true, false, OS_WORD },
   /* r/m == 101 */ { true, false, OS_WORD },
   /* r/m == 110 */ { true, false, OS_WORD },
-  /* r/m == 111 */ { true, false, OS_WORD }, 
+  /* r/m == 111 */ { true, false, OS_WORD },
 // mod == 11
   /* r/m == 000 */ { false, false, OS_ZERO },
   /* r/m == 001 */ { false, false, OS_ZERO },
@@ -88,7 +89,7 @@ const ModrmEntry MiniDisassembler::s_ia32_modrm_map_[] = {
   /* r/m == 100 */ { false, true, OS_ZERO },
   /* r/m == 101 */ { true, false, OS_DOUBLE_WORD },
   /* r/m == 110 */ { false, false, OS_ZERO },
-  /* r/m == 111 */ { false, false, OS_ZERO }, 
+  /* r/m == 111 */ { false, false, OS_ZERO },
 // mod == 01
   /* r/m == 000 */ { true, false, OS_BYTE },
   /* r/m == 001 */ { true, false, OS_BYTE },
@@ -97,7 +98,7 @@ const ModrmEntry MiniDisassembler::s_ia32_modrm_map_[] = {
   /* r/m == 100 */ { true, true, OS_BYTE },
   /* r/m == 101 */ { true, false, OS_BYTE },
   /* r/m == 110 */ { true, false, OS_BYTE },
-  /* r/m == 111 */ { true, false, OS_BYTE }, 
+  /* r/m == 111 */ { true, false, OS_BYTE },
 // mod == 10
   /* r/m == 000 */ { true, false, OS_DOUBLE_WORD },
   /* r/m == 001 */ { true, false, OS_DOUBLE_WORD },
@@ -106,7 +107,7 @@ const ModrmEntry MiniDisassembler::s_ia32_modrm_map_[] = {
   /* r/m == 100 */ { true, true, OS_DOUBLE_WORD },
   /* r/m == 101 */ { true, false, OS_DOUBLE_WORD },
   /* r/m == 110 */ { true, false, OS_DOUBLE_WORD },
-  /* r/m == 111 */ { true, false, OS_DOUBLE_WORD }, 
+  /* r/m == 111 */ { true, false, OS_DOUBLE_WORD },
 // mod == 11
   /* r/m == 000 */ { false, false, OS_ZERO },
   /* r/m == 001 */ { false, false, OS_ZERO },

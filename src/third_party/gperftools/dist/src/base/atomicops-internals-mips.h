@@ -161,12 +161,6 @@ inline Atomic32 Release_AtomicExchange(volatile Atomic32* ptr,
     return NoBarrier_AtomicExchange(ptr, new_value);
 }
 
-inline void Acquire_Store(volatile Atomic32* ptr, Atomic32 value)
-{
-    *ptr = value;
-    MemoryBarrier();
-}
-
 inline void Release_Store(volatile Atomic32* ptr, Atomic32 value)
 {
     MemoryBarrier();
@@ -183,12 +177,6 @@ inline Atomic32 Acquire_Load(volatile const Atomic32* ptr)
     Atomic32 value = *ptr;
     MemoryBarrier();
     return value;
-}
-
-inline Atomic32 Release_Load(volatile const Atomic32* ptr)
-{
-    MemoryBarrier();
-    return *ptr;
 }
 
 #if (_MIPS_ISA == _MIPS_ISA_MIPS64) || (_MIPS_SIM == _MIPS_SIM_ABI64)
@@ -285,12 +273,6 @@ inline Atomic64 Release_AtomicExchange(volatile Atomic64* ptr,
     return NoBarrier_AtomicExchange(ptr, new_value);
 }
 
-inline void Acquire_Store(volatile Atomic64* ptr, Atomic64 value)
-{
-    *ptr = value;
-    MemoryBarrier();
-}
-
 inline void Release_Store(volatile Atomic64* ptr, Atomic64 value)
 {
     MemoryBarrier();
@@ -307,12 +289,6 @@ inline Atomic64 Acquire_Load(volatile const Atomic64* ptr)
     Atomic64 value = *ptr;
     MemoryBarrier();
     return value;
-}
-
-inline Atomic64 Release_Load(volatile const Atomic64* ptr)
-{
-    MemoryBarrier();
-    return *ptr;
 }
 
 #endif

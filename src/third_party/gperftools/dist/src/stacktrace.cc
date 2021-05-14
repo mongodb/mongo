@@ -120,6 +120,27 @@ struct GetStackImplementation {
 #define HAVE_GST_x86
 #endif // i386 || x86_64
 
+// Sadly, different OSes have very different mcontexts even for
+// identical hardware arch. So keep it linux-only for now.
+#if defined(__GNUC__) && __linux__ && (defined(__x86_64__) || defined(__aarch64__) || defined(__riscv))
+#define STACKTRACE_INL_HEADER "stacktrace_generic_fp-inl.h"
+#define GST_SUFFIX generic_fp
+#include "stacktrace_impl_setup-inl.h"
+#undef GST_SUFFIX
+#undef STACKTRACE_INL_HEADER
+#define HAVE_GST_generic_fp
+
+#undef TCMALLOC_UNSAFE_GENERIC_FP_STACKTRACE
+#define TCMALLOC_UNSAFE_GENERIC_FP_STACKTRACE 1
+
+#define STACKTRACE_INL_HEADER "stacktrace_generic_fp-inl.h"
+#define GST_SUFFIX generic_fp_unsafe
+#include "stacktrace_impl_setup-inl.h"
+#undef GST_SUFFIX
+#undef STACKTRACE_INL_HEADER
+#define HAVE_GST_generic_fp_unsafe
+#endif
+
 #if defined(__ppc__) || defined(__PPC__)
 #if defined(__linux__)
 #define STACKTRACE_INL_HEADER "stacktrace_powerpc-linux-inl.h"
@@ -169,6 +190,12 @@ static GetStackImplementation *all_impls[] = {
 #ifdef HAVE_GST_generic
   &impl__generic,
 #endif
+#ifdef HAVE_GST_generic_fp
+  &impl__generic_fp,
+#endif
+#ifdef HAVE_GST_generic_fp
+  &impl__generic_fp_unsafe,
+#endif
 #ifdef HAVE_GST_libunwind
   &impl__libunwind,
 #endif
@@ -192,7 +219,7 @@ static GetStackImplementation *all_impls[] = {
 
 // ppc and i386 implementations prefer arch-specific asm implementations.
 // arm's asm implementation is broken
-#if defined(__i386__) || defined(__x86_64__) || defined(__ppc__) || defined(__PPC__)
+#if defined(__i386__) || defined(__ppc__) || defined(__PPC__)
 #if !defined(NO_FRAME_POINTER)
 #define TCMALLOC_DONT_PREFER_LIBUNWIND
 #endif
@@ -204,6 +231,10 @@ static bool get_stack_impl_inited;
 static GetStackImplementation *get_stack_impl = &impl__instrument;
 #elif defined(HAVE_GST_win32)
 static GetStackImplementation *get_stack_impl = &impl__win32;
+#elif defined(HAVE_GST_generic_fp) && !defined(NO_FRAME_POINTER) \
+   && !defined(__riscv) \
+   && (!defined(HAVE_GST_libunwind) || defined(TCMALLOC_DONT_PREFER_LIBUNWIND))
+static GetStackImplementation *get_stack_impl = &impl__generic_fp;
 #elif defined(HAVE_GST_x86) && defined(TCMALLOC_DONT_PREFER_LIBUNWIND)
 static GetStackImplementation *get_stack_impl = &impl__x86;
 #elif defined(HAVE_GST_ppc) && defined(TCMALLOC_DONT_PREFER_LIBUNWIND)
@@ -306,6 +337,29 @@ PERFTOOLS_DLL_DECL int GetStackTraceWithContext(void** result, int max_depth,
                         result, max_depth, skip_count, uc));
 }
 
+// As of this writing, aarch64 has completely borked libunwind, so
+// lets test this case and fall back to frame pointers (which is
+// nearly but not quite perfect).
+ATTRIBUTE_NOINLINE
+static void maybe_convert_libunwind_to_generic_fp() {
+#if defined(HAVE_GST_libunwind) && defined(HAVE_GST_generic_fp)
+  if (get_stack_impl != &impl__libunwind) {
+    return;
+  }
+
+  // Okay we're on libunwind and we have generic_fp, check if
+  // libunwind returns bogus results.
+  void* stack[4];
+  int rv = get_stack_impl->GetStackTracePtr(stack, 4, 0);
+  if (rv > 2) {
+    // Seems fine
+    return;
+  }
+  // bogus. So replacing with generic_fp
+  get_stack_impl = &impl__generic_fp;
+#endif
+}
+
 static void init_default_stack_impl_inner(void) {
   if (get_stack_impl_inited) {
     return;
@@ -313,6 +367,7 @@ static void init_default_stack_impl_inner(void) {
   get_stack_impl_inited = true;
   const char *val = TCMallocGetenvSafe("TCMALLOC_STACKTRACE_METHOD");
   if (!val || !*val) {
+    maybe_convert_libunwind_to_generic_fp();
     return;
   }
   for (GetStackImplementation **p = all_impls; *p; p++) {
@@ -325,6 +380,7 @@ static void init_default_stack_impl_inner(void) {
   fprintf(stderr, "Unknown or unsupported stacktrace method requested: %s. Ignoring it\n", val);
 }
 
+ATTRIBUTE_NOINLINE
 static void init_default_stack_impl(void) {
   init_default_stack_impl_inner();
   if (EnvToBool("TCMALLOC_STACKTRACE_METHOD_VERBOSE", false)) {

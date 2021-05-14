@@ -1,4 +1,4 @@
-// -*- Mode: C; c-basic-offset: 2; indent-tabs-mode: nil -*-
+/* -*- Mode: C; c-basic-offset: 2; indent-tabs-mode: nil -*- */
 /* Copyright (c) 2003, Google Inc.
  * All rights reserved.
  *
@@ -43,9 +43,9 @@
 
 /* Define the version number so folks can check against it */
 #define TC_VERSION_MAJOR  2
-#define TC_VERSION_MINOR  7
-#define TC_VERSION_PATCH  ""
-#define TC_VERSION_STRING "gperftools 2.7"
+#define TC_VERSION_MINOR  9
+#define TC_VERSION_PATCH  ".1"
+#define TC_VERSION_STRING "gperftools 2.9.1"
 
 /* For struct mallinfo, if it's defined. */
 #if 0

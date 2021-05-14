@@ -4,6 +4,7 @@ Import("env")
 Import("has_option")
 Import("use_libunwind")
 Import("debugBuild")
+Import("selected_experimental_optimizations")
 
 env = env.Clone(
     # Building with hidden visibility interferes with intercepting the
@@ -11,11 +12,37 @@ env = env.Clone(
     DISALLOW_VISHIDDEN=True,
 )
 
+# If we don't have a frame pointer, we need to tell tcmalloc so that
+# it doesn't try to select a frame pointer based unwinder like
+# generic_fp. For debugBuilds, we also don't want the generic_fp or
+# libunwind based unwinders because they are currently too slow. We
+# will still fall back to libunwind if it is present and no better
+# option is available. Note that defining
+# TCMALLOC_DONT_PREFER_LIBUNWIND has real effects even if libunwind
+# isn't in play. Specifically, it enables the architecture specific
+# implementations for x86 and ppc.
+#
+# Please see the following gperftools issues for ongoing discussion:
+#
+# https://github.com/gperftools/gperftools/issues/1276
+# https://github.com/gperftools/gperftools/issues/1277
+# https://github.com/gperftools/gperftools/issues/1278
+#
+
+fp = 'nofp' not in selected_experimental_optimizations
+if not fp or debugBuild:
+    env.Append(
+        CPPDEFINES=[
+            'NO_FRAME_POINTER',
+            'TCMALLOC_DONT_PREFER_LIBUNWIND' if debugBuild else None,
+        ],
+    )
+
 if use_libunwind:
     env.Append(
         CPPDEFINES=[
             ("HAVE_LIBUNWIND_H", "1"),
-            'HAVE_UCONTEXT_H'
+            'HAVE_UCONTEXT_H',
         ],
     )
     env.InjectThirdParty(libraries=['unwind'])

@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 /* Copyright (c) 2007, Google Inc.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
  *     * Neither the name of Google Inc. nor the names of its
  * contributors may be used to endorse or promote products derived from
  * this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -111,7 +111,7 @@ class DeleteUnsignedCharArray;
 // MyTypesafeFuncPtr original_func_stub;
 // int MyTypesafeFunc(int x) { return x + 1; }
 // int HookMyTypesafeFunc(int x) { return 1 + original_func_stub(x); }
-// 
+//
 // void MyPatchInitializingFunction() {
 //   original_func_stub = PreamblePatcher::Patch(
 //              MyTypesafeFunc, HookMyTypesafeFunc);
@@ -311,9 +311,9 @@ class PERFTOOLS_DLL_DECL PreamblePatcher {
   }
 
   // Allocates a block of memory of size MAX_PREAMBLE_STUB_SIZE that is as
-  // close (within 2GB) as possible to target.  This is done to ensure that 
-  // we can perform a relative jump from target to a trampoline if the 
-  // replacement function is > +-2GB from target.  This means that we only need 
+  // close (within 2GB) as possible to target.  This is done to ensure that
+  // we can perform a relative jump from target to a trampoline if the
+  // replacement function is > +-2GB from target.  This means that we only need
   // to patch 5 bytes in the target function.
   //
   // @param target    Pointer to target function.
@@ -346,7 +346,7 @@ class PERFTOOLS_DLL_DECL PreamblePatcher {
   // head of a linked list of pages used to allocate blocks that are within
   // 2GB of the target.
   static PreamblePage* preamble_pages_;
-  
+
   // Page granularity
   static long granularity_;
 
@@ -436,9 +436,9 @@ class PERFTOOLS_DLL_DECL PreamblePatcher {
   // target_function, we get to the address stop, we return
   // immediately, the address that jumps to stop_before.
   //
-  // @param stop_before_trampoline  When following JMP instructions from 
+  // @param stop_before_trampoline  When following JMP instructions from
   // target_function, stop before a trampoline is detected.  See comment in
-  // PreamblePatcher::RawPatchWithStub for more information.  This parameter 
+  // PreamblePatcher::RawPatchWithStub for more information.  This parameter
   // has no effect in 32-bit mode.
   //
   // @return Either target_function (the input parameter), or if
@@ -492,7 +492,7 @@ class PERFTOOLS_DLL_DECL PreamblePatcher {
   static bool IsNearRelativeJump(unsigned char* target,
                                  unsigned int instruction_size);
 
-  // Helper routine that determines if a target instruction is a near 
+  // Helper routine that determines if a target instruction is a near
   // absolute call.
   //
   // @param target            Pointer to instruction.
@@ -503,7 +503,7 @@ class PERFTOOLS_DLL_DECL PreamblePatcher {
   static bool IsNearAbsoluteCall(unsigned char* target,
                                  unsigned int instruction_size);
 
-  // Helper routine that determines if a target instruction is a near 
+  // Helper routine that determines if a target instruction is a near
   // absolute call.
   //
   // @param target            Pointer to instruction.
@@ -590,7 +590,7 @@ class PERFTOOLS_DLL_DECL PreamblePatcher {
                                            unsigned char* target,
                                            unsigned int* target_bytes,
                                            unsigned int target_size);
-  
+
   // Helper routine that patches a 64-bit MOV instruction with a RIP-relative
   // displacement.  The target buffer must be within 2GB of the source.
   //

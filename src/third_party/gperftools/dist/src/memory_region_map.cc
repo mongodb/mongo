@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 /* Copyright (c) 2006, Google Inc.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
  *     * Neither the name of Google Inc. nor the names of its
  * contributors may be used to endorse or promote products derived from
  * this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -233,6 +233,9 @@ void MemoryRegionMap::Init(int max_stack_depth, bool use_buckets) {
     recursive_insert = false;
     memset(bucket_table_, 0, table_bytes);
     num_buckets_ = 0;
+  }
+  if (regions_ == NULL) {  // init regions_
+    InitRegionSetLocked();
   }
   Unlock();
   RAW_VLOG(10, "MemoryRegionMap Init done");
@@ -536,6 +539,15 @@ void MemoryRegionMap::RestoreSavedBucketsLocked() {
   }
 }
 
+inline void MemoryRegionMap::InitRegionSetLocked() {
+  RAW_VLOG(12, "Initializing region set");
+  regions_ = regions_rep.region_set();
+  recursive_insert = true;
+  new (regions_) RegionSet();
+  HandleSavedRegionsLocked(&DoInsertRegionLocked);
+  recursive_insert = false;
+}
+
 inline void MemoryRegionMap::InsertRegionLocked(const Region& region) {
   RAW_CHECK(LockIsHeld(), "should be held (by this thread)");
   // We can be called recursively, because RegionSet constructor
@@ -556,12 +568,7 @@ inline void MemoryRegionMap::InsertRegionLocked(const Region& region) {
     saved_regions[saved_regions_count++] = region;
   } else {  // not a recusrive call
     if (regions_ == NULL) {  // init regions_
-      RAW_VLOG(12, "Initializing region set");
-      regions_ = regions_rep.region_set();
-      recursive_insert = true;
-      new(regions_) RegionSet();
-      HandleSavedRegionsLocked(&DoInsertRegionLocked);
-      recursive_insert = false;
+      InitRegionSetLocked();
     }
     recursive_insert = true;
     // Do the actual insertion work to put new regions into regions_:
@@ -675,7 +682,7 @@ void MemoryRegionMap::RecordRegionRemoval(const void* start, size_t size) {
   uintptr_t start_addr = reinterpret_cast<uintptr_t>(start);
   uintptr_t end_addr = start_addr + size;
   // subtract start_addr, end_addr from all the regions
-  RAW_VLOG(10, "Removing global region %p..%p; have %" PRIuS " regions",
+  RAW_VLOG(10, "Removing global region %p..%p; have %zu regions",
               reinterpret_cast<void*>(start_addr),
               reinterpret_cast<void*>(end_addr),
               regions_->size());
@@ -742,7 +749,7 @@ void MemoryRegionMap::RecordRegionRemoval(const void* start, size_t size) {
     }
     ++region;
   }
-  RAW_VLOG(12, "Removed region %p..%p; have %" PRIuS " regions",
+  RAW_VLOG(12, "Removed region %p..%p; have %zu regions",
               reinterpret_cast<void*>(start_addr),
               reinterpret_cast<void*>(end_addr),
               regions_->size());
@@ -765,9 +772,9 @@ void MemoryRegionMap::MmapHook(const void* result,
                                const void* start, size_t size,
                                int prot, int flags,
                                int fd, off_t offset) {
-  // TODO(maxim): replace all 0x%" PRIxS " by %p when RAW_VLOG uses a safe
+  // TODO(maxim): replace all 0x%" PRIxPTR " by %p when RAW_VLOG uses a safe
   // snprintf reimplementation that does not malloc to pretty-print NULL
-  RAW_VLOG(10, "MMap = 0x%" PRIxPTR " of %" PRIuS " at %" PRIu64 " "
+  RAW_VLOG(10, "MMap = 0x%" PRIxPTR " of %zu at %" PRIu64 " "
               "prot %d flags %d fd %d offs %" PRId64,
               reinterpret_cast<uintptr_t>(result), size,
               reinterpret_cast<uint64>(start), prot, flags, fd,
@@ -778,7 +785,7 @@ void MemoryRegionMap::MmapHook(const void* result,
 }
 
 void MemoryRegionMap::MunmapHook(const void* ptr, size_t size) {
-  RAW_VLOG(10, "MUnmap of %p %" PRIuS "", ptr, size);
+  RAW_VLOG(10, "MUnmap of %p %zu", ptr, size);
   if (size != 0) {
     RecordRegionRemoval(ptr, size);
   }
@@ -788,8 +795,8 @@ void MemoryRegionMap::MremapHook(const void* result,
                                  const void* old_addr, size_t old_size,
                                  size_t new_size, int flags,
                                  const void* new_addr) {
-  RAW_VLOG(10, "MRemap = 0x%" PRIxPTR " of 0x%" PRIxPTR " %" PRIuS " "
-              "to %" PRIuS " flags %d new_addr=0x%" PRIxPTR,
+  RAW_VLOG(10, "MRemap = 0x%" PRIxPTR " of 0x%" PRIxPTR " %zu "
+              "to %zu flags %d new_addr=0x%" PRIxPTR,
               (uintptr_t)result, (uintptr_t)old_addr,
                old_size, new_size, flags,
                flags & MREMAP_FIXED ? (uintptr_t)new_addr : 0);
@@ -800,7 +807,7 @@ void MemoryRegionMap::MremapHook(const void* result,
 }
 
 void MemoryRegionMap::SbrkHook(const void* result, ptrdiff_t increment) {
-  RAW_VLOG(10, "Sbrk = 0x%" PRIxPTR " of %" PRIdS "", (uintptr_t)result, increment);
+  RAW_VLOG(10, "Sbrk = 0x%" PRIxPTR " of %zd", (uintptr_t)result, increment);
   if (result != reinterpret_cast<void*>(-1)) {
     if (increment > 0) {
       void* new_end = sbrk(0);

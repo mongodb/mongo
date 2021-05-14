@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2006, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -440,22 +440,20 @@ bool HeapProfileTable::WriteProfile(const char* file_name,
                                     AllocationMap* allocations) {
   RAW_VLOG(1, "Dumping non-live heap profile to %s", file_name);
   RawFD fd = RawOpenForWriting(file_name);
-  if (fd != kIllegalRawFD) {
-    RawWrite(fd, kProfileHeader, strlen(kProfileHeader));
-    char buf[512];
-    int len = UnparseBucket(total, buf, 0, sizeof(buf), " heapprofile",
-                            NULL);
-    RawWrite(fd, buf, len);
-    const DumpArgs args(fd, NULL);
-    allocations->Iterate<const DumpArgs&>(DumpNonLiveIterator, args);
-    RawWrite(fd, kProcSelfMapsHeader, strlen(kProcSelfMapsHeader));
-    DumpProcSelfMaps(fd);
-    RawClose(fd);
-    return true;
-  } else {
+  if (fd == kIllegalRawFD) {
     RAW_LOG(ERROR, "Failed dumping filtered heap profile to %s", file_name);
     return false;
   }
+  RawWrite(fd, kProfileHeader, strlen(kProfileHeader));
+  char buf[512];
+  int len = UnparseBucket(total, buf, 0, sizeof(buf), " heapprofile", NULL);
+  RawWrite(fd, buf, len);
+  const DumpArgs args(fd, NULL);
+  allocations->Iterate<const DumpArgs&>(DumpNonLiveIterator, args);
+  RawWrite(fd, kProcSelfMapsHeader, strlen(kProcSelfMapsHeader));
+  DumpProcSelfMaps(fd);
+  RawClose(fd);
+  return true;
 }
 
 void HeapProfileTable::CleanupOldProfiles(const char* prefix) {
@@ -551,8 +549,8 @@ void HeapProfileTable::Snapshot::ReportLeaks(const char* checker_name,
   // This is only used by the heap leak checker, but is intimately
   // tied to the allocation map that belongs in this module and is
   // therefore placed here.
-  RAW_LOG(ERROR, "Leak check %s detected leaks of %" PRIuS " bytes "
-          "in %" PRIuS " objects",
+  RAW_LOG(ERROR, "Leak check %s detected leaks of %zu bytes "
+          "in %zu objects",
           checker_name,
           size_t(total_.alloc_size),
           size_t(total_.allocs));
@@ -622,7 +620,7 @@ void HeapProfileTable::Snapshot::ReportObject(const void* ptr,
                                               char* unused) {
   // Perhaps also log the allocation stack trace (unsymbolized)
   // on this line in case somebody finds it useful.
-  RAW_LOG(ERROR, "leaked %" PRIuS " byte object %p", v->bytes, ptr);
+  RAW_LOG(ERROR, "leaked %zu byte object %p", v->bytes, ptr);
 }
 
 void HeapProfileTable::Snapshot::ReportIndividualObjects() {

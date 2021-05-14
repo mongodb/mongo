@@ -5224,6 +5224,7 @@ Export([
     'http_client',
     'module_sconscripts',
     'optBuild',
+    'selected_experimental_optimizations',
     'serverJs',
     'ssl_provider',
     'use_libunwind',

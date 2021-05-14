@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 /* Copyright (c) 2006, Google Inc.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
  *     * Neither the name of Google Inc. nor the names of its
  * contributors may be used to endorse or promote products derived from
  * this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -108,7 +108,6 @@ static int IntLog2(size_t size, size_t base) {
 // Return a random integer n:  p(n)=1/(2**n) if 1 <= n; p(n)=0 if n < 1.
 static int Random() {
   static uint32 r = 1;         // no locking---it's not critical
-  ANNOTATE_BENIGN_RACE(&r, "benign race, not critical.");
   int result = 1;
   while ((((r = r*1103515245 + 12345) >> 30) & 1) == 0) {
     result++;
@@ -249,7 +248,7 @@ namespace {
       this->arena_->mu.Lock();
     }
     ~ArenaLock() { RAW_CHECK(this->left_, "haven't left Arena region"); }
-    void Leave() /*UNLOCK_FUNCTION()*/ {
+    void Leave() UNLOCK_FUNCTION() {
       this->arena_->mu.Unlock();
 #if 0
       if (this->mask_valid_) {
@@ -511,7 +510,6 @@ static void *DoAllocWithArena(size_t request, LowLevelAlloc::Arena *arena) {
     section.Leave();
     result = &s->levels;
   }
-  ANNOTATE_NEW_MEMORY(result, request);
   return result;
 }
 

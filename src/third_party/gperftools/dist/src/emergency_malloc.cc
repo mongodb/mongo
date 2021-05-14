@@ -56,7 +56,7 @@ namespace tcmalloc {
     void *MapPages(int32 flags, size_t size) {
       char *new_end = emergency_arena_end + size;
       if (new_end > emergency_arena_start + kEmergencyArenaSize) {
-        RAW_LOG(FATAL, "Unable to allocate %" PRIuS " bytes in emergency zone.", size);
+        RAW_LOG(FATAL, "Unable to allocate %zu bytes in emergency zone.", size);
       }
       char *rv = emergency_arena_end;
       emergency_arena_end = new_end;

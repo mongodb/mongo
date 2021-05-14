@@ -41,6 +41,7 @@
 #include <stdint.h>                     // for uintptr_t
 #endif
 #include "common.h"
+#include "page_heap_allocator.h"
 
 namespace tcmalloc {
 
@@ -62,29 +63,21 @@ class PERFTOOLS_DLL_DECL StackTraceTable {
   void** ReadStackTracesAndClear();
 
   // Exposed for PageHeapAllocator
-  struct Bucket {
-    // Key
-    uintptr_t hash;
-    StackTrace trace;
-
-    // Payload
-    int count;
-    Bucket* next;
-
-    bool KeyEqual(uintptr_t h, const StackTrace& t) const;
-  };
-
   // For testing
   int depth_total() const { return depth_total_; }
   int bucket_total() const { return bucket_total_; }
 
  private:
-  static const int kHashTableSize = 1 << 14; // => table_ is 128k
+  struct Entry {
+    Entry* next;
+    StackTrace trace;
+  };
 
   bool error_;
   int depth_total_;
   int bucket_total_;
-  Bucket** table_;
+  Entry* head_;
+  STLPageHeapAllocator<Entry, void> allocator_;
 };
 
 }  // namespace tcmalloc

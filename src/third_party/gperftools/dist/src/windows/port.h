@@ -102,19 +102,8 @@
 /* ----------------------------------- BASIC TYPES */
 
 #ifndef HAVE_STDINT_H
-#ifndef HAVE___INT64    /* we need to have all the __intX names */
 # error  Do not know how to set up type aliases.  Edit port.h for your system.
 #endif
-
-typedef __int8 int8_t;
-typedef __int16 int16_t;
-typedef __int32 int32_t;
-typedef __int64 int64_t;
-typedef unsigned __int8 uint8_t;
-typedef unsigned __int16 uint16_t;
-typedef unsigned __int32 uint32_t;
-typedef unsigned __int64 uint64_t;
-#endif  /* #ifndef HAVE_STDINT_H */
 
 /* I guess MSVC's <types.h> doesn't include ssize_t by default? */
 #ifdef _MSC_VER
@@ -326,17 +315,6 @@ inline int perftools_vsnprintf(char *str, size_t size, const char *format,
     return -1;        /* not what C99 says to do, but what windows does */
   str[size-1] = '\0';
   return _vsnprintf(str, size-1, format, ap);
-}
-#endif
-
-#ifndef HAVE_SNPRINTF
-inline int snprintf(char *str, size_t size, const char *format, ...) {
-  va_list ap;
-  int r;
-  va_start(ap, format);
-  r = perftools_vsnprintf(str, size, format, ap);
-  va_end(ap);
-  return r;
 }
 #endif
 

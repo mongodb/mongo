@@ -88,11 +88,11 @@ class CentralFreeList {
 
   // Lock/Unlock the internal SpinLock. Used on the pthread_atfork call
   // to set the lock in a consistent state before the fork.
-  void Lock() {
+  void Lock() EXCLUSIVE_LOCK_FUNCTION(lock_) {
     lock_.Lock();
   }
 
-  void Unlock() {
+  void Unlock() UNLOCK_FUNCTION(lock_) {
     lock_.Unlock();
   }
 

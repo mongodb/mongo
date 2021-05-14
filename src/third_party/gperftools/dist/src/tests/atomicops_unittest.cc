@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 /* Copyright (c) 2006, Google Inc.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
  *     * Neither the name of Google Inc. nor the names of its
  * contributors may be used to endorse or promote products derived from
  * this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -104,11 +104,6 @@ static void TestStore() {
   base::subtle::NoBarrier_Store(&value, kVal2);
   ASSERT_EQ(kVal2, value);
 
-  base::subtle::Acquire_Store(&value, kVal1);
-  ASSERT_EQ(kVal1, value);
-  base::subtle::Acquire_Store(&value, kVal2);
-  ASSERT_EQ(kVal2, value);
-
   base::subtle::Release_Store(&value, kVal1);
   ASSERT_EQ(kVal1, value);
   base::subtle::Release_Store(&value, kVal2);
@@ -133,11 +128,6 @@ static void TestLoad() {
   ASSERT_EQ(kVal1, base::subtle::Acquire_Load(&value));
   value = kVal2;
   ASSERT_EQ(kVal2, base::subtle::Acquire_Load(&value));
-
-  value = kVal1;
-  ASSERT_EQ(kVal1, base::subtle::Release_Load(&value));
-  value = kVal2;
-  ASSERT_EQ(kVal2, base::subtle::Release_Load(&value));
 }
 
 template <class AtomicType>

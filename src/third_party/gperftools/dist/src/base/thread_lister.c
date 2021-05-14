@@ -1,3 +1,4 @@
+/* -*- Mode: c; c-basic-offset: 2; indent-tabs-mode: nil -*- */
 /* Copyright (c) 2005-2007, Google Inc.
  * All rights reserved.
  *

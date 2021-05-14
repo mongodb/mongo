@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 /* Copyright (c) 2006, Google Inc.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
  *     * Neither the name of Google Inc. nor the names of its
  * contributors may be used to endorse or promote products derived from
  * this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -63,14 +63,11 @@ class LOCKABLE SpinLock {
   }
 
   // Acquire this SpinLock.
-  // TODO(csilvers): uncomment the annotation when we figure out how to
-  //                 support this macro with 0 args (see thread_annotations.h)
-  inline void Lock() /*EXCLUSIVE_LOCK_FUNCTION()*/ {
+  inline void Lock() EXCLUSIVE_LOCK_FUNCTION() {
     if (base::subtle::Acquire_CompareAndSwap(&lockword_, kSpinLockFree,
                                              kSpinLockHeld) != kSpinLockFree) {
       SlowLock();
     }
-    ANNOTATE_RWLOCK_ACQUIRED(this, 1);
   }
 
   // Try to acquire this SpinLock without blocking and return true if the
@@ -81,17 +78,11 @@ class LOCKABLE SpinLock {
     bool res =
         (base::subtle::Acquire_CompareAndSwap(&lockword_, kSpinLockFree,
                                               kSpinLockHeld) == kSpinLockFree);
-    if (res) {
-      ANNOTATE_RWLOCK_ACQUIRED(this, 1);
-    }
     return res;
   }
 
   // Release this SpinLock, which must be held by the calling thread.
-  // TODO(csilvers): uncomment the annotation when we figure out how to
-  //                 support this macro with 0 args (see thread_annotations.h)
-  inline void Unlock() /*UNLOCK_FUNCTION()*/ {
-    ANNOTATE_RWLOCK_RELEASED(this, 1);
+  inline void Unlock() UNLOCK_FUNCTION() {
     uint64 prev_value = static_cast<uint64>(
         base::subtle::Release_AtomicExchange(&lockword_, kSpinLockFree));
     if (prev_value != kSpinLockHeld) {
@@ -138,9 +129,7 @@ class SCOPED_LOCKABLE SpinLockHolder {
       : lock_(l) {
     l->Lock();
   }
-  // TODO(csilvers): uncomment the annotation when we figure out how to
-  //                 support this macro with 0 args (see thread_annotations.h)
-  inline ~SpinLockHolder() /*UNLOCK_FUNCTION()*/ { lock_->Unlock(); }
+  inline ~SpinLockHolder() UNLOCK_FUNCTION() { lock_->Unlock(); }
 };
 // Catch bug where variable name is omitted, e.g. SpinLockHolder (&lock);
 #define SpinLockHolder(x) COMPILE_ASSERT(0, spin_lock_decl_missing_var_name)

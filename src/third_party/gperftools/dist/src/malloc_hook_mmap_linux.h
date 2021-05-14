@@ -40,11 +40,10 @@
 # error Should only be including malloc_hook_mmap_linux.h on linux systems.
 #endif
 
-#include <unistd.h>
-#include <syscall.h>
-#include <sys/mman.h>
 #include <errno.h>
-#include "base/linux_syscall_support.h"
+#include <sys/mman.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 // The x86-32 case and the x86-64 case differ:
 // 32b has a mmap2() syscall, 64b does not.
@@ -56,12 +55,19 @@
     || defined(__PPC64__) \
     || defined(__aarch64__) \
     || (defined(_MIPS_SIM) && (_MIPS_SIM == _ABI64 || _MIPS_SIM == _ABIN32)) \
-    || defined(__s390__)
+    || defined(__s390__) || (defined(__riscv) && __riscv_xlen == 64) \
+    || defined(__e2k__)
 
 static inline void* do_mmap64(void *start, size_t length,
                               int prot, int flags,
-                              int fd, __off64_t offset) __THROW {
-  return sys_mmap(start, length, prot, flags, fd, offset);
+                              int fd, off64_t offset) __THROW {
+#if defined(__s390__)
+  long args[6] = { (long)start, (long)length, (long)prot, (long)flags,
+                   (long)fd, (long)offset };
+  return (void*)syscall(SYS_mmap, args);
+#else
+  return (void*)syscall(SYS_mmap, start, length, prot, flags, fd, offset);
+#endif
 }
 
 #define MALLOC_HOOK_HAVE_DO_MMAP64 1
@@ -71,7 +77,7 @@ static inline void* do_mmap64(void *start, size_t length,
 
 static inline void* do_mmap64(void *start, size_t length,
                               int prot, int flags,
-                              int fd, __off64_t offset) __THROW {
+                              int fd, off64_t offset) __THROW {
   void *result;
 
   // Try mmap2() unless it's not supported
@@ -137,12 +143,13 @@ static inline void* do_mmap64(void *start, size_t length,
 // malloc_hook section,
 // so that MallocHook::GetCallerStackTrace can function accurately:
 
-// Make sure mmap doesn't get #define'd away by <sys/mman.h>
+// Make sure mmap64 and mmap doesn't get #define'd away by <sys/mman.h>
+# undef mmap64
 # undef mmap
 
 extern "C" {
   void* mmap64(void *start, size_t length, int prot, int flags,
-               int fd, __off64_t offset  ) __THROW
+               int fd, off64_t offset  ) __THROW
     ATTRIBUTE_SECTION(malloc_hook);
   void* mmap(void *start, size_t length,int prot, int flags,
              int fd, off_t offset) __THROW
@@ -157,7 +164,7 @@ extern "C" {
 }
 
 extern "C" void* mmap64(void *start, size_t length, int prot, int flags,
-                        int fd, __off64_t offset) __THROW {
+                        int fd, off64_t offset) __THROW {
   MallocHook::InvokePreMmapHook(start, length, prot, flags, fd, offset);
   void *result;
   if (!MallocHook::InvokeMmapReplacement(
@@ -189,7 +196,7 @@ extern "C" int munmap(void* start, size_t length) __THROW {
   MallocHook::InvokeMunmapHook(start, length);
   int result;
   if (!MallocHook::InvokeMunmapReplacement(start, length, &result)) {
-    result = sys_munmap(start, length);
+    result = syscall(SYS_munmap, start, length);
   }
   return result;
 }
@@ -200,13 +207,14 @@ extern "C" void* mremap(void* old_addr, size_t old_size, size_t new_size,
   va_start(ap, flags);
   void *new_address = va_arg(ap, void *);
   va_end(ap);
-  void* result = sys_mremap(old_addr, old_size, new_size, flags, new_address);
+  void* result = (void*)syscall(SYS_mremap, old_addr, old_size, new_size, flags,
+                                new_address);
   MallocHook::InvokeMremapHook(result, old_addr, old_size, new_size, flags,
                                new_address);
   return result;
 }
 
-#ifndef __UCLIBC__
+#ifdef HAVE___SBRK
 // libc's version:
 extern "C" void* __sbrk(intptr_t increment);
 

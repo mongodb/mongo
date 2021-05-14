@@ -52,14 +52,14 @@ namespace tcmalloc {
 // sure the central_cache locks remain in a consisten state in the forked
 // version of the thread.
 
-void CentralCacheLockAll()
+void CentralCacheLockAll() NO_THREAD_SAFETY_ANALYSIS
 {
   Static::pageheap_lock()->Lock();
   for (int i = 0; i < Static::num_size_classes(); ++i)
     Static::central_cache()[i].Lock();
 }
 
-void CentralCacheUnlockAll()
+void CentralCacheUnlockAll() NO_THREAD_SAFETY_ANALYSIS
 {
   for (int i = 0; i < Static::num_size_classes(); ++i)
     Static::central_cache()[i].Unlock();
@@ -74,7 +74,6 @@ CentralFreeListPadded Static::central_cache_[kClassSizesMax];
 PageHeapAllocator<Span> Static::span_allocator_;
 PageHeapAllocator<StackTrace> Static::stacktrace_allocator_;
 Span Static::sampled_objects_;
-PageHeapAllocator<StackTraceTable::Bucket> Static::bucket_allocator_;
 StackTrace* Static::growth_stacks_ = NULL;
 Static::PageHeapStorage Static::pageheap_;
 
@@ -84,7 +83,6 @@ void Static::InitStaticVars() {
   span_allocator_.New(); // Reduce cache conflicts
   span_allocator_.New(); // Reduce cache conflicts
   stacktrace_allocator_.Init();
-  bucket_allocator_.Init();
   // Do a bit of sanitizing: make sure central_cache is aligned properly
   CHECK_CONDITION((sizeof(central_cache_[0]) % 64) == 0);
   for (int i = 0; i < num_size_classes(); ++i) {
@@ -93,9 +91,17 @@ void Static::InitStaticVars() {
 
   new (&pageheap_.memory) PageHeap;
 
+#if defined(ENABLE_AGGRESSIVE_DECOMMIT_BY_DEFAULT)
+  const bool kDefaultAggressiveDecommit = true;
+#else
+  const bool kDefaultAggressiveDecommit = false;
+#endif
+
+
   bool aggressive_decommit =
     tcmalloc::commandlineflags::StringToBool(
-      TCMallocGetenvSafe("TCMALLOC_AGGRESSIVE_DECOMMIT"), false);
+      TCMallocGetenvSafe("TCMALLOC_AGGRESSIVE_DECOMMIT"),
+                         kDefaultAggressiveDecommit);
 
   pageheap()->SetAggressiveDecommit(aggressive_decommit);
 

@@ -42,27 +42,15 @@
 
 namespace tcmalloc {
 
-bool StackTraceTable::Bucket::KeyEqual(uintptr_t h,
-                                       const StackTrace& t) const {
-  const bool eq = (this->hash == h && this->trace.depth == t.depth);
-  for (int i = 0; eq && i < t.depth; ++i) {
-    if (this->trace.stack[i] != t.stack[i]) {
-      return false;
-    }
-  }
-  return eq;
-}
-
 StackTraceTable::StackTraceTable()
     : error_(false),
       depth_total_(0),
       bucket_total_(0),
-      table_(new Bucket*[kHashTableSize]()) {
-  memset(table_, 0, kHashTableSize * sizeof(Bucket*));
+      head_(nullptr) {
 }
 
 StackTraceTable::~StackTraceTable() {
-  delete[] table_;
+  ASSERT(head_ == nullptr);
 }
 
 void StackTraceTable::AddTrace(const StackTrace& t) {
@@ -70,89 +58,64 @@ void StackTraceTable::AddTrace(const StackTrace& t) {
     return;
   }
 
-  // Hash function borrowed from base/heap-profile-table.cc
-  uintptr_t h = 0;
-  for (int i = 0; i < t.depth; ++i) {
-    h += reinterpret_cast<uintptr_t>(t.stack[i]);
-    h += h << 10;
-    h ^= h >> 6;
-  }
-  h += h << 3;
-  h ^= h >> 11;
-
-  const int idx = h % kHashTableSize;
-
-  Bucket* b = table_[idx];
-  while (b != NULL && !b->KeyEqual(h, t)) {
-    b = b->next;
-  }
-  if (b != NULL) {
-    b->count++;
-    b->trace.size += t.size;  // keep cumulative size
+  depth_total_ += t.depth;
+  bucket_total_++;
+  Entry* entry = allocator_.allocate(1);
+  if (entry == nullptr) {
+    Log(kLog, __FILE__, __LINE__,
+        "tcmalloc: could not allocate bucket", sizeof(*entry));
+    error_ = true;
   } else {
-    depth_total_ += t.depth;
-    bucket_total_++;
-    b = Static::bucket_allocator()->New();
-    if (b == NULL) {
-      Log(kLog, __FILE__, __LINE__,
-          "tcmalloc: could not allocate bucket", sizeof(*b));
-      error_ = true;
-    } else {
-      b->hash = h;
-      b->trace = t;
-      b->count = 1;
-      b->next = table_[idx];
-      table_[idx] = b;
-    }
+    entry->trace = t;
+    entry->next = head_;
+    head_ = entry;
   }
 }
 
 void** StackTraceTable::ReadStackTracesAndClear() {
-  if (error_) {
-    return NULL;
-  }
+  void** out = nullptr;
 
-  // Allocate output array
   const int out_len = bucket_total_ * 3 + depth_total_ + 1;
-  void** out = new void*[out_len];
-  if (out == NULL) {
-    Log(kLog, __FILE__, __LINE__,
-        "tcmalloc: allocation failed for stack traces",
-        out_len * sizeof(*out));
-    return NULL;
-  }
-
-  // Fill output array
-  int idx = 0;
-  for (int i = 0; i < kHashTableSize; ++i) {
-    Bucket* b = table_[i];
-    while (b != NULL) {
-      out[idx++] = reinterpret_cast<void*>(static_cast<uintptr_t>(b->count));
-      out[idx++] = reinterpret_cast<void*>(b->trace.size);  // cumulative size
-      out[idx++] = reinterpret_cast<void*>(b->trace.depth);
-      for (int d = 0; d < b->trace.depth; ++d) {
-        out[idx++] = b->trace.stack[d];
-      }
-      b = b->next;
+  if (!error_) {
+    // Allocate output array
+    out = new (std::nothrow_t{}) void*[out_len];
+    if (out == nullptr) {
+      Log(kLog, __FILE__, __LINE__,
+          "tcmalloc: allocation failed for stack traces",
+          out_len * sizeof(*out));
     }
   }
-  out[idx++] = NULL;
-  ASSERT(idx == out_len);
+
+  if (out) {
+    // Fill output array
+    int idx = 0;
+    Entry* entry = head_;
+    while (entry != NULL) {
+      out[idx++] = reinterpret_cast<void*>(uintptr_t{1});   // count
+      out[idx++] = reinterpret_cast<void*>(entry->trace.size);  // cumulative size
+      out[idx++] = reinterpret_cast<void*>(entry->trace.depth);
+      for (int d = 0; d < entry->trace.depth; ++d) {
+        out[idx++] = entry->trace.stack[d];
+      }
+      entry = entry->next;
+    }
+    out[idx++] = NULL;
+    ASSERT(idx == out_len);
+  }
 
   // Clear state
   error_ = false;
   depth_total_ = 0;
   bucket_total_ = 0;
+
   SpinLockHolder h(Static::pageheap_lock());
-  for (int i = 0; i < kHashTableSize; ++i) {
-    Bucket* b = table_[i];
-    while (b != NULL) {
-      Bucket* next = b->next;
-      Static::bucket_allocator()->Delete(b);
-      b = next;
-    }
-    table_[i] = NULL;
+  Entry* entry = head_;
+  while (entry != nullptr) {
+    Entry* next = entry->next;
+    allocator_.deallocate(entry, 1);
+    entry = next;
   }
+  head_ = nullptr;
 
   return out;
 }

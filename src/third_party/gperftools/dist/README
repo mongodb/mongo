@@ -33,11 +33,6 @@ tcmalloc functionality is available on all systems we've tested; see
 INSTALL for more details.  See README_windows.txt for instructions on
 using tcmalloc on Windows.
 
-NOTE: When compiling with programs with gcc, that you plan to link
-with libtcmalloc, it's safest to pass in the flags
-
- -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free
-
 when compiling.  gcc makes some optimizations assuming it is using its
 own, built-in malloc; that assumption obviously isn't true with
 tcmalloc.  In practice, we haven't seen any problems with this, but
@@ -146,7 +141,7 @@ make for just this purpose:
 CONFIGURATION OPTIONS
 ---------------------
 For advanced users, there are several flags you can pass to
-'./configure' that tweak tcmalloc performace.  (These are in addition
+'./configure' that tweak tcmalloc performance.  (These are in addition
 to the environment variables you can set at runtime to affect
 tcmalloc, described below.)  See the INSTALL file for details.
 
@@ -268,7 +263,7 @@ annotations', which make it easy to recognize a signal frame.  Some OS
 distributions, such as Fedora and gentoo 2007.0, already have added
 cfi annotations to their libc.  A future version of libunwind should
 recognize these annotations; these systems should not see any
-crashses.
+crashes.
 
 Workarounds: If you see problems with crashes when running the
 cpu-profiler, consider inserting ProfilerStart()/ProfilerStop() into

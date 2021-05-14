@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2007, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -32,7 +32,9 @@
 // Author: Arun Sharma
 
 #include "config_for_unittests.h"
+
 #include "system-alloc.h"
+
 #include <stdio.h>
 #if defined HAVE_STDINT_H
 #include <stdint.h>             // to get uintptr_t
@@ -40,11 +42,15 @@
 #include <inttypes.h>           // another place uintptr_t might be defined
 #endif
 #include <sys/types.h>
+
 #include <algorithm>
 #include <limits>
-#include "base/logging.h"               // for Check_GEImpl, Check_LTImpl, etc
-#include <gperftools/malloc_extension.h>    // for MallocExtension::instance
-#include "common.h"                     // for kAddressBits
+
+#include "base/logging.h"                // for Check_GEImpl, Check_LTImpl, etc
+#include "common.h"                      // for kAddressBits
+#include "gperftools/malloc_extension.h" // for MallocExtension::instance
+#include "gperftools/tcmalloc.h"
+#include "tests/testutil.h"
 
 class ArraySysAllocator : public SysAllocator {
 public:
@@ -101,7 +107,7 @@ static void TestBasicInvoked() {
 
   // An allocation size that is likely to trigger the system allocator.
   // XXX: this is implementation specific.
-  char *p = new char[1024 * 1024];
+  char *p =  noopt(new char[1024 * 1024]);
   delete [] p;
 
   // Make sure that our allocator was invoked.
@@ -136,12 +142,12 @@ static void TestBasicRetryFailTest() {
   // disable this test.
   // The weird parens are to avoid macro-expansion of 'max' on windows.
   const size_t kHugeSize = (std::numeric_limits<size_t>::max)() / 2;
-  void* p1 = malloc(kHugeSize);
-  void* p2 = malloc(kHugeSize);
+  void* p1 = noopt(malloc(kHugeSize));
+  void* p2 = noopt(malloc(kHugeSize));
   CHECK(p2 == NULL);
   if (p1 != NULL) free(p1);
 
-  char* q = new char[1024];
+  char* q = noopt(new char[1024]);
   CHECK(q != NULL);
   delete [] q;
 }

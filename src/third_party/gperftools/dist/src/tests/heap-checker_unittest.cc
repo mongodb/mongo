@@ -787,9 +787,9 @@ template<class Alloc>
 static void DirectTestSTLAlloc(Alloc allocator, const char* name) {
   HeapLeakChecker check((string("direct_stl-") + name).c_str());
   static const int kSize = 1000;
-  typename Alloc::pointer ptrs[kSize];
+  typename Alloc::value_type* ptrs[kSize];
   for (int i = 0; i < kSize; ++i) {
-    typename Alloc::pointer p = allocator.allocate(i*3+1);
+    typename Alloc::value_type* p = allocator.allocate(i*3+1);
     HeapLeakChecker::IgnoreObject(p);
     // This will crash if p is not known to heap profiler:
     // (i.e. STL's "allocator" does not have a direct hook to heap profiler)
@@ -1298,7 +1298,7 @@ static inline uintptr_t GetFunctionAddress (void* (*func)(uintptr_t*))
 #endif
 
 // to trick complier into preventing inlining
-static void* (*mmapper_addr)(uintptr_t* addr) = &Mmapper;
+static void* (* volatile mmapper_addr)(uintptr_t* addr) = &Mmapper;
 
 // TODO(maxim): copy/move this to memory_region_map_unittest
 // TODO(maxim): expand this test to include mmap64, mremap and sbrk calls.

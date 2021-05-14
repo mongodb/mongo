@@ -65,9 +65,6 @@ typedef int ucontext_t;   // just to quiet the compiler, mostly
 #include "base/sysinfo.h"             /* for GetUniquePathFromEnv, etc */
 #include "profiledata.h"
 #include "profile-handler.h"
-#ifdef HAVE_CONFLICT_SIGNAL_H
-#include "conflict-signal.h"          /* used on msvc machines */
-#endif
 
 using std::string;
 
@@ -144,34 +141,31 @@ class CpuProfiler {
 // number is defined in the environment variable CPUPROFILESIGNAL.
 static void CpuProfilerSwitch(int signal_number)
 {
-    bool static started = false;
-	static unsigned profile_count = 0;
-    static char base_profile_name[1024] = "\0";
+  static unsigned profile_count;
+  static char base_profile_name[PATH_MAX];
+  static bool started = false;
 
-	if (base_profile_name[0] == '\0') {
-    	if (!GetUniquePathFromEnv("CPUPROFILE", base_profile_name)) {
-        	RAW_LOG(FATAL,"Cpu profiler switch is registered but no CPUPROFILE is defined");
-        	return;
-    	}
-	}
-    if (!started) 
-    {
-    	char full_profile_name[1024];
-
-		snprintf(full_profile_name, sizeof(full_profile_name), "%s.%u",
-                 base_profile_name, profile_count++);
-
-        if(!ProfilerStart(full_profile_name))
-        {
-            RAW_LOG(FATAL, "Can't turn on cpu profiling for '%s': %s\n",
-                    full_profile_name, strerror(errno));
-        }
+  if (base_profile_name[0] == '\0') {
+    if (!GetUniquePathFromEnv("CPUPROFILE", base_profile_name)) {
+      RAW_LOG(FATAL,"Cpu profiler switch is registered but no CPUPROFILE is defined");
+      return;
     }
-    else    
-    {
-        ProfilerStop();
+  }
+
+  if (!started) {
+    char full_profile_name[PATH_MAX + 16];
+
+    snprintf(full_profile_name, sizeof(full_profile_name), "%s.%u",
+             base_profile_name, profile_count++);
+
+    if(!ProfilerStart(full_profile_name)) {
+      RAW_LOG(FATAL, "Can't turn on cpu profiling for '%s': %s\n",
+              full_profile_name, strerror(errno));
     }
-    started = !started;
+  } else {
+    ProfilerStop();
+  }
+  started = !started;
 }
 
 // Profile data structure singleton: Constructor will check to see if
@@ -405,6 +399,11 @@ extern "C" PERFTOOLS_DLL_DECL void ProfilerGetCurrentState(
   CpuProfiler::instance_.GetCurrentState(state);
 }
 
+extern "C" PERFTOOLS_DLL_DECL int ProfilerGetStackTrace(
+    void** result, int max_depth, int skip_count, const void *uc) {
+  return GetStackTraceWithContext(result, max_depth, skip_count, uc);
+}
+
 #else  // OS_CYGWIN
 
 // ITIMER_PROF doesn't work under cygwin.  ITIMER_REAL is available, but doesn't
@@ -422,6 +421,10 @@ extern "C" int ProfilerStartWithOptions(const char *fname,
 extern "C" void ProfilerStop() { }
 extern "C" void ProfilerGetCurrentState(ProfilerState* state) {
   memset(state, 0, sizeof(*state));
+}
+extern "C" int ProfilerGetStackTrace(
+    void** result, int max_depth, int skip_count, const void *uc) {
+  return 0;
 }
 
 #endif  // OS_CYGWIN

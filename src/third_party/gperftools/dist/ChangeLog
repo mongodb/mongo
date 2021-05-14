@@ -1,10 +1,1264 @@
+commit f5ae2c7efb3a49b6397884b0005c9185eaec8aa6
+Merge: 5f4db7b a5ec4f0
+Author: Andrew Morrow <acm@mongodb.com>
+Date:   Mon May 17 16:34:42 2021 -0400
+
+    Merge remote-tracking branch 'mongodb/2.7-mongodb' into 2.9-mongodb
+
+commit a5ec4f06ca031f5e8d77cee6ffb70c83c8d489b7
+Author: Andrew Morrow <acm@mongodb.com>
+Date:   Mon May 17 16:31:57 2021 -0400
+
+    SERVER-48324 FTDC - add verbose tcmalloc set parameter
+
+M	src/gperftools/malloc_extension.h
+M	src/malloc_extension.cc
+M	src/tcmalloc.cc
+
+commit 5f4db7b039a468d57bfad3c2b26edd6bed9066b3
+Merge: 9825572 f7c6fb6
+Author: Andrew Morrow <acm@mongodb.com>
+Date:	Thu May 13 21:56:44 2021 -0400
+
+    Merge tag 'gperftools-2.9.1' into 2.9-mongodb
+
+    bump version to 2.9.1
+
+commit 98255723e14d6ebcc3daff2f6a966c9e91bc0f94
+Merge: 47b5b59 05c0740
+Author: Andrew Morrow <acm@mongodb.com>
+Date:	Thu May 13 21:51:25 2021 -0400
+
+    Merge remote-tracking branch 'mongodb/2.7-mongodb' into 2.9-mongodb
+
+commit f7c6fb6c8e99d6b1b725e5994373bcd19ffdf8fd
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Tue Mar 2 19:32:07 2021 -0800
+
+    bump version to 2.9.1
+
+M	CMakeLists.txt
+M	NEWS
+M	configure.ac
+M	src/windows/config.h
+M	src/windows/gperftools/tcmalloc.h
+
+commit c2f60400a86a5211bf009941bf1ccf9b2947a7c1
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 28 17:52:17 2021 -0800
+
+    prefer backtrace() on OSX
+
+    It seems to work and _Unwind_Backtrace which is configured otherwise
+    doesn't.
+
+M	CMakeLists.txt
+M	cmake/DefineTargetVariables.cmake
+M	configure.ac
+
+commit a015377a54eb09fca4b893ae530187a705164df5
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 28 17:47:56 2021 -0800
+
+    Set tcmalloc heap limit prior to testing oom
+
+    Otherwise it can take long time to OOM on osex.
+
+M	src/tcmalloc.cc
+M	src/tests/tcmalloc_unittest.cc
+
+commit c939dd5531fd95e8af2181ac60e0b6e6230226c8
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 28 15:42:00 2021 -0800
+
+    correctly check sized delete hint when asserts are on
+
+    We previously tested wrong assumption that larger than page size size
+    classes have addresses aligned on page size. New code is making proper
+    check of size class.
+
+    Also added is unit test coverage for this previously failing
+    condition. And we now also run "assert-ful" unittests for big tcmalloc
+    too, not only tcmalloc_minimal configuration.
+
+    This fixes github issue #1254
+
+M	.gitignore
+M	Makefile.am
+M	src/tcmalloc.cc
+M	src/tests/tcmalloc_unittest.cc
+
+commit 47b5b59ca9b62ee42cf30273cce463aa9cbba8c7
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 21 15:16:06 2021 -0800
+
+    bump version to 2.9
+
+M	CMakeLists.txt
+M	NEWS
+M	configure.ac
+M	src/windows/config.h
+M	src/windows/gperftools/tcmalloc.h
+
+commit d7cbc8c2ff4ab8dbdc411ab1f25eca459f88502e
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 21 14:55:15 2021 -0800
+
+    unbreak cmake build
+
+    It was trying to use third_party/valgrind.h header which I recently
+    removed.
+
+M	CMakeLists.txt
+
+commit be0bbdb3403685798a7c1d5acf6405d2635fba4c
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 21 13:48:11 2021 -0800
+
+    amputate various unused bits from elfcore.h
+
+M	src/base/elfcore.h
+
+commit 42bab59f25dee53f91c0ba45e95b73754e197c20
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 21 13:35:43 2021 -0800
+
+    liberate profile handler from linux_syscall_support
+
+    We can get thread's tid in more portable way via libc syscall wrapper.
+
+M	src/profile-handler.cc
+
+commit 4629511e99f85fa8ca40fcbe105e014a725059d2
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 21 13:32:08 2021 -0800
+
+    liberate spinlock futex waits from linux_syscall_support includes
+
+    We've been using libc syscall wrapper some time now.
+
+M	src/base/spinlock_linux-inl.h
+
+commit 2e7094a86215118f3dcd3ad6f2c9099dc409ecc5
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 21 13:28:48 2021 -0800
+
+    liberate malloc_hook_mmap_linux.h from linux_syscall_support
+
+    It was not used some time now, as we're rightfully trusting libc
+    syscall wrapper instead.
+
+M	src/malloc_hook_mmap_linux.h
+
+commit 35301e2e59b30b7379981e60f3046124a2dfd68e
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 21 12:40:45 2021 -0800
+
+    add missing noopt wrappings around more operator new calls
+
+    This fixes tests passing on clang which otherwise eliminates those
+    new/delete calls so checking for hooks being called failed.
+
+M	src/tests/tcmalloc_unittest.cc
+
+commit fa412adfe38ffd3f545a0e10139bd20b38b688e9
+Author: Venkatesh Srinivas <venkateshs@chromium.org>
+Date:	Wed Feb 17 17:50:43 2021 -0800
+
+    Fix thread-safety (annotalysis) annotations
+
+    tcmalloc contains some thread-safety annotations; however those
+    annotations have not been exercised for some time, as they used
+    macros/attributes only supported by a legacy branch of gcc.
+
+    Pull request #1251 converted those macros to support modern
+    versions of clang; this CR fixes the annotations that were
+    enabled. For the most part, this just requires re-enabling
+    annotations on member functions that take/release locks. For the
+    tcmalloc fork (pre-fork and post-fork) handlers, we mark the
+    functions as exempt from this analysis, as it takes a dynamic
+    number of locks.
+
+M	src/base/low_level_alloc.cc
+M	src/base/spinlock.h
+M	src/central_freelist.h
+M	src/static_vars.cc
+
+commit cc496aecb81ee5966c865f3723743ff02046c5ad
+Author: Venkatesh Srinivas <venkateshs@chromium.org>
+Date:	Wed Feb 17 16:23:17 2021 -0800
+
+    tcmalloc: Switch thread-safety annotations to support clang
+
+    tcmalloc contains its own copy of thread_annotations.h, wrapper
+    macros for static thread-safety analysis expressions. These thread-
+    safety expressions allow asserting (at compile time) that certain
+    locks are held or excluded or certain data is protected by specific
+    locks; they are checked at compile-time by recent versions of clang
+    or a gcc branch (https://gcc.gnu.org/wiki/ThreadSafetyAnnotation).
+
+    Convert the #if-guard and macro names from the no-longer-supported
+    gcc branch's defines & macros to the versions supported by recent
+    versions of clang.
+
+M	src/base/thread_annotations.h
+
+commit 96ba58e19b7b93fcf1db6a0551c9510296ce26da
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 23:18:57 2021 -0800
+
+    bump version to 2.9rc
+
+M	CMakeLists.txt
+M	NEWS
+M	configure.ac
+M	src/windows/config.h
+M	src/windows/gperftools/tcmalloc.h
+
+commit 9ce32aefa9c66698817be50e141c5a39fe3823c8
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 23:02:28 2021 -0800
+
+    upgrade test bot to xenial (ubuntu 16.04 LTS)
+
+    Older glibc seemingly doesn't have right unwind info for signal frame,
+    so fails recently upgraded stacktrace_unittest. But since this version
+    is not supported anymore, lets just test newer glibc.
+
+M	.travis.yml
+
+commit 91ff3114492f368a651ee790c8311eb6fadf3e8e
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 22:36:55 2021 -0800
+
+    don't default to generic_fp without frame pointers
+
+    I.e. on x86-64 and riscv.
+
+M	src/stacktrace.cc
+
+commit 4cf7dd0a7502849b117e15ad5eb1eb68eab4b6dc
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 22:28:34 2021 -0800
+
+    enable emergency_malloc on all architectures with mmap
+
+    It is actually needed for libgcc backtracer from time to time. And
+    we've seen libunwind to need it too. Plus we've not heard of any
+    problems with it. So lets just always enable it.
+
+    This should fix github issue #1248.
+
+M	configure.ac
+
+commit 37087ec5360e821627155d3129f9b55a321a0001
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 21:37:20 2021 -0800
+
+    prefer libunwind on x86-64 even with -fno-omit-frame-pointer
+
+    Libunwind is mostly safe on x86-64 and most of OS (e.g. libc) is
+    compiled without frame pointers anyways. Even when libc is built with
+    frame pointers, various libc asm routines (e.g. memcpy) are not. And
+    even for code built with frame pointers we actually sometimes get
+    SIGPROF inside function prologues, before frame pointer is
+    established. Which then causes imperfect backtraces.
+
+    Libunwind should handle this all (when it doesn't crash or deadlock).
+
+M	src/stacktrace.cc
+
+commit f4aa2a435eed63fc047448635f705a9c6037bd97
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 7 11:59:44 2021 -0800
+
+    implement generic frame pointer backtracer
+
+    This supports frame pointer backtracing on x86-64, aarch64 and
+    riscv-s (should work for both 32 and 64 bits).
+
+    Also added is detection of borked libunwind on aarch64-s. In this case
+    frame pointer unwinder is preferred.
+
+M	Makefile.am
+M	src/stacktrace.cc
+A	src/stacktrace_generic_fp-inl.h
+M	src/tests/stacktrace_unittest.cc
+
+commit 17bab484aea43cf1a5247c823e036dfb52f5d92b
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sat Feb 6 13:21:12 2021 -0800
+
+    always respect --enable-frame-pointers
+
+    Previously it only was respected on x86_64, but this days lots
+    of modern
+    ABIs are without frame pointers by default (e.g. arm64 and riscv, and
+    even older mips).
+
+M	CMakeLists.txt
+M	Makefile.am
+D	cmake/CheckNoFPByDefault.cmake
+M	configure.ac
+
+commit 22c0eceddcf986a9b3f853b36d855acb38fa678f
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 16:29:14 2021 -0800
+
+    add emacs mode line annotations to remaining files
+
+M	src/base/arm_instruction_set_select.h
+M	src/base/dynamic_annotations.c
+M	src/base/dynamic_annotations.h
+M	src/base/linuxthreads.h
+M	src/base/thread_annotations.h
+M	src/base/thread_lister.c
+M	src/base/vdso_support.cc
+M	src/base/vdso_support.h
+M	src/gperftools/heap-profiler.h
+M	src/gperftools/profiler.h
+M	src/gperftools/tcmalloc.h.in
+M	src/stacktrace_powerpc-darwin-inl.h
+M	src/tests/stacktrace_unittest.cc
+M	src/windows/addr2line-pdb.c
+M	src/windows/config.h
+M	src/windows/ia32_modrm_map.cc
+M	src/windows/ia32_opcode_map.cc
+M	src/windows/nm-pdb.c
+M	src/windows/patch_functions.cc
+M	src/windows/system-alloc.cc
+
+commit b12139ddbaa3e16ba491a24ce6fec51009e70cce
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 16:13:15 2021 -0800
+
+    delete-trailing-whitespace on all files
+
+M	src/addressmap-inl.h
+M	src/base/atomicops-internals-gcc.h
+M	src/base/atomicops-internals-linuxppc.h
+M	src/base/atomicops-internals-macosx.h
+M	src/base/atomicops-internals-windows.h
+M	src/base/atomicops-internals-x86.cc
+M	src/base/atomicops-internals-x86.h
+M	src/base/atomicops.h
+M	src/base/commandlineflags.h
+M	src/base/googleinit.h
+M	src/base/linuxthreads.cc
+M	src/base/logging.cc
+M	src/base/logging.h
+M	src/base/low_level_alloc.cc
+M	src/base/low_level_alloc.h
+M	src/base/simple_mutex.h
+M	src/base/spinlock.cc
+M	src/base/spinlock.h
+M	src/base/spinlock_linux-inl.h
+M	src/base/spinlock_posix-inl.h
+M	src/base/spinlock_win32-inl.h
+M	src/base/stl_allocator.h
+M	src/base/sysinfo.cc
+M	src/base/sysinfo.h
+M	src/base/thread_annotations.h
+M	src/base/vdso_support.cc
+M	src/common.cc
+M	src/config_for_unittests.h
+M	src/getenv_safe.h
+M	src/google/heap-profiler.h
+M	src/google/malloc_extension.h
+M	src/google/malloc_extension_c.h
+M	src/google/malloc_hook.h
+M	src/google/malloc_hook_c.h
+M	src/google/profiler.h
+M	src/google/stacktrace.h
+M	src/google/tcmalloc.h
+M	src/gperftools/heap-profiler.h
+M	src/gperftools/malloc_extension.h
+M	src/gperftools/malloc_extension_c.h
+M	src/gperftools/malloc_hook.h
+M	src/gperftools/malloc_hook_c.h
+M	src/gperftools/profiler.h
+M	src/gperftools/stacktrace.h
+M	src/heap-checker-bcad.cc
+M	src/heap-profile-stats.h
+M	src/heap-profile-table.cc
+M	src/heap-profile-table.h
+M	src/heap-profiler.cc
+M	src/internal_logging.cc
+M	src/internal_logging.h
+M	src/malloc_extension.cc
+M	src/malloc_hook-inl.h
+M	src/malloc_hook.cc
+M	src/maybe_threads.cc
+M	src/maybe_threads.h
+M	src/memfs_malloc.cc
+M	src/memory_region_map.cc
+M	src/memory_region_map.h
+M	src/pagemap.h
+M	src/profile-handler.cc
+M	src/profile-handler.h
+M	src/raw_printer.cc
+M	src/raw_printer.h
+M	src/sampler.cc
+M	src/sampler.h
+M	src/stacktrace_powerpc-inl.h
+M	src/symbolize.cc
+M	src/symbolize.h
+M	src/system-alloc.cc
+M	src/system-alloc.h
+M	src/tests/addressmap_unittest.cc
+M	src/tests/atomicops_unittest.cc
+M	src/tests/frag_unittest.cc
+M	src/tests/heap-profiler_unittest.cc
+M	src/tests/low_level_alloc_unittest.cc
+M	src/tests/malloc_extension_c_test.c
+M	src/tests/malloc_extension_test.cc
+M	src/tests/markidle_unittest.cc
+M	src/tests/memalign_unittest.cc
+M	src/tests/pagemap_unittest.cc
+M	src/tests/profiler_unittest.cc
+M	src/tests/realloc_unittest.cc
+M	src/tests/sampler_test.cc
+M	src/tests/stacktrace_unittest.cc
+M	src/tests/system-alloc_unittest.cc
+M	src/tests/tcmalloc_large_unittest.cc
+M	src/tests/testutil.cc
+M	src/tests/testutil.h
+M	src/tests/thread_dealloc_unittest.cc
+M	src/windows/get_mangled_names.cc
+M	src/windows/google/tcmalloc.h
+M	src/windows/ia32_modrm_map.cc
+M	src/windows/ia32_opcode_map.cc
+M	src/windows/mingw.h
+M	src/windows/mini_disassembler.cc
+M	src/windows/mini_disassembler.h
+M	src/windows/mini_disassembler_types.h
+M	src/windows/nm-pdb.c
+M	src/windows/override_functions.cc
+M	src/windows/patch_functions.cc
+M	src/windows/port.cc
+M	src/windows/preamble_patcher.cc
+M	src/windows/preamble_patcher.h
+M	src/windows/preamble_patcher_test.cc
+M	src/windows/preamble_patcher_with_stub.cc
+M	src/windows/system-alloc.cc
+
+commit 419c85814de497d6dfaf6f9a19d153138a7dec08
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 16:02:56 2021 -0800
+
+    amputate unused dynamic annotations support
+
+M	CMakeLists.txt
+M	Makefile.am
+M	cmake/config.h.in
+M	configure.ac
+M	src/base/dynamic_annotations.c
+M	src/base/dynamic_annotations.h
+M	src/base/low_level_alloc.cc
+M	src/base/spinlock.h
+M	src/profile-handler.cc
+D	src/third_party/valgrind.h
+M	src/windows/config.h
+
+commit 73a72cdb6154ab7bdd49b1dde91349a30e8d7973
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 15:11:12 2021 -0800
+
+    don't check for snprintf
+
+M	CMakeLists.txt
+M	cmake/config.h.in
+M	src/windows/config.h
+M	src/windows/mingw.h
+M	src/windows/port.h
+
+commit 95b52b0504a7cb2bce36d72b8bb0825833500b4c
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 15:02:57 2021 -0800
+
+    don't check for unused uname symbol
+
+M	CMakeLists.txt
+M	cmake/config.h.in
+M	configure.ac
+M	src/windows/config.h
+
+commit 01c2697fac41a5d6175ad0da21d9d753f0b385a1
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 14:30:29 2021 -0800
+
+    amputate unused SleepForMilliseconds from sysinfo.{h,cc}
+
+M	src/base/sysinfo.cc
+M	src/base/sysinfo.h
+
+commit ac68c97187e3729668ff5048c9bd27aae14e974d
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 14:25:49 2021 -0800
+
+    don't check for useless __builtin_stack_pointer
+
+    It doesn't seem to be supported anyways, and we're not using it too.
+
+M	CMakeLists.txt
+M	cmake/config.h.in
+M	configure.ac
+M	src/windows/config.h
+
+commit 7271bb72be08db491d3f0c60c1b0d5593cc1b5b5
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 14:22:08 2021 -0800
+
+    unbreak cmake check for TLS support
+
+M	CMakeLists.txt
+
+commit 7c106ca241a344993f8011397de8004a224e094a
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 14:14:55 2021 -0800
+
+    don't bother checking for stl namespace and use std
+
+    Because there are no compilers left that don't do std namespace.
+
+M	CMakeLists.txt
+M	cmake/config.h.in
+M	configure.ac
+D	m4/namespaces.m4
+D	m4/stl_namespace.m4
+M	src/heap-profiler.cc
+M	src/malloc_extension.cc
+M	src/tcmalloc.cc
+M	src/windows/config.h
+
+commit 0d6f32b9cef7ee044e55a746e7c76db62d23cd86
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 14:04:10 2021 -0800
+
+    use standard way to print size_t-sized ints
+
+    I.e. just use zu/zd/zx instead of finding out right size and defining
+    PRI{u,x,d}S defines. Compilers have long caught up to this part of
+    standard.
+
+M	cmake/config.h.in
+M	configure.ac
+D	m4/compiler_characteristics.m4
+M	src/debugallocation.cc
+M	src/emergency_malloc.cc
+M	src/heap-checker.cc
+M	src/heap-profile-table.cc
+M	src/heap-profiler.cc
+M	src/memory_region_map.cc
+M	src/profiledata.cc
+M	src/tcmalloc.cc
+M	src/tests/markidle_unittest.cc
+M	src/tests/tcmalloc_unittest.cc
+M	src/windows/config.h
+
+commit 0c11d35f4a2a0f5f42ee684a3f5b27cbab8abae2
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 13:39:55 2021 -0800
+
+    amputate checking for __int64
+
+    Since everything supports stdint.h this days.
+
+M	CMakeLists.txt
+M	cmake/config.h.in
+M	configure.ac
+M	src/windows/config.h
+M	src/windows/port.h
+
+commit 92718aaaeb08d139b346633333235bf2260d0848
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 13:34:58 2021 -0800
+
+    amputate checking for conflict-signal.h
+
+    It was never found or used.
+
+M	CMakeLists.txt
+M	cmake/config.h.in
+M	src/profiler.cc
+M	src/windows/config.h
+
+commit 9bb2937261bca6c0257a8cfd62ff97f69c450acb
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 14 13:33:10 2021 -0800
+
+    amputate checking for inline keyword support
+
+    It is supported everywhere now.
+
+M	CMakeLists.txt
+M	cmake/config.h.in
+M	configure.ac
+M	src/windows/config.h
+
+commit d9c4c3b481e641b719d3d790987ed7d094157bf2
+Author: Đoàn Trần Công Danh <congdanhqx@gmail.com>
+Date:	Fri Feb 12 19:21:18 2021 +0700
+
+    profile-handler: use documented sigev_notify_thread_id in sigevent
+
+    sigevent(7) is documented to have sigev_notify_thread_id as its
+    member.
+    In glibc system, it's a macro expanded to the legacy _sigev_un._tid,
+    _sigev_un._tid is obviously an internal implementation detail as
+    signaled by its underscore prefix. And this macro was hidden inside
+    linux/signal.h in older version of glibc.
+
+    On Linux that use musl libc, sigev_notify_thread_id is also a
+    macro, but
+    it's expanded to __sev_fields.sigev_notify_thread_id
+
+    [alkondratenko@gmail.com: amputated broken linux/signal.h dependency]
+    [alkondratenko@gmail.com: see
+    https://github.com/gperftools/gperftools/pull/1250]
+    Signed-off-by: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+
+M	src/profile-handler.cc
+
+commit 43459feb33b87d3300e3b8b4917e5226678e4a0f
+Author: Đoàn Trần Công Danh <congdanhqx@gmail.com>
+Date:	Sat Feb 13 17:35:20 2021 +0700
+
+    configure.ac: check for features.h once
+
+M	configure.ac
+
+commit 290b123c01f6578391b20bb31849f26b02401112
+Author: Venkatesh Srinivas <venkateshs@chromium.org>
+Date:	Mon Feb 8 12:32:23 2021 -0800
+
+    atomicops: Remove Acquire_Store / Release_Load
+
+    gperftools' internal atomicops library included atomic
+    Release Load and Acquire Store operations; those operations
+    were unused and expressed ordering constraints that aren't
+    expressible in the C++ standard memory model.
+
+    Remove them, to make a transition to C++11 atomics easier
+    and to avoid confusing use of them.
+
+M	src/base/atomicops-internals-arm-generic.h
+M	src/base/atomicops-internals-arm-v6plus.h
+M	src/base/atomicops-internals-gcc.h
+M	src/base/atomicops-internals-linuxppc.h
+M	src/base/atomicops-internals-macosx.h
+M	src/base/atomicops-internals-mips.h
+M	src/base/atomicops-internals-windows.h
+M	src/base/atomicops-internals-x86.h
+M	src/base/atomicops.h
+M	src/tests/atomicops_unittest.cc
+
+commit 3b1c60cc4ea737ff151977dbcd164c5e2eb859fb
+Author: SSE4 <tomskside@gmail.com>
+Date:	Wed Jan 27 11:15:56 2021 +0300
+
+    Add support for Elbrus 2000 (e2k)
+
+M	cmake/PCFromUContext.cmake
+M	m4/pc_from_ucontext.m4
+M	src/base/basictypes.h
+M	src/malloc_hook_mmap_linux.h
+
+commit c5747615da78f7c2d91112f2a6b6b4da4f18540a
+Author: Jarno Rajahalme <jarno@covalent.io>
+Date:	Fri Jan 29 09:54:18 2021 -0800
+
+    syscall: Mark x8 as clobbered
+
+    Mark arm64 register x8 as clobbered by syscall body inline assembly as
+    it is being used to store the syscall number. Otherwise the compiler
+    may try to use it for some other purpose.
+
+    This fix is derived from a resolution to clang Bugzilla report
+    https://bugs.llvm.org/show_bug.cgi?id=48798.  See this report for a
+    minimal reproducer derived from the code fixed here as well as the
+    resolution.
+
+    This should fix SEGFAULTs as reported in
+    https://github.com/envoyproxy/envoy/issues/14756.
+
+    Fixes: #1241
+    Signed-off-by: Jarno Rajahalme <jarno@covalent.io>
+
+M	src/base/linux_syscall_support.h
+
+commit d8eb315fb18f6fb0d6efa923401f166343727bc6
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Dec 20 23:35:08 2020 -0800
+
+    bump version to 2.8.1
+
+M	CMakeLists.txt
+M	NEWS
+M	configure.ac
+M	src/windows/config.h
+M	src/windows/gperftools/tcmalloc.h
+
+commit 6ed61f8e91ffc00310b253ad2c777c0e862bd742
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sat Dec 19 19:14:50 2020 -0800
+
+    add note that cmake build is preliminary
+
+M	CMakeLists.txt
+
+commit 6bbf2ed1501e27e215bb412b9b0b930921598bca
+Author: okhowang(王沛文) <okhowang@tencent.com>
+Date:	Sat Sep 12 02:43:56 2020 +0800
+
+    Update cmake
+
+M	CMakeLists.txt
+M	cmake/FindObjcopyWithWeaken.cmake
+D	cmake/GPerftoolsAddTarget.cmake
+M	cmake/config.h.in
+A	cmake/pkgconfig.pc
+M	cmake/tcmalloc.h.in
+M	src/tests/addressmap_unittest.cc
+A	src/windows/CMakeLists.txt
+
+commit 913d3eb7d7fc1c5cc025920d5699b528c268f0fa
+Author: Isaac Hier <ihier@uber.com>
+Date:	Wed Nov 8 11:20:25 2017 -0500
+
+    Fix a few macros for Apple
+
+M	CMakeLists.txt
+M	cmake/config.h.in
+
+commit 64a73b1cb87a6661e4c3092b07bfd5032fe9a1fa
+Author: Isaac Hier <isaachier@gmail.com>
+Date:	Wed Nov 8 07:24:08 2017 -0500
+
+    Work on fixing linking errors in stacktrace
+
+M	CMakeLists.txt
+M	cmake/config.h.in
+
+commit b788d51eb4cf80adc7d782fa8df7175ee96d41d9
+Author: Isaac Hier <isaachier@gmail.com>
+Date:	Tue Nov 7 21:25:34 2017 -0500
+
+    Fix conditional definitions
+
+M	CMakeLists.txt
+
+commit 495229b625d65b19f3fc98fed5b626d31a89ee03
+Author: Isaac Hier <isaachier@gmail.com>
+Date:	Tue Nov 7 13:26:10 2017 -0500
+
+    Make internal tcmalloc libs
+
+M	CMakeLists.txt
+
+commit cca7f6f669657218a15ef5a176706660ad2c1d67
+Author: Isaac Hier <isaachier@gmail.com>
+Date:	Sun Nov 5 16:53:28 2017 -0500
+
+    More unit tests and libraries
+
+M	CMakeLists.txt
+
+commit 11dc65c3c40618065ae48ccdb1e1548e339bff32
+Author: Isaac Hier <isaachier@gmail.com>
+Date:	Sun Nov 5 12:53:07 2017 -0500
+
+    Fix config headers, add more unit tests
+
+M	CMakeLists.txt
+M	cmake/config.h.in
+M	cmake/tcmalloc.h.in
+
+commit 6078fe40d9a5b829cbbadc6ec824163d6d9eda5b
+Author: Isaac Hier <isaachier@gmail.com>
+Date:	Sun Nov 5 12:23:42 2017 -0500
+
+    Finish configure.ac conversion to CMake, start on Makefile.am
+
+M	CMakeLists.txt
+A	cmake/CheckNoFPByDefault.cmake
+M	cmake/DefineTargetVariables.cmake
+A	cmake/FindObjcopyWithWeaken.cmake
+A	cmake/GPerftoolsAddTarget.cmake
+M	cmake/PCFromUContext.cmake
+M	cmake/config.h.in
+
+commit 515fb221966a2413d00184186da97719b90e3915
+Author: Isaac Hier <isaachier@gmail.com>
+Date:	Fri Nov 3 09:10:27 2017 -0400
+
+    Generate config header
+
+M	CMakeLists.txt
+D	cmake/DefineArchVariables.cmake
+A	cmake/DefineTargetVariables.cmake
+M	cmake/PCFromUContext.cmake
+A	cmake/config.h.in
+A	cmake/tcmalloc.h.in
+
+commit 4adb5ff74d35900dd8d0ed07959eef68f85c8886
+Author: Isaac Hier <ihier@uber.com>
+Date:	Thu Nov 2 20:07:29 2017 -0400
+
+    Add architecture checks
+
+M	CMakeLists.txt
+A	cmake/DefineArchVariables.cmake
+M	src/tcmalloc.h
+
+commit fa9bedc82cbbc289875a07b6e431e553b1a15b77
+Author: Isaac Hier <isaachier@gmail.com>
+Date:	Wed Nov 1 09:52:02 2017 -0400
+
+    Add most of CMake build
+
+M	CMakeLists.txt
+A	cmake/PCFromUContext.cmake
+
+commit 9e4f72fd1faa3f406f468796b4b6908391c8019c
+Author: Isaac Hier <ihier@uber.com>
+Date:	Mon Oct 30 22:26:13 2017 -0400
+
+    Define options, start system checks
+
+M	CMakeLists.txt
+
+commit a6ce98174b47213f11c84d57cfbc1e3cdd609bfb
+Author: Isaac Hier <isaachier@gmail.com>
+Date:	Mon Oct 30 09:35:34 2017 -0400
+
+    Add CMakeLists.txt
+
+A	CMakeLists.txt
+
+commit 313495587598fb1a69b94c44a83735f6056f6049
+Author: Steve Langasek <steve.langasek@canonical.com>
+Date:	Thu Oct 8 16:49:21 2020 -0700
+
+    Additional porting for riscv64.
+
+    Adds handling for the PC register, malloc_hook_mmap, and syscalls.
+
+    Successfully built in Ubuntu with these changes.
+
+M	m4/pc_from_ucontext.m4
+M	src/base/linux_syscall_support.h
+M	src/malloc_hook_mmap_linux.h
+
+commit f0e289bdbb2fbbb7fa71496d846988c1bac0e310
+Author: Steve Langasek <steve.langasek@canonical.com>
+Date:	Thu Oct 8 07:54:03 2020 -0700
+
+    Enable build on riscv64.
+
+    Cacheline length may be implementation-specific, but this is known
+    to be
+    correct on the U54.
+
+M	src/base/basictypes.h
+
+commit 6c715b4fa183e221a29c5d7a4ea87aeba4ee02cf
+Author: Tim Gates <tim.gates@iress.com>
+Date:	Sat Oct 10 17:26:00 2020 +1100
+
+    docs: fix simple typo, defininitions -> definitions
+
+    There is a small typo in src/base/linux_syscall_support.h.
+
+    Should read `definitions` rather than `defininitions`.
+
+M	src/base/linux_syscall_support.h
+
+commit 02d5264018cc76a36713f97329870dbf85969519
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sat Dec 19 17:15:31 2020 -0800
+
+    Revert "drop page heap lock when returning memory back to kernel"
+
+    This reverts commit be3da70298bf3d25c7d64655922ab82dd819ec98.
+
+    There are reports of crashes and false-positive OOMs from this
+    patch. Crashes under aggressive decommit mode are understood, but I
+    have yet to get confirmations whether false-positive OOMs were seen
+    under aggressive decommit or not. Thus lets revert for now.
+
+    Updates issue #1227 and issue #1204.
+
+M	src/page_heap.cc
+M	src/page_heap.h
+M	src/tests/page_heap_test.cc
+
+commit 151cbf5146cd5b359a4470860d1f7d8f6a843d62
+Author: Grant Henke <granthenke@gmail.com>
+Date:	Thu Nov 26 20:56:46 2020 -0600
+
+    Add OS X arm64 program counter
+
+    [alkondratenko@gmail.com: updated comment that it is tested]
+
+    Signed-off-by: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+
+M	m4/pc_from_ucontext.m4
+
+commit 140e3481d0541044cdc27f45129b47f92d5940b7
+Merge: bda3c82 0fc5cab
+Author: Aliaksey Kandratsenka (aka Aliaksei Kandratsenka)
+<alkondratenko@gmail.com>
+Date:	Tue Nov 17 14:30:59 2020 -0800
+
+    Merge pull request #1231 from PatriosTheGreat/master
+
+    Fix implicit-int-float-conversion warning.
+
+commit 0fc5cabdfc966affb6f336848d9587ec5d904d0c
+Author: Levon Ter-Grigoryan <patrios@google.com>
+Date:	Tue Nov 17 12:29:22 2020 +0100
+
+    Fix implicit-int-float-conversion warning.
+
+M	src/sampler.cc
+
+commit bda3c82e11615ca9e7751d1f3cfb161026ee742a
+Author: Kerrick Staley <kstaley@lyft.com>
+Date:	Wed Jul 8 16:42:12 2020 -0700
+
+    Increase kMaxStackDepth to 254
+
+    [alkondratenko@gmail.com: reduced value from 256 to 254]
+
+M	src/profiledata.h
+
+commit 1d9b8bb59d5610f2c3e9faad6bbd91ceca17fb93
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sat Jul 11 20:33:40 2020 -0700
+
+    don't test sbrk hook if we're on linux and don't have __sbrk
+
+    "mmap" hooks code for linux only hooks sbrk when __sbrk is
+    defined. But musl doesn't offer this function (reasonably so), so
+    sbrk hooking doesn't work there. Not big loss, but lets make sure
+    tests don't fail.
+
+    Lets reference this to issue #1198
+
+M	src/tests/tcmalloc_unittest.cc
+
+commit 180bfa10d7cb38e8b3784d60943d50e8fcef0dcb
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Mon Jul 6 02:51:43 2020 -0700
+
+    bumped version to 2.8
+
+M	Makefile.am
+M	NEWS
+M	configure.ac
+M	src/windows/config.h
+M	src/windows/gperftools/tcmalloc.h
+
+commit c1bcc412ba4a94deaf8c3230519ecb4dda60557d
+Author: Ryan Macnak <rmacnak@google.com>
+Date:	Fri May 1 11:50:16 2020 -0700
+
+    Don't try to mark esp as clobbered in linux syscall support.
+
+    Compare 9e5b1628737c67b4587f937164572774592978c4, issue #1076
+
+M	src/base/linux_syscall_support.h
+
+commit 50f89afaed3d07d384fa8d86c98460ccff1e870e
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Apr 19 22:21:07 2020 -0700
+
+    liberate gperftools tests from relying on -fno-builtin-XXX flags
+
+    Clang mostly ignores those anyways, so our tests needed better way to
+    disable optimizations (clang is quite aggressive replacing new/delete
+    pair with stack allocation).
+
+M	Makefile.am
+M	README
+M	src/tests/debugallocation_test.cc
+M	src/tests/system-alloc_unittest.cc
+M	src/tests/tcmalloc_large_unittest.cc
+M	src/tests/tcmalloc_unittest.cc
+M	src/tests/testutil.h
+
+commit 98ccd0f1029c11a3df0a51e4a14b543e430a96f8
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Apr 19 22:50:16 2020 -0700
+
+    prevent inlining in heap-checker unittest
+
+    The test relies on stuff "mmaper" function not being inlined, but
+    compilers are getting smarter and latest clang actually does inline it
+    now. Adding volatile to pointer declaration fixes it.
+
+M	src/tests/heap-checker_unittest.cc
+
+commit e521472f1ac1ecf028e8c922ca4f8741473afd66
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Jul 5 22:49:41 2020 -0700
+
+    fix linking of page_heap_test on windows
+
+    After change to release page heap lock around returning memory back to
+    kernel, page heap test got dependency on page heap lock. Which was not
+    available on windows since relevant symbols are not exported.
+
+    Proposed fix is to simply duplicate all needed .cc files in
+    page_heap_test project instead of linking to dll. This is not perfect
+    but gets job done, until we figure out better solution (GNU/Linux will
+    eventually get hidden visibility and will need it).
+
+    This fixes github issue 1189.
+
+M	vsprojects/page_heap_test/page_heap_test.vcxproj
+M	vsprojects/page_heap_test/page_heap_test.vcxproj.filters
+
+commit e5f77d6485bd2f6ce43862e3e57118b1bb97d30a
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Mon Mar 23 01:21:27 2020 -0700
+
+    chmod -x Makefile.am gperftools.sln
+
+M	Makefile.am
+M	gperftools.sln
+
+commit 6b92e00cecb82e7fae6e019583865faced29c6f7
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Mon Mar 23 01:15:40 2020 -0700
+
+    don't assume HAVE_MMAP on mingw builds
+
+    Fixes github issue #1108.
+
+M	configure.ac
+
+commit 4cddede3990a96969aac9ff13ce3c8195ec91ce7
+Author: Kirill Müller <krlmlr@mailbox.org>
+Date:	Tue Feb 25 09:09:22 2020 +0100
+
+    New ProfilerGetStackTrace()
+
+M	Makefile.am
+M	src/gperftools/profiler.h
+M	src/profiler.cc
+
+commit db7aa547abb5abdd558587a15502584cbc825438
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Mar 8 20:57:01 2020 -0700
+
+    bumped version to 2.8rc
+
+M	NEWS
+M	configure.ac
+M	src/windows/config.h
+M	src/windows/gperftools/tcmalloc.h
+
+commit be3da70298bf3d25c7d64655922ab82dd819ec98
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Mar 8 19:32:02 2020 -0700
+
+    drop page heap lock when returning memory back to kernel
+
+    Fixes issue #754.
+
+M	src/page_heap.cc
+M	src/page_heap.h
+M	src/tests/page_heap_test.cc
+
+commit 87acc2782fe49a8b57d19783f61ff8bc667db68d
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Mar 8 18:22:17 2020 -0700
+
+    amputate span events history
+
+    Nobody used it in years. Abseil tcmalloc had it amputated years ago.
+
+M	src/central_freelist.cc
+M	src/page_heap.cc
+M	src/span.cc
+M	src/span.h
+
+commit e40c7f231ad89e1ee8bf37a1d6680880c519c901
+Author: Ilya Leoshkevich <iii@linux.ibm.com>
+Date:	Thu Feb 27 13:10:29 2020 +0100
+
+    Fix mmap syscall on s390
+
+    mmap arguments must be passed in an array on s390.
+
+    Signed-off-by: Ilya Leoshkevich <iii@linux.ibm.com>
+
+M	src/malloc_hook_mmap_linux.h
+
+commit b7607ee7d4ab35504a54588e5912a8e850686db2
+Author: Jon Kohler <jon@nutanix.com>
+Date:	Sun Jan 19 22:09:08 2020 -0500
+
+    tcmalloc: ability to disable fallback allocator in memfs
+
+    Whenever tcmalloc memfs allocator runs out of huge memory, it falls
+    back to the
+    default system allocator, which will start allocating from normal
+    anonymous
+    memory pool (small pages).	For use cases that exclusively want
+    hugepage backed
+    memory, such as using tcmalloc in combination with Intel SPDK, this is
+    problematic.
+
+    This change adds an environment variable
+    "TCMALLOC_MEMFS_DISABLE_FALLBACK"
+    which when set to true will ensure that tcmalloc doesn't fallback
+    to using the
+    system allocator when the system runs out of hugepages. This is
+    false by
+    default, such that all other tcmalloc consumers will not see any
+    changes.
+
+    For those curious, you can see part of our upstream SPDK work here:
+    https://review.gerrithub.io/c/spdk/spdk/+/475943
+
+M	src/memfs_malloc.cc
+
+commit 1bfcb5bc3a779b6c0c63125737f035c2afcc9e95
+Author: Jon Kohler <jon@nutanix.com>
+Date:	Tue Feb 18 11:14:49 2020 -0500
+
+    tcmalloc: fragmentation overhead instrumentation
+
+    This patch adds visibility into the overhead due to fragmentation
+    for each size
+    class in the tcmalloc central free list, which is helpful when
+    debugging
+    fragmentation issues.
+
+M	src/tcmalloc.cc
+
+commit 36bf1309de52433f0088274b347b4fc385ea056f
+Author: Todd Lipcon <todd@cloudera.com>
+Date:	Mon Jun 3 10:29:06 2019 -0700
+
+    Fix a clang-tidy readability warning for static member access
+
+    This fixes the following warning:
+
+    src/thread_cache.cc:281:10: warning: static member accessed through
+    instance [readability-static-accessed-through-instance]
+      return sampler_.GetSamplePeriod();
+	     ^~~~~~~~~~~~~~~~~~~~~~~~
+	     tcmalloc::Sampler::
+
+M	src/thread_cache.cc
+
+commit 2b2a962c2bdc3ecbdbd45873a07989c7ccb56560
+Author: prehistoricpenguin <prehistoricpenguin@qq.com>
+Date:	Fri Jul 12 16:25:55 2019 +0800
+
+    Remove executable flag for c++ files
+
+M	src/heap-checker.cc
+M	src/heap-profiler.cc
+M	src/stacktrace_instrument-inl.h
+M	src/symbolize.cc
+M	src/system-alloc.cc
+M	src/tests/sampler_test.cc
+
+commit 8f308afbfedeca0991ef431e3b8e0b01bd5b8a8f
+Author: Henrik Edin <henrik.edin@mongodb.com>
+Date:	Tue Apr 9 15:16:55 2019 -0400
+
+    Increase kClassSizesMax to 128 to allow for page size of 4K
+
+M	src/common.h
+
+commit d3fefdb69439292ec914cd8c65dd83ed1bcbdc65
+Author: Henrik Edin <henrik.edin@mongodb.com>
+Date:	Tue Jan 29 13:25:40 2019 -0500
+
+    Allow configuring page size to 4K, 8K, 16K, 32K, 64K, 128K and 256K
+
+M	INSTALL
+M	configure.ac
+M	src/common.h
+M	src/windows/config.h
+
+commit cf2df3b000c58155d3c83bd01b603894b4559c0b
+Author: Laurent Stacul <laurent.stacul@gmail.com>
+Date:	Fri Feb 7 09:37:34 2020 +0000
+
+    Fix the removed std::allocator::pointer member type removed in C++20
+
+M	src/tests/heap-checker_unittest.cc
+
+commit 31024506c543132adb315b8de89d5faa85e0ff0e
+Author: shipujin <shipujin.t@gmail.com>
+Date:	Tue Aug 20 13:24:57 2019 +0800
+
+    Add mips64* support
+
+M	src/base/linux_syscall_support.h
+
+commit fe62a0baab87ba3abca12f4a621532bf67c9a7d2
+Author: Holy Wu <HolyWu@users.noreply.github.com>
+Date:	Tue Apr 9 18:33:26 2019 +0800
+
+    Update config.h in Windows
+
+M	src/windows/config.h
+
+commit 8272631b5a9f9e840eb1b014f43b3ddea16ff67d
+Author: 风 <invalid_ms_user@live.com>
+Date:	Wed Apr 17 10:55:06 2019 +0800
+
+    Fix a long time typo
+
+    Thought this fix may not effect the behavior or performance, but it
+    seems indeed a bug.
+
+M	src/pprof
+
 commit 05c07409ae777669aad8f972f54de6b6a18347ae
 Author: Henrik Edin <henrik.edin@mongodb.com>
-Date:   Fri Apr 12 14:16:17 2019 -0400
+Date:	Fri Apr 12 14:16:17 2019 -0400
 
     SERVER-40544 Disable injection of on_process_term() at process exit
 
 M	src/windows/port.cc
+
+commit c1d546d7b22cc503f37e9a6efa1d249be60243a3
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Apr 7 15:27:17 2019 -0700
+
+    never test and always default HAVE_MMAP to on
+
+    This should alleviate vboxfs problems from issue #1008.
+
+M	configure.ac
+
+commit fba6ce0e7aaa094fec09ef8763e86b19dc815624
+Author: pkubaj <pkubaj@users.noreply.github.com>
+Date:	Mon Feb 4 16:10:06 2019 +0000
+
+    Fix build on FreeBSD
+
+    On FreeBSD the following syntax is used:
+    mr REGA,REGB
+
+M	src/stacktrace_powerpc-darwin-inl.h
+
+commit 98ac4ee9bc6ab285429fc5d97335b4c94fc0b919
+Author: Jakub Wilk <jwilk@jwilk.net>
+Date:	Wed Apr 3 09:50:40 2019 +0200
+
+    Fix typos
+
+M	README
 
 commit f402f44778d29ba1b532044278329b94589c2a0c
 Author: obones <obones@free.fr>
@@ -48,6 +1302,142 @@ Date:	Mon Feb 25 17:08:14 2019 -0500
 
 M	configure.ac
 M	src/common.cc
+
+commit 9e5b1628737c67b4587f937164572774592978c4
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Feb 10 12:46:18 2019 -0800
+
+    don't try to mark rsp as clobbered in linux syscall support
+
+    rsp is not actually clobbered by that code and later gccs actually
+    (correctly) bark
+    at it.
+
+    Fixed issue #1076.
+
+M	src/base/linux_syscall_support.h
+
+commit 1e36ed705548ae2a5170bb00dfee0954b8ef76de
+Author: Romain Geissler <romain.geissler@amadeus.com>
+Date:	Tue Jan 29 18:31:19 2019 +0000
+
+    Use initial exec TLS model for all thread local variables from
+    thread_cache.cc
+
+    This avoids a deadlock when a library which is being dlopen'ed creates
+    as part of its static constructors a thread which quickly need to call
+    malloc. We are still in the dlopen call (so with some internal glibc
+    mutex taken) when the thread executes code and later needs to call
+    malloc which in term calls tls_get_addr_tail, which wait for the
+    dlopen
+    mutex to be unlocked. If later the dlopen'ing thread also calls malloc
+    as part of its constructors, we are in a deadlock.
+
+    Fix is similar to
+    https://github.com/gperftools/gperftools/commit/7852eeb75b9375cf52a7da01be044da6e915dd08
+
+    Stack of the dlopening thread:
+	#0  0x00007fd5406ca93c in __lll_lock_wait () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/libpthread.so.0
+	#1  0x00007fd5406c45a5 in pthread_mutex_lock () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/libpthread.so.0
+	... proprietary code in the stack
+	#9  0x00007fd5074f0367 in
+	__static_initialization_and_destruction_0 (__initialize_p=1,
+	__priority=65535) at src/ClientImpl.cpp:15
+	#10 0x00007fd5074f06d7 in _GLOBAL__sub_I_ClientImpl.cpp(void)
+	() at src/ClientImpl.cpp:85
+	#11 0x00007fd50757aa46 in __do_global_ctors_aux ()
+	#12 0x00007fd5073e985f in _init () from ...
+	#13 0x00007fd53bf9dec8 in ?? () from ...
+	#14 0x00007fd54d637a5d in call_init.part () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/ld-linux-x86-64.so.2
+	#15 0x00007fd54d637bab in _dl_init () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/ld-linux-x86-64.so.2
+	#16 0x00007fd54d63c160 in dl_open_worker () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/ld-linux-x86-64.so.2
+	#17 0x00007fd54d637944 in _dl_catch_error () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/ld-linux-x86-64.so.2
+	#18 0x00007fd54d63b7d9 in _dl_open () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/ld-linux-x86-64.so.2
+	#19 0x00007fd54d61f2b9 in dlopen_doit () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/libdl.so.2
+	#20 0x00007fd54d637944 in _dl_catch_error () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/ld-linux-x86-64.so.2
+	#21 0x00007fd54d61f889 in _dlerror_run () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/libdl.so.2
+	#22 0x00007fd54d61f351 in dlopen@@GLIBC_2.2.5 () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/libdl.so.2
+
+    Stack of the newly created thread calling tls_get_addr_tail:
+	#0  0x00007fd5406ca93c in __lll_lock_wait () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/libpthread.so.0
+	#1  0x00007fd5406c4622 in pthread_mutex_lock () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/libpthread.so.0
+	#2  0x00007fd54d63a2ed in tls_get_addr_tail () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/ld-linux-x86-64.so.2
+	#3  0x00007fd53fee877d in
+	tcmalloc::ThreadCache::CreateCacheIfNecessary () at
+	src/thread_cache.cc:344
+	#4  0x00007fd53fecb4ab in tcmalloc::ThreadCache::GetCache ()
+	at src/thread_cache.h:437
+	#5  0x00007fd53fefeccb in (anonymous namespace)::do_malloc
+	(size=56) at src/tcmalloc.cc:1354
+	#6  tcmalloc::do_allocate_full<tcmalloc::cpp_throw_oom> (size=56)
+	at src/tcmalloc.cc:1762
+	#7  tcmalloc::allocate_full_cpp_throw_oom (size=56) at
+	src/tcmalloc.cc:1776
+	#8  0x00007fd53ff01b80 in
+	tcmalloc::dispatch_allocate_full<tcmalloc::cpp_throw_oom>
+	(size=56) at src/tcmalloc.cc:1785
+	#9  malloc_fast_path<tcmalloc::cpp_throw_oom> (size=56) at
+	src/tcmalloc.cc:1845
+	#10 tc_new (size=56) at src/tcmalloc.cc:1980
+	... proprietary code in the stack
+	#26 0x00007fd5406c1ef4 in start_thread () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/libpthread.so.0
+	#27 0x00007fd5403ba01d in clone () from
+	/data3/mwrep/rgeissler/core.tls/opt/1A/toolchain/x86_64-2.6.32-v2/lib64/libc.so.6
+
+M	src/thread_cache.cc
+
+commit 8f9a873fce14337e113a3837603a11ade06da533
+Author: pkubaj <pkubaj@users.noreply.github.com>
+Date:	Mon Feb 4 16:06:32 2019 +0000
+
+    Fix accessing PC on FreeBSD/powerpc and powerpc64
+
+M	m4/pc_from_ucontext.m4
+
+commit fc00474ddc21fff618fc3f009b46590e241e425e
+Author: Tulio Magno Quites Machado Filho <tuliom@linux.ibm.com>
+Date:	Fri Feb 8 10:33:09 2019 -0200
+
+    Include asm/ptrace.h when accessing ucontext_t
+
+    In some architectures (e.g. powerpc, powerpc64 and powerpc64le), the
+    macro that specifies the position of the program counter is defined in
+    header asm/ptrace.h.
+
+    When glibc bug 21457 got fixed in version 2.27, header sys/ucontext.h
+    stopped including signal.h, which indirectly removed asm/ptrace.h too.
+
+    Signed-off-by: Tulio Magno Quites Machado Filho <tuliom@linux.ibm.com>
+
+M	m4/pc_from_ucontext.m4
+M	src/getpc.h
+
+commit 5574c87e39ee592c909cb48245c1d91e90ddaf4d
+Author: Laurent Stacul <laurent.stacul@amadeus.com>
+Date:	Mon Oct 15 16:56:18 2018 +0200
+
+    Compile time aggressive decommit option
+
+    [alkondratenko@gmail.com: performed s/agressive/aggressive/g]
+    Signed-off-by: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+
+M	configure.ac
+M	src/static_vars.cc
 
 commit 85c56a9d6499570267193f6e30d1deb5d47d6e94
 Author: Mark Benvenuto <mark.benvenuto@mongodb.com>
@@ -139,6 +1529,653 @@ M	configure.ac
 M	src/libc_override.h
 M	src/tests/tcmalloc_unittest.cc
 M	src/windows/config.h
+
+commit e9ab4c53041ac62feefbbb076d326e9a77dd1567
+Author: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+Date:	Sun Oct 7 18:12:03 2018 +0200
+
+    undef mmap64 function
+
+    mmap64 can already been defined and as a result the following error is
+    raised:
+
+    In file included from src/malloc_hook.cc:686:0:
+    src/malloc_hook_mmap_linux.h: In function ‘void* mmap(void*,
+    size_t, int, int, int, off_t)’:
+    src/malloc_hook_mmap_linux.h:173:18: error: redefinition of ‘void*
+    mmap(void*, size_t, int, int, int, off_t)’
+     extern "C" void* mmap(void *start, size_t length, int prot,
+     int flags,
+		      ^~~~
+    In file included from src/malloc_hook.cc:41:0:
+    src/malloc_hook_mmap_linux.h:159:18: note: ‘void* mmap(void*,
+    size_t, int, int, int, off_t)’ previously defined here
+     extern "C" void* mmap64(void *start, size_t length, int prot,
+     int flags,
+		      ^
+    Makefile:4874: recipe for target
+    'src/libtcmalloc_minimal_internal_la-malloc_hook.lo' failed
+
+    Signed-off-by: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+
+M	src/malloc_hook_mmap_linux.h
+
+commit 5eec9d0ae396aa90ebcb5756dfd0f3d101667490
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Oct 7 08:17:04 2018 -0700
+
+    Drop not very portable and not very useful unwind benchmark.
+
+M	.gitignore
+M	Makefile.am
+D	benchmark/getcontext_light.cc
+D	benchmark/unwind_bench.cc
+
+commit 1561f0946fcc96d1384dae2a81f3ed111338a341
+Author: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+Date:	Sat Oct 6 20:43:19 2018 +0200
+
+    check for __sbrk
+
+    __sbrk is not defined in musl so add a check for it in configure.ac
+    and
+    replace the check on ifndef __UCLIBC__ by a check on ifdef HAVE__SBRK
+    in src/malloc_hook_mmap_linux.h
+
+    Signed-off-by: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+
+M	configure.ac
+M	src/malloc_hook_mmap_linux.h
+
+commit 1de76671d478e848f0dd210e00df43bfa463ca9f
+Author: Gabriel Marin <gmx@chromium.org>
+Date:	Thu Oct 4 22:52:35 2018 +0000
+
+    Fix mmap region iteration while no regions are recorded.
+
+    If no mmap regions are recorded, iteration failed since the RegionSet
+    (std::set) object is not initialized.
+
+    Original CL https://codereview.chromium.org/14769008
+
+    Reviewed-on: https://chromium-review.googlesource.com/c/1130807
+
+M	src/memory_region_map.cc
+M	src/memory_region_map.h
+
+commit acdcacc28f17d2e8db1d1bb634025f820f912d93
+Author: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+Date:	Sun Apr 29 23:48:41 2018 +0200
+
+    Use off64_t instead of __off64_t
+
+    __off64_t is a kernel internal symbol, which happens to be
+    user-visible
+    with glibc, but not necessarily with other C libraries such as musl.
+
+    Switching from __off64_t to off64_t allows the code to build properly
+    with musl.
+
+    Signed-off-by: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+
+M	src/malloc_hook_mmap_linux.h
+
+commit 0177a2420aa68229f55bec970c59136813a50613
+Author: Gabriel Marin <gmx@chromium.org>
+Date:	Fri Oct 5 21:49:50 2018 +0000
+
+    Return early in WriteProfile to reduce indentation
+
+    Small code refactoring to reduce indentation. This change was
+    originally
+    part of https://codereview.chromium.org/9963095.
+
+    Reviewed-on: https://chromium-review.googlesource.com/c/1130804
+
+M	src/heap-profile-table.cc
+
+commit b85652bf268d061a0ad0aec90f0d3c29aa80a6b5
+Author: Gabriel Marin <gmx@chromium.org>
+Date:	Wed Oct 3 18:15:16 2018 +0000
+
+    Add generic.total_physical_bytes property to MallocExtension
+
+    Original CL:
+
+    - https://codereview.chromium.org/1410353005
+
+      Add generic.total_physical_bytes property to MallocExtension
+
+      The actual physical memory usage of tcmalloc cannot be obtained by
+      GetNumericProperty. This accounts for the current_allocated_bytes,
+      fragmentation and malloc metadata, and excludes the unmapped memory
+      regions. This helps the user to understand how much memory is
+      actually
+      being used for the allocations that were made.
+
+    Reviewed-on: https://chromium-review.googlesource.com/1130803
+
+M	src/gperftools/malloc_extension.h
+M	src/tcmalloc.cc
+
+commit 90df23c81fe6baf7799b5d3df37d2846ab88fc60
+Author: Gabriel Marin <gmx@chromium.org>
+Date:	Fri Oct 5 22:00:33 2018 +0000
+
+    Make some tcmalloc constants truly const
+
+    Reviewed-on: https://chromium-review.googlesource.com/c/1130809
+
+M	src/tcmalloc.cc
+
+commit 49dbe4362b431629111b85929d91fe9a46c42295
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Mon Sep 3 16:44:52 2018 -0700
+
+    Add comment about gperftools 2.8 not deduplicating heapz samples.
+
+M	src/gperftools/malloc_extension.h
+
+commit 63a12a5ed3c4aca61cc46078b6cdf1d161425a69
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Mon Aug 27 20:10:09 2018 -0700
+
+    Drop de-duplication of heap sample (aka heapz) entries.
+
+    pprof can aggregate them, and it can do it way better than we
+    can. With
+    proper unsampling etc.
+
+M	src/stack_trace_table.cc
+M	src/stack_trace_table.h
+M	src/static_vars.cc
+M	src/static_vars.h
+M	src/tests/stack_trace_table_test.cc
+
+commit 954f9dc0e37ff46cb0cb24edfb39dc77fd2e7d0b
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Aug 26 11:37:59 2018 -0700
+
+    Add flag to disable installing unmaintained & deprecated pprof.
+
+    Everyone should be using golang pprof from github.com/google/pprof,
+    but
+    distros still ship our perl version and not everyone is aware of
+    better pprof yet.
+
+    This is another step in completely dropping perl pprof. We still
+    default to installing it, but hopefully we'll be able to convince
+    distros to disable this soon.
+
+    We still install pprof under pprof-symbolize name because
+    stack traces symbolization depends on it, and because golang pprof
+    won't support this feature.
+
+    This is related to issue #1038.
+
+M	.gitignore
+M	Makefile.am
+M	configure.ac
+M	src/symbolize.cc
+
+commit 893bff51bcf220b724a812d340d878b5fb8ce911
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Aug 26 11:35:44 2018 -0700
+
+    Avoid static initialization of pprof path for symbolization.
+
+    This is one of the things that chrome's fork fixes, but with c++11 we
+    can do it even nicer. Proposed fix is to use c++11 local static
+    variable to ensure that pprof path is initialized once on as-needed
+    basis.
+
+M	src/symbolize.cc
+
+commit 69867c523b334028c90f2acf22b5ae528fdc2356
+Author: Holy Wu <HolyWu@users.noreply.github.com>
+Date:	Fri Aug 10 17:19:29 2018 +0800
+
+    Clean up MSVC projects
+
+    1.Remove superfluous per file settings for include directory and
+    runtime library.
+    2.Remove unnecessary project tcmalloc_minimal_unittest-static. We
+    can simply build libtcmalloc_minimal as a static library and then
+    link against the single .lib file.
+    3.Add separate configurations of patching and overriding facility
+    for release mode.
+
+M	Makefile.am
+M	gperftools.sln
+M	vsprojects/addr2line-pdb/addr2line-pdb.vcxproj
+M	vsprojects/addressmap_unittest/addressmap_unittest.vcxproj
+M
+vsprojects/current_allocated_bytes_test/current_allocated_bytes_test.vcxproj
+M	vsprojects/frag_unittest/frag_unittest.vcxproj
+M	vsprojects/libtcmalloc_minimal/libtcmalloc_minimal.vcxproj
+M	vsprojects/libtcmalloc_minimal/libtcmalloc_minimal.vcxproj.filters
+M
+vsprojects/low_level_alloc_unittest/low_level_alloc_unittest.vcxproj
+M	vsprojects/malloc_extension_test/malloc_extension_test.vcxproj
+M	vsprojects/malloc_hook_test/malloc_hook_test.vcxproj
+M	vsprojects/markidle_unittest/markidle_unittest.vcxproj
+M	vsprojects/nm-pdb/nm-pdb.vcxproj
+M	vsprojects/packed-cache_test/packed-cache_test.vcxproj
+M	vsprojects/page_heap_test/page_heap_test.vcxproj
+M	vsprojects/pagemap_unittest/pagemap_unittest.vcxproj
+M	vsprojects/preamble_patcher_test/preamble_patcher_test.vcxproj
+M	vsprojects/realloc_unittest/realloc_unittest.vcxproj
+M	vsprojects/sampler_test/sampler_test.vcxproj
+M	vsprojects/stack_trace_table_test/stack_trace_table_test.vcxproj
+M	vsprojects/system-alloc_unittest/system-alloc_unittest.vcxproj
+M
+vsprojects/tcmalloc_minimal_large/tcmalloc_minimal_large_unittest.vcxproj
+M
+vsprojects/tcmalloc_minimal_unittest/tcmalloc_minimal_unittest.vcxproj
+M	vsprojects/thread_dealloc_unittest/thread_dealloc_unittest.vcxproj
+D	vsprojects/tmu-static/tmu-static.vcxproj
+D	vsprojects/tmu-static/tmu-static.vcxproj.filters
+
+commit f2bca77aed83107197abadee0652c39e2c4c73d3
+Author: Brian Silverman <brian@peloton-tech.com>
+Date:	Thu Aug 9 16:33:39 2018 -0700
+
+    Fix page_heap_test flakiness
+
+    After 71fa9f87 (use 2-level page map for 48-bit addresses), there is a
+    potential for allocs of additional leaves in the middle of the test.
+    With ASLR enabled on amd64 (without TCMALLOC_SMALL_BUT_SLOW), this
+    results in the test failing sometimes (< 1% of the time). Instead,
+    make
+    sure all those leaves are allocated before deciding on the baseline
+    heap
+    usage in the test.
+
+M	src/tests/page_heap_test.cc
+
+commit c41688bf20186723367b560ceb539b2330951ddb
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Aug 5 20:39:07 2018 -0700
+
+    Use standard-conforming alignof in debugallocation.cc
+
+    Clang was giving warning that alignof(<variable>) is extension. So
+    we're now doing alignof of decltype.
+
+M	src/debugallocation.cc
+
+commit 71c8cedacafe700e662c008b65f5064b23426070
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Aug 5 18:54:01 2018 -0700
+
+    Fix incompatible aliasing warnings
+
+    We aliased functions with different signatures and gcc now correctly
+    gives warning for that. Originally gcc 5 same code merging feature
+    caused us to alias more than necessary, but I am not able to reproduce
+    this problem anymore. So we're now aliasing only compatible functions.
+
+M	src/libc_override_gcc_and_weak.h
+M	src/tcmalloc.cc
+
+commit 8dd304035848e780372a5a4bb1afac2b2d20bc43
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Aug 5 19:52:11 2018 -0700
+
+    Format and fix out of bound access in CpuProfilerSwitch
+
+    GCC was giving warning on snprintf and it hinted at base_profile_name
+    and full_profile_name not being long enough.
+
+    Fix is to ensure base_profile_name is long enough for PATH_MAX and
+    that full_profile_name is enough longer to fit extra chars.
+
+M	src/profiler.cc
+
+commit 467502e70acb89f36b475bf29fe12333939fe5c7
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Aug 5 17:42:04 2018 -0700
+
+    provide constexpr constructor for Sampler
+
+    Constexpr constructor lets us use Sampler in TLS variable in cleaner
+    way.
+
+M	src/sampler.h
+M	src/tests/sampler_test.cc
+
+commit 1fb543cc708f22017cb39ae874a28c0addcf5a63
+Author: HolyWu <holywu@gmail.com>
+Date:	Tue May 1 18:04:57 2018 +0800
+
+    Patch _free_dbg to make Debug mode in MSVC works
+
+    Like _free_base, _free_dbg is called by CRT internal functions or
+    operator delete in Debug mode.
+
+    This closes #719 and closes #894.
+
+    [alkondratenko@gmail.com: trivial formatting fixes]
+    [alkondratenko@gmail.com: build free_dbg even in release builds]
+
+M	src/windows/patch_functions.cc
+
+commit 267f431d8071799282f9f4af10455b7b6adeee38
+Author: Gabriel Marin <gmx@chromium.org>
+Date:	Thu Aug 2 17:16:25 2018 -0700
+
+    Use indirect system calls in the linux spinlock implementation
+
+M	src/base/spinlock_linux-inl.h
+
+commit 73ee9b15440d72d5c4f93586ea1179c0a265980c
+Author: Gabriel Marin <gmx@chromium.org>
+Date:	Mon Jul 2 09:31:10 2018 -0700
+
+    Use indirect system calls in the mmap malloc hooks.
+
+    sys_{mmap|munmap|mremap}(...) calls are replaced with
+    syscall(SYS_{mmap|munmap|mremap}, ...).
+
+M	src/malloc_hook_mmap_linux.h
+
+commit 3af509d4f91aa1fae3f8caeb17b158f20e9b5e59
+Author: Gabriel Marin <gmx@chromium.org>
+Date:	Tue Jul 17 18:28:01 2018 -0700
+
+    benchmark: use angle brackets to include ucontext.h
+
+    Using quotes for a system header file fails a presubmit check in
+    Chromium.
+
+M	benchmark/unwind_bench.cc
+
+commit 0cdda6d7cc5e082bb704a9352934148e13dc0a0d
+Author: Gabriel Marin <gmx@chromium.org>
+Date:	Tue Jul 17 18:36:31 2018 -0700
+
+    use utf-8 for special symbols
+
+    A few files in the windows port that haven't been touched in a
+    long time,
+    use non-utf8 codes for special symbols, breaking a presubmit
+    checker in
+    Chromium.
+
+M	src/windows/ia32_modrm_map.cc
+M	src/windows/ia32_opcode_map.cc
+M	src/windows/mini_disassembler.h
+
+commit c7a0cfda880a7310a030c62546f04a2987a11ec2
+Author: etienneb <etienneb@chromium.org>
+Date:	Thu Apr 20 12:58:02 2017 -0700
+
+    Fix potential missing nul character on resolved symbol names
+
+    The symbol name returned by SymFromName may not contains a NUL
+    character
+    when the symbol name is exactly the size of the buffer. It believe
+    this
+    may also happen when the symbol name is too long and truncated.
+
+    The original code is based on:
+      https://msdn.microsoft.com/en-us/library/windows/desktop/ms680580(v=vs.85).aspx
+
+    A right implementation can be found here:
+      https://cs.chromium.org/chromium/src/base/debug/stack_trace_win.cc?l=145&rcl=f4ecb9e37e9e2d59e32b8b96f23ac4a1e33b9552
+
+    As described here:
+      https://msdn.microsoft.com/en-us/library/windows/desktop/ms680686(v=vs.85).aspx
+
+      NameLen
+	The length of the name, in characters, not including the
+	null-terminating character.
+      MaxNameLen
+	The size of the Name buffer, in characters. If this member is 0,
+	the Name member is not used.
+
+    This issue was causing the catapult symbolisation script to encode
+    incorrect (random) characters into the symbol names.
+    See the example in the bug.
+
+    Original BUG=713741
+
+    Review-Url: https://codereview.chromium.org/2832643004
+    Cr-Commit-Position: refs/heads/master@{#466098}
+
+    BUG=724399,b:70905156
+
+    Change-Id: Ia6de4ddbd5c66a966b74ecec3fda5e853f36073b
+
+M	src/windows/addr2line-pdb.c
+
+commit e42bfc8c06abd1ea1a7e92d1d6d72d1959ec27b6
+Author: Gabriel Marin <gmx@chromium.org>
+Date:	Thu Jul 19 11:10:31 2018 -0700
+
+    tcmalloc: use relative addresses with the windows addr2line wrapper
+
+    Modifies the Windows addr2line wrapper to expect addresses relative to
+    DllBase to better simulate how addr2line works with modules in Linux.
+
+    Windows DLLs have a concept of "default load address" which hints
+    to the OS
+    where to load the binary image after relocation. The dbghelp.dll
+    symbolization library will load the module at this location in
+    the virtual
+    address space meaning the caller of these functions would need to
+    be aware
+    of the base address. This makes things unnecessarily complex in the
+    face of
+    ASLR and also diverges from the behavior of addr2line when used
+    with linux-
+    style DSOs. This CL simply adds the module base address to the
+    incoming
+    addresses, thereby making the input relative addresses for the
+    module which
+    both is easier to use and lines up better with linux's addr2line
+    behavior.
+
+    These changes were made originally as part of CL
+    https://codereview.chromium.org/2730473002.
+
+    BUG=724399,b:70905156
+
+    Change-Id: I0abe9e0c380e7e60ae29a11021bb805b31718d08
+
+M	src/windows/addr2line-pdb.c
+
+commit d8f8d1cced71c37ff86ff577c3afe03b7cd1648f
+Author: Gabriel Marin <gmx@chromium.org>
+Date:	Wed Jul 18 18:50:30 2018 -0700
+
+    tcmalloc: add long form flag '--exe' to specify the binary
+
+    This change was originally made as part of CL
+    https://codereview.chromium.org/2730473002
+
+    BUG=724399,b:70905156
+
+    Change-Id: I33ee28eac4dab6077cf162358cf4c10b41c0f6a2
+
+M	src/windows/addr2line-pdb.c
+
+commit 25c53aca125b54df1d5c0e64c96f074bdb92ade2
+Author: Gabriel Marin <gmx@chromium.org>
+Date:	Wed Jul 18 18:39:15 2018 -0700
+
+    tcmalloc: fixes for the windows addr2line wrapper
+
+    Fixes a few small format string bugs and makes the windows library
+    configuration #defines more friendly for chromium builds.
+
+    Based on original CL: https://codereview.chromium.org/2730473002
+
+    BUG=724399,b:70905156
+
+    Change-Id: If54c6cfc5c508744d2ee18f251677b2456acda72
+
+M	src/windows/addr2line-pdb.c
+
+commit f02e28f3488122f497755de59dc822f08c6449b9
+Author: Gabriel Marin <gmx@chromium.org>
+Date:	Tue Jul 31 15:35:53 2018 -0700
+
+    Replace builtin_expect configure test with a direct GCC compiler check
+
+M	configure.ac
+M	src/base/basictypes.h
+
+commit 62c4eca6e7ec9dc78333dc6b499f90eef9849378
+Author: obones <obones@free.fr>
+Date:	Fri Jul 20 11:07:02 2018 +0200
+
+    Under x64, the PE loader looks for callbacks in constant sections
+
+    [alkondratenko@gmail.com: deleted some trailing whitespace]
+
+M	src/windows/port.cc
+
+commit 0b588e7490eac4ef37b59c9265f1f3f05f4bb27c
+Author: Brian Silverman <brian@peloton-tech.com>
+Date:	Tue Jul 31 15:53:47 2018 -0700
+
+    Fix uninitialized memory use in sampler_test
+
+    Sampler's documentation states the following:
+      C++03 requires that types stored in TLS be POD.  As a result,
+      you must
+      initialize these members to {0, 0, false} before using this class!
+
+    However, the test code wasn't doing that. MemorySanitizer and
+    UndefinedBehaviorSanitizer both failed because of it.
+
+M	src/tests/sampler_test.cc
+
+commit 51a5613f21a34197ed655c363c54c71cf68271ba
+Author: Aliaksei Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Aug 5 15:28:27 2018 -0700
+
+    Upgrade MSVC projects to MSVC2015
+
+M	Makefile.am
+M	gperftools.sln
+D	vsprojects/addr2line-pdb/addr2line-pdb.vcproj
+A	vsprojects/addr2line-pdb/addr2line-pdb.vcxproj
+A	vsprojects/addr2line-pdb/addr2line-pdb.vcxproj.filters
+D	vsprojects/addressmap_unittest/addressmap_unittest.vcproj
+A	vsprojects/addressmap_unittest/addressmap_unittest.vcxproj
+A	vsprojects/addressmap_unittest/addressmap_unittest.vcxproj.filters
+D
+vsprojects/current_allocated_bytes_test/current_allocated_bytes_test.vcproj
+A
+vsprojects/current_allocated_bytes_test/current_allocated_bytes_test.vcxproj
+A
+vsprojects/current_allocated_bytes_test/current_allocated_bytes_test.vcxproj.filters
+D	vsprojects/frag_unittest/frag_unittest.vcproj
+A	vsprojects/frag_unittest/frag_unittest.vcxproj
+A	vsprojects/frag_unittest/frag_unittest.vcxproj.filters
+D	vsprojects/libtcmalloc_minimal/libtcmalloc_minimal.vcproj
+A	vsprojects/libtcmalloc_minimal/libtcmalloc_minimal.vcxproj
+A	vsprojects/libtcmalloc_minimal/libtcmalloc_minimal.vcxproj.filters
+D
+vsprojects/low_level_alloc_unittest/low_level_alloc_unittest.vcproj
+A
+vsprojects/low_level_alloc_unittest/low_level_alloc_unittest.vcxproj
+A
+vsprojects/low_level_alloc_unittest/low_level_alloc_unittest.vcxproj.filters
+D	vsprojects/malloc_extension_test/malloc_extension_test.vcproj
+A	vsprojects/malloc_extension_test/malloc_extension_test.vcxproj
+A
+vsprojects/malloc_extension_test/malloc_extension_test.vcxproj.filters
+D	vsprojects/malloc_hook_test/malloc_hook_test.vcproj
+A	vsprojects/malloc_hook_test/malloc_hook_test.vcxproj
+A	vsprojects/malloc_hook_test/malloc_hook_test.vcxproj.filters
+D	vsprojects/markidle_unittest/markidle_unittest.vcproj
+A	vsprojects/markidle_unittest/markidle_unittest.vcxproj
+A	vsprojects/markidle_unittest/markidle_unittest.vcxproj.filters
+D	vsprojects/nm-pdb/nm-pdb.vcproj
+A	vsprojects/nm-pdb/nm-pdb.vcxproj
+A	vsprojects/nm-pdb/nm-pdb.vcxproj.filters
+D	vsprojects/packed-cache_test/packed-cache_test.vcproj
+A	vsprojects/packed-cache_test/packed-cache_test.vcxproj
+A	vsprojects/packed-cache_test/packed-cache_test.vcxproj.filters
+D	vsprojects/page_heap_test/page_heap_test.vcproj
+A	vsprojects/page_heap_test/page_heap_test.vcxproj
+A	vsprojects/page_heap_test/page_heap_test.vcxproj.filters
+D	vsprojects/pagemap_unittest/pagemap_unittest.vcproj
+A	vsprojects/pagemap_unittest/pagemap_unittest.vcxproj
+A	vsprojects/pagemap_unittest/pagemap_unittest.vcxproj.filters
+D	vsprojects/preamble_patcher_test/preamble_patcher_test.vcproj
+A	vsprojects/preamble_patcher_test/preamble_patcher_test.vcxproj
+A
+vsprojects/preamble_patcher_test/preamble_patcher_test.vcxproj.filters
+D	vsprojects/realloc_unittest/realloc_unittest.vcproj
+A	vsprojects/realloc_unittest/realloc_unittest.vcxproj
+A	vsprojects/realloc_unittest/realloc_unittest.vcxproj.filters
+D	vsprojects/sampler_test/sampler_test.vcproj
+A	vsprojects/sampler_test/sampler_test.vcxproj
+A	vsprojects/sampler_test/sampler_test.vcxproj.filters
+D	vsprojects/stack_trace_table_test/stack_trace_table_test.vcproj
+A	vsprojects/stack_trace_table_test/stack_trace_table_test.vcxproj
+A
+vsprojects/stack_trace_table_test/stack_trace_table_test.vcxproj.filters
+D	vsprojects/system-alloc_unittest/system-alloc_unittest.vcproj
+A	vsprojects/system-alloc_unittest/system-alloc_unittest.vcxproj
+A
+vsprojects/system-alloc_unittest/system-alloc_unittest.vcxproj.filters
+D
+vsprojects/tcmalloc_minimal_large/tcmalloc_minimal_large_unittest.vcproj
+A
+vsprojects/tcmalloc_minimal_large/tcmalloc_minimal_large_unittest.vcxproj
+A
+vsprojects/tcmalloc_minimal_large/tcmalloc_minimal_large_unittest.vcxproj.filters
+D
+vsprojects/tcmalloc_minimal_unittest/tcmalloc_minimal_unittest.vcproj
+A
+vsprojects/tcmalloc_minimal_unittest/tcmalloc_minimal_unittest.vcxproj
+A
+vsprojects/tcmalloc_minimal_unittest/tcmalloc_minimal_unittest.vcxproj.filters
+D	vsprojects/thread_dealloc_unittest/thread_dealloc_unittest.vcproj
+A	vsprojects/thread_dealloc_unittest/thread_dealloc_unittest.vcxproj
+A
+vsprojects/thread_dealloc_unittest/thread_dealloc_unittest.vcxproj.filters
+D	vsprojects/tmu-static/tmu-static.vcproj
+A	vsprojects/tmu-static/tmu-static.vcxproj
+A	vsprojects/tmu-static/tmu-static.vcxproj.filters
+
+commit 44da4ce5397344342e71ea3cc2c246c2ca4aedb6
+Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+Date:	Sun Aug 5 15:09:20 2018 -0700
+
+    build with c++11 or later
+
+M	configure.ac
+A	m4/ax_cxx_compile_stdcxx.m4
+
+commit f47a52ce85c3d8d559aaae7b7a426c359fbca225
+Author: HolyWu <holywu@gmail.com>
+Date:	Mon Apr 30 15:41:50 2018 +0800
+
+    Make _recalloc adhere to MS's definition
+
+M	src/tcmalloc.cc
+M	src/windows/override_functions.cc
+
+commit fe87ffb7ea5a7c6ce4dea45222331716907ddbf4
+Author: Junhao Li <streaver91@gmail.com>
+Date:	Sun May 20 13:45:32 2018 -0400
+
+    Disable large allocation report by default
+
+    Fixes issue #360.
+
+    [alkondratenko@gmail.com: adjusted commit message a bit]
+    [alkondratenko@gmail.com: adjusted configure help message]
+    Signed-off-by: Aliaksey Kandratsenka <alkondratenko@gmail.com>
+
+M	configure.ac
+M	src/tcmalloc.cc
 
 commit 9608fa3bcf8020d35f59fbf70cd3cbe4b015b972
 Author: Aliaksey Kandratsenka <alkondratenko@gmail.com>

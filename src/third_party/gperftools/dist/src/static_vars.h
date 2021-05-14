@@ -83,9 +83,6 @@ class Static {
 
   // State kept for sampled allocations (/pprof/heap support)
   static Span* sampled_objects() { return &sampled_objects_; }
-  static PageHeapAllocator<StackTraceTable::Bucket>* bucket_allocator() {
-    return &bucket_allocator_;
-  }
 
   // Check if InitStaticVars() has been run.
   static bool IsInited() { return inited_; }
@@ -107,7 +104,6 @@ class Static {
   ATTRIBUTE_HIDDEN static PageHeapAllocator<Span> span_allocator_;
   ATTRIBUTE_HIDDEN static PageHeapAllocator<StackTrace> stacktrace_allocator_;
   ATTRIBUTE_HIDDEN static Span sampled_objects_;
-  ATTRIBUTE_HIDDEN static PageHeapAllocator<StackTraceTable::Bucket> bucket_allocator_;
 
   // Linked list of stack traces recorded every time we allocated memory
   // from the system.  Useful for finding allocation sites that cause

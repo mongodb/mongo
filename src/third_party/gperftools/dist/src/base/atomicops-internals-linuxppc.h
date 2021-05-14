@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 /* Copyright (c) 2008, Google Inc.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
  *     * Neither the name of Google Inc. nor the names of its
  * contributors may be used to endorse or promote products derived from
  * this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -359,14 +359,6 @@ inline void NoBarrier_Store(volatile Atomic32 *ptr, Atomic32 value) {
   *ptr = value;
 }
 
-inline void Acquire_Store(volatile Atomic32 *ptr, Atomic32 value) {
-  *ptr = value;
-  // This can't be _lwsync(); we need to order the immediately
-  // preceding stores against any load that may follow, but lwsync
-  // doesn't guarantee that.
-  _sync();
-}
-
 inline void Release_Store(volatile Atomic32 *ptr, Atomic32 value) {
   _lwsync();
   *ptr = value;
@@ -382,28 +374,12 @@ inline Atomic32 Acquire_Load(volatile const Atomic32 *ptr) {
   return value;
 }
 
-inline Atomic32 Release_Load(volatile const Atomic32 *ptr) {
-  // This can't be _lwsync(); we need to order the immediately
-  // preceding stores against any load that may follow, but lwsync
-  // doesn't guarantee that.
-  _sync();
-  return *ptr;
-}
-
 #ifdef __PPC64__
 
 // 64-bit Versions.
 
 inline void NoBarrier_Store(volatile Atomic64 *ptr, Atomic64 value) {
   *ptr = value;
-}
-
-inline void Acquire_Store(volatile Atomic64 *ptr, Atomic64 value) {
-  *ptr = value;
-  // This can't be _lwsync(); we need to order the immediately
-  // preceding stores against any load that may follow, but lwsync
-  // doesn't guarantee that.
-  _sync();
 }
 
 inline void Release_Store(volatile Atomic64 *ptr, Atomic64 value) {
@@ -419,14 +395,6 @@ inline Atomic64 Acquire_Load(volatile const Atomic64 *ptr) {
   Atomic64 value = *ptr;
   _lwsync();
   return value;
-}
-
-inline Atomic64 Release_Load(volatile const Atomic64 *ptr) {
-  // This can't be _lwsync(); we need to order the immediately
-  // preceding stores against any load that may follow, but lwsync
-  // doesn't guarantee that.
-  _sync();
-  return *ptr;
 }
 
 #endif

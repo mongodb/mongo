@@ -38,6 +38,7 @@
 #include "gperftools/malloc_extension.h"
 #include "gperftools/tcmalloc.h"
 #include "base/logging.h"
+#include "tests/testutil.h"
 
 using std::vector;
 
@@ -91,7 +92,7 @@ TEST(DebugAllocationTest, DeallocMismatch) {
 
   // Allocate with malloc.
   {
-    int* x = static_cast<int*>(malloc(sizeof(*x)));
+    int* x = static_cast<int*>(noopt(malloc(sizeof(*x))));
     IF_DEBUG_EXPECT_DEATH(delete x, "mismatch.*being dealloc.*delete");
     IF_DEBUG_EXPECT_DEATH(delete [] x, "mismatch.*being dealloc.*delete *[[]");
     // Should work fine.
@@ -100,8 +101,8 @@ TEST(DebugAllocationTest, DeallocMismatch) {
 
   // Allocate with new.
   {
-    int* x = new int;
-    int* y = new int;
+    int* x = noopt(new int);
+    int* y = noopt(new int);
     IF_DEBUG_EXPECT_DEATH(free(x), "mismatch.*being dealloc.*free");
     IF_DEBUG_EXPECT_DEATH(delete [] x, "mismatch.*being dealloc.*delete *[[]");
     delete x;
@@ -110,8 +111,8 @@ TEST(DebugAllocationTest, DeallocMismatch) {
 
   // Allocate with new[].
   {
-    int* x = new int[1];
-    int* y = new int[1];
+    int* x = noopt(new int[1]);
+    int* y = noopt(new int[1]);
     IF_DEBUG_EXPECT_DEATH(free(x), "mismatch.*being dealloc.*free");
     IF_DEBUG_EXPECT_DEATH(delete x, "mismatch.*being dealloc.*delete");
     delete [] x;
@@ -120,8 +121,8 @@ TEST(DebugAllocationTest, DeallocMismatch) {
 
   // Allocate with new(nothrow).
   {
-    int* x = new(std::nothrow) int;
-    int* y = new(std::nothrow) int;
+    int* x = noopt(new (std::nothrow) int);
+    int* y = noopt(new (std::nothrow) int);
     IF_DEBUG_EXPECT_DEATH(free(x), "mismatch.*being dealloc.*free");
     IF_DEBUG_EXPECT_DEATH(delete [] x, "mismatch.*being dealloc.*delete *[[]");
     delete x;
@@ -130,8 +131,8 @@ TEST(DebugAllocationTest, DeallocMismatch) {
 
   // Allocate with new(nothrow)[].
   {
-    int* x = new(std::nothrow) int[1];
-    int* y = new(std::nothrow) int[1];
+    int* x = noopt(new (std::nothrow) int[1]);
+    int* y = noopt(new (std::nothrow) int[1]);
     IF_DEBUG_EXPECT_DEATH(free(x), "mismatch.*being dealloc.*free");
     IF_DEBUG_EXPECT_DEATH(delete x, "mismatch.*being dealloc.*delete");
     delete [] x;
@@ -141,13 +142,13 @@ TEST(DebugAllocationTest, DeallocMismatch) {
 #endif  // #ifdef OS_MACOSX
 
 TEST(DebugAllocationTest, DoubleFree) {
-  int* pint = new int;
+  int* pint = noopt(new int);
   delete pint;
   IF_DEBUG_EXPECT_DEATH(delete pint, "has been already deallocated");
 }
 
 TEST(DebugAllocationTest, StompBefore) {
-  int* pint = new int;
+  int* pint = noopt(new int);
 #ifndef NDEBUG   // don't stomp memory if we're not in a position to detect it
   pint[-1] = 5;
   IF_DEBUG_EXPECT_DEATH(delete pint, "a word before object");
@@ -155,7 +156,7 @@ TEST(DebugAllocationTest, StompBefore) {
 }
 
 TEST(DebugAllocationTest, StompAfter) {
-  int* pint = new int;
+  int* pint = noopt(new int);
 #ifndef NDEBUG   // don't stomp memory if we're not in a position to detect it
   pint[1] = 5;
   IF_DEBUG_EXPECT_DEATH(delete pint, "a word after object");
@@ -164,10 +165,10 @@ TEST(DebugAllocationTest, StompAfter) {
 
 TEST(DebugAllocationTest, FreeQueueTest) {
   // Verify that the allocator doesn't return blocks that were recently freed.
-  int* x = new int;
+  int* x = noopt(new int);
   int* old_x = x;
   delete x;
-  x = new int;
+  x = noopt(new int);
   #if 1
     // This check should not be read as a universal guarantee of behavior.  If
     // other threads are executing, it would be theoretically possible for this
@@ -191,12 +192,12 @@ TEST(DebugAllocationTest, DanglingPointerWriteTest) {
   // safe.  When debugging, we expect the (trashed) deleted block to be on the
   // list of recently-freed blocks, so the following 'new' will be safe.
 #if 1
-  int* x = new int;
+  int* x = noopt(new int);
   delete x;
   int poisoned_x_value = *x;
   *x = 1;  // a dangling write.
 
-  char* s = new char[FLAGS_max_free_queue_size];
+  char* s = noopt(new char[FLAGS_max_free_queue_size]);
   // When we delete s, we push the storage that was previously allocated to x
   // off the end of the free queue.  At that point, the write to that memory
   // will be detected.
@@ -210,7 +211,7 @@ TEST(DebugAllocationTest, DanglingPointerWriteTest) {
 }
 
 TEST(DebugAllocationTest, DanglingWriteAtExitTest) {
-  int *x = new int;
+  int *x = noopt(new int);
   delete x;
   int old_x_value = *x;
   *x = 1;
@@ -221,7 +222,7 @@ TEST(DebugAllocationTest, DanglingWriteAtExitTest) {
 }
 
 TEST(DebugAllocationTest, StackTraceWithDanglingWriteAtExitTest) {
-  int *x = new int;
+  int *x = noopt(new int);
   delete x;
   int old_x_value = *x;
   *x = 1;
@@ -244,13 +245,13 @@ TEST(DebugAllocationTest, CurrentlyAllocated) {
   FLAGS_max_free_queue_size = 0;
   // Force a round-trip through the queue management code so that the
   // new size is seen and the queue of recently-freed blocks is flushed.
-  free(malloc(1));
+  free(noopt(malloc(1)));
   FLAGS_max_free_queue_size = 1048576;
 #endif
 
   // Free something and check that it disappears from allocated bytes
   // immediately.
-  char* p = new char[1000];
+  char* p = noopt(new char[1000]);
   size_t after_malloc = CurrentlyAllocatedBytes();
   delete[] p;
   size_t after_free = CurrentlyAllocatedBytes();
@@ -263,12 +264,12 @@ TEST(DebugAllocationTest, GetAllocatedSizeTest) {
   // exactly requested size, since debug_allocation doesn't allow users
   // to write more than that.
   for (int i = 0; i < 10; ++i) {
-    void *p = malloc(i);
+    void *p = noopt(malloc(i));
     EXPECT_EQ(i, MallocExtension::instance()->GetAllocatedSize(p));
     free(p);
   }
 #endif
-  void* a = malloc(1000);
+  void* a = noopt(malloc(1000));
   EXPECT_GE(MallocExtension::instance()->GetAllocatedSize(a), 1000);
   // This is just a sanity check.  If we allocated too much, alloc is broken
   EXPECT_LE(MallocExtension::instance()->GetAllocatedSize(a), 5000);
@@ -285,7 +286,7 @@ TEST(DebugAllocationTest, HugeAlloc) {
 
 #ifndef NDEBUG
 
-  a = malloc(kTooBig);
+  a = noopt(malloc(noopt(kTooBig)));
   EXPECT_EQ(NULL, a);
 
   // kAlsoTooBig is small enough not to get caught by debugallocation's check,
@@ -293,7 +294,7 @@ TEST(DebugAllocationTest, HugeAlloc) {
   // a non-const variable. See kTooBig for more details.
   size_t kAlsoTooBig = kTooBig - 1024;
 
-  a = malloc(kAlsoTooBig);
+  a = noopt(malloc(noopt(kAlsoTooBig)));
   EXPECT_EQ(NULL, a);
 #endif
 }
@@ -307,7 +308,7 @@ TEST(DebugAllocationTest, ReallocAfterMemalign) {
   EXPECT_NE(p, NULL);
   memcpy(stuff, p, sizeof(stuff));
 
-  p = realloc(p, sizeof(stuff) + 10);
+  p = noopt(realloc(p, sizeof(stuff) + 10));
   EXPECT_NE(p, NULL);
 
   int rv = memcmp(stuff, p, sizeof(stuff));

@@ -6,23 +6,29 @@
 #define GPERFTOOLS_CONFIG_H_
 
 
+/* enable aggressive decommit by default */
+/* #undef ENABLE_AGGRESSIVE_DECOMMIT_BY_DEFAULT */
+
 /* Build new/delete operators for overaligned types */
 #define ENABLE_ALIGNED_NEW_DELETE 1
 
 /* Build runtime detection for sized delete */
 /* #undef ENABLE_DYNAMIC_SIZED_DELETE */
 
+/* report large allocation */
+/* #undef ENABLE_LARGE_ALLOC_REPORT */
+
 /* Build sized deletion operators */
 #define ENABLE_SIZED_DELETE 1
 
-/* Define to 1 if compiler supports __builtin_expect */
-#define HAVE_BUILTIN_EXPECT 1
-
-/* Define to 1 if compiler supports __builtin_stack_pointer */
-/* #undef HAVE_BUILTIN_STACK_POINTER */
+/* Define to 1 if you have the <asm/ptrace.h> header file. */
+#define HAVE_ASM_PTRACE_H 1
 
 /* Define to 1 if you have the <conflict-signal.h> header file. */
 /* #undef HAVE_CONFLICT_SIGNAL_H */
+
+/* define if the compiler supports basic C++11 syntax */
+#define HAVE_CXX11 1
 
 /* Define to 1 if you have the <cygwin/signal.h> header file. */
 /* #undef HAVE_CYGWIN_SIGNAL_H */
@@ -55,10 +61,6 @@
    */
 /* #undef HAVE_DECL_SLEEP */
 
-/* Define to 1 if you have the declaration of `uname', and to 0 if you don't.
-   */
-#define HAVE_DECL_UNAME 1
-
 /* Define to 1 if you have the declaration of `valloc', and to 0 if you don't.
    */
 #define HAVE_DECL_VALLOC 1
@@ -84,9 +86,6 @@
 /* Define to 1 if you have the `geteuid' function. */
 #define HAVE_GETEUID 1
 
-/* Define to 1 if you have the `getpagesize' function. */
-#define HAVE_GETPAGESIZE 1
-
 /* Define to 1 if you have the <glob.h> header file. */
 #define HAVE_GLOB_H 1
 
@@ -108,14 +107,8 @@
 /* Define to 1 if you have the <malloc.h> header file. */
 #define HAVE_MALLOC_H 1
 
-/* Define to 1 if you have the <memory.h> header file. */
-#define HAVE_MEMORY_H 1
-
 /* Define to 1 if you have a working `mmap' system call. */
 #define HAVE_MMAP 1
-
-/* define if the compiler implements namespaces */
-#define HAVE_NAMESPACES 1
 
 /* Define to 1 if you have the <poll.h> header file. */
 #define HAVE_POLL_H 1
@@ -142,6 +135,9 @@
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
 
+/* Define to 1 if you have the <stdio.h> header file. */
+#define HAVE_STDIO_H 1
+
 /* Define to 1 if you have the <stdlib.h> header file. */
 #define HAVE_STDLIB_H 1
 
@@ -156,9 +152,6 @@
 
 /* Define to 1 if you have the <sys/cdefs.h> header file. */
 #define HAVE_SYS_CDEFS_H 1
-
-/* Define to 1 if you have the <sys/param.h> header file. */
-#define HAVE_SYS_PARAM_H 1
 
 /* Define to 1 if you have the <sys/prctl.h> header file. */
 #define HAVE_SYS_PRCTL_H 1
@@ -199,9 +192,6 @@
 /* Define to 1 if you have the <unwind.h> header file. */
 #define HAVE_UNWIND_H 1
 
-/* Define to 1 if you have the <valgrind.h> header file. */
-/* #undef HAVE_VALGRIND_H */
-
 /* define if your compiler has __attribute__ */
 #define HAVE___ATTRIBUTE__ 1
 
@@ -211,11 +201,11 @@
 /* Define to 1 if compiler supports __environ */
 #define HAVE___ENVIRON 1
 
-/* Define to 1 if the system has the type `__int64'. */
-/* #undef HAVE___INT64 */
+/* Define to 1 if you have the `__sbrk' function. */
+#define HAVE___SBRK 1
 
 /* prefix where we look for installed files */
-#define INSTALL_PREFIX "/tmp/gperftools-configure.uVrjV8/src/third_party/gperftools-2.7/platform/linux_s390x/junk"
+#define INSTALL_PREFIX "/home/amorrow/mongo/src/third_party/gperftools/platform/linux_s390x/junk"
 
 /* Define to 1 if int32_t is equivalent to intptr_t */
 /* #undef INT32_EQUALS_INTPTR */
@@ -233,7 +223,7 @@
 #define PACKAGE_NAME "gperftools"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "gperftools 2.7"
+#define PACKAGE_STRING "gperftools 2.9.1"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "gperftools"
@@ -242,7 +232,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "2.7"
+#define PACKAGE_VERSION "2.9.1"
 
 /* How to access the PC from a struct ucontext */
 #define PC_FROM_UCONTEXT uc_mcontext.psw.addr
@@ -254,15 +244,6 @@
    "config.h" before anything else. */
 #define PERFTOOLS_DLL_DECL /**/
 
-/* printf format code for printing a size_t and ssize_t */
-#define PRIdS "ld"
-
-/* printf format code for printing a size_t and ssize_t */
-#define PRIuS "lu"
-
-/* printf format code for printing a size_t and ssize_t */
-#define PRIxS "lx"
-
 /* Mark the systems where we know it's bad if pthreads runs too
    early before main (before threads are initialized, presumably).  */
 #ifdef __FreeBSD__
@@ -273,11 +254,10 @@
    your system. */
 /* #undef PTHREAD_CREATE_JOINABLE */
 
-/* Define to 1 if you have the ANSI C header files. */
+/* Define to 1 if all of the C90 standard headers exist (not just the ones
+   required in a freestanding environment). This macro is provided for
+   backward compatibility; new code need not use it. */
 #define STDC_HEADERS 1
-
-/* the namespace where STL code like vector<> is defined */
-#define STL_NAMESPACE std
 
 /* Define to 1 to try to reduce the number of size classes. */
 #define TCMALLOC_AGGRESSIVE_MERGE 1
@@ -301,17 +281,11 @@
 #define TCMALLOC_USE_UNCLAMPED_TRANSFER_SIZES 1
 
 /* Version number of package */
-#define VERSION "2.7"
+#define VERSION "2.9.1"
 
 /* C99 says: define this to get the PRI... macros from stdint.h */
 #ifndef __STDC_FORMAT_MACROS
 # define __STDC_FORMAT_MACROS 1
-#endif
-
-/* Define to `__inline__' or `__inline' if that's what the C compiler
-   calls it, or to nothing if 'inline' is not supported under any name.  */
-#ifndef __cplusplus
-/* #undef inline */
 #endif
 
 

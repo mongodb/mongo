@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2006, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -55,7 +55,7 @@
 // routines that run before main(), when the state required for getenv() may
 // not be set up yet.  In particular, errno isn't set up until relatively late
 // (after the pthreads library has a chance to make it threadsafe), and
-// getenv() doesn't work until then. 
+// getenv() doesn't work until then.
 // On some platforms, this call will utilize the same, static buffer for
 // repeated GetenvBeforeMain() calls. Callers should not expect pointers from
 // this routine to be long lived.
@@ -71,8 +71,6 @@ extern const char* GetenvBeforeMain(const char* name);
 extern bool GetUniquePathFromEnv(const char* env_name, char* path);
 
 extern int GetSystemCPUsCount();
-
-void SleepForMilliseconds(int milliseconds);
 
 //  Return true if we're running POSIX (e.g., NPTL on Linux) threads,
 //  as opposed to a non-POSIX thread library.  The thing that we care

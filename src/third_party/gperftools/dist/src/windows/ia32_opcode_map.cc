@@ -1,10 +1,11 @@
+// -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 /* Copyright (c) 2007, Google Inc.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above
@@ -14,7 +15,7 @@
  *     * Neither the name of Google Inc. nor the names of its
  * contributors may be used to endorse or promote products derived from
  * this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -30,8 +31,8 @@
  * ---
  * Author: Joi Sigurdsson
  *
- * Opcode decoding maps.  Based on the IA-32 Intel® Architecture
- * Software Developer’s Manual Volume 2: Instruction Set Reference.  Idea
+ * Opcode decoding maps.  Based on the IA-32 IntelÂ® Architecture
+ * Software Developer's Manual Volume 2: Instruction Set Reference.  Idea
  * for how to lay out the tables in memory taken from the implementation
  * in the Bastard disassembly environment.
  */
@@ -294,10 +295,10 @@ const Opcode s_first_opcode_byte[] = {
   /* 0xD5 */ { 0, IT_GENERIC, AM_I | OT_B, AM_NOT_USED, AM_NOT_USED, "aad", false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
   /* 0xD6 */ { 0, IT_UNUSED, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, 0, false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
   /* 0xD7 */ { 0, IT_GENERIC, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, "xlat", false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
-  
+
   // The following 8 lines would be references to the FPU tables, but we currently
   // do not support the FPU instructions in this disassembler.
-  
+
   /* 0xD8 */ { 0, IT_UNKNOWN, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, 0, false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
   /* 0xD9 */ { 0, IT_UNKNOWN, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, 0, false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
   /* 0xDA */ { 0, IT_UNKNOWN, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, 0, false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
@@ -306,8 +307,8 @@ const Opcode s_first_opcode_byte[] = {
   /* 0xDD */ { 0, IT_UNKNOWN, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, 0, false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
   /* 0xDE */ { 0, IT_UNKNOWN, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, 0, false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
   /* 0xDF */ { 0, IT_UNKNOWN, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, 0, false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
-  
-  
+
+
   /* 0xE0 */ { 0, IT_JUMP, AM_J | OT_B, AM_NOT_USED, AM_NOT_USED, "loopnz", false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
   /* 0xE1 */ { 0, IT_JUMP, AM_J | OT_B, AM_NOT_USED, AM_NOT_USED, "loopz", false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
   /* 0xE2 */ { 0, IT_JUMP, AM_J | OT_B, AM_NOT_USED, AM_NOT_USED, "loop", false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
@@ -619,7 +620,7 @@ const Opcode s_opcode_byte_after_0f[] = {
     /* F3h */ { 0 },
     /* 66h */ { 0, IT_GENERIC, AM_V | OT_DQ, AM_W | OT_DQ, AM_NOT_USED, "pcmpeqd" } },
   /* 0x77 */ { 0, IT_GENERIC, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, "emms", false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
-  
+
   // The following six opcodes are escapes into the MMX stuff, which this disassembler does not support.
   /* 0x78 */ { 0, IT_UNKNOWN, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, 0, false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
   /* 0x79 */ { 0, IT_UNKNOWN, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, 0, false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
@@ -627,7 +628,7 @@ const Opcode s_opcode_byte_after_0f[] = {
   /* 0x7B */ { 0, IT_UNKNOWN, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, 0, false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
   /* 0x7C */ { 0, IT_UNKNOWN, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, 0, false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
   /* 0x7D */ { 0, IT_UNKNOWN, AM_NOT_USED, AM_NOT_USED, AM_NOT_USED, 0, false, /* F2h */ { 0 }, /* F3h */ { 0 }, /* 66h */ { 0 } },
-  
+
   /* 0x7E */ { 0, IT_GENERIC, AM_E | OT_D, AM_P | OT_D, AM_NOT_USED, "movd", true,
     /* F2h */ { 0 },
     /* F3h */ { 0, IT_GENERIC, AM_V | OT_Q, AM_W | OT_Q, AM_NOT_USED, "movq" },
@@ -1192,27 +1193,27 @@ const OpcodeTable MiniDisassembler::s_ia32_opcode_map_[]={
   /*  1 */ {s_opcode_byte_after_0f, 0, 0xff, 0, 0xff},
   // Start of tables for opcodes using ModR/M bits as extension
   /*  2 */ {s_opcode_byte_after_80, 3, 0x07, 0, 0x07},
-  /*  3 */ {s_opcode_byte_after_81, 3, 0x07, 0, 0x07}, 
-  /*  4 */ {s_opcode_byte_after_82, 3, 0x07, 0, 0x07}, 
-  /*  5 */ {s_opcode_byte_after_83, 3, 0x07, 0, 0x07}, 
-  /*  6 */ {s_opcode_byte_after_c0, 3, 0x07, 0, 0x07}, 
-  /*  7 */ {s_opcode_byte_after_c1, 3, 0x07, 0, 0x07}, 
-  /*  8 */ {s_opcode_byte_after_d0, 3, 0x07, 0, 0x07}, 
-  /*  9 */ {s_opcode_byte_after_d1, 3, 0x07, 0, 0x07}, 
-  /* 10 */ {s_opcode_byte_after_d2, 3, 0x07, 0, 0x07}, 
-  /* 11 */ {s_opcode_byte_after_d3, 3, 0x07, 0, 0x07}, 
-  /* 12 */ {s_opcode_byte_after_f6, 3, 0x07, 0, 0x07}, 
-  /* 13 */ {s_opcode_byte_after_f7, 3, 0x07, 0, 0x07}, 
-  /* 14 */ {s_opcode_byte_after_fe, 3, 0x07, 0, 0x01}, 
-  /* 15 */ {s_opcode_byte_after_ff, 3, 0x07, 0, 0x07}, 
-  /* 16 */ {s_opcode_byte_after_0f00, 3, 0x07, 0, 0x07}, 
-  /* 17 */ {s_opcode_byte_after_0f01, 3, 0x07, 0, 0x07}, 
-  /* 18 */ {s_opcode_byte_after_0f18, 3, 0x07, 0, 0x07}, 
-  /* 19 */ {s_opcode_byte_after_0f71, 3, 0x07, 0, 0x07}, 
-  /* 20 */ {s_opcode_byte_after_0f72, 3, 0x07, 0, 0x07}, 
-  /* 21 */ {s_opcode_byte_after_0f73, 3, 0x07, 0, 0x07}, 
-  /* 22 */ {s_opcode_byte_after_0fae, 3, 0x07, 0, 0x07}, 
-  /* 23 */ {s_opcode_byte_after_0fba, 3, 0x07, 0, 0x07}, 
+  /*  3 */ {s_opcode_byte_after_81, 3, 0x07, 0, 0x07},
+  /*  4 */ {s_opcode_byte_after_82, 3, 0x07, 0, 0x07},
+  /*  5 */ {s_opcode_byte_after_83, 3, 0x07, 0, 0x07},
+  /*  6 */ {s_opcode_byte_after_c0, 3, 0x07, 0, 0x07},
+  /*  7 */ {s_opcode_byte_after_c1, 3, 0x07, 0, 0x07},
+  /*  8 */ {s_opcode_byte_after_d0, 3, 0x07, 0, 0x07},
+  /*  9 */ {s_opcode_byte_after_d1, 3, 0x07, 0, 0x07},
+  /* 10 */ {s_opcode_byte_after_d2, 3, 0x07, 0, 0x07},
+  /* 11 */ {s_opcode_byte_after_d3, 3, 0x07, 0, 0x07},
+  /* 12 */ {s_opcode_byte_after_f6, 3, 0x07, 0, 0x07},
+  /* 13 */ {s_opcode_byte_after_f7, 3, 0x07, 0, 0x07},
+  /* 14 */ {s_opcode_byte_after_fe, 3, 0x07, 0, 0x01},
+  /* 15 */ {s_opcode_byte_after_ff, 3, 0x07, 0, 0x07},
+  /* 16 */ {s_opcode_byte_after_0f00, 3, 0x07, 0, 0x07},
+  /* 17 */ {s_opcode_byte_after_0f01, 3, 0x07, 0, 0x07},
+  /* 18 */ {s_opcode_byte_after_0f18, 3, 0x07, 0, 0x07},
+  /* 19 */ {s_opcode_byte_after_0f71, 3, 0x07, 0, 0x07},
+  /* 20 */ {s_opcode_byte_after_0f72, 3, 0x07, 0, 0x07},
+  /* 21 */ {s_opcode_byte_after_0f73, 3, 0x07, 0, 0x07},
+  /* 22 */ {s_opcode_byte_after_0fae, 3, 0x07, 0, 0x07},
+  /* 23 */ {s_opcode_byte_after_0fba, 3, 0x07, 0, 0x07},
   /* 24 */ {s_opcode_byte_after_0fc7, 3, 0x07, 0, 0x01}
 };
 

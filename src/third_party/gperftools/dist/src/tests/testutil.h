@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2007, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -58,5 +58,16 @@ extern "C" void RunManyThreadsWithId(void (*fn)(int), int count, int stacksize);
 // limiting the address-space size we get sufficient coverage without blowing
 // out job limits.
 void SetTestResourceLimit();
+
+static void (* volatile noopt_helper)(void *) = +[] (void* dummy) {};
+
+// This function forces compiler to forget specific knowledge about
+// value of 'val'. This is useful to avoid compiler optimizing out
+// new/delete pairs for our unit tests.
+template <typename T>
+T noopt(T val) {
+  noopt_helper(&val);
+  return val;
+}
 
 #endif  // TCMALLOC_TOOLS_TESTUTIL_H_

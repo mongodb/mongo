@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2005, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -42,19 +42,21 @@
 #include <set>                          // for set, etc
 
 #include "base/logging.h"               // for operator<<, CHECK, etc
+#include "gperftools/tcmalloc.h"
+#include "tests/testutil.h"
 
 using std::set;
 
 // Alloc a size that should always fail.
 
 void TryAllocExpectFail(size_t size) {
-  void* p1 = malloc(size);
+  void* p1 = noopt(malloc(size));
   CHECK(p1 == NULL);
 
-  void* p2 = malloc(1);
+  void* p2 = noopt(malloc(1));
   CHECK(p2 != NULL);
 
-  void* p3 = realloc(p2, size);
+  void* p3 = noopt(realloc(p2, size));
   CHECK(p3 == NULL);
 
   free(p2);
@@ -64,24 +66,23 @@ void TryAllocExpectFail(size_t size) {
 // If it does work, touch some pages.
 
 void TryAllocMightFail(size_t size) {
-  unsigned char* p = static_cast<unsigned char*>(malloc(size));
-  if ( p != NULL ) {
-    unsigned char volatile* vp = p;  // prevent optimizations
+  unsigned char* p = static_cast<unsigned char*>(noopt(malloc(size)));
+  if (p != NULL) {
     static const size_t kPoints = 1024;
 
     for ( size_t i = 0; i < kPoints; ++i ) {
-      vp[i * (size / kPoints)] = static_cast<unsigned char>(i);
+      p[i * (size / kPoints)] = static_cast<unsigned char>(i);
     }
 
     for ( size_t i = 0; i < kPoints; ++i ) {
-      CHECK(vp[i * (size / kPoints)] == static_cast<unsigned char>(i));
+      CHECK(p[i * (size / kPoints)] == static_cast<unsigned char>(i));
     }
 
-    vp[size-1] = 'M';
-    CHECK(vp[size-1] == 'M');
+    p[size-1] = 'M';
+    CHECK(p[size-1] == 'M');
   }
 
-  free(p);
+  free(noopt(p));
 }
 
 int main (int argc, char** argv) {
@@ -103,7 +104,7 @@ int main (int argc, char** argv) {
 
   // Grab some memory so that some later allocations are guaranteed to fail.
   printf("Test small malloc\n");
-  void* p_small = malloc(4*1048576);
+  void* p_small = noopt(malloc(4*1048576));
   CHECK(p_small != NULL);
 
   // Test sizes up near the maximum size_t.

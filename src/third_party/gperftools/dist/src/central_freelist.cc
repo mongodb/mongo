@@ -110,7 +110,6 @@ void CentralFreeList::ReleaseToSpans(void* object) {
   if (span->objects == NULL) {
     tcmalloc::DLL_Remove(span);
     tcmalloc::DLL_Prepend(&nonempty_, span);
-    Event(span, 'N', 0);
   }
 
   // The following check is expensive, so it is disabled by default
@@ -129,7 +128,6 @@ void CentralFreeList::ReleaseToSpans(void* object) {
   counter_++;
   span->refcount--;
   if (span->refcount == 0) {
-    Event(span, '#', 0);
     counter_ -= ((span->length<<kPageShift) /
                  Static::sizemap()->ByteSizeForClass(span->sizeclass));
     tcmalloc::DLL_Remove(span);
@@ -305,7 +303,6 @@ int CentralFreeList::FetchFromOneSpans(int N, void **start, void **end) {
     // Move to empty list
     tcmalloc::DLL_Remove(span);
     tcmalloc::DLL_Prepend(&empty_, span);
-    Event(span, 'E', 0);
   }
 
   *start = span->objects;

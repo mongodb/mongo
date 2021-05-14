@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2007, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -85,6 +85,10 @@ DEFINE_bool(memfs_malloc_ignore_mmap_fail,
 DEFINE_bool(memfs_malloc_map_private,
             EnvToBool("TCMALLOC_MEMFS_MAP_PRIVATE", false),
 	    "Use MAP_PRIVATE with mmap");
+DEFINE_bool(memfs_malloc_disable_fallback,
+            EnvToBool("TCMALLOC_MEMFS_DISABLE_FALLBACK", false),
+            "If we run out of hugepage memory don't fallback to default "
+            "allocator.");
 
 // Hugetlbfs based allocator for tcmalloc
 class HugetlbSysAllocator: public SysAllocator {
@@ -120,13 +124,14 @@ static union {
 // us with an internal lock held (see tcmalloc/system-alloc.cc).
 void* HugetlbSysAllocator::Alloc(size_t size, size_t *actual_size,
                                  size_t alignment) {
-  if (failed_) {
+  if (!FLAGS_memfs_malloc_disable_fallback && failed_) {
     return fallback_->Alloc(size, actual_size, alignment);
   }
 
   // We don't respond to allocation requests smaller than big_page_size_ unless
   // the caller is ok to take more than they asked for. Used by MetaDataAlloc.
-  if (actual_size == NULL && size < big_page_size_) {
+  if (!FLAGS_memfs_malloc_disable_fallback &&
+      actual_size == NULL && size < big_page_size_) {
     return fallback_->Alloc(size, actual_size, alignment);
   }
 
@@ -135,13 +140,15 @@ void* HugetlbSysAllocator::Alloc(size_t size, size_t *actual_size,
   if (new_alignment < big_page_size_) new_alignment = big_page_size_;
   size_t aligned_size = ((size + new_alignment - 1) /
                          new_alignment) * new_alignment;
-  if (aligned_size < size) {
+  if (!FLAGS_memfs_malloc_disable_fallback && aligned_size < size) {
     return fallback_->Alloc(size, actual_size, alignment);
   }
 
   void* result = AllocInternal(aligned_size, actual_size, new_alignment);
   if (result != NULL) {
     return result;
+  } else if (FLAGS_memfs_malloc_disable_fallback) {
+    return NULL;
   }
   Log(kLog, __FILE__, __LINE__,
       "HugetlbSysAllocator: (failed, allocated)", failed_, hugetlb_base_);

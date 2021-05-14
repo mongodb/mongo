@@ -93,23 +93,9 @@ struct Span {
   // Copies out and destroys iterator stored in span_iter_space.
   SpanSet::iterator ExtractSpanSetIterator();
 
-#undef SPAN_HISTORY
-#ifdef SPAN_HISTORY
-  // For debugging, we can keep a log events per span
-  int nexthistory;
-  char history[64];
-  int value[64];
-#endif
-
   // What freelist the span is on: IN_USE if on none, or normal or returned
   enum { IN_USE, ON_NORMAL_FREELIST, ON_RETURNED_FREELIST };
 };
-
-#ifdef SPAN_HISTORY
-void Event(Span* span, char op, int v = 0);
-#else
-#define Event(s,o,v) ((void) 0)
-#endif
 
 inline SpanPtrWithLength::SpanPtrWithLength(Span* s)
     : span(s),

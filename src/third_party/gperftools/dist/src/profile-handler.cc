@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2009, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -49,8 +49,11 @@
 #if HAVE_LINUX_SIGEV_THREAD_ID
 // for timer_{create,settime} and associated typedefs & constants
 #include <time.h>
-// for sys_gettid
-#include "base/linux_syscall_support.h"
+// for sigevent
+#include <signal.h>
+// for SYS_gettid
+#include <sys/syscall.h>
+
 // for perftools_pthread_key_create
 #include "maybe_threads.h"
 #endif
@@ -60,6 +63,18 @@
 #include "base/logging.h"
 #include "base/spinlock.h"
 #include "maybe_threads.h"
+
+// Some Linux systems don't have sigev_notify_thread_id defined in
+// signal.h (despite having SIGEV_THREAD_ID defined) and also lack
+// working linux/signal.h. So lets workaround. Note, we know that at
+// least on Linux sigev_notify_thread_id is macro.
+//
+// See https://sourceware.org/bugzilla/show_bug.cgi?id=27417 and
+// https://bugzilla.kernel.org/show_bug.cgi?id=200081
+//
+#if __linux__ && HAVE_LINUX_SIGEV_THREAD_ID && !defined(sigev_notify_thread_id)
+#define sigev_notify_thread_id _sigev_un._tid
+#endif
 
 using std::list;
 using std::string;
@@ -272,7 +287,7 @@ static void StartLinuxThreadTimer(int timer_type, int signal_number,
   struct itimerspec its;
   memset(&sevp, 0, sizeof(sevp));
   sevp.sigev_notify = SIGEV_THREAD_ID;
-  sevp._sigev_un._tid = sys_gettid();
+  sevp.sigev_notify_thread_id = syscall(SYS_gettid);
   sevp.sigev_signo = signal_number;
   clockid_t clock = CLOCK_THREAD_CPUTIME_ID;
   if (timer_type == ITIMER_REAL) {
@@ -519,7 +534,7 @@ void ProfileHandler::SignalHandler(int sig, siginfo_t* sinfo, void* ucontext) {
   // At this moment, instance_ must be initialized because the handler is
   // enabled in RegisterThread or RegisterCallback only after
   // ProfileHandler::Instance runs.
-  ProfileHandler* instance = ANNOTATE_UNPROTECTED_READ(instance_);
+  ProfileHandler* instance = instance_;
   RAW_CHECK(instance != NULL, "ProfileHandler is not initialized");
   {
     SpinLockHolder sl(&instance->signal_lock_);

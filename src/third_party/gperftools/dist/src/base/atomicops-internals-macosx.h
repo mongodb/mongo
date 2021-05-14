@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 /* Copyright (c) 2006, Google Inc.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
  *     * Neither the name of Google Inc. nor the names of its
  * contributors may be used to endorse or promote products derived from
  * this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -172,11 +172,6 @@ inline void NoBarrier_Store(volatile Atomic32* ptr, Atomic32 value) {
   *ptr = value;
 }
 
-inline void Acquire_Store(volatile Atomic32 *ptr, Atomic32 value) {
-  *ptr = value;
-  MemoryBarrier();
-}
-
 inline void Release_Store(volatile Atomic32 *ptr, Atomic32 value) {
   MemoryBarrier();
   *ptr = value;
@@ -190,11 +185,6 @@ inline Atomic32 Acquire_Load(volatile const Atomic32 *ptr) {
   Atomic32 value = *ptr;
   MemoryBarrier();
   return value;
-}
-
-inline Atomic32 Release_Load(volatile const Atomic32 *ptr) {
-  MemoryBarrier();
-  return *ptr;
 }
 
 // 64-bit version
@@ -268,11 +258,6 @@ inline void NoBarrier_Store(volatile Atomic64* ptr, Atomic64 value) {
   *ptr = value;
 }
 
-inline void Acquire_Store(volatile Atomic64 *ptr, Atomic64 value) {
-  *ptr = value;
-  MemoryBarrier();
-}
-
 inline void Release_Store(volatile Atomic64 *ptr, Atomic64 value) {
   MemoryBarrier();
   *ptr = value;
@@ -286,11 +271,6 @@ inline Atomic64 Acquire_Load(volatile const Atomic64 *ptr) {
   Atomic64 value = *ptr;
   MemoryBarrier();
   return value;
-}
-
-inline Atomic64 Release_Load(volatile const Atomic64 *ptr) {
-  MemoryBarrier();
-  return *ptr;
 }
 
 #else
@@ -342,11 +322,6 @@ inline Atomic64 NoBarrier_Load(volatile const Atomic64* ptr) {
 #endif
 
 
-inline void Acquire_Store(volatile Atomic64 *ptr, Atomic64 value) {
-  NoBarrier_Store(ptr, value);
-  MemoryBarrier();
-}
-
 inline void Release_Store(volatile Atomic64 *ptr, Atomic64 value) {
   MemoryBarrier();
   NoBarrier_Store(ptr, value);
@@ -358,10 +333,6 @@ inline Atomic64 Acquire_Load(volatile const Atomic64 *ptr) {
   return value;
 }
 
-inline Atomic64 Release_Load(volatile const Atomic64 *ptr) {
-  MemoryBarrier();
-  return NoBarrier_Load(ptr);
-}
 #endif  // __LP64__
 
 }   // namespace base::subtle
