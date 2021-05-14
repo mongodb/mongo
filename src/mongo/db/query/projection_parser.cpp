@@ -230,8 +230,8 @@ void attemptToParseFindSlice(ParseContext* parseCtx,
     if (subObj.firstElement().isNumber()) {
         addNodeAtPath(parent,
                       path,
-                      std::make_unique<ProjectionSliceASTNode>(boost::none,
-                                                               subObj.firstElement().numberInt()));
+                      std::make_unique<ProjectionSliceASTNode>(
+                          boost::none, subObj.firstElement().safeNumberInt()));
     } else if (subObj.firstElementType() == BSONType::Array) {
         BSONObj arr = subObj.firstElement().embeddedObject();
         uassert(31272, "$slice array argument should be of form [skip, limit]", arr.nFields() == 2);
@@ -248,13 +248,10 @@ void attemptToParseFindSlice(ParseContext* parseCtx,
                               << limitElt.type(),
                 limitElt.isNumber());
 
-        uassert(31259,
-                str::stream() << "$slice limit must be positive, got " << limitElt.numberInt(),
-                limitElt.numberInt() > 0);
+        auto limit = limitElt.safeNumberInt();
+        uassert(31259, str::stream() << "$slice limit must be positive, got " << limit, limit > 0);
         addNodeAtPath(
-            parent,
-            path,
-            std::make_unique<ProjectionSliceASTNode>(skipElt.numberInt(), limitElt.numberInt()));
+            parent, path, std::make_unique<ProjectionSliceASTNode>(skipElt.safeNumberInt(), limit));
     } else {
         uasserted(31273, "$slice only supports numbers and [skip, limit] arrays");
     }
