@@ -837,6 +837,9 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     IndexBuildEntry indexbuildEntry(
         replState->buildUUID, replState->collectionUUID, newCommitQuorum, replState->indexNames);
     status = indexbuildentryhelpers::persistIndexCommitQuorum(opCtx, indexbuildEntry);
+    if (!status.isOK()) {
+        return status;
+    }
 
     {
         // Check to see the index build hasn't received commit index build signal while updating
@@ -844,10 +847,18 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
         stdx::unique_lock<Latch> lk(replState->mutex);
         if (replState->waitForNextAction->getFuture().isReady()) {
             auto action = replState->waitForNextAction->getFuture().get();
-            invariant(action != IndexBuildAction::kCommitQuorumSatisfied);
+            uassert(
+                ErrorCodes::CommandFailed,
+                str::stream() << "Commit quorum is already satisfied, this command has no effect",
+                action != IndexBuildAction::kCommitQuorumSatisfied);
         }
     }
-    return status;
+
+    // If the index builder is already waiting for the commit quorum to be satisfied and the commit
+    // quorum changes, we need to signal the index builder to make it aware of the change.
+    _signalIfCommitQuorumIsSatisfied(opCtx, replState);
+
+    return Status::OK();
 }
 
 Status IndexBuildsCoordinatorMongod::_finishScanningPhase() {
