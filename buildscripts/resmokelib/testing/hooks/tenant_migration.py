@@ -1,5 +1,6 @@
 """Test hook that runs tenant migrations continuously."""
 
+import copy
 import random
 import re
 import threading
@@ -37,7 +38,7 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
         if not isinstance(fixture, tenant_migration.TenantMigrationFixture):
             raise ValueError("The ContinuousTenantMigration hook requires a TenantMigrationFixture")
         self._tenant_migration_fixture = fixture
-        self._shell_options = shell_options.copy()
+        self._shell_options = copy.deepcopy(shell_options)
 
         self._tenant_migration_thread = None
 
