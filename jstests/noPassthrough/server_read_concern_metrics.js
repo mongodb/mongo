@@ -126,16 +126,16 @@ const dbName = "test";
 const collName = "server_read_concern_metrics";
 const testDB = primary.getDB(dbName);
 const testColl = testDB[collName];
+testDB.runCommand({drop: collName});
+assert.commandWorked(testDB.createCollection(collName));
+assert.commandWorked(testColl.insert({_id: 0}, {writeConcern: {w: 'majority'}}));
+
 const sessionOptions = {
     causalConsistency: false
 };
 const session = testDB.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
 const sessionColl = sessionDb[collName];
-
-testDB.runCommand({drop: collName});
-assert.commandWorked(testDB.createCollection(collName));
-assert.commandWorked(testColl.insert({_id: 0}));
 
 // Run an initial transaction to get config.transactions state into memory.
 session.startTransaction();
