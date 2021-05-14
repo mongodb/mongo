@@ -495,6 +495,19 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                            opCtx->recoveryUnit()->getSnapshotId(), originalStateDocBson);
                        invariant(!originalRecordId.isNull());
 
+                       if (nextState == TenantMigrationDonorStateEnum::kBlocking) {
+                           // Start blocking writes before getting an oplog slot to guarantee no
+                           // writes to the tenant's data can commit with a timestamp after the
+                           // block timestamp.
+                           auto mtab = tenant_migration_access_blocker::
+                               getTenantMigrationDonorAccessBlocker(_serviceContext, _tenantId);
+                           invariant(mtab);
+                           mtab->startBlockingWrites();
+
+                           opCtx->recoveryUnit()->onRollback(
+                               [mtab] { mtab->rollBackStartBlocking(); });
+                       }
+
                        // Reserve an opTime for the write.
                        auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
                        {
@@ -510,15 +523,6 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                                }
                                case TenantMigrationDonorStateEnum::kBlocking: {
                                    _stateDoc.setBlockTimestamp(oplogSlot.getTimestamp());
-
-                                   auto mtab = tenant_migration_access_blocker::
-                                       getTenantMigrationDonorAccessBlocker(_serviceContext,
-                                                                            _tenantId);
-                                   invariant(mtab);
-
-                                   mtab->startBlockingWrites();
-                                   opCtx->recoveryUnit()->onRollback(
-                                       [mtab] { mtab->rollBackStartBlocking(); });
                                    break;
                                }
                                case TenantMigrationDonorStateEnum::kCommitted:
