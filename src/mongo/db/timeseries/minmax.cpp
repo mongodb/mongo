@@ -172,7 +172,9 @@ MinMaxStore::ObjView::ObjView(const MinMaxStore::Entries& entries,
     : _entries(entries), _pos(pos) {}
 
 MinMaxStore::ObjView& MinMaxStore::ObjView::operator=(const MinMaxStore::ObjView& rhs) {
-    _pos = rhs._pos;
+    if (this != &rhs) {
+        _pos = rhs._pos;
+    }
     return *this;
 }
 
@@ -208,7 +210,9 @@ MinMaxStore::Obj::operator MinMaxStore::ObjView() {
 }
 
 MinMaxStore::Obj& MinMaxStore::Obj::operator=(const MinMaxStore::Obj& rhs) {
-    _pos = rhs._pos;
+    if (this != &rhs) {
+        _pos = rhs._pos;
+    }
     return *this;
 }
 
