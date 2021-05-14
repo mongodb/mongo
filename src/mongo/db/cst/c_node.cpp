@@ -293,8 +293,6 @@ int CNode::numberInt() const {
 
     // safeNumberLong returns the LLONG_MIN/LLONG_MAX when the original value is too big/small
     // for a long long, so imitate that behavior here for int.
-
-    // TODO SERVER-51204: Factor out this type conversion instead of depending on BSON.
     long long val = numberLong();
     constexpr int max = std::numeric_limits<int>::max();
     constexpr int min = std::numeric_limits<int>::min();
@@ -306,7 +304,6 @@ int CNode::numberInt() const {
 }
 
 long long CNode::numberLong() const {
-    // TODO SERVER-51204: Factor out this type conversion instead of depending on BSON.
     return stdx::visit(
         visit_helper::Overloaded{
             [](const UserDouble& userDouble) {
