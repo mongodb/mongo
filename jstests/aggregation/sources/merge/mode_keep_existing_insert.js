@@ -8,6 +8,13 @@
 load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
 load("jstests/aggregation/extras/utils.js");          // For assertArrayEq.
 load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isMongos.
+load("jstests/libs/write_concern_util.js");  // For isDefaultWriteConcernMajorityFlagEnabled.
+
+// TODO (SERVER-56963): Re-enable the test.
+if (isDefaultWriteConcernMajorityFlagEnabled(db)) {
+    jsTestLog("Skipping test because the default WC majority feature flag is enabled.");
+    return;
+}
 
 const source = db[`${jsTest.name()}_source`];
 source.drop();
