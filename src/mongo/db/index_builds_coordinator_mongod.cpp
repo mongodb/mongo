@@ -852,15 +852,23 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     IndexBuildEntry indexbuildEntry(
         replState->buildUUID, replState->collectionUUID, newCommitQuorum, replState->indexNames);
     status = indexbuildentryhelpers::persistIndexCommitQuorum(opCtx, indexbuildEntry);
-
-    {
-        // Check to see the index build hasn't received commit index build signal while updating
-        // the commit quorum value on-disk.
-        if (auto action = replState->getNextActionNoWait()) {
-            invariant(*action != IndexBuildAction::kCommitQuorumSatisfied);
-        }
+    if (!status.isOK()) {
+        return status;
     }
-    return status;
+
+    // Check to see the index build hasn't received commit index build signal while updating
+    // the commit quorum value on-disk.
+    if (auto action = replState->getNextActionNoWait()) {
+        uassert(ErrorCodes::CommandFailed,
+                str::stream() << "Commit quorum is already satisfied, this command has no effect",
+                *action != IndexBuildAction::kCommitQuorumSatisfied);
+    }
+
+    // If the index builder is already waiting for the commit quorum to be satisfied and the commit
+    // quorum changes, we need to signal the index builder to make it aware of the change.
+    _signalIfCommitQuorumIsSatisfied(opCtx, replState);
+
+    return Status::OK();
 }
 
 Status IndexBuildsCoordinatorMongod::_finishScanningPhase() {
