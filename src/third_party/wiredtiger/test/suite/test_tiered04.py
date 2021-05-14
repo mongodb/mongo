@@ -35,7 +35,7 @@ StorageSource = wiredtiger.StorageSource  # easy access to constants
 class test_tiered04(wttest.WiredTigerTestCase):
 
     # If the 'uri' changes all the other names must change with it.
-    fileuri = 'file:test_tiered04-0000000001.wt'
+    fileuri = 'file:test_tiered04-0000000001.wtobj'
     objuri = 'object:test_tiered04-0000000001.wtobj'
     tiereduri = "tiered:test_tiered04"
     uri = "table:test_tiered04"

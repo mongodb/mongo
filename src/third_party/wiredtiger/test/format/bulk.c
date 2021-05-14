@@ -113,7 +113,6 @@ wts_load(void)
         bulk_begin_transaction(session);
 
     for (committed_keyno = keyno = 0; ++keyno <= g.c_rows;) {
-        key_gen(&key, keyno);
         val_gen(NULL, &value, keyno);
 
         switch (g.type) {
@@ -132,6 +131,7 @@ wts_load(void)
                 trace_msg("bulk %" PRIu32 " {%.*s}", keyno, (int)value.size, (char *)value.data);
             break;
         case ROW:
+            key_gen(&key, keyno);
             cursor->set_key(cursor, &key);
             cursor->set_value(cursor, &value);
             if (g.trace_all)

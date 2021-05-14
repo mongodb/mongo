@@ -1351,8 +1351,8 @@ order_error_col:
                  * to the row's key.) Keys are strings with terminating '/' values, so absent key
                  * corruption, we can simply do the underlying string conversion on the key string.
                  */
-                keyno_prev = strtoul(tinfo->key->data, NULL, 10);
-                keyno = strtoul(key.data, NULL, 10);
+                keyno_prev = strtoul((char *)tinfo->key->data + g.prefix_len, NULL, 10);
+                keyno = strtoul((char *)key.data + g.prefix_len, NULL, 10);
                 if (incrementing) {
                     if (keyno_prev != keyno && keyno_prev + 1 != keyno)
                         goto order_error_row;

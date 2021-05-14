@@ -91,15 +91,16 @@ __wt_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, 
 {
     WT_CELL_UNPACK_KV unpack;
 
-    WT_TIME_WINDOW_INIT(tw);
     /*
-     * If a value is simple and is globally visible at the time of reading a page into cache, we set
-     * the start time point as globally visible.
+     * Simple values are encoded at the time of reading a page into cache, in which case we set the
+     * start time point as globally visible.
      */
-    if (__wt_row_leaf_value_exists(rip))
+    if (__wt_row_leaf_value_is_encoded(rip)) {
+        WT_TIME_WINDOW_INIT(tw);
         return;
+    }
 
-    __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
+    __wt_row_leaf_value_cell(session, page, rip, &unpack);
     WT_TIME_WINDOW_COPY(tw, &unpack.tw);
 }
 
@@ -165,7 +166,7 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
         }
 
         /* Take the value from the original page cell. */
-        __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
+        __wt_row_leaf_value_cell(session, page, rip, &unpack);
         if (tw != NULL)
             WT_TIME_WINDOW_COPY(tw, &unpack.tw);
         return (__wt_page_cell_data_ref(session, page, &unpack, buf));

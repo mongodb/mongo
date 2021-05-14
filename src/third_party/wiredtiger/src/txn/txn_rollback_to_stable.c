@@ -300,7 +300,7 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page
 
         /* Get the full update value from the data store. */
         unpack = &_unpack;
-        __wt_row_leaf_value_cell(session, page, rip, NULL, unpack);
+        __wt_row_leaf_value_cell(session, page, rip, unpack);
     } else {
         /* Unpack a column cell. */
         WT_ERR(__wt_scr_alloc(session, WT_INTPACK64_MAXSIZE, &key));
@@ -588,7 +588,7 @@ __rollback_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_COL *cip, W
     WT_ASSERT(session, (rip != NULL && cip == NULL) || (rip == NULL && cip != NULL));
 
     if (rip != NULL)
-        __wt_row_leaf_value_cell(session, page, rip, NULL, vpack);
+        __wt_row_leaf_value_cell(session, page, rip, vpack);
     else {
         kcell = WT_COL_PTR(page, cip);
         __wt_cell_unpack_kv(session, page->dsk, kcell, vpack);

@@ -197,6 +197,7 @@ typedef struct {
     uint32_t c_mmap_all;
     uint32_t c_modify_pct;
     uint32_t c_ops;
+    uint32_t c_prefix;
     uint32_t c_prefix_compression;
     uint32_t c_prefix_compression_min;
     uint32_t c_prepare;
@@ -284,6 +285,7 @@ typedef struct {
 
     uint64_t rows; /* Total rows */
 
+    uint32_t prefix_len;         /* Common key prefix length */
     uint32_t key_rand_len[1031]; /* Key lengths */
 } GLOBAL;
 extern GLOBAL g;

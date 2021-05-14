@@ -113,6 +113,8 @@ static CONFIG c[] = {
 
   {"btree.memory_page_max", "maximum cache page size", 0x0, 1, 10, 128, &g.c_memory_page_max, NULL},
 
+  {"btree.prefix", "common key prefix", C_BOOL, 3, 0, 0, &g.c_prefix, NULL},
+
   /* 80% */
   {"btree.prefix_compression", "configure prefix compressed keys", C_BOOL, 80, 0, 0,
     &g.c_prefix_compression, NULL},

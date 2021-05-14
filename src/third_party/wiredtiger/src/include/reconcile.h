@@ -252,6 +252,10 @@ struct __wt_reconcile {
     WT_ITEM *cur, _cur;   /* Key/Value being built */
     WT_ITEM *last, _last; /* Last key/value built */
 
+/* Don't increase key prefix-compression unless there's a significant gain. */
+#define WT_KEY_PREFIX_PREVIOUS_MINIMUM 10
+    uint8_t key_pfx_last; /* Last prefix compression */
+
     bool key_pfx_compress;      /* If can prefix-compress next key */
     bool key_pfx_compress_conf; /* If prefix compression configured */
     bool key_sfx_compress;      /* If can suffix-compress next key */

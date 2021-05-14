@@ -53,6 +53,7 @@ static void config_map_encryption(const char *, u_int *);
 static void config_map_file_type(const char *, u_int *);
 static void config_map_isolation(const char *, u_int *);
 static void config_pct(void);
+static void config_prefix(void);
 static void config_reset(void);
 static void config_transaction(void);
 
@@ -202,6 +203,7 @@ config_run(void)
     config_compression("btree.compression");
     config_compression("logging.compression");
     config_encryption();
+    config_prefix();
 
     /* Configuration based on the configuration already chosen. */
     config_directio();
@@ -921,6 +923,19 @@ config_pct(void)
 
     testutil_assert(
       g.c_delete_pct + g.c_insert_pct + g.c_modify_pct + g.c_read_pct + g.c_write_pct == 100);
+}
+
+/*
+ * config_prefix --
+ *     Prefix configuration.
+ */
+static void
+config_prefix(void)
+{
+    /* Add prefix compression if prefixes are configured and no explicit choice was made. */
+    if (g.c_prefix != 0 && g.c_prefix_compression == 0 &&
+      !config_is_perm("btree.prefix_compression"))
+        config_single("btree.prefix_compression=on", false);
 }
 
 /*
