@@ -38,6 +38,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/session.h"
@@ -54,12 +55,66 @@ namespace {
 
 PseudoRandom hashGenerator(SecureRandom().nextInt64());
 
-boost::optional<repl::OplogEntry> fetchPrePostImageOplog(OperationContext* opCtx,
-                                                         const repl::OplogEntry& oplog) {
-    auto opTimeToFetch = oplog.getPreImageOpTime();
+boost::optional<repl::OplogEntry> forgeNoopEntryFromImageCollection(
+    OperationContext* opCtx, const repl::OplogEntry retryableFindAndModifyOplogEntry) {
+    invariant(retryableFindAndModifyOplogEntry.getNeedsRetryImage());
 
+    DBDirectClient client(opCtx);
+    BSONObj imageObj =
+        client.findOne(NamespaceString::kConfigImagesNamespace.ns(),
+                       BSON("_id" << retryableFindAndModifyOplogEntry.getSessionId()->toBSON()),
+                       nullptr);
+    if (imageObj.isEmpty()) {
+        return boost::none;
+    }
+
+    auto image = repl::ImageEntry::parse(IDLParserErrorContext("image entry"), imageObj);
+    if (image.getTxnNumber() != retryableFindAndModifyOplogEntry.getTxnNumber()) {
+        // In our snapshot, fetch the current transaction number for a session. If that transaction
+        // number doesn't match what's found on the image lookup, it implies that the image is not
+        // the correct version for this oplog entry. We will not forge a noop from it.
+        return boost::none;
+    }
+
+    repl::MutableOplogEntry forgedNoop;
+    forgedNoop.setSessionId(image.get_id());
+    forgedNoop.setTxnNumber(image.getTxnNumber());
+    forgedNoop.setObject(image.getImage());
+    forgedNoop.setOpType(repl::OpTypeEnum::kNoop);
+    // The wallclock and namespace are not directly available on the txn document when
+    // forging the noop image document.
+    forgedNoop.setWallClockTime(Date_t::now());
+    forgedNoop.setNss(retryableFindAndModifyOplogEntry.getNss());
+    forgedNoop.setUuid(retryableFindAndModifyOplogEntry.getUuid());
+    // The OpTime is probably the last write time, but the destination will overwrite this
+    // anyways. Just set an OpTime to satisfy the IDL constraints for calling `toBSON`.
+    repl::OpTimeBase opTimeBase(Timestamp::min());
+    opTimeBase.setTerm(-1);
+    forgedNoop.setOpTimeBase(opTimeBase);
+    forgedNoop.setStatementIds({0});
+    forgedNoop.setPrevWriteOpTimeInTransaction(repl::OpTime(Timestamp::min(), -1));
+    return repl::OplogEntry::parse(forgedNoop.toBSON()).getValue();
+}
+
+boost::optional<repl::OplogEntry> fetchPrePostImageOplog(OperationContext* opCtx,
+                                                         repl::OplogEntry* oplog) {
+    if (oplog->getNeedsRetryImage()) {
+        auto ret = forgeNoopEntryFromImageCollection(opCtx, *oplog);
+        if (ret == boost::none) {
+            // No pre/post image was found. Defensively strip the `needsRetryImage` value to remove
+            // any notion this operation was a retryable findAndModify. If the request is retried on
+            // the destination, it will surface an error to the user.
+            auto mutableOplog =
+                fassert(5676405, repl::MutableOplogEntry::parse(oplog->getEntry().toBSON()));
+            mutableOplog.setNeedsRetryImage(boost::none);
+            *oplog = repl::OplogEntry(mutableOplog.toBSON());
+        }
+        return ret;
+    }
+
+    auto opTimeToFetch = oplog->getPreImageOpTime();
     if (!opTimeToFetch) {
-        opTimeToFetch = oplog.getPostImageOpTime();
+        opTimeToFetch = oplog->getPostImageOpTime();
     }
 
     if (!opTimeToFetch) {
@@ -223,6 +278,10 @@ SessionCatalogMigrationSource::OplogResult SessionCatalogMigrationSource::getLas
 
     {
         stdx::lock_guard<Latch> _lk(_newOplogMutex);
+        if (_lastFetchedNewWriteOplogImage) {
+            return OplogResult(_lastFetchedNewWriteOplogImage.get(), false);
+        }
+
         return OplogResult(_lastFetchedNewWriteOplog, true);
     }
 }
@@ -282,7 +341,7 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock, OperationConte
                 }
             }
 
-            auto doc = fetchPrePostImageOplog(opCtx, *nextOplog);
+            auto doc = fetchPrePostImageOplog(opCtx, &(nextOplog.get()));
             if (doc) {
                 _lastFetchedOplogBuffer.push_back(*nextOplog);
                 _lastFetchedOplog = *doc;
@@ -342,6 +401,15 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
 
     {
         stdx::lock_guard<Latch> lk(_newOplogMutex);
+        if (_lastFetchedNewWriteOplogImage) {
+            // When `_lastFetchedNewWriteOplogImage` is set, it means we found an oplog entry with
+            // `needsRetryImage`. At this step, we've already returned the image document, but we
+            // have yet to return the original oplog entry stored in `_lastFetchedNewWriteOplog`. We
+            // will unset this value and return such that the next call to `getLastFetchedOplog`
+            // will return `_lastFetchedNewWriteOplog`.
+            _lastFetchedNewWriteOplogImage.reset();
+            return true;
+        }
 
         if (_newWriteOpTimeList.empty()) {
             _lastFetchedNewWriteOplog.reset();
@@ -371,10 +439,29 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
                                    opCtx->getServiceContext()->getFastClockSource()->now());
     }
 
+    boost::optional<repl::OplogEntry> forgedNoopImage;
+    if (newWriteOplogEntry.getNeedsRetryImage()) {
+        // Generate the image outside of the mutex. Assign it atomically with the actual oplog
+        // entry.
+        forgedNoopImage = forgeNoopEntryFromImageCollection(opCtx, newWriteOplogEntry);
+        if (forgedNoopImage == boost::none) {
+            // No pre/post image was found. Defensively strip the `needsRetryImage` value to remove
+            // any notion this operation was a retryable findAndModify. If the request is retried on
+            // the destination, it will surface an error to the user.
+            auto mutableOplog = fassert(5676404, repl::MutableOplogEntry::parse(newWriteOplogDoc));
+            mutableOplog.setNeedsRetryImage(boost::none);
+            newWriteOplogEntry = repl::OplogEntry(mutableOplog.toBSON());
+        }
+    }
+
     {
         stdx::lock_guard<Latch> lk(_newOplogMutex);
         _lastFetchedNewWriteOplog = newWriteOplogEntry;
         _newWriteOpTimeList.pop_front();
+
+        if (forgedNoopImage) {
+            _lastFetchedNewWriteOplogImage = forgedNoopImage;
+        }
     }
 
     return true;
