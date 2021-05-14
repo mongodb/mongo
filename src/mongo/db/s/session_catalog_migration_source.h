@@ -258,6 +258,9 @@ private:
     // Used to store the last fetched oplog from _newWriteTsList.
     boost::optional<repl::OplogEntry> _lastFetchedNewWriteOplog;
 
+    // Used to store an image when `_lastFetchedNewWriteOplog` has a `needsRetryImage` field.
+    boost::optional<repl::OplogEntry> _lastFetchedNewWriteOplogImage;
+
     // Stores the current state.
     State _state{State::kActive};
 

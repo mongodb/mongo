@@ -107,6 +107,23 @@ void setPrePostImageTs(const ProcessOplogResult& lastResult, repl::MutableOplogE
                           << redact(entry->toBSON()) << " to have txnNumber: " << lastResult.txnNum,
             lastResult.txnNum == entry->getTxnNumber());
 
+    // PM-2213 introduces oplog entries that link to pre/post images in the
+    // `config.image_collection` table. For chunk migration, we downconvert to the classic format
+    // where the image is stored as a no-op in the oplog. A chunk migration source will always send
+    // the appropriate no-op. This code on the destination patches up the CRUD operation oplog entry
+    // to look like the classic format.
+    if (entry->getNeedsRetryImage()) {
+        switch (entry->getNeedsRetryImage().get()) {
+            case repl::RetryImageEnum::kPreImage:
+                entry->setPreImageOpTime({repl::OpTime()});
+                break;
+            case repl::RetryImageEnum::kPostImage:
+                entry->setPostImageOpTime({repl::OpTime()});
+                break;
+        }
+        entry->setNeedsRetryImage(boost::none);
+    }
+
     if (entry->getPreImageOpTime()) {
         entry->setPreImageOpTime(lastResult.oplogTime);
     } else if (entry->getPostImageOpTime()) {
