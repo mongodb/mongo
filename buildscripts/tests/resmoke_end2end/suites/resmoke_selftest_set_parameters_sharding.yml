@@ -14,6 +14,10 @@ executor:
           outputLocation: ./output.json # This is a template value replaced at runtime.
   fixture:
     class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+    num_rs_nodes_per_shard: 1
