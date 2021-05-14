@@ -2,27 +2,36 @@
 
 from __future__ import absolute_import
 
-import datetime
+import json
+from datetime import datetime
 import os
 import sys
 import unittest
-
 from mock import MagicMock, patch
 
+import inject
 from shrub.v2 import BuildVariant, ShrubProject
+from evergreen import EvergreenApi
 
 import buildscripts.burn_in_tests_multiversion as under_test
-from buildscripts.burn_in_tests import TaskInfo, RepeatConfig
-from buildscripts.ciconfig.evergreen import parse_evergreen_file
+from buildscripts.burn_in_tests import TaskInfo
+from buildscripts.ciconfig.evergreen import parse_evergreen_file, EvergreenProjectConfig
 import buildscripts.resmokelib.parser as _parser
 import buildscripts.evergreen_gen_multiversion_tests as gen_multiversion
-from buildscripts.evergreen_burn_in_tests import GenerateBurnInExecutor
+from buildscripts.evergreen_burn_in_tests import GenerateBurnInExecutor, EvergreenFileChangeDetector
+from buildscripts.evergreen_generate_resmoke_tasks import GENERATE_CONFIG_FILE
+from buildscripts.task_generation.gen_config import GenerationConfiguration
+from buildscripts.task_generation.resmoke_proxy import ResmokeProxyConfig
+from buildscripts.task_generation.suite_split import SuiteSplitConfig
+from buildscripts.task_generation.suite_split_strategies import greedy_division, SplitStrategy, \
+    FallbackStrategy, round_robin_fallback
+from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
 
 _parser.set_run_options()
 
 MONGO_4_2_HASH = "d94888c0d0a8065ca57d354ece33b3c2a1a5a6d6"
 
-# pylint: disable=missing-docstring,protected-access,too-many-lines,no-self-use
+# pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access,no-value-for-parameter
 
 
 def create_tests_by_task_mock(n_tasks, n_tests, multiversion_values=None):
@@ -41,15 +50,31 @@ def create_tests_by_task_mock(n_tasks, n_tests, multiversion_values=None):
 
 
 MV_MOCK_SUITES = ["replica_sets_jscore_passthrough", "sharding_jscore_passthrough"]
+MV_MOCK_TESTS = {
+    "replica_sets_jscore_passthrough": [
+        "core/all.js",
+        "core/andor.js",
+        "core/apitest_db.js",
+        "core/auth1.js",
+        "core/auth2.js",
+    ], "sharding_jscore_passthrough": [
+        "core/basic8.js",
+        "core/batch_size.js",
+        "core/bson.js",
+        "core/bulk_insert.js",
+        "core/capped.js",
+    ]
+}
 
 
 def create_multiversion_tests_by_task_mock(n_tasks, n_tests):
     assert n_tasks <= len(MV_MOCK_SUITES)
+    assert n_tests <= len(MV_MOCK_TESTS[MV_MOCK_SUITES[0]])
     return {
-        f"{MV_MOCK_SUITES[i % len(MV_MOCK_SUITES)]}": TaskInfo(
+        f"{MV_MOCK_SUITES[i]}": TaskInfo(
             display_task_name=f"task_{i}",
             resmoke_args=f"--suites=suite_{i}",
-            tests=[f"jstests/tests_{j}" for j in range(n_tests)],
+            tests=[f"jstests/{MV_MOCK_TESTS[MV_MOCK_SUITES[i]][j]}" for j in range(n_tests)],
             use_multiversion=None,
             distro="",
         )
@@ -57,7 +82,7 @@ def create_multiversion_tests_by_task_mock(n_tasks, n_tests):
     }
 
 
-_DATE = datetime.datetime(2018, 7, 15)
+_DATE = datetime(2018, 7, 15)
 BURN_IN_TESTS = "buildscripts.burn_in_tests"
 NUM_REPL_MIXED_VERSION_CONFIGS = len(gen_multiversion.REPL_MIXED_VERSION_CONFIGS)
 NUM_SHARDED_MIXED_VERSION_CONFIGS = len(gen_multiversion.SHARDED_MIXED_VERSION_CONFIGS)
@@ -110,34 +135,92 @@ def create_variant_task_mock(task_name, suite_name, distro="distro"):
     return variant_task
 
 
+def build_mock_gen_task_options():
+    return GenTaskOptions(
+        create_misc_suite=False,
+        is_patch=True,
+        generated_config_dir=under_test.DEFAULT_CONFIG_DIR,
+        use_default_timeouts=False,
+    )
+
+
+def build_mock_split_task_config():
+    return SuiteSplitConfig(
+        evg_project="my project",
+        target_resmoke_time=60,
+        max_sub_suites=100,
+        max_tests_per_suite=1,
+        start_date=datetime.utcnow(),
+        end_date=datetime.utcnow(),
+        default_to_fallback=True,
+    )
+
+
+def configure_dependencies(evg_api, split_config):
+    gen_task_options = build_mock_gen_task_options()
+
+    def dependencies(binder: inject.Binder) -> None:
+        binder.bind(SuiteSplitConfig, split_config)
+        binder.bind(SplitStrategy, greedy_division)
+        binder.bind(FallbackStrategy, round_robin_fallback)
+        binder.bind(GenTaskOptions, gen_task_options)
+        binder.bind(EvergreenApi, evg_api)
+        binder.bind(GenerationConfiguration,
+                    GenerationConfiguration.from_yaml_file(GENERATE_CONFIG_FILE))
+        binder.bind(ResmokeProxyConfig,
+                    ResmokeProxyConfig(resmoke_suite_dir=under_test.DEFAULT_TEST_SUITE_DIR))
+        binder.bind(EvergreenFileChangeDetector, None)
+        binder.bind(EvergreenProjectConfig, MagicMock())
+        binder.bind(
+            under_test.BurnInConfig,
+            under_test.BurnInConfig(build_id="build_id", build_variant="build variant",
+                                    revision="revision"))
+
+    inject.clear_and_configure(dependencies)
+
+
 class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
     def tests_no_tasks_given(self):
-        gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
-                               project="project", build_variant="build_variant", task_id="task_id",
-                               target_resmoke_time=60)
-        evg_api = MagicMock()
-        build_variant = under_test.create_multiversion_generate_tasks_config({}, evg_api,
-                                                                             gen_config)
-        evg_config_dict = build_variant.as_dict()
+        target_file = "target_file.json"
+        mock_evg_api = MagicMock()
+        split_config = build_mock_split_task_config()
+        configure_dependencies(mock_evg_api, split_config)
+
+        orchestrator = under_test.MultiversionBurnInOrchestrator()
+        generated_config = orchestrator.generate_configuration({}, target_file, "build_variant")
+
+        evg_config = [
+            config for config in generated_config.file_list if config.file_name == target_file
+        ]
+        self.assertEqual(1, len(evg_config))
+        evg_config = evg_config[0]
+        evg_config_dict = json.loads(evg_config.content)
+
         self.assertEqual(0, len(evg_config_dict["tasks"]))
 
     def test_tasks_not_in_multiversion_suites(self):
         n_tasks = 1
         n_tests = 1
-        gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
-                               project="project", build_variant="build_variant", task_id="task_id",
-                               target_resmoke_time=60)
-        evg_api = MagicMock()
-
-        # Create a tests_by_tasks dict that doesn't contain any multiversion suites.
+        target_file = "target_file.json"
+        mock_evg_api = MagicMock()
+        split_config = build_mock_split_task_config()
+        configure_dependencies(mock_evg_api, split_config)
         tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
-        build_variant = under_test.create_multiversion_generate_tasks_config(
-            tests_by_task, evg_api, gen_config)
-        evg_config_dict = build_variant.as_dict()
 
-        # We should not generate any tasks that are not part of the burn_in_multiversion suite.
+        orchestrator = under_test.MultiversionBurnInOrchestrator()
+        generated_config = orchestrator.generate_configuration(tests_by_task, target_file,
+                                                               "build_variant")
+
+        evg_config = [
+            config for config in generated_config.file_list if config.file_name == target_file
+        ]
+        self.assertEqual(1, len(evg_config))
+        evg_config = evg_config[0]
+        evg_config_dict = json.loads(evg_config.content)
+
         self.assertEqual(0, len(evg_config_dict["tasks"]))
 
+    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch(
         "buildscripts.evergreen_gen_multiversion_tests.get_backports_required_hash_for_shell_version"
     )
@@ -145,18 +228,26 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
         mock_hash.return_value = MONGO_4_2_HASH
         n_tasks = 1
         n_tests = 1
-        gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
-                               project="project", build_variant="build_variant", task_id="task_id",
-                               target_resmoke_time=60)
-        evg_api = MagicMock()
-
+        target_file = "target_file.json"
+        mock_evg_api = MagicMock()
+        split_config = build_mock_split_task_config()
+        configure_dependencies(mock_evg_api, split_config)
         tests_by_task = create_multiversion_tests_by_task_mock(n_tasks, n_tests)
-        build_variant = under_test.create_multiversion_generate_tasks_config(
-            tests_by_task, evg_api, gen_config)
-        evg_config_dict = build_variant.as_dict()
+
+        orchestrator = under_test.MultiversionBurnInOrchestrator()
+        generated_config = orchestrator.generate_configuration(tests_by_task, target_file,
+                                                               "build_variant")
+
+        evg_config = [
+            config for config in generated_config.file_list if config.file_name == target_file
+        ]
+        self.assertEqual(1, len(evg_config))
+        evg_config = evg_config[0]
+        evg_config_dict = json.loads(evg_config.content)
         tasks = evg_config_dict["tasks"]
         self.assertEqual(len(tasks), NUM_REPL_MIXED_VERSION_CONFIGS * n_tests)
 
+    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch(
         "buildscripts.evergreen_gen_multiversion_tests.get_backports_required_hash_for_shell_version"
     )
@@ -164,20 +255,28 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
         mock_hash.return_value = MONGO_4_2_HASH
         n_tasks = 2
         n_tests = 1
-        gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
-                               project="project", build_variant="build_variant", task_id="task_id",
-                               target_resmoke_time=60)
-        evg_api = MagicMock()
-
+        target_file = "target_file.json"
+        mock_evg_api = MagicMock()
+        split_config = build_mock_split_task_config()
+        configure_dependencies(mock_evg_api, split_config)
         tests_by_task = create_multiversion_tests_by_task_mock(n_tasks, n_tests)
-        build_variant = under_test.create_multiversion_generate_tasks_config(
-            tests_by_task, evg_api, gen_config)
-        evg_config_dict = build_variant.as_dict()
+
+        orchestrator = under_test.MultiversionBurnInOrchestrator()
+        generated_config = orchestrator.generate_configuration(tests_by_task, target_file,
+                                                               "build_variant")
+
+        evg_config = [
+            config for config in generated_config.file_list if config.file_name == target_file
+        ]
+        self.assertEqual(1, len(evg_config))
+        evg_config = evg_config[0]
+        evg_config_dict = json.loads(evg_config.content)
         tasks = evg_config_dict["tasks"]
         self.assertEqual(
             len(tasks),
             (NUM_REPL_MIXED_VERSION_CONFIGS + NUM_SHARDED_MIXED_VERSION_CONFIGS) * n_tests)
 
+    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch(
         "buildscripts.evergreen_gen_multiversion_tests.get_backports_required_hash_for_shell_version"
     )
@@ -185,18 +284,26 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
         mock_hash.return_value = MONGO_4_2_HASH
         n_tasks = 1
         n_tests = 2
-        gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
-                               project="project", build_variant="build_variant", task_id="task_id",
-                               target_resmoke_time=60)
-        evg_api = MagicMock()
-
+        target_file = "target_file.json"
+        mock_evg_api = MagicMock()
+        split_config = build_mock_split_task_config()
+        configure_dependencies(mock_evg_api, split_config)
         tests_by_task = create_multiversion_tests_by_task_mock(n_tasks, n_tests)
-        build_variant = under_test.create_multiversion_generate_tasks_config(
-            tests_by_task, evg_api, gen_config)
-        evg_config_dict = build_variant.as_dict()
+
+        orchestrator = under_test.MultiversionBurnInOrchestrator()
+        generated_config = orchestrator.generate_configuration(tests_by_task, target_file,
+                                                               "build_variant")
+
+        evg_config = [
+            config for config in generated_config.file_list if config.file_name == target_file
+        ]
+        self.assertEqual(1, len(evg_config))
+        evg_config = evg_config[0]
+        evg_config_dict = json.loads(evg_config.content)
         tasks = evg_config_dict["tasks"]
         self.assertEqual(len(tasks), NUM_REPL_MIXED_VERSION_CONFIGS * n_tests)
 
+    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch(
         "buildscripts.evergreen_gen_multiversion_tests.get_backports_required_hash_for_shell_version"
     )
@@ -204,15 +311,22 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
         mock_hash.return_value = MONGO_4_2_HASH
         n_tasks = 2
         n_tests = 3
-        gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
-                               project="project", build_variant="build_variant", task_id="task_id",
-                               target_resmoke_time=60)
-        evg_api = MagicMock()
-
+        target_file = "target_file.json"
+        mock_evg_api = MagicMock()
+        split_config = build_mock_split_task_config()
+        configure_dependencies(mock_evg_api, split_config)
         tests_by_task = create_multiversion_tests_by_task_mock(n_tasks, n_tests)
-        build_variant = under_test.create_multiversion_generate_tasks_config(
-            tests_by_task, evg_api, gen_config)
-        evg_config_dict = build_variant.as_dict()
+
+        orchestrator = under_test.MultiversionBurnInOrchestrator()
+        generated_config = orchestrator.generate_configuration(tests_by_task, target_file,
+                                                               "build_variant")
+
+        evg_config = [
+            config for config in generated_config.file_list if config.file_name == target_file
+        ]
+        self.assertEqual(1, len(evg_config))
+        evg_config = evg_config[0]
+        evg_config_dict = json.loads(evg_config.content)
         tasks = evg_config_dict["tasks"]
         self.assertEqual(
             len(tasks),

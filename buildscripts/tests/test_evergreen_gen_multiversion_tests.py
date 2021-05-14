@@ -14,59 +14,6 @@ from buildscripts.util.fileops import read_yaml_file
 # pylint: disable=missing-docstring, no-self-use
 
 
-class TestRun(unittest.TestCase):
-    def setUp(self):
-        self._tmpdir = TemporaryDirectory()
-
-    def tearDown(self):
-        self._tmpdir.cleanup()
-        under_test.CONFIG_DIR = generate_resmoke.DEFAULT_CONFIG_VALUES
-
-    @patch.object(under_test.EvergreenMultiversionConfigGenerator, 'generate_evg_tasks')
-    @patch('buildscripts.evergreen_generate_resmoke_tasks.should_tasks_be_generated')
-    @patch('buildscripts.evergreen_gen_multiversion_tests.write_file_to_dir')
-    def test_empty_result_config_fails(self, generate_evg_tasks, should_tasks_be_generated,
-                                       write_file_to_dir):
-        # pylint: disable=unused-argument
-        ''' Hijacks the write_file_to_dir function to prevent the configuration
-        from being written to disk, and ensure the command fails '''
-        under_test.CONFIG_DIR = self._tmpdir.name
-
-        # NamedTemporaryFile doesn't work too well on Windows. We need to
-        # close the fd's so that run_generate_tasks can open the files,
-        # so we override the delete-on-close behaviour on Windows, and manually
-        # handle cleanup later
-        is_windows = os.name == 'nt'
-        with NamedTemporaryFile(mode='w',
-                                delete=not is_windows) as expansions_file, NamedTemporaryFile(
-                                    mode='w', delete=not is_windows) as evg_conf:
-            expansions_file.write(EXPANSIONS)
-            expansions_file.flush()
-            should_tasks_be_generated.return_value = True
-            if is_windows:
-                # on windows we need to close the fd's so that
-                # run_generate_tasks can open the file handle
-                expansions_file.close()
-                evg_conf.close()
-
-            runner = CliRunner()
-            result = runner.invoke(
-                under_test.run_generate_tasks,
-                ['--expansion-file', expansions_file.name, '--evergreen-config', evg_conf.name])
-            self.assertEqual(result.exit_code, 1, result)
-            self.assertTrue(isinstance(result.exception, RuntimeError))
-            self.assertEqual(
-                str(result.exception),
-                f"Multiversion suite generator unexpectedly yielded no configuration in '{self._tmpdir.name}'"
-            )
-            self.assertEqual(write_file_to_dir.call_count, 1)
-            if is_windows:
-                # on windows we need to manually delete these files, since
-                # we've disabled the delete-on-close mechanics
-                os.remove(expansions_file.name)
-                os.remove(evg_conf.name)
-
-
 class TestGenerateExcludeYaml(unittest.TestCase):
     def setUp(self):
         self._tmpdir = TemporaryDirectory()
@@ -256,15 +203,6 @@ class TestGenerateExcludeYaml(unittest.TestCase):
         self.patch_and_run(latest_yaml, last_lts_yaml)
         self.assert_contents(expected)
 
-
-EXPANSIONS = """task: t
-build_variant: bv
-fallback_num_sub_suites: 5
-project: p
-task_id: t0
-task_name: t
-use_multiversion: "true"
-"""
 
 if __name__ == '__main__':
     unittest.main()
