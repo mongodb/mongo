@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional/optional_io.hpp>
 #include <map>
 #include <string>
 #include <vector>
@@ -513,6 +514,8 @@ TEST_F(ProjectionASTTest, ParserErrorsOnCollisionIdenticalField) {
 TEST_F(ProjectionASTTest, ParserErrorsOnSliceWithWrongNumberOfArguments) {
     ASSERT_THROWS_CODE(
         parseWithFindFeaturesEnabled(fromjson("{'a': {$slice: []}}")), DBException, 28667);
+    ASSERT_THROWS_CODE(
+        parseWithFindFeaturesEnabled(fromjson("{'a': {$slice: [1]}}")), DBException, 28667);
     ASSERT_THROWS_CODE(parseWithFindFeaturesEnabled(fromjson("{'a': {$slice: [1, 2, 3, 4]}}")),
                        DBException,
                        28667);
@@ -524,6 +527,65 @@ TEST_F(ProjectionASTTest, ParserErrorsOnSliceWithWrongArgumentType) {
                        28667);
     ASSERT_THROWS_CODE(
         parseWithFindFeaturesEnabled(fromjson("{'a': {$slice: {foo: 1}}}")), DBException, 28667);
+}
+
+TEST_F(ProjectionASTTest, ParserErrorsOnFindSliceWithSpecialValuesAsArguments) {
+    const StringData fieldName = "a";
+
+    auto checkSliceArguments = [&](const BSONObj& projection,
+                                   int expectedLimit,
+                                   boost::optional<int> expectedSkip) {
+        auto parsedProjection = parseWithFindFeaturesEnabled(projection);
+        auto astNode = parsedProjection.root()->getChild(fieldName);
+        ASSERT(astNode);
+        auto sliceAstNode = dynamic_cast<const projection_ast::ProjectionSliceASTNode*>(astNode);
+        ASSERT(sliceAstNode);
+        ASSERT_EQ(sliceAstNode->limit(), expectedLimit);
+        ASSERT_EQ(sliceAstNode->skip(), expectedSkip);
+    };
+
+    const auto positiveClamping =
+        BSON_ARRAY((static_cast<long long>(std::numeric_limits<int>::max()) + 1)
+                   << std::numeric_limits<long long>::max() << std::numeric_limits<double>::max()
+                   << std::numeric_limits<double>::infinity() << Decimal128::kPositiveInfinity
+                   << Decimal128::kLargestPositive);
+    for (const auto& element : positiveClamping) {
+        constexpr auto expectedValue = std::numeric_limits<int>::max();
+        checkSliceArguments(
+            BSON(fieldName << BSON("$slice" << element)), expectedValue, boost::none);
+        checkSliceArguments(
+            BSON(fieldName << BSON("$slice" << BSON_ARRAY(1 << element))), expectedValue, 1);
+        checkSliceArguments(
+            BSON(fieldName << BSON("$slice" << BSON_ARRAY(element << 1))), 1, expectedValue);
+        checkSliceArguments(BSON(fieldName << BSON("$slice" << BSON_ARRAY(element << element))),
+                            expectedValue,
+                            expectedValue);
+    }
+
+    const auto negativeClamping =
+        BSON_ARRAY((static_cast<long long>(std::numeric_limits<int>::min()) - 1)
+                   << std::numeric_limits<long long>::min() << std::numeric_limits<double>::lowest()
+                   << -std::numeric_limits<double>::infinity() << Decimal128::kNegativeInfinity
+                   << Decimal128::kLargestNegative);
+    for (const auto& element : negativeClamping) {
+        const auto expectedValue = std::numeric_limits<int>::min();
+        checkSliceArguments(
+            BSON(fieldName << BSON("$slice" << element)), expectedValue, boost::none);
+        checkSliceArguments(
+            BSON(fieldName << BSON("$slice" << BSON_ARRAY(element << 1))), 1, expectedValue);
+    }
+
+    const auto convertionToZero =
+        BSON_ARRAY(0ll << 0.0 << 0.3 << -0.3 << std::numeric_limits<double>::quiet_NaN()
+                       << Decimal128::kNegativeNaN << Decimal128::kPositiveNaN
+                       << Decimal128::kSmallestPositive << Decimal128::kSmallestNegative);
+    for (const auto& element : convertionToZero) {
+        constexpr auto expectedValue = 0;
+        checkSliceArguments(
+            BSON(fieldName << BSON("$slice" << element)), expectedValue, boost::none);
+        checkSliceArguments(
+            BSON(fieldName << BSON("$slice" << BSON_ARRAY(element << 1))), 1, expectedValue);
+    }
 }
 
 TEST_F(ProjectionASTTest, ParserErrorsOnInvalidElemMatchArgument) {
