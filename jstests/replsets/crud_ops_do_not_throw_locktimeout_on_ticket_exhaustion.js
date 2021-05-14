@@ -21,6 +21,7 @@ const rst = new ReplSetTest({
         setParameter: {
             wiredTigerConcurrentWriteTransactions: kNumWriteTickets,
             wiredTigerConcurrentReadTransactions: kNumReadTickets,
+            logComponentVerbosity: tojson({storage: 1, command: 2})
         }
     }
 });
@@ -75,13 +76,16 @@ jsTestLog("Waiting for reads and writes to block on prepare conflicts");
 
 assert.soon(
     () => {
-        const ops = db.currentOp({
+        const commandObj = {"currentOp": 1};
+        const queryObj = {
             "$and": [
                 {"$or": [{"op": "query"}, {"op": "update"}]},
                 {"ns": dbName + "." + otherCollName},
                 {"prepareReadConflicts": {"$gt": 0}}
             ]
-        });
+        };
+        Object.extend(commandObj, queryObj);
+        const ops = db.adminCommand(commandObj);
         return ops.inprog.length === (kNumReadTickets + kNumWriteTickets);
     },
     () => {
