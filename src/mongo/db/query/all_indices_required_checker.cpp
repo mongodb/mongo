@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,13 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/requires_all_indices_stage.h"
+#include "mongo/db/query/all_indices_required_checker.h"
 
 namespace mongo {
 
-void RequiresAllIndicesStage::doRestoreStateRequiresCollection() {
+AllIndicesRequiredChecker::AllIndicesRequiredChecker(const CollectionPtr& collection) {
+    auto allEntriesShared = collection->getIndexCatalog()->getAllReadyEntriesShared();
+    _indexCatalogEntries.reserve(allEntriesShared.size());
+    _indexNames.reserve(allEntriesShared.size());
+    for (auto&& index : allEntriesShared) {
+        _indexCatalogEntries.emplace_back(index);
+        _indexNames.push_back(index->descriptor()->indexName());
+    }
+}
+
+void AllIndicesRequiredChecker::check() const {
     size_t i = 0;
     for (auto&& index : _indexCatalogEntries) {
         auto indexCatalogEntry = index.lock();

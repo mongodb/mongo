@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/sbe_runtime_planner.h"
 
@@ -47,7 +48,9 @@ public:
                const CanonicalQuery& cq,
                const QueryPlannerParams& queryParams,
                PlanYieldPolicySBE* yieldPolicy)
-        : BaseRuntimePlanner{opCtx, collection, cq, yieldPolicy}, _queryParams{queryParams} {}
+        : BaseRuntimePlanner{opCtx, collection, cq, yieldPolicy},
+          _queryParams{queryParams},
+          _indexExistenceChecker(collection) {}
 
     CandidatePlans plan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
@@ -59,5 +62,7 @@ private:
 
     // Query parameters used to create a query solution for each $or branch.
     const QueryPlannerParams _queryParams;
+
+    const AllIndicesRequiredChecker _indexExistenceChecker;
 };
 }  // namespace mongo::sbe

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/sbe_runtime_planner.h"
 
@@ -50,7 +51,8 @@ public:
                           PlanYieldPolicySBE* yieldPolicy)
         : BaseRuntimePlanner{opCtx, collection, cq, yieldPolicy},
           _queryParams{queryParams},
-          _decisionReads{decisionReads} {}
+          _decisionReads{decisionReads},
+          _indexExistenceChecker{collection} {}
 
     CandidatePlans plan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
@@ -84,5 +86,7 @@ private:
     // The number of physical reads taken to decide on a winning plan when the plan was first
     // cached.
     const size_t _decisionReads;
+
+    const AllIndicesRequiredChecker _indexExistenceChecker;
 };
 }  // namespace mongo::sbe

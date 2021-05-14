@@ -117,6 +117,11 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     // yield policy.
     _yieldPolicy->clearRegisteredPlans();
 
+    // We're planning from scratch, using the original set of indexes provided in '_queryParams'.
+    // Therefore, if any of the collection's indexes have been dropped, the query should fail with
+    // a 'QueryPlanKilled' error.
+    _indexExistenceChecker.check();
+
     if (shouldCache) {
         // Deactivate the current cache entry.
         auto cache = CollectionQueryInfo::get(_collection).getPlanCache();

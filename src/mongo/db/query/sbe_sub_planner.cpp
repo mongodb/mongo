@@ -54,6 +54,10 @@ CandidatePlans SubPlanner::plan(
     auto multiplanCallback = [&](CanonicalQuery* cq,
                                  std::vector<std::unique_ptr<QuerySolution>> solutions)
         -> StatusWith<std::unique_ptr<QuerySolution>> {
+        // One of the indexes in '_queryParams' might have been dropped while planning a previous
+        // branch of the OR query. In this case, fail with a 'QueryPlanKilled' error.
+        _indexExistenceChecker.check();
+
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots;
         for (auto&& solution : solutions) {
             roots.push_back(stage_builder::buildSlotBasedExecutableTree(
@@ -77,6 +81,10 @@ CandidatePlans SubPlanner::plan(
         invariant(winnerIdx < candidates.size());
         return std::move(candidates[winnerIdx].solution);
     };
+
+    // One of the indexes in '_queryParams' might have been dropped while planning the final branch
+    // of the OR query. In this case, fail with a 'QueryPlanKilled' error.
+    _indexExistenceChecker.check();
 
     auto subplanSelectStat = QueryPlanner::choosePlanForSubqueries(
         _cq, _queryParams, std::move(subplanningStatus.getValue()), multiplanCallback);

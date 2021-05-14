@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,44 +29,42 @@
 
 #pragma once
 
-#include "mongo/db/exec/requires_collection_stage.h"
-#include "mongo/db/query/all_indices_required_checker.h"
+#include <memory>
+#include <vector>
+
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 
 namespace mongo {
 
 /**
- * A base class for plan stages which require access to _all_ indices of a collection, and should
- * cause the query to die on yield recovery if any index is dropped. Plan stages which depend on a
- * single index, such as IXSCAN, should instead use RequiresIndexStage.
+ * A utility which, on construction, takes note of all indices for a given collection. The caller
+ * can subsequently check whether any of those indices have been dropped.
  */
-class RequiresAllIndicesStage : public RequiresCollectionStage {
+class AllIndicesRequiredChecker {
 public:
-    RequiresAllIndicesStage(const char* stageType,
-                            ExpressionContext* expCtx,
-                            const CollectionPtr& coll)
-        : RequiresCollectionStage(stageType, expCtx, coll), _allIndicesRequiredChecker(coll) {}
-
-    virtual ~RequiresAllIndicesStage() = default;
-
-protected:
-    void doSaveStateRequiresCollection() override final {}
-
-    void doRestoreStateRequiresCollection() override final {
-        if (_allIndicesRequiredChecker) {
-            _allIndicesRequiredChecker->check();
-        }
-    }
+    /**
+     * Constructs an 'AllIndicesRequiredChecker' which can be used later to ensure that none of the
+     * indices for the given 'collection' have been dropped. The caller must hold the appropriate
+     * db_raii object in order to read the collection's index catalog.
+     */
+    explicit AllIndicesRequiredChecker(const CollectionPtr& collection);
 
     /**
-     * Subclasses may call this to indicate that they no longer require all indices on the
-     * collection to survive. After calling this, yield recovery will never fail.
+     * Throws a 'QueryPlanKilled' error if any of the indices which existed at the time of
+     * construction have since been dropped.
      */
-    void releaseAllIndicesRequirement() {
-        _allIndicesRequiredChecker = boost::none;
-    }
+    void check() const;
 
 private:
-    boost::optional<AllIndicesRequiredChecker> _allIndicesRequiredChecker;
+    // This class holds weak pointers to all of the index catalog entries known at the time of
+    // construction. Later, we can attempt to lock each weak pointer in order to determine whether
+    // an index in the list has been destroyed. If we can lock the weak pointer, we need to check
+    // the 'isDropped()' flag on the index catalog entry.
+    std::vector<std::weak_ptr<const IndexCatalogEntry>> _indexCatalogEntries;
+
+    // The names of the indices above. Used for error reporting.
+    std::vector<std::string> _indexNames;
 };
 
 }  // namespace mongo
