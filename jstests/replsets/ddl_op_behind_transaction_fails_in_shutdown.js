@@ -36,7 +36,7 @@ const txnDoc = {
 };
 
 jsTest.log("Creating a collection '" + collName + "' with data in it...");
-assert.commandWorked(testDB.createCollection(collName));
+assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "majority"}}));
 let bulk = testColl.initializeUnorderedBulkOp();
 for (let i = 0; i < 2; ++i) {
     bulk.insert({_id: i});
