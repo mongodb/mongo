@@ -7,10 +7,7 @@
  *   requires_sharding,
  *   # TODO (SERVER-56879): Support add/remove shards in new DDL paths
  *   does_not_support_add_remove_shards,
- *   # TODO (SERVER-56789) Enable stepdown on DDL FSM workloads
- *   does_not_support_stepdowns,
- *   # Can be removed once PM-1965-Milestone-1 is completed.
- *   featureFlagShardingFullDDLSupport
+ *   featureFlagShardingFullDDLSupport,
  *  ]
  */
 
