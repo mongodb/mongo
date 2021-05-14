@@ -1958,6 +1958,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
               "Replication failed for write concern: {writeConcern}, waiting for optime: {opTime}, "
               "opID: {opID}, all_durable: {allDurable}, progress: {progress}",
               "Replication failed for write concern",
+              "status"_attr = redact(status),
               "writeConcern"_attr = writeConcern.toBSON(),
               "opTime"_attr = opTime,
               "opID"_attr = opCtx->getOpID(),
