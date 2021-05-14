@@ -404,7 +404,7 @@ TEST_F(TenantAllDatabaseClonerTest, ResumingFromLastClonedDb) {
 
     TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
     auto cloner = makeAllDatabaseCloner(&resumingSharedData);
-    cloner->setStopAfterStage_forTest("updateStatsStage");
+    cloner->setStopAfterStage_forTest("initializeStatsStage");
 
     ASSERT_OK(cloner->run());
 
@@ -447,7 +447,7 @@ TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_AllGreater) {
 
     TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
     auto cloner = makeAllDatabaseCloner(&resumingSharedData);
-    cloner->setStopAfterStage_forTest("updateStatsStage");
+    cloner->setStopAfterStage_forTest("initializeStatsStage");
 
     ASSERT_OK(cloner->run());
 
@@ -504,7 +504,7 @@ TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_SomeGreater) {
 
     TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
     auto cloner = makeAllDatabaseCloner(&resumingSharedData);
-    cloner->setStopAfterStage_forTest("updateStatsStage");
+    cloner->setStopAfterStage_forTest("initializeStatsStage");
 
     ASSERT_OK(cloner->run());
 
@@ -572,7 +572,7 @@ TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_AllLess) {
 
     TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
     auto cloner = makeAllDatabaseCloner(&resumingSharedData);
-    cloner->setStopAfterStage_forTest("updateStatsStage");
+    cloner->setStopAfterStage_forTest("initializeStatsStage");
 
     ASSERT_OK(cloner->run());
 
