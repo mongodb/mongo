@@ -4,6 +4,10 @@
  * downgrade.
  *
  * TODO (SERVER-56171): Remove this test once 5.0 is last-lts.
+ *
+ * @tags: [
+ *  __TEMPORARILY_DISABLED__
+ * ]
  */
 (function() {
 'use strict';
