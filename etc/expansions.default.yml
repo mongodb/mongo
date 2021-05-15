@@ -36,3 +36,4 @@ cmake_path: /opt/cmake/bin/cmake
 content_type: application/x-gzip
 jstestfuzz_concurrent_num_files: "10"
 curator_release: "latest"
+ext: tgz

@@ -992,6 +992,8 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/selected_tests_generate.sh"
+        env:
+          workdir: ${workdir}
     - command: archive.targz_pack
       params:
         target: generate_tasks_config.tgz
@@ -2126,6 +2128,8 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/scons_splunk.sh"
+        env:
+          workdir: ${workdir}
 
   "attach report":
     command: attach.results
