@@ -2,6 +2,7 @@
  * Confirms slow currentOp logging does not conflict with processing commitIndexBuild, which may
  * block replication.
  * @tags: [
+ *   __TEMPORARILY_DISABLED__,
  *   requires_replication,
  * ]
  */
