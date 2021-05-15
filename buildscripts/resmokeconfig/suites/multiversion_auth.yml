@@ -21,6 +21,9 @@ selector:
   # TODO: SERVER-35390
   - jstests/multiVersion/upgrade_downgrade_cluster.js
 
+  # Skip any tests that run with auth explicitly.
+  - jstests/multiVersion/load_keys_on_upgrade.js
+
 # Multiversion tests start their own mongod's.
 executor:
   config:
