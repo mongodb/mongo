@@ -274,7 +274,6 @@ std::pair<BSONObj, bool> CNode::toBsonWithArrayIndicator() const {
 }
 
 bool CNode::isNumber() const {
-    // TODO SERVER-51204: Factor out this logic instead of reimplementing the one in BSONElement.
     return stdx::visit(
         visit_helper::Overloaded{
             [](const UserLong&) { return true; },
