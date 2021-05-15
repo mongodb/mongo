@@ -56,7 +56,7 @@ Value WindowFunctionIntegral::integralOfTwoPointsByTrapezoidalRule(const Value& 
 }
 
 void WindowFunctionIntegral::assertValueType(const Value& value) {
-    tassert(5423900,
+    uassert(5423900,
             "The input value of $integral window function must be a vector of 2 value, the first "
             "value must be numeric or date type and the second must be numeric.",
             value.isArray() && value.getArray().size() == 2 && value.getArray()[1].numeric() &&

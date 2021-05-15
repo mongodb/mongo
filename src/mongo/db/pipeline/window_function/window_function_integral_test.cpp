@@ -275,5 +275,31 @@ TEST_F(WindowFunctionIntegralTest, ResetShouldNotResetOutputUnit) {
     ASSERT_THROWS_CODE(addValuesToWindow(numericValues), AssertionException, 5423901);
 }
 
+TEST_F(WindowFunctionIntegralTest, InputParameterWrongTypeTest) {
+    auto dateValue = Value(Date_t::fromMillisSinceEpoch(1000));
+    ASSERT_THROWS_CODE(integral.add(dateValue), DBException, 5423900);
+
+    auto emptyArray = Value(std::vector<Value>({}));
+    ASSERT_THROWS_CODE(integral.add(emptyArray), DBException, 5423900);
+
+    auto singleton = Value{std::vector<Value>{{Value(5.0)}}};
+    ASSERT_THROWS_CODE(integral.add(singleton), DBException, 5423900);
+
+    auto doubleString =
+        Value(std::vector<Value>{Value{StringData{"hello"}}, Value{StringData{"world"}}});
+    ASSERT_THROWS_CODE(integral.add(doubleString), DBException, 5423900);
+
+    auto str1 = Value(std::vector<Value>{Value{StringData{"hello"}}, Value{1}});
+    ASSERT_THROWS_CODE(integral.add(str1), DBException, 5423900);
+
+    auto str2 = Value(std::vector<Value>{Value{1}, Value{StringData{"world"}}});
+    ASSERT_THROWS_CODE(integral.add(str2), DBException, 5423900);
+
+    auto str2date = Value(
+        std::vector<Value>{Value{Date_t::fromMillisSinceEpoch(1000)}, Value{StringData{"world"}}});
+    ASSERT_THROWS_CODE(integral.add(str2), DBException, 5423900);
+}
+
+
 }  // namespace
 }  // namespace mongo
