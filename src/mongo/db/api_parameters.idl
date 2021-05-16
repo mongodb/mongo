@@ -59,6 +59,7 @@ structs:
 server_parameters:
   requireApiVersion:
     description: "Require clients to pass the 'apiVersion' parameter with all commands"
+    test_only: true
     set_at: ["startup", "runtime"]
     cpp_vartype: AtomicWord<bool>
     cpp_varname: gRequireApiVersion
