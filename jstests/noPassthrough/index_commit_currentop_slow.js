@@ -44,7 +44,7 @@ const secondaryDB = secondary.getDB(testDB.getName());
 assert.soon(function() {
     const filter = {
         'command.commitIndexBuild': {$exists: true},
-        'waitingForLatch.captureName': 'FutureResolution',
+        'waitingForLatch.captureName': 'AnonymousLockable',
         '$all': true,
     };
     const result = assert.commandWorked(secondaryDB.currentOp(filter));
