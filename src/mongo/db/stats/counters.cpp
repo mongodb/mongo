@@ -45,34 +45,6 @@ namespace {
 using namespace fmt::literals;
 }
 
-void OpCounters::gotOp(int op, bool isCommand) {
-    switch (op) {
-        case dbInsert: /*gotInsert();*/
-            break;     // need to handle multi-insert
-        case dbQuery:
-            if (isCommand)
-                gotCommand();
-            else
-                gotQuery();
-            break;
-
-        case dbUpdate:
-            gotUpdate();
-            break;
-        case dbDelete:
-            gotDelete();
-            break;
-        case dbGetMore:
-            gotGetMore();
-            break;
-        case dbKillCursors:
-        case opReply:
-            break;
-        default:
-            LOGV2(22205, "OpCounters::gotOp unknown op: {op}", "op"_attr = op);
-    }
-}
-
 void OpCounters::_checkWrap(CacheAligned<AtomicWord<long long>> OpCounters::*counter, int n) {
     static constexpr auto maxCount = 1LL << 60;
     auto oldValue = (this->*counter).fetchAndAddRelaxed(n);
@@ -94,6 +66,27 @@ BSONObj OpCounters::getObj() const {
     b.append("delete", _delete.loadRelaxed());
     b.append("getmore", _getmore.loadRelaxed());
     b.append("command", _command.loadRelaxed());
+
+    auto queryDep = _queryDeprecated.loadRelaxed();
+    auto getmoreDep = _getmoreDeprecated.loadRelaxed();
+    auto killcursorsDep = _killcursorsDeprecated.loadRelaxed();
+    auto updateDep = _updateDeprecated.loadRelaxed();
+    auto deleteDep = _deleteDeprecated.loadRelaxed();
+    auto insertDep = _insertDeprecated.loadRelaxed();
+    auto totalDep = queryDep + getmoreDep + killcursorsDep + updateDep + deleteDep + insertDep;
+
+    if (totalDep > 0) {
+        BSONObjBuilder d(b.subobjStart("deprecated"));
+
+        d.append("total", totalDep);
+        d.append("insert", insertDep);
+        d.append("query", queryDep);
+        d.append("update", updateDep);
+        d.append("delete", deleteDep);
+        d.append("getmore", getmoreDep);
+        d.append("killcursors", killcursorsDep);
+    }
+
     return b.obj();
 }
 
