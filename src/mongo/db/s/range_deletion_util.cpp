@@ -431,8 +431,12 @@ std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext*
 void snapshotRangeDeletionsForRename(OperationContext* opCtx,
                                      const NamespaceString& fromNss,
                                      const NamespaceString& toNss) {
-    auto rangeDeletionTasks = getPersistentRangeDeletionTasks(opCtx, fromNss);
+    // Clear out eventual snapshots associated with the target collection: always restart from a
+    // clean state in case of stepdown or primary killed.
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionForRenameNamespace);
+    store.remove(opCtx, QUERY(RangeDeletionTask::kNssFieldName << toNss.ns()));
+
+    auto rangeDeletionTasks = getPersistentRangeDeletionTasks(opCtx, fromNss);
     for (auto& task : rangeDeletionTasks) {
         task.setNss(toNss);  // Associate task to the new namespace
         store.add(opCtx, task);
