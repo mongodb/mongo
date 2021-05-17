@@ -1,5 +1,5 @@
 /**
- * Tests that writes are disallowed while in kCommitted or kRenaming.
+ * Tests that writes are disallowed while in kCommitted.
  *
  * @tags: [
  *   requires_fcv_49,

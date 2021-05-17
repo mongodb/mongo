@@ -337,7 +337,6 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
                                                           RecipientStateEnum::kCloning,
                                                           RecipientStateEnum::kApplying,
                                                           RecipientStateEnum::kStrictConsistency,
-                                                          RecipientStateEnum::kRenaming,
                                                           RecipientStateEnum::kDone};
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5551106,
@@ -390,7 +389,6 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
                     notifyToStartCloning(opCtx.get(), *recipient, doc);
                     break;
                 }
-                case RecipientStateEnum::kRenaming:
                 case RecipientStateEnum::kDone: {
                     notifyReshardingCommitting(opCtx.get(), *recipient, doc);
                     break;

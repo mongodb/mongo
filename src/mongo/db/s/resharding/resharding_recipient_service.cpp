@@ -275,7 +275,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                    .then([this, aborted] {
                        // It is safe to drop the oplog collections once either (1) the
                        // collection is renamed or (2) the operation is aborting.
-                       invariant(_recipientCtx.getState() >= RecipientStateEnum::kRenaming ||
+                       invariant(_recipientCtx.getState() >=
+                                     RecipientStateEnum::kStrictConsistency ||
                                  aborted);
                        _cleanupReshardingCollections(aborted);
                    })
@@ -607,13 +608,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardingCollection() {
-    if (_recipientCtx.getState() > RecipientStateEnum::kRenaming) {
+    if (_recipientCtx.getState() == RecipientStateEnum::kDone) {
         return;
-    }
-
-    if (_recipientCtx.getState() != RecipientStateEnum::kRenaming) {
-        // TODO SERVER-56816: remove this if statement altogether.
-        _transitionState(RecipientStateEnum::kRenaming);
     }
 
     if (!_isAlsoDonor) {
