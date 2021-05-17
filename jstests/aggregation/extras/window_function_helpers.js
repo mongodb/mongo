@@ -177,14 +177,9 @@ function assertResultsEqual(wfRes, index, groupRes, accum) {
  * Note that this function assumes that the documents in 'coll' were initialized using the
  * seedWithTickerData() method above.
  */
-function testAccumAgainstGroup(coll, accum, onNoResults = null, disableRemovable = false) {
+function testAccumAgainstGroup(coll, accum, onNoResults = null) {
     forEachPartitionCase(function(partition) {
         documentBounds.forEach(function(bounds, index) {
-            if (disableRemovable && bounds[0] !== "unbounded") {
-                jsTestLog("Skipping testing accumulator " + accum + " against " +
-                          tojson(partition) + " partition and [" + bounds + "] bounds");
-                return;
-            }
             jsTestLog("Testing accumulator " + accum + " against " + tojson(partition) +
                       " partition and [" + bounds + "] bounds");
             const wfResults =
@@ -243,11 +238,6 @@ function testAccumAgainstGroup(coll, accum, onNoResults = null, disableRemovable
             };
             let outputFields = {};
             arrayOfBounds.forEach(function(bounds, index) {
-                if (disableRemovable && bounds[0] !== "unbounded") {
-                    jsTestLog("Skipping testing accumulator " + accum + " against " +
-                              tojson(partition) + " partition and [" + tojson(bounds) + "] bounds");
-                    return;
-                }
                 outputFields["res" + index] = {[accum]: "$price", window: {documents: bounds}};
             });
             let specWithOutput = Object.merge(baseSpec, {output: outputFields});
