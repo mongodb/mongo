@@ -867,6 +867,13 @@ retry:
         goto retry;
     WT_ERR(ret);
 
+#ifdef HAVE_DIAGNOSTIC
+    /* Do a search again and call next to check the key order. */
+    WT_WITH_PAGE_INDEX(session, ret = __wt_hs_row_search(cbt, &file_cursor->key, true));
+    WT_ASSERT(session, ret == 0);
+    WT_ERR_NOTFOUND_OK(__curhs_file_cursor_next(session, file_cursor), false);
+#endif
+
     /* Insert doesn't maintain a position across calls, clear resources. */
     if (0) {
 err:
