@@ -1218,6 +1218,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                                 argArrayContains("logComponentVerbosity")) {
                                 continue;
                             }
+                            if (paramName === "storeFindAndModifyImagesInSideCollection" &&
+                                argArrayContains("storeFindAndModifyImagesInSideCollection")) {
+                                continue;
+                            }
                             const paramVal = params[paramName];
                             const setParamStr = paramName + "=" + JSON.stringify(paramVal);
                             argArray.push(...['--setParameter', setParamStr]);

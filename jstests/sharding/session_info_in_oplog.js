@@ -2,6 +2,8 @@
  * Test that the oplog entries will contain the correct logical session id, transaction number and
  * statement id after executing a write command. Also tests that the session table is properly
  * updated after the write operations.
+ *
+ * @tags: [requires_storing_fam_images_in_oplog]
  */
 (function() {
     "use strict";
