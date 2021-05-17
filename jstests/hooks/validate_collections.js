@@ -84,7 +84,7 @@ function CollectionValidator() {
     };
 
     // Run a separate thread to validate collections on each server in parallel.
-    const validateCollectionsThread = function(validatorFunc, host, skipFCV) {
+    const validateCollectionsThread = function(validatorFunc, host) {
         try {
             print('Running validate() on ' + host);
             const conn = new Mongo(host);
@@ -98,7 +98,7 @@ function CollectionValidator() {
             }
 
             let requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
-            if (requiredFCV && !skipFCV) {
+            if (requiredFCV) {
                 requiredFCV = new Function(`return typeof ${requiredFCV} === "string" ? ${
                     requiredFCV} : "${requiredFCV}"`)();
                 // Make sure this node has the desired FCV as it may take time for the updates to
@@ -124,7 +124,7 @@ function CollectionValidator() {
         }
     };
 
-    this.validateNodes = function(hostList, skipFCV) {
+    this.validateNodes = function(hostList) {
         // We run the scoped threads in a try/finally block in case any thread throws an exception,
         // in which case we want to still join all the threads.
         let threads = [];
@@ -132,7 +132,7 @@ function CollectionValidator() {
         try {
             hostList.forEach(host => {
                 const thread =
-                    new Thread(validateCollectionsThread, this.validateCollections, host, skipFCV);
+                    new Thread(validateCollectionsThread, this.validateCollections, host);
                 threads.push(thread);
                 thread.start();
             });
