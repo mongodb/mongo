@@ -190,8 +190,10 @@ class workload_validation {
         /* Retrieve all keys from the given collection. */
         for (auto const &it : database.collections.at(collection_name).keys)
             collection_keys.push_back(it.first);
-        /* There must be at least a key. */
-        testutil_assert(!collection_keys.empty());
+
+        /* The collection didn't have any keys added. */
+        if (collection_keys.empty())
+            return;
         /* Sort keys. */
         std::sort(collection_keys.begin(), collection_keys.end());
         /* Use the first key as a parameter for search_near. */
