@@ -1695,19 +1695,18 @@ public:
                                     EvalStage inputStage) -> EvalExprStagePair {
             auto [bsonRegexTag, bsonRegexVal] =
                 sbe::value::makeNewBsonRegex(expr->getString(), expr->getFlags());
+            auto bsonRegexExpr = makeConstant(bsonRegexTag, bsonRegexVal);
+
             auto [compiledRegexTag, compiledRegexVal] =
                 sbe::value::makeNewPcreRegex(expr->getString(), expr->getFlags());
-            sbe::EVariable inputVar{inputSlot};
+            auto compiledRegexExpr = makeConstant(compiledRegexTag, compiledRegexVal);
+
             auto resultExpr = makeBinaryOp(
                 sbe::EPrimBinary::logicOr,
-                makeFillEmptyFalse(
-                    makeBinaryOp(sbe::EPrimBinary::eq,
-                                 inputVar.clone(),
-                                 sbe::makeE<sbe::EConstant>(bsonRegexTag, bsonRegexVal))),
-                makeFillEmptyFalse(
-                    makeFunction("regexMatch",
-                                 sbe::makeE<sbe::EConstant>(compiledRegexTag, compiledRegexVal),
-                                 inputVar.clone())));
+                makeFillEmptyFalse(makeBinaryOp(
+                    sbe::EPrimBinary::eq, makeVariable(inputSlot), std::move(bsonRegexExpr))),
+                makeFillEmptyFalse(makeFunction(
+                    "regexMatch", std::move(compiledRegexExpr), makeVariable(inputSlot))));
 
             return {std::move(resultExpr), std::move(inputStage)};
         };
