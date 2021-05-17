@@ -140,7 +140,7 @@ main(int argc, char *argv[])
      * -l   : Trace level.
      * -t   : Test to run. All tests are run if not specified.
      */
-    for (int i = 1; (i < argc) && (error_code == 0); ++i) {
+    for (size_t i = 1; (i < argc) && (error_code == 0); ++i) {
         if (std::string(argv[i]) == "-h") {
             print_help();
             return 0;

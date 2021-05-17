@@ -87,7 +87,7 @@ class workload_generator : public component {
         testutil_assert(value_size >= 0);
 
         /* Generate threads to execute read operations on the collections. */
-        for (int i = 0; i < read_threads; ++i) {
+        for (size_t i = 0; i < read_threads; ++i) {
             thread_context *tc = new thread_context(_timestamp_manager, _tracking, _database,
               thread_operation::READ, max_operation_per_transaction, min_operation_per_transaction,
               value_size, throttle());
@@ -96,7 +96,7 @@ class workload_generator : public component {
         }
 
         /* Generate threads to execute update operations on the collections. */
-        for (int i = 0; i < update_threads; ++i) {
+        for (size_t i = 0; i < update_threads; ++i) {
             thread_context *tc = new thread_context(_timestamp_manager, _tracking, _database,
               thread_operation::UPDATE, max_operation_per_transaction,
               min_operation_per_transaction, value_size, throttle(update_config));
@@ -148,7 +148,7 @@ class workload_generator : public component {
             db_operation.update_operation(context, session);
             break;
         default:
-            testutil_die(DEBUG_ABORT, "system: thread_operation is unknown : %d",
+            testutil_die(DEBUG_ERROR, "system: thread_operation is unknown : %d",
               static_cast<int>(context.get_thread_operation()));
             break;
         }

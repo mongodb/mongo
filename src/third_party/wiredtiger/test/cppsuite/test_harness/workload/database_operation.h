@@ -46,7 +46,7 @@ class database_operation {
      *      - Open a cursor on each collection.
      *      - Insert m key/value pairs in each collection. Values are random strings which size is
      * defined by the configuration.
-     *      - Store in memory the created collections and the generated keys that were inserted.
+     *      - Store in memory the created collections.
      */
     virtual void
     populate(database &database, timestamp_manager *timestamp_manager, configuration *config,
@@ -67,13 +67,14 @@ class database_operation {
         session = connection_manager::instance().create_session();
         /* Create n collections as per the configuration and store each collection name. */
         collection_count = config->get_int(COLLECTION_COUNT);
-        for (int i = 0; i < collection_count; ++i) {
+        for (size_t i = 0; i < collection_count; ++i) {
             collection_name = "table:collection" + std::to_string(i);
             database.collections[collection_name] = {};
             testutil_check(
               session->create(session, collection_name.c_str(), DEFAULT_FRAMEWORK_SCHEMA));
             ts = timestamp_manager->get_next_ts();
-            testutil_check(tracking->save(tracking_operation::CREATE, collection_name, 0, "", ts));
+            tracking->save_schema_operation(
+              tracking_operation::CREATE_COLLECTION, collection_name, ts);
         }
         debug_print(std::to_string(collection_count) + " collections created", DEBUG_TRACE);
 
@@ -89,11 +90,13 @@ class database_operation {
         for (const auto &it_collections : database.collections) {
             collection_name = it_collections.first;
             key_cpt = 0;
-            /* WiredTiger lets you open a cursor on a collection using the same pointer. When a
-             * session is closed, WiredTiger APIs close the cursors too. */
+            /*
+             * WiredTiger lets you open a cursor on a collection using the same pointer. When a
+             * session is closed, WiredTiger APIs close the cursors too.
+             */
             testutil_check(
               session->open_cursor(session, collection_name.c_str(), NULL, NULL, &cursor));
-            for (size_t j = 0; j < key_count; ++j) {
+            for (size_t i = 0; i < key_count; ++i) {
                 /* Generation of a unique key. */
                 generated_key = number_to_string(key_size, key_cpt);
                 ++key_cpt;
@@ -106,16 +109,12 @@ class database_operation {
                 ts = timestamp_manager->get_next_ts();
                 if (ts_enabled)
                     testutil_check(session->begin_transaction(session, ""));
-                testutil_check(insert(cursor, tracking, collection_name, generated_key.c_str(),
-                  generated_value.c_str(), ts));
+                insert(cursor, tracking, collection_name, generated_key.c_str(),
+                  generated_value.c_str(), ts);
                 if (ts_enabled) {
                     cfg = std::string(COMMIT_TS) + "=" + timestamp_manager->decimal_to_hex(ts);
                     testutil_check(session->commit_transaction(session, cfg.c_str()));
                 }
-                /* Update the memory representation of the collections. */
-                database.collections[collection_name].keys[generated_key].exists = true;
-                /* Values are not stored here. */
-                database.collections[collection_name].values = nullptr;
             }
         }
         debug_print("Populate stage done", DEBUG_TRACE);
@@ -150,13 +149,15 @@ class database_operation {
     virtual void
     update_operation(thread_context &context, WT_SESSION *session)
     {
+        WT_DECL_RET;
         WT_CURSOR *cursor;
         wt_timestamp_t ts;
         std::vector<WT_CURSOR *> cursors;
-        std::string collection_name;
         std::vector<std::string> collection_names = context.get_collection_names();
-        key_value_t generated_value, key;
-        int64_t cpt, value_size = context.get_value_size();
+        key_value_t key, generated_value;
+        const char *key_tmp;
+        int64_t value_size = context.get_value_size();
+        uint64_t i;
 
         testutil_assert(session != nullptr);
         /* Get a cursor for each collection in collection_names. */
@@ -165,17 +166,32 @@ class database_operation {
             cursors.push_back(cursor);
         }
 
-        cpt = 0;
-        /* Walk each cursor. */
-        for (const auto &it : cursors) {
-            collection_name = collection_names[cpt];
-            /* Walk each key. */
-            for (keys_iterator_t iter_key = context.get_collection_keys_begin(collection_name);
-                 iter_key != context.get_collection_keys_end(collection_name); ++iter_key) {
-                /* Do not process removed keys. */
-                if (!iter_key->second.exists)
-                    continue;
-
+        /*
+         * Update each collection while the test is running.
+         */
+        i = 0;
+        while (context.is_running() && !collection_names.empty()) {
+            if (i >= collection_names.size())
+                i = 0;
+            ret = cursors[i]->next(cursors[i]);
+            /* If we have reached the end of the collection, reset. */
+            if (ret == WT_NOTFOUND) {
+                testutil_check(cursors[i]->reset(cursors[i]));
+                ++i;
+                continue;
+            } else if (ret != 0)
+                /* Stop updating in case of an error. */
+                testutil_die(DEBUG_ERROR, "update_operation: cursor->next() failed: %d", ret);
+            else {
+                testutil_check(cursors[i]->get_key(cursors[i], &key_tmp));
+                /*
+                 * The retrieved key needs to be passed inside the update function. However, the
+                 * update API doesn't guarantee our buffer will still be valid once it is called, as
+                 * such we copy the buffer and then pass it into the API.
+                 */
+                key = key_value_t(key_tmp);
+                generated_value =
+                  random_generator::random_generator::instance().generate_string(value_size);
                 ts = context.get_timestamp_manager()->get_next_ts();
 
                 /* Start a transaction if possible. */
@@ -183,17 +199,15 @@ class database_operation {
                     context.begin_transaction(session, "");
                     context.set_commit_timestamp(session, ts);
                 }
-                generated_value =
-                  random_generator::random_generator::instance().generate_string(value_size);
-                testutil_check(update(context.get_tracking(), it, collection_name,
-                  iter_key->first.c_str(), generated_value.c_str(), ts));
+
+                update(context.get_tracking(), cursors[i], collection_names[i], key.c_str(),
+                  generated_value.c_str(), ts);
 
                 /* Commit the current transaction if possible. */
                 context.increment_operation_count();
                 if (context.can_commit_transaction())
                     context.commit_transaction(session, "");
             }
-            ++cpt;
         }
 
         /*
@@ -211,48 +225,34 @@ class database_operation {
     private:
     /* WiredTiger APIs wrappers for single operations. */
     template <typename K, typename V>
-    int
+    void
     insert(WT_CURSOR *cursor, workload_tracking *tracking, const std::string &collection_name,
       const K &key, const V &value, wt_timestamp_t ts)
     {
-        int error_code;
-
         testutil_assert(cursor != nullptr);
+
         cursor->set_key(cursor, key);
         cursor->set_value(cursor, value);
-        error_code = cursor->insert(cursor);
+        testutil_check(cursor->insert(cursor));
+        debug_print("key/value inserted", DEBUG_TRACE);
 
-        if (error_code == 0) {
-            debug_print("key/value inserted", DEBUG_TRACE);
-            error_code =
-              tracking->save(tracking_operation::INSERT, collection_name, key, value, ts);
-        } else
-            debug_print("key/value insertion failed", DEBUG_ERROR);
-
-        return (error_code);
+        tracking->save_operation(tracking_operation::INSERT, collection_name, key, value, ts);
     }
 
     template <typename K, typename V>
-    static int
+    static void
     update(workload_tracking *tracking, WT_CURSOR *cursor, const std::string &collection_name,
       K key, V value, wt_timestamp_t ts)
     {
-        int error_code;
-
         testutil_assert(tracking != nullptr);
         testutil_assert(cursor != nullptr);
+
         cursor->set_key(cursor, key);
         cursor->set_value(cursor, value);
-        error_code = cursor->update(cursor);
+        testutil_check(cursor->update(cursor));
+        debug_print("key/value updated", DEBUG_TRACE);
 
-        if (error_code == 0) {
-            debug_print("key/value update", DEBUG_TRACE);
-            error_code =
-              tracking->save(tracking_operation::UPDATE, collection_name, key, value, ts);
-        } else
-            debug_print("key/value update failed", DEBUG_ERROR);
-
-        return (error_code);
+        tracking->save_operation(tracking_operation::UPDATE, collection_name, key, value, ts);
     }
 
     /*

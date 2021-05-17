@@ -69,18 +69,6 @@ class thread_context {
         return (_database.get_collection_names());
     }
 
-    const keys_iterator_t
-    get_collection_keys_begin(const std::string &collection_name) const
-    {
-        return (_database.get_collection_keys_begin(collection_name));
-    }
-
-    const keys_iterator_t
-    get_collection_keys_end(const std::string &collection_name) const
-    {
-        return (_database.get_collection_keys_end(collection_name));
-    }
-
     thread_operation
     get_thread_operation() const
     {
