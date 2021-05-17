@@ -1118,7 +1118,12 @@ DbResponse receivedQuery(OperationContext* opCtx,
                          const Message& m,
                          const ServiceEntryPointCommon::Hooks& behaviors) {
     invariant(!nss.isCommand());
+
+    // The legacy opcodes should be counted twice: as part of the overall opcodes' counts and on
+    // their own to highlight that they are being used.
     globalOpCounters.gotQuery();
+    globalOpCounters.gotQueryDeprecated();
+
     ServerReadConcernMetrics::get(opCtx)->recordReadConcern(repl::ReadConcernArgs::get(opCtx));
 
     DbMessage d(m);
@@ -1146,6 +1151,8 @@ DbResponse receivedQuery(OperationContext* opCtx,
 }
 
 void receivedKillCursors(OperationContext* opCtx, const Message& m) {
+    globalOpCounters.gotKillCursorsDeprecated();
+
     LastError::get(opCtx->getClient()).disable();
     DbMessage dbmessage(m);
     int n = dbmessage.pullInt();
@@ -1174,6 +1181,8 @@ void receivedInsert(OperationContext* opCtx, const NamespaceString& nsString, co
     auto insertOp = InsertOp::parseLegacy(m);
     invariant(insertOp.getNamespace() == nsString);
 
+    globalOpCounters.gotInsertsDeprecated(insertOp.getDocuments().size());
+
     for (const auto& obj : insertOp.getDocuments()) {
         Status status =
             AuthorizationSession::get(opCtx->getClient())->checkAuthForInsert(opCtx, nsString);
@@ -1184,6 +1193,7 @@ void receivedInsert(OperationContext* opCtx, const NamespaceString& nsString, co
 }
 
 void receivedUpdate(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
+    globalOpCounters.gotUpdateDeprecated();
     auto updateOp = UpdateOp::parseLegacy(m);
     auto& singleUpdate = updateOp.getUpdates()[0];
     invariant(updateOp.getNamespace() == nsString);
@@ -1207,6 +1217,7 @@ void receivedUpdate(OperationContext* opCtx, const NamespaceString& nsString, co
 }
 
 void receivedDelete(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
+    globalOpCounters.gotDeleteDeprecated();
     auto deleteOp = DeleteOp::parseLegacy(m);
     auto& singleDelete = deleteOp.getDeletes()[0];
     invariant(deleteOp.getNamespace() == nsString);
@@ -1223,7 +1234,10 @@ DbResponse receivedGetMore(OperationContext* opCtx,
                            const Message& m,
                            CurOp& curop,
                            bool* shouldLogOpDebug) {
+    // The legacy opcodes should be counted twice: as part of the overall opcodes' counts and on
+    // their own to highlight that they are being used.
     globalOpCounters.gotGetMore();
+    globalOpCounters.gotGetMoreDeprecated();
     DbMessage d(m);
 
     const char* ns = d.getns();
