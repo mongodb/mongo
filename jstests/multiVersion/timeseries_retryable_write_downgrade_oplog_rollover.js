@@ -4,10 +4,6 @@
  * downgrade.
  *
  * TODO (SERVER-56171): Remove this test once 5.0 is last-lts.
- *
- * @tags: [
- *  __TEMPORARILY_DISABLED__
- * ]
  */
 (function() {
 'use strict';
@@ -42,7 +38,7 @@ assert.commandWorked(
                 {ordered: false}));
 
 // Wait for the oplog entry of the retryable time-series insert to fall off the oplog.
-assert.soon(() => {
+assert.soonNoExcept(() => {
     assert.commandWorked(primary.getDB(testDB.getName())[coll.getName() + '_rollover'].insert(
         {a: 'a'.repeat(1024 * 1024)}));
     return primary.getDB('local')
