@@ -443,4 +443,95 @@ const DeprecatedWireOpsTest = function() {
 
         tearDown(conn);
     };
+
+    this.runDeprecatedOpcountersInServerStatusTest = (setUp, tearDown) => {
+        const [conn, dbTest] = setUp();
+
+        const insertCount = 5;
+        const batchSize = 3;
+
+        function exerciseOperations(collection) {
+            // Insert (each document is counted as separate insert op)
+            let docs = [];
+            for (let i = 0; i < insertCount; i++) {
+                docs.push({a: i});
+            }
+            assert.commandWorked(collection.insertMany(docs));
+
+            // Query and getmore (one query op, count of getmore ops depends on ratio of insertCount
+            // to batchSize)
+            collection.find().batchSize(batchSize).toArray();
+
+            // Update (one update op even if multiple doucuments match)
+            assert.commandWorked(collection.updateMany({a: {$lt: insertCount}}, {$set: {b: 42}}));
+
+            // Delete (one delete op even if multiple documents match)
+            // Delete everything so we can compare results of consecutive exerciseOperations.
+            assert.commandWorked(collection.deleteMany({a: {$lt: insertCount}}));
+        }
+
+        const coll = dbTest.getCollection("opcounters");
+        coll.drop();
+
+        const initialOpcounters = dbTest.serverStatus().opcounters;
+        jsTestLog("opcounters before running tests: " + tojson(initialOpcounters));
+
+        // Execute operations in commands mode against "coll" collection and cache the counters.
+        exerciseOperations(coll);
+        const afterCommands = dbTest.serverStatus().opcounters;
+        jsTestLog("opcounters after running in commands mode: " + tojson(afterCommands));
+        assert.eq(undefined, afterCommands.deprecated, "should have no deprecated ops yet");
+
+        const queryCommands = afterCommands.query - initialOpcounters.query;
+        const insertCommands = afterCommands.insert - initialOpcounters.insert;
+        const getmoreCommands = afterCommands.getmore - initialOpcounters.getmore;
+        const deleteCommands = afterCommands.delete - initialOpcounters.delete;
+        const updateCommands = afterCommands.update - initialOpcounters.update;
+
+        // Switch to legacy mode and execute exactly the same operations. This should add deprecated
+        // section to serverStatus with the same counts as we got in `afterCommands` and it should
+        // double the base counts.
+        const mongo = dbTest.getMongo();
+        mongo.forceReadMode("legacy");
+        mongo.forceWriteMode("legacy");
+        exerciseOperations(coll);
+
+        const afterLegacyOps = dbTest.serverStatus().opcounters;
+        jsTestLog("opcounters after running in legacy mode: " + tojson(afterLegacyOps));
+
+        const queryDeprecated = afterLegacyOps.deprecated.query;
+        const insertDeprecated = afterLegacyOps.deprecated.insert;
+        const getmoreDeprecated = afterLegacyOps.deprecated.getmore;
+        const deleteDeprecated = afterLegacyOps.deprecated.delete;
+        const updateDeprecated = afterLegacyOps.deprecated.update;
+        const totalDeprecated = insertDeprecated + queryDeprecated + getmoreDeprecated +
+            updateDeprecated + deleteDeprecated;
+
+        // Check that the legacy operations have been accounted for in the deprecated counters and
+        // that they've produced the same numbers as command-based ops.
+        assert.eq(insertCommands, insertDeprecated, "deprecated insert");
+        assert.eq(queryCommands, queryDeprecated, "deprecated query");
+        assert.eq(getmoreCommands, getmoreDeprecated, "deprecated getmore");
+        assert.eq(updateCommands, updateDeprecated, "deprecated update");
+        assert.eq(deleteCommands, deleteDeprecated, "deprecated delete");
+        assert.eq(0, afterLegacyOps.deprecated.killcursors, "deprecated killcursors");
+        assert.eq(totalDeprecated, afterLegacyOps.deprecated.total, "deprecated total");
+
+        // Check that the legacy operations have been added to the main counters.
+        assert.eq(afterCommands.insert + insertDeprecated, afterLegacyOps.insert, "main insert");
+        assert.eq(afterCommands.query + queryDeprecated, afterLegacyOps.query, "main query");
+        assert.eq(
+            afterCommands.getmore + getmoreDeprecated, afterLegacyOps.getmore, "main getmore");
+        assert.eq(afterCommands.update + updateDeprecated, afterLegacyOps.update, "main update");
+        assert.eq(afterCommands.delete + deleteDeprecated, afterLegacyOps.delete, "main delete");
+
+        // Check killcursors separately to make the math above simpler.
+        assert.commandWorked(coll.insertMany([{a: 0}, {a: 1}, {a: 2}, {a: 3}, {a: 4}]));
+        let cursor = getLegacyCursor(dbTest, coll);
+        assert.eq(cursor.hasNext(), true);
+        cursor.close();
+        assert.eq(1, dbTest.serverStatus().opcounters.deprecated.killcursors, "killcursors");
+
+        tearDown(conn);
+    };
 };

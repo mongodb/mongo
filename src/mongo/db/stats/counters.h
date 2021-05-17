@@ -73,7 +73,24 @@ public:
         _checkWrap(&OpCounters::_command, 1);
     }
 
-    void gotOp(int op, bool isCommand);
+    void gotInsertsDeprecated(int n) {
+        _checkWrap(&OpCounters::_insertDeprecated, n);
+    }
+    void gotQueryDeprecated() {
+        _checkWrap(&OpCounters::_queryDeprecated, 1);
+    }
+    void gotUpdateDeprecated() {
+        _checkWrap(&OpCounters::_updateDeprecated, 1);
+    }
+    void gotDeleteDeprecated() {
+        _checkWrap(&OpCounters::_deleteDeprecated, 1);
+    }
+    void gotGetMoreDeprecated() {
+        _checkWrap(&OpCounters::_getmoreDeprecated, 1);
+    }
+    void gotKillCursorsDeprecated() {
+        _checkWrap(&OpCounters::_killcursorsDeprecated, 1);
+    }
 
     BSONObj getObj() const;
 
@@ -146,6 +163,14 @@ private:
     CacheAligned<AtomicWord<long long>> _deleteWasEmpty;
     CacheAligned<AtomicWord<long long>> _deleteFromMissingNamespace;
     CacheAligned<AtomicWord<long long>> _acceptableErrorInCommand;
+
+    // Counters for deprecated opcodes.
+    CacheAligned<AtomicWord<long long>> _insertDeprecated;
+    CacheAligned<AtomicWord<long long>> _queryDeprecated;
+    CacheAligned<AtomicWord<long long>> _updateDeprecated;
+    CacheAligned<AtomicWord<long long>> _deleteDeprecated;
+    CacheAligned<AtomicWord<long long>> _getmoreDeprecated;
+    CacheAligned<AtomicWord<long long>> _killcursorsDeprecated;
 };
 
 extern OpCounters globalOpCounters;
