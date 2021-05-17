@@ -58,7 +58,12 @@ public:
     void gotGetMore();
     void gotCommand();
 
-    void gotOp(int op, bool isCommand);
+    void gotInsertsDeprecated(int n);
+    void gotQueryDeprecated();
+    void gotUpdateDeprecated();
+    void gotDeleteDeprecated();
+    void gotGetMoreDeprecated();
+    void gotKillCursorsDeprecated();
 
     BSONObj getObj() const;
 
@@ -91,6 +96,14 @@ private:
     CacheAligned<AtomicUInt32> _delete;
     CacheAligned<AtomicUInt32> _getmore;
     CacheAligned<AtomicUInt32> _command;
+
+    // Counters for deprecated opcodes.
+    CacheAligned<AtomicUInt32> _insertDeprecated;
+    CacheAligned<AtomicUInt32> _queryDeprecated;
+    CacheAligned<AtomicUInt32> _updateDeprecated;
+    CacheAligned<AtomicUInt32> _deleteDeprecated;
+    CacheAligned<AtomicUInt32> _getmoreDeprecated;
+    CacheAligned<AtomicUInt32> _killcursorsDeprecated;
 };
 
 extern OpCounters globalOpCounters;

@@ -80,48 +80,54 @@ void OpCounters::gotCommand() {
     _command.fetchAndAdd(1);
 }
 
-void OpCounters::gotOp(int op, bool isCommand) {
-    switch (op) {
-        case dbInsert: /*gotInsert();*/
-            break;     // need to handle multi-insert
-        case dbQuery:
-            if (isCommand)
-                gotCommand();
-            else
-                gotQuery();
-            break;
-
-        case dbUpdate:
-            gotUpdate();
-            break;
-        case dbDelete:
-            gotDelete();
-            break;
-        case dbGetMore:
-            gotGetMore();
-            break;
-        case dbKillCursors:
-        case opReply:
-            break;
-        default:
-            log() << "OpCounters::gotOp unknown op: " << op << endl;
-    }
+void OpCounters::gotInsertsDeprecated(int n) {
+    RARELY _checkWrap();
+    _insertDeprecated.fetchAndAdd(n);
+}
+void OpCounters::gotQueryDeprecated() {
+    RARELY _checkWrap();
+    _queryDeprecated.fetchAndAdd(1);
+}
+void OpCounters::gotUpdateDeprecated() {
+    RARELY _checkWrap();
+    _updateDeprecated.fetchAndAdd(1);
+}
+void OpCounters::gotDeleteDeprecated() {
+    RARELY _checkWrap();
+    _deleteDeprecated.fetchAndAdd(1);
+}
+void OpCounters::gotGetMoreDeprecated() {
+    RARELY _checkWrap();
+    _getmoreDeprecated.fetchAndAdd(1);
+}
+void OpCounters::gotKillCursorsDeprecated() {
+    RARELY _checkWrap();
+    _killcursorsDeprecated.fetchAndAdd(1);
 }
 
 void OpCounters::_checkWrap() {
     const unsigned MAX = 1 << 30;
-
-    bool wrap = _insert.loadRelaxed() > MAX || _query.loadRelaxed() > MAX ||
+    const bool wrap = _insert.loadRelaxed() > MAX || _query.loadRelaxed() > MAX ||
         _update.loadRelaxed() > MAX || _delete.loadRelaxed() > MAX ||
         _getmore.loadRelaxed() > MAX || _command.loadRelaxed() > MAX;
 
-    if (wrap) {
+    const bool wrapDeprecated = _insertDeprecated.loadRelaxed() > MAX ||
+        _queryDeprecated.loadRelaxed() > MAX || _updateDeprecated.loadRelaxed() > MAX ||
+        _deleteDeprecated.loadRelaxed() > MAX || _getmoreDeprecated.loadRelaxed() > MAX;
+
+    if (wrap || wrapDeprecated) {
         _insert.store(0);
         _query.store(0);
         _update.store(0);
         _delete.store(0);
         _getmore.store(0);
         _command.store(0);
+
+        _insertDeprecated.store(0);
+        _queryDeprecated.store(0);
+        _updateDeprecated.store(0);
+        _deleteDeprecated.store(0);
+        _getmoreDeprecated.store(0);
     }
 }
 
@@ -133,6 +139,27 @@ BSONObj OpCounters::getObj() const {
     b.append("delete", _delete.loadRelaxed());
     b.append("getmore", _getmore.loadRelaxed());
     b.append("command", _command.loadRelaxed());
+
+    auto queryDep = _queryDeprecated.loadRelaxed();
+    auto getmoreDep = _getmoreDeprecated.loadRelaxed();
+    auto killcursorsDep = _killcursorsDeprecated.loadRelaxed();
+    auto updateDep = _updateDeprecated.loadRelaxed();
+    auto deleteDep = _deleteDeprecated.loadRelaxed();
+    auto insertDep = _insertDeprecated.loadRelaxed();
+    auto totalDep = queryDep + getmoreDep + killcursorsDep + updateDep + deleteDep + insertDep;
+
+    if (totalDep > 0) {
+        BSONObjBuilder d(b.subobjStart("deprecated"));
+
+        d.append("total", totalDep);
+        d.append("insert", insertDep);
+        d.append("query", queryDep);
+        d.append("update", updateDep);
+        d.append("delete", deleteDep);
+        d.append("getmore", getmoreDep);
+        d.append("killcursors", killcursorsDep);
+    }
+
     return b.obj();
 }
 
