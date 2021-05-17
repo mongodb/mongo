@@ -94,8 +94,8 @@ public:
           _isIngressSession(isIngressSession) {
         auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
         if (family == AF_INET || family == AF_INET6) {
-            _socket.set_option(asio::ip::tcp::no_delay(true));
-            _socket.set_option(asio::socket_base::keep_alive(true));
+            setSocketOption(_socket, asio::ip::tcp::no_delay(true), "session no delay");
+            setSocketOption(_socket, asio::socket_base::keep_alive(true), "session keep alive");
             setSocketKeepAliveParams(_socket.native_handle());
         }
 
@@ -357,12 +357,18 @@ protected:
             // Change boost::none (which means no timeout) into a zero value for the socket option,
             // which also means no timeout.
             auto timeout = _configuredTimeout.value_or(Milliseconds{0});
-            getSocket().set_option(ASIOSocketTimeoutOption<SO_SNDTIMEO>(timeout), ec);
+            setSocketOption(getSocket(),
+                            ASIOSocketTimeoutOption<SO_SNDTIMEO>(timeout),
+                            ec,
+                            "session send timeout");
             if (auto status = errorCodeToStatus(ec); !status.isOK()) {
                 tasserted(5342000, status.reason());
             }
 
-            getSocket().set_option(ASIOSocketTimeoutOption<SO_RCVTIMEO>(timeout), ec);
+            setSocketOption(getSocket(),
+                            ASIOSocketTimeoutOption<SO_RCVTIMEO>(timeout),
+                            ec,
+                            "session receive timeout");
             if (auto status = errorCodeToStatus(ec); !status.isOK()) {
                 tasserted(5342001, status.reason());
             }

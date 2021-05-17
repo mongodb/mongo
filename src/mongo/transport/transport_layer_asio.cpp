@@ -538,7 +538,8 @@ StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncCon
 #ifdef TCP_FASTOPEN_CONNECT
     const auto family = protocol.family();
     if ((family == AF_INET) || (family == AF_INET6)) {
-        sock.set_option(TCPFastOpenConnect(gTCPFastOpenClient), ec);
+        setSocketOption(
+            sock, TCPFastOpenConnect(gTCPFastOpenClient), ec, "connect (sync) TCP fast open");
         if (tcpFastOpenIsConfigured) {
             return errorCodeToStatus(ec);
         }
@@ -689,7 +690,10 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
 
 #ifdef TCP_FASTOPEN_CONNECT
             std::error_code ec;
-            connector->socket.set_option(TCPFastOpenConnect(gTCPFastOpenClient), ec);
+            setSocketOption(connector->socket,
+                            TCPFastOpenConnect(gTCPFastOpenClient),
+                            ec,
+                            "connect (async) TCP fast open");
             if (tcpFastOpenIsConfigured) {
                 return futurize(ec);
             }
@@ -984,12 +988,13 @@ Status TransportLayerASIO::setup() {
 
             throw;
         }
-        acceptor.set_option(GenericAcceptor::reuse_address(true));
+        setSocketOption(acceptor, GenericAcceptor::reuse_address(true), "acceptor reuse address");
 
         std::error_code ec;
 #ifdef TCP_FASTOPEN
         if (gTCPFastOpenServer && ((addr.family() == AF_INET) || (addr.family() == AF_INET6))) {
-            acceptor.set_option(TCPFastOpen(gTCPFastOpenQueueSize), ec);
+            setSocketOption(
+                acceptor, TCPFastOpen(gTCPFastOpenQueueSize), ec, "acceptor TCP fast open");
             if (tcpFastOpenIsConfigured) {
                 return errorCodeToStatus(ec);
             }
@@ -997,7 +1002,7 @@ Status TransportLayerASIO::setup() {
         }
 #endif
         if (addr.family() == AF_INET6) {
-            acceptor.set_option(asio::ip::v6_only(true));
+            setSocketOption(acceptor, asio::ip::v6_only(true), "acceptor v6 only");
         }
 
         acceptor.non_blocking(true, ec);

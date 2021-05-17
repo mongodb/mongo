@@ -29,20 +29,22 @@
 
 #pragma once
 
+#ifndef _WIN32
+#include <sys/poll.h>
+#endif
+
+#include <asio.hpp>
+
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/base/system_error.h"
 #include "mongo/config.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/future.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/ssl_manager.h"
-
-#ifndef _WIN32
-#include <sys/poll.h>
-#endif  // ndef _WIN32
-
-#include <asio.hpp>
 
 namespace mongo {
 namespace transport {
@@ -320,6 +322,58 @@ boost::optional<std::array<std::uint8_t, 7>> checkTLSRequest(const Buffer& buffe
     return boost::none;
 }
 #endif
+
+/**
+ * Calls Asio `socket.set_option(opt)` with better failure diagnostics.
+ * To be used instead of Asio `socket.set_option``, because errors are hard to diagnose.
+ * Emits a log message about what option was attempted and what went wrong with
+ * it. The `note` string should uniquely identify the source of the call.
+ *
+ * Two overloads are provided, matching the Asio `socket.set_option` overloads.
+ *
+ *     setSocketOption(socket, opt, note)
+ *     setSocketOption(socket, opt, ec, note)
+ *
+ * If an `ec` is provided, errors are reported by mutating it.
+ * Otherwise, the Asio `std::system_error` exception is rethrown.
+ */
+template <typename Socket, typename Option>
+void setSocketOption(Socket& socket, const Option& opt, StringData note) {
+    try {
+        socket.set_option(opt);
+    } catch (const std::system_error& ex) {
+        LOGV2_INFO(5693100,
+                   "Asio socket.set_option failed with std::system_error",
+                   "note"_attr = note,
+                   "option"_attr =
+                       [&opt, p = socket.local_endpoint().protocol()] {
+                           return BSONObjBuilder{}
+                               .append("level", opt.level(p))
+                               .append("name", opt.name(p))
+                               .append("data", hexdump(opt.data(p), opt.size(p)))
+                               .obj();
+                       }(),
+                   "error"_attr =
+                       [&ex] {
+                           return BSONObjBuilder{}
+                               .append("what", ex.what())
+                               .append("message", ex.code().message())
+                               .append("category", ex.code().category().name())
+                               .append("value", ex.code().value())
+                               .obj();
+                       }());
+        throw;
+    }
+}
+
+template <typename Socket, typename Option>
+void setSocketOption(Socket& socket, const Option& opt, std::error_code& ec, StringData note) {
+    try {
+        setSocketOption(socket, opt, note);
+    } catch (const std::system_error& ex) {
+        ec = ex.code();
+    }
+}
 
 /**
  * Pass this to asio functions in place of a callback to have them return a Future<T>. This behaves
