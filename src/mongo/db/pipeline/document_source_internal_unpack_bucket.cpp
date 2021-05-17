@@ -904,6 +904,10 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     if (!_optimizedEndOfPipeline) {
         _optimizedEndOfPipeline = true;
         optimizeEndOfPipeline(itr, container);
+
+        if (std::next(itr) == container->end()) {
+            return container->end();
+        }
     }
     {
         // Check if we can avoid unpacking if we have a group stage with min/max aggregates.
