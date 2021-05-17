@@ -693,9 +693,6 @@ std::vector<RecipientShardEntry> constructRecipientShardEntries(
 
 void ReshardingCoordinatorExternalStateImpl::insertCoordDocAndChangeOrigCollEntry(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
-    auto originalCollType = Grid::get(opCtx)->catalogClient()->getCollection(
-        opCtx, coordinatorDoc.getSourceNss(), repl::ReadConcernLevel::kMajorityReadConcern);
-    const auto collation = originalCollType.getDefaultCollation();
 
     ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
         opCtx, coordinatorDoc.getSourceNss(), [&](OperationContext* opCtx, TxnNumber txnNumber) {

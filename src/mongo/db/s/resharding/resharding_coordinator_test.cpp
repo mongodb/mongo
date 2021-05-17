@@ -896,7 +896,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest,
     ASSERT_THROWS_CODE(reshardingCoordinatorExternalState.insertCoordDocAndChangeOrigCollEntry(
                            operationContext(), coordinatorDoc),
                        AssertionException,
-                       ErrorCodes::NamespaceNotFound);
+                       5514600);
 }
 
 }  // namespace
