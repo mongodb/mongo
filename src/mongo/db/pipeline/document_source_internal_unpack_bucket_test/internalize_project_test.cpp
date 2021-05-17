@@ -41,7 +41,7 @@ namespace {
 using InternalUnpackBucketInternalizeProjectTest = AggregationContextFixture;
 
 TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesInclusionProject) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
+    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
         fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: "
                  "3600}}")
             .firstElement(),
@@ -58,7 +58,7 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesInclusionProject)
 }
 
 TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesInclusionButExcludesId) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
+    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
         fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: "
                  "3600}}")
             .firstElement(),
@@ -76,7 +76,7 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesInclusionButExclu
 
 
 TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesNonBoolInclusionProject) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
+    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
         fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: "
                  "3600}}")
             .firstElement(),
@@ -93,7 +93,7 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesNonBoolInclusionP
 }
 
 TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesExclusionProject) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
+    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
         fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: "
                  "3600}}")
             .firstElement(),
@@ -110,7 +110,7 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesExclusionProject)
 }
 
 TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesExclusionProjectButIncludesId) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
+    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
         fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: "
                  "3600}}")
             .firstElement(),
@@ -128,7 +128,7 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesExclusionProjectB
 
 
 TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesNonBoolExclusionProject) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
+    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
         fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: "
                  "3600}}")
             .firstElement(),
@@ -146,7 +146,7 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesNonBoolExclusionP
 
 TEST_F(InternalUnpackBucketInternalizeProjectTest,
        InternalizeProjectUpdatesMetaAndTimeFieldStateInclusionProj) {
-    auto unpackSpec = DocumentSourceInternalUnpackBucket::createFromBson(
+    auto unpackSpec = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
         fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'meta', "
                  "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),
@@ -166,7 +166,7 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest,
 
 TEST_F(InternalUnpackBucketInternalizeProjectTest,
        InternalizeProjectUpdatesMetaAndTimeFieldStateExclusionProj) {
-    auto unpackSpec = DocumentSourceInternalUnpackBucket::createFromBson(
+    auto unpackSpec = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
         fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
                  "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),

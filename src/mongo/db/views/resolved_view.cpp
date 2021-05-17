@@ -107,7 +107,7 @@ AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
     // specially convert them to the time-series collection's schema, and then onward. There is no
     // need for the $_internalUnpackBucket stage with $indexStats, so we remove it.
     if (resolvedPipeline.size() >= 2 &&
-        resolvedPipeline[0][DocumentSourceInternalUnpackBucket::kStageName] &&
+        resolvedPipeline[0][DocumentSourceInternalUnpackBucket::kStageNameInternal] &&
         resolvedPipeline[1][DocumentSourceIndexStats::kStageName]) {
         // Clear the $_internalUnpackBucket stage.
         auto unpackStage = resolvedPipeline[0];
@@ -116,7 +116,8 @@ AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
         // Grab the $_internalUnpackBucket stage's time-series collection schema options and pass
         // them into the $_internalConvertBucketIndexStats stage to use for schema conversion.
         BSONObjBuilder builder;
-        for (const auto& elem : unpackStage[DocumentSourceInternalUnpackBucket::kStageName].Obj()) {
+        for (const auto& elem :
+             unpackStage[DocumentSourceInternalUnpackBucket::kStageNameInternal].Obj()) {
             if (elem.fieldNameStringData() == timeseries::kTimeFieldName ||
                 elem.fieldNameStringData() == timeseries::kMetaFieldName) {
                 builder.append(elem);

@@ -182,7 +182,10 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
         }
 
         internalUnpackBucketCount +=
-            (DocumentSourceInternalUnpackBucket::kStageName == stageName) ? 1 : 0;
+            (DocumentSourceInternalUnpackBucket::kStageNameInternal == stageName ||
+             DocumentSourceInternalUnpackBucket::kStageNameExternal == stageName)
+            ? 1
+            : 0;
 
         for (auto&& subPipeline : stage->getSubPipelines()) {
             subPipeline.validate(opCtx, performApiVersionChecks);
@@ -190,10 +193,12 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
     }
 
 
-    // Validates that the pipeline contains at most one $_internalUnpackBucket stage.
+    // Validates that the pipeline contains at most one $_internalUnpackBucket or $_unpackBucket
+    // stage.
     uassert(5348302,
             str::stream() << "Encountered pipeline with more than one "
-                          << DocumentSourceInternalUnpackBucket::kStageName << " stage",
+                          << DocumentSourceInternalUnpackBucket::kStageNameInternal << " or "
+                          << DocumentSourceInternalUnpackBucket::kStageNameExternal << " stage",
             internalUnpackBucketCount <= 1);
 }
 

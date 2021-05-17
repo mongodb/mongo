@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
 #include <iterator>
 
@@ -61,9 +59,23 @@
 
 namespace mongo {
 
+/*
+ * $_internalUnpackBucket is an internal stage for materializing time-series measurements from
+ * time-series collections. It should never be used anywhere outside the MongoDB server.
+ */
 REGISTER_DOCUMENT_SOURCE(_internalUnpackBucket,
                          LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceInternalUnpackBucket::createFromBson,
+                         DocumentSourceInternalUnpackBucket::createFromBsonInternal,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kInternal);
+
+/*
+ * $_unpackBucket is an alias of $_internalUnpackBucket. It only exposes the "timeField" and the
+ * "metaField" parameters and is only used for special known use cases by other MongoDB products
+ * rather than user applications.
+ */
+REGISTER_DOCUMENT_SOURCE(_unpackBucket,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceInternalUnpackBucket::createFromBsonExternal,
                          LiteParsedDocumentSource::AllowedWithApiStrict::kInternal);
 
 namespace {
@@ -273,39 +285,43 @@ DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BucketUnpacker bucketUnpacker,
     int bucketMaxSpanSeconds)
-    : DocumentSource(kStageName, expCtx),
+    : DocumentSource(kStageNameInternal, expCtx),
       _bucketUnpacker(std::move(bucketUnpacker)),
       _bucketMaxSpanSeconds{bucketMaxSpanSeconds} {}
 
-boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createFromBson(
+boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createFromBsonInternal(
     BSONElement specElem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5346500,
-            "$_internalUnpackBucket specification must be an object",
-            specElem.type() == Object);
+            str::stream() << "$_internalUnpackBucket specification must be an object, got: "
+                          << specElem.type(),
+            specElem.type() == BSONType::Object);
 
     // If neither "include" nor "exclude" is specified, the default is "exclude": [] and
     // if that's the case, no field will be added to 'bucketSpec.fieldSet' in the for-loop below.
     BucketUnpacker::Behavior unpackerBehavior = BucketUnpacker::Behavior::kExclude;
     BucketSpec bucketSpec;
     auto hasIncludeExclude = false;
-    std::vector<std::string> fields;
+    auto hasTimeField = false;
+    auto hasBucketMaxSpanSeconds = false;
     auto bucketMaxSpanSeconds = 0;
     std::vector<std::string> computedMetaProjFields;
     for (auto&& elem : specElem.embeddedObject()) {
         auto fieldName = elem.fieldNameStringData();
-        if (fieldName == "include" || fieldName == "exclude") {
+        if (fieldName == kInclude || fieldName == kExclude) {
             uassert(5408000,
                     "The $_internalUnpackBucket stage expects at most one of include/exclude "
                     "parameters to be specified",
                     !hasIncludeExclude);
 
             uassert(5346501,
-                    "include or exclude field must be an array",
+                    str::stream() << "include or exclude field must be an array, got: "
+                                  << elem.type(),
                     elem.type() == BSONType::Array);
 
             for (auto&& elt : elem.embeddedObject()) {
                 uassert(5346502,
-                        "include or exclude field element must be a string",
+                        str::stream() << "include or exclude field element must be a string, got: "
+                                      << elt.type(),
                         elt.type() == BSONType::String);
                 auto field = elt.valueStringData();
                 uassert(5346503,
@@ -313,12 +329,15 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                         field.find('.') == std::string::npos);
                 bucketSpec.fieldSet.emplace(field);
             }
-            unpackerBehavior = fieldName == "include" ? BucketUnpacker::Behavior::kInclude
-                                                      : BucketUnpacker::Behavior::kExclude;
+            unpackerBehavior = fieldName == kInclude ? BucketUnpacker::Behavior::kInclude
+                                                     : BucketUnpacker::Behavior::kExclude;
             hasIncludeExclude = true;
         } else if (fieldName == timeseries::kTimeFieldName) {
-            uassert(5346504, "timeField field must be a string", elem.type() == BSONType::String);
+            uassert(5346504,
+                    str::stream() << "timeField field must be a string, got: " << elem.type(),
+                    elem.type() == BSONType::String);
             bucketSpec.timeField = elem.str();
+            hasTimeField = true;
         } else if (fieldName == timeseries::kMetaFieldName) {
             uassert(5346505,
                     str::stream() << "metaField field must be a string, got: " << elem.type(),
@@ -328,22 +347,27 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                     str::stream() << "metaField field must be a single-element field path",
                     metaField.find('.') == std::string::npos);
             bucketSpec.metaField = std::move(metaField);
-        } else if (fieldName == "bucketMaxSpanSeconds") {
+        } else if (fieldName == kBucketMaxSpanSeconds) {
             uassert(5510600,
-                    "bucketMaxSpanSeconds field must be an integer",
+                    str::stream() << "bucketMaxSpanSeconds field must be an integer, got: "
+                                  << elem.type(),
                     elem.type() == BSONType::NumberInt);
             uassert(5510601,
                     "bucketMaxSpanSeconds field must be greater than zero",
                     elem._numberInt() > 0);
             bucketMaxSpanSeconds = elem._numberInt();
+            hasBucketMaxSpanSeconds = true;
         } else if (fieldName == "computedMetaProjFields") {
             uassert(5509900,
-                    "computedMetaProjFields field must be an array",
+                    str::stream() << "computedMetaProjFields field must be an array, got: "
+                                  << elem.type(),
                     elem.type() == BSONType::Array);
 
             for (auto&& elt : elem.embeddedObject()) {
                 uassert(5509901,
-                        "computedMetaProjFields field element must be a string",
+                        str::stream()
+                            << "computedMetaProjFields field element must be a string, got: "
+                            << elt.type(),
                         elt.type() == BSONType::String);
                 auto field = elt.valueStringData();
                 uassert(5509902,
@@ -358,16 +382,55 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
         }
     }
 
-    uassert(5346508,
-            "The $_internalUnpackBucket stage requires a timeField parameter",
-            specElem[timeseries::kTimeFieldName].ok());
+    uassert(
+        5346508, "The $_internalUnpackBucket stage requires a timeField parameter", hasTimeField);
 
     uassert(5510602,
             "The $_internalUnpackBucket stage requires a bucketMaxSpanSeconds parameter",
-            specElem["bucketMaxSpanSeconds"].ok());
+            hasBucketMaxSpanSeconds);
 
     return make_intrusive<DocumentSourceInternalUnpackBucket>(
         expCtx, BucketUnpacker{std::move(bucketSpec), unpackerBehavior}, bucketMaxSpanSeconds);
+}
+
+boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createFromBsonExternal(
+    BSONElement specElem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(5612400,
+            str::stream() << "$_unpackBucket specification must be an object, got: "
+                          << specElem.type(),
+            specElem.type() == BSONType::Object);
+
+    BucketSpec bucketSpec;
+    auto hasTimeField = false;
+    for (auto&& elem : specElem.embeddedObject()) {
+        auto fieldName = elem.fieldNameStringData();
+        // We only expose "timeField" and "metaField" as parameters in $_unpackBucket.
+        if (fieldName == timeseries::kTimeFieldName) {
+            uassert(5612401,
+                    str::stream() << "timeField field must be a string, got: " << elem.type(),
+                    elem.type() == BSONType::String);
+            bucketSpec.timeField = elem.str();
+            hasTimeField = true;
+        } else if (fieldName == timeseries::kMetaFieldName) {
+            uassert(5612402,
+                    str::stream() << "metaField field must be a string, got: " << elem.type(),
+                    elem.type() == BSONType::String);
+            auto metaField = elem.str();
+            uassert(5612403,
+                    str::stream() << "metaField field must be a single-element field path",
+                    metaField.find('.') == std::string::npos);
+            bucketSpec.metaField = std::move(metaField);
+        } else {
+            uasserted(5612404,
+                      str::stream() << "unrecognized parameter to $_unpackBucket: " << fieldName);
+        }
+    }
+    uassert(5612405,
+            str::stream() << "The $_unpackBucket stage requires a timeField parameter",
+            hasTimeField);
+
+    return make_intrusive<DocumentSourceInternalUnpackBucket>(
+        expCtx, BucketUnpacker{std::move(bucketSpec), BucketUnpacker::Behavior::kExclude}, 3600);
 }
 
 void DocumentSourceInternalUnpackBucket::serializeToArray(
@@ -394,7 +457,7 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
     if (spec.metaField) {
         out.addField(timeseries::kMetaFieldName, Value{*spec.metaField});
     }
-    out.addField("bucketMaxSpanSeconds", Value{_bucketMaxSpanSeconds});
+    out.addField(kBucketMaxSpanSeconds, Value{_bucketMaxSpanSeconds});
 
     if (!spec.computedMetaProjFields.empty())
         out.addField("computedMetaProjFields", Value{[&] {

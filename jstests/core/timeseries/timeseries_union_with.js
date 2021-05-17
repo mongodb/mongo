@@ -56,7 +56,7 @@ TimeseriesTest.run((insert) => {
             }
         }
 
-        let results =
+        const results =
             collA
                 .aggregate([
                     {

@@ -44,7 +44,7 @@ namespace {
 using InternalUnpackBucketExtractProjectForPushdownTest = AggregationContextFixture;
 
 TEST_F(InternalUnpackBucketExtractProjectForPushdownTest, DoesNotExtractWhenNoMetaField) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
+    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
         fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: "
                  "3600}}")
             .firstElement(),
@@ -66,7 +66,7 @@ TEST_F(InternalUnpackBucketExtractProjectForPushdownTest, DoesNotExtractWhenNoMe
 }
 
 TEST_F(InternalUnpackBucketExtractProjectForPushdownTest, ExtractsEntireProjectOnMetaField) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
+    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
         fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
                  "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),
@@ -83,7 +83,7 @@ TEST_F(InternalUnpackBucketExtractProjectForPushdownTest, ExtractsEntireProjectO
 }
 
 TEST_F(InternalUnpackBucketExtractProjectForPushdownTest, ExtractsEntireProjectOnSubfieldsOfMeta) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
+    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
         fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
                  "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),
@@ -101,7 +101,7 @@ TEST_F(InternalUnpackBucketExtractProjectForPushdownTest, ExtractsEntireProjectO
 }
 
 TEST_F(InternalUnpackBucketExtractProjectForPushdownTest, ExtractsPartOfProjectOnMetaField) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
+    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
         fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
                  "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),

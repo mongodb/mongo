@@ -39,11 +39,15 @@
 namespace mongo {
 class DocumentSourceInternalUnpackBucket : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$_internalUnpackBucket"_sd;
+    static constexpr StringData kStageNameInternal = "$_internalUnpackBucket"_sd;
+    static constexpr StringData kStageNameExternal = "$_unpackBucket"_sd;
     static constexpr StringData kInclude = "include"_sd;
     static constexpr StringData kExclude = "exclude"_sd;
+    static constexpr StringData kBucketMaxSpanSeconds = "bucketMaxSpanSeconds"_sd;
 
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
+    static boost::intrusive_ptr<DocumentSource> createFromBsonInternal(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    static boost::intrusive_ptr<DocumentSource> createFromBsonExternal(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DocumentSourceInternalUnpackBucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -51,7 +55,7 @@ public:
                                        int bucketMaxSpanSeconds);
 
     const char* getSourceName() const override {
-        return kStageName.rawData();
+        return kStageNameInternal.rawData();
     }
 
     void serializeToArray(
