@@ -20,6 +20,7 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
     WT_CONFIG_ITEM v;
     WT_DECL_ITEM(a);
     WT_DECL_ITEM(b);
+    WT_DECL_ITEM(buf);
     WT_DECL_ITEM(checkpoint);
     WT_DECL_RET;
     WT_KEYED_ENCRYPTOR *kencryptor;
@@ -33,6 +34,7 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
 
     WT_ERR(__wt_scr_alloc(session, 0, &a));
     WT_ERR(__wt_scr_alloc(session, 0, &b));
+    WT_ERR(__wt_scr_alloc(session, 1024, &buf));
     WT_ERR(__wt_scr_alloc(session, 0, &checkpoint));
 
     WT_ASSERT(session, WT_PREFIX_MATCH(uri, "file:"));
@@ -92,13 +94,14 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
      * Build and flatten the metadata and the checkpoint list, then insert it into the metadata for
      * this file.
      *
-     * Strip out any incremental backup information, an imported file has not been part of a backup.
-     * Strip out the checkpoint LSN, an imported file isn't associated with any log files. Assign a
-     * unique file ID.
+     * Reconstruct the incremental backup information, to indicate copying the whole file as an
+     * imported file has not been part of backup. Strip out the checkpoint LSN, an imported file
+     * isn't associated with any log files. Assign a unique file ID.
      */
     cfg[1] = a->data;
     cfg[2] = checkpoint_list;
-    cfg[3] = "checkpoint_backup_info=";
+    WT_ERR(__wt_reset_blkmod(session, a->data, buf));
+    cfg[3] = buf->mem;
     cfg[4] = "checkpoint_lsn=";
     WT_WITH_SCHEMA_LOCK(session,
       ret = __wt_snprintf(fileid, sizeof(fileid), "id=%" PRIu32, ++S2C(session)->next_file_id));
@@ -154,6 +157,7 @@ err:
 
     __wt_scr_free(session, &a);
     __wt_scr_free(session, &b);
+    __wt_scr_free(session, &buf);
     __wt_scr_free(session, &checkpoint);
 
     return (ret);
