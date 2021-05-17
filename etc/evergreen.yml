@@ -7344,39 +7344,6 @@ tasks:
   - func: "upload pip requirements"
   - func: "run idl tests"
 
-- name: blackduck_scanner
-  patchable: false
-  commands:
-  - func: "do non-compile setup"
-  - command: shell.exec
-    type: setup
-    params:
-      working_dir: src
-      silent: true
-      script: |
-        # Create the Evergreen API credentials
-        cat > .restconfig.json <<END_OF_CREDS
-        {
-        "baseurl": "${blackduck_url}",
-        "username": "${blackduck_username}",
-        "password": "${blackduck_password}",
-        "debug": false,
-        "insecure" : false
-        }
-        END_OF_CREDS
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: src/
-      script: |
-        set -o errexit
-        set -o verbose
-
-        # activate the virtualenv if it has been set up
-        ${activate_virtualenv}
-
-        python buildscripts/blackduck_hub.py -v scan_and_report --build_logger=mci.buildlogger --build_logger_task_id=${task_id} --report_file=report.json
-
 - name: tla_plus
   commands:
   - func: "do non-compile setup"
@@ -9382,16 +9349,6 @@ buildvariants:
 #  - name: powercycle_smoke_skip_compile
     distros:
     - amazon2-test
-
-- name: security-daily-cron
-  modules:
-  - enterprise
-  display_name: "~ Security Daily Cron"
-  run_on:
-  - rhel80-small
-  stepback: false
-  tasks:
-  - name: blackduck_scanner
 
 ###########################################
 #         Windows buildvariants           #
