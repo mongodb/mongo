@@ -307,3 +307,11 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: startupRecoveryForRestore
         default: false
+
+    storeFindAndModifyImagesInSideCollection:
+        description: >-
+            Determines where document images for retryable find and modifies are to be stored.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gStoreFindAndModifyImagesInSideCollection
+        default: false
