@@ -46,7 +46,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
@@ -184,14 +184,17 @@ Message DBClientCursor::_assembleGetMore() {
     invariant(cursorId);
     if (_useFindCommand) {
         std::int64_t batchSize = nextBatchSize();
-        auto gmr = GetMoreRequest(ns,
-                                  cursorId,
-                                  boost::make_optional(batchSize != 0, batchSize),
-                                  boost::make_optional(tailableAwaitData(),
-                                                       _awaitDataTimeout),  // awaitDataTimeout
-                                  _term,
-                                  _lastKnownCommittedOpTime);
-        auto msg = assembleCommandRequest(_client, ns.db(), opts, gmr.toBSON());
+        auto getMoreRequest = GetMoreCommandRequest(cursorId, ns.coll().toString());
+        getMoreRequest.setBatchSize(boost::make_optional(batchSize != 0, batchSize));
+        getMoreRequest.setMaxTimeMS(boost::make_optional(
+            tailableAwaitData(),
+            static_cast<std::int64_t>(durationCount<Milliseconds>(_awaitDataTimeout))));
+        if (_term) {
+            getMoreRequest.setTerm(static_cast<std::int64_t>(*_term));
+        }
+        getMoreRequest.setLastKnownCommittedOpTime(_lastKnownCommittedOpTime);
+        auto msg = assembleCommandRequest(_client, ns.db(), opts, getMoreRequest.toBSON({}));
+
         // Set the exhaust flag if needed.
         if (opts & QueryOption_Exhaust && msg.operation() == dbMsg) {
             OpMsg::setFlag(&msg, OpMsg::kExhaustSupported);

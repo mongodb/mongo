@@ -31,8 +31,9 @@
 
 #include <string>
 
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/repl/optime.h"
 
 #include "mongo/unittest/unittest.h"
@@ -41,66 +42,38 @@ namespace {
 
 using namespace mongo;
 
-TEST(GetMoreRequestTest, toBSONHasBatchSize) {
-    GetMoreRequest request(
-        NamespaceString("testdb.testcoll"), 123, 99, boost::none, boost::none, boost::none);
-    BSONObj requestObj = request.toBSON();
-    BSONObj expectedRequest = BSON("getMore" << CursorId(123) << "collection"
-                                             << "testcoll"
-                                             << "batchSize" << 99);
-    ASSERT_BSONOBJ_EQ(requestObj, expectedRequest);
+GetMoreCommandRequest createGetMoreCommandRequest(
+    std::string collection,
+    std::int64_t cursorId,
+    boost::optional<std::int64_t> sizeOfBatch = boost::none,
+    boost::optional<std::int64_t> awaitDataTimeout = boost::none,
+    boost::optional<std::int64_t> term = boost::none,
+    boost::optional<repl::OpTime> lastKnownCommittedOpTime = boost::none) {
+    GetMoreCommandRequest request(cursorId, collection);
+    request.setBatchSize(sizeOfBatch);
+    request.setMaxTimeMS(awaitDataTimeout);
+    request.setTerm(term);
+    request.setLastKnownCommittedOpTime(lastKnownCommittedOpTime);
+    return request;
 }
 
-TEST(GetMoreRequestTest, toBSONMissingMatchSize) {
-    GetMoreRequest request(NamespaceString("testdb.testcoll"),
-                           123,
-                           boost::none,
-                           boost::none,
-                           boost::none,
-                           boost::none);
-    BSONObj requestObj = request.toBSON();
+TEST(GetMoreRequestTest, toBSONMissingOptionalFields) {
+    GetMoreCommandRequest request = createGetMoreCommandRequest("testcoll", 123);
+    BSONObj requestObj = request.toBSON({});
     BSONObj expectedRequest = BSON("getMore" << CursorId(123) << "collection"
                                              << "testcoll");
     ASSERT_BSONOBJ_EQ(requestObj, expectedRequest);
 }
 
-TEST(GetMoreRequestTest, toBSONHasTerm) {
-    GetMoreRequest request(
-        NamespaceString("testdb.testcoll"), 123, 99, boost::none, 1, boost::none);
-    BSONObj requestObj = request.toBSON();
+TEST(GetMoreRequestTest, toBSONNoMissingFields) {
+    GetMoreCommandRequest request =
+        createGetMoreCommandRequest("testcoll", 123, 99, 789, 1, repl::OpTime(Timestamp(0, 10), 2));
+    BSONObj requestObj = request.toBSON({});
     BSONObj expectedRequest = BSON("getMore" << CursorId(123) << "collection"
                                              << "testcoll"
-                                             << "batchSize" << 99 << "term" << 1);
-    ASSERT_BSONOBJ_EQ(requestObj, expectedRequest);
-}
-
-TEST(GetMoreRequestTest, toBSONHasCommitLevel) {
-    GetMoreRequest request(NamespaceString("testdb.testcoll"),
-                           123,
-                           99,
-                           boost::none,
-                           1,
-                           repl::OpTime(Timestamp(0, 10), 2));
-    BSONObj requestObj = request.toBSON();
-    BSONObj expectedRequest =
-        BSON("getMore" << CursorId(123) << "collection"
-                       << "testcoll"
-                       << "batchSize" << 99 << "term" << 1 << "lastKnownCommittedOpTime"
-                       << BSON("ts" << Timestamp(0, 10) << "t" << 2LL));
-    ASSERT_BSONOBJ_EQ(requestObj, expectedRequest);
-}
-
-TEST(GetMoreRequestTest, toBSONHasMaxTimeMS) {
-    GetMoreRequest request(NamespaceString("testdb.testcoll"),
-                           123,
-                           boost::none,
-                           Milliseconds(789),
-                           boost::none,
-                           boost::none);
-    BSONObj requestObj = request.toBSON();
-    BSONObj expectedRequest = BSON("getMore" << CursorId(123) << "collection"
-                                             << "testcoll"
-                                             << "maxTimeMS" << 789);
+                                             << "batchSize" << 99 << "maxTimeMS" << 789 << "term"
+                                             << 1 << "lastKnownCommittedOpTime"
+                                             << BSON("ts" << Timestamp(0, 10) << "t" << 2LL));
     ASSERT_BSONOBJ_EQ(requestObj, expectedRequest);
 }
 

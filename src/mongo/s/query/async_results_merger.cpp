@@ -38,7 +38,7 @@
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/executor/remote_command_request.h"
@@ -443,13 +443,13 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
         adjustedBatchSize = *_params.getBatchSize() - remote.fetchedCount;
     }
 
-    BSONObj cmdObj = GetMoreRequest(remote.cursorNss,
-                                    remote.cursorId,
-                                    adjustedBatchSize,
-                                    _awaitDataTimeout,
-                                    boost::none,
-                                    boost::none)
-                         .toBSON();
+    GetMoreCommandRequest getMoreRequest(remote.cursorId, remote.cursorNss.coll().toString());
+    getMoreRequest.setBatchSize(adjustedBatchSize);
+    if (_awaitDataTimeout) {
+        getMoreRequest.setMaxTimeMS(
+            static_cast<std::int64_t>(durationCount<Milliseconds>(*_awaitDataTimeout)));
+    }
+    BSONObj cmdObj = getMoreRequest.toBSON({});
 
     if (_params.getSessionId()) {
         BSONObjBuilder newCmdBob(std::move(cmdObj));

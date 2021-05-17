@@ -37,7 +37,7 @@
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
@@ -356,8 +356,9 @@ void exhaustGetMoreTest(bool enableChecksum) {
     // Construct getMore request with exhaust flag. Set batch size so we will need multiple batches
     // to exhaust the cursor.
     int batchSize = 2;
-    GetMoreRequest gmr(nss, cursorId, batchSize, boost::none, boost::none, boost::none);
-    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), gmr.toBSON());
+    GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
+    getMoreRequest.setBatchSize(batchSize);
+    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), getMoreRequest.toBSON({}));
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -473,8 +474,9 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
 
     // Construct getMore request with exhaust flag.
     int batchSize = 2;
-    GetMoreRequest gmr(nss, cursorId, batchSize, boost::none, boost::none, boost::none);
-    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), gmr.toBSON());
+    GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
+    getMoreRequest.setBatchSize(batchSize);
+    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), getMoreRequest.toBSON({}));
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -517,8 +519,9 @@ TEST(OpMsg, MongosIgnoresExhaustForGetMore) {
 
     // Construct getMore request with exhaust flag.
     int batchSize = 2;
-    GetMoreRequest gmr(nss, cursorId, batchSize, boost::none, boost::none, boost::none);
-    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), gmr.toBSON());
+    GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
+    getMoreRequest.setBatchSize(batchSize);
+    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), getMoreRequest.toBSON({}));
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 

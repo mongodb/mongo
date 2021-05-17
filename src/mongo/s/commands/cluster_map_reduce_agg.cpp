@@ -45,7 +45,6 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain_common.h"
-#include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/map_reduce_output_format.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"

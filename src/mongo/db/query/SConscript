@@ -165,7 +165,6 @@ env.Library(
         "count_request.cpp",
         'cursor_request.cpp',
         'cursor_response.cpp',
-        'getmore_request.cpp',
         'view_response_formatter.cpp',
         'count_command.idl',
         'kill_cursors.idl',

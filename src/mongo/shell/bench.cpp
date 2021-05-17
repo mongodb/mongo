@@ -39,7 +39,7 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/bson_template_evaluator.h"
@@ -266,21 +266,16 @@ int runQueryWithReadCommands(DBClientBase* conn,
     while (cursorResponse.getCursorId() != 0) {
         sleepFor(delayBeforeGetMore);
 
-        GetMoreRequest getMoreRequest(
-            findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()),
+        GetMoreCommandRequest getMoreRequest(
             cursorResponse.getCursorId(),
-            findCommand->getBatchSize() ? boost::optional<std::int64_t>(static_cast<std::int64_t>(
-                                              *findCommand->getBatchSize()))
-                                        : boost::none,
-            boost::none,   // maxTimeMS
-            boost::none,   // term
-            boost::none);  // lastKnownCommittedOpTime
+            findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).coll().toString());
+        getMoreRequest.setBatchSize(findCommand->getBatchSize());
         BSONObj getMoreCommandResult;
         uassert(ErrorCodes::CommandFailed,
                 str::stream() << "getMore command failed; reply was: " << getMoreCommandResult,
                 runCommandWithSession(conn,
                                       dbName,
-                                      getMoreRequest.toBSON(),
+                                      getMoreRequest.toBSON({}),
                                       // read command with txnNumber implies performing reads in a
                                       // multi-statement transaction
                                       txnNumber ? kMultiStatementTransactionOption : kNoOptions,
@@ -1067,19 +1062,15 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(result));
                 int count = cursorResponse.getBatch().size();
                 while (cursorResponse.getCursorId() != 0) {
-                    GetMoreRequest getMoreRequest(cursorResponse.getNSS(),
-                                                  cursorResponse.getCursorId(),
-                                                  boost::none,   // batchSize
-                                                  boost::none,   // maxTimeMS
-                                                  boost::none,   // term
-                                                  boost::none);  // lastKnownCommittedOpTime
+                    GetMoreCommandRequest getMoreRequest(cursorResponse.getCursorId(),
+                                                         cursorResponse.getNSS().coll().toString());
                     BSONObj getMoreCommandResult;
                     uassert(ErrorCodes::CommandFailed,
                             str::stream()
                                 << "getMore command failed; reply was: " << getMoreCommandResult,
                             runCommandWithSession(conn,
                                                   this->ns,
-                                                  getMoreRequest.toBSON(),
+                                                  getMoreRequest.toBSON({}),
                                                   kNoOptions,
                                                   lsid,
                                                   &getMoreCommandResult));

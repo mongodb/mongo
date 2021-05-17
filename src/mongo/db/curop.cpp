@@ -48,7 +48,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/profile_filter.h"
-#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -143,14 +143,9 @@ BSONObj upconvertQueryEntry(const BSONObj& query,
 }
 
 BSONObj upconvertGetMoreEntry(const NamespaceString& nss, CursorId cursorId, int ntoreturn) {
-    return GetMoreRequest(nss,
-                          cursorId,
-                          ntoreturn,
-                          boost::none,  // awaitDataTimeout
-                          boost::none,  // term
-                          boost::none   // lastKnownCommittedOpTime
-                          )
-        .toBSON();
+    GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
+    getMoreRequest.setBatchSize(ntoreturn);
+    return getMoreRequest.toBSON({});
 }
 
 /**

@@ -1269,7 +1269,7 @@ TEST_F(AsyncResultsMergerTest, ReturnsErrorOnRetriableError) {
     killFuture.wait();
 }
 
-TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
+TEST_F(AsyncResultsMergerTest, GetMoreCommandRequestIncludesMaxTimeMS) {
     BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true, awaitData: true}");
     std::vector<RemoteCursor> cursors;
     cursors.push_back(
@@ -1788,7 +1788,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
     scheduleNetworkResponse({kTestNss, CursorId(0), cleanupBatch});
 }
 
-TEST_F(AsyncResultsMergerTest, GetMoreRequestWithoutTailableCantHaveMaxTime) {
+TEST_F(AsyncResultsMergerTest, GetMoreCommandRequestWithoutTailableCantHaveMaxTime) {
     BSONObj findCmd = fromjson("{find: 'testcoll'}");
     std::vector<RemoteCursor> cursors;
     cursors.push_back(
@@ -1800,7 +1800,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestWithoutTailableCantHaveMaxTime) {
     killFuture.wait();
 }
 
-TEST_F(AsyncResultsMergerTest, GetMoreRequestWithoutAwaitDataCantHaveMaxTime) {
+TEST_F(AsyncResultsMergerTest, GetMoreCommandRequestWithoutAwaitDataCantHaveMaxTime) {
     BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true}");
     std::vector<RemoteCursor> cursors;
     cursors.push_back(

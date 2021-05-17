@@ -53,18 +53,26 @@ commands:
         type: string
         validator: { callback: "query_request_helper::validateGetMoreCollectionName" }
       batchSize:
+        description: >
+          The batch size is optional. If not provided, we will put as many documents into the batch
+          as fit within the byte limit.
         type: safeInt64
         optional: true
         validator: {gte: 0}
       maxTimeMS:
-        description: "The awaitData timeout."
+        description: >
+          The await data timeout: the number of milliseconds for which a getMore on a tailable,
+          awaitData query should block.
         type: safeInt64
         optional: true
       term:
+        description: >
+          Only internal queries from replication will typically have a term.
         type: long
         optional: true
         unstable: true
       lastKnownCommittedOpTime:
+        description: Only internal queries from replication will have a last known committed optime.
         type: optime
         optional: true
         unstable: true

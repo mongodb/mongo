@@ -416,7 +416,7 @@ private:
     std::string _planSummary;
 
     // Commit point at the time the last batch was returned. This is only used by internal exhaust
-    // oplog fetching. Also see lastKnownCommittedOpTime in GetMoreRequest.
+    // oplog fetching.
     boost::optional<repl::OpTime> _lastKnownCommittedOpTime;
 
     // The client OperationKey associated with this cursor.

@@ -35,7 +35,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
@@ -167,8 +167,9 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
 
     // If we got a cursor id back, pre-fetch the next batch
     if (_cursorId) {
-        _runRemoteCommand(_createRequest(
-            opCtx, GetMoreRequest(_ns, _cursorId, _options.batchSize, {}, {}, {}).toBSON()));
+        GetMoreCommandRequest getMoreRequest(_cursorId, _ns.coll().toString());
+        getMoreRequest.setBatchSize(_options.batchSize);
+        _runRemoteCommand(_createRequest(opCtx, getMoreRequest.toBSON({})));
     }
 }
 
