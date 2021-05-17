@@ -119,6 +119,8 @@ public:
     void enterCommitPhase();
 
 private:
+    void _cleanup();
+
     OperationContext* const _opCtx;
     const NamespaceString _nss;
     const BSONObj _reason;

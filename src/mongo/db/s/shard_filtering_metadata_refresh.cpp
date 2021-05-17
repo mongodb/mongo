@@ -318,18 +318,16 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
         }
     }
 
-    forceShardFilteringMetadataRefresh(_opCtx, _nss);
+    try {
+        forceShardFilteringMetadataRefresh(_opCtx, _nss);
+    } catch (const DBException&) {
+        _cleanup();
+        throw;
+    }
 }
 
 ScopedShardVersionCriticalSection::~ScopedShardVersionCriticalSection() {
-    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-    // DBLock and CollectionLock are used here to avoid throwing further recursive stale config
-    // errors.
-    Lock::DBLock dbLock(_opCtx, _nss.db(), MODE_IX);
-    Lock::CollectionLock collLock(_opCtx, _nss, MODE_IX);
-    auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
-    csr->exitCriticalSection(csrLock, _reason);
+    _cleanup();
 }
 
 void ScopedShardVersionCriticalSection::enterCommitPhase() {
@@ -342,6 +340,17 @@ void ScopedShardVersionCriticalSection::enterCommitPhase() {
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
     csr->enterCriticalSectionCommitPhase(csrLock, _reason);
+}
+
+void ScopedShardVersionCriticalSection::_cleanup() {
+    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+    // DBLock and CollectionLock are used here to avoid throwing further recursive stale config
+    // errors.
+    Lock::DBLock dbLock(_opCtx, _nss.db(), MODE_IX);
+    Lock::CollectionLock collLock(_opCtx, _nss, MODE_IX);
+    auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+    csr->exitCriticalSection(csrLock, _reason);
 }
 
 Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
