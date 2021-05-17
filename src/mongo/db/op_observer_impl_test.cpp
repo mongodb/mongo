@@ -44,6 +44,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/s/config_server_test_fixture.h"
@@ -766,6 +767,173 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
                                                            << BSON("_id" << 1))));
     ASSERT_BSONOBJ_EQ(oExpected, o);
 }
+
+TEST_F(OpObserverTransactionTest,
+       RetryableFindAndModifyUpdateRequestingPostImageHasNeedsRetryImage) {
+    // Set parameter to indicate that pre- and post- images should be stored in a side collection
+    // rather than the oplog.
+    std::ignore = ServerParameterSet::getGlobal()
+                      ->getMap()
+                      .find("storeFindAndModifyImagesInSideCollection")
+                      ->second->setFromString("true");
+    ON_BLOCK_EXIT([&] {
+        // Ensure the server parameter is set back to the default if we fail the test midway.
+        std::ignore = ServerParameterSet::getGlobal()
+                          ->getMap()
+                          .find("storeFindAndModifyImagesInSideCollection")
+                          ->second->setFromString("false");
+    });
+    OpObserverImpl opObserver;
+
+    // Create session and do a retryable write.
+    const TxnNumber txnNum = 3;
+    opCtx()->setTxnNumber(txnNum);
+    OperationContextSession opSession(opCtx(), true /* checkOutSession */);
+    NamespaceString nss = {"test", "coll"};
+    const auto uuid = CollectionUUID::gen();
+    OperationContextSession::get(opCtx())->beginOrContinueTxn(opCtx(),
+                                                              txnNum,
+                                                              /* autocommit */ boost::none,
+                                                              /* startTransaction */ boost::none,
+                                                              "testDB",
+                                                              "update");
+
+    session()->unstashTransactionResources(opCtx(), "update");
+
+    OplogUpdateEntryArgs update;
+    update.nss = nss;
+    update.uuid = uuid;
+    update.stmtId = 0;
+    update.updatedDoc = BSON("_id" << 0 << "data"
+                                   << "x");
+    update.update = BSON("$set" << BSON("data"
+                                        << "x"));
+    update.criteria = BSON("_id" << 0);
+    update.storeDocOption = OplogUpdateEntryArgs::StoreDocOption::PostImage;
+
+    WriteUnitOfWork wunit(opCtx());
+    AutoGetDb autoDb(opCtx(), nss.db(), MODE_X);
+    opObserver.onUpdate(opCtx(), update);
+    // Asserts that only a single oplog entry was created. In essence, we did not create any
+    // no-op image entries in the oplog.
+    const auto oplogEntry = getSingleOplogEntry(opCtx());
+    ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPreImageOpTimeFieldName));
+    ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPostImageOpTimeFieldName));
+    ASSERT_TRUE(oplogEntry.hasField(repl::OplogEntryBase::kNeedsRetryImageFieldName));
+    ASSERT_EQUALS(oplogEntry.getStringField(repl::OplogEntryBase::kNeedsRetryImageFieldName),
+                  "postImage"_sd);
+}
+
+TEST_F(OpObserverTransactionTest,
+       RetryableFindAndModifyUpdateRequestingPreImageHasNeedsRetryImage) {
+    // Set parameter to indicate that pre- and post- images should be stored in a side collection
+    // rather than the oplog.
+    std::ignore = ServerParameterSet::getGlobal()
+                      ->getMap()
+                      .find("storeFindAndModifyImagesInSideCollection")
+                      ->second->setFromString("true");
+    ON_BLOCK_EXIT([&] {
+        // Ensure the server parameter is set back to the default if we fail the test midway.
+        std::ignore = ServerParameterSet::getGlobal()
+                          ->getMap()
+                          .find("storeFindAndModifyImagesInSideCollection")
+                          ->second->setFromString("false");
+    });
+    OpObserverImpl opObserver;
+
+    // Create session and do a retryable write.
+    const TxnNumber txnNum = 3;
+    opCtx()->setTxnNumber(txnNum);
+    OperationContextSession opSession(opCtx(), true /* checkOutSession */);
+    NamespaceString nss = {"test", "coll"};
+    const auto uuid = CollectionUUID::gen();
+    OperationContextSession::get(opCtx())->beginOrContinueTxn(opCtx(),
+                                                              txnNum,
+                                                              /* autocommit */ boost::none,
+                                                              /* startTransaction */ boost::none,
+                                                              "testDB",
+                                                              "update");
+
+    session()->unstashTransactionResources(opCtx(), "update");
+
+    OplogUpdateEntryArgs update;
+    update.nss = nss;
+    update.uuid = uuid;
+    update.stmtId = 0;
+    update.preImageDoc = BSON("_id" << 0 << "data"
+                                    << "y");
+    update.update = BSON("$set" << BSON("data"
+                                        << "x"));
+    update.criteria = BSON("_id" << 0);
+    update.storeDocOption = OplogUpdateEntryArgs::StoreDocOption::PreImage;
+
+    WriteUnitOfWork wunit(opCtx());
+    AutoGetDb autoDb(opCtx(), nss.db(), MODE_X);
+    opObserver.onUpdate(opCtx(), update);
+    // Asserts that only a single oplog entry was created. In essence, we did not create any
+    // no-op image entries in the oplog.
+    const auto oplogEntry = getSingleOplogEntry(opCtx());
+    ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPreImageOpTimeFieldName));
+    ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPostImageOpTimeFieldName));
+    ASSERT_TRUE(oplogEntry.hasField(repl::OplogEntryBase::kNeedsRetryImageFieldName));
+    ASSERT_EQUALS(oplogEntry.getStringField(repl::OplogEntryBase::kNeedsRetryImageFieldName),
+                  "preImage"_sd);
+}
+
+TEST_F(OpObserverTransactionTest, RetryableFindAndModifyDeleteHasNeedsRetryImage) {
+    // Set parameter to indicate that pre- and post- images should be stored in a side collection
+    // rather than the oplog.
+    std::ignore = ServerParameterSet::getGlobal()
+                      ->getMap()
+                      .find("storeFindAndModifyImagesInSideCollection")
+                      ->second->setFromString("true");
+    ON_BLOCK_EXIT([&] {
+        // Ensure the server parameter is set back to the default if we fail the test midway.
+        std::ignore = ServerParameterSet::getGlobal()
+                          ->getMap()
+                          .find("storeFindAndModifyImagesInSideCollection")
+                          ->second->setFromString("false");
+    });
+    OpObserverImpl opObserver;
+
+    // Create session and do a retryable write.
+    const TxnNumber txnNum = 3;
+    opCtx()->setTxnNumber(txnNum);
+    OperationContextSession opSession(opCtx(), true /* checkOutSession */);
+    NamespaceString nss = {"test", "coll"};
+    const auto uuid = CollectionUUID::gen();
+    OperationContextSession::get(opCtx())->beginOrContinueTxn(opCtx(),
+                                                              txnNum,
+                                                              /* autocommit */ boost::none,
+                                                              /* startTransaction */ boost::none,
+                                                              "testDB",
+                                                              "insert");
+
+    session()->unstashTransactionResources(opCtx(), "delete");
+
+    WriteUnitOfWork wunit(opCtx());
+    AutoGetDb autoDb(opCtx(), nss.db(), MODE_X);
+    opObserver.aboutToDelete(opCtx(),
+                             nss,
+                             BSON("_id" << 0 << "data"
+                                        << "x"));
+    opObserver.onDelete(opCtx(),
+                        nss,
+                        uuid,
+                        0,
+                        false,
+                        BSON("_id" << 0 << "data"
+                                   << "x"));
+    // Asserts that only a single oplog entry was created. In essence, we did not create any
+    // no-op image entries in the oplog.
+    const auto oplogEntry = getSingleOplogEntry(opCtx());
+    ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPreImageOpTimeFieldName));
+    ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPostImageOpTimeFieldName));
+    ASSERT_TRUE(oplogEntry.hasField(repl::OplogEntryBase::kNeedsRetryImageFieldName));
+    ASSERT_EQUALS(oplogEntry.getStringField(repl::OplogEntryBase::kNeedsRetryImageFieldName),
+                  "preImage"_sd);
+}
+
 
 DEATH_TEST_F(OpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
     OpObserverImpl opObserver;

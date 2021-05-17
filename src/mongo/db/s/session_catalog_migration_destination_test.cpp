@@ -81,15 +81,17 @@ const NamespaceString kNs("a.b");
 /**
  * Creates an OplogEntry with given parameters and preset defaults for this test suite.
  */
-repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
-                                repl::OpTypeEnum opType,
-                                BSONObj object,
-                                boost::optional<BSONObj> object2,
-                                OperationSessionInfo sessionInfo,
-                                boost::optional<Date_t> wallClockTime,
-                                boost::optional<StmtId> stmtId,
-                                boost::optional<repl::OpTime> preImageOpTime = boost::none,
-                                boost::optional<repl::OpTime> postImageOpTime = boost::none) {
+repl::OplogEntry makeOplogEntry(
+    repl::OpTime opTime,
+    repl::OpTypeEnum opType,
+    BSONObj object,
+    boost::optional<BSONObj> object2,
+    OperationSessionInfo sessionInfo,
+    boost::optional<Date_t> wallClockTime,
+    boost::optional<StmtId> stmtId,
+    boost::optional<repl::OpTime> preImageOpTime = boost::none,
+    boost::optional<repl::OpTime> postImageOpTime = boost::none,
+    boost::optional<repl::RetryImageEnum> needsRetryImage = boost::none) {
     return repl::OplogEntry(opTime,            // optime
                             0,                 // hash
                             opType,            // opType
@@ -105,7 +107,8 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                             stmtId,            // statement id
                             boost::none,       // optime of previous write within same transaction
                             preImageOpTime,    // pre-image optime
-                            postImageOpTime);  // post-image optime
+                            postImageOpTime,   // post-image optime
+                            needsRetryImage);  // needsRetryImage
 }
 
 repl::OplogEntry extractInnerOplog(const repl::OplogEntry& oplog) {
@@ -718,6 +721,98 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
     checkStatementExecuted(opCtx, session.get(), 2, 45, updateOplog);
 }
 
+TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleForgedPreImageFindAndModify) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+
+    SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
+
+    sessionMigration.start(getServiceContext());
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(2);
+
+    auto preImageOplog = makeOplogEntry(OpTime(Timestamp(100, 2), 1),  // optime
+                                        OpTypeEnum::kNoop,             // op type
+                                        BSON("x" << 100),              // o
+                                        boost::none,                   // o2
+                                        sessionInfo,                   // session info
+                                        Date_t::now(),                 // wall clock time
+                                        45);                           // statement id
+    // Test that we will downconvert the updateOplog by removing the 'needsRetryImage' and appending
+    // the proper preImageOpTime link.
+    auto updateOplog = makeOplogEntry(OpTime(Timestamp(80, 2), 1),       // optime
+                                      OpTypeEnum::kUpdate,               // op type
+                                      BSON("x" << 100),                  // o
+                                      BSON("$set" << BSON("x" << 101)),  // o2
+                                      sessionInfo,                       // session info
+                                      Date_t::now(),                     // wall clock time
+                                      45,                                // statement id
+                                      boost::none,                       // pre-image optime
+                                      boost::none,                       // post-image optime
+                                      repl::RetryImageEnum::kPreImage);  // needsRetryImage
+
+    returnOplog({preImageOplog, updateOplog});
+
+    finishSessionExpectSuccess(&sessionMigration);
+
+    auto opCtx = operationContext();
+    auto session = getSessionWithTxn(opCtx, sessionId, 2);
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTime(2));
+
+    ASSERT_TRUE(historyIter.hasNext());
+
+    auto nextOplog = historyIter.next(opCtx);
+    ASSERT_TRUE(nextOplog.getOpType() == OpTypeEnum::kNoop);
+
+    ASSERT_TRUE(nextOplog.getStatementId());
+    ASSERT_EQ(45, nextOplog.getStatementId().value());
+
+    auto nextSessionInfo = nextOplog.getOperationSessionInfo();
+
+    ASSERT_TRUE(nextSessionInfo.getSessionId());
+    ASSERT_EQ(sessionId, nextSessionInfo.getSessionId().value());
+
+    ASSERT_TRUE(nextSessionInfo.getTxnNumber());
+    ASSERT_EQ(2, nextSessionInfo.getTxnNumber().value());
+
+    ASSERT_BSONOBJ_EQ(kSessionOplogTag, nextOplog.getObject());
+
+    auto innerOplog = extractInnerOplog(nextOplog);
+    ASSERT_TRUE(innerOplog.getOpType() == OpTypeEnum::kUpdate);
+    ASSERT_BSONOBJ_EQ(updateOplog.getObject(), innerOplog.getObject());
+    ASSERT_TRUE(innerOplog.getObject2());
+    ASSERT_BSONOBJ_EQ(updateOplog.getObject2().value(), innerOplog.getObject2().value());
+
+    ASSERT_FALSE(historyIter.hasNext());
+
+    ASSERT_TRUE(nextOplog.getPreImageOpTime());
+    ASSERT_FALSE(nextOplog.getPostImageOpTime());
+    ASSERT_FALSE(nextOplog.getNeedsRetryImage());
+
+    // Check preImage oplog
+
+    auto preImageOpTime = nextOplog.getPreImageOpTime().value();
+    auto newPreImageOplog = getOplog(opCtx, preImageOpTime);
+
+    ASSERT_TRUE(newPreImageOplog.getStatementId());
+    ASSERT_EQ(45, newPreImageOplog.getStatementId().value());
+
+    auto preImageSessionInfo = newPreImageOplog.getOperationSessionInfo();
+
+    ASSERT_TRUE(preImageSessionInfo.getSessionId());
+    ASSERT_EQ(sessionId, preImageSessionInfo.getSessionId().value());
+
+    ASSERT_TRUE(preImageSessionInfo.getTxnNumber());
+    ASSERT_EQ(2, preImageSessionInfo.getTxnNumber().value());
+
+    ASSERT_BSONOBJ_EQ(preImageOplog.getObject(), newPreImageOplog.getObject());
+    ASSERT_TRUE(newPreImageOplog.getObject2());
+    ASSERT_TRUE(newPreImageOplog.getObject2().value().isEmpty());
+
+    checkStatementExecuted(opCtx, session.get(), 2, 45, updateOplog);
+}
+
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFindAndModify) {
     const auto sessionId = makeLogicalSessionIdForTest();
 
@@ -782,6 +877,97 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
 
     ASSERT_FALSE(nextOplog.getPreImageOpTime());
     ASSERT_TRUE(nextOplog.getPostImageOpTime());
+
+    // Check preImage oplog
+
+    auto postImageOpTime = nextOplog.getPostImageOpTime().value();
+    auto newPostImageOplog = getOplog(opCtx, postImageOpTime);
+
+    ASSERT_TRUE(newPostImageOplog.getStatementId());
+    ASSERT_EQ(45, newPostImageOplog.getStatementId().value());
+
+    auto preImageSessionInfo = newPostImageOplog.getOperationSessionInfo();
+
+    ASSERT_TRUE(preImageSessionInfo.getSessionId());
+    ASSERT_EQ(sessionId, preImageSessionInfo.getSessionId().value());
+
+    ASSERT_TRUE(preImageSessionInfo.getTxnNumber());
+    ASSERT_EQ(2, preImageSessionInfo.getTxnNumber().value());
+
+    ASSERT_BSONOBJ_EQ(postImageOplog.getObject(), newPostImageOplog.getObject());
+    ASSERT_TRUE(newPostImageOplog.getObject2());
+    ASSERT_TRUE(newPostImageOplog.getObject2().value().isEmpty());
+
+    checkStatementExecuted(opCtx, session.get(), 2, 45, updateOplog);
+}
+
+
+TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleForgedPostImageFindAndModify) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+
+    SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
+    sessionMigration.start(getServiceContext());
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(2);
+
+    auto postImageOplog = makeOplogEntry(OpTime(Timestamp(100, 2), 1),  // optime
+                                         OpTypeEnum::kNoop,             // op type
+                                         BSON("x" << 100),              // o
+                                         boost::none,                   // o2
+                                         sessionInfo,                   // session info
+                                         Date_t::now(),                 // wall clock time
+                                         45);                           // statement id
+
+    auto updateOplog = makeOplogEntry(OpTime(Timestamp(80, 2), 1),  // optime
+                                      OpTypeEnum::kUpdate,          // op type
+                                      BSON("x" << 100),             // o
+                                      BSON("$set" << BSON("x" << 101)),
+                                      sessionInfo,                        // session info
+                                      Date_t::now(),                      // wall clock time
+                                      45,                                 // statement id
+                                      boost::none,                        // pre-image optime
+                                      boost::none,                        // post-image optime
+                                      repl::RetryImageEnum::kPostImage);  // needsRetryImage
+
+    returnOplog({postImageOplog, updateOplog});
+
+    finishSessionExpectSuccess(&sessionMigration);
+
+    auto opCtx = operationContext();
+    auto session = getSessionWithTxn(opCtx, sessionId, 2);
+    TransactionHistoryIterator historyIter(session->getLastWriteOpTime(2));
+
+    ASSERT_TRUE(historyIter.hasNext());
+
+    auto nextOplog = historyIter.next(opCtx);
+    ASSERT_TRUE(nextOplog.getOpType() == OpTypeEnum::kNoop);
+
+    ASSERT_TRUE(nextOplog.getStatementId());
+    ASSERT_EQ(45, nextOplog.getStatementId().value());
+
+    auto nextSessionInfo = nextOplog.getOperationSessionInfo();
+
+    ASSERT_TRUE(nextSessionInfo.getSessionId());
+    ASSERT_EQ(sessionId, nextSessionInfo.getSessionId().value());
+
+    ASSERT_TRUE(nextSessionInfo.getTxnNumber());
+    ASSERT_EQ(2, nextSessionInfo.getTxnNumber().value());
+
+    ASSERT_BSONOBJ_EQ(kSessionOplogTag, nextOplog.getObject());
+
+    auto innerOplog = extractInnerOplog(nextOplog);
+    ASSERT_TRUE(innerOplog.getOpType() == OpTypeEnum::kUpdate);
+    ASSERT_BSONOBJ_EQ(updateOplog.getObject(), innerOplog.getObject());
+    ASSERT_TRUE(innerOplog.getObject2());
+    ASSERT_BSONOBJ_EQ(updateOplog.getObject2().value(), innerOplog.getObject2().value());
+
+    ASSERT_FALSE(historyIter.hasNext());
+
+    ASSERT_FALSE(nextOplog.getPreImageOpTime());
+    ASSERT_TRUE(nextOplog.getPostImageOpTime());
+    ASSERT_FALSE(nextOplog.getNeedsRetryImage());
 
     // Check preImage oplog
 

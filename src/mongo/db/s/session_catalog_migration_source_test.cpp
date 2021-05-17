@@ -32,6 +32,7 @@
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/s/session_catalog_migration_source.h"
@@ -61,7 +62,9 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 StmtId stmtId,
                                 repl::OpTime prevWriteOpTimeInTransaction,
                                 boost::optional<repl::OpTime> preImageOpTime,
-                                boost::optional<repl::OpTime> postImageOpTime) {
+                                boost::optional<repl::OpTime> postImageOpTime,
+                                boost::optional<OperationSessionInfo> osi,
+                                boost::optional<repl::RetryImageEnum> needsRetryImage) {
     return repl::OplogEntry(
         opTime,                           // optime
         0,                                // hash
@@ -72,24 +75,28 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         repl::OplogEntry::kOplogVersion,  // version
         object,                           // o
         object2,                          // o2
-        {},                               // sessionInfo
+        osi.get_value_or({}),             // sessionInfo
         boost::none,                      // upsert
         wallClockTime,                    // wall clock time
         stmtId,                           // statement id
         prevWriteOpTimeInTransaction,     // optime of previous write within same transaction
         preImageOpTime,                   // pre-image optime
-        postImageOpTime);                 // post-image optime
+        postImageOpTime,
+        needsRetryImage);  // post-image optime
 }
 
-repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
-                                repl::OpTypeEnum opType,
-                                BSONObj object,
-                                boost::optional<BSONObj> object2,
-                                boost::optional<Date_t> wallClockTime,
-                                StmtId stmtId,
-                                repl::OpTime prevWriteOpTimeInTransaction,
-                                boost::optional<repl::OpTime> preImageOpTime = boost::none,
-                                boost::optional<repl::OpTime> postImageOpTime = boost::none) {
+repl::OplogEntry makeOplogEntry(
+    repl::OpTime opTime,
+    repl::OpTypeEnum opType,
+    BSONObj object,
+    boost::optional<BSONObj> object2,
+    boost::optional<Date_t> wallClockTime,
+    StmtId stmtId,
+    repl::OpTime prevWriteOpTimeInTransaction,
+    boost::optional<repl::OpTime> preImageOpTime = boost::none,
+    boost::optional<repl::OpTime> postImageOpTime = boost::none,
+    boost::optional<OperationSessionInfo> osi = boost::none,
+    boost::optional<repl::RetryImageEnum> needsRetryImage = boost::none) {
     return makeOplogEntry(opTime,
                           opType,
                           kNs,
@@ -99,7 +106,9 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                           stmtId,
                           prevWriteOpTimeInTransaction,
                           preImageOpTime,
-                          postImageOpTime);
+                          postImageOpTime,
+                          osi,
+                          needsRetryImage);
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, NoSessionsToTransferShouldNotHaveOplog) {
@@ -336,6 +345,69 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithFindAndModifyPreImageAnd
     ASSERT_FALSE(migrationSource.hasMoreOplog());
 }
 
+TEST_F(SessionCatalogMigrationSourceTest, ForgeImageEntriesWhenFetchingEntriesWithNeedsRetryImage) {
+    repl::ImageEntry imageEntry;
+    const auto preImage = BSON("_id" << 1 << "y" << 50);
+    const auto lsid = makeLogicalSessionIdForTest();
+    const repl::OpTime imageEntryOpTime = repl::OpTime(Timestamp(52, 346), 2);
+    const auto txnNumber = 1LL;
+    imageEntry.set_id(lsid);
+    imageEntry.setTxnNumber(txnNumber);
+    imageEntry.setTs(imageEntryOpTime.getTimestamp());
+    imageEntry.setImageKind(repl::RetryImageEnum::kPreImage);
+    imageEntry.setImage(preImage);
+
+    OperationSessionInfo osi;
+    osi.setTxnNumber(txnNumber);
+    osi.setSessionId(lsid);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kConfigImagesNamespace.ns(), imageEntry.toBSON());
+
+    // Insert an oplog entry with a non-null needsRetryImage field.
+    auto entry = makeOplogEntry(
+        repl::OpTime(Timestamp(52, 346), 2),  // optime
+        repl::OpTypeEnum::kDelete,            // op type
+        BSON("y" << 50),                      // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time
+        0,                                    // statement id
+        repl::OpTime(Timestamp(0, 0), 0),     // optime of previous write within same transaction
+        boost::none,                          // pre-image optime
+        boost::none,                          // post-image optime
+        osi,                                  // operation session info
+        repl::RetryImageEnum::kPreImage);     // needsRetryImage
+    insertOplogEntry(entry);
+
+    SessionTxnRecord sessionRecord;
+    sessionRecord.setSessionId(lsid);
+    sessionRecord.setTxnNum(1);
+    sessionRecord.setLastWriteOpTime(entry.getOpTime());
+    sessionRecord.setLastWriteDate(*entry.getWallClockTime());
+
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionRecord.toBSON());
+
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs);
+    // The next oplog entry should be the forged preImage entry.
+    ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+    ASSERT_TRUE(migrationSource.hasMoreOplog());
+    auto nextOplogResult = migrationSource.getLastFetchedOplog();
+    ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
+    // Check that the key fields are what we expect. The destination will overwrite any unneeded
+    // fields when it processes the incoming entries.
+    ASSERT_BSONOBJ_EQ(preImage, nextOplogResult.oplog->getObject());
+    ASSERT_EQUALS(txnNumber, nextOplogResult.oplog->getTxnNumber().get());
+    ASSERT_EQUALS(lsid, nextOplogResult.oplog->getSessionId().get());
+    ASSERT_EQUALS("n", repl::OpType_serializer(nextOplogResult.oplog->getOpType()));
+    ASSERT_EQUALS(0LL, nextOplogResult.oplog->getStatementId().get());
+
+    // The next oplog entry should be the original entry that generated the image entry.
+    ASSERT_TRUE(migrationSource.hasMoreOplog());
+    ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+    nextOplogResult = migrationSource.getLastFetchedOplog();
+    ASSERT_BSONOBJ_EQ(entry.toBSON(), nextOplogResult.oplog->toBSON());
+}
+
 TEST_F(SessionCatalogMigrationSourceTest, OplogWithOtherNsShouldBeIgnored) {
     auto entry1 = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
@@ -368,7 +440,9 @@ TEST_F(SessionCatalogMigrationSourceTest, OplogWithOtherNsShouldBeIgnored) {
         1,                                   // statement id
         repl::OpTime(Timestamp(0, 0), 0),    // optime of previous write within same transaction
         boost::none,                         // pre-image optime
-        boost::none);                        // post-image optime
+        boost::none,                         // post-image optime
+        boost::none,                         // operation session info
+        boost::none);                        // needsRetryImage
     insertOplogEntry(entry2);
 
     SessionTxnRecord sessionRecord2;
