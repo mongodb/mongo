@@ -4763,7 +4763,7 @@ tasks:
 
 - <<: *task_template
   name: replica_sets_jscore_passthrough
-  tags: ["replica_sets", "common", "san", "large"]
+  tags: ["replica_sets", "common", "san", "large", "ignore_on_linux_debug_variant"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -4779,13 +4779,12 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 5
 
-- <<: *task_template
-  name: replica_sets_reconfig_jscore_stepdown_passthrough
+- name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=replica_sets_reconfig_jscore_stepdown_passthrough --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 5
 
 - <<: *task_template
   name: replica_sets_reconfig_kill_primary_jscore_passthrough
@@ -4850,23 +4849,21 @@ tasks:
     vars:
       resmoke_args: --suites=replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: replica_sets_update_v1_oplog_jscore_passthrough
+- name: replica_sets_update_v1_oplog_jscore_passthrough_gen
   tags: ["replica_sets", "non_maj_read"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=replica_sets_update_v1_oplog_jscore_passthrough --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 5
 
-- <<: *task_template
-  name: replica_sets_initsync_jscore_passthrough
+- name: replica_sets_initsync_jscore_passthrough_gen
   tags: ["replica_sets", "san", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=replica_sets_initsync_jscore_passthrough --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 5
 
 - <<: *task_template
   name: replica_sets_initsync_static_jscore_passthrough
@@ -7460,9 +7457,10 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: .ocsp
   - name: .read_write_concern
-  - name: .replica_sets !.encrypt
+  - name: .replica_sets !.encrypt !.ignore_on_linux_debug_variant
+  - name: replica_sets_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_stepdown_passthrough
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
   - name: .retry
   - name: .read_only
   - name: session_jscore_passthrough
@@ -9022,7 +9020,7 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_stepdown_passthrough
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
     distros:
     - rhel80-medium
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough
@@ -9150,7 +9148,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_stepdown_passthrough
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
     distros:
     - rhel80-xlarge
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough
@@ -9263,7 +9261,7 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_stepdown_passthrough
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
     distros:
     - rhel80-medium
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough
@@ -9543,7 +9541,7 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_stepdown_passthrough
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
     distros:
     - rhel80-medium
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough
@@ -11686,7 +11684,7 @@ buildvariants:
 #  - name: .read_write_concern
 #  - name: .replica_sets !.encrypt !.auth !.non_live_record
 #  - name: replica_sets_reconfig_jscore_passthrough_gen
-#  - name: replica_sets_reconfig_jscore_stepdown_passthrough
+#  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
 #  - name: .read_only
