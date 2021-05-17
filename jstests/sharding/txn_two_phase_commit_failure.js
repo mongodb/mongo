@@ -14,7 +14,7 @@ const collName = "foo";
 const ns = dbName + "." + collName;
 
 // The test should not depend on a particular timeout, but shorter timeout makes it faster.
-TestData.transactionLifetimeLimitSeconds = 5;
+TestData.transactionLifetimeLimitSeconds = 10;
 
 let lsid = {id: UUID()};
 let txnNumber = 0;
