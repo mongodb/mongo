@@ -217,9 +217,10 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                     const auto docWasRemoved = _removeDocument(opCtx);
 
                     if (!docWasRemoved) {
+                        // Release the instance without interrupting it
                         _service->releaseInstance(BSON(ShardingDDLCoordinatorMetadata::kIdFieldName
                                                        << _coorMetadata.getId().toBSON()),
-                                                  status);
+                                                  Status::OK());
                     }
                 } catch (DBException& ex) {
                     static constexpr auto errMsg = "Failed to release sharding DDL coordinator";
