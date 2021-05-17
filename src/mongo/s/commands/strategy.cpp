@@ -920,6 +920,7 @@ void runCommand(OperationContext* opCtx,
 
 DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {
     globalOpCounters.gotQuery();
+    globalOpCounters.gotQueryDeprecated();
 
     ON_BLOCK_EXIT([opCtx] {
         Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
@@ -1160,6 +1161,7 @@ DbResponse Strategy::getMore(OperationContext* opCtx, const NamespaceString& nss
     const long long cursorId = dbm->pullInt64();
 
     globalOpCounters.gotGetMore();
+    globalOpCounters.gotGetMoreDeprecated();
 
     // TODO: Handle stale config exceptions here from coll being dropped or sharded during op for
     // now has same semantics as legacy request.
@@ -1215,7 +1217,7 @@ void Strategy::killCursors(OperationContext* opCtx, DbMessage* dbm) {
                           << ".",
             numCursors >= 1 && numCursors < 30000);
 
-    globalOpCounters.gotOp(dbKillCursors, false);
+    globalOpCounters.gotKillCursorsDeprecated();
 
     ConstDataCursor cursors(dbm->getArray(numCursors));
 
@@ -1281,12 +1283,16 @@ void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
                [&]() {
                    switch (msg.operation()) {
                        case dbInsert: {
-                           return InsertOp::parseLegacy(msg).serialize({});
+                           auto op = InsertOp::parseLegacy(msg);
+                           globalOpCounters.gotInsertsDeprecated(op.getDocuments().size());
+                           return op.serialize({});
                        }
                        case dbUpdate: {
+                           globalOpCounters.gotUpdateDeprecated();
                            return UpdateOp::parseLegacy(msg).serialize({});
                        }
                        case dbDelete: {
+                           globalOpCounters.gotDeleteDeprecated();
                            return DeleteOp::parseLegacy(msg).serialize({});
                        }
                        default:
