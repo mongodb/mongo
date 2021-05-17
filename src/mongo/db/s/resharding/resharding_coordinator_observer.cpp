@@ -144,7 +144,6 @@ ReshardingCoordinatorObserver::~ReshardingCoordinatorObserver() {
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(_allDonorsReportedMinFetchTimestamp.getFuture().isReady());
     invariant(_allRecipientsFinishedCloning.getFuture().isReady());
-    invariant(_allRecipientsFinishedApplying.getFuture().isReady());
     invariant(_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady());
     invariant(_allRecipientsDone.getFuture().isReady());
     invariant(_allDonorsDone.getFuture().isReady());
@@ -167,13 +166,6 @@ void ReshardingCoordinatorObserver::onReshardingParticipantTransition(
 
     if (!stateTransistionsComplete(
             lk, _allRecipientsFinishedCloning, RecipientStateEnum::kApplying, updatedStateDoc)) {
-        return;
-    }
-
-    if (!stateTransistionsComplete(lk,
-                                   _allRecipientsFinishedApplying,
-                                   RecipientStateEnum::kSteadyState,
-                                   updatedStateDoc)) {
         return;
     }
 
@@ -202,11 +194,6 @@ ReshardingCoordinatorObserver::awaitAllDonorsReadyToDonate() {
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllRecipientsFinishedCloning() {
     return _allRecipientsFinishedCloning.getFuture();
-}
-
-SharedSemiFuture<ReshardingCoordinatorDocument>
-ReshardingCoordinatorObserver::awaitAllRecipientsFinishedApplying() {
-    return _allRecipientsFinishedApplying.getFuture();
 }
 
 SharedSemiFuture<ReshardingCoordinatorDocument>
@@ -253,10 +240,6 @@ void ReshardingCoordinatorObserver::_onAbortOrStepdown(WithLock, Status status) 
 
     if (!_allRecipientsFinishedCloning.getFuture().isReady()) {
         _allRecipientsFinishedCloning.setError(status);
-    }
-
-    if (!_allRecipientsFinishedApplying.getFuture().isReady()) {
-        _allRecipientsFinishedApplying.setError(status);
     }
 
     if (!_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady()) {

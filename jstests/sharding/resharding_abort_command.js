@@ -312,7 +312,7 @@ runAbortWithFailpoint(
                 }
 
                 for (const shardEntry of coordinatorDoc.recipientShards) {
-                    if (shardEntry.mutableState.state !== "steady-state") {
+                    if (shardEntry.mutableState.state !== "applying") {
                         return false;
                     }
                 }

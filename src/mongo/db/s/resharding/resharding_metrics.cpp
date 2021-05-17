@@ -242,11 +242,9 @@ void ReshardingMetrics::onOplogEntriesFetched(int64_t entries) noexcept {
     if (!_currentOp)
         return;
 
-    invariant(checkState(_currentOp->recipientState,
-                         {RecipientStateEnum::kCloning,
-                          RecipientStateEnum::kApplying,
-                          RecipientStateEnum::kSteadyState,
-                          RecipientStateEnum::kError}));
+    invariant(checkState(
+        _currentOp->recipientState,
+        {RecipientStateEnum::kCloning, RecipientStateEnum::kApplying, RecipientStateEnum::kError}));
 
     _currentOp->oplogEntriesFetched += entries;
     _cumulativeOp.oplogEntriesFetched += entries;
@@ -258,9 +256,7 @@ void ReshardingMetrics::onOplogEntriesApplied(int64_t entries) noexcept {
         return;
 
     invariant(checkState(_currentOp->recipientState,
-                         {RecipientStateEnum::kApplying,
-                          RecipientStateEnum::kSteadyState,
-                          RecipientStateEnum::kError}));
+                         {RecipientStateEnum::kApplying, RecipientStateEnum::kError}));
 
     _currentOp->oplogEntriesApplied += entries;
     _cumulativeOp.oplogEntriesApplied += entries;

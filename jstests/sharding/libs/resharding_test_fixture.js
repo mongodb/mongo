@@ -74,7 +74,7 @@ var ReshardingTest = class {
         /** @private */
         this._newShardKey = undefined;
         /** @private */
-        this._pauseCoordinatorInSteadyStateFailpoint = undefined;
+        this._pauseCoordinatorBeforeBlockingWrites = undefined;
         /** @private */
         this._pauseCoordinatorBeforeDecisionPersistedFailpoint = undefined;
         /** @private */
@@ -225,8 +225,8 @@ var ReshardingTest = class {
         this._newShardKey = Object.assign({}, newShardKeyPattern);
 
         const configPrimary = this._st.configRS.getPrimary();
-        this._pauseCoordinatorInSteadyStateFailpoint =
-            configureFailPoint(configPrimary, "reshardingPauseCoordinatorInSteadyState");
+        this._pauseCoordinatorBeforeBlockingWrites =
+            configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeBlockingWrites");
         this._pauseCoordinatorBeforeDecisionPersistedFailpoint =
             configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeDecisionPersisted");
         this._pauseCoordinatorBeforeCompletionFailpoint = configureFailPoint(
@@ -319,9 +319,9 @@ var ReshardingTest = class {
     /**
      * Wrapper around invoking a 0-argument function to make test failures less confusing.
      *
-     * This helper attempts to disable the reshardingPauseCoordinatorInSteadyState failpoint when an
-     * exception is thrown to prevent the mongo shell from hanging (really the config server) on top
-     * of having a JavaScript error.
+     * This helper attempts to disable the reshardingPauseCoordinatorBeforeBlockingWrites
+     * failpoint when an exception is thrown to prevent the mongo shell from hanging (really the
+     * config server) on top of having a JavaScript error.
      *
      * This helper attempts to interrupt and join the resharding thread when an exception is thrown
      * to prevent the mongo shell from aborting on top of having a JavaScript error.
@@ -332,7 +332,7 @@ var ReshardingTest = class {
         try {
             fn();
         } catch (duringReshardingError) {
-            for (const fp of [this._pauseCoordinatorInSteadyStateFailpoint,
+            for (const fp of [this._pauseCoordinatorBeforeBlockingWrites,
                               this._pauseCoordinatorBeforeDecisionPersistedFailpoint,
                               this._pauseCoordinatorBeforeCompletionFailpoint]) {
                 try {
@@ -411,16 +411,17 @@ var ReshardingTest = class {
         let performCorrectnessChecks = true;
         if (expectedErrorCode === ErrorCodes.OK) {
             this._callFunctionSafely(() => {
-                // We use the reshardingPauseCoordinatorInSteadyState failpoint so that any
-                // intervening writes performed on the sharded collection (from when the resharding
-                // operation had started until now) are eventually applied by the recipient shards.
-                // We then use the reshardingPauseCoordinatorBeforeDecisionPersisted failpoint to
-                // wait for all of the recipient shards to have applied through all of the oplog
-                // entries from all of the donor shards.
-                if (!this._waitForFailPoint(this._pauseCoordinatorInSteadyStateFailpoint)) {
+                // We use the reshardingPauseCoordinatorBeforeBlockingWrites failpoint so that
+                // any intervening writes performed on the sharded collection (from when the
+                // resharding operation had started until now) are eventually applied by the
+                // recipient shards. We then use the
+                // reshardingPauseCoordinatorBeforeDecisionPersisted failpoint to wait for all of
+                // the recipient shards to have applied through all of the oplog entries from all of
+                // the donor shards.
+                if (!this._waitForFailPoint(this._pauseCoordinatorBeforeBlockingWrites)) {
                     performCorrectnessChecks = false;
                 }
-                this._pauseCoordinatorInSteadyStateFailpoint.off();
+                this._pauseCoordinatorBeforeBlockingWrites.off();
 
                 // A resharding command that returned a failure will not hit the "Decision
                 // Persisted" failpoint. If the command has returned, don't require that the
@@ -446,7 +447,7 @@ var ReshardingTest = class {
             });
         } else {
             this._callFunctionSafely(() => {
-                this._pauseCoordinatorInSteadyStateFailpoint.off();
+                this._pauseCoordinatorBeforeBlockingWrites.off();
                 postCheckConsistencyFn();
                 this._pauseCoordinatorBeforeDecisionPersistedFailpoint.off();
                 postDecisionPersistedFn();
