@@ -48,7 +48,6 @@ const expectedParamDefaults = {
     internalQueryIgnoreUnknownJSONSchemaKeywords: false,
     internalQueryProhibitBlockingMergeOnMongoS: false,
     internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: 1000,
-    internalQueryForceClassicEngine: false,
 };
 
 function assertDefaultParameterValues() {

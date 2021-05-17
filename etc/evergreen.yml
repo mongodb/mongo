@@ -9295,15 +9295,15 @@ buildvariants:
 #    distros:
 #      - rhel80-large
 
-- name: enterprise-rhel-80-64-bit-dynamic-sbe
-  display_name: "Shared Library Enterprise RHEL 8.0 (SBE)"
+- name: enterprise-rhel-80-64-bit-dynamic-classic-engine
+  display_name: "Shared Library Enterprise RHEL 8.0 (Classic Execution Engine)"
   batchtime: 1440 # 1 day
   stepback: false
   modules:
   - enterprise
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-dynamic-sbe-expansions
+  expansions: &enterprise-rhel-80-64-bit-dynamic-classic-engine-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: rhel80
@@ -9318,7 +9318,7 @@ buildvariants:
     large_distro_name: rhel80-medium
     num_scons_link_jobs_available: 0.99
     test_flags: >-
-      --additionalFeatureFlags=featureFlagSBE
+      --mongodSetParameters="{internalQueryForceClassicEngine: true, featureFlagSBE: false}"
       --additionalFeatureFlags=featureFlagTimeseriesCollection
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
