@@ -686,6 +686,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
         upd->durable_ts = unpack.tw.durable_start_ts;
         upd->start_ts = unpack.tw.start_ts;
         upd->txnid = unpack.tw.start_txn;
+        F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
 
         /*
          * Instantiate both update and tombstone if the prepared update is a tombstone. This is
@@ -700,7 +701,6 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
             tombstone->txnid = unpack.tw.stop_txn;
             tombstone->prepare_state = WT_PREPARE_INPROGRESS;
             F_SET(tombstone, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
-            F_SET(upd, WT_UPDATE_RESTORED_FROM_DS);
 
             /*
              * Mark the update also as in-progress if the update and tombstone are from same
@@ -712,14 +712,12 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
               unpack.tw.start_txn == unpack.tw.stop_txn) {
                 upd->durable_ts = WT_TS_NONE;
                 upd->prepare_state = WT_PREPARE_INPROGRESS;
-                F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
             }
 
             tombstone->next = upd;
         } else {
             upd->durable_ts = WT_TS_NONE;
             upd->prepare_state = WT_PREPARE_INPROGRESS;
-            F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
             tombstone = upd;
         }
 

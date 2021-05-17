@@ -1054,6 +1054,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
 #endif
     size_t not_used;
     uint32_t hs_btree_id;
+    char ts_string[3][WT_TS_INT_STRING_SIZE];
     bool upd_appended;
 
     hs_cursor = NULL;
@@ -1063,9 +1064,18 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
 
     WT_RET(__txn_search_prepared_op(session, op, cursorp, &upd));
 
-    __wt_verbose(session, WT_VERB_TRANSACTION,
-      "resolving prepared op for txnid: %" PRIu64 " that %s", txn->id,
-      commit ? "committed" : "roll backed");
+    if (commit)
+        __wt_verbose(session, WT_VERB_TRANSACTION,
+          "commit resolving prepared transaction with txnid: %" PRIu64
+          "and timestamp: %s to commit and durable timestamps: %s,%s",
+          txn->id, __wt_timestamp_to_string(txn->prepare_timestamp, ts_string[0]),
+          __wt_timestamp_to_string(txn->commit_timestamp, ts_string[1]),
+          __wt_timestamp_to_string(txn->durable_timestamp, ts_string[2]));
+    else
+        __wt_verbose(session, WT_VERB_TRANSACTION,
+          "rollback resolving prepared transaction with txnid: %" PRIu64 "and timestamp:%s",
+          txn->id, __wt_timestamp_to_string(txn->prepare_timestamp, ts_string[0]));
+
     /*
      * Aborted updates can exist in the update chain of our transaction. Generally this will occur
      * due to a reserved update. As such we should skip over these updates.
@@ -1092,9 +1102,14 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
      * updates first, the history search logic may race with other sessions modifying the same key
      * and checkpoint moving the new updates to the history store.
      *
-     * For prepared delete, we don't need to fix the history store.
+     * For prepared delete commit, we don't need to fix the history store. Whereas for rollback, if
+     * the update is also from the same prepared transaction, restore the update from history store
+     * or remove the key.
      */
-    if (F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS) && upd->type != WT_UPDATE_TOMBSTONE) {
+    if (F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS) &&
+      (upd->type != WT_UPDATE_TOMBSTONE ||
+        (!commit && upd->next != NULL && upd->durable_ts == upd->next->durable_ts &&
+          upd->txnid == upd->next->txnid && upd->start_ts == upd->next->start_ts))) {
         cbt = (WT_CURSOR_BTREE *)(*cursorp);
         hs_btree_id = S2BT(session)->id;
         /* Open a history store table cursor. */
