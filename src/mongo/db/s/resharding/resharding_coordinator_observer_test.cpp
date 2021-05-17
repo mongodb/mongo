@@ -205,14 +205,14 @@ TEST_F(ReshardingCoordinatorObserverTest, onReshardingRecipientsOutOfSync) {
     auto donorShards = makeMockDonorsInState(DonorStateEnum::kDonatingInitialData, Timestamp(1, 1));
     std::vector<RecipientShardEntry> recipientShards0{
         makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kUnused),
-        makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kSteadyState)};
+        makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kStrictConsistency)};
     auto coordinatorDoc0 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards0, donorShards);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc0);
     ASSERT_FALSE(fut.isReady());
 
     std::vector<RecipientShardEntry> recipientShards1{
         makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kApplying),
-        makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kSteadyState)};
+        makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kStrictConsistency)};
     auto coordinatorDoc1 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards1, donorShards);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc1);
     ASSERT_TRUE(fut.isReady());

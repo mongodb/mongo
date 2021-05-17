@@ -67,7 +67,7 @@ using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorAfterPreparingToDonate);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCloning);
-MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorInSteadyState);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeBlockingWrites);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCompletion);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeStartingErrorFlow);
@@ -1439,31 +1439,25 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    return future_util::withCancellation(
-               _reshardingCoordinatorObserver->awaitAllRecipientsFinishedApplying(),
-               _ctHolder->getAbortToken())
-        .thenRunOn(**executor)
-        .then([this, executor](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
-            {
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-                reshardingPauseCoordinatorInSteadyState.pauseWhileSetAndNotCanceled(
-                    opCtx.get(), _ctHolder->getAbortToken());
-            }
-
+    return ExecutorFuture<void>(**executor)
+        .then([this, executor] {
             _startCommitMonitor(executor);
 
             LOGV2(5391602, "Resharding operation waiting for an okay to enter critical section");
-            return _canEnterCritical.getFuture()
-                .thenRunOn(**executor)
-                .then([this, doc = std::move(coordinatorDocChangedOnDisk)] {
-                    _commitMonitorCancellationSource.cancel();
-                    LOGV2(5391603, "Resharding operation is okay to enter critical section");
-                    return doc;
-                });
+            return _canEnterCritical.getFuture().thenRunOn(**executor).then([this] {
+                _commitMonitorCancellationSource.cancel();
+                LOGV2(5391603, "Resharding operation is okay to enter critical section");
+            });
         })
-        .then([this, executor](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
+        .then([this, executor] {
+            {
+                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                reshardingPauseCoordinatorBeforeBlockingWrites.pauseWhileSetAndNotCanceled(
+                    opCtx.get(), _ctHolder->getAbortToken());
+            }
+
             this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kBlockingWrites,
-                                                              coordinatorDocChangedOnDisk);
+                                                              _coordinatorDoc);
             const auto criticalSectionTimeout =
                 Milliseconds(resharding::gReshardingCriticalSectionTimeoutMillis.load());
             const auto criticalSectionExpiresAt = (*executor)->now() + criticalSectionTimeout;

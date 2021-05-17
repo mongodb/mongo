@@ -72,7 +72,6 @@ enums:
             kCreatingCollection: "creating-collection"
             kCloning: "cloning"
             kApplying: "applying"
-            kSteadyState: "steady-state"
             kError: "error"
             kStrictConsistency: "strict-consistency"
             kRenaming: "renaming"

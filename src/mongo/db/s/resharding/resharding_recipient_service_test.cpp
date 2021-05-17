@@ -336,7 +336,6 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
     const std::vector<RecipientStateEnum> recipientStates{RecipientStateEnum::kCreatingCollection,
                                                           RecipientStateEnum::kCloning,
                                                           RecipientStateEnum::kApplying,
-                                                          RecipientStateEnum::kSteadyState,
                                                           RecipientStateEnum::kStrictConsistency,
                                                           RecipientStateEnum::kRenaming,
                                                           RecipientStateEnum::kDone};

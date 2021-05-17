@@ -176,9 +176,6 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                        return _cloneThenTransitionToApplying(executor, abortToken);
                    })
                    .then([this, executor, abortToken] {
-                       return _applyThenTransitionToSteadyState(executor, abortToken);
-                   })
-                   .then([this, executor, abortToken] {
                        return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
                            executor, abortToken);
                    });
@@ -559,27 +556,11 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
         .then([this] { _transitionState(RecipientStateEnum::kApplying); });
 }
 
-ExecutorFuture<void>
-ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSteadyState(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken) {
-    if (_recipientCtx.getState() > RecipientStateEnum::kApplying) {
-        return ExecutorFuture<void>(**executor, Status::OK());
-    }
-
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    _ensureDataReplicationStarted(opCtx.get(), executor, abortToken);
-
-    return _updateCoordinator(opCtx.get(), executor).then([this] {
-        _transitionState(RecipientStateEnum::kSteadyState);
-    });
-}
-
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken) {
-    if (_recipientCtx.getState() > RecipientStateEnum::kSteadyState) {
+    if (_recipientCtx.getState() > RecipientStateEnum::kApplying) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
@@ -731,16 +712,12 @@ BSONObj ReshardingRecipientService::RecipientStateMachine::_makeQueryForCoordina
     static const stdx::unordered_map<RecipientStateEnum, std::vector<RecipientStateEnum>>
         validPreviousStateMap = {
             {RecipientStateEnum::kApplying, {RecipientStateEnum::kUnused}},
-            {RecipientStateEnum::kSteadyState, {RecipientStateEnum::kApplying}},
-            {RecipientStateEnum::kStrictConsistency, {RecipientStateEnum::kSteadyState}},
+            {RecipientStateEnum::kStrictConsistency, {RecipientStateEnum::kApplying}},
             {RecipientStateEnum::kError,
-             {RecipientStateEnum::kUnused,
-              RecipientStateEnum::kApplying,
-              RecipientStateEnum::kSteadyState}},
+             {RecipientStateEnum::kUnused, RecipientStateEnum::kApplying}},
             {RecipientStateEnum::kDone,
              {RecipientStateEnum::kUnused,
               RecipientStateEnum::kApplying,
-              RecipientStateEnum::kSteadyState,
               RecipientStateEnum::kStrictConsistency,
               RecipientStateEnum::kError}},
         };

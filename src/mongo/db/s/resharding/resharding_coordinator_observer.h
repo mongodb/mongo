@@ -79,12 +79,6 @@ public:
     SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllRecipientsFinishedCloning();
 
     /**
-     * Fulfills the '_allRecipientsFinishedApplying' promise when the last recipient writes that it
-     * is in 'steady-state'.
-     */
-    SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllRecipientsFinishedApplying();
-
-    /**
      * Fulfills the '_allRecipientsReportedStrictConsistencyTimestamp' promise when the last
      * recipient writes that it is in 'strict-consistency' state as well as its
      * 'strictConsistencyTimestamp'.
@@ -134,7 +128,6 @@ private:
      *
      *  {_allDonorsReportedMinFetchTimestamp, DonorStateEnum::kDonatingInitialData}
      *  {_allRecipientsFinishedCloning, RecipientStateEnum::kApplying}
-     *  {_allRecipientsFinishedApplying, RecipientStateEnum::kSteadyState}
      *  {_allRecipientsReportedStrictConsistencyTimestamp, RecipientStateEnum::kStrictConsistency}
      *  {_allRecipientsDone, RecipientStateEnum::kDone}
      *  {_allDonorsDone, DonorStateEnum::kDone}
@@ -143,8 +136,6 @@ private:
     SharedPromise<ReshardingCoordinatorDocument> _allDonorsReportedMinFetchTimestamp;
 
     SharedPromise<ReshardingCoordinatorDocument> _allRecipientsFinishedCloning;
-
-    SharedPromise<ReshardingCoordinatorDocument> _allRecipientsFinishedApplying;
 
     SharedPromise<ReshardingCoordinatorDocument> _allRecipientsReportedStrictConsistencyTimestamp;
 
