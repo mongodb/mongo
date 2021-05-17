@@ -16,5 +16,9 @@ executor:
       readMode: commands
       global_vars:
         TestData:
-          setParameters: "logComponentVerbosity={network:2}"
-          setParametersMongos: "logComponentVerbosity={network:2}"
+          setParameters:
+            logComponentVerbosity:
+              network: 2
+          setParametersMongos:
+            logComponentVerbosity:
+              network: 2

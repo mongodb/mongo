@@ -106,7 +106,7 @@ def _make_parser():  # pylint: disable=too-many-statements
     parser.add_option("--mongod", dest="mongod_executable", metavar="PATH",
                       help="The path to the mongod executable for resmoke.py to use.")
 
-    parser.add_option("--mongodSetParameters", dest="mongod_set_parameters",
+    parser.add_option("--mongodSetParameters", action="append", dest="mongod_set_parameters",
                       metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
                       help=("Passes one or more --setParameter options to all mongod processes"
                             " started by resmoke.py. The argument is specified as bracketed YAML -"
@@ -115,7 +115,7 @@ def _make_parser():  # pylint: disable=too-many-statements
     parser.add_option("--mongos", dest="mongos_executable", metavar="PATH",
                       help="The path to the mongos executable for resmoke.py to use.")
 
-    parser.add_option("--mongosSetParameters", dest="mongos_set_parameters",
+    parser.add_option("--mongosSetParameters", action="append", dest="mongos_set_parameters",
                       metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
                       help=("Passes one or more --setParameter options to all mongos processes"
                             " started by resmoke.py. The argument is specified as bracketed YAML -"
@@ -329,6 +329,34 @@ def _validate_options(parser, options, args):
                      " test(s) under those suite configuration(s)".format(
                          options.executor_file, " ".join(args)))
 
+    def get_set_param_errors(process_params):
+        """Return the list of errors to indicate parameters with multiple values."""
+        agg_set_params = collections.defaultdict(list)
+        for set_param in process_params:
+            for key, value in utils.load_yaml(set_param).items():
+                agg_set_params[key] += [value]
+
+        errors = []
+        for key, values in agg_set_params.items():
+            if len(values) == 1:
+                for left, _ in enumerate(values):
+                    for right in range(left + 1, len(values)):
+                        if values[left] != values[right]:
+                            errors.append(
+                                "setParameter has multiple values. Key: {} Values: {}".format(
+                                    key, values))
+        return errors
+
+    mongod_set_param_errors = get_set_param_errors(options.mongod_set_parameters or [])
+    mongos_set_param_errors = get_set_param_errors(options.mongos_set_parameters or [])
+    error_msgs = {}
+    if mongod_set_param_errors:
+        error_msgs["mongodSetParameters"] = mongod_set_param_errors
+    if mongos_set_param_errors:
+        error_msgs["mongosSetParameters"] = mongos_set_param_errors
+    if error_msgs:
+        parser.error(str(error_msgs))
+
 
 def validate_benchmark_options():
     """Error out early if any options are incompatible with benchmark test suites.
@@ -346,6 +374,14 @@ def validate_benchmark_options():
             "--jobs=%d cannot be used for benchmark tests. Parallel jobs affect CPU cache access "
             "patterns and cause additional context switching, which lead to inaccurate benchmark "
             "results. Please use --jobs=1" % _config.JOBS)
+
+
+def _merge_set_params(param_list):
+    """Merge the setParameters."""
+    ret = {}
+    for set_param in param_list:
+        ret.update(utils.load_yaml(set_param))
+    return utils.dump_yaml(ret)
 
 
 def _update_config_vars(values):  # pylint: disable=too-many-statements
@@ -377,9 +413,9 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     _config.MAJORITY_READ_CONCERN = config.pop("majority_read_concern") == "on"
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo_executable"))
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
-    _config.MONGOD_SET_PARAMETERS = config.pop("mongod_set_parameters")
+    _config.MONGOD_SET_PARAMETERS = _merge_set_params(config.pop("mongod_set_parameters"))
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
-    _config.MONGOS_SET_PARAMETERS = config.pop("mongos_set_parameters")
+    _config.MONGOS_SET_PARAMETERS = _merge_set_params(config.pop("mongos_set_parameters"))
     _config.NO_JOURNAL = config.pop("no_journal")
     _config.NO_PREALLOC_JOURNAL = config.pop("prealloc_journal") == "off"
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("num_clients_per_fixture")
