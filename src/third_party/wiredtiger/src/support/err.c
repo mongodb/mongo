@@ -472,8 +472,8 @@ __wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...) WT_GCC_FUNC_ATTRIBUTE((
     handler = session->event_handler;
     ret = handler->handle_message(handler, wt_session, buf->data);
 
+err:
     __wt_scr_free(session, &buf);
-
     return (ret);
 }
 
@@ -501,8 +501,8 @@ __wt_ext_msg_printf(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char
     handler = session->event_handler;
     ret = handler->handle_message(handler, wt_session, buf->data);
 
+err:
     __wt_scr_free(session, &buf);
-
     return (ret);
 }
 

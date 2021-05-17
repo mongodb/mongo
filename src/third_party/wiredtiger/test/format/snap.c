@@ -29,11 +29,6 @@
 #include "format.h"
 
 /*
- * Issue a warning when there enough consecutive unsuccessful checks for rollback to stable.
- */
-#define WARN_RTS_NO_CHECK 5
-
-/*
  * snap_init --
  *     Initialize the repeatable operation tracking.
  */
@@ -41,14 +36,16 @@ void
 snap_init(TINFO *tinfo)
 {
     /*
-     * We maintain two snap lists. The current one is indicated by tinfo->s, and keeps the most
-     * recent operations. The other one is used when we are running with rollback_to_stable. When
-     * each thread notices that the stable timestamp has changed, it stashes the current snap list
-     * and starts fresh with the other snap list. After we've completed a rollback_to_stable, we can
-     * the secondary snap list to see the state of keys/values seen and updated at the time of the
-     * rollback.
+     * We maintain two snap lists, where the current one is indicated by tinfo->s, and keeps the
+     * most recent operations.
+     *
+     * The other one is used when we are running timestamp transactions with rollback_to_stable.
+     * When each thread notices that the stable timestamp has changed, it stashes the current snap
+     * list and starts fresh with the other snap list. After we've completed a rollback_to_stable,
+     * we can the secondary snap list to see the state of keys/values seen and updated at the time
+     * of the rollback.
      */
-    if (g.c_txn_rollback_to_stable) {
+    if (g.c_txn_timestamps) {
         tinfo->s = &tinfo->snap_states[1];
         tinfo->snap_list = dcalloc(SNAP_LIST_SIZE, sizeof(SNAP_OPS));
         tinfo->snap_end = &tinfo->snap_list[SNAP_LIST_SIZE];
@@ -113,7 +110,7 @@ snap_op_init(TINFO *tinfo, uint64_t read_ts, bool repeatable_reads)
 
     ++tinfo->opid;
 
-    if (g.c_txn_rollback_to_stable) {
+    if (g.c_txn_timestamps) {
         /*
          * If the stable timestamp has changed and we've advanced beyond it, preserve the current
          * snapshot history up to this point, we'll use it verify rollback_to_stable. Switch our
@@ -528,40 +525,45 @@ snap_repeat_update(TINFO *tinfo, bool committed)
  *     Repeat one operation.
  */
 static void
-snap_repeat(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap, bool rollback_allowed)
+snap_repeat(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap)
 {
     WT_DECL_RET;
     WT_SESSION *session;
+#define MAX_RETRY_ON_ROLLBACK 1000
+    u_int max_retry;
     char buf[64];
 
     session = cursor->session;
 
-    /*
-     * Start a new transaction. Set the read timestamp. Verify the record. Discard the transaction.
-     */
-    wiredtiger_begin_transaction(session, "isolation=snapshot");
+    trace_op(tinfo, "repeat %" PRIu64 " ts=%" PRIu64 " {%s}", snap->keyno, snap->ts,
+      trace_bytes(tinfo, snap->vdata, snap->vsize));
 
-    /*
-     * If the timestamp has aged out of the system, we'll get EINVAL when we try and set it.
-     */
+    /* Start a transaction with a read-timestamp and verify the record. */
     testutil_check(__wt_snprintf(buf, sizeof(buf), "read_timestamp=%" PRIx64, snap->ts));
 
-    ret = session->timestamp_transaction(session, buf);
-    if (ret == 0) {
-        trace_op(tinfo, "repeat %" PRIu64 " ts=%" PRIu64 " {%s}", snap->keyno, snap->ts,
-          trace_bytes(tinfo, snap->vdata, snap->vsize));
+    for (max_retry = 0; max_retry < MAX_RETRY_ON_ROLLBACK; ++max_retry, __wt_yield()) {
+        wiredtiger_begin_transaction(session, "isolation=snapshot");
 
-        /* The only expected error is rollback. */
-        ret = snap_verify(cursor, tinfo, snap);
-
-        if (ret != 0 && (!rollback_allowed || (ret != WT_ROLLBACK && ret != WT_CACHE_FULL)))
-            testutil_check(ret);
-    } else if (ret == EINVAL)
-        snap_ts_clear(tinfo, snap->ts);
-    else
+        /* EINVAL means the timestamp has aged out of the system. */
+        if ((ret = session->timestamp_transaction(session, buf)) == EINVAL) {
+            snap_ts_clear(tinfo, snap->ts);
+            break;
+        }
         testutil_check(ret);
 
-    /* Discard the transaction. */
+        /*
+         * The only expected error is rollback (as a read-only transaction, cache-full shouldn't
+         * matter to us). Persist after rollback, as a repeatable read we should succeed, yield to
+         * let eviction catch up.
+         */
+        if ((ret = snap_verify(cursor, tinfo, snap)) == 0)
+            break;
+        testutil_assert(ret == WT_ROLLBACK);
+
+        testutil_check(session->rollback_transaction(session, NULL));
+    }
+    testutil_assert(max_retry < MAX_RETRY_ON_ROLLBACK);
+
     testutil_check(session->rollback_transaction(session, NULL));
 }
 
@@ -593,7 +595,7 @@ snap_repeat_single(WT_CURSOR *cursor, TINFO *tinfo)
     if (count == 0)
         return;
 
-    snap_repeat(cursor, tinfo, snap, true);
+    snap_repeat(cursor, tinfo, snap);
 }
 
 /*
@@ -626,9 +628,8 @@ snap_repeat_rollback(WT_CURSOR *cursor, TINFO **tinfo_array, size_t tinfo_count)
         for (statenum = 0; statenum < WT_ELEMENTS(tinfo->snap_states); statenum++) {
             state = &tinfo->snap_states[statenum];
             for (snap = state->snap_state_list; snap < state->snap_state_end; ++snap) {
-                if (snap->repeatable && snap->ts <= g.stable_timestamp &&
-                  snap->ts >= g.oldest_timestamp) {
-                    snap_repeat(cursor, tinfo, snap, false);
+                if (snap->repeatable && snap->ts <= g.stable_timestamp) {
+                    snap_repeat(cursor, tinfo, snap);
                     ++count;
                     if (count % 100 == 0) {
                         testutil_check(__wt_snprintf(
@@ -646,6 +647,7 @@ snap_repeat_rollback(WT_CURSOR *cursor, TINFO **tinfo_array, size_t tinfo_count)
       __wt_snprintf(buf, sizeof(buf), "rollback_to_stable: %" PRIu32 " ops repeated", count));
     track(buf, 0ULL, NULL);
     if (count == 0) {
+#define WARN_RTS_NO_CHECK 5
         if (++g.rts_no_check >= WARN_RTS_NO_CHECK)
             fprintf(stderr,
               "Warning: %" PRIu32 " consecutive runs with no rollback_to_stable checking\n", count);

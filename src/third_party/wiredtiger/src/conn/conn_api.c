@@ -1287,7 +1287,7 @@ __conn_query_timestamp(WT_CONNECTION *wt_conn, char *hex_timestamp, const char *
     conn = (WT_CONNECTION_IMPL *)wt_conn;
 
     CONNECTION_API_CALL(conn, session, query_timestamp, config, cfg);
-    WT_TRET(__wt_txn_query_timestamp(session, hex_timestamp, cfg, true));
+    ret = __wt_txn_query_timestamp(session, hex_timestamp, cfg, true);
 err:
     API_END_RET(session, ret);
 }
@@ -1306,7 +1306,7 @@ __conn_set_timestamp(WT_CONNECTION *wt_conn, const char *config)
     conn = (WT_CONNECTION_IMPL *)wt_conn;
 
     CONNECTION_API_CALL(conn, session, set_timestamp, config, cfg);
-    WT_TRET(__wt_txn_global_set_timestamp(session, cfg));
+    ret = __wt_txn_global_set_timestamp(session, cfg);
 err:
     API_END_RET(session, ret);
 }
@@ -1326,7 +1326,7 @@ __conn_rollback_to_stable(WT_CONNECTION *wt_conn, const char *config)
 
     CONNECTION_API_CALL(conn, session, rollback_to_stable, config, cfg);
     WT_STAT_CONN_INCR(session, txn_rts);
-    WT_TRET(__wt_rollback_to_stable(session, cfg, false));
+    ret = __wt_rollback_to_stable(session, cfg, false);
 err:
     API_END_RET(session, ret);
 }

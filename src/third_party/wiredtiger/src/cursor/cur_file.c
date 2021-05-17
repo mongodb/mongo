@@ -423,7 +423,8 @@ __curfile_remove(WT_CURSOR *cursor)
     WT_ASSERT(session, F_MASK(cursor, WT_CURSTD_VALUE_SET) == 0);
 
 err:
-    CURSOR_UPDATE_API_END(session, ret);
+    /* If we've lost an initial position, we must fail. */
+    CURSOR_UPDATE_API_END_RETRY(session, ret, !positioned || F_ISSET(cursor, WT_CURSTD_KEY_INT));
     return (ret);
 }
 

@@ -349,22 +349,17 @@ create_object(WT_CONNECTION *conn)
     if (g.c_compression_flag != COMPRESS_NONE)
         CONFIG_APPEND(p, ",block_compressor=\"%s\"", compressor(g.c_compression_flag));
 
-    /* Configure Btree internal key truncation. */
+    /* Configure Btree. */
     CONFIG_APPEND(p, ",internal_key_truncate=%s", g.c_internal_key_truncation ? "true" : "false");
-
-    /* Configure Btree page key gap. */
     CONFIG_APPEND(p, ",key_gap=%" PRIu32, g.c_key_gap);
-
-    /* Configure Btree split page percentage. */
     CONFIG_APPEND(p, ",split_pct=%" PRIu32, g.c_split_pct);
 
-    /*
-     * Assertions. Assertions slow down the code for additional diagnostic checking.
-     */
-    if (g.c_txn_timestamps && g.c_assert_commit_timestamp)
-        CONFIG_APPEND(p, ",write_timestamp_usage=key_consistent,assert=(write_timestamp=on)");
-    if (g.c_txn_timestamps && g.c_assert_read_timestamp)
-        CONFIG_APPEND(p, ",assert=(read_timestamp=always)");
+    /* Assertions: assertions slow down the code for additional diagnostic checking.  */
+    if (g.c_assert_read_timestamp)
+        CONFIG_APPEND(p, ",assert=(read_timestamp=%s)", g.c_txn_timestamps ? "always" : "never");
+    if (g.c_assert_write_timestamp)
+        CONFIG_APPEND(p, ",assert=(write_timestamp=on),write_timestamp_usage=%s",
+          g.c_txn_timestamps ? "always" : "never");
 
     /* Configure LSM. */
     if (DATASOURCE("lsm")) {

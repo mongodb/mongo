@@ -189,35 +189,20 @@ tinfo_teardown(void)
 }
 
 /*
- * Command used before rollback to stable to save the interesting files so we can replay the command
- * as necessary.
- *
- * Redirect the "cd" command to /dev/null so chatty cd implementations don't add the new working
- * directory to our output.
- */
-#define ROLLBACK_STABLE_COPY_CMD                      \
-    "cd %s > /dev/null && "                           \
-    "rm -rf ROLLBACK.copy && mkdir ROLLBACK.copy && " \
-    "cp WiredTiger* wt* ROLLBACK.copy/"
-
-/*
- * tinfo_rollback_to_stable_and_check --
- *     Do a rollback to stable, then check that changes are correct from what we know in the worker
- *     thread structures.
+ * tinfo_rollback_to_stable --
+ *     Do a rollback to stable and verify operations.
  */
 static void
-tinfo_rollback_to_stable_and_check(WT_SESSION *session)
+tinfo_rollback_to_stable(WT_SESSION *session)
 {
     WT_CURSOR *cursor;
-    WT_DECL_RET;
-    char cmd[512];
 
-    testutil_check(__wt_snprintf(cmd, sizeof(cmd), ROLLBACK_STABLE_COPY_CMD, g.home));
-    if ((ret = system(cmd)) != 0)
-        testutil_die(ret, "rollback to stable copy (\"%s\") failed", cmd);
+    /* Rollback-to-stable only makes sense for timestamps and on-disk stores. */
+    if (g.c_txn_timestamps == 0 || g.c_in_memory != 0)
+        return;
+
     trace_msg("%-10s ts=%" PRIu64, "rts", g.stable_timestamp);
-
-    g.wts_conn->rollback_to_stable(g.wts_conn, NULL);
+    testutil_check(g.wts_conn->rollback_to_stable(g.wts_conn, NULL));
 
     /* Check the saved snap operations for consistency. */
     testutil_check(session->open_cursor(session, g.uri, NULL, NULL, &cursor));
@@ -402,8 +387,13 @@ operations(u_int ops_seconds, bool lastrun)
 
     trace_msg("%s", "=============== thread ops stop");
 
-    if (g.c_txn_rollback_to_stable)
-        tinfo_rollback_to_stable_and_check(session);
+    /*
+     * The system should be quiescent at this point, call rollback to stable. Generally, we expect
+     * applications to do rollback-to-stable as part of the database open, but calling it outside of
+     * the open path is expected in the case of applications that are "restarting" but skipping the
+     * close/re-open pair.
+     */
+    tinfo_rollback_to_stable(session);
 
     if (lastrun) {
         tinfo_teardown();
@@ -418,19 +408,15 @@ operations(u_int ops_seconds, bool lastrun)
  *     Begin a timestamped transaction.
  */
 static void
-begin_transaction_ts(TINFO *tinfo, u_int *iso_configp)
+begin_transaction_ts(TINFO *tinfo)
 {
     TINFO **tlp;
     WT_DECL_RET;
     WT_SESSION *session;
     uint64_t ts;
-    const char *config;
     char buf[64];
 
     session = tinfo->session;
-
-    config = "isolation=snapshot";
-    *iso_configp = ISOLATION_SNAPSHOT;
 
     /*
      * Transaction reads are normally repeatable, but WiredTiger timestamps allow rewriting commits,
@@ -444,7 +430,7 @@ begin_transaction_ts(TINFO *tinfo, u_int *iso_configp)
         for (ts = UINT64_MAX, tlp = tinfo_list; *tlp != NULL; ++tlp)
             ts = WT_MIN(ts, (*tlp)->commit_ts);
     if (ts != 0) {
-        wiredtiger_begin_transaction(session, config);
+        wiredtiger_begin_transaction(session, NULL);
 
         /*
          * If the timestamp has aged out of the system, we'll get EINVAL when we try and set it.
@@ -463,7 +449,7 @@ begin_transaction_ts(TINFO *tinfo, u_int *iso_configp)
         testutil_check(session->rollback_transaction(session, NULL));
     }
 
-    wiredtiger_begin_transaction(session, config);
+    wiredtiger_begin_transaction(session, NULL);
 
     /*
      * Otherwise, pick a current timestamp.
@@ -487,40 +473,19 @@ begin_transaction_ts(TINFO *tinfo, u_int *iso_configp)
 
 /*
  * begin_transaction --
- *     Choose an isolation configuration and begin a transaction.
+ *     Begin a non-timestamp transaction.
  */
 static void
-begin_transaction(TINFO *tinfo, u_int *iso_configp)
+begin_transaction(TINFO *tinfo, const char *iso_config)
 {
     WT_SESSION *session;
-    u_int v;
-    const char *config;
 
     session = tinfo->session;
 
-    if ((v = g.c_isolation_flag) == ISOLATION_RANDOM)
-        v = mmrand(&tinfo->rnd, 1, 3);
-    switch (v) {
-    case 1:
-        v = ISOLATION_READ_UNCOMMITTED;
-        config = "isolation=read-uncommitted";
-        break;
-    case 2:
-        v = ISOLATION_READ_COMMITTED;
-        config = "isolation=read-committed";
-        break;
-    case 3:
-    default:
-        v = ISOLATION_SNAPSHOT;
-        config = "isolation=snapshot";
-        break;
-    }
-    *iso_configp = v;
-
-    wiredtiger_begin_transaction(session, config);
+    wiredtiger_begin_transaction(session, iso_config);
 
     snap_op_init(tinfo, WT_TS_NONE, false);
-    trace_op(tinfo, "begin %s", config);
+    trace_op(tinfo, "begin %s", iso_config);
 }
 
 /*
@@ -641,7 +606,7 @@ prepare_transaction(TINFO *tinfo)
 #define OP_FAILED(notfound_ok)                                                                \
     do {                                                                                      \
         positioned = false;                                                                   \
-        if (intxn && (ret == WT_CACHE_FULL || ret == WT_ROLLBACK || ret == WT_CACHE_FULL))    \
+        if (intxn && (ret == WT_CACHE_FULL || ret == WT_ROLLBACK))                            \
             goto rollback;                                                                    \
         testutil_assert(                                                                      \
           (notfound_ok && ret == WT_NOTFOUND) || ret == WT_CACHE_FULL || ret == WT_ROLLBACK); \
@@ -657,16 +622,6 @@ prepare_transaction(TINFO *tinfo)
         if (ret == WT_PREPARE_CONFLICT) \
             ret = WT_ROLLBACK;          \
         OP_FAILED(notfound_ok);         \
-    } while (0)
-
-/*
- * When in a transaction on the live table with snapshot isolation, track operations for later
- * repetition.
- */
-#define SNAP_TRACK(tinfo, op)                          \
-    do {                                               \
-        if (intxn && iso_config == ISOLATION_SNAPSHOT) \
-            snap_track(tinfo, op);                     \
     } while (0)
 
 /*
@@ -702,6 +657,21 @@ ops_open_session(TINFO *tinfo)
     tinfo->cursor = cursor;
 }
 
+/* Isolation configuration. */
+typedef enum {
+    ISOLATION_READ_COMMITTED,
+    ISOLATION_READ_UNCOMMITTED,
+    ISOLATION_SNAPSHOT
+} iso_level_t;
+
+/* When in an explicit snapshot isolation transaction, track operations for later
+ * repetition. */
+#define SNAP_TRACK(tinfo, op)                         \
+    do {                                              \
+        if (intxn && iso_level == ISOLATION_SNAPSHOT) \
+            snap_track(tinfo, op);                    \
+    } while (0)
+
 /*
  * ops --
  *     Per-thread operations.
@@ -713,10 +683,12 @@ ops(void *arg)
     WT_CURSOR *cursor;
     WT_DECL_RET;
     WT_SESSION *session;
+    iso_level_t iso_level;
     thread_op op;
     uint64_t reset_op, session_op, truncate_op;
     uint32_t range, rnd;
-    u_int i, j, iso_config;
+    u_int i, j;
+    const char *iso_config;
     bool greater_than, intxn, next, positioned, prepared;
 
     tinfo = arg;
@@ -733,7 +705,7 @@ ops(void *arg)
     else
         __wt_random_init(&tinfo->rnd);
 
-    iso_config = ISOLATION_RANDOM; /* -Wconditional-uninitialized */
+    iso_level = ISOLATION_SNAPSHOT; /* -Wconditional-uninitialized */
 
     /* Set the first operation where we'll create sessions and cursors. */
     cursor = NULL;
@@ -769,9 +741,9 @@ ops(void *arg)
         }
 
         /*
-         * If not in a transaction, reset the session now and then, just to make sure that operation
-         * gets tested. The test is not for equality, we have to do the reset outside of a
-         * transaction so we aren't likely to get an exact match.
+         * If not in a transaction, reset the session periodically to make sure that operation is
+         * tested. The test is not for equality, resets must be done outside of transactions so we
+         * aren't likely to get an exact match.
          */
         if (!intxn && tinfo->ops > reset_op) {
             testutil_check(session->reset(session));
@@ -781,42 +753,66 @@ ops(void *arg)
         }
 
         /*
-         * If not in a transaction, have a live handle and running in a timestamp world,
-         * occasionally repeat a timestamped operation.
+         * If not in a transaction and in a timestamp world, occasionally repeat a timestamped
+         * operation.
          */
         if (!intxn && g.c_txn_timestamps && mmrand(&tinfo->rnd, 1, 15) == 1) {
             ++tinfo->search;
             snap_repeat_single(cursor, tinfo);
         }
 
-        /*
-         * If not in a transaction and have a live handle, choose an isolation level and start a
-         * transaction some percentage of the time.
-         */
-        if (!intxn && (g.c_txn_timestamps || mmrand(&tinfo->rnd, 1, 100) <= g.c_txn_freq)) {
-            if (g.c_txn_timestamps)
-                begin_transaction_ts(tinfo, &iso_config);
-            else
-                begin_transaction(tinfo, &iso_config);
+        /* If not in a transaction and in a timestamp world, start a transaction. */
+        if (!intxn && g.c_txn_timestamps) {
+            iso_level = ISOLATION_SNAPSHOT;
+            begin_transaction_ts(tinfo);
             intxn = true;
         }
 
-        /* Select an operation. */
-        op = READ;
-        i = mmrand(&tinfo->rnd, 1, 100);
-        if (i < g.c_delete_pct && tinfo->ops > truncate_op) {
-            op = TRUNCATE;
+        /*
+         * If not in a transaction and not in a timestamp world, start a transaction some percentage
+         * of the time.
+         */
+        if (!intxn && mmrand(&tinfo->rnd, 1, 100) < g.c_txn_implicit) {
+            iso_level = ISOLATION_SNAPSHOT;
+            iso_config = "isolation=snapshot";
 
-            /* Pick the next truncate operation. */
-            truncate_op += mmrand(&tinfo->rnd, 20000, 100000);
-        } else if (i < g.c_delete_pct)
-            op = REMOVE;
-        else if (i < g.c_delete_pct + g.c_insert_pct)
-            op = INSERT;
-        else if (i < g.c_delete_pct + g.c_insert_pct + g.c_modify_pct)
-            op = MODIFY;
-        else if (i < g.c_delete_pct + g.c_insert_pct + g.c_modify_pct + g.c_write_pct)
-            op = UPDATE;
+            /* Occasionally do reads at an isolation level lower than snapshot. */
+            switch (mmrand(NULL, 1, 20)) {
+            case 1:
+                iso_level = ISOLATION_READ_COMMITTED; /* 5% */
+                iso_config = "isolation=read-committed";
+                break;
+            case 2:
+                iso_level = ISOLATION_READ_UNCOMMITTED; /* 5% */
+                iso_config = "isolation=read-uncommitted";
+                break;
+            }
+
+            begin_transaction(tinfo, iso_config);
+            intxn = true;
+        }
+
+        /*
+         * Select an operation: all updates must be in snapshot isolation, modify must be in an
+         * explicit transaction.
+         */
+        op = READ;
+        if (iso_level == ISOLATION_SNAPSHOT) {
+            i = mmrand(&tinfo->rnd, 1, 100);
+            if (i < g.c_delete_pct && tinfo->ops > truncate_op) {
+                op = TRUNCATE;
+
+                /* Pick the next truncate operation. */
+                truncate_op += mmrand(&tinfo->rnd, 20000, 100000);
+            } else if (i < g.c_delete_pct)
+                op = REMOVE;
+            else if (i < g.c_delete_pct + g.c_insert_pct)
+                op = INSERT;
+            else if (intxn && i < g.c_delete_pct + g.c_insert_pct + g.c_modify_pct)
+                op = MODIFY;
+            else if (i < g.c_delete_pct + g.c_insert_pct + g.c_modify_pct + g.c_write_pct)
+                op = UPDATE;
+        }
 
         /* Select a row. */
         tinfo->keyno = mmrand(&tinfo->rnd, 1, (u_int)g.rows);
@@ -838,10 +834,10 @@ ops(void *arg)
         }
 
         /*
-         * Optionally reserve a row. Reserving a row before a read isn't all that sensible, but not
-         * unexpected, either.
+         * Optionally reserve a row, it's an update so it requires snapshot isolation. Reserving a
+         * row before a read isn't all that sensible, but not unexpected, either.
          */
-        if (intxn && mmrand(&tinfo->rnd, 0, 20) == 1) {
+        if (intxn && iso_level == ISOLATION_SNAPSHOT && mmrand(&tinfo->rnd, 0, 20) == 1) {
             switch (g.type) {
             case ROW:
                 ret = row_reserve(tinfo, cursor, positioned);
@@ -853,8 +849,7 @@ ops(void *arg)
             }
             if (ret == 0) {
                 positioned = true;
-
-                __wt_yield(); /* Let other threads proceed. */
+                __wt_yield(); /* Encourage races */
             } else
                 WRITE_OP_FAILED(true);
         }
@@ -888,13 +883,6 @@ ops(void *arg)
                 WRITE_OP_FAILED(false);
             break;
         case MODIFY:
-            /*
-             * Change modify into update if not part of a snapshot isolation transaction, modify
-             * isn't supported in those cases.
-             */
-            if (!intxn || iso_config != ISOLATION_SNAPSHOT)
-                goto update_instead_of_chosen_op;
-
             ++tinfo->update;
             switch (g.type) {
             case ROW:
@@ -1050,17 +1038,17 @@ update_instead_of_chosen_op:
         testutil_check(cursor->reset(cursor));
 
         /*
-         * Continue if not in a transaction, else add more operations to the transaction half the
-         * time.
+         * No post-operation work is needed outside of a transaction. If in a transaction, add more
+         * operations to the transaction half the time.
          */
         if (!intxn || (rnd = mmrand(&tinfo->rnd, 1, 10)) > 5)
             continue;
 
         /*
-         * Ending a transaction. If on a live handle and the transaction was configured for snapshot
-         * isolation, repeat the operations and confirm the results are unchanged.
+         * Ending a transaction. If the transaction was configured for snapshot isolation, repeat
+         * the operations and confirm the results are unchanged.
          */
-        if (intxn && iso_config == ISOLATION_SNAPSHOT) {
+        if (intxn && iso_level == ISOLATION_SNAPSHOT) {
             __wt_yield(); /* Encourage races */
 
             ret = snap_repeat_txn(cursor, tinfo);
@@ -1069,13 +1057,10 @@ update_instead_of_chosen_op:
                 goto rollback;
         }
 
-        /*
-         * If prepare configured, prepare the transaction 10% of the time.
-         */
+        /* If prepare configured, prepare the transaction 10% of the time. */
         prepared = false;
         if (g.c_prepare && mmrand(&tinfo->rnd, 1, 10) == 1) {
-            ret = prepare_transaction(tinfo);
-            if (ret != 0)
+            if ((ret = prepare_transaction(tinfo)) != 0)
                 WRITE_OP_FAILED(false);
 
             __wt_yield(); /* Encourage races */
@@ -1083,7 +1068,8 @@ update_instead_of_chosen_op:
         }
 
         /*
-         * If we're in a transaction, commit 40% of the time and rollback 10% of the time.
+         * If we're in a transaction, commit 40% of the time and rollback 10% of the time (we
+         * continued to add operations to the transaction the remaining 50% of the time).
          */
         switch (rnd) {
         case 1:

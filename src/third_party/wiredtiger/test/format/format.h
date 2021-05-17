@@ -140,8 +140,8 @@ typedef struct {
 
     uint32_t c_abort; /* Config values */
     uint32_t c_alter;
-    uint32_t c_assert_commit_timestamp;
     uint32_t c_assert_read_timestamp;
+    uint32_t c_assert_write_timestamp;
     uint32_t c_auto_throttle;
     char *c_backup_incremental;
     uint32_t c_backup_incr_granularity;
@@ -178,7 +178,6 @@ typedef struct {
     uint32_t c_insert_pct;
     uint32_t c_internal_key_truncation;
     uint32_t c_intl_page_max;
-    char *c_isolation;
     uint32_t c_key_gap;
     uint32_t c_key_max;
     uint32_t c_key_min;
@@ -229,8 +228,7 @@ typedef struct {
     uint32_t c_timing_stress_split_7;
     uint32_t c_timing_stress_split_8;
     uint32_t c_truncate;
-    uint32_t c_txn_freq;
-    uint32_t c_txn_rollback_to_stable;
+    uint32_t c_txn_implicit;
     uint32_t c_txn_timestamps;
     uint32_t c_value_max;
     uint32_t c_value_min;
@@ -270,13 +268,6 @@ typedef struct {
 #define ENCRYPT_NONE 1
 #define ENCRYPT_ROTN_7 2
     u_int c_encryption_flag; /* Encryption flag value */
-
-#define ISOLATION_NOT_SET 0
-#define ISOLATION_RANDOM 1
-#define ISOLATION_READ_UNCOMMITTED 2
-#define ISOLATION_READ_COMMITTED 3
-#define ISOLATION_SNAPSHOT 4
-    u_int c_isolation_flag; /* Isolation flag value */
 
 /* The page must be a multiple of the allocation size, and 512 always works. */
 #define BLOCK_ALLOCATION_SIZE 512

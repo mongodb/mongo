@@ -16,14 +16,11 @@ operate on data concurrently because they have the following properties:
 WiredTiger supports transactions with the following caveats to the ACID
 properties:
 
-- the maximum level of isolation supported is snapshot isolation.
-  See @ref transaction_isolation for more details.
+- the maximum level of isolation supported is snapshot isolation and all updates must be done at
+  snapshot isolation. See @ref transaction_isolation for more details.
 - transactional updates are made durable by a combination of checkpoints
   and logging.  See @ref checkpoint for information on checkpoint durability
   and @ref durability for information on commit-level durability.
-- each transaction's uncommitted changes must fit in memory: for
-  efficiency, WiredTiger does not write to the log until a transaction
-  commits.
 
 @section transactions_api Transactional API
 
@@ -101,8 +98,8 @@ transactional readers, an operation may fail and return ::WT_ROLLBACK.
 @section transaction_isolation Isolation levels
 
 WiredTiger supports <code>read-uncommitted</code>,
-<code>read-committed</code> and  <code>snapshot</code> isolation levels;
-the default isolation level is <code>snapshot</code>.
+<code>read-committed</code> and <code>snapshot</code> isolation levels; the default isolation
+level is <code>snapshot</code>, and all updates must be done at snapshot isolation.
 
 - <code>read-uncommitted</code>:
 Transactions can see changes made by other transactions before those

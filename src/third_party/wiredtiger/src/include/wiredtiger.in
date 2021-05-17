@@ -480,6 +480,8 @@ struct __wt_cursor {
 	 * (as it partially depends on the underlying file configuration), but
 	 * is always a small number of bytes less than 4GB.
 	 *
+	 * The WT_CURSOR::insert method can only be used at snapshot isolation.
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 * In particular, if \c overwrite=false is configured and a record with
@@ -491,10 +493,8 @@ struct __wt_cursor {
 	int __F(insert)(WT_CURSOR *cursor);
 
 	/*!
-	 * Modify an existing record.
-	 *
-	 * Both the key and value must be set and the record must already exist;
-	 * the record will be updated.
+	 * Modify an existing record. Both the key and value must be set and the record must
+	 * already exist.
 	 *
 	 * Modifications are specified in WT_MODIFY structures. Modifications
 	 * are applied in order and later modifications can update earlier ones.
@@ -502,9 +502,6 @@ struct __wt_cursor {
 	 * The modify method is only supported on strings (value format type
 	 * \c S), or raw byte arrays accessed using a WT_ITEM structure (value
 	 * format type \c u).
-	 *
-	 * The WT_CURSOR::modify method can only be called from within an
-	 * explicit transaction configured at the snapshot isolation level.
 	 *
 	 * The WT_CURSOR::modify method stores a change record in cache and
 	 * writes a change record to the log instead of the usual complete
@@ -525,6 +522,8 @@ struct __wt_cursor {
 	 * The maximum length of a single column stored in a table is not fixed
 	 * (as it partially depends on the underlying file configuration), but
 	 * is always a small number of bytes less than 4GB.
+	 *
+	 * The WT_CURSOR::modify method can only be used at snapshot isolation.
 	 *
 	 * @param cursor the cursor handle
 	 * @param entries an array of modification data structures
@@ -561,6 +560,8 @@ struct __wt_cursor {
 	 * (as it partially depends on the underlying file configuration), but
 	 * is always a small number of bytes less than 4GB.
 	 *
+	 * The WT_CURSOR::update method can only be used at snapshot isolation.
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 * In particular, if \c overwrite=false is configured and no record with
@@ -593,6 +594,8 @@ struct __wt_cursor {
 	 * Removing a record in a fixed-length bit field column-store
 	 * (that is, a store with an 'r' type key and 't' type value) is
 	 * identical to setting the record's value to 0.
+	 *
+	 * The WT_CURSOR::remove method can only be used at snapshot isolation.
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -1511,15 +1514,17 @@ struct __wt_session {
 	 * contains.
 	 * @snippet ex_all.c Truncate a range
 	 *
-	 * Any specified cursors end with no position, and subsequent calls to
-	 * the WT_CURSOR::next (WT_CURSOR::prev) method will iterate from the
-	 * beginning (end) of the table.
-	 *
 	 * When a range truncate is in progress, and another transaction inserts
 	 * a key into that range, the behavior is not well defined - a conflict
 	 * may be detected or both transactions may be permitted to commit. If
 	 * they do commit, and if there is a crash and recovery runs, the result
 	 * may be different than what was in cache before the crash.
+	 *
+	 * The WT_CURSOR::truncate range truncate operation can only be used at snapshot isolation.
+	 *
+	 * Any specified cursors end with no position, and subsequent calls to
+	 * the WT_CURSOR::next (WT_CURSOR::prev) method will iterate from the
+	 * beginning (end) of the table.
 	 *
 	 * Truncate a backup cursor.  This operation removes all log files that
 	 * have been returned by the backup cursor.  It can be used to remove log
@@ -1783,6 +1788,8 @@ struct __wt_session {
 	/*!
 	 * Set a timestamp on a transaction.
 	 *
+	 * The WT_SESSION.timestamp_transaction method can only be used at snapshot isolation.
+	 *
 	 * @snippet ex_all.c transaction timestamp
 	 *
 	 * @requires_transaction
@@ -1810,6 +1817,8 @@ struct __wt_session {
 
 	/*!
 	 * Query the session's transaction timestamp state.
+	 *
+	 * The WT_SESSION.query_timestamp method can only be used at snapshot isolation.
 	 *
 	 * @param session the session handle
 	 * @param[out] hex_timestamp a buffer that will be set to the
