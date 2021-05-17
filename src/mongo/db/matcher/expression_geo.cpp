@@ -233,6 +233,9 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
                       str::stream() << "invalid geo near query operator: " << e.fieldName());
     }
 
+    // Returns true if 'x' is a valid numeric value, that is, a non-negative finite number.
+    auto isValidNumericValue = [](double x) -> bool { return x >= 0.0 && std::isfinite(x); };
+
     // Iterate over the argument.
     BSONObjIterator it(e.embeddedObject());
     while (it.more()) {
@@ -260,7 +263,7 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
                 return Status(ErrorCodes::BadValue, "$minDistance must be a number");
             }
             minDistance = e.Number();
-            if (minDistance < 0.0) {
+            if (!isValidNumericValue(minDistance)) {
                 return Status(ErrorCodes::BadValue, "$minDistance must be non-negative");
             }
         } else if (fieldName == "$maxDistance") {
@@ -268,7 +271,7 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
                 return Status(ErrorCodes::BadValue, "$maxDistance must be a number");
             }
             maxDistance = e.Number();
-            if (maxDistance < 0.0) {
+            if (!isValidNumericValue(maxDistance)) {
                 return Status(ErrorCodes::BadValue, "$maxDistance must be non-negative");
             }
         } else {
