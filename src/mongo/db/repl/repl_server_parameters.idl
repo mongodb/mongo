@@ -542,7 +542,8 @@ feature_flags:
             When enabled, default write concern might be set to majority following the default write
             concern formula if there is no cluster wide write concern (CWWC).
         cpp_varname: feature_flags::gDefaultWCMajority
-        default: false
+        default: true
+        version: 5.0
 
     featureFlagRetryableFindAndModify:
         description: >-
