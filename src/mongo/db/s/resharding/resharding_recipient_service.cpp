@@ -289,8 +289,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                            _transitionState(RecipientStateEnum::kDone);
                        }
 
-                       if (!aborted && !_isAlsoDonor) {
-                           // An aborted operation will already have released the critical section.
+                       if (!_isAlsoDonor) {
                            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                            RecoverableCriticalSectionService::get(opCtx.get())
                                ->releaseRecoverableCriticalSection(
@@ -619,7 +618,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                         opCtx.get(),
                         _metadata.getSourceNss(),
                         _critSecReason,
-                        ShardingCatalogClient::kMajorityWriteConcern);
+                        ShardingCatalogClient::kLocalWriteConcern);
             }
 
             _transitionState(RecipientStateEnum::kStrictConsistency);
@@ -958,15 +957,6 @@ void ReshardingRecipientService::RecipientStateMachine::_onAbortEncountered(
 
     if (abortSource) {
         abortSource->cancel();
-    }
-
-
-    if (!_isAlsoDonor) {
-        RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
-            opCtx,
-            _metadata.getSourceNss(),
-            _critSecReason,
-            ShardingCatalogClient::kMajorityWriteConcern);
     }
 }
 
