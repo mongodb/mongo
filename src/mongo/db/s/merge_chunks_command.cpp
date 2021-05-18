@@ -40,6 +40,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -92,11 +93,19 @@ void mergeChunks(OperationContext* opCtx,
 
     // We now have the collection distributed lock, refresh metadata to latest version and sanity
     // check
-    forceShardFilteringMetadataRefresh(opCtx, nss, true /* forceRefreshFromThisThread */);
+    const bool isVersioned = OperationShardingState::isOperationVersioned(opCtx);
+    if (!isVersioned) {
+        forceShardFilteringMetadataRefresh(opCtx, nss, true /* forceRefreshFromThisThread */);
+    }
 
     const auto collDesc = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
+        auto css = CollectionShardingState::get(opCtx, nss);
+        // If there is a version attached to the OperationContext, validate it
+        if (isVersioned) {
+            css->checkShardVersionOrThrow(opCtx);
+        }
+        return css->getCollectionDescription();
     }();
 
     uassert(ErrorCodes::StaleEpoch,
