@@ -72,12 +72,13 @@ void SyncTailOpObserver::onDelete(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   OptionalCollectionUUID uuid,
                                   StmtId stmtId,
-                                  bool fromMigrate,
-                                  const boost::optional<BSONObj>& deletedDoc) {
+                                  const OplogDeleteEntryArgs& args) {
     if (!onDeleteFn) {
         return;
     }
-    onDeleteFn(opCtx, nss, uuid, stmtId, fromMigrate, deletedDoc);
+    boost::optional<BSONObj> deletedDoc =
+        args.deletedDoc ? boost::optional<BSONObj>(*(args.deletedDoc)) : boost::none;
+    onDeleteFn(opCtx, nss, uuid, stmtId, args.fromMigrate, deletedDoc);
 }
 
 void SyncTailOpObserver::onCreateCollection(OperationContext* opCtx,

@@ -89,8 +89,7 @@ public:
                   const NamespaceString& nss,
                   OptionalCollectionUUID uuid,
                   StmtId stmtId,
-                  bool fromMigrate,
-                  const boost::optional<BSONObj>& deletedDoc) final;
+                  const OplogDeleteEntryArgs& args) final;
 
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,

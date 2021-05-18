@@ -47,8 +47,7 @@ void ConfigServerOpObserver::onDelete(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       OptionalCollectionUUID uuid,
                                       StmtId stmtId,
-                                      bool fromMigrate,
-                                      const boost::optional<BSONObj>& deletedDoc) {
+                                      const OplogDeleteEntryArgs& args) {
     if (nss == VersionType::ConfigNS) {
         if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
             uasserted(40302, "cannot delete config.version document while in --configsvr mode");

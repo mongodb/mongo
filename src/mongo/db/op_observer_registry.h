@@ -133,11 +133,10 @@ public:
                   const NamespaceString& nss,
                   OptionalCollectionUUID uuid,
                   StmtId stmtId,
-                  bool fromMigrate,
-                  const boost::optional<BSONObj>& deletedDoc) override {
+                  const OplogDeleteEntryArgs& args) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onDelete(opCtx, nss, uuid, stmtId, fromMigrate, deletedDoc);
+            o->onDelete(opCtx, nss, uuid, stmtId, args);
     }
 
     void onInternalOpMessage(OperationContext* const opCtx,

@@ -85,8 +85,7 @@ void AuthOpObserver::onDelete(OperationContext* opCtx,
                               const NamespaceString& nss,
                               OptionalCollectionUUID uuid,
                               StmtId stmtId,
-                              bool fromMigrate,
-                              const boost::optional<BSONObj>& deletedDoc) {
+                              const OplogDeleteEntryArgs& args) {
     auto& documentKey = documentKeyDecoration(opCtx);
     invariant(!documentKey.isEmpty());
     AuthorizationManager::get(opCtx->getServiceContext())

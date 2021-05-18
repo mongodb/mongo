@@ -134,8 +134,7 @@ void FreeMonOpObserver::onDelete(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  OptionalCollectionUUID uuid,
                                  StmtId stmtId,
-                                 bool fromMigrate,
-                                 const boost::optional<BSONObj>& deletedDoc) {
+                                 const OplogDeleteEntryArgs& args) {
     if (nss != NamespaceString::kServerConfigurationNamespace) {
         return;
     }

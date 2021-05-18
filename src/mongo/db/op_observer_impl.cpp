@@ -603,8 +603,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                               const NamespaceString& nss,
                               OptionalCollectionUUID uuid,
                               StmtId stmtId,
-                              bool fromMigrate,
-                              const boost::optional<BSONObj>& deletedDoc) {
+                              const OplogDeleteEntryArgs& args) {
     auto& documentKey = documentKeyDecoration(opCtx);
     invariant(!documentKey.isEmpty());
 
@@ -617,7 +616,9 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         auto operation = OplogEntry::makeDeleteOperation(nss, uuid, documentKey);
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
-        opTime = replLogDelete(opCtx, nss, uuid, stmtId, fromMigrate, deletedDoc);
+        boost::optional<BSONObj> deletedDoc =
+            args.deletedDoc ? boost::optional<BSONObj>(*(args.deletedDoc)) : boost::none;
+        opTime = replLogDelete(opCtx, nss, uuid, stmtId, args.fromMigrate, deletedDoc);
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
@@ -625,7 +626,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     }
 
     if (nss != NamespaceString::kSessionTransactionsTableNamespace) {
-        if (!fromMigrate) {
+        if (!args.fromMigrate) {
             shardObserveDeleteOp(opCtx,
                                  nss,
                                  documentKey,
