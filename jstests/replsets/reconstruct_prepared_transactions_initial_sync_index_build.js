@@ -80,7 +80,7 @@ jsTest.log("Hanging index build on the primary node");
 IndexBuildTest.pauseIndexBuilds(primary);
 
 jsTest.log("Beginning index build");
-IndexBuildTest.startIndexBuild(primary, testColl.getFullName(), {a: 1});
+let awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, testColl.getFullName(), {a: 1});
 
 let session = primary.startSession();
 let sessionDB = session.getDatabase(dbName);
@@ -126,6 +126,7 @@ jsTestLog("Committing the transaction");
 
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 replTest.awaitReplication();
+awaitIndexBuild();
 
 // Make sure that we can see the data from the committed transaction on the secondary.
 assert.docEq(secondaryColl.findOne({_id: 1}), {_id: 1, a: 2});
