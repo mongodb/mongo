@@ -40,6 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock.h"
@@ -196,13 +197,19 @@ void mergeChunks(OperationContext* opCtx,
                       << " to merge chunks in [" << redact(minKey) << ", " << redact(maxKey)
                       << ")");
 
-    // We now have the collection distributed lock, refresh metadata to latest version and sanity
-    // check
-    onShardVersionMismatch(opCtx, nss, boost::none);
+    const bool isVersioned = OperationShardingState::isOperationVersioned(opCtx);
+    if (!isVersioned) {
+        onShardVersionMismatch(opCtx, nss, boost::none);
+    }
 
     const auto metadataBeforeMerge = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
+        auto csr = CollectionShardingRuntime::get(opCtx, nss);
+        // If there is a version attached to the OperationContext, validate it
+        if (isVersioned) {
+            csr->checkShardVersionOrThrow(opCtx);
+        }
+        return csr->getCurrentMetadataIfKnown();
     }();
 
     uassert(ErrorCodes::StaleEpoch,
