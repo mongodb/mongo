@@ -150,6 +150,21 @@ private:
 
         // The term in which the loader scheduled this task.
         uint32_t termCreated;
+
+        std::string toString() const {
+            std::stringstream ss;
+            ss << "CollAndChunkTask -"
+               << " taskNum: " << taskNum << ", collectionAndChangedChunksSize: "
+               << (collectionAndChangedChunks ? collectionAndChangedChunks->changedChunks.size()
+                                              : -1)
+               << ", minQueryVersion: "
+               << (minQueryVersion.isSet() ? minQueryVersion.toString() : "(unset)")
+               << ", maxQueryVersion: "
+               << (maxQueryVersion.isSet() ? maxQueryVersion.toString() : "(unset)")
+               << ", dropped: " << dropped << ", updateMetadataFormat: " << updateMetadataFormat
+               << ", termCreated: " << termCreated;
+            return ss.str();
+        }
     };
 
     /* This class represents the results of a _getEnqueuedMetadata call. It contains information
