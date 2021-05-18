@@ -103,10 +103,6 @@ public:
                    BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        const auto cm = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                         nss));
-
         vector<BSONObj> bounds;
         if (!FieldParser::extract(cmdObj, boundsField, &bounds, &errmsg)) {
             return false;
@@ -135,6 +131,9 @@ public:
             return false;
         }
 
+        auto const cm =
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
+
         if (!cm.getShardKeyPattern().isShardKey(minKey) ||
             !cm.getShardKeyPattern().isShardKey(maxKey)) {
             errmsg = str::stream()
@@ -148,6 +147,7 @@ public:
         maxKey = cm.getShardKeyPattern().normalizeShardKey(maxKey);
 
         const auto firstChunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
+        ChunkVersion shardVersion = cm.getVersion(firstChunk.getShardId());
 
         BSONObjBuilder remoteCmdObjB;
         remoteCmdObjB.append(cmdObj[ClusterMergeChunksCommand::nsField()]);
@@ -157,7 +157,8 @@ public:
             Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
         remoteCmdObjB.append(ClusterMergeChunksCommand::shardNameField(),
                              firstChunk.getShardId().toString());
-        remoteCmdObjB.append("epoch", cm.getVersion().epoch());
+        remoteCmdObjB.append("epoch", shardVersion.epoch());
+        shardVersion.appendToCommand(&remoteCmdObjB);
 
         BSONObj remoteResult;
 
