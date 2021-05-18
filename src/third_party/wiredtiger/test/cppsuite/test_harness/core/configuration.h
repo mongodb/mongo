@@ -44,8 +44,10 @@ class configuration {
     public:
     configuration(const std::string &test_config_name, const std::string &config)
     {
-        std::string default_config =
-          std::string(__wt_test_config_match(test_config_name.c_str())->base);
+        const auto *config_entry = __wt_test_config_match(test_config_name.c_str());
+        if (config_entry == nullptr)
+            testutil_die(EINVAL, "failed to match test config name");
+        std::string default_config = std::string(config_entry->base);
         /* Merge in the default configuration. */
         _config = merge_default_config(default_config, config);
         debug_print("Running with enriched config: " + _config, DEBUG_INFO);

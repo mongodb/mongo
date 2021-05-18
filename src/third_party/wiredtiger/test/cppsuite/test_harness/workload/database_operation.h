@@ -178,7 +178,6 @@ class database_operation {
             if (ret == WT_NOTFOUND) {
                 testutil_check(cursors[i]->reset(cursors[i]));
                 ++i;
-                continue;
             } else if (ret != 0)
                 /* Stop updating in case of an error. */
                 testutil_die(DEBUG_ERROR, "update_operation: cursor->next() failed: %d", ret);
