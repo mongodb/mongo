@@ -270,6 +270,8 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
     auto oldOplogBuffer = std::move(_oplogBuffer);
     auto oldBgSync = std::move(_bgSync);
     auto oldApplier = std::move(_oplogApplier);
+    auto oldWriterPool = std::move(_writerPool);
+    auto oldApplierExecutor = std::move(_oplogApplierTaskExecutor);
     lock.unlock();
 
     // _syncSourceFeedbackThread should be joined before _bgSync's shutdown because it has
@@ -307,6 +309,20 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
 
     if (oldOplogBuffer) {
         oldOplogBuffer->shutdown(opCtx);
+    }
+
+    // Once the writer pool's shutdown() is called, scheduling new tasks will return error, so
+    // we shutdown writer pool after the applier exits to avoid new tasks being scheduled.
+    if (oldWriterPool) {
+        LOGV2(5698300, "Stopping replication applier writer pool");
+        oldWriterPool->shutdown();
+        oldWriterPool->join();
+    }
+
+    if (oldApplierExecutor) {
+        LOGV2(21307, "Stopping replication storage threads");
+        oldApplierExecutor->shutdown();
+        oldApplierExecutor->join();
     }
 
     lock.lock();
@@ -385,11 +401,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
 
     _stopDataReplication_inlock(opCtx, lk);
 
-    LOGV2(21307, "Stopping replication storage threads");
     _taskExecutor->shutdown();
-    _oplogApplierTaskExecutor->shutdown();
-
-    _oplogApplierTaskExecutor->join();
     lk.unlock();
 
     // Perform additional shutdown steps below that must be done outside _threadMutex.
