@@ -425,6 +425,9 @@ executor:
         # 'abortTransaction', since all writes are automatically rerouted to the recipient. We set
         # a low 'transactionLifetimeLimitSeconds' value to ensure that they are cleaned up quickly.
         transactionLifetimeLimitSeconds: 20
+        # Tenant migrations is not currently compatible with implicitly replicated retryable
+        # findAndModify images.
+        storeFindAndModifyImagesInSideCollection: false
       tlsMode: allowTLS
       tlsCAFile: jstests/libs/ca.pem
       tlsAllowInvalidHostnames: ''

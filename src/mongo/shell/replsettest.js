@@ -2383,7 +2383,12 @@ var ReplSetTest = function(opts) {
 
                 const dbHashes = rst.getHashes(dbName, secondaries);
                 const primaryDBHash = dbHashes.primary;
-                const primaryCollections = Object.keys(primaryDBHash.collections);
+                // The `config.image_collection` is not necessarily consistent after an initial
+                // sync. It's guaranteed to be eventually consistent. However, tests that initial
+                // sync concurrently with retryable findAndModify statements cannot make this
+                // assumption.
+                const primaryCollections = Object.keys(primaryDBHash.collections)
+                                               .filter((x) => x !== "config.image_collection");
                 assert.commandWorked(primaryDBHash);
 
                 // Filter only collections that were retrieved by the dbhash. listCollections

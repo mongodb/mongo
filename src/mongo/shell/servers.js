@@ -694,6 +694,9 @@ MongoRunner.mongodOptions = function(opts = {}) {
     _removeSetParameterIfBeforeVersion(
         opts, "enableDefaultWriteConcernUpdatesForInitiate", "5.0.0");
     _removeSetParameterIfBeforeVersion(opts, "enableReconfigRollbackCommittedWritesCheck", "5.0.0");
+    // TODO SERVER-56952: Understand how to run a 5.0 with this setting against 4.4.x without
+    // allowing it on 4.9.
+    _removeSetParameterIfBeforeVersion(opts, "storeFindAndModifyImagesInSideCollection", "5.0.0");
 
     if (!opts.logFile && opts.useLogFiles) {
         opts.logFile = opts.dbpath + "/mongod.log";

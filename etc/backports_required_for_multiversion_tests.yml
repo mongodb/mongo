@@ -144,6 +144,12 @@ all:
     test_file: jstests/concurrency/fsm_workloads/collmod_writeconflict.js
   - ticket: SERVER-55111
     test_file: jstests/sharding/transactions_reject_writes_for_moved_chunks.js
+  - ticket: SERVER-59952
+    test_file: jstests/sharding/write_transactions_during_migration.js
+  - ticket: SERVER-59952
+    test_file: jstests/sharding/retryable_writes.js
+  - ticket: SERVER-59952
+    test_file: jstests/sharding/move_chunk_find_and_modify_with_write_retryability.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
