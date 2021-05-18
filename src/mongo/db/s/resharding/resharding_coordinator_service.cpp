@@ -885,7 +885,7 @@ void ReshardingCoordinatorExternalStateImpl::removeCoordinatorDocAndReshardingFi
 
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
-    emplaceAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
+    emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
     ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
         opCtx,
@@ -1093,18 +1093,21 @@ ReshardingCoordinatorService::ReshardingCoordinator::_runUntilReadyToPersistDeci
                 return status;
             }
 
-            // If the abort cancellation token was triggered, implying that a user ran the abort
-            // command, override with the abort error code.
-            if (_ctHolder->isAborted()) {
-                status = {ErrorCodes::ReshardCollectionAborted, status.reason()};
-            }
-
             auto nss = _coordinatorDoc.getSourceNss();
             LOGV2(4956902,
                   "Resharding failed",
                   "namespace"_attr = nss.ns(),
                   "newShardKeyPattern"_attr = _coordinatorDoc.getReshardingKey(),
                   "error"_attr = status);
+
+            if (_ctHolder->isAborted()) {
+                // If the abort cancellation token was triggered, implying that a user ran the abort
+                // command, override status with a resharding abort error.
+                //
+                // Note for debugging purposes: Ensure the original error status is recorded in the
+                // logs before replacing it.
+                status = {ErrorCodes::ReshardCollectionAborted, "aborted"};
+            }
 
             if (_coordinatorDoc.getState() == CoordinatorStateEnum::kUnused) {
                 return status;
@@ -1573,7 +1576,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     updatedCoordinatorDoc.setState(nextState);
     emplaceApproxBytesToCopyIfExists(updatedCoordinatorDoc, std::move(approxCopySize));
     emplaceCloneTimestampIfExists(updatedCoordinatorDoc, std::move(cloneTimestamp));
-    emplaceAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
+    emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     _reshardingCoordinatorExternalState->writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(

@@ -39,6 +39,7 @@
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
@@ -552,6 +553,67 @@ TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
             ASSERT_TRUE(bool(coll));
             ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
         }
+    }
+}
+
+TEST_F(ReshardingDonorServiceTest, TruncatesXLErrorOnDonorDocument) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
+    for (bool isAlsoRecipient : {false, true}) {
+        LOGV2(5568601,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "isAlsoRecipient"_attr = isAlsoRecipient);
+
+        std::string xlErrMsg(6000, 'x');
+        FailPointEnableBlock failpoint("reshardingDonorFailsAfterTransitionToDonatingOplogEntries",
+                                       BSON("errmsg" << xlErrMsg));
+
+        auto doc = makeStateDocument(isAlsoRecipient);
+        auto opCtx = makeOperationContext();
+        DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+
+        auto localTransitionToErrorFuture = donor->awaitInBlockingWritesOrError();
+        ASSERT_OK(localTransitionToErrorFuture.getNoThrow());
+
+        // The donor still waits for the abort decision from the coordinator despite it having
+        // errored locally. It is therefore safe to check its local state document until
+        // DonorStateMachine::abort() is called.
+        {
+            boost::optional<ReshardingDonorDocument> persistedDonorDocument;
+            PersistentTaskStore<ReshardingDonorDocument> store(
+                NamespaceString::kDonorReshardingOperationsNamespace);
+            store.forEach(
+                opCtx.get(),
+                QUERY(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID()),
+                [&](const auto& donorDocument) {
+                    persistedDonorDocument.emplace(donorDocument);
+                    return false;
+                });
+
+            ASSERT(persistedDonorDocument);
+            auto persistedAbortReasonBSON =
+                persistedDonorDocument->getMutableState().getAbortReason();
+            ASSERT(persistedAbortReasonBSON);
+            // The actual abortReason will be slightly larger than kReshardErrorMaxBytes bytes due
+            // to the primitive truncation algorithm - Check that the total size is less than
+            // kReshardErrorMaxBytes + a couple additional bytes to provide a buffer for the field
+            // name sizes.
+            int maxReshardErrorBytesCeiling = kReshardErrorMaxBytes + 200;
+            ASSERT_LT(persistedAbortReasonBSON->objsize(), maxReshardErrorBytesCeiling);
+            ASSERT_EQ(persistedAbortReasonBSON->getIntField("code"),
+                      ErrorCodes::ReshardCollectionTruncatedError);
+        }
+
+        donor->abort(false);
+        ASSERT_OK(donor->getCompletionFuture().getNoThrow());
     }
 }
 

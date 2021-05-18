@@ -51,7 +51,7 @@ protected:
         auto coordinatorDoc = ReshardingCoordinatorDocument();
         coordinatorDoc.setRecipientShards(std::move(recipients));
         coordinatorDoc.setDonorShards(std::move(donors));
-        emplaceAbortReasonIfExists(coordinatorDoc, abortReason);
+        emplaceTruncatedAbortReasonIfExists(coordinatorDoc, abortReason);
         return coordinatorDoc;
     }
 
