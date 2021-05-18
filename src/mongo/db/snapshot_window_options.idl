@@ -38,5 +38,5 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<int>
     cpp_varname: minSnapshotHistoryWindowInSeconds
-    default: 5
+    default: 300
     validator: { gte: 0 }
