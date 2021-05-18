@@ -1199,6 +1199,88 @@ __wt_row_leaf_key(
 }
 
 /*
+ * __wt_row_leaf_key_instantiate --
+ *     Instantiate the keys on a leaf page as needed.
+ */
+static inline int
+__wt_row_leaf_key_instantiate(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+    WT_CELL *cell;
+    WT_DECL_ITEM(key);
+    WT_DECL_RET;
+    WT_ROW *rip;
+    size_t key_size;
+    uint32_t i, slot;
+    uint8_t key_prefix;
+    u_int skip;
+    void *copy;
+    const void *key_data;
+
+    /*
+     * Cursor previous traversals will be too slow in the case of a set of prefix-compressed keys
+     * requiring long roll-forward processing. In the worst case, each key would require processing
+     * every key appearing before it on the page as we walk backwards through the page. If we're
+     * doing a cursor previous call, and this page has never been checked for excessively long
+     * stretches of prefix-compressed keys, do it now.
+     */
+    if (F_ISSET_ATOMIC(page, WT_PAGE_BUILD_KEYS))
+        return (0);
+    F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
+
+    /* Walk the keys, making sure there's something easy to work with periodically. */
+    skip = 0;
+    WT_ROW_FOREACH (page, rip, i) {
+        /*
+         * Get the key's information. The row-store key can change underfoot; explicitly take a
+         * copy.
+         */
+        copy = WT_ROW_KEY_COPY(rip);
+        __wt_row_leaf_key_info(page, copy, NULL, &cell, &key_data, &key_size, &key_prefix);
+
+        /*
+         * If the key isn't prefix compressed, or is a prefix-compressed key we can derive from the
+         * group record, we're done.
+         */
+        slot = WT_ROW_SLOT(page, rip);
+        if (key_data != NULL &&
+          (key_prefix == 0 || (slot > page->prefix_start && slot <= page->prefix_stop))) {
+            skip = 0;
+            continue;
+        }
+
+        /*
+         * Skip overflow keys: we'll instantiate them on demand and they don't require any special
+         * processing (but they don't help with long strings of prefix compressed keys, either, so
+         * we'll likely want to instantiate the first key we find after a long stretch of overflow
+         * keys). More importantly, we don't want to instantiate them for a cursor traversal, we
+         * only want to instantiate them for a tree search, as that's likely to happen repeatedly.
+         */
+        if (__wt_cell_type(cell) == WT_CELL_KEY_OVFL) {
+            ++skip;
+            continue;
+        }
+
+        /*
+         * If we skip 10 keys, instantiate one, limiting how far we're forced to roll backward. (The
+         * value 10 was chosen for no particular reason.) There are still cases where we might not
+         * need to instantiate this key (for example, a key too large to be encoded, but still
+         * on-page and not prefix-compressed). Let the underlying worker function figure that out,
+         * we should have found the vast majority of cases by now.
+         */
+        if (++skip >= 10) {
+            if (key == NULL)
+                WT_ERR(__wt_scr_alloc(session, 0, &key));
+            WT_ERR(__wt_row_leaf_key(session, page, rip, key, true));
+            skip = 0;
+        }
+    }
+
+err:
+    __wt_scr_free(session, &key);
+    return (ret);
+}
+
+/*
  * __wt_row_leaf_value_is_encoded --
  *     Return if the value for a row-store leaf page is an encoded key/value pair.
  */

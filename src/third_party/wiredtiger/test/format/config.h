@@ -98,8 +98,6 @@ static CONFIG c[] = {
   {"btree.internal_page_max", "btree internal node maximum size", 0x0, 9, 17, 27,
     &g.c_intl_page_max, NULL},
 
-  {"btree.key_gap", "btree page instantiated key gap", 0x0, 0, 20, 20, &g.c_key_gap, NULL},
-
   {"btree.key_max", "maximum key size", 0x0, 20, 128, MEGABYTE(10), &g.c_key_max, NULL},
 
   /*

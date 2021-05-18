@@ -101,8 +101,6 @@ static const char *list[] = {
   "btree.internal_key_truncation",
   "internal_page_max=",
   "btree.internal_page_max",
-  "key_gap=",
-  "btree.key_gap",
   "key_max=",
   "btree.key_max",
   "key_min=",

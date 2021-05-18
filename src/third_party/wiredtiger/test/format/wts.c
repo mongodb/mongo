@@ -351,7 +351,6 @@ create_object(WT_CONNECTION *conn)
 
     /* Configure Btree. */
     CONFIG_APPEND(p, ",internal_key_truncate=%s", g.c_internal_key_truncation ? "true" : "false");
-    CONFIG_APPEND(p, ",key_gap=%" PRIu32, g.c_key_gap);
     CONFIG_APPEND(p, ",split_pct=%" PRIu32, g.c_split_pct);
 
     /* Assertions: assertions slow down the code for additional diagnostic checking.  */

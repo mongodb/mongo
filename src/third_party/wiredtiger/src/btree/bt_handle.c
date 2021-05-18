@@ -344,7 +344,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
     WT_RET(__wt_struct_confchk(session, &cval));
     WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->value_format));
 
-    /* Row-store key comparison and key gap for prefix compression. */
+    /* Row-store key comparison. */
     if (btree->type == BTREE_ROW) {
         WT_RET(__wt_config_gets_none(session, cfg, "collator", &cval));
         if (cval.len != 0) {
@@ -352,9 +352,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
             WT_RET(__wt_collator_config(session, btree->dhandle->name, &cval, &metadata,
               &btree->collator, &btree->collator_owned));
         }
-
-        WT_RET(__wt_config_gets(session, cfg, "key_gap", &cval));
-        btree->key_gap = (uint32_t)cval.val;
     }
 
     /* Column-store: check for fixed-size data. */

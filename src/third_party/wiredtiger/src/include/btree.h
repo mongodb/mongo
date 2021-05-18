@@ -115,8 +115,6 @@ struct __wt_btree {
 
     uint32_t id; /* File ID, for logging */
 
-    uint32_t key_gap; /* Row-store prefix key gap */
-
     uint32_t allocsize;        /* Allocation size */
     uint32_t maxintlpage;      /* Internal page max size */
     uint32_t maxintlkey;       /* Internal page max key size */

@@ -1122,8 +1122,8 @@ struct __wt_session {
 	 * \c none.}
 	 * @config{format, the file format., a string\, chosen from the following options: \c
 	 * "btree"; default \c btree.}
-	 * @config{huffman_key, This option is no longer supported.  Retained for backward
-	 * compatibility.  See @ref huffman for more information., a string; default \c none.}
+	 * @config{huffman_key, This option is no longer supported\, retained for backward
+	 * compatibility., a string; default \c none.}
 	 * @config{huffman_value, configure Huffman encoding for values.  Permitted values are \c
 	 * "none"\, \c "english"\, \c "utf8<file>" or \c "utf16<file>". See @ref huffman for more
 	 * information., a string; default \c none.}
@@ -1143,6 +1143,8 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;repair, whether to reconstruct the metadata from
 	 * the raw file content., a boolean flag; default \c false.}
 	 * @config{ ),,}
+	 * @config{internal_item_max, This option is no longer supported\, retained for backward
+	 * compatibility., an integer greater than or equal to 0; default \c 0.}
 	 * @config{internal_key_max, the largest key stored in an internal node\, in bytes.  If
 	 * set\, keys larger than the specified size are stored as overflow items (which may require
 	 * additional I/O to access). The default and the maximum allowed value are both one-tenth
@@ -1161,6 +1163,10 @@ struct __wt_session {
 	 * use WT_ITEM structures to manipulate raw byte arrays.  By default\, records are stored in
 	 * row-store files: keys of type \c 'r' are record numbers and records referenced by record
 	 * number are stored in column-store files., a format string; default \c u.}
+	 * @config{key_gap, This option is no longer supported\, retained for backward
+	 * compatibility., an integer greater than or equal to 0; default \c 10.}
+	 * @config{leaf_item_max, This option is no longer supported\, retained for backward
+	 * compatibility., an integer greater than or equal to 0; default \c 0.}
 	 * @config{leaf_key_max, the largest key stored in a leaf node\, in bytes.  If set\, keys
 	 * larger than the specified size are stored as overflow items (which may require additional
 	 * I/O to access). The default value is one-tenth the size of a newly split leaf page., an

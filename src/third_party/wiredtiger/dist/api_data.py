@@ -49,12 +49,10 @@ common_runtime_config = [
         enable enhanced checking. ''',
         type='category', subconfig= [
         Config('commit_timestamp', 'none', r'''
-            This option is no longer supported. Retained for backward
-            compatibility. Use \c write_timestamp option instead.''',
+            This option is no longer supported, retained for backward compatibility.''',
             choices=['always', 'key_consistent', 'never', 'none']),
         Config('durable_timestamp', 'none', r'''
-            This option is no longer supported. Retained for backward
-            compatibility. Use \c write_timestamp option instead.''',
+            This option is no longer supported, retained for backward compatibility.''',
             choices=['always', 'key_consistent', 'never', 'none']),
         Config('write_timestamp', 'off', r'''
             verify that commit timestamps are used per the configured
@@ -330,8 +328,7 @@ file_config = format_meta + file_runtime_config + tiered_config + [
         the file format''',
         choices=['btree']),
     Config('huffman_key', 'none', r'''
-        This option is no longer supported. Retained for backward
-        compatibility. See @ref huffman for more information'''),
+        This option is no longer supported, retained for backward compatibility.'''),
     Config('huffman_value', 'none', r'''
         configure Huffman encoding for values.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
@@ -355,8 +352,8 @@ file_config = format_meta + file_runtime_config + tiered_config + [
         block compression is done''',
         min='512B', max='512MB'),
     Config('internal_item_max', '0', r'''
-        historic term for internal_key_max''',
-        min=0, undoc=True),
+        This option is no longer supported, retained for backward compatibility.''',
+        min=0),
     Config('internal_key_max', '0', r'''
         the largest key stored in an internal node, in bytes.  If set, keys
         larger than the specified size are stored as overflow items (which
@@ -365,10 +362,8 @@ file_config = format_meta + file_runtime_config + tiered_config + [
         page''',
         min='0'),
     Config('key_gap', '10', r'''
-        the maximum gap between instantiated keys in a Btree leaf page,
-        constraining the number of keys processed to instantiate a
-        random Btree leaf page key''',
-        min='0', undoc=True),
+        This option is no longer supported, retained for backward compatibility.''',
+        min='0'),
     Config('leaf_key_max', '0', r'''
         the largest key stored in a leaf node, in bytes.  If set, keys
         larger than the specified size are stored as overflow items (which
@@ -392,8 +387,8 @@ file_config = format_meta + file_runtime_config + tiered_config + [
         a newly split leaf page''',
         min='0'),
     Config('leaf_item_max', '0', r'''
-        historic term for leaf_key_max and leaf_value_max''',
-        min=0, undoc=True),
+        This option is no longer supported, retained for backward compatibility.''',
+        min=0),
     Config('memory_page_image_max', '0', r'''
         the maximum in-memory page image represented by a single storage block.
         Depending on compression efficiency, compression can create storage
