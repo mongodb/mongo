@@ -45,6 +45,8 @@ namespace mongo {
  */
 class DatabaseVersion : public DatabaseVersionBase {
 public:
+    using DatabaseVersionBase::getTimestamp;
+
     DatabaseVersion() = default;
 
     explicit DatabaseVersion(const BSONObj& obj) {

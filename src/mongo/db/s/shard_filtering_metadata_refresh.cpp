@@ -76,7 +76,9 @@ void onDbVersionMismatch(OperationContext* opCtx,
         const ComparableDatabaseVersion comparableClientDbVersion =
             ComparableDatabaseVersion::makeComparableDatabaseVersion(clientDbVersion);
 
-        if (comparableClientDbVersion <= comparableServerDbVersion) {
+        if (comparableClientDbVersion < comparableServerDbVersion ||
+            (comparableClientDbVersion == comparableServerDbVersion &&
+             clientDbVersion.getTimestamp() == serverDbVersion->getTimestamp())) {
             // The client was stale; do not trigger server-side refresh.
             return;
         }
@@ -244,7 +246,9 @@ void onShardVersionMismatch(OperationContext* opCtx,
                 const auto currentShardVersion = metadata->getShardVersion();
                 // Don't need to remotely reload if we're in the same epoch and the requested
                 // version is smaller than the known one. This means that the remote side is behind.
-                if (shardVersionReceived->isOlderThan(currentShardVersion)) {
+                if (shardVersionReceived->isOlderThan(currentShardVersion) ||
+                    (*shardVersionReceived == currentShardVersion &&
+                     shardVersionReceived->getTimestamp() == currentShardVersion.getTimestamp())) {
                     return;
                 }
             }
@@ -440,7 +444,9 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         if (optMetadata) {
             const auto& metadata = *optMetadata;
             if (metadata.isSharded() &&
-                cm.getVersion().isOlderOrEqualThan(metadata.getCollVersion())) {
+                (cm.getVersion().isOlderThan(metadata.getCollVersion()) ||
+                 (cm.getVersion() == metadata.getCollVersion() &&
+                  cm.getVersion().getTimestamp() == metadata.getCollVersion().getTimestamp()))) {
                 LOGV2_DEBUG(
                     22063,
                     1,
@@ -472,7 +478,9 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         if (optMetadata) {
             const auto& metadata = *optMetadata;
             if (metadata.isSharded() &&
-                cm.getVersion().isOlderOrEqualThan(metadata.getCollVersion())) {
+                (cm.getVersion().isOlderThan(metadata.getCollVersion()) ||
+                 (cm.getVersion() == metadata.getCollVersion() &&
+                  cm.getVersion().getTimestamp() == metadata.getCollVersion().getTimestamp()))) {
                 LOGV2_DEBUG(
                     22064,
                     1,
@@ -532,6 +540,7 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
     }
 
     auto refreshedDbInfo = uassertStatusOK(std::move(swRefreshedDbInfo));
+    const auto refreshedDBVersion = refreshedDbInfo.databaseVersion();
 
     // First, check under a shared lock if another thread already updated the cached version.
     // This is a best-effort optimization to make as few threads as possible to convoy on the
@@ -546,15 +555,16 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
         const auto cachedDbVersion = dss->getDbVersion(opCtx, dssLock);
         if (cachedDbVersion) {
             // Do not reorder these two statements! if the comparison is done through epochs, the
-            // construction order matters: we are pessimistically assuming that the client version
-            // is newer when they have different uuids
+            // construction order matters: we are pessimistically assuming that the refreshed
+            // version is newer when they have different uuids
             const ComparableDatabaseVersion comparableCachedDbVersion =
                 ComparableDatabaseVersion::makeComparableDatabaseVersion(*cachedDbVersion);
             const ComparableDatabaseVersion comparableRefreshedDbVersion =
-                ComparableDatabaseVersion::makeComparableDatabaseVersion(
-                    refreshedDbInfo.databaseVersion());
+                ComparableDatabaseVersion::makeComparableDatabaseVersion(refreshedDBVersion);
 
-            if (comparableRefreshedDbVersion <= comparableCachedDbVersion) {
+            if (comparableRefreshedDbVersion < comparableCachedDbVersion ||
+                (comparableRefreshedDbVersion == comparableCachedDbVersion &&
+                 cachedDbVersion->getTimestamp() == refreshedDBVersion.getTimestamp())) {
                 LOGV2_DEBUG(5369130,
                             2,
                             "Skipping updating cached database info from refreshed version "

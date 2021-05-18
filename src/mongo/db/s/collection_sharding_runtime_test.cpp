@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "boost/optional/optional_io.hpp"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/db_raii.h"
@@ -36,7 +37,11 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/s/sharding_state.h"
+#include "mongo/s/catalog/sharding_catalog_client_mock.h"
+#include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -181,6 +186,186 @@ TEST_F(CollectionShardingRuntimeTest,
     ASSERT_EQ(csr.getNumMetadataManagerChanges_forTest(), 2);
     ASSERT(
         csr.getCollectionDescription(opCtx).uuidMatches(*newMetadata.getChunkManager()->getUUID()));
+}
+
+class CollectionShardingRuntimeTestWithMockedLoader : public ShardServerTestFixture {
+public:
+    const NamespaceString kNss{"test.foo"};
+    const UUID kCollUUID = UUID::gen();
+    const std::string kShardKey = "x";
+    const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};
+    const std::vector<ShardType> kShardList = {ShardType("shard0", "Host0:12345")};
+
+    void setUp() override {
+        // Don't call ShardServerTestFixture::setUp so we can install a mock catalog cache
+        // loader.
+        ShardingMongodTestFixture::setUp();
+
+        replicationCoordinator()->alwaysAllowWrites(true);
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+
+        _clusterId = OID::gen();
+        ShardingState::get(getServiceContext())
+            ->setInitialized(kShardList[0].getName(), _clusterId);
+
+        auto mockLoader = std::make_unique<CatalogCacheLoaderMock>();
+        _mockCatalogCacheLoader = mockLoader.get();
+        CatalogCacheLoader::set(getServiceContext(), std::move(mockLoader));
+
+        uassertStatusOK(
+            initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));
+
+        configTargeterMock()->setFindHostReturnValue(kConfigHostAndPort);
+
+        WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
+
+        for (const auto& shard : kShardList) {
+            std::unique_ptr<RemoteCommandTargeterMock> targeter(
+                std::make_unique<RemoteCommandTargeterMock>());
+            HostAndPort host(shard.getHost());
+            targeter->setConnectionStringReturnValue(ConnectionString(host));
+            targeter->setFindHostReturnValue(host);
+            targeterFactory()->addTargeterToReturn(ConnectionString(host), std::move(targeter));
+        }
+    }
+
+    void tearDown() override {
+        WaitForMajorityService::get(getServiceContext()).shutDown();
+
+        ShardServerTestFixture::tearDown();
+    }
+
+    class StaticCatalogClient final : public ShardingCatalogClientMock {
+    public:
+        StaticCatalogClient(std::vector<ShardType> shards) : _shards(std::move(shards)) {}
+
+        StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
+            OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
+            return repl::OpTimeWith<std::vector<ShardType>>(_shards);
+        }
+
+        std::vector<CollectionType> getCollections(
+            OperationContext* opCtx,
+            StringData dbName,
+            repl::ReadConcernLevel readConcernLevel) override {
+            return _colls;
+        }
+
+        void setCollections(std::vector<CollectionType> colls) {
+            _colls = std::move(colls);
+        }
+
+    private:
+        const std::vector<ShardType> _shards;
+        std::vector<CollectionType> _colls;
+    };
+
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
+        return std::make_unique<StaticCatalogClient>(kShardList);
+    }
+
+    CollectionType createCollection(const OID& epoch,
+                                    boost::optional<Timestamp> timestamp = boost::none) {
+        CollectionType res(kNss, epoch, timestamp, Date_t::now(), kCollUUID);
+        res.setKeyPattern(BSON(kShardKey << 1));
+        res.setUnique(false);
+        res.setAllowMigrations(false);
+        return res;
+    }
+
+    std::vector<ChunkType> createChunks(const OID& epoch,
+                                        boost::optional<Timestamp> timestamp = boost::none) {
+        auto range1 = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << 5));
+        ChunkType chunk1(
+            kNss, range1, ChunkVersion(1, 0, epoch, timestamp), kShardList[0].getName());
+
+        auto range2 = ChunkRange(BSON(kShardKey << 5), BSON(kShardKey << MAXKEY));
+        ChunkType chunk2(
+            kNss, range2, ChunkVersion(1, 1, epoch, timestamp), kShardList[0].getName());
+
+        return {chunk1, chunk2};
+    }
+
+protected:
+    CatalogCacheLoaderMock* _mockCatalogCacheLoader;
+};
+
+TEST_F(CollectionShardingRuntimeTestWithMockedLoader,
+       ForceShardFilteringMetadataRefreshWithUpdateMetadataFormat) {
+    const DatabaseType dbType(
+        kNss.db().toString(), kShardList[0].getName(), true, DatabaseVersion(UUID::gen()));
+
+    const auto epoch = OID::gen();
+    const Timestamp timestamp(42);
+
+    const auto coll = createCollection(epoch);
+    const auto chunks = createChunks(epoch);
+
+    const auto timestampedColl = createCollection(epoch, timestamp);
+    const auto timestampedChunks = createChunks(epoch, timestamp);
+
+    auto checkForceFilteringMetadataRefresh = [&](const auto& coll, const auto& chunks) {
+        auto opCtx = operationContext();
+
+        _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(dbType);
+        _mockCatalogCacheLoader->setCollectionRefreshValues(
+            kNss, coll, chunks, boost::none /* reshardingFields */);
+        forceShardFilteringMetadataRefresh(opCtx, kNss);
+        AutoGetCollection autoColl(opCtx, kNss, LockMode::MODE_IS);
+        const auto currentMetadata =
+            CollectionShardingRuntime::get(opCtx, kNss)->getCurrentMetadataIfKnown();
+        ASSERT_TRUE(currentMetadata);
+        ASSERT_EQ(currentMetadata->getCollVersion().getTimestamp(), coll.getTimestamp());
+    };
+
+    // Testing the following transitions:
+    // CV<E, M, m> -> CV<E, T, M, m> -> CV<E, M, m>
+    // Note that the loader only returns the last chunk since we didn't modify any chunk.
+    checkForceFilteringMetadataRefresh(coll, chunks);
+    checkForceFilteringMetadataRefresh(timestampedColl, std::vector{timestampedChunks.back()});
+    checkForceFilteringMetadataRefresh(coll, std::vector{chunks.back()});
+}
+
+TEST_F(CollectionShardingRuntimeTestWithMockedLoader,
+       OnShardVersionMismatchWithUpdateMetadataFormat) {
+    const DatabaseType dbType(
+        kNss.db().toString(), kShardList[0].getName(), true, DatabaseVersion(UUID::gen()));
+
+    const auto epoch = OID::gen();
+    const Timestamp timestamp(42);
+
+    const auto coll = createCollection(epoch);
+    const auto chunks = createChunks(epoch);
+    const auto collVersion = chunks.back().getVersion();
+
+    const auto timestampedColl = createCollection(epoch, timestamp);
+    const auto timestampedChunks = createChunks(epoch, timestamp);
+    const auto timestampedCollVersion = timestampedChunks.back().getVersion();
+
+    auto opCtx = operationContext();
+
+    auto onShardVersionMismatchCheck =
+        [&](const auto& coll, const auto& chunks, const auto& receivedVersion) {
+            _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(dbType);
+            _mockCatalogCacheLoader->setCollectionRefreshValues(
+                kNss, coll, chunks, boost::none /* reshardingFields */);
+
+            onShardVersionMismatch(opCtx, kNss, receivedVersion);
+
+            AutoGetCollection autoColl(opCtx, kNss, LockMode::MODE_IS);
+            auto currentMetadata =
+                CollectionShardingRuntime::get(opCtx, kNss)->getCurrentMetadataIfKnown();
+            ASSERT_TRUE(currentMetadata);
+            ASSERT_EQ(currentMetadata->getCollVersion(), receivedVersion);
+        };
+
+    // Testing the following transitions:
+    // CV<E, M, m> -> CV<E, T, M, m> -> CV<E, M, m>
+    // Note that the loader only returns the last chunk since we didn't modify any chunk.
+    onShardVersionMismatchCheck(coll, chunks, collVersion);
+    onShardVersionMismatchCheck(
+        timestampedColl, std::vector{timestampedChunks.back()}, timestampedCollVersion);
+    onShardVersionMismatchCheck(coll, std::vector{chunks.back()}, collVersion);
 }
 
 /**
