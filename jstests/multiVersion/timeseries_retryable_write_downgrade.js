@@ -48,10 +48,10 @@ assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastL
 assert.eq(configTransactions.find().toArray().length, 0);
 
 replTest.upgradeSet({binVersion: 'last-lts'});
-if (replTest.getPrimary() !== primary) {
-    replTest.stepdown(replTest.getPrimary());
-}
 replTest.awaitNodesAgreeOnPrimary();
+if (replTest.getPrimary() !== primary) {
+    replTest.stepUp(replTest.getSecondary());
+}
 
 // Another insert using the same session can succeed since it doesn't need to parse the oplog entry
 // with multiple statement ids, which isn't supported on versions older than 4.9.
