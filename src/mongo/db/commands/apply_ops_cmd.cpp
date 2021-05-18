@@ -47,6 +47,7 @@
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
@@ -256,6 +257,9 @@ public:
                                                << "Could not parse out "
                                                << repl::ApplyOps::kOplogApplicationModeFieldName));
         }
+
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            opCtx);
 
         auto applyOpsStatus = CommandHelpers::appendCommandStatusNoThrow(
             result, repl::applyOps(opCtx, dbname, cmdObj, oplogApplicationMode, &result));
