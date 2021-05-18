@@ -60,7 +60,10 @@ assert.commandFailedWithCode(
     "Source and destination collections must be on the same database.");
 
 // Renaming unsharded collection to a different db with same primary shard.
-assert.commandWorked(db.unSharded.renameCollection('otherDBSamePrimary.unsharded'));
+assert.commandWorked(
+    db.adminCommand({renameCollection: 'test.unSharded', to: 'otherDBSamePrimary.foo'}));
+assert.eq(0, db.unsharded.countDocuments({}));
+assert.eq(1, s.getDB('otherDBSamePrimary').foo.countDocuments({}));
 
 jsTest.log("Testing that rename operations involving views are not allowed");
 {

@@ -186,20 +186,23 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     _doc.setOptShardedCollInfo(optSourceCollType);
                     _doc.setSourceUUID(optSourceCollType->getUuid());
                 } else {
-                    Lock::DBLock dbLock(opCtx, fromNss.db(), MODE_IS);
-                    Lock::CollectionLock collLock(opCtx, fromNss, MODE_IS);
-                    const auto sourceCollPtr =
-                        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, fromNss);
+                    {
+                        Lock::DBLock dbLock(opCtx, fromNss.db(), MODE_IS);
+                        Lock::CollectionLock collLock(opCtx, fromNss, MODE_IS);
+                        const auto sourceCollPtr =
+                            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
+                                                                                       fromNss);
 
-                    uassert(ErrorCodes::NamespaceNotFound,
-                            str::stream() << "Collection " << fromNss << " doesn't exist.",
-                            sourceCollPtr);
+                        uassert(ErrorCodes::NamespaceNotFound,
+                                str::stream() << "Collection " << fromNss << " doesn't exist.",
+                                sourceCollPtr);
+
+                        _doc.setSourceUUID(sourceCollPtr->uuid());
+                    }
 
                     if (fromNss.db() != toNss.db()) {
                         sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
                     }
-
-                    _doc.setSourceUUID(sourceCollPtr->uuid());
                 }
 
                 // Make sure the target namespace is not a view
