@@ -162,6 +162,7 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
 
     auto done{false};
     for (size_t it = 0; it < maxNumResults && !done; ++it) {
+        size_t numCandidatesFailedOrExitedEarly = 0;
         for (size_t ix = 0; ix < candidates.size(); ++ix) {
             // Even if we had a candidate plan that exited early, we still want continue the trial
             // run as the early exited plan may not be the best. E.g., it could be blocked in a SORT
@@ -170,11 +171,16 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
             // we need to continue and complete the trial period for all candidates, as some of them
             // may have a better cost.
             if (!candidates[ix].status.isOK() || candidates[ix].exitedEarly) {
+                ++numCandidatesFailedOrExitedEarly;
                 continue;
             }
 
-            done |= fetchNextDocument(&candidates[ix], slots[ix]);
+            // Note: we evaluate these two separately to avoid short-circuit evaluation. We want to
+            // pull the same number of results from each candidate.
+            bool candidateDone = fetchNextDocument(&candidates[ix], slots[ix]);
+            done = done || candidateDone;
         }
+        done = done || (numCandidatesFailedOrExitedEarly == candidates.size());
     }
 
     return candidates;
