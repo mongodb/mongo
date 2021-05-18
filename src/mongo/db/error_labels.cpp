@@ -120,13 +120,14 @@ void ErrorLabelBuilder::build(BSONArrayBuilder& labels) const {
     if (isTransientTransactionError()) {
         labels << ErrorLabel::kTransientTransaction;
         hasTransientTransactionOrRetryableWriteError = true;
-    }
-    if (isRetryableWriteError()) {
-        // RetryableWriteError and TransientTransactionError are mutually exclusive.
-        invariant(!hasTransientTransactionOrRetryableWriteError);
+    } else if (isRetryableWriteError()) {
+        // In the rare case where RetryableWriteError and TransientTransactionError are not mutually
+        // exclusive, only append the TransientTransactionError label so users know to retry the
+        // entire transaction.
         labels << ErrorLabel::kRetryableWrite;
         hasTransientTransactionOrRetryableWriteError = true;
     }
+
     // Change streams cannot run in a transaction, and cannot be a retryable write. Since these
     // labels are only added in the event that we are executing the associated operation, we do
     // not add a ResumableChangeStreamError label if either of them is set.

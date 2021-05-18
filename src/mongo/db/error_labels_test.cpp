@@ -191,6 +191,26 @@ TEST_F(ErrorLabelBuilderTest, TransientTransactionErrorsHaveTransientTransaction
     ASSERT_TRUE(builder.isTransientTransactionError());
 }
 
+TEST_F(
+    ErrorLabelBuilderTest,
+    TransientTransactionErrorWithRetryableWriteConcernErrorHasTransientTransactionErrorLabelOnly) {
+    OperationSessionInfoFromClient sessionInfo;
+    sessionInfo.setTxnNumber(1);
+    sessionInfo.setAutocommit(false);
+    std::string commandName = "commitTransaction";
+
+    auto transientError = ErrorCodes::WriteConflict;
+    auto retryableError = ErrorCodes::InterruptedDueToReplStateChange;
+    auto actualErrorLabels =
+        getErrorLabels(opCtx(), sessionInfo, commandName, transientError, retryableError, false);
+
+    // Ensure only the TransientTransactionError label is attached so users know to retry the entire
+    // transaction.
+    BSONArrayBuilder expectedLabelArray;
+    expectedLabelArray << ErrorLabel::kTransientTransaction;
+    ASSERT_BSONOBJ_EQ(actualErrorLabels, BSON(kErrorLabelsFieldName << expectedLabelArray.arr()));
+}
+
 TEST_F(ErrorLabelBuilderTest, NonRetryableWritesHaveNoRetryableWriteErrorLabel) {
     OperationSessionInfoFromClient sessionInfo;
     std::string commandName = "insert";
