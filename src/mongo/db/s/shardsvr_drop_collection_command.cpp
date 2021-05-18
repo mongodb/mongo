@@ -77,6 +77,8 @@ public:
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
+
             try {
                 const auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns());
 

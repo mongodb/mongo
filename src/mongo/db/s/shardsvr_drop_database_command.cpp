@@ -77,6 +77,8 @@ public:
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
+
             const auto dbName = request().getDbName();
 
             FixedFCVRegion fixedFCVRegion(opCtx);
