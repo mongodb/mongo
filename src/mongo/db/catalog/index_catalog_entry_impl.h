@@ -245,19 +245,20 @@ private:
     // this point, future writers do not need to update the catalog.
     AtomicWord<bool> _isMultikeyForWrite;
 
-    // Controls concurrent access to '_indexMultikeyPaths'. We acquire this mutex rather than the
-    // RESOURCE_METADATA lock as a performance optimization so that it is cheaper to detect whether
-    // there is actually any path-level multikey information to update or not.
+    // Controls concurrent access to '_indexMultikeyPathsForRead'.
+    // We acquire this mutex rather than the RESOURCE_METADATA lock as a performance optimization
+    // so that it is cheaper to detect whether there is actually any path-level multikey
+    // information to update or not.
     mutable Mutex _indexMultikeyPathsMutex =
         MONGO_MAKE_LATCH("IndexCatalogEntryImpl::_indexMultikeyPathsMutex");
 
     // Non-empty only if '_indexTracksPathLevelMultikeyInfo' is true.
     //
-    // If non-empty, '_indexMultikeyPaths' is a vector with size equal to the number of elements
+    // If non-empty, '_indexMultikeyPaths*' is a vector with size equal to the number of elements
     // in the index key pattern. Each element in the vector is an ordered set of positions (starting
     // at 0) into the corresponding indexed field that represent what prefixes of the indexed field
     // causes the index to be multikey.
-    MultikeyPaths _indexMultikeyPaths;
+    MultikeyPaths _indexMultikeyPathsForRead;  // May include paths not committed to catalog.
 
     // The earliest snapshot that is allowed to read this index.
     boost::optional<Timestamp> _minVisibleSnapshot;
