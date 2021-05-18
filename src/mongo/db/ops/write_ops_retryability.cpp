@@ -32,13 +32,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/ops/write_ops_retryability.h"
-
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/find_and_modify_result.h"
+#include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logger/redaction.h"
 #include "mongo/util/log.h"
 
@@ -132,15 +132,30 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
         Timestamp ts = oplog.getTimestamp();
         const auto query = BSON("_id" << sessionIdBson);
         auto imageDoc = client.findOne(NamespaceString::kConfigImagesNamespace.ns(), query);
-        uassert(5637601,
-                str::stream()
-                    << "image collection no longer contains the complete write history of this "
-                       "transaction, record with sessionId "
-                    << sessionIdBson.toString()
-                    << " and txnNumber: "
-                    << txnNumber
-                    << " cannot be found",
-                !imageDoc.isEmpty());
+        if (serverGlobalParams.featureCompatibility.getVersion() <
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+            // We expect to have lost the transaction history since we drop the
+            // 'config.image_collection' table on downgrade FCV.
+            uassert(ErrorCodes::IncompleteTransactionHistory,
+                    str::stream() << "Incomplete transaction history for sessionId: "
+                                  << sessionIdBson
+                                  << " txnNumber: "
+                                  << txnNumber,
+                    !imageDoc.isEmpty());
+        } else {
+            // Other than a real code bug, it is possible to be missing expected transaction
+            // history if the server has gone through an FCV downgrade and then a subsequent
+            // FCV upgrade before retrying.
+            uassert(5637601,
+                    str::stream()
+                        << "image collection no longer contains the complete write history of this "
+                           "transaction, record with sessionId "
+                        << sessionIdBson.toString()
+                        << " and txnNumber: "
+                        << txnNumber
+                        << " cannot be found",
+                    !imageDoc.isEmpty());
+        }
 
         auto entry =
             repl::ImageEntry::parse(IDLParserErrorContext("ImageEntryForRequest"), imageDoc);

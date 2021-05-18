@@ -513,7 +513,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         const auto storeImagesInSideCollection = storeFindAndModifyImagesInSideCollection.load() &&
             serverGlobalParams.featureCompatibility.isVersionInitialized() &&
             serverGlobalParams.featureCompatibility.getVersion() >=
-                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40;
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40;
         opTime = replLogUpdate(opCtx, session, args, storeImagesInSideCollection);
         if (storeImagesInSideCollection && opCtx->getTxnNumber() &&
             args.storeDocOption != OplogUpdateEntryArgs::StoreDocOption::None) {
@@ -588,7 +588,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     } else {
         const auto storeImagesInSideCollection = storeFindAndModifyImagesInSideCollection.load() &&
             serverGlobalParams.featureCompatibility.getVersion() >=
-                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40;
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40;
         opTime = replLogDelete(opCtx,
                                nss,
                                uuid,
