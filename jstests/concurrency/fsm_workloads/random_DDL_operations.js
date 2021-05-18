@@ -47,8 +47,9 @@ var $config = (function() {
             const srcCollName = srcColl.getFullName();
 
             // Rename collection
-            const destCollName = getRandomCollection(db).getFullName();
-            jsTestLog('Executing rename state:' + srcCollName + ' to ' + destCollName);
+            const destCollNS = getRandomCollection(db).getFullName();
+            const destCollName = destCollNS.split('.')[1];
+            jsTestLog('Executing rename state:' + srcCollName + ' to ' + destCollNS);
             assertAlways.commandWorkedOrFailedWithCode(
                 srcColl.renameCollection(destCollName, true /* dropTarget */),
                 [ErrorCodes.NamespaceNotFound, ErrorCodes.ConflictingOperationInProgress]);
