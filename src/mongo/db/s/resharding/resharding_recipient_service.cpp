@@ -72,6 +72,7 @@ MONGO_FAIL_POINT_DEFINE(removeRecipientDocFailpoint);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeCloning);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientDuringCloning);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientDuringOplogApplication);
+MONGO_FAIL_POINT_DEFINE(reshardingRecipientFailsAfterTransitionToCloning);
 
 namespace {
 
@@ -218,6 +219,20 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                 .onUnrecoverableError([](const Status& status) {})
                 .until([](const Status& retryStatus) { return retryStatus.isOK(); })
                 .on(**executor, abortToken);
+        })
+        .onCompletion([this, executor, abortToken](Status status) {
+            if (abortToken.isCanceled()) {
+                return ExecutorFuture<void>(**executor, status);
+            }
+
+            {
+                // The recipient is done with all local transitions until the coordinator makes its
+                // decision.
+                stdx::lock_guard<Latch> lk(_mutex);
+                invariant(_recipientCtx.getState() >= RecipientStateEnum::kError);
+                ensureFulfilledPromise(lk, _inStrictConsistencyOrError);
+            }
+            return ExecutorFuture<void>(**executor, status);
         });
 }
 
@@ -565,6 +580,11 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
         _ensureDataReplicationStarted(opCtx.get(), executor, abortToken);
     }
 
+    reshardingRecipientFailsAfterTransitionToCloning.execute([&](const BSONObj& data) {
+        auto errmsg = data.getStringField("errmsg");
+        uasserted(ErrorCodes::InternalError, errmsg);
+    });
+
     {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         reshardingPauseRecipientDuringCloning.pauseWhileSet(opCtx.get());
@@ -726,7 +746,7 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToStrictConsi
 void ReshardingRecipientService::RecipientStateMachine::_transitionToError(Status abortReason) {
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kError);
-    emplaceAbortReasonIfExists(newRecipientCtx, abortReason);
+    emplaceTruncatedAbortReasonIfExists(newRecipientCtx, abortReason);
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none);
 }
 

@@ -97,6 +97,15 @@ public:
 
     SharedSemiFuture<void> awaitFinalOplogEntriesWritten();
 
+    /**
+     * Returns a Future fulfilled once the donor locally persists its final state before the
+     * coordinator makes its decision to commit or abort (DonorStateEnum::kError or
+     * DonorStateEnum::kBlockingWrites).
+     */
+    SharedSemiFuture<void> awaitInBlockingWritesOrError() const {
+        return _inBlockingWritesOrError.getFuture();
+    }
+
     static void insertStateDocument(OperationContext* opCtx,
                                     const ReshardingDonorDocument& donorDoc);
 
@@ -227,6 +236,8 @@ private:
     SharedPromise<void> _allRecipientsDoneApplying;
 
     SharedPromise<void> _finalOplogEntriesWritten;
+
+    SharedPromise<void> _inBlockingWritesOrError;
 
     SharedPromise<void> _coordinatorHasDecisionPersisted;
 

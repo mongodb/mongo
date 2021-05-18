@@ -88,6 +88,33 @@ bool documentBelongsToMe(OperationContext* opCtx,
 }
 }  // namespace
 
+BSONObj serializeAndTruncateReshardingErrorIfNeeded(Status originalError) {
+    BSONObjBuilder originalBob;
+    originalError.serializeErrorToBSON(&originalBob);
+    auto originalObj = originalBob.obj();
+
+    if (originalObj.objsize() <= kReshardErrorMaxBytes ||
+        originalError.code() == ErrorCodes::ReshardCollectionTruncatedError) {
+        // The provided originalError either meets the size constraints or has already been
+        // truncated (and is just slightly larger than 2000 bytes to avoid complicating the
+        // truncation math).
+        return originalObj;
+    }
+
+    // ReshardCollectionAborted has special internal handling. It should always have a short, fixed
+    // error message so it never exceeds the size limit and requires truncation and error code
+    // substitution.
+    invariant(originalError.code() != ErrorCodes::ReshardCollectionAborted);
+
+    auto originalErrorStr = originalError.toString();
+    auto truncatedErrorStr =
+        str::UTF8SafeTruncation(StringData(originalErrorStr), kReshardErrorMaxBytes);
+    Status truncatedError{ErrorCodes::ReshardCollectionTruncatedError, truncatedErrorStr};
+    BSONObjBuilder truncatedBob;
+    truncatedError.serializeErrorToBSON(&truncatedBob);
+    return truncatedBob.obj();
+}
+
 DonorShardEntry makeDonorShard(ShardId shardId,
                                DonorStateEnum donorState,
                                boost::optional<Timestamp> minFetchTimestamp,
@@ -95,7 +122,7 @@ DonorShardEntry makeDonorShard(ShardId shardId,
     DonorShardContext donorCtx;
     donorCtx.setState(donorState);
     emplaceMinFetchTimestampIfExists(donorCtx, minFetchTimestamp);
-    emplaceAbortReasonIfExists(donorCtx, abortReason);
+    emplaceTruncatedAbortReasonIfExists(donorCtx, abortReason);
 
     return DonorShardEntry{std::move(shardId), std::move(donorCtx)};
 }
@@ -105,7 +132,7 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
                                        boost::optional<Status> abortReason) {
     RecipientShardContext recipientCtx;
     recipientCtx.setState(recipientState);
-    emplaceAbortReasonIfExists(recipientCtx, abortReason);
+    emplaceTruncatedAbortReasonIfExists(recipientCtx, abortReason);
 
     return RecipientShardEntry{std::move(shardId), std::move(recipientCtx)};
 }

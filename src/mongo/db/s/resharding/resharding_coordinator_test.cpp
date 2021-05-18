@@ -673,7 +673,7 @@ protected:
         auto expectedCoordinatorDoc = coordinatorDoc;
         expectedCoordinatorDoc.setState(CoordinatorStateEnum::kAborting);
         auto abortReason = Status{errorCode, "reason to abort"};
-        emplaceAbortReasonIfExists(expectedCoordinatorDoc, abortReason);
+        emplaceTruncatedAbortReasonIfExists(expectedCoordinatorDoc, abortReason);
 
         writeStateTransitionUpdateExpectSuccess(operationContext(), expectedCoordinatorDoc);
     }

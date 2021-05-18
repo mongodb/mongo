@@ -419,7 +419,6 @@ error_codes:
     - {code: 337, name: AuthenticationAbandoned, categories: [InternalOnly]}
     
     - {code: 338, name: ReshardCollectionInProgress}
-
     - {code: 339, name: NoSuchReshardCollection}
     - {code: 340, name: ReshardCollectionCommitted}
     - {code: 341, name: ReshardCollectionAborted}
@@ -442,6 +441,8 @@ error_codes:
 
     - {code: 349, name: KeyPatternShorterThanBound}
 
+    - {code: 350, name: ReshardCollectionTruncatedError}
+    
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

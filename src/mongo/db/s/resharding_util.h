@@ -47,10 +47,12 @@
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
 constexpr auto kReshardFinalOpLogType = "reshardFinalOp"_sd;
+static const auto kReshardErrorMaxBytes = 2000;
 
 /**
  * Emplaces the 'fetchTimestamp' onto the ClassWithFetchTimestamp if the timestamp has been
@@ -118,11 +120,21 @@ void emplaceMinFetchTimestampIfExists(ClassWithMinFetchTimestamp& c,
 }
 
 /**
+ * Returns a serialized version of the originalError status. If the originalError status exceeds
+ * maxErrorBytes, truncates the status and returns it in the errmsg field of a new status with code
+ * ErrorCodes::ReshardingCollectionTruncatedError.
+ */
+BSONObj serializeAndTruncateReshardingErrorIfNeeded(Status originalError);
+
+/**
  * Emplaces the 'abortReason' onto the ClassWithAbortReason if the reason has been emplaced inside
- * the boost::optional.
+ * the boost::optional. If the 'abortReason' is too large, emplaces a status with
+ * ErrorCodes::ReshardCollectionTruncatedError and a truncated version of the 'abortReason' for the
+ * errmsg.
  */
 template <class ClassWithAbortReason>
-void emplaceAbortReasonIfExists(ClassWithAbortReason& c, boost::optional<Status> abortReason) {
+void emplaceTruncatedAbortReasonIfExists(ClassWithAbortReason& c,
+                                         boost::optional<Status> abortReason) {
     if (!abortReason) {
         return;
     }
@@ -134,10 +146,9 @@ void emplaceAbortReasonIfExists(ClassWithAbortReason& c, boost::optional<Status>
         return;
     }
 
-    BSONObjBuilder bob;
-    abortReason.get().serializeErrorToBSON(&bob);
+    auto truncatedAbortReasonObj = serializeAndTruncateReshardingErrorIfNeeded(abortReason.get());
     AbortReason abortReasonStruct;
-    abortReasonStruct.setAbortReason(bob.obj());
+    abortReasonStruct.setAbortReason(truncatedAbortReasonObj);
     c.setAbortReasonStruct(std::move(abortReasonStruct));
 }
 

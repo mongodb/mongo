@@ -260,6 +260,20 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                 .onUnrecoverableError([](const Status& status) {})
                 .until([](const Status& status) { return status.isOK(); })
                 .on(**executor, abortToken);
+        })
+        .onCompletion([this, executor, abortToken](Status status) {
+            if (abortToken.isCanceled()) {
+                return ExecutorFuture<void>(**executor, status);
+            }
+
+            {
+                // The donor is done with all local transitions until the coordinator makes its
+                // decision.
+                stdx::lock_guard<Latch> lk(_mutex);
+                invariant(_donorCtx.getState() >= DonorStateEnum::kError);
+                ensureFulfilledPromise(lk, _inBlockingWritesOrError);
+            }
+            return ExecutorFuture<void>(**executor, status);
         });
 }
 
@@ -527,10 +541,13 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
         .thenRunOn(**executor)
         .then([this]() { _transitionState(DonorStateEnum::kDonatingOplogEntries); })
         .onCompletion([=](Status s) {
-            if (MONGO_unlikely(
-                    reshardingDonorFailsAfterTransitionToDonatingOplogEntries.shouldFail())) {
-                uasserted(ErrorCodes::InternalError, "Failing for test");
-            }
+            reshardingDonorFailsAfterTransitionToDonatingOplogEntries.execute(
+                [&](const BSONObj& data) {
+                    auto errmsgElem = data["errmsg"];
+                    StringData errmsg =
+                        errmsgElem ? errmsgElem.checkAndGetStringData() : "Failing for test"_sd;
+                    uasserted(ErrorCodes::InternalError, errmsg);
+                });
         });
 }
 
@@ -714,7 +731,7 @@ void ReshardingDonorService::DonorStateMachine::_transitionToDonatingInitialData
 void ReshardingDonorService::DonorStateMachine::_transitionToError(Status abortReason) {
     auto newDonorCtx = _donorCtx;
     newDonorCtx.setState(DonorStateEnum::kError);
-    emplaceAbortReasonIfExists(newDonorCtx, abortReason);
+    emplaceTruncatedAbortReasonIfExists(newDonorCtx, abortReason);
     _transitionState(std::move(newDonorCtx));
 }
 

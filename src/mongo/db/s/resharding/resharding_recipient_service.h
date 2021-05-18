@@ -128,6 +128,15 @@ public:
     void interrupt(Status status) override;
 
     /**
+     * Returns a Future fulfilled once the recipient locally persists its final state before the
+     * coordinator makes its decision to commit or abort (RecipientStateEnum::kError or
+     * RecipientStateEnum::kStrictConsistency).
+     */
+    SharedSemiFuture<void> awaitInStrictConsistencyOrError() const {
+        return _inStrictConsistencyOrError.getFuture();
+    }
+
+    /**
      * Returns a Future that will be resolved when all work associated with this Instance is done
      * making forward progress.
      */
@@ -272,6 +281,8 @@ private:
     // Each promise below corresponds to a state on the recipient state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.
     SharedPromise<CloneDetails> _allDonorsPreparedToDonate;
+
+    SharedPromise<void> _inStrictConsistencyOrError;
 
     SharedPromise<void> _coordinatorHasDecisionPersisted;
 

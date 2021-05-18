@@ -34,6 +34,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/op_observer_registry.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
@@ -531,6 +533,67 @@ TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenD
         AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
         ASSERT_TRUE(bool(coll));
         ASSERT_EQ(coll->uuid(), doc.getReshardingUUID());
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
+    for (bool isAlsoDonor : {false, true}) {
+        LOGV2(5568600,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "isAlsoDonor"_attr = isAlsoDonor);
+
+        std::string xlErrMsg(6000, 'x');
+        FailPointEnableBlock failpoint("reshardingRecipientFailsAfterTransitionToCloning",
+                                       BSON("errmsg" << xlErrMsg));
+
+        auto doc = makeStateDocument(isAlsoDonor);
+        auto opCtx = makeOperationContext();
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        notifyToStartCloning(opCtx.get(), *recipient, doc);
+
+        auto localTransitionToErrorFuture = recipient->awaitInStrictConsistencyOrError();
+        ASSERT_OK(localTransitionToErrorFuture.getNoThrow());
+
+        // The recipient still waits for the abort decision from the coordinator despite it having
+        // errored locally. It is therefore safe to check its local state document until
+        // RecipientStateMachine::abort() is called.
+        {
+            boost::optional<ReshardingRecipientDocument> persistedRecipientDocument;
+            PersistentTaskStore<ReshardingRecipientDocument> store(
+                NamespaceString::kRecipientReshardingOperationsNamespace);
+            store.forEach(opCtx.get(),
+                          QUERY(ReshardingRecipientDocument::kReshardingUUIDFieldName
+                                << doc.getReshardingUUID()),
+                          [&](const auto& recipientDocument) {
+                              persistedRecipientDocument.emplace(recipientDocument);
+                              return false;
+                          });
+
+            ASSERT(persistedRecipientDocument);
+            auto persistedAbortReasonBSON =
+                persistedRecipientDocument->getMutableState().getAbortReason();
+            ASSERT(persistedAbortReasonBSON);
+            // The actual abortReason will be slightly larger than kReshardErrorMaxBytes bytes due
+            // to the primitive truncation algorithm - Check that the total size is less than
+            // kReshardErrorMaxBytes + a couple additional bytes to provide a buffer for the field
+            // name sizes.
+            int maxReshardErrorBytesCeiling = kReshardErrorMaxBytes + 200;
+            ASSERT_LT(persistedAbortReasonBSON->objsize(), maxReshardErrorBytesCeiling);
+            ASSERT_EQ(persistedAbortReasonBSON->getIntField("code"),
+                      ErrorCodes::ReshardCollectionTruncatedError);
+        }
+
+        recipient->abort(false);
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
     }
 }
 
