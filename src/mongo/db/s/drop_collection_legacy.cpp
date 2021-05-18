@@ -33,6 +33,7 @@
 
 #include "mongo/db/s/drop_collection_legacy.h"
 
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/logv2/log.h"
@@ -208,6 +209,10 @@ void dropCollectionLegacy(OperationContext* opCtx,
     ON_BLOCK_EXIT([opCtx, nss] {
         Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss);
     });
+
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer && !nss.isConfigDB()) {
+        DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, nss.db());
+    }
 
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
