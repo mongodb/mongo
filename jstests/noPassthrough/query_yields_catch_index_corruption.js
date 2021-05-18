@@ -22,6 +22,7 @@ assert.commandWorked(db.adminCommand({
 }));
 
 let coll = db.getCollection(collName);
+assert.commandWorked(db.createCollection(collName, {writeConcern: {w: "majority"}}));
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
 // Corrupt the collection by inserting a document and then deleting it without deleting its index
