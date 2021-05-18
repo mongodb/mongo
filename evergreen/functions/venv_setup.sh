@@ -1,10 +1,11 @@
 # exit immediately if virtualenv is not found
 set -o errexit
 
-evergreen_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-. "$evergreen_dir/../prelude_python.sh"
+evergreen_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)/.."
+. "$evergreen_dir/prelude_workdir.sh"
+. "$evergreen_dir/prelude_python.sh"
 
-python_loc=$(which ${python:-/opt/mongodbtoolchain/v3/bin/python3})
+python_loc=$(which ${python})
 venv_dir="${workdir}/venv"
 if [ -d "$venv_dir" ]; then
   exit 0
@@ -34,7 +35,7 @@ toolchain_txt="$pip_dir/toolchain-requirements.txt"
 
 # the whole prelude cannot be imported because it requires pyyaml to be
 # installed, which happens just below.
-. "$evergreen_dir/../prelude_venv.sh"
+. "$evergreen_dir/prelude_venv.sh"
 
 activate_venv
 echo "Upgrading pip to 21.0.1"

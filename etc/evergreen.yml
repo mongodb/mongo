@@ -382,8 +382,6 @@ functions:
         binary: bash
         args:
           - "src/evergreen/functions/files_remove.sh"
-        env:
-          workdir: ${workdir}
 
   "configure evergreen api credentials": &configure_evergreen_api_credentials
     command: subprocess.exec
@@ -392,8 +390,6 @@ functions:
       binary: bash
       args:
         - "src/evergreen/functions/evergreen_api_credentials_configure.sh"
-      env:
-        workdir: ${workdir}
 
   "configure selected tests credentials": &configure_selected_tests_credentials
     command: subprocess.exec
@@ -465,8 +461,6 @@ functions:
       binary: bash
       args:
         - "src/evergreen/functions/binaries_extract.sh"
-      env:
-        workdir: ${workdir}
 
   "check binary version": &check_binary_version
     command: subprocess.exec
@@ -474,8 +468,6 @@ functions:
       binary: bash
       args:
         - "src/evergreen/functions/binary_version_check.sh"
-      env:
-        workdir: ${workdir}
 
   "fetch benchmarks": &fetch_benchmarks
     command: s3.get
@@ -564,8 +556,6 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/functions/system_resource_info_collect.sh"
-      env:
-        workdir: ${workdir}
 
   # Run a monitor process as a background, system task to periodically
   # display how many threads interesting processes are using.
@@ -577,8 +567,6 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/functions/process_threads_monitor.sh"
-      env:
-        workdir: ${workdir}
 
   "set up credentials": &set_up_credentials
     command: subprocess.exec
@@ -587,8 +575,6 @@ functions:
       silent: true
       args:
         - "./src/evergreen/functions/credentials_setup.sh"
-      env:
-        workdir: ${workdir}
 
   "set up win mount script":
     - *f_expansions_write
@@ -598,8 +584,6 @@ functions:
         silent: true
         args:
           - "./src/evergreen/functions/win_mount_script_setup.sh"
-        env:
-          workdir: ${workdir}
 
   "set up notary client credentials":
     - *f_expansions_write
@@ -609,8 +593,6 @@ functions:
         silent: true
         args:
           - "./src/evergreen/functions/notary_client_credentials_setup.sh"
-        env:
-          workdir: ${workdir}
 
   "f_remote_credentials_setup_exec": &set_up_remote_credentials
     command: subprocess.exec
@@ -619,7 +601,6 @@ functions:
       args:
         - "./src/evergreen/functions/remote_credentials_setup.sh"
       env:
-        workdir: ${workdir}
         private_key_remote_bash_var: ${private_key_remote}
 
   "set up remote credentials":
@@ -634,8 +615,6 @@ functions:
         silent: true
         args:
           - "./src/evergreen/functions/bf_suggestion_service_call.sh"
-        env:
-          workdir: ${workdir}
 
   "upload debugsymbols": &upload_debugsymbols
     command: s3.put
@@ -664,8 +643,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/functions/wiredtiger_develop_use.sh"
-        env:
-          workdir: ${workdir}
 
   "shared scons cache pruning":
     - *f_expansions_write
@@ -675,8 +652,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/functions/shared_scons_cache_pruning.sh"
-        env:
-          workdir: ${workdir}
 
   "umount shared scons directory":
     - *f_expansions_write
@@ -685,8 +660,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/functions/shared_scons_directory_umount.sh"
-        env:
-          workdir: ${workdir}
 
   "get all modified patch files":
     - *f_expansions_write
@@ -695,8 +668,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/functions/modified_patch_files_get_all.sh"
-        env:
-          workdir: ${workdir}
 
   # This function should only be called from patch-build-only tasks.
   "get added and modified patch files":
@@ -706,8 +677,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/functions/added_and_modified_patch_files_get.sh"
-        env:
-          workdir: ${workdir}
 
   "determine resmoke jobs": &determine_resmoke_jobs
     command: subprocess.exec
@@ -715,8 +684,6 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/functions/resmoke_jobs_determine.sh"
-      env:
-        workdir: ${workdir}
 
   "update resmoke jobs expansions": &update_resmoke_jobs_expansions
     command: expansions.update
@@ -730,8 +697,6 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/functions/task_timeout_determine.sh"
-      env:
-        workdir: ${workdir}
 
   "update task timeout expansions": &update_task_timeout_expansions
     command: expansions.update
@@ -780,8 +745,8 @@ functions:
       args:
         - "src/evergreen/functions/venv_setup.sh"
       env:
-        workdir: ${workdir}
         pip_dir: ${pip_dir}
+        workdir: ${workdir}
 
   "upload pip requirements": &upload_pip_requirements
     command: s3.put
@@ -846,8 +811,6 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/multiversion_setup.sh"
-      env:
-        workdir: ${workdir}
 
   "do multiversion setup":
     - *f_expansions_write
@@ -860,8 +823,6 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/compiled_binaries_get.sh"
-      env:
-        workdir: ${workdir}
 
   "generate powercycle tasks":
     - *f_expansions_write
@@ -873,8 +834,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/powercycle_tasks_generate.sh"
-        env:
-          workdir: ${workdir}
 
     - command: archive.targz_pack
       params:
@@ -911,8 +870,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/powercycle_sentinel_run.sh"
-        env:
-          workdir: ${workdir}
 
   "execute resmoke tests": &execute_resmoke_tests
     command: subprocess.exec
@@ -921,8 +878,6 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/resmoke_tests_execute.sh"
-      env:
-        workdir: ${workdir}
 
   "retrieve generated test configuration": &retrieve_generated_test_configuration
     command: s3.get
@@ -954,8 +909,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/selected_tests_generate.sh"
-        env:
-          workdir: ${workdir}
     - command: archive.targz_pack
       params:
         target: generate_tasks_config.tgz
@@ -988,8 +941,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/burn_in_tests_generate.sh"
-        env:
-          workdir: ${workdir}
     - command: archive.targz_pack
       params:
         target: burn_in_tags_gen.tgz
@@ -1026,8 +977,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/randomized_multiversion_tasks_generate.sh"
-        env:
-          workdir: ${workdir}
 
     - *do_multiversion_setup
     - command: subprocess.exec
@@ -1035,8 +984,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/randomized_multiversion_tasks_generate_exclude_tags.sh"
-        env:
-          workdir: ${workdir}
     - command: archive.targz_pack
       params:
         target: generate_tasks_config.tgz
@@ -1085,8 +1032,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/resmoke_tasks_generate.sh"
-        env:
-          workdir: ${workdir}
 
     - command: archive.targz_pack
       params:
@@ -1196,8 +1141,6 @@ functions:
         binary: bash
         args:
           - "src/evergreen/scons_lint.sh"
-        env:
-          workdir: ${workdir}
 
   "scons compile":
     - *f_expansions_write
@@ -1207,9 +1150,6 @@ functions:
         binary: bash
         args:
           - "src/evergreen/scons_compile.sh"
-        env:
-          workdir: ${workdir}
-          patch_compile_flags: ${patch_compile_flags}
 
   "generate compile expansions":
     - *f_expansions_write
@@ -1218,8 +1158,6 @@ functions:
         binary: bash
         args:
           - "src/evergreen/functions/compile_expansions_generate.sh"
-        env:
-          workdir: ${workdir}
 
   "apply compile expansions":
     - command: expansions.update
@@ -1244,8 +1182,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/do_jepsen_setup/nodes.sh"
-        env:
-          workdir: ${workdir}
     - command: subprocess.exec
       params:
         binary: bash
@@ -1261,15 +1197,11 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/jepsen_test_run.sh"
-        env:
-          workdir: ${workdir}
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "./src/evergreen/jepsen_test_fail.sh"
-        env:
-          workdir: ${workdir}
 
   "load aws test credentials":
     - *f_expansions_write
@@ -1279,8 +1211,6 @@ functions:
         silent: true
         args:
           - "./src/evergreen/functions/aws_test_credentials_load.sh"
-        env:
-          workdir: ${workdir}
 
 
   "generate explicit multiversion tasks":
@@ -1302,8 +1232,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/explicit_multiversion_tasks_generate.sh"
-        env:
-          workdir: ${workdir}
 
     - command: archive.targz_pack
       params:
@@ -1357,8 +1285,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/implicit_multiversions_tasks_generate.sh"
-        env:
-          workdir: ${workdir}
 
     - command: archive.targz_pack
       params:
@@ -1410,8 +1336,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/fuzzer_tasks_generate.sh"
-        env:
-          workdir: ${workdir}
 
     - command: archive.targz_pack
       params:
@@ -1449,8 +1373,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/jstestfuzz_setup.sh"
-        env:
-          workdir: ${workdir}
 
   "lint fuzzer sanity patch":
     - *f_expansions_write
@@ -1460,8 +1382,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/lint_fuzzer_sanity_patch.sh"
-        env:
-          workdir: ${workdir}
 
   "lint fuzzer sanity all":
     - *f_expansions_write
@@ -1471,8 +1391,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/lint_fuzzer_sanity_all.sh"
-        env:
-          workdir: ${workdir}
 
   # Used by generator
   "run jstestfuzz":
@@ -1489,16 +1407,12 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/jstestfuzz_run.sh"
-        env:
-          workdir: ${workdir}
     # TODO SERVER-57161 remove this touch command
     - command: subprocess.exec
       params:
         binary: touch
         args:
           - "./src/jstestfuzz/out/placeholder.js"
-        env:
-          workdir: ${workdir}
     - command: archive.targz_pack
       params:
         target: "jstests.tgz"
@@ -1525,8 +1439,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/idl_tests_run.sh"
-        env:
-          workdir: ${workdir}
 
   "run powercycle test":
     - *f_expansions_write
@@ -1536,8 +1448,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/powercycle_run_test.sh"
-        env:
-          workdir: ${workdir}
 
     - command: expansions.update
       params:
@@ -1556,16 +1466,12 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/powercycle_ssh_failure_exit.sh"
-        env:
-          workdir: ${workdir}
     - command: subprocess.exec
       type: test
       params:
         binary: bash
         args:
           - "./src/evergreen/powercycle_exit.sh"
-        env:
-          workdir: ${workdir}
 
   "run packager.py":
     - *f_expansions_write
@@ -1574,8 +1480,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/packager.py_run.sh"
-        env:
-          workdir: ${workdir}
 
   "do snmp setup":
     command: subprocess.exec
@@ -1614,8 +1518,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/kitchen_run.sh"
-        env:
-          workdir: ${workdir}
 
   "set up EC2 instance": &set_up_ec2_instance
 
@@ -1640,8 +1542,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/powercycle_check_host.sh"
-        env:
-          workdir: ${workdir}
 
     - command: expansions.update
       params:
@@ -1653,8 +1553,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/powercycle_setup_host.sh"
-        env:
-          workdir: ${workdir}
 
   ### Process & archive remote EC2 artifacts ###
   "save powercycle artifacts": &save_powercycle_artifacts
@@ -1663,8 +1561,6 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/powercycle_save_artifacts.sh"
-      env:
-        workdir: ${workdir}
 
   "archive remote EC2 artifacts": &archive_remote_ec2_artifacts
     command: s3.put
@@ -1705,8 +1601,6 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/local_client_logs_tar.sh"
-      env:
-        workdir: ${workdir}
 
   "archive local client logs": &archive_local_client_logs
     command: s3.put
@@ -1860,8 +1754,6 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/failed_unittests_gather.sh"
-      env:
-        workdir: ${workdir}
 
   "tar failed unittests": &tar_failed_unittests
     command: archive.targz_pack
@@ -1927,8 +1819,6 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/hang_analyzer.sh"
-      env:
-        workdir: ${workdir}
 
   "wait for resmoke to shutdown":
     command: subprocess.exec
@@ -2078,8 +1968,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/scons_splunk.sh"
-        env:
-          workdir: ${workdir}
 
   "attach report":
     command: attach.results
@@ -2101,8 +1989,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/wiki_page.sh"
-        env:
-          workdir: ${workdir}
     - command: attach.artifacts
       params:
         files:
@@ -2200,8 +2086,6 @@ tasks:
         binary: bash
         args:
           - "src/evergreen/gen_feature_flags.sh"
-        env:
-          workdir: ${workdir}
 
     - command: archive.targz_pack
       params:
@@ -2286,8 +2170,6 @@ tasks:
         binary: bash
         args:
           - "./src/evergreen/ninja_compile.sh"
-        env:
-          workdir: ${workdir}
 
 - name: compile_ninja_next
   commands:
@@ -2307,8 +2189,6 @@ tasks:
         binary: bash
         args:
           - "./src/evergreen/ninja_compile.sh"
-        env:
-          workdir: ${workdir}
 
 - name: compile_build_tools_next
   commands:
@@ -2327,8 +2207,6 @@ tasks:
         binary: bash
         args:
           - "src/evergreen/libdeps_setup.sh"
-        env:
-          workdir: ${workdir}
 
     - func: "scons compile"
       vars:
@@ -2343,8 +2221,6 @@ tasks:
         binary: bash
         args:
           - "src/evergreen/libdeps_run.sh"
-        env:
-          workdir: ${workdir}
 
     - command: s3.put
       params:
@@ -2545,8 +2421,6 @@ tasks:
         binary: bash
         args:
           - "src/evergreen/embedded_sdk_build_cdriver.sh"
-        env:
-          workdir: ${workdir}
 
 - name: embedded_sdk_install_dev
   depends_on:
@@ -2580,8 +2454,6 @@ tasks:
         binary: bash
         args:
           - "src/evergreen/embedded_sdk_s3_tar.sh"
-        env:
-          workdir: ${workdir}
 
     # Upload it so we can download from EVG.
     - command: s3.put
@@ -2624,8 +2496,6 @@ tasks:
         binary: bash
         args:
           - "src/evergreen/embedded_sdk_tests_s3_tar.sh"
-        env:
-          workdir: ${workdir}
 
     # Upload it so we can download from EVG.
     - command: s3.put
@@ -2651,15 +2521,11 @@ tasks:
         binary: bash
         args:
           - "src/evergreen/embedded_sdk_run_tests.sh"
-        env:
-          workdir: ${workdir}
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "src/evergreen/embedded_sdk_run_tests_post.sh"
-        env:
-          workdir: ${workdir}
 
 - name: embedded_sdk_s3_put_latest
   depends_on:
@@ -2718,8 +2584,6 @@ tasks:
         binary: bash
         args:
           - "src/evergreen/stitch_support_create_lib_tar.sh"
-        env:
-          workdir: ${workdir}
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -2759,8 +2623,6 @@ tasks:
         binary: bash
         args:
           - "src/evergreen/stitch_support_run_tests.sh"
-        env:
-          workdir: ${workdir}
 
 - name: compile_benchmarks
   depends_on: []
@@ -2884,8 +2746,6 @@ tasks:
       binary: bash
       args:
         - "src/evergreen/lint_yaml.sh"
-      env:
-        workdir: ${workdir}
 
 - name: lint_shellscripts
   commands:
@@ -2925,8 +2785,6 @@ tasks:
         binary: bash
         args:
           - "src/evergreen/check_idl_compat.sh"
-        env:
-          workdir: ${workdir}
 
 - name: burn_in_tests_gen
   commands:
@@ -2943,8 +2801,6 @@ tasks:
       binary: bash
       args:
         - "src/evergreen/burn_in_tests.sh"
-      env:
-        workdir: ${workdir}
   - command: archive.targz_pack
     params:
       target: src/burn_in_tests_gen.tgz
@@ -2983,8 +2839,6 @@ tasks:
       binary: bash
       args:
         - "src/evergreen/burn_in_tests_multiversion.sh"
-      env:
-        workdir: ${workdir}
 
   - command: archive.targz_pack
     params:
@@ -4472,8 +4326,6 @@ tasks:
       binary: bash
       args:
         - "src/evergreen/external_auth_pip.sh"
-      env:
-        workdir: ${workdir}
   - func: "run tests"
     vars:
       resmoke_args: --suites=external_auth --excludeWithAnyTags=requires_domain_controller --storageEngine=wiredTiger
@@ -4490,15 +4342,11 @@ tasks:
       silent: true
       args:
         - "src/evergreen/external_auth_aws_setup.sh"
-      env:
-        workdir: ${workdir}
   - command: subprocess.exec
     params:
       binary: bash
       args:
         - "src/evergreen/external_auth_aws_pip.sh"
-      env:
-        workdir: ${workdir}
   - func: "run tests"
     vars:
       resmoke_args: --suites=external_auth_aws --storageEngine=wiredTiger
@@ -6271,16 +6119,12 @@ tasks:
       silent: true
       args:
         - "src/evergreen/blackduck_setup.sh"
-      env:
-        workdir: ${workdir}
   - command: subprocess.exec
     type: test
     params:
       binary: bash
       args:
         - "src/evergreen/blackduck_hub.sh"
-      env:
-        workdir: ${workdir}
 
 - name: tla_plus
   commands:
@@ -6355,8 +6199,6 @@ tasks:
         binary: bash
         args:
           - "src/evergreen/package.sh"
-        env:
-          workdir: ${workdir}
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -6506,8 +6348,6 @@ tasks:
         binary: bash
         args:
           - "./src/evergreen/packages_publish.sh"
-        env:
-          workdir: ${workdir}
 
 - name: push
   tags: ["publish"]
@@ -6571,8 +6411,6 @@ tasks:
         binary: bash
         args:
           - "./src/evergreen/notary_client_run.sh"
-        env:
-          workdir: ${workdir}
 
     # Put the binaries tarball/zipfile
     - command: s3.put
@@ -7121,8 +6959,6 @@ tasks:
       binary: bash
       args:
         - "./src/evergreen/commit_message_validate.sh"
-      env:
-        workdir: ${workdir}
 
 - name: check_for_todos
   exec_timeout_secs: 600 # 10 minute timeout
@@ -7138,8 +6974,6 @@ tasks:
         binary: bash
         args:
           - "./src/evergreen/todos_check.sh"
-        env:
-          workdir: ${workdir}
 
 - <<: *task_template
   name: mqlrun

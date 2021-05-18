@@ -2,20 +2,12 @@ if [[ "$0" == *"/evergreen/prelude.sh" ]]; then
   echo "ERROR: do not execute this script. source it instead. ie: . prelude.sh"
   exit 1
 fi
+set -o errexit
 
 # path the directory that contains this script.
 evergreen_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-# bootstrapping python assumes that the user has not cd'd before the prelude.
-# Ensure that here.
-calculated_workdir=$(cd "$evergreen_dir/../.." && echo $PWD)
-if [ "$PWD" != "$calculated_workdir" ]; then
-  echo "ERROR: Your script changed directory before loading prelude.sh. Don't do that"
-  echo "\$PWD: $PWD"
-  echo "\$calculated_workdir: $calculated_workdir"
-  exit 1
-fi
-
+. "$evergreen_dir/prelude_workdir.sh"
 . "$evergreen_dir/prelude_python.sh"
 . "$evergreen_dir/prelude_venv.sh"
 
@@ -79,3 +71,4 @@ function set_sudo {
     set -o errexit
   fi
 }
+set +o errexit
