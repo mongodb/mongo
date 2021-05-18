@@ -72,6 +72,7 @@ class workload_generator : public component {
 
         /* Populate the database. */
         _database_operation->populate(_database, _timestamp_manager, _config, _tracking);
+        _db_populated = true;
 
         /* Retrieve useful parameters from the test configuration. */
         transaction_config = _config->get_subconfig(OPS_PER_TRANSACTION);
@@ -87,7 +88,7 @@ class workload_generator : public component {
         testutil_assert(value_size >= 0);
 
         /* Generate threads to execute read operations on the collections. */
-        for (size_t i = 0; i < read_threads; ++i) {
+        for (size_t i = 0; i < read_threads && _running; ++i) {
             thread_context *tc = new thread_context(_timestamp_manager, _tracking, _database,
               thread_operation::READ, max_operation_per_transaction, min_operation_per_transaction,
               value_size, throttle());
@@ -96,7 +97,7 @@ class workload_generator : public component {
         }
 
         /* Generate threads to execute update operations on the collections. */
-        for (size_t i = 0; i < update_threads; ++i) {
+        for (size_t i = 0; i < update_threads && _running; ++i) {
             thread_context *tc = new thread_context(_timestamp_manager, _tracking, _database,
               thread_operation::UPDATE, max_operation_per_transaction,
               min_operation_per_transaction, value_size, throttle(update_config));
@@ -123,7 +124,13 @@ class workload_generator : public component {
     database &
     get_database()
     {
-        return _database;
+        return (_database);
+    }
+
+    bool
+    db_populated() const
+    {
+        return (_db_populated);
     }
 
     /* Workload threaded operations. */
@@ -161,6 +168,7 @@ class workload_generator : public component {
     timestamp_manager *_timestamp_manager;
     workload_tracking *_tracking;
     std::vector<thread_context *> _workers;
+    bool _db_populated = false;
 };
 } // namespace test_harness
 

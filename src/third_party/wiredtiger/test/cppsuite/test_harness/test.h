@@ -124,6 +124,10 @@ class test : public database_operation {
         for (const auto &it : _components)
             _thread_manager->add_thread(&component::run, it);
 
+        /* The initial population phase needs to be finished before starting the actual test. */
+        while (_workload_generator->enabled() && !_workload_generator->db_populated())
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
         /* The test will run for the duration as defined in the config. */
         duration_seconds = _config->get_int(DURATION_SECONDS);
         testutil_assert(duration_seconds >= 0);
@@ -135,7 +139,7 @@ class test : public database_operation {
         _thread_manager->join();
 
         /* Validation stage. */
-        if (_workload_tracking->is_enabled()) {
+        if (_workload_tracking->enabled()) {
             workload_validation wv;
             wv.validate(_workload_tracking->get_operation_table_name(),
               _workload_tracking->get_schema_table_name(), _workload_generator->get_database());

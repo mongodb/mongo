@@ -120,7 +120,7 @@ class thread_context {
     void
     begin_transaction(WT_SESSION *session, const std::string &config)
     {
-        if (!_in_txn && _timestamp_manager->is_enabled()) {
+        if (!_in_txn && _timestamp_manager->enabled()) {
             testutil_check(
               session->begin_transaction(session, config.empty() ? nullptr : config.c_str()));
             /* This randomizes the number of operations to be executed in one transaction. */
@@ -142,7 +142,7 @@ class thread_context {
     bool
     can_commit_transaction() const
     {
-        return (_timestamp_manager->is_enabled() && _in_txn &&
+        return (_timestamp_manager->enabled() && _in_txn &&
           (!_running || (_current_op_count > _max_op_count)));
     }
 
@@ -168,7 +168,7 @@ class thread_context {
     void
     set_commit_timestamp(WT_SESSION *session, wt_timestamp_t ts)
     {
-        if (!_timestamp_manager->is_enabled())
+        if (!_timestamp_manager->enabled())
             return;
 
         std::string config = std::string(COMMIT_TS) + "=" + _timestamp_manager->decimal_to_hex(ts);

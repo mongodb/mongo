@@ -58,7 +58,7 @@ class database_operation {
         int64_t collection_count, key_count, key_cpt, key_size, value_size;
         std::string collection_name, cfg, home;
         key_value_t generated_key, generated_value;
-        bool ts_enabled = timestamp_manager->is_enabled();
+        bool ts_enabled = timestamp_manager->enabled();
 
         cursor = nullptr;
         collection_count = key_count = key_size = value_size = 0;
