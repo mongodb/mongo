@@ -1046,8 +1046,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
         auto indexFilterKeySlots = makeIndexKeyOutputSlotsMatchingParentReqs(
             ixn->index.keyPattern, indexFilterKeyBitset, indexKeyBitset, indexKeySlots);
 
-        relevantSlots.insert(
-            relevantSlots.end(), indexFilterKeySlots.begin(), indexFilterKeySlots.end());
+        // Relevant slots must include slots for all index keys in case they are needed by parent
+        // stages (for instance, covered shard filter).
+        relevantSlots.insert(relevantSlots.end(), indexKeySlots.begin(), indexKeySlots.end());
 
         auto outputStage = generateIndexFilter(state,
                                                ixn->filter.get(),
