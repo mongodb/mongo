@@ -34,6 +34,7 @@
 #include "mongo/db/s/drop_database_legacy.h"
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/drop_collection_legacy.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -69,6 +70,11 @@ void dropDatabaseLegacy(OperationContext* opCtx, StringData dbName) {
         opCtx, dbName, "dropDatabase", DistLockManager::kDefaultLockTimeout));
 
     ON_BLOCK_EXIT([&] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbName); });
+
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+        dbName != NamespaceString::kConfigDb) {
+        DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, dbName);
+    }
 
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
