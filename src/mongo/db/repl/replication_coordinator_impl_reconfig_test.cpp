@@ -32,7 +32,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/jsobj.h"
-#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
@@ -1954,12 +1953,6 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
 }
 
 TEST_F(ReplCoordReconfigTest, ArbiterNodesShouldNeverHaveNewlyAddedField) {
-    RWConcernDefault newDefaults;
-    WriteConcernOptions wc;
-    wc.wMode = "majority";
-    newDefaults.setDefaultWriteConcern(wc);
-    _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();

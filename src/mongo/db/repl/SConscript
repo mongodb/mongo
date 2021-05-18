@@ -1686,7 +1686,6 @@ env.CppUnitTest(
         'topology_coordinator_v1_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/read_write_concern_defaults_mock',
         'isself',
         'repl_coordinator_impl',
         'repl_coordinator_test_fixture',

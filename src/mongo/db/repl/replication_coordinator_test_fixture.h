@@ -320,8 +320,6 @@ protected:
      */
     void simulateCatchUpAbort();
 
-    ReadWriteConcernDefaultsLookupMock _lookupMock;
-
 private:
     std::unique_ptr<ReplicationCoordinatorImpl> _repl;
     // Owned by ReplicationCoordinatorImpl
@@ -337,6 +335,8 @@ private:
 
     ReplSettings _settings;
     bool _callShutdown = false;
+
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
 };
 
 }  // namespace repl
