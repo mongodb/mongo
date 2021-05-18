@@ -1,0 +1,39 @@
+# Oplog Entry IDL File
+
+global:
+    cpp_namespace: "mongo::repl"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/db/logical_session_id.idl"
+    - "mongo/db/repl/oplog_entry.idl"
+
+structs:
+    ImageEntry:
+        description: "Represents either a pre-image or post-image necessary for satisfying a
+                      retryable findAndModify."
+        strict: false
+        fields:
+            _id:
+                cpp_name: _id
+                type: LogicalSessionId
+            txnNum:
+                cpp_name: txnNumber
+                type: TxnNumber
+            ts:
+                cpp_name: ts
+                type: timestamp
+            imageKind:
+                cpp_name: imageKind
+                type: RetryImage
+            image:
+                cpp_name: image
+                type: object
+            invalidated:
+                cpp_name: invalidated
+                type: bool
+                default: false
+            invalidatedReason:
+                cpp_name: invalidatedReason
+                type: string
+                optional: true

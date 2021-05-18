@@ -46,6 +46,13 @@ enums:
             kUpdate: "u"
             kDelete: "d"
             kNoop: "n"
+    RetryImage:
+        description: "Dictates whether a pre-image or post-image is to be stored on behalf of this
+                      retryable write."
+        type: string
+        values:
+            kPreImage: "preImage"
+            kPostImage: "postImage"
 
 structs:
     DurableReplOperation:

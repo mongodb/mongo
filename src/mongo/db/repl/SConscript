@@ -1808,3 +1808,16 @@ env.Library(
         'election_reason_counter',
     ],
 )
+
+env.Library(
+    target='image_collection_entry',
+    source=[
+        env.Idlc('image_collection_entry.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'oplog_entry',
+    ],
+)
