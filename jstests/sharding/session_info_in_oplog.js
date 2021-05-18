@@ -323,12 +323,7 @@ var runTests = function(mainConn, priConn, secConn) {
     lastTs = firstDoc.ts;
 };
 
-// This test specifically looks for side-effects of writing retryable findAndModify images into the
-// oplog as noops. Ensure images are not stored in a side collection.
-var replTest = new ReplSetTest({
-    nodes: kNodes,
-    nodeOptions: {setParameter: {storeFindAndModifyImagesInSideCollection: false}}
-});
+var replTest = new ReplSetTest({nodes: kNodes});
 replTest.startSet();
 replTest.initiate();
 
@@ -340,9 +335,7 @@ runTests(priConn, priConn, secConn);
 
 replTest.stopSet();
 
-var st = new ShardingTest({
-    shards: {rs0: {nodes: kNodes, setParameter: {storeFindAndModifyImagesInSideCollection: false}}}
-});
+var st = new ShardingTest({shards: {rs0: {nodes: kNodes}}});
 
 secConn = st.rs0.getSecondary();
 secConn.setSecondaryOk();

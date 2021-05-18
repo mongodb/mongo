@@ -430,9 +430,6 @@ executor:
       tlsAllowInvalidHostnames: ''
       auth: ''
       keyFile: *keyFile
-      # Tenant migrations is not currently compatible with implicitly replicated retryable
-      # findAndModify images.
-      storeFindAndModifyImagesInSideCollection: false
     per_mongod_options:
       # Each entry is for a different replica set's extra mongod options.
       - tlsCertificateKeyFile: jstests/libs/rs0.pem

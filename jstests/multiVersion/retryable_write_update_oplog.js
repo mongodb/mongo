@@ -148,11 +148,7 @@ function enableV2OplogEntries(rst) {
     assert.commandWorked(rst.getSecondary().adminCommand(cmd));
 }
 
-const rst = new ReplSetTest({
-    nodes: 2,
-    nodeOpts: {binVersion: "latest", noCleanData: true},
-    nodeOptions: {setParameter: {storeFindAndModifyImagesInSideCollection: false}}
-});
+const rst = new ReplSetTest({nodes: 2, nodeOpts: {binVersion: "latest", noCleanData: true}});
 
 jsTestLog("Running downgrade test");
 

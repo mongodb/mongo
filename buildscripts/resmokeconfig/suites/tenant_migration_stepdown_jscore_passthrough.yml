@@ -296,9 +296,6 @@ executor:
         # so. Therefore, the garbage collection delay doesn't need to be large.
         tenantMigrationGarbageCollectionDelayMS: 1
         ttlMonitorSleepSecs: 1
-        # Tenant migrations is not currently compatible with implicitly replicated retryable
-        # findAndModify images.
-        storeFindAndModifyImagesInSideCollection: false
       tlsMode: allowTLS
       tlsCAFile: jstests/libs/ca.pem
       tlsAllowInvalidHostnames: ''

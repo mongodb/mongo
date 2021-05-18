@@ -115,19 +115,6 @@ function TenantMigrationTest({
             // Stop any replica sets started by the TenantMigrationTest fixture.
             this.stop();
         }
-
-        function unsetStoreFindAndModifyImagesInSideCollection(rst) {
-            // Ensure `storeFindAndModifyImagesInSideCollection=false` to successfully run tenant
-            // migration.
-            const conn = rst.getPrimary();
-            rst.asCluster(conn, () => {
-                return assert.commandWorked(conn.adminCommand(
-                    {setParameter: 1, storeFindAndModifyImagesInSideCollection: false}));
-            });
-        }
-        unsetStoreFindAndModifyImagesInSideCollection(this.getDonorRst());
-        unsetStoreFindAndModifyImagesInSideCollection(this.getRecipientRst());
-
         return retVal;
     };
 
