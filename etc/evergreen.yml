@@ -10984,7 +10984,6 @@ buildvariants:
   - name: .change_streams
   - name: .misc_js
   - name: .concurrency !.ubsan !.no_txns !.kill_terminate
-  - name: disk_wiredtiger
   - name: .encrypt
   - name: free_monitoring
   - name: external_auth
@@ -11061,7 +11060,6 @@ buildvariants:
   - name: .change_streams
   - name: .misc_js
 #  - name: .concurrency !.ubsan !.no_txns !.kill_terminate
-#  - name: disk_wiredtiger
 #  - name: .encrypt
   - name: free_monitoring
   - name: external_auth
