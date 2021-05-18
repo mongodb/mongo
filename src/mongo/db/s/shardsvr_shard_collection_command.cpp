@@ -90,6 +90,8 @@ public:
         auto const shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
+        opCtx->setAlwaysInterruptAtStepDownOrUp();
+
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
         FixedFCVRegion fcvRegion(opCtx);

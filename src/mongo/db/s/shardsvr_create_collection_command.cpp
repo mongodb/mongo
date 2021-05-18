@@ -218,6 +218,8 @@ public:
             auto const shardingState = ShardingState::get(opCtx);
             uassertStatusOK(shardingState->canAcceptShardedCommands());
 
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
+
             uassert(
                 ErrorCodes::InvalidOptions,
                 str::stream()
