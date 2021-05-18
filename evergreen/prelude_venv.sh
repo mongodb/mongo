@@ -13,7 +13,10 @@ function activate_venv {
     fi
     python=python
   else
-    python=${python:-/opt/mongodbtoolchain/v3/bin/python3}
+    if [ -z "$python" ]; then
+      echo "\$python is unset. This should never happen"
+    fi
+    python=${python}
   fi
 
   if [ "Windows_NT" = "$OS" ]; then
