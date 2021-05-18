@@ -36,18 +36,20 @@ namespace mongo {
  * A custom subclass of DocumentSourceMatch which is used to generate a $match stage to be applied
  * on the oplog. The stage requires itself to be the first stage in the pipeline.
  */
-class DocumentSourceOplogMatch final : public DocumentSourceMatch,
-                                       public ChangeStreamStageSerializationInterface {
+class DocumentSourceChangeStreamOplogMatch final : public DocumentSourceMatch,
+                                                   public ChangeStreamStageSerializationInterface {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamOplogMatch"_sd;
 
-    DocumentSourceOplogMatch(BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    DocumentSourceChangeStreamOplogMatch(BSONObj filter,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceMatch(std::move(filter), expCtx) {
         // A change stream pipeline should always create a tailable + awaitData cursor.
         expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
     }
 
-    DocumentSourceOplogMatch(const DocumentSourceOplogMatch& other) : DocumentSourceMatch(other) {}
+    DocumentSourceChangeStreamOplogMatch(const DocumentSourceChangeStreamOplogMatch& other)
+        : DocumentSourceMatch(other) {}
 
     virtual boost::intrusive_ptr<DocumentSourceMatch> clone() const {
         return make_intrusive<std::decay_t<decltype(*this)>>(*this);
@@ -55,7 +57,7 @@ public:
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-    static boost::intrusive_ptr<DocumentSourceOplogMatch> create(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamOplogMatch> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, bool showMigrationEvents);
 
     const char* getSourceName() const final;

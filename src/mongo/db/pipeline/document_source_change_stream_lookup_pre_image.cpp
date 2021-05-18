@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -32,7 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_lookup_change_pre_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_lookup_pre_image.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/transaction_history_iterator.h"
@@ -44,34 +44,35 @@ namespace {
 REGISTER_INTERNAL_DOCUMENT_SOURCE(
     _internalChangeStreamLookupPreImage,
     LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceLookupChangePreImage::createFromBson,
+    DocumentSourceChangeStreamLookupPreImage::createFromBson,
     feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
 }
 
-constexpr StringData DocumentSourceLookupChangePreImage::kStageName;
-constexpr StringData DocumentSourceLookupChangePreImage::kFullDocumentBeforeChangeFieldName;
+constexpr StringData DocumentSourceChangeStreamLookupPreImage::kStageName;
+constexpr StringData DocumentSourceChangeStreamLookupPreImage::kFullDocumentBeforeChangeFieldName;
 
-boost::intrusive_ptr<DocumentSourceLookupChangePreImage> DocumentSourceLookupChangePreImage::create(
+boost::intrusive_ptr<DocumentSourceChangeStreamLookupPreImage>
+DocumentSourceChangeStreamLookupPreImage::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec) {
     auto mode = spec.getFullDocumentBeforeChange();
 
-    return make_intrusive<DocumentSourceLookupChangePreImage>(expCtx, mode);
+    return make_intrusive<DocumentSourceChangeStreamLookupPreImage>(expCtx, mode);
 }
 
-boost::intrusive_ptr<DocumentSourceLookupChangePreImage>
-DocumentSourceLookupChangePreImage::createFromBson(
+boost::intrusive_ptr<DocumentSourceChangeStreamLookupPreImage>
+DocumentSourceChangeStreamLookupPreImage::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5467610,
             str::stream() << "the '" << kStageName << "' stage spec must be an object",
             elem.type() == BSONType::Object);
     auto parsedSpec = DocumentSourceChangeStreamLookUpPreImageSpec::parse(
         IDLParserErrorContext("DocumentSourceChangeStreamLookUpPreImageSpec"), elem.Obj());
-    return make_intrusive<DocumentSourceLookupChangePreImage>(
+    return make_intrusive<DocumentSourceChangeStreamLookupPreImage>(
         expCtx, parsedSpec.getFullDocumentBeforeChange());
 }
 
-DocumentSource::GetNextResult DocumentSourceLookupChangePreImage::doGetNext() {
+DocumentSource::GetNextResult DocumentSourceChangeStreamLookupPreImage::doGetNext() {
     auto input = pSource->getNext();
     if (!input.isAdvanced()) {
         return input;
@@ -112,7 +113,7 @@ DocumentSource::GetNextResult DocumentSourceLookupChangePreImage::doGetNext() {
     return outputDoc.freeze();
 }
 
-boost::optional<Document> DocumentSourceLookupChangePreImage::lookupPreImage(
+boost::optional<Document> DocumentSourceChangeStreamLookupPreImage::lookupPreImage(
     const Document& inputDoc, const repl::OpTime& opTime) const {
     // We need the oplog's UUID for lookup, so obtain the collection info via MongoProcessInterface.
     auto localOplogInfo = pExpCtx->mongoProcessInterface->getCollectionOptions(
@@ -153,7 +154,7 @@ boost::optional<Document> DocumentSourceLookupChangePreImage::lookupPreImage(
     return Document{opLogEntry.getObject().getOwned()};
 }
 
-Value DocumentSourceLookupChangePreImage::serializeLatest(
+Value DocumentSourceChangeStreamLookupPreImage::serializeLatest(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return explain
         ? Value(Document{

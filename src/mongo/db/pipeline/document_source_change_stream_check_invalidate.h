@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -39,14 +39,15 @@ namespace mongo {
  * "invalidate" entry for commands that should invalidate the change stream (e.g. collection drop
  * for a single-collection change stream). It is not intended to be created by the user.
  */
-class DocumentSourceCheckInvalidate final : public DocumentSource,
-                                            public ChangeStreamStageSerializationInterface {
+class DocumentSourceChangeStreamCheckInvalidate final
+    : public DocumentSource,
+      public ChangeStreamStageSerializationInterface {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamCheckInvalidate"_sd;
 
     const char* getSourceName() const final {
         // This is used in error reporting.
-        return DocumentSourceCheckInvalidate::kStageName.rawData();
+        return DocumentSourceChangeStreamCheckInvalidate::kStageName.rawData();
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -69,20 +70,21 @@ public:
         return ChangeStreamStageSerializationInterface::serializeToValue(explain);
     }
 
-    static boost::intrusive_ptr<DocumentSourceCheckInvalidate> createFromBson(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamCheckInvalidate> createFromBson(
         BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx);
-    static boost::intrusive_ptr<DocumentSourceCheckInvalidate> create(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamCheckInvalidate> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<ResumeTokenData> startAfterInvalidate) {
-        return new DocumentSourceCheckInvalidate(expCtx, std::move(startAfterInvalidate));
+        return new DocumentSourceChangeStreamCheckInvalidate(expCtx,
+                                                             std::move(startAfterInvalidate));
     }
 
 private:
     /**
-     * Use the create static method to create a DocumentSourceCheckInvalidate.
+     * Use the create static method to create a DocumentSourceChangeStreamCheckInvalidate.
      */
-    DocumentSourceCheckInvalidate(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                  boost::optional<ResumeTokenData> startAfterInvalidate)
+    DocumentSourceChangeStreamCheckInvalidate(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              boost::optional<ResumeTokenData> startAfterInvalidate)
         : DocumentSource(kStageName, expCtx),
           _startAfterInvalidate(std::move(startAfterInvalidate)) {
         invariant(!_startAfterInvalidate ||

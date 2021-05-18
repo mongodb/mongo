@@ -37,7 +37,7 @@ namespace mongo {
 REGISTER_INTERNAL_DOCUMENT_SOURCE(
     _internalChangeStreamOplogMatch,
     LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceOplogMatch::createFromBson,
+    DocumentSourceChangeStreamOplogMatch::createFromBson,
     feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
 
 namespace {
@@ -192,11 +192,12 @@ BSONObj buildMatchFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 }  // namespace
 
-boost::intrusive_ptr<DocumentSourceOplogMatch> DocumentSourceOplogMatch::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, bool showMigrationEvents) {
+boost::intrusive_ptr<DocumentSourceChangeStreamOplogMatch>
+DocumentSourceChangeStreamOplogMatch::create(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                             bool showMigrationEvents) {
     // TODO SERVER-56669: ensure that 'initialPostBatchResumeToken' is always populated at this
     // point.
-    return make_intrusive<DocumentSourceOplogMatch>(
+    return make_intrusive<DocumentSourceChangeStreamOplogMatch>(
         buildMatchFilter(
             expCtx,
             ResumeToken::parse(expCtx->initialPostBatchResumeToken).getData().clusterTime,
@@ -204,23 +205,24 @@ boost::intrusive_ptr<DocumentSourceOplogMatch> DocumentSourceOplogMatch::create(
         expCtx);
 }
 
-boost::intrusive_ptr<DocumentSource> DocumentSourceOplogMatch::createFromBson(
+boost::intrusive_ptr<DocumentSource> DocumentSourceChangeStreamOplogMatch::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(5467600,
             "the match filter must be an expression in an object",
             elem.type() == BSONType::Object);
     auto parsedSpec = DocumentSourceChangeStreamOplogMatchSpec::parse(
         IDLParserErrorContext("DocumentSourceChangeStreamOplogMatchSpec"), elem.Obj());
-    return make_intrusive<DocumentSourceOplogMatch>(parsedSpec.getFilter(), pExpCtx);
+    return make_intrusive<DocumentSourceChangeStreamOplogMatch>(parsedSpec.getFilter(), pExpCtx);
 }
 
-const char* DocumentSourceOplogMatch::getSourceName() const {
+const char* DocumentSourceChangeStreamOplogMatch::getSourceName() const {
     // This is used in error reporting, particularly if we find this stage in a position other
     // than first, so report the name as $changeStream.
     return DocumentSourceChangeStream::kStageName.rawData();
 }
 
-StageConstraints DocumentSourceOplogMatch::constraints(Pipeline::SplitState pipeState) const {
+StageConstraints DocumentSourceChangeStreamOplogMatch::constraints(
+    Pipeline::SplitState pipeState) const {
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kFirst,
                                  HostTypeRequirement::kAnyShard,
@@ -235,7 +237,7 @@ StageConstraints DocumentSourceOplogMatch::constraints(Pipeline::SplitState pipe
     return constraints;
 }
 
-Value DocumentSourceOplogMatch::serializeLatest(
+Value DocumentSourceChangeStreamOplogMatch::serializeLatest(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {
         return Value(
@@ -244,7 +246,7 @@ Value DocumentSourceOplogMatch::serializeLatest(
     }
 
     DocumentSourceChangeStreamOplogMatchSpec spec(_predicate);
-    return Value(Document{{DocumentSourceOplogMatch::kStageName, spec.toBSON()}});
+    return Value(Document{{DocumentSourceChangeStreamOplogMatch::kStageName, spec.toBSON()}});
 }
 
 }  // namespace mongo

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,20 +29,20 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_lookup_post_image.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 
 namespace mongo {
 
-constexpr StringData DocumentSourceLookupChangePostImage::kStageName;
-constexpr StringData DocumentSourceLookupChangePostImage::kFullDocumentFieldName;
+constexpr StringData DocumentSourceChangeStreamLookupPostImage::kStageName;
+constexpr StringData DocumentSourceChangeStreamLookupPostImage::kFullDocumentFieldName;
 
 namespace {
 REGISTER_INTERNAL_DOCUMENT_SOURCE(
     _internalChangeStreamLookupPostImage,
     LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceLookupChangePostImage::createFromBson,
+    DocumentSourceChangeStreamLookupPostImage::createFromBson,
     feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
 
 
@@ -58,8 +58,8 @@ Value assertFieldHasType(const Document& fullDoc, StringData fieldName, BSONType
 }
 }  // namespace
 
-boost::intrusive_ptr<DocumentSourceLookupChangePostImage>
-DocumentSourceLookupChangePostImage::createFromBson(
+boost::intrusive_ptr<DocumentSourceChangeStreamLookupPostImage>
+DocumentSourceChangeStreamLookupPostImage::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5467608,
             str::stream() << "the '" << kStageName << "' stage spec must be an object",
@@ -70,10 +70,10 @@ DocumentSourceLookupChangePostImage::createFromBson(
             str::stream() << "the 'fullDocument' field can only be 'updateLookup'",
             parsedSpec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup);
 
-    return new DocumentSourceLookupChangePostImage(expCtx);
+    return new DocumentSourceChangeStreamLookupPostImage(expCtx);
 }
 
-DocumentSource::GetNextResult DocumentSourceLookupChangePostImage::doGetNext() {
+DocumentSource::GetNextResult DocumentSourceChangeStreamLookupPostImage::doGetNext() {
     auto input = pSource->getNext();
     if (!input.isAdvanced()) {
         return input;
@@ -89,7 +89,7 @@ DocumentSource::GetNextResult DocumentSourceLookupChangePostImage::doGetNext() {
     return output.freeze();
 }
 
-NamespaceString DocumentSourceLookupChangePostImage::assertValidNamespace(
+NamespaceString DocumentSourceChangeStreamLookupPostImage::assertValidNamespace(
     const Document& inputDoc) const {
     auto namespaceObject =
         assertFieldHasType(inputDoc, DocumentSourceChangeStream::kNamespaceField, BSONType::Object)
@@ -110,7 +110,7 @@ NamespaceString DocumentSourceLookupChangePostImage::assertValidNamespace(
     return nss;
 }
 
-Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updateOp) const {
+Value DocumentSourceChangeStreamLookupPostImage::lookupPostImage(const Document& updateOp) const {
     // Make sure we have a well-formed input.
     auto nss = assertValidNamespace(updateOp);
 
@@ -147,7 +147,7 @@ Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updat
     return (lookedUpDoc ? Value(*lookedUpDoc) : Value(BSONNULL));
 }
 
-Value DocumentSourceLookupChangePostImage::serializeLatest(
+Value DocumentSourceChangeStreamLookupPostImage::serializeLatest(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return explain
         ? Value(Document{{DocumentSourceChangeStream::kStageName,

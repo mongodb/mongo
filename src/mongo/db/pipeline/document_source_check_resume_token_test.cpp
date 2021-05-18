@@ -40,8 +40,8 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
-#include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
@@ -312,10 +312,10 @@ protected:
     /**
      * Convenience method to create the class under test with a given ResumeTokenData.
      */
-    intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> createDSEnsureResumeTokenPresent(
-        ResumeTokenData tokenData) {
+    intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent>
+    createDSEnsureResumeTokenPresent(ResumeTokenData tokenData) {
         auto checkResumeToken =
-            DocumentSourceEnsureResumeTokenPresent::create(getExpCtx(), tokenData);
+            DocumentSourceChangeStreamEnsureResumeTokenPresent::create(getExpCtx(), tokenData);
         _mock->setResumeToken(std::move(tokenData));
         checkResumeToken->setSource(_mock.get());
         return checkResumeToken;
@@ -325,12 +325,12 @@ protected:
      * Convenience method to create the class under test with a given timestamp, docKey, and
      * namespace.
      */
-    intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> createDSEnsureResumeTokenPresent(
-        Timestamp ts,
-        int version,
-        std::size_t txnOpIndex,
-        boost::optional<Document> docKey,
-        UUID uuid) {
+    intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent>
+    createDSEnsureResumeTokenPresent(Timestamp ts,
+                                     int version,
+                                     std::size_t txnOpIndex,
+                                     boost::optional<Document> docKey,
+                                     UUID uuid) {
         return createDSEnsureResumeTokenPresent(
             {ts, version, txnOpIndex, uuid, docKey ? Value(*docKey) : Value()});
     }
@@ -339,8 +339,10 @@ protected:
      * Convenience method to create the class under test with a given timestamp, docKey, and
      * namespace.
      */
-    intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> createDSEnsureResumeTokenPresent(
-        Timestamp ts, boost::optional<Document> docKey, UUID uuid = testUuid()) {
+    intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent>
+    createDSEnsureResumeTokenPresent(Timestamp ts,
+                                     boost::optional<Document> docKey,
+                                     UUID uuid = testUuid()) {
         return createDSEnsureResumeTokenPresent(ts, 0, 0, docKey, uuid);
     }
 
@@ -348,8 +350,8 @@ protected:
      * Convenience method to create the class under test with a given timestamp, _id string, and
      * namespace.
      */
-    intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> createDSEnsureResumeTokenPresent(
-        Timestamp ts, StringData id, UUID uuid = testUuid()) {
+    intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent>
+    createDSEnsureResumeTokenPresent(Timestamp ts, StringData id, UUID uuid = testUuid()) {
         return createDSEnsureResumeTokenPresent(ts, 0, 0, Document{{"_id", id}}, uuid);
     }
 
@@ -367,14 +369,16 @@ protected:
 
 class CheckResumabilityTest : public CheckResumeTokenTest {
 protected:
-    intrusive_ptr<DocumentSourceCheckResumability> createDSCheckResumability(
+    intrusive_ptr<DocumentSourceChangeStreamCheckResumability> createDSCheckResumability(
         ResumeTokenData tokenData) {
-        auto dsCheckResumability = DocumentSourceCheckResumability::create(getExpCtx(), tokenData);
+        auto dsCheckResumability =
+            DocumentSourceChangeStreamCheckResumability::create(getExpCtx(), tokenData);
         _mock->setResumeToken(std::move(tokenData));
         dsCheckResumability->setSource(_mock.get());
         return dsCheckResumability;
     }
-    intrusive_ptr<DocumentSourceCheckResumability> createDSCheckResumability(Timestamp ts) {
+    intrusive_ptr<DocumentSourceChangeStreamCheckResumability> createDSCheckResumability(
+        Timestamp ts) {
         return createDSCheckResumability(ResumeToken::makeHighWaterMarkToken(ts).getData());
     }
 };
@@ -493,8 +497,8 @@ TEST_F(CheckResumeTokenTest, ShouldSucceedWithBinaryCollation) {
 TEST_F(CheckResumeTokenTest, UnshardedTokenSucceedsForShardedResumeOnMongosIfIdMatchesFirstDoc) {
     // Verify that a resume token whose documentKey only contains _id can be used to resume a stream
     // on a sharded collection as long as its _id matches the first document. We set 'inMongos'
-    // since this behaviour is only applicable when DocumentSourceEnsureResumeTokenPresent is
-    // running on mongoS.
+    // since this behaviour is only applicable when
+    // DocumentSourceChangeStreamEnsureResumeTokenPresent is running on mongoS.
     Timestamp resumeTimestamp(100, 1);
     getExpCtx()->inMongos = true;
 
@@ -533,8 +537,8 @@ TEST_F(CheckResumeTokenTest, UnshardedTokenFailsForShardedResumeOnMongosIfIdDoes
 TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfTokenHasSubsetOfDocumentKeyFields) {
     // Verify that the relaxed _id check only applies if _id is the sole field present in the
     // client's resume token, even if all the fields that are present match the first doc. We set
-    // 'inMongos' since this is only applicable when DocumentSourceEnsureResumeTokenPresent is
-    // running on mongoS.
+    // 'inMongos' since this is only applicable when
+    // DocumentSourceChangeStreamEnsureResumeTokenPresent is running on mongoS.
     Timestamp resumeTimestamp(100, 1);
     getExpCtx()->inMongos = true;
 
@@ -976,7 +980,8 @@ TEST_F(CheckResumabilityTest, ShouldIgnoreOplogAfterFirstEOF) {
 TEST_F(CheckResumabilityTest, ShouldSwallowAllEventsAtSameClusterTimeUpToResumeToken) {
     Timestamp resumeTimestamp(100, 2);
 
-    // Set up the DocumentSourceCheckResumability to check for an exact event ResumeToken.
+    // Set up the DocumentSourceChangeStreamCheckResumability to check for an exact event
+    // ResumeToken.
     ResumeTokenData token(resumeTimestamp, 0, 0, testUuid(), Value(Document{{"_id"_sd, "3"_sd}}));
     auto dsCheckResumability = createDSCheckResumability(token);
 
@@ -1005,7 +1010,8 @@ TEST_F(CheckResumabilityTest, ShouldSwallowAllEventsAtSameClusterTimeUpToResumeT
 TEST_F(CheckResumabilityTest, ShouldSwallowAllEventsAtSameClusterTimePriorToResumeToken) {
     Timestamp resumeTimestamp(100, 2);
 
-    // Set up the DocumentSourceCheckResumability to check for an exact event ResumeToken.
+    // Set up the DocumentSourceChangeStreamCheckResumability to check for an exact event
+    // ResumeToken.
     ResumeTokenData token(resumeTimestamp, 0, 0, testUuid(), Value(Document{{"_id"_sd, "3"_sd}}));
     auto dsCheckResumability = createDSCheckResumability(token);
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -59,8 +59,8 @@ namespace mongo {
  * - Otherwise we cannot resume, as we do not know if there were any events between the resume token
  *   and the first matching document in the oplog.
  */
-class DocumentSourceCheckResumability : public DocumentSource,
-                                        public ChangeStreamStageSerializationInterface {
+class DocumentSourceChangeStreamCheckResumability : public DocumentSource,
+                                                    public ChangeStreamStageSerializationInterface {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamCheckResumability"_sd;
 
@@ -94,7 +94,7 @@ public:
         return ChangeStreamStageSerializationInterface::serializeToValue(explain);
     }
 
-    static boost::intrusive_ptr<DocumentSourceCheckResumability> createFromBson(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamCheckResumability> createFromBson(
         BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
         uassert(5467603,
                 str::stream() << "the '" << kStageName << "' object spec must be an object",
@@ -106,18 +106,18 @@ public:
         return create(expCtx, parsed.getResumeToken().getData());
     }
 
-    static boost::intrusive_ptr<DocumentSourceCheckResumability> create(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamCheckResumability> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Timestamp ts);
 
-    static boost::intrusive_ptr<DocumentSourceCheckResumability> create(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamCheckResumability> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
 
 protected:
     /**
-     * Use the create static method to create a DocumentSourceCheckResumability.
+     * Use the create static method to create a DocumentSourceChangeStreamCheckResumability.
      */
-    DocumentSourceCheckResumability(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                    ResumeTokenData token);
+    DocumentSourceChangeStreamCheckResumability(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
 
     GetNextResult doGetNext() override;
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -45,7 +45,7 @@ namespace mongo {
  * the first time. When this event is detected, this stage will establish a new cursor on that
  * shard and add it to the cursors being merged.
  */
-class DocumentSourceUpdateOnAddShard final : public DocumentSource {
+class DocumentSourceChangeStreamUpdateOnAddShard final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalUpdateOnAddShard"_sd;
 
@@ -53,7 +53,7 @@ public:
      * Creates a new stage which will establish a new cursor and add it to the cursors being merged
      * by 'mergeCursorsStage' whenever a new shard is detected by a change stream.
      */
-    static boost::intrusive_ptr<DocumentSourceUpdateOnAddShard> create(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamUpdateOnAddShard> create(
         const boost::intrusive_ptr<ExpressionContext>&);
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
@@ -77,7 +77,7 @@ public:
     }
 
 private:
-    DocumentSourceUpdateOnAddShard(const boost::intrusive_ptr<ExpressionContext>&);
+    DocumentSourceChangeStreamUpdateOnAddShard(const boost::intrusive_ptr<ExpressionContext>&);
 
     GetNextResult doGetNext() final;
 

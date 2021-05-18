@@ -41,13 +41,13 @@ namespace mongo {
  * "invalidate" entries.
  * It is not intended to be created by the user.
  */
-class DocumentSourceCloseCursor final : public DocumentSource {
+class DocumentSourceChangeStreamCloseCursor final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$changeStream"_sd;
 
     const char* getSourceName() const final {
         // This is used in error reporting.
-        return DocumentSourceCloseCursor::kStageName.rawData();
+        return DocumentSourceChangeStreamCloseCursor::kStageName.rawData();
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -71,9 +71,9 @@ public:
         return explain ? Value(DOC(kStageName << Document())) : Value();
     }
 
-    static boost::intrusive_ptr<DocumentSourceCloseCursor> create(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamCloseCursor> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceCloseCursor(expCtx);
+        return new DocumentSourceChangeStreamCloseCursor(expCtx);
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
@@ -82,9 +82,9 @@ public:
 
 private:
     /**
-     * Use the create static method to create a DocumentSourceCloseCursor.
+     * Use the create static method to create a DocumentSourceChangeStreamCloseCursor.
      */
-    DocumentSourceCloseCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    DocumentSourceChangeStreamCloseCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(kStageName, expCtx) {}
 
     GetNextResult doGetNext() final;

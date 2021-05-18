@@ -33,21 +33,22 @@
 
 namespace mongo {
 
-DocumentSourceEnsureResumeTokenPresent::DocumentSourceEnsureResumeTokenPresent(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token)
-    : DocumentSourceCheckResumability(expCtx, std::move(token)) {}
+DocumentSourceChangeStreamEnsureResumeTokenPresent::
+    DocumentSourceChangeStreamEnsureResumeTokenPresent(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token)
+    : DocumentSourceChangeStreamCheckResumability(expCtx, std::move(token)) {}
 
-boost::intrusive_ptr<DocumentSourceEnsureResumeTokenPresent>
-DocumentSourceEnsureResumeTokenPresent::create(
+boost::intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent>
+DocumentSourceChangeStreamEnsureResumeTokenPresent::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token) {
-    return new DocumentSourceEnsureResumeTokenPresent(expCtx, std::move(token));
+    return new DocumentSourceChangeStreamEnsureResumeTokenPresent(expCtx, std::move(token));
 }
 
-const char* DocumentSourceEnsureResumeTokenPresent::getSourceName() const {
+const char* DocumentSourceChangeStreamEnsureResumeTokenPresent::getSourceName() const {
     return kStageName.rawData();
 }
 
-DocumentSource::GetNextResult DocumentSourceEnsureResumeTokenPresent::doGetNext() {
+DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent::doGetNext() {
     // If we have already verified the resume token is present, return the next doc immediately.
     if (_resumeStatus == ResumeStatus::kSurpassedToken) {
         return pSource->getNext();
@@ -59,9 +60,10 @@ DocumentSource::GetNextResult DocumentSourceEnsureResumeTokenPresent::doGetNext(
     // occurred at the same clusterTime on more than one shard, then we may see multiple identical
     // resume tokens here. We swallow all of them until the resume status becomes kSurpassedToken.
     while (_resumeStatus != ResumeStatus::kSurpassedToken) {
-        // Delegate to DocumentSourceCheckResumability to consume all events up to the token. This
-        // will also set '_resumeStatus' to indicate whether we have seen or surpassed the token.
-        nextInput = DocumentSourceCheckResumability::doGetNext();
+        // Delegate to DocumentSourceChangeStreamCheckResumability to consume all events up to the
+        // token. This will also set '_resumeStatus' to indicate whether we have seen or surpassed
+        // the token.
+        nextInput = DocumentSourceChangeStreamCheckResumability::doGetNext();
 
         // If there are no more results, return EOF. We will continue checking for the resume token
         // the next time the getNext method is called. If we hit EOF, then we cannot have surpassed
@@ -92,7 +94,7 @@ DocumentSource::GetNextResult DocumentSourceEnsureResumeTokenPresent::doGetNext(
     return nextInput;
 }
 
-Value DocumentSourceEnsureResumeTokenPresent::serialize(
+Value DocumentSourceChangeStreamEnsureResumeTokenPresent::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     // We only serialize this stage in the context of explain.
     if (explain) {

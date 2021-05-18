@@ -44,15 +44,15 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
+#include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
+#include "mongo/db/pipeline/document_source_change_stream_lookup_post_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_lookup_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transactions.h"
-#include "mongo/db/pipeline/document_source_check_invalidate.h"
-#include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
-#include "mongo/db/pipeline/document_source_lookup_change_pre_image.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_sort.h"
@@ -252,12 +252,12 @@ public:
         getExpCtx()->mongoProcessInterface =
             std::make_unique<MockMongoInterface>(std::vector<FieldPath>{});
 
-        // This match stage is a DocumentSourceOplogMatch, which we explicitly disallow from
-        // executing as a safety mechanism, since it needs to use the collection-default collation,
-        // even if the rest of the pipeline is using some other collation. To avoid ever executing
-        // that stage here, we'll up-convert it from the non-executable DocumentSourceOplogMatch to
-        // a fully-executable DocumentSourceMatch. This is safe because all of the unit tests will
-        // use the 'simple' collation.
+        // This match stage is a DocumentSourceChangeStreamOplogMatch, which we explicitly disallow
+        // from executing as a safety mechanism, since it needs to use the collection-default
+        // collation, even if the rest of the pipeline is using some other collation. To avoid ever
+        // executing that stage here, we'll up-convert it from the non-executable
+        // DocumentSourceChangeStreamOplogMatch to a fully-executable DocumentSourceMatch. This is
+        // safe because all of the unit tests will use the 'simple' collation.
         auto match = dynamic_cast<DocumentSourceMatch*>(stages[0].get());
         ASSERT(match);
         auto executableMatch = DocumentSourceMatch::create(match->getQuery(), getExpCtx());
@@ -275,7 +275,7 @@ public:
 
         // Remove the DSEnsureResumeTokenPresent stage since it will swallow the result.
         auto newEnd = std::remove_if(stages.begin(), stages.end(), [](auto& stage) {
-            return dynamic_cast<DocumentSourceEnsureResumeTokenPresent*>(stage.get());
+            return dynamic_cast<DocumentSourceChangeStreamEnsureResumeTokenPresent*>(stage.get());
         });
         stages.erase(newEnd, stages.end());
 
@@ -2176,7 +2176,7 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSOplogMatchStageSeriali
     spec.setFilter(dummyFilter);
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
-    validateDocumentSourceStageSerialization<DocumentSourceOplogMatch>(
+    validateDocumentSourceStageSerialization<DocumentSourceChangeStreamOplogMatch>(
         std::move(spec), stageSpecAsBSON, expCtx);
 }
 
@@ -2199,7 +2199,7 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSCheckInvalidateStageSe
         kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)));
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
-    validateDocumentSourceStageSerialization<DocumentSourceCheckInvalidate>(
+    validateDocumentSourceStageSerialization<DocumentSourceChangeStreamCheckInvalidate>(
         std::move(spec), stageSpecAsBSON, expCtx);
 }
 
@@ -2210,7 +2210,7 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSResumabilityStageSeria
     spec.setResumeToken(ResumeToken::parse(makeResumeToken(kDefaultTs, testUuid())));
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
-    validateDocumentSourceStageSerialization<DocumentSourceCheckResumability>(
+    validateDocumentSourceStageSerialization<DocumentSourceChangeStreamCheckResumability>(
         std::move(spec), stageSpecAsBSON, expCtx);
 }
 
@@ -2220,7 +2220,7 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSLookupChangePreImageSt
     DocumentSourceChangeStreamLookUpPreImageSpec spec(FullDocumentBeforeChangeModeEnum::kRequired);
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
-    validateDocumentSourceStageSerialization<DocumentSourceLookupChangePreImage>(
+    validateDocumentSourceStageSerialization<DocumentSourceChangeStreamLookupPreImage>(
         std::move(spec), stageSpecAsBSON, expCtx);
 }
 
@@ -2230,7 +2230,7 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSLookupChangePostImageS
     DocumentSourceChangeStreamLookUpPostImageSpec spec(FullDocumentModeEnum::kUpdateLookup);
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
-    validateDocumentSourceStageSerialization<DocumentSourceLookupChangePostImage>(
+    validateDocumentSourceStageSerialization<DocumentSourceChangeStreamLookupPostImage>(
         std::move(spec), stageSpecAsBSON, expCtx);
 }
 

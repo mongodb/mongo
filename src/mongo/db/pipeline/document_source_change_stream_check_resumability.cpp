@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -30,7 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/curop.h"
-#include "mongo/db/pipeline/document_source_check_resume_token.h"
+#include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 
@@ -41,10 +41,10 @@ namespace {
 REGISTER_INTERNAL_DOCUMENT_SOURCE(
     _internalChangeStreamCheckResumability,
     LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceCheckResumability::createFromBson,
+    DocumentSourceChangeStreamCheckResumability::createFromBson,
     feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
 
-using ResumeStatus = DocumentSourceCheckResumability::ResumeStatus;
+using ResumeStatus = DocumentSourceChangeStreamCheckResumability::ResumeStatus;
 
 // Returns ResumeStatus::kFoundToken if the document retrieved from the resumed pipeline satisfies
 // the client's resume token, ResumeStatus::kCheckNextDoc if it is older than the client's token,
@@ -173,26 +173,28 @@ ResumeStatus compareAgainstClientResumeToken(const intrusive_ptr<ExpressionConte
 }
 }  // namespace
 
-DocumentSourceCheckResumability::DocumentSourceCheckResumability(
+DocumentSourceChangeStreamCheckResumability::DocumentSourceChangeStreamCheckResumability(
     const intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token)
     : DocumentSource(getSourceName(), expCtx), _tokenFromClient(std::move(token)) {}
 
-intrusive_ptr<DocumentSourceCheckResumability> DocumentSourceCheckResumability::create(
-    const intrusive_ptr<ExpressionContext>& expCtx, Timestamp ts) {
+intrusive_ptr<DocumentSourceChangeStreamCheckResumability>
+DocumentSourceChangeStreamCheckResumability::create(const intrusive_ptr<ExpressionContext>& expCtx,
+                                                    Timestamp ts) {
     // We are resuming from a point in time, not an event. Seed the stage with a high water mark.
     return create(expCtx, ResumeToken::makeHighWaterMarkToken(ts).getData());
 }
 
-intrusive_ptr<DocumentSourceCheckResumability> DocumentSourceCheckResumability::create(
-    const intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token) {
-    return new DocumentSourceCheckResumability(expCtx, std::move(token));
+intrusive_ptr<DocumentSourceChangeStreamCheckResumability>
+DocumentSourceChangeStreamCheckResumability::create(const intrusive_ptr<ExpressionContext>& expCtx,
+                                                    ResumeTokenData token) {
+    return new DocumentSourceChangeStreamCheckResumability(expCtx, std::move(token));
 }
 
-const char* DocumentSourceCheckResumability::getSourceName() const {
+const char* DocumentSourceChangeStreamCheckResumability::getSourceName() const {
     return kStageName.rawData();
 }
 
-DocumentSource::GetNextResult DocumentSourceCheckResumability::doGetNext() {
+DocumentSource::GetNextResult DocumentSourceChangeStreamCheckResumability::doGetNext() {
     if (_resumeStatus == ResumeStatus::kSurpassedToken) {
         return pSource->getNext();
     }
@@ -234,7 +236,7 @@ DocumentSource::GetNextResult DocumentSourceCheckResumability::doGetNext() {
     MONGO_UNREACHABLE;
 }
 
-Value DocumentSourceCheckResumability::serializeLatest(
+Value DocumentSourceChangeStreamCheckResumability::serializeLatest(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return explain
         ? Value(DOC(DocumentSourceChangeStream::kStageName
@@ -242,7 +244,7 @@ Value DocumentSourceCheckResumability::serializeLatest(
                            << "internalCheckResumability"_sd
                            << "resumeToken" << ResumeToken(_tokenFromClient).toDocument())))
         : Value(Document{
-              {DocumentSourceCheckResumability::kStageName,
+              {DocumentSourceChangeStreamCheckResumability::kStageName,
                DocumentSourceChangeStreamCheckResumabilitySpec(ResumeToken(_tokenFromClient))
                    .toBSON()}});
 }

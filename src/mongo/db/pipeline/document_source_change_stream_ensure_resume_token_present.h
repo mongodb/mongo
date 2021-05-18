@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source_check_resume_token.h"
+#include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 
 namespace mongo {
 /**
  * This stage is used internally for change streams to ensure that the resume token is in the
  * stream.  It is not intended to be created by the user.
  */
-class DocumentSourceEnsureResumeTokenPresent final : public DocumentSourceCheckResumability {
+class DocumentSourceChangeStreamEnsureResumeTokenPresent final
+    : public DocumentSourceChangeStreamCheckResumability {
 public:
     static constexpr StringData kStageName = "$_internalEnsureResumeTokenPresent"_sd;
 
@@ -56,17 +57,17 @@ public:
                 ChangeStreamRequirement::kChangeStreamStage};
     }
 
-    static boost::intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> create(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
 private:
     /**
-     * Use the create static method to create a DocumentSourceEnsureResumeTokenPresent.
+     * Use the create static method to create a DocumentSourceChangeStreamEnsureResumeTokenPresent.
      */
-    DocumentSourceEnsureResumeTokenPresent(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           ResumeTokenData token);
+    DocumentSourceChangeStreamEnsureResumeTokenPresent(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
 
     GetNextResult doGetNext() final;
 

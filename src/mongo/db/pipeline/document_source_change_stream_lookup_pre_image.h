@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -41,25 +41,26 @@ namespace mongo {
  * its "fullDocumentBeforeChange" field shall be the optime of the noop oplog entry containing the
  * pre-image. This stage replaces that field with the actual pre-image document.
  */
-class DocumentSourceLookupChangePreImage final : public DocumentSource,
-                                                 public ChangeStreamStageSerializationInterface {
+class DocumentSourceChangeStreamLookupPreImage final
+    : public DocumentSource,
+      public ChangeStreamStageSerializationInterface {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamLookupPreImage"_sd;
     static constexpr StringData kFullDocumentBeforeChangeFieldName =
         DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
 
     /**
-     * Creates a DocumentSourceLookupChangePostImage stage.
+     * Creates a DocumentSourceChangeStreamLookupPostImage stage.
      */
-    static boost::intrusive_ptr<DocumentSourceLookupChangePreImage> create(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamLookupPreImage> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const DocumentSourceChangeStreamSpec& spec);
 
-    static boost::intrusive_ptr<DocumentSourceLookupChangePreImage> createFromBson(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamLookupPreImage> createFromBson(
         const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    DocumentSourceLookupChangePreImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       FullDocumentBeforeChangeModeEnum mode)
+    DocumentSourceChangeStreamLookupPreImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                             FullDocumentBeforeChangeModeEnum mode)
         : DocumentSource(kStageName, expCtx), _fullDocumentBeforeChangeMode(mode) {
         // This stage should never be created with FullDocumentBeforeChangeMode::kOff.
         invariant(_fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kOff);

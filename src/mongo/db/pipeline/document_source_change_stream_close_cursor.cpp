@@ -52,7 +52,7 @@ bool isInvalidatingCommand(const boost::intrusive_ptr<ExpressionContext>& pExpCt
 
 }  // namespace
 
-DocumentSource::GetNextResult DocumentSourceCloseCursor::doGetNext() {
+DocumentSource::GetNextResult DocumentSourceChangeStreamCloseCursor::doGetNext() {
     // Close cursor if we have returned an invalidate entry.
     if (_shouldCloseCursor) {
         uasserted(ErrorCodes::CloseChangeStream, "Change stream has been invalidated");

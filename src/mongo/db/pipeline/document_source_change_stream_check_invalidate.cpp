@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -32,7 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_check_invalidate.h"
+#include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
@@ -43,7 +43,7 @@ using DSCS = DocumentSourceChangeStream;
 REGISTER_INTERNAL_DOCUMENT_SOURCE(
     _internalChangeStreamCheckInvalidate,
     LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceCheckInvalidate::createFromBson,
+    DocumentSourceChangeStreamCheckInvalidate::createFromBson,
     feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
 
 namespace {
@@ -65,7 +65,8 @@ bool isInvalidatingCommand(const boost::intrusive_ptr<ExpressionContext>& pExpCt
 
 }  // namespace
 
-boost::intrusive_ptr<DocumentSourceCheckInvalidate> DocumentSourceCheckInvalidate::createFromBson(
+boost::intrusive_ptr<DocumentSourceChangeStreamCheckInvalidate>
+DocumentSourceChangeStreamCheckInvalidate::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5467602,
             str::stream() << "the '" << kStageName << "' object spec must be an object",
@@ -74,14 +75,14 @@ boost::intrusive_ptr<DocumentSourceCheckInvalidate> DocumentSourceCheckInvalidat
     auto parsed = DocumentSourceChangeStreamCheckInvalidateSpec::parse(
         IDLParserErrorContext("DocumentSourceChangeStreamCheckInvalidateSpec"),
         spec.embeddedObject());
-    return new DocumentSourceCheckInvalidate(
+    return new DocumentSourceChangeStreamCheckInvalidate(
         expCtx,
         parsed.getStartAfterInvalidate()
             ? boost::optional<ResumeTokenData>(parsed.getStartAfterInvalidate()->getData())
             : boost::none);
 }
 
-DocumentSource::GetNextResult DocumentSourceCheckInvalidate::doGetNext() {
+DocumentSource::GetNextResult DocumentSourceChangeStreamCheckInvalidate::doGetNext() {
     // To declare a change stream as invalidated, this stage first emits an invalidate event and
     // then throws a 'ChangeStreamInvalidated' exception on the next call to this method.
 
@@ -160,7 +161,7 @@ DocumentSource::GetNextResult DocumentSourceCheckInvalidate::doGetNext() {
     return nextInput;
 }
 
-Value DocumentSourceCheckInvalidate::serializeLatest(
+Value DocumentSourceChangeStreamCheckInvalidate::serializeLatest(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {
         return Value(Document{{DocumentSourceChangeStream::kStageName,
@@ -171,7 +172,7 @@ Value DocumentSourceCheckInvalidate::serializeLatest(
     if (_startAfterInvalidate) {
         spec.setStartAfterInvalidate(ResumeToken(*_startAfterInvalidate));
     }
-    return Value(Document{{DocumentSourceCheckInvalidate::kStageName, spec.toBSON()}});
+    return Value(Document{{DocumentSourceChangeStreamCheckInvalidate::kStageName, spec.toBSON()}});
 }
 
 }  // namespace mongo

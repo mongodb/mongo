@@ -31,17 +31,17 @@
 
 #include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 
+#include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
+#include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/db/pipeline/document_source_change_stream_close_cursor.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
+#include "mongo/db/pipeline/document_source_change_stream_lookup_post_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_lookup_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transactions.h"
-#include "mongo/db/pipeline/document_source_check_invalidate.h"
-#include "mongo/db/pipeline/document_source_check_resume_token.h"
-#include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
-#include "mongo/db/pipeline/document_source_lookup_change_pre_image.h"
-#include "mongo/db/pipeline/document_source_update_on_add_shard.h"
+#include "mongo/db/pipeline/document_source_change_stream_update_on_add_shard.h"
 #include "mongo/db/pipeline/expression.h"
 
 namespace mongo {
@@ -70,7 +70,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
         const ResumeTokenData tokenData = token.getData();
 
         // If resuming from an "invalidate" using "startAfter", pass along the resume token data to
-        // DocumentSourceCheckInvalidate to signify that another invalidate should not be generated.
+        // DocumentSourceChangeStreamCheckInvalidate to signify that another invalidate should not
+        // be generated.
         if (startAfter && tokenData.fromInvalidate) {
             startAfterInvalidate = tokenData;
         }
@@ -93,9 +94,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
         // before any event that would sort after it. High water mark tokens, however, do not refer
         // to a specific event; we thus only need to check (1), similar to 'startAtOperationTime'.
         if (expCtx->needsMerge || ResumeToken::isHighWaterMarkToken(tokenData)) {
-            resumeStage = DocumentSourceCheckResumability::create(expCtx, tokenData);
+            resumeStage = DocumentSourceChangeStreamCheckResumability::create(expCtx, tokenData);
         } else {
-            resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, tokenData);
+            resumeStage =
+                DocumentSourceChangeStreamEnsureResumeTokenPresent::create(expCtx, tokenData);
         }
     }
 
@@ -104,7 +106,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
         uassert(40674,
                 "Only one type of resume option is allowed, but multiple were found.",
                 !resumeStage);
-        resumeStage = DocumentSourceCheckResumability::create(expCtx, *startAtOperationTime);
+        resumeStage =
+            DocumentSourceChangeStreamCheckResumability::create(expCtx, *startAtOperationTime);
     }
 
     auto transformStage = DocumentSourceChangeStreamTransform::createFromBson(rawSpec, expCtx);
@@ -115,7 +118,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
 
     // We must always build the DSOplogMatch stage even on mongoS, since our validation logic relies
     // upon the fact that it is always the first stage in the pipeline.
-    stages.push_back(DocumentSourceOplogMatch::create(expCtx, showMigrationEvents));
+    stages.push_back(DocumentSourceChangeStreamOplogMatch::create(expCtx, showMigrationEvents));
 
     stages.push_back(DocumentSourceChangeStreamUnwindTransaction::create(expCtx));
     stages.push_back(transformStage);
@@ -131,24 +134,26 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
 
     // The resume stage must come after the check invalidate stage so that the former can determine
     // whether the event that matches the resume token should be followed by an "invalidate" event.
-    stages.push_back(DocumentSourceCheckInvalidate::create(expCtx, startAfterInvalidate));
+    stages.push_back(
+        DocumentSourceChangeStreamCheckInvalidate::create(expCtx, startAfterInvalidate));
 
-    // The resume stage 'DocumentSourceCheckResumability' should come before the split point stage
-    // 'DocumentSourceUpdateOnAddShard'.
+    // The resume stage 'DocumentSourceChangeStreamCheckResumability' should come before the split
+    // point stage 'DocumentSourceChangeStreamUpdateOnAddShard'.
     if (resumeStage &&
-        resumeStage->getSourceName() == DocumentSourceCheckResumability::kStageName) {
+        resumeStage->getSourceName() == DocumentSourceChangeStreamCheckResumability::kStageName) {
         stages.push_back(resumeStage);
         resumeStage.reset();
     }
 
-    // If the pipeline is build on MongoS, then the stage 'DocumentSourceUpdateOnAddShard' acts as
-    // the split point for the pipline. All stages before this stages will run on shards and all
-    // stages after and inclusive of this stage will run on the MongoS.
+    // If the pipeline is build on MongoS, then the stage
+    // 'DocumentSourceChangeStreamUpdateOnAddShard' acts as the split point for the pipline. All
+    // stages before this stages will run on shards and all stages after and inclusive of this stage
+    // will run on the MongoS.
     if (expCtx->inMongos) {
-        stages.push_back(DocumentSourceUpdateOnAddShard::create(expCtx));
+        stages.push_back(DocumentSourceChangeStreamUpdateOnAddShard::create(expCtx));
     }
 
-    // This resume stage should be 'DocumentSourceEnsureResumeTokenPresent'.
+    // This resume stage should be 'DocumentSourceChangeStreamEnsureResumeTokenPresent'.
     if (resumeStage) {
         stages.push_back(resumeStage);
     }
@@ -158,7 +163,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
             // There should only be one close cursor stage. If we're on the shards and producing
             // input to be merged, do not add a close cursor stage, since the mongos will already
             // have one.
-            stages.push_back(DocumentSourceCloseCursor::create(expCtx));
+            stages.push_back(DocumentSourceChangeStreamCloseCursor::create(expCtx));
         }
 
         // We only create a pre-image lookup stage on a non-merging mongoD. We place this stage here
@@ -169,13 +174,13 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
         // TODO SERVER-36941: figure out how to get this to work in a sharded cluster.
         if (spec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff) {
             invariant(!expCtx->inMongos);
-            stages.push_back(DocumentSourceLookupChangePreImage::create(expCtx, spec));
+            stages.push_back(DocumentSourceChangeStreamLookupPreImage::create(expCtx, spec));
         }
 
         // There should be only one post-image lookup stage.  If we're on the shards and producing
         // input to be merged, the lookup is done on the mongos.
         if (spec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup) {
-            stages.push_back(DocumentSourceLookupChangePostImage::create(expCtx));
+            stages.push_back(DocumentSourceChangeStreamLookupPostImage::create(expCtx));
         }
     }
 
@@ -183,7 +188,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
 }
 }  // namespace change_stream_legacy
 
-Value DocumentSourceOplogMatch::serializeLegacy(
+Value DocumentSourceChangeStreamOplogMatch::serializeLegacy(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return explain ? Value(Document{{"$_internalOplogMatch"_sd, Document{}}}) : Value();
 }
@@ -201,13 +206,13 @@ Value DocumentSourceChangeStreamTransform::serializeLegacy(
     return Value(Document{{getSourceName(), _changeStreamSpec.toBSON()}});
 }
 
-Value DocumentSourceCheckInvalidate::serializeLegacy(
+Value DocumentSourceChangeStreamCheckInvalidate::serializeLegacy(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     // We only serialize this stage in the context of explain.
     return explain ? Value(DOC(kStageName << Document())) : Value();
 }
 
-Value DocumentSourceCheckResumability::serializeLegacy(
+Value DocumentSourceChangeStreamCheckResumability::serializeLegacy(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     // We only serialize this stage in the context of explain.
     return explain ? Value(DOC(getSourceName()
@@ -225,12 +230,12 @@ Value DocumentSourceChangeStreamUnwindTransaction::serializeLegacy(
     return Value();
 }
 
-Value DocumentSourceLookupChangePreImage::serializeLegacy(
+Value DocumentSourceChangeStreamLookupPreImage::serializeLegacy(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return (explain ? Value{Document{{kStageName, Document()}}} : Value());
 }
 
-Value DocumentSourceLookupChangePostImage::serializeLegacy(
+Value DocumentSourceChangeStreamLookupPostImage::serializeLegacy(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return (explain ? Value{Document{{kStageName, Document()}}} : Value());
 }

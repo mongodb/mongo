@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -38,22 +38,23 @@ namespace mongo {
  * Part of the change stream API machinery used to look up the post-image of a document. Uses the
  * "documentKey" field of the input to look up the new version of the document.
  */
-class DocumentSourceLookupChangePostImage final : public DocumentSource,
-                                                  public ChangeStreamStageSerializationInterface {
+class DocumentSourceChangeStreamLookupPostImage final
+    : public DocumentSource,
+      public ChangeStreamStageSerializationInterface {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamLookupPostImage"_sd;
     static constexpr StringData kFullDocumentFieldName =
         DocumentSourceChangeStream::kFullDocumentField;
 
     /**
-     * Creates a DocumentSourceLookupChangePostImage stage.
+     * Creates a DocumentSourceChangeStreamLookupPostImage stage.
      */
-    static boost::intrusive_ptr<DocumentSourceLookupChangePostImage> create(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamLookupPostImage> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceLookupChangePostImage(expCtx);
+        return new DocumentSourceChangeStreamLookupPostImage(expCtx);
     }
 
-    static boost::intrusive_ptr<DocumentSourceLookupChangePostImage> createFromBson(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamLookupPostImage> createFromBson(
         const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
@@ -107,7 +108,7 @@ public:
     }
 
 private:
-    DocumentSourceLookupChangePostImage(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    DocumentSourceChangeStreamLookupPostImage(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(kStageName, expCtx) {}
 
     /**
