@@ -186,6 +186,7 @@ clientDriverEnv.Library(
         'global_conn_pool.cpp',
         'replica_set_monitor.cpp',
         'replica_set_monitor_manager.cpp',
+	'replica_set_monitor_transport.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/write_concern_options',
@@ -194,6 +195,7 @@ clientDriverEnv.Library(
         '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/util/background_job',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/util/md5',
         '$BUILD_DIR/mongo/util/net/network',
         'clientdriver_minimal',
@@ -295,6 +297,7 @@ env.CppUnitTest('dbclient_rs_test',
                 LIBDEPS=[
                     'clientdriver_network',
                     '$BUILD_DIR/mongo/dbtests/mocklib',
+		    '$BUILD_DIR/mongo/db/service_context_test_fixture',
                 ],
 )
 

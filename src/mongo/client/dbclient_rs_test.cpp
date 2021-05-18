@@ -47,6 +47,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/stdx/unordered_set.h"
@@ -78,7 +79,7 @@ BSONObj makeMetadata(ReadPreference rp, TagSet tagSet) {
 /**
  * Basic fixture with one primary and one secondary.
  */
-class BasicRS : public unittest::Test {
+class BasicRS : public ServiceContextTest {
 protected:
     void setUp() {
         ReplicaSetMonitor::cleanup();
@@ -202,7 +203,7 @@ TEST_F(BasicRS, CommandSecondaryPreferred) {
 /**
  * Setup for 2 member replica set will all of the nodes down.
  */
-class AllNodesDown : public unittest::Test {
+class AllNodesDown : public ServiceContextTest {
 protected:
     void setUp() {
         ReplicaSetMonitor::cleanup();
@@ -310,7 +311,7 @@ TEST_F(AllNodesDown, CommandNearest) {
 /**
  * Setup for 2 member replica set with the primary down.
  */
-class PrimaryDown : public unittest::Test {
+class PrimaryDown : public ServiceContextTest {
 protected:
     void setUp() {
         ReplicaSetMonitor::cleanup();
@@ -416,7 +417,7 @@ TEST_F(PrimaryDown, Nearest) {
 /**
  * Setup for 2 member replica set with the secondary down.
  */
-class SecondaryDown : public unittest::Test {
+class SecondaryDown : public ServiceContextTest {
 protected:
     void setUp() {
         ReplicaSetMonitor::cleanup();
@@ -527,7 +528,7 @@ TEST_F(SecondaryDown, CommandNearest) {
  * Warning: Tests running this fixture cannot be run in parallel with other tests
  * that uses ConnectionString::setConnectionHook
  */
-class TaggedFiveMemberRS : public unittest::Test {
+class TaggedFiveMemberRS : public ServiceContextTest {
 protected:
     void setUp() {
         // Tests for pinning behavior require this.

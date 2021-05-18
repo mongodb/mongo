@@ -94,7 +94,8 @@ TEST_F(ReplicaSetMonitorTest, SeedWithPriOnlySecDown) {
     const string replSetName(replSet->getSetName());
     set<HostAndPort> seedList;
     seedList.insert(HostAndPort(replSet->getPrimary()));
-    auto monitor = ReplicaSetMonitor::createIfNeeded(replSetName, seedList);
+    auto monitor = ReplicaSetMonitor::createIfNeeded(
+        replSetName, seedList, std::make_unique<ReplicaSetMonitorDbClientTransport>());
 
     replSet->kill(replSet->getPrimary());
 
@@ -149,7 +150,8 @@ TEST(ReplicaSetMonitorTest, PrimaryRemovedFromSetStress) {
     const string replSetName(replSet.getSetName());
     set<HostAndPort> seedList;
     seedList.insert(HostAndPort(replSet.getPrimary()));
-    auto replMonitor = ReplicaSetMonitor::createIfNeeded(replSetName, seedList);
+    auto replMonitor = ReplicaSetMonitor::createIfNeeded(
+        replSetName, seedList, std::make_unique<ReplicaSetMonitorDbClientTransport>());
 
     const repl::ReplSetConfig& origConfig = replSet.getReplConfig();
 
@@ -261,7 +263,8 @@ TEST_F(TwoNodeWithTags, SecDownRetryNoTag) {
 
     set<HostAndPort> seedList;
     seedList.insert(HostAndPort(replSet->getPrimary()));
-    auto monitor = ReplicaSetMonitor::createIfNeeded(replSet->getSetName(), seedList);
+    auto monitor = ReplicaSetMonitor::createIfNeeded(
+        replSet->getSetName(), seedList, std::make_unique<ReplicaSetMonitorDbClientTransport>());
 
     const string secHost(replSet->getSecondaries().front());
     replSet->kill(secHost);
@@ -287,7 +290,8 @@ TEST_F(TwoNodeWithTags, SecDownRetryWithTag) {
 
     set<HostAndPort> seedList;
     seedList.insert(HostAndPort(replSet->getPrimary()));
-    auto monitor = ReplicaSetMonitor::createIfNeeded(replSet->getSetName(), seedList);
+    auto monitor = ReplicaSetMonitor::createIfNeeded(
+        replSet->getSetName(), seedList, std::make_unique<ReplicaSetMonitorDbClientTransport>());
 
     const string secHost(replSet->getSecondaries().front());
     replSet->kill(secHost);

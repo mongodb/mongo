@@ -139,11 +139,12 @@ DBClientReplicaSet::DBClientReplicaSet(const string& name,
       _applicationName(applicationName.toString()),
       _so_timeout(so_timeout),
       _uri(std::move(uri)) {
+    auto rsmTransport = std::make_unique<ReplicaSetMonitorDbClientTransport>();
     if (_uri.isValid()) {
-        _rsm = ReplicaSetMonitor::createIfNeeded(_uri);
+        _rsm = ReplicaSetMonitor::createIfNeeded(_uri, std::move(rsmTransport));
     } else {
-        _rsm = ReplicaSetMonitor::createIfNeeded(name,
-                                                 set<HostAndPort>(servers.begin(), servers.end()));
+        _rsm = ReplicaSetMonitor::createIfNeeded(
+            name, set<HostAndPort>(servers.begin(), servers.end()), std::move(rsmTransport));
     }
 }
 

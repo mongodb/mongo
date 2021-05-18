@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/client/replica_set_monitor_transport.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
@@ -60,8 +61,10 @@ public:
      * nullptr if there is no monitor registered for the particular replica set.
      */
     std::shared_ptr<ReplicaSetMonitor> getMonitor(StringData setName);
-    std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const ConnectionString& connStr);
-    std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const MongoURI& uri);
+    std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const ConnectionString& connStr,
+                                                          ReplicaSetMonitorTransportPtr transport);
+    std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const MongoURI& uri,
+                                                          ReplicaSetMonitorTransportPtr transport);
 
     /**
      * Retrieves the names of all sets tracked by this manager.
@@ -95,6 +98,11 @@ public:
      * Returns an executor for running RSM tasks.
      */
     executor::TaskExecutor* getExecutor();
+
+    /*
+     * Returns a transport that uses the ReplicaSetMonitorManager's executor to run commands
+     */
+    ReplicaSetMonitorTransportPtr makeRsmTransport();
 
 private:
     using ReplicaSetMonitorsMap = StringMap<std::weak_ptr<ReplicaSetMonitor>>;

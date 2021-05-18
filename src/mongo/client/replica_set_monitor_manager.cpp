@@ -38,6 +38,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/client.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
@@ -47,6 +48,7 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 
@@ -62,6 +64,11 @@ using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutorPool;
 using executor::TaskExecutor;
 using executor::ThreadPoolTaskExecutor;
+
+namespace {
+const int kMaxRsmThreads = 1024;
+const int kMaxRsmConnectionsPerHost = 128;
+}
 
 ReplicaSetMonitorManager::ReplicaSetMonitorManager() {}
 
@@ -79,17 +86,46 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData se
     }
 }
 
+auto makeThreadPool(const std::string& poolName) {
+    ThreadPool::Options threadPoolOptions;
+    threadPoolOptions.poolName = poolName;
+
+    // Two threads are for the Scan and the hello request.
+    threadPoolOptions.minThreads = 2;
+
+    // This setting is a hedge against the issue described in
+    // SERVER-56854. Generally an RSM instance will use 1 thread
+    // to make the hello request. If there are delays in the network
+    // interface delivering the replies, the RSM will timeout and
+    // spawn additional threads to make progress.
+    threadPoolOptions.maxThreads = kMaxRsmThreads;
+
+    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
+    return stdx::make_unique<ThreadPool>(threadPoolOptions);
+}
+
 void ReplicaSetMonitorManager::_setupTaskExecutorInLock(const std::string& name) {
     auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
 
     // do not restart taskExecutor if is in shutdown
     if (!_taskExecutor && !_isShutdown) {
         // construct task executor
+        auto threadName = "ReplicaSetMonitor-TaskExecutor";
+
+        // This is to limit the number of threads that a failed host can consume
+        // when there is a TCP blackhole. The RSM will attempt to contact the host repeatly
+        // spawning a new thread on each attempt if there is no response from the last attempt.
+        // Eventually, the connections will timeout according to TCP keepalive settings.
+        // See SERVER-56854 for more information.
+        executor::ConnectionPool::Options connPoolOptions;
+        connPoolOptions.maxConnections = kMaxRsmConnectionsPerHost;
+
         auto net = executor::makeNetworkInterface(
-            "ReplicaSetMonitor-TaskExecutor", nullptr, std::move(hookList));
-        auto netPtr = net.get();
-        _taskExecutor = stdx::make_unique<ThreadPoolTaskExecutor>(
-            stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
+            threadName, nullptr, std::move(hookList), connPoolOptions);
+        _taskExecutor =
+            stdx::make_unique<ThreadPoolTaskExecutor>(makeThreadPool(threadName), std::move(net));
         LOG(1) << "Starting up task executor for monitoring replica sets in response to request to "
                   "monitor set: "
                << redact(name);
@@ -104,7 +140,7 @@ void uassertNotMixingSSL(transport::ConnectSSLMode a, transport::ConnectSSLMode 
 }
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
-    const ConnectionString& connStr) {
+    const ConnectionString& connStr, ReplicaSetMonitorTransportPtr transport) {
     invariant(connStr.type() == ConnectionString::SET);
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -120,13 +156,17 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
 
     log() << "Starting new replica set monitor for " << connStr.toString();
 
-    auto newMonitor = std::make_shared<ReplicaSetMonitor>(setName, servers);
+    if (!transport) {
+        transport = makeRsmTransport();
+    }
+    auto newMonitor = std::make_shared<ReplicaSetMonitor>(setName, servers, std::move(transport));
     _monitors[setName] = newMonitor;
     newMonitor->init();
     return newMonitor;
 }
 
-shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(const MongoURI& uri) {
+shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
+    const MongoURI& uri, ReplicaSetMonitorTransportPtr transport) {
     invariant(uri.type() == ConnectionString::SET);
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -140,7 +180,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(const
 
     log() << "Starting new replica set monitor for " << uri.toString();
 
-    auto newMonitor = std::make_shared<ReplicaSetMonitor>(uri);
+    auto newMonitor = std::make_shared<ReplicaSetMonitor>(uri, std::move(transport));
     _monitors[setName] = newMonitor;
     newMonitor->init();
     return newMonitor;
@@ -230,4 +270,8 @@ TaskExecutor* ReplicaSetMonitorManager::getExecutor() {
     return _taskExecutor.get();
 }
 
+
+ReplicaSetMonitorTransportPtr ReplicaSetMonitorManager::makeRsmTransport() {
+    return std::make_unique<ReplicaSetMonitorExecutorTransport>(getExecutor());
+}
 }  // namespace mongo

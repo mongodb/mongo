@@ -46,6 +46,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/server_options.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -70,6 +71,9 @@ MONGO_FAIL_POINT_DEFINE(failAsyncConfigChangeHook);
 
 // Failpoint for changing the default refresh period
 MONGO_FAIL_POINT_DEFINE(modifyReplicaSetMonitorDefaultRefreshPeriod);
+
+// Failpoint for changing the default socket timeout for Hello command.
+MONGO_FAIL_POINT_DEFINE(modifyReplicaSetMonitorHelloTimeout);
 
 namespace {
 
@@ -96,6 +100,8 @@ const int64_t unknownLatency = numeric_limits<int64_t>::max();
 static constexpr int kRsmVerbosityThresholdTimeoutSec = 20;
 // When 'is master' reply latency is over 2 sec, it will be logged.
 static constexpr int kSlowIsMasterThresholdMicros = 2L * 1000 * 1000;
+
+static Seconds kHelloTimeout = Seconds{10};
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly, TagSet());
 const Milliseconds kFindHostMaxBackOffTime(500);
@@ -192,22 +198,43 @@ const Seconds ReplicaSetMonitor::kDefaultFindHostTimeout(15);
 // Defaults to random selection as required by the spec
 bool ReplicaSetMonitor::useDeterministicHostSelection = false;
 
-Seconds ReplicaSetMonitor::getDefaultRefreshPeriod() {
+Seconds ReplicaSetMonitor::getRefreshPeriod() {
     MONGO_FAIL_POINT_BLOCK_IF(modifyReplicaSetMonitorDefaultRefreshPeriod,
                               data,
                               [&](const BSONObj& data) { return data.hasField("period"); }) {
-        return Seconds{data.getData().getIntField("period")};
+        auto result = Seconds{data.getData().getIntField("period")};
+        log() << "Modified the default replica set monitor refresh period via failpoint to "
+              << result;
+        return result;
     }
 
     return kDefaultRefreshPeriod;
 }
 
-ReplicaSetMonitor::ReplicaSetMonitor(StringData name, const std::set<HostAndPort>& seeds)
-    : _state(std::make_shared<SetState>(name, seeds)),
-      _executor(globalRSMonitorManager.getExecutor()) {}
+Milliseconds ReplicaSetMonitor::getHelloTimeout() {
+    MONGO_FAIL_POINT_BLOCK_IF(modifyReplicaSetMonitorHelloTimeout, data, [&](const BSONObj& data) {
+        return data.hasField("period");
+    }) {
+        auto result = Milliseconds{data.getData().getIntField("period")};
+        log() << "Modified the replica set monitor request timeout via failpoint to " << result;
+        return result;
+    }
 
-ReplicaSetMonitor::ReplicaSetMonitor(const MongoURI& uri)
-    : _state(std::make_shared<SetState>(uri)), _executor(globalRSMonitorManager.getExecutor()) {}
+    return duration_cast<Milliseconds>(kHelloTimeout);
+}
+
+ReplicaSetMonitor::ReplicaSetMonitor(StringData name,
+                                     const std::set<HostAndPort>& seeds,
+                                     ReplicaSetMonitorTransportPtr transport)
+    : _state(std::make_shared<SetState>(name, seeds)),
+      _executor(globalRSMonitorManager.getExecutor()),
+      _rsmTransport(std::move(transport)) {}
+
+ReplicaSetMonitor::ReplicaSetMonitor(const MongoURI& uri,
+                                     std::unique_ptr<ReplicaSetMonitorTransport> transport)
+    : _state(std::make_shared<SetState>(uri)),
+      _executor(globalRSMonitorManager.getExecutor()),
+      _rsmTransport(std::move(transport)) {}
 
 void ReplicaSetMonitor::init() {
     _scheduleRefresh(_executor->now());
@@ -325,7 +352,7 @@ HostAndPort ReplicaSetMonitor::getMasterOrUassert() {
 Refresher ReplicaSetMonitor::startOrContinueRefresh() {
     stdx::lock_guard<stdx::mutex> lk(_state->mutex);
 
-    Refresher out(_state);
+    Refresher out(_state, _executor, _rsmTransport.get());
     DEV _state->checkInvariants();
     return out;
 }
@@ -394,14 +421,16 @@ bool ReplicaSetMonitor::contains(const HostAndPort& host) const {
     return _state->seedNodes.count(host);
 }
 
-shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::createIfNeeded(const string& name,
-                                                                const set<HostAndPort>& servers) {
+shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::createIfNeeded(
+    const string& name, const set<HostAndPort>& servers, ReplicaSetMonitorTransportPtr transport) {
     return globalRSMonitorManager.getOrCreateMonitor(
-        ConnectionString::forReplicaSet(name, vector<HostAndPort>(servers.begin(), servers.end())));
+        ConnectionString::forReplicaSet(name, vector<HostAndPort>(servers.begin(), servers.end())),
+        std::move(transport));
 }
 
-shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::createIfNeeded(const MongoURI& uri) {
-    return globalRSMonitorManager.getOrCreateMonitor(uri);
+shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::createIfNeeded(
+    const MongoURI& uri, ReplicaSetMonitorTransportPtr transport) {
+    return globalRSMonitorManager.getOrCreateMonitor(uri, std::move(transport));
 }
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::get(const std::string& name) {
@@ -490,7 +519,10 @@ void ReplicaSetMonitor::markAsRemoved() {
     _isRemovedFromManager.store(true);
 }
 
-Refresher::Refresher(const SetStatePtr& setState) : _set(setState), _scan(setState->currentScan) {
+Refresher::Refresher(const SetStatePtr& setState,
+                     executor::TaskExecutor* executor,
+                     ReplicaSetMonitorTransport* transport)
+    : _set(setState), _scan(setState->currentScan), _executor(executor), _rsmTransport(transport) {
     if (_scan)
         return;  // participate in in-progress scan
 
@@ -865,32 +897,18 @@ HostAndPort Refresher::_refreshUntilMatches(const ReadPreferenceSetting* criteri
                 continue;
 
             case NextStep::CONTACT_HOST: {
-                StatusWith<BSONObj> isMasterReplyStatus{ErrorCodes::InternalError,
-                                                        "Uninitialized variable"};
+                StatusWith<BSONObj> helloReplyStatus{ErrorCodes::InternalError,
+                                                     "Uninitialized variable"};
                 int64_t pingMicros = 0;
-                MongoURI targetURI;
-
-                if (_set->setUri.isValid()) {
-                    targetURI = _set->setUri.cloneURIForServer(ns.host, "");
-                    targetURI.setUser("");
-                    targetURI.setPassword("");
-                } else {
-                    targetURI = MongoURI(ConnectionString(ns.host));
-                }
 
                 // Do not do network calls while holding a mutex
                 lk.unlock();
-                try {
-                    ScopedDbConnection conn(targetURI, socketTimeoutSecs);
-                    bool ignoredOutParam = false;
+                {
                     Timer timer;
-                    BSONObj reply;
-                    conn->isMaster(ignoredOutParam, &reply);
-                    isMasterReplyStatus = reply;
+                    auto helloFuture = _rsmTransport->sayHello(
+                        ns.host, _set->name, _set->setUri, getHelloTimeout());
+                    helloReplyStatus = helloFuture.getNoThrow();
                     pingMicros = timer.micros();
-                    conn.done();  // return to pool on success.
-                } catch (const DBException& ex) {
-                    isMasterReplyStatus = ex.toStatus();
                 }
                 lk.lock();
 
@@ -900,10 +918,10 @@ HostAndPort Refresher::_refreshUntilMatches(const ReadPreferenceSetting* criteri
                     return criteria ? _set->getMatchingHost(*criteria) : HostAndPort();
                 }
 
-                if (isMasterReplyStatus.isOK())
-                    receivedIsMaster(ns.host, pingMicros, isMasterReplyStatus.getValue(), verbose);
+                if (helloReplyStatus.isOK())
+                    receivedIsMaster(ns.host, pingMicros, helloReplyStatus.getValue(), verbose);
                 else
-                    failedHost(ns.host, isMasterReplyStatus.getStatus());
+                    failedHost(ns.host, helloReplyStatus.getStatus());
             }
         }
 
@@ -1069,7 +1087,7 @@ SetState::SetState(StringData name, const std::set<HostAndPort>& seedNodes, Mong
       rand(std::random_device()()),
       roundRobin(0),
       setUri(std::move(uri)),
-      refreshPeriod(getDefaultRefreshPeriod()) {
+      refreshPeriod(getRefreshPeriod()) {
     uassert(13642, "Replica set seed list can't be empty", !seedNodes.empty());
 
     if (name.empty())
