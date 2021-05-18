@@ -256,6 +256,37 @@ skip_known_errors()
 	return 1
 }
 
+# Categorize the failures
+# $1 Log file
+categorize_failure()
+{
+	log=$1
+
+	# Add any important configs to be picked from the detailed failed configuration.
+	configs=("backup=" "runs.source" "runs.type" "transaction.isolation" "transaction.rollback_to_stable"
+			 "ops.prepare" "transaction.timestamps")
+	count=${#configs[@]}
+
+	search_string=""
+
+	# now loop through the config array
+	for ((i=0; i<$count; i++))
+	do
+		if [ $i == $(($count - 1)) ]
+		then
+			search_string+=${configs[i]}
+		else
+			search_string+="${configs[i]}|"
+		fi
+	done
+
+	echo "############################################"
+	echo "test/format run configuration highlights"
+	echo "############################################"
+	grep -E "$search_string" $log
+	echo "############################################"
+}
+
 # Report a failure.
 # $1 directory name
 report_failure()
@@ -287,6 +318,8 @@ report_failure()
 	}
 	echo "$name: $dir/CONFIG:"
 	sed 's/^/    /' < $dir/CONFIG
+
+	categorize_failure $log
 
 	echo "$name: failure status reported" > $dir/$status
 }
