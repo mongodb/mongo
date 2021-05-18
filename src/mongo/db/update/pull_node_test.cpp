@@ -90,7 +90,7 @@ TEST(PullNodeTest, InitWithGeoNearElemFails) {
     PullNode node;
     auto status = node.init(update["$pull"]["a"], expCtx);
     ASSERT_NOT_OK(status);
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_EQUALS(5626500, status.code());
 }
 
 TEST(PullNodeTest, InitWithGeoNearObjectFails) {
@@ -100,7 +100,7 @@ TEST(PullNodeTest, InitWithGeoNearObjectFails) {
     PullNode node;
     auto status = node.init(update["$pull"]["a"], expCtx);
     ASSERT_NOT_OK(status);
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_EQUALS(5626500, status.code());
 }
 
 TEST(PullNodeTest, InitWithExprElemFails) {

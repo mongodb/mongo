@@ -1164,7 +1164,7 @@ StatusWithMatchExpression parseGeo(StringData name,
         invariant(PathAcceptingKeyword::GEO_NEAR == type);
 
         if ((allowedFeatures & MatchExpressionParser::AllowedFeatures::kGeoNear) == 0u) {
-            return {Status(ErrorCodes::BadValue,
+            return {Status(ErrorCodes::Error(5626500),
                            "$geoNear, $near, and $nearSphere are not allowed in this context")};
         }
 
