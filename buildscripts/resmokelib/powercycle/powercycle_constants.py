@@ -1,6 +1,14 @@
 """Powercycle constants."""
 
-EXPANSIONS_FILE = "expansions.yml"
+import os
+
+if 'CI' in os.environ:
+    # in CI, the expansions file is located in the ${workdir}, one dir up
+    # from src, the checkout directory
+    EXPANSIONS_FILE = "../expansions.yml"
+else:
+    # outside of CI (local replication), the file is expected in PWD
+    EXPANSIONS_FILE = "expansions.yml"
 
 # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
 # & UserKnownHostsFile, since these are local connections from one AWS instance to another.

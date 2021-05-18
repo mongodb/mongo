@@ -983,10 +983,6 @@ functions:
 
   "generate burn in tags":
     - *f_expansions_write
-    - command: expansions.write
-      params:
-        file: src/expansions.yml
-    - *f_expansions_write
     - *configure_evergreen_api_credentials
     - command: subprocess.exec
       type: test
@@ -1084,9 +1080,6 @@ functions:
     - *upload_pip_requirements
     - *f_expansions_write
     - *configure_evergreen_api_credentials
-    - command: expansions.write
-      params:
-        file: src/expansions.yml
 
     - command: subprocess.exec
       type: test
@@ -1619,10 +1612,6 @@ functions:
           workdir: ${workdir}
 
   "set up EC2 instance": &set_up_ec2_instance
-    - *f_expansions_write
-    - command: expansions.write
-      params:
-        file: src/expansions.yml
 
     - command: host.create
       params:
@@ -1651,11 +1640,6 @@ functions:
     - command: expansions.update
       params:
         file: src/powercycle_ip_address.yml
-    - *f_expansions_write
-
-    - command: expansions.write
-      params:
-        file: src/expansions.yml
 
     - *f_expansions_write
     - command: subprocess.exec
@@ -1704,11 +1688,6 @@ functions:
 
   "save ec2 task artifacts":
     - *f_expansions_write
-    # deliberate double write. Powercyle expects the expansions.yml file to
-    # be in src
-    - command: expansions.write
-      params:
-        file: src/expansions.yml
     - *save_powercycle_artifacts
     - *archive_remote_ec2_artifacts
     - *archive_remote_ec2_monitor_files
