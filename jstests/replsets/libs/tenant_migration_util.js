@@ -321,12 +321,6 @@ var TenantMigrationUtil = (function() {
             const recipientCollInfos = new CollInfos(recipientPrimary, 'recipientPrimary', dbName);
             recipientCollInfos.filter(recipientCollections);
 
-            // TODO (SERVER-55343): Investigate temp collection behavior during tenant migrations.
-            donorCollInfos.collInfosRes =
-                donorCollInfos.collInfosRes.filter(info => !info.options.temp);
-            recipientCollInfos.collInfosRes =
-                recipientCollInfos.collInfosRes.filter(info => !info.options.temp);
-
             print(`checking db hash between donor: ${donorPrimary} and recipient: ${
                 recipientPrimary}`);
 
