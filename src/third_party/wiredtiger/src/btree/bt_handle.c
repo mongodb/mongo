@@ -222,6 +222,9 @@ __wt_btree_close(WT_SESSION_IMPL *session)
       !F_ISSET(S2C(session), WT_CONN_HS_OPEN) || !btree->hs_entries ||
         (!WT_IS_METADATA(btree->dhandle) && !WT_IS_HS(btree->dhandle)));
 
+    /* Clear the saved checkpoint information. */
+    __wt_meta_saved_ckptlist_free(session);
+
     /*
      * If we turned eviction off and never turned it back on, do that now, otherwise the counter
      * will be off.

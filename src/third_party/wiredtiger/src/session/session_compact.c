@@ -213,7 +213,8 @@ __compact_checkpoint(WT_SESSION_IMPL *session)
     /* Checkpoints take a lot of time, check if we've run out. */
     WT_RET(__wt_session_compact_check_timeout(session));
 
-    if ((ret = __wt_txn_checkpoint(session, checkpoint_cfg, false)) == 0)
+    ret = __wt_txn_checkpoint(session, checkpoint_cfg, false);
+    if (ret == 0)
         return (0);
     WT_RET_BUSY_OK(ret);
 

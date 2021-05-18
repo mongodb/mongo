@@ -1035,6 +1035,7 @@ mbss
 mem
 memalign
 membar
+memcmp
 memcpy
 memdup
 memget

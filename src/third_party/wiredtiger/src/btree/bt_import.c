@@ -132,7 +132,7 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
      * Update the last checkpoint with the corrected information. Update the file's metadata with
      * the new checkpoint information.
      */
-    WT_ERR(__wt_meta_ckptlist_get_from_config(session, false, &ckptbase, config_tmp));
+    WT_ERR(__wt_meta_ckptlist_get_from_config(session, false, &ckptbase, NULL, config_tmp));
     WT_CKPT_FOREACH (ckptbase, ckpt)
         if (ckpt->name == NULL || (ckpt + 1)->name == NULL)
             break;

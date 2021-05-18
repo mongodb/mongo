@@ -62,7 +62,8 @@ __check_imported_ts(WT_SESSION_IMPL *session, const char *uri, const char *confi
     ckptbase = NULL;
     txn_global = &S2C(session)->txn_global;
 
-    WT_ERR_NOTFOUND_OK(__wt_meta_ckptlist_get_from_config(session, false, &ckptbase, config), true);
+    WT_ERR_NOTFOUND_OK(
+      __wt_meta_ckptlist_get_from_config(session, false, &ckptbase, NULL, config), true);
     if (ret == WT_NOTFOUND)
         WT_ERR_MSG(session, EINVAL,
           "%s: import could not find any checkpoint information in supplied metadata", uri);
