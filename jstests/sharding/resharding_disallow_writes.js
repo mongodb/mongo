@@ -40,36 +40,36 @@ reshardingTest.withReshardingInBackground(
     {
         postCheckConsistencyFn: (tempNs) => {
             jsTestLog("Attempting insert");
-            assert.commandFailedWithCode(sourceCollection.runCommand({
+            let res = sourceCollection.runCommand({
                 insert: collName,
                 documents: [{_id: 1, oldKey: -10, newKey: 10}],
                 maxTimeMS: 5000
-            }),
-                                         ErrorCodes.MaxTimeMSExpired);
+            });
+            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
 
             jsTestLog("Attempting update");
-            assert.commandFailedWithCode(sourceCollection.runCommand({
+            res = sourceCollection.runCommand({
                 update: collName,
                 updates: [{q: {_id: 0}, u: {$set: {newKey: 15}}}],
                 maxTimeMS: 5000
-            }),
-                                         ErrorCodes.MaxTimeMSExpired);
+            });
+            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
 
             jsTestLog("Attempting delete");
-            assert.commandFailedWithCode(sourceCollection.runCommand({
+            res = sourceCollection.runCommand({
                 delete: collName,
                 deletes: [{q: {_id: 0, oldKey: -20}, limit: 1}],
                 maxTimeMS: 5000
-            }),
-                                         ErrorCodes.MaxTimeMSExpired);
+            });
+            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
 
             jsTestLog("Attempting createIndex");
-            assert.commandFailedWithCode(sourceCollection.runCommand({
+            res = sourceCollection.runCommand({
                 createIndexes: collName,
                 indexes: [{key: {yak: 1}, name: "yak_0"}],
                 maxTimeMS: 5000
-            }),
-                                         ErrorCodes.MaxTimeMSExpired);
+            });
+            assert(ErrorCodes.isExceededTimeLimitError(res.code));
 
             jsTestLog("Attempting collMod");
             assert.commandFailedWithCode(

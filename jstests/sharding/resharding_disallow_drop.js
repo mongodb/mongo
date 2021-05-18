@@ -47,8 +47,8 @@ const awaitReshardResult = startParallelShell(
 
 awaitReshardingStarted();
 
-assert.commandFailedWithCode(db.runCommand({drop: collName, maxTimeMS: 5000}),
-                             ErrorCodes.MaxTimeMSExpired);
+let res = db.runCommand({drop: collName, maxTimeMS: 5000});
+assert(ErrorCodes.isExceededTimeLimitError(res.code));
 
 pauseCoordinatorBeforeDecisionPersistedFailpoint.off();
 awaitReshardResult();
