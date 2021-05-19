@@ -130,6 +130,11 @@ public:
                                                      const boost::optional<WriteConcern>& wc);
 
     /**
+     * Returns true if cluster-wide write concern is set and false otherwise.
+     */
+    bool isCWWCSet(OperationContext* opCtx);
+
+    /**
      * Invalidates the cached RWC defaults, causing them to be refreshed.
      *
      * After this call returns, the read methods below (getDefault, getDefaultReadConcern,

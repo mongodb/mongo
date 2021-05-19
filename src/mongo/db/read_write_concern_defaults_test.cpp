@@ -54,6 +54,10 @@ protected:
         return ReadWriteConcernDefaults::get(getServiceContext()).getDefault(_opCtx);
     }
 
+    bool isCWWCSet() {
+        return ReadWriteConcernDefaults::get(getServiceContext()).isCWWCSet(_opCtx);
+    }
+
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 
     bool _isDefaultWCMajorityEnabled{
@@ -72,6 +76,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentCWRWCWithImplicitWC
     auto defaults = getDefault();
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(!defaults.getDefaultWriteConcern());
+    ASSERT(!isCWWCSet());
     ASSERT(!defaults.getUpdateOpTime());
     ASSERT(!defaults.getUpdateWallClockTime());
     ASSERT_EQ(Date_t(), defaults.localUpdateWallClockTime());
@@ -89,6 +94,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentCWRWCWithImplicitWC
 
     // By not calling _lookupMock.setLookupCallReturnValue(), tests _defaults.lookup() returning
     // boost::none.
+    ASSERT(!isCWWCSet());
     auto defaults = getDefault();
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(defaults.getDefaultWriteConcern());
@@ -105,6 +111,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNeverSetWithImplicit
     // _defaults.lookup() returning default constructed RWConcern not boost::none.
     _lookupMock.setLookupCallReturnValue({});
 
+    ASSERT(!isCWWCSet());
     auto defaults = getDefault();
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(!defaults.getDefaultWriteConcern());
@@ -124,6 +131,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNeverSetWithImplicit
     createDefaults(true /* isImplicitWCMajority */);
 
     // _defaults.lookup() returning default constructed RWConcern not boost::none.
+    ASSERT(!isCWWCSet());
     _lookupMock.setLookupCallReturnValue({});
     auto defaults = getDefault();
     ASSERT(!defaults.getDefaultReadConcern());
@@ -143,6 +151,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetCWRWCWithImplicitWCW
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
+    ASSERT(!isCWWCSet());
     auto defaults = getDefault();
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(!defaults.getDefaultWriteConcern());
@@ -166,6 +175,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetCWRWCWithImplicitWCM
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
+    ASSERT(!isCWWCSet());
     auto defaults = getDefault();
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(defaults.getDefaultWriteConcern());
@@ -184,6 +194,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCW1)
         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern));
     WriteConcernOptions wc;
     wc.wNumNodes = 4;
+    wc.usedDefault = false;
+    wc.usedDefaultW = false;
     newDefaults.setDefaultWriteConcern(wc);
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
@@ -192,6 +204,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCW1)
     }
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
+    ASSERT(isCWWCSet());
     auto defaults = getDefault();
     ASSERT(defaults.getDefaultReadConcern()->getLevel() ==
            repl::ReadConcernLevel::kLocalReadConcern);
@@ -226,6 +239,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCMaj
     }
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
+    ASSERT(isCWWCSet());
     auto defaults = getDefault();
     ASSERT(defaults.getDefaultReadConcern()->getLevel() ==
            repl::ReadConcernLevel::kLocalReadConcern);
@@ -246,17 +260,14 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWriteConcernSourceImplicitWit
     createDefaults(true /* isImplicitWCMajority */);
 
     RWConcernDefault newDefaults;
-    WriteConcernOptions wc;
-    wc.wNumNodes = 4;
-    wc.usedDefault = true;
-    wc.usedDefaultW = false;
-    newDefaults.setDefaultWriteConcern(wc);
+    newDefaults.setDefaultWriteConcern(WriteConcernOptions());
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
     newDefaults.setDefaultWriteConcernSource(DefaultWriteConcernSourceEnum::kGlobal);
 
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
+    ASSERT(!isCWWCSet());
     // The default write concern source should be set to implicit if wc.usedDefault is true
     auto defaults = getDefault();
     ASSERT(!defaults.getDefaultReadConcern());
@@ -279,6 +290,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplic
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
+    ASSERT(!isCWWCSet());
     auto defaults = getDefault();
     ASSERT(defaults.getDefaultReadConcern()->getLevel() ==
            repl::ReadConcernLevel::kLocalReadConcern);
@@ -298,6 +310,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplic
 
     ReadWriteConcernDefaults::get(getServiceContext()).refreshIfNecessary(_opCtx);
 
+    ASSERT(!isCWWCSet());
     defaults = getDefault();
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(!defaults.getDefaultWriteConcern());
@@ -324,7 +337,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplic
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
-
+    ASSERT(!isCWWCSet());
     auto defaults = getDefault();
     ASSERT(defaults.getDefaultReadConcern()->getLevel() ==
            repl::ReadConcernLevel::kLocalReadConcern);
@@ -343,6 +356,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplic
 
     ReadWriteConcernDefaults::get(getServiceContext()).refreshIfNecessary(_opCtx);
 
+    ASSERT(!isCWWCSet());
     defaults = getDefault();
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(defaults.getDefaultWriteConcern());
@@ -358,6 +372,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultLookupFailure) {
     createDefaults(true /* isImplicitWCMajority */);
     _lookupMock.setLookupCallFailure(Status{ErrorCodes::Error(1234), "foobar"});
     ASSERT_THROWS_CODE_AND_WHAT(getDefault(), AssertionException, 1234, "foobar");
+    ASSERT_THROWS_CODE_AND_WHAT(isCWWCSet(), AssertionException, 1234, "foobar");
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithoutInvalidateDoesNotCallLookup) {
@@ -368,6 +383,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithoutInvalidateDoesNotCallL
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
+    ASSERT(!isCWWCSet());
     auto defaults = getDefault();
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(!defaults.getDefaultWriteConcern());
@@ -383,6 +399,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithoutInvalidateDoesNotCallL
         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern));
     WriteConcernOptions wc;
     wc.wNumNodes = 4;
+    wc.usedDefault = false;
+    wc.usedDefaultW = false;
     newDefaults2.setDefaultWriteConcern(wc);
     newDefaults2.setUpdateOpTime(Timestamp(3, 4));
     newDefaults2.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(5678));
@@ -391,6 +409,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithoutInvalidateDoesNotCallL
     }
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults2));
 
+    ASSERT(!isCWWCSet());
     auto defaults2 = getDefault();
     ASSERT(!defaults2.getDefaultReadConcern());
     ASSERT(!defaults2.getDefaultWriteConcern());
@@ -411,6 +430,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
+    ASSERT(!isCWWCSet());
     auto defaults = getDefault();
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(!defaults.getDefaultWriteConcern());
@@ -426,6 +446,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern));
     WriteConcernOptions wc;
     wc.wNumNodes = 4;
+    wc.usedDefault = false;
+    wc.usedDefaultW = false;
     newDefaults2.setDefaultWriteConcern(wc);
     newDefaults2.setUpdateOpTime(Timestamp(3, 4));
     newDefaults2.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(5678));
@@ -435,6 +457,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults2));
 
     ReadWriteConcernDefaults::get(getServiceContext()).invalidate();
+    ASSERT(isCWWCSet());
     auto defaults2 = getDefault();
     ASSERT(defaults2.getDefaultReadConcern()->getLevel() ==
            repl::ReadConcernLevel::kLocalReadConcern);
@@ -451,6 +474,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithEmptyCacheAndAbsentD
     createDefaults(false /* isImplicitWCMajority */);
     ReadWriteConcernDefaults::get(getServiceContext()).refreshIfNecessary(_opCtx);
 
+    ASSERT(!isCWWCSet());
     auto defaults = getDefault();
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(!defaults.getDefaultWriteConcern());
@@ -472,6 +496,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithEmptyCacheAndSetDefa
 
     ReadWriteConcernDefaults::get(getServiceContext()).refreshIfNecessary(_opCtx);
 
+    ASSERT(!isCWWCSet());
     auto defaults = getDefault();
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
@@ -489,6 +514,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpoch) {
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
+    ASSERT(!isCWWCSet());
     auto defaults = getDefault();
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
@@ -503,6 +529,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpoch) {
 
     ReadWriteConcernDefaults::get(getServiceContext()).refreshIfNecessary(_opCtx);
 
+    ASSERT(!isCWWCSet());
     auto defaults2 = getDefault();
     ASSERT_EQ(Timestamp(3, 4), *defaults2.getUpdateOpTime());
     ASSERT_EQ(5678, defaults2.getUpdateWallClockTime()->toMillisSinceEpoch());
