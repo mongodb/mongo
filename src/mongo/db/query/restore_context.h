@@ -45,7 +45,7 @@ public:
         kYield      // Internal restore after yield
     };
 
-    RestoreContext() = default;
+    RestoreContext() = delete;
     /* implicit */ RestoreContext(const CollectionPtr* coll) : _collection(coll) {}
     /* implicit */ RestoreContext(RestoreType type, const CollectionPtr* coll)
         : _type(type), _collection(coll) {}
