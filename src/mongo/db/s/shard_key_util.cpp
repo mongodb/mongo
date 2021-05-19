@@ -219,7 +219,7 @@ void ValidationBehaviorsShardCollection::verifyUsefulNonMultiKeyIndex(
         "admin",
         BSON(kCheckShardingIndexCmdName << nss.ns() << kKeyPatternField << proposedKey),
         res);
-    uassert(ErrorCodes::OperationFailed, res["errmsg"].str(), success);
+    uassert(ErrorCodes::InvalidOptions, res["errmsg"].str(), success);
 }
 
 void ValidationBehaviorsShardCollection::verifyCanCreateShardKeyIndex(
