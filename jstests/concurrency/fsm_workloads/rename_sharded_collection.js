@@ -104,6 +104,13 @@ var $config = (function() {
                 assertAlways.commandWorked(srcColl.renameCollection(destCollName));
             } catch (e) {
                 const exceptionCode = e.code;
+                if (exceptionCode == ErrorCodes.IllegalOperation) {
+                    assert.eq(
+                        collName,
+                        destCollName,
+                        "The FSM thread can fail with IllegalOperation just if a rename collection is happening on the same collection.");
+                    return;
+                }
                 if (exceptionCode) {
                     logException(db, exceptionCode);
                     if (expectedExceptions.includes(exceptionCode)) {

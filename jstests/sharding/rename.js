@@ -77,6 +77,18 @@ jsTest.log("Testing that rename operations involving views are not allowed");
     assert.commandFailed(fromAView);
 }
 
+// Rename a collection to itself fails, without loosing data
+{
+    const sameCollName = 'sameColl';
+    const sameColl = db[sameCollName];
+    assert.commandWorked(sameColl.insert({a: 1}));
+
+    assert.commandFailedWithCode(sameColl.renameCollection(sameCollName, true /* dropTarget */),
+                                 ErrorCodes.IllegalOperation);
+
+    assert.eq(1, sameColl.countDocuments({}), "Rename a collection to itself must not loose data");
+}
+
 // Ensure write concern works by shutting down 1 node in a replica set shard
 jsTest.log("Testing write concern (2)");
 

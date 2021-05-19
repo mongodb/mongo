@@ -845,6 +845,8 @@ void validateAndRunRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& source,
                                     const NamespaceString& target,
                                     const RenameCollectionOptions& options) {
+    invariant(source != target, "Can't rename a collection to itself");
+
     validateNamespacesForRenameCollection(opCtx, source, target);
 
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
