@@ -89,18 +89,19 @@ ReshardingMetrics* ReshardingMetrics::get(ServiceContext* ctx) noexcept {
     return getMetrics(ctx).get();
 }
 
-void ReshardingMetrics::onStart() noexcept {
+void ReshardingMetrics::onStart(Date_t runningOperationStartTime) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
     // TODO Re-add this invariant once all breaking test cases have been fixed.
     // invariant(!_currentOp.has_value(), kAnotherOperationInProgress);
     // Create a new operation and record the time it started.
     _currentOp.emplace(_svcCtx->getFastClockSource());
-    _currentOp->runningOperation.start();
+    _currentOp->runningOperation.start(runningOperationStartTime);
     _currentOp->opStatus = ReshardingOperationStatusEnum::kRunning;
     _started++;
 }
 
-void ReshardingMetrics::onCompletion(ReshardingOperationStatusEnum status) noexcept {
+void ReshardingMetrics::onCompletion(ReshardingOperationStatusEnum status,
+                                     Date_t runningOperationEndTime) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
     // TODO Re-add this invariant once all breaking test cases have been fixed.
     // invariant(_currentOp.has_value(), kNoOperationInProgress);
@@ -118,6 +119,8 @@ void ReshardingMetrics::onCompletion(ReshardingOperationStatusEnum status) noexc
             MONGO_UNREACHABLE;
     }
 
+    _currentOp->runningOperation.end(runningOperationEndTime);
+
     // Reset current op metrics.
     _currentOp = boost::none;
 }
@@ -131,9 +134,9 @@ void ReshardingMetrics::onStepUp() noexcept {
     // TODO SERVER-53914 Implement coordinator metrics rehydration.
     // TODO SERVER-53912 Implement recipient metrics rehydration.
 
-    // TODO SERVER-56739 Resume the runningOperation duration from a timestamp stored on disk
+    // TODO SERVER-57094 Resume the runningOperation duration from a timestamp stored on disk
     // instead of starting from the current time.
-    _currentOp->runningOperation.start();
+    _currentOp->runningOperation.start(_svcCtx->getFastClockSource()->now());
     _currentOp->opStatus = ReshardingOperationStatusEnum::kRunning;
 }
 
@@ -156,18 +159,6 @@ void ReshardingMetrics::setRecipientState(RecipientStateEnum state) noexcept {
 
     const auto oldState = std::exchange(_currentOp->recipientState, state);
     invariant(oldState != state);
-
-    if (state == RecipientStateEnum::kCloning) {
-        _currentOp->copyingDocuments.start();
-    } else if (state == RecipientStateEnum::kApplying) {
-        _currentOp->applyingOplogEntries.start();
-    }
-
-    if (oldState == RecipientStateEnum::kCloning) {
-        _currentOp->copyingDocuments.end();
-    } else if (oldState == RecipientStateEnum::kApplying) {
-        _currentOp->applyingOplogEntries.end();
-    }
 }
 
 void ReshardingMetrics::setCoordinatorState(CoordinatorStateEnum state) noexcept {
@@ -227,14 +218,34 @@ void ReshardingMetrics::onDocumentsCopied(int64_t documents, int64_t bytes) noex
     _cumulativeOp.bytesCopied += bytes;
 }
 
-void ReshardingMetrics::startInCriticalSection() {
+void ReshardingMetrics::startCopyingDocuments(Date_t start) {
     stdx::lock_guard<Latch> lk(_mutex);
-    _currentOp->inCriticalSection.start();
+    _currentOp->copyingDocuments.start(start);
 }
 
-void ReshardingMetrics::endInCritcialSection() {
+void ReshardingMetrics::endCopyingDocuments(Date_t end) {
     stdx::lock_guard<Latch> lk(_mutex);
-    _currentOp->inCriticalSection.end();
+    _currentOp->copyingDocuments.forceEnd(end);
+}
+
+void ReshardingMetrics::startApplyingOplogEntries(Date_t start) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _currentOp->applyingOplogEntries.start(start);
+}
+
+void ReshardingMetrics::endApplyingOplogEntries(Date_t end) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _currentOp->applyingOplogEntries.forceEnd(end);
+}
+
+void ReshardingMetrics::startInCriticalSection(Date_t start) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _currentOp->inCriticalSection.start(start);
+}
+
+void ReshardingMetrics::endInCriticalSection(Date_t end) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _currentOp->inCriticalSection.forceEnd(end);
 }
 
 void ReshardingMetrics::onOplogEntriesFetched(int64_t entries) noexcept {
@@ -276,15 +287,23 @@ void ReshardingMetrics::onWriteDuringCriticalSection(int64_t writes) noexcept {
     _cumulativeOp.writesDuringCriticalSection += writes;
 }
 
-void ReshardingMetrics::OperationMetrics::TimeInterval::start() noexcept {
+void ReshardingMetrics::OperationMetrics::TimeInterval::start(Date_t start) noexcept {
     invariant(!_start.has_value(), "Already started");
-    _start.emplace(_clockSource->now());
+    _start.emplace(start);
 }
 
-void ReshardingMetrics::OperationMetrics::TimeInterval::end() noexcept {
+void ReshardingMetrics::OperationMetrics::TimeInterval::end(Date_t end) noexcept {
     invariant(_start.has_value(), "Not started");
     invariant(!_end.has_value(), "Already stopped");
-    _end.emplace(_clockSource->now());
+    _end.emplace(end);
+}
+
+void ReshardingMetrics::OperationMetrics::TimeInterval::forceEnd(Date_t end) noexcept {
+    if (!_start.has_value()) {
+        _start.emplace(end);
+    }
+
+    this->end(end);
 }
 
 Milliseconds ReshardingMetrics::OperationMetrics::TimeInterval::duration() const noexcept {

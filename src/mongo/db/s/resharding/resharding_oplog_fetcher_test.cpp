@@ -98,7 +98,7 @@ public:
 
         // Initialize ReshardingMetrics to a recipient state compatible with fetching.
         _metrics = std::make_unique<ReshardingMetrics>(_svcCtx);
-        _metrics->onStart();
+        _metrics->onStart(_svcCtx->getFastClockSource()->now());
         _metrics->setRecipientState(RecipientStateEnum::kCloning);
 
         for (const auto& shardId : kTwoShardIdList) {

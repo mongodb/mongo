@@ -78,7 +78,7 @@ public:
             };
 
             ReshardingMetrics metrics(opCtx->getServiceContext());
-            metrics.onStart();
+            metrics.onStart(opCtx->getServiceContext()->getFastClockSource()->now());
             metrics.setRecipientState(RecipientStateEnum::kCloning);
 
             auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
