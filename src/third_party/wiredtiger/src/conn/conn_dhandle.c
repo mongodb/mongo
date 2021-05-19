@@ -191,7 +191,7 @@ __wt_conn_dhandle_alloc(WT_SESSION_IMPL *session, const char *uri, const char *c
         WT_RET_PANIC(session, EINVAL, "illegal handle allocation URI %s", uri);
 
     /* Btree handles keep their data separate from the interface. */
-    if (dhandle->type == WT_DHANDLE_TYPE_BTREE) {
+    if (WT_DHANDLE_BTREE(dhandle)) {
         WT_ERR(__wt_calloc_one(session, &btree));
         dhandle->handle = btree;
         btree->dhandle = dhandle;
@@ -295,7 +295,7 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead)
      * The only data handle type that uses the "handle" field is btree. For other data handle types,
      * it should be NULL.
      */
-    is_btree = dhandle->type == WT_DHANDLE_TYPE_BTREE;
+    is_btree = WT_DHANDLE_BTREE(dhandle);
     btree = is_btree ? dhandle->handle : NULL;
 
     if (is_btree) {
@@ -507,7 +507,7 @@ __wt_conn_dhandle_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t fla
     WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_CLOSING_NO_MORE_OPENS));
 
     /* Turn off eviction. */
-    if (dhandle->type == WT_DHANDLE_TYPE_BTREE)
+    if (WT_DHANDLE_BTREE(dhandle))
         WT_RET(__wt_evict_file_exclusive_on(session));
 
     /*
@@ -578,7 +578,7 @@ err:
             F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
     }
 
-    if (dhandle->type == WT_DHANDLE_TYPE_BTREE)
+    if (WT_DHANDLE_BTREE(dhandle))
         __wt_evict_file_exclusive_off(session);
 
     if (ret == ENOENT && F_ISSET(dhandle, WT_DHANDLE_IS_METADATA)) {
@@ -690,8 +690,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session, const char *uri,
                 goto done;
 
             if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) || F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
-              dhandle->type != WT_DHANDLE_TYPE_BTREE || dhandle->checkpoint != NULL ||
-              WT_IS_METADATA(dhandle))
+              !WT_DHANDLE_BTREE(dhandle) || dhandle->checkpoint != NULL || WT_IS_METADATA(dhandle))
                 continue;
             WT_ERR(__conn_btree_apply_internal(session, dhandle, file_func, name_func, cfg));
         }

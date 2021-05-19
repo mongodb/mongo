@@ -591,7 +591,7 @@ __curfile_reopen_int(WT_CURSOR *cursor)
      */
     if (ret == 0) {
         /* Assert a valid tree (we didn't race with eviction). */
-        WT_ASSERT(session, dhandle->type == WT_DHANDLE_TYPE_BTREE);
+        WT_ASSERT(session, WT_DHANDLE_BTREE(dhandle));
         WT_ASSERT(session, ((WT_BTREE *)dhandle->handle)->root.page != NULL);
 
         btree = CUR2BT(cursor);
@@ -821,7 +821,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, c
     if (bulk)
         LF_SET(WT_BTREE_BULK | WT_DHANDLE_EXCLUSIVE);
 
-    WT_ASSERT(session, WT_PREFIX_MATCH(uri, "file:"));
+    WT_ASSERT(session, WT_PREFIX_MATCH(uri, "file:") || WT_PREFIX_MATCH(uri, "tiered:"));
 
     /* Get the handle and lock it while the cursor is using it. */
     /*
