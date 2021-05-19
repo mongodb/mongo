@@ -245,7 +245,7 @@ private:
     // this point, future writers do not need to update the catalog.
     AtomicWord<bool> _isMultikeyForWrite;
 
-    // Controls concurrent access to '_indexMultikeyPathsForRead'.
+    // Controls concurrent access to '_indexMultikeyPathsForRead' and '_indexMultikeyPathsForWrite'.
     // We acquire this mutex rather than the RESOURCE_METADATA lock as a performance optimization
     // so that it is cheaper to detect whether there is actually any path-level multikey
     // information to update or not.
@@ -258,7 +258,8 @@ private:
     // in the index key pattern. Each element in the vector is an ordered set of positions (starting
     // at 0) into the corresponding indexed field that represent what prefixes of the indexed field
     // causes the index to be multikey.
-    MultikeyPaths _indexMultikeyPathsForRead;  // May include paths not committed to catalog.
+    MultikeyPaths _indexMultikeyPathsForRead;   // May include paths not committed to catalog.
+    MultikeyPaths _indexMultikeyPathsForWrite;  // Paths in catalog updated by a transaction commit.
 
     // The earliest snapshot that is allowed to read this index.
     boost::optional<Timestamp> _minVisibleSnapshot;

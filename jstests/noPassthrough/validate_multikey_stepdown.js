@@ -120,9 +120,9 @@ assert(result.indexDetails._id_.valid, tojson(result));
 
 // Check geo index.
 assert.lt(1, result.keysPerIndex.geo_2dsphere, tojson(result));
-assert(!result.indexDetails.geo_2dsphere.valid, tojson(result));
+assert(result.indexDetails.geo_2dsphere.valid, tojson(result));
 
-assert(!result.valid, tojson(result));
+assert(result.valid, tojson(result));
 
-rst.stopSet(/*signal=*/undefined, /*forRestart=*/undefined, {skipValidation: true});
+rst.stopSet();
 })();
