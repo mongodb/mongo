@@ -10074,6 +10074,33 @@ buildvariants:
     distros:
     - rhel70-small
 
+- name: rhel-72-s390x
+  display_name: RHEL 7.2 s390x
+  batchtime: 525600 # 365 days
+  run_on:
+  - rhel72-zseries-test
+  expansions:
+    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: s390x
+    packager_distro: rhel72
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: s390x-rhel72
+    repo_edition: org
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel72-zseries-build
+  - name: jsCore
+  - name: replica_sets_jscore_passthrough
+  - name: ssl_gen
+  - name: .publish
+    distros:
+    - rhel70-small
+
 ###########################################
 #          Ubuntu buildvariants           #
 ###########################################
