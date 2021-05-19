@@ -70,6 +70,10 @@ public:
                     str::stream() << "Invalid target namespace: " << toNss.ns(),
                     toNss.isValid());
 
+            uassert(ErrorCodes::IllegalOperation,
+                    "Can't rename a collection to itself",
+                    fromNss != toNss);
+
             RenameCollectionRequest renameCollReq(request().getTo());
             renameCollReq.setDropTarget(request().getDropTarget());
             renameCollReq.setStayTemp(request().getStayTemp());

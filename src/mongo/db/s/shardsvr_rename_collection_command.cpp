@@ -119,6 +119,10 @@ public:
             const auto& fromNss = ns();
             const auto& toNss = req.getTo();
 
+            uassert(ErrorCodes::IllegalOperation,
+                    "Can't rename a collection to itself",
+                    fromNss != toNss);
+
             auto const shardingState = ShardingState::get(opCtx);
             uassertStatusOK(shardingState->canAcceptShardedCommands());
 
@@ -140,16 +144,6 @@ public:
                                   << " must be called with majority writeConcern, got "
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
-
-            // TODO SERVER-56296 Uniform `fromNss == toNss` behavior between RS and sharded cluster
-            if (fromNss == toNss) {
-                // Simply return the current collection version
-                const auto catalog = Grid::get(opCtx)->catalogCache();
-                const auto cm =
-                    uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, fromNss));
-                return RenameCollectionResponse(cm.isSharded() ? cm.getVersion()
-                                                               : ChunkVersion::UNSHARDED());
-            }
 
             validateNamespacesForRenameCollection(opCtx, fromNss, toNss);
 

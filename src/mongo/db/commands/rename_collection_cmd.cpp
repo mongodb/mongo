@@ -94,6 +94,13 @@ public:
                            BSONObjBuilder& result) {
         auto renameRequest =
             RenameCollectionCommand::parse(IDLParserErrorContext("renameCollection"), cmdObj);
+
+        const auto& fromNss = renameRequest.getCommandParameter();
+        const auto& toNss = renameRequest.getTo();
+
+        uassert(
+            ErrorCodes::IllegalOperation, "Can't rename a collection to itself", fromNss != toNss);
+
         RenameCollectionOptions options;
         options.dropTarget = renameRequest.getDropTarget();
         options.stayTemp = renameRequest.getStayTemp();
