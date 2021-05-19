@@ -1139,6 +1139,10 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
     const CancellationToken& token,
     const CancellationToken& abortToken,
     Status status) {
+    // Don't handle errors if the instance token is canceled to guarantee we don't enter the abort
+    // state because of an earlier error from token cancellation.
+    checkForTokenInterrupt(token);
+
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
@@ -1147,7 +1151,10 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
         }
     }
 
-    if (abortToken.isCanceled()) {
+    // Note we must check the parent token has not been canceled so we don't change the error if the
+    // abortToken was canceled because of an instance interruption. The checks don't need to be
+    // atomic because a token cannot be uncanceled.
+    if (abortToken.isCanceled() && !token.isCanceled()) {
         status = Status(ErrorCodes::TenantMigrationAborted, "Aborted due to donorAbortMigration.");
     }
 
