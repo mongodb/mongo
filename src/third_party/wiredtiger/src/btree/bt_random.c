@@ -506,7 +506,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
      * sampling, pick a roughly random leaf page in the tree and return an entry from it.
      */
     if (cbt->ref == NULL || cbt->next_random_sample_size == 0) {
-        WT_ERR(__cursor_func_init(cbt, true));
+        WT_ERR(__wt_cursor_func_init(cbt, true));
         WT_WITH_PAGE_INDEX(session, ret = __wt_random_descent(session, &cbt->ref, read_flags));
         if (ret == 0) {
             WT_ERR(__random_leaf(cbt));
