@@ -1082,7 +1082,7 @@ TenantMigrationDonorService::Instance::_waitForRecipientToReachBlockTimestampAnd
             if (idx == 0) {
                 LOGV2(5290301,
                       "Tenant migration blocking stage timeout expired",
-                      "timeoutMs"_attr = repl::tenantMigrationGarbageCollectionDelayMS.load());
+                      "timeoutMs"_attr = repl::tenantMigrationBlockingStateTimeoutMS.load());
                 // Deadline reached, cancel the pending '_sendRecipientSyncDataCommand()'...
                 recipientSyncDataSource.cancel();
                 // ...and return error.
