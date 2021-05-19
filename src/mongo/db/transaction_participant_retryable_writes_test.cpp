@@ -218,7 +218,8 @@ protected:
                            osi,
                            stmtId,
                            link,
-                           OplogSlot());
+                           OplogSlot(),
+                           {});
     }
 
     repl::OpTime writeTxnRecord(TxnNumber txnNum,
@@ -646,7 +647,8 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
                                   osi,
                                   1,
                                   {},
-                                  OplogSlot());
+                                  OplogSlot(),
+                                  {});
 
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setSessionId(sessionId);
@@ -679,7 +681,8 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
                                   osi,
                                   kIncompleteHistoryStmtId,
                                   link,
-                                  OplogSlot());
+                                  OplogSlot(),
+                                  {});
 
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setSessionId(sessionId);

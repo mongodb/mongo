@@ -380,7 +380,8 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             Date_t wallTime,
                             const OperationSessionInfo& sessionInfo,
                             boost::optional<StmtId> statementId,
-                            const OplogLink& oplogLink) {
+                            const OplogLink& oplogLink,
+                            boost::optional<repl::RetryImageEnum> needsRetryImage) {
     BSONObjBuilder b(256);
 
     b.append("ts", optime.getTimestamp());
@@ -401,6 +402,10 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
 
     if (o2)
         b.append("o2", *o2);
+
+    if (needsRetryImage) {
+        b.append("needsRetryImage", repl::RetryImage_serializer(*needsRetryImage));
+    }
 
     invariant(wallTime != Date_t{});
     b.appendDate(OplogEntryBase::kWallClockTimeFieldName, wallTime);
@@ -490,7 +495,8 @@ OpTime logOp(OperationContext* opCtx,
              const OperationSessionInfo& sessionInfo,
              boost::optional<StmtId> statementId,
              const OplogLink& oplogLink,
-             const OplogSlot& oplogSlot) {
+             const OplogSlot& oplogSlot,
+             boost::optional<repl::RetryImageEnum> needsRetryImage) {
     // All collections should have UUIDs now, so all insert, update, and delete oplog entries should
     // also have uuids. Some no-op (n) and command (c) entries may still elide the uuid field.
     invariant(uuid || 'n' == *opstr || 'c' == *opstr,
@@ -539,7 +545,8 @@ OpTime logOp(OperationContext* opCtx,
                                wallClockTime,
                                sessionInfo,
                                statementId,
-                               oplogLink);
+                               oplogLink,
+                               needsRetryImage);
     const DocWriter* basePtr = &writer;
     auto timestamp = slot.getTimestamp();
     _logOpsInner(opCtx, nss, &basePtr, &timestamp, 1, oplog, slot, wallClockTime);
@@ -610,7 +617,8 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
                                           wallClockTime,
                                           sessionInfo,
                                           begin[i].stmtId,
-                                          oplogLink));
+                                          oplogLink,
+                                          {}));
         oplogLink.prevOpTime = insertStatementOplogSlot;
         timestamps[i] = oplogLink.prevOpTime.getTimestamp();
         opTimes.push_back(insertStatementOplogSlot);

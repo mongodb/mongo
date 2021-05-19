@@ -142,7 +142,8 @@ OpTime logOp(OperationContext* opCtx,
              const OperationSessionInfo& sessionInfo,
              boost::optional<StmtId> stmtId,
              const OplogLink& oplogLink,
-             const OplogSlot& oplogSlot);
+             const OplogSlot& oplogSlot,
+             boost::optional<repl::RetryImageEnum> needsRetryImage);
 
 // Flush out the cached pointer to the oplog.
 void clearLocalOplogPtr();
