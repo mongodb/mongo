@@ -37,7 +37,7 @@ function verifyFields(res,
         unexpectedFields.push("defaultWriteConcern");
     }
 
-    if (isDefaultWCMajorityFlagEnabled) {
+    if (isDefaultWCMajorityFlagEnabled && !isPersistedDocument) {
         expectedFields.push("defaultWriteConcernSource");
     } else {
         unexpectedFields.push("defaultWriteConcernSource");
@@ -55,7 +55,7 @@ function verifyFields(res,
         assert(!res.hasOwnProperty(field),
                `response unexpectedly had field '${field}', res: ${tojson(res)}`);
     });
-    if (isDefaultWCMajorityFlagEnabled) {
+    if (isDefaultWCMajorityFlagEnabled && !isPersistedDocument) {
         if (expectWC) {
             assert.eq(res.defaultWriteConcernSource, "global", tojson(res));
         } else {
