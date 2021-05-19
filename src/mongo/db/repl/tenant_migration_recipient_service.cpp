@@ -986,15 +986,18 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
 
     MutableOplogEntry noopEntry;
     noopEntry.setOpType(repl::OpTypeEnum::kNoop);
-    noopEntry.setNss({});
-    noopEntry.setObject({});
+    auto tenantNss = NamespaceString(getTenantId() + "_", "");
+    noopEntry.setNss(tenantNss);
+    // Write a fake applyOps with the tenantId as the namespace so that this will be picked
+    // up by the committed transaction prefetch pipeline in subsequent migrations.
+    noopEntry.setObject(
+        BSON("applyOps" << BSON_ARRAY(BSON(OplogEntry::kNssFieldName << tenantNss.ns()))));
     noopEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
     noopEntry.setSessionId(sessionId);
     noopEntry.setTxnNumber(txnNumber);
 
     // Use the same wallclock time as the noop entry.
     sessionTxnRecord.setStartOpTime(boost::none);
-    sessionTxnRecord.setLastWriteOpTime(OpTime());
     sessionTxnRecord.setLastWriteDate(noopEntry.getWallClockTime());
 
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
@@ -1003,7 +1006,8 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
             WriteUnitOfWork wuow(opCtx);
 
             // Write the no-op entry and update 'config.transactions'.
-            repl::logOp(opCtx, &noopEntry);
+            auto opTime = repl::logOp(opCtx, &noopEntry);
+            sessionTxnRecord.setLastWriteOpTime(std::move(opTime));
             TransactionParticipant::get(opCtx).onWriteOpCompletedOnPrimary(
                 opCtx, {}, sessionTxnRecord);
 
