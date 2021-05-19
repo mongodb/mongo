@@ -111,7 +111,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
 
     DBDirectClient client(opCtx);
 
-    boost::optional<DistLockManager::ScopedDistLock> dbDistLock;
+    boost::optional<DistLockManager::ScopedLock> dbLock;
 
     // First perform an optimistic attempt to write the 'sharded' field to the database entry, in
     // case this is the only thing, which is missing. If that doesn't succeed, go through the
@@ -143,14 +143,14 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
             return uassertStatusOK(DatabaseType::fromBSON(*response.getValue()));
         }
 
-        if (dbDistLock) {
+        if (dbLock) {
             break;
         }
 
-        // Do another loop, with the dist lock held in order to avoid taking the expensive path on
+        // Do another loop, with the db lock held in order to avoid taking the expensive path on
         // concurrent create database operations
-        dbDistLock.emplace(uassertStatusOK(DistLockManager::get(opCtx)->lock(
-            opCtx, dbName, "createDatabase", DistLockManager::kDefaultLockTimeout)));
+        dbLock.emplace(DistLockManager::get(opCtx)->lockDirectLocally(
+            opCtx, dbName, DistLockManager::kDefaultLockTimeout));
     }
 
     // Expensive createDatabase code path
