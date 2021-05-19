@@ -4636,6 +4636,13 @@ tasks:
     vars:
       resmoke_args: --suites=replica_sets_reconfig_kill_primary_jscore_passthrough --storageEngine=wiredTiger
 
+- name: replica_sets_api_version_jscore_passthrough_gen
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 5
+
 - name: replica_sets_jscore_passthrough_gen
   commands:
   - func: "generate resmoke tasks"
@@ -8868,6 +8875,7 @@ buildvariants:
   - name: .replica_sets !.encrypt !.auth
     distros:
     - rhel80-medium
+  - name: replica_sets_api_version_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
     distros:
@@ -8996,6 +9004,7 @@ buildvariants:
   - name: .replica_sets !.encrypt !.auth
     distros:
     - rhel80-xlarge
+  - name: replica_sets_api_version_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
     distros:
@@ -9110,6 +9119,7 @@ buildvariants:
   - name: .replica_sets !.encrypt !.auth
     distros:
     - rhel80-medium
+  - name: replica_sets_api_version_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
     distros:
@@ -9201,6 +9211,7 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
+  - name: replica_sets_api_version_jscore_passthrough_gen
   - name: replica_sets_multiversion_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: retryable_writes_jscore_passthrough_gen

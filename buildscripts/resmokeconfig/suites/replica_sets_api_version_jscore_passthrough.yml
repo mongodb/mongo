@@ -1,0 +1,44 @@
+# This suite starts a two-node replica set and runs JS core tests with the 'apiVersion' parameter
+# passed in for every command.
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # This test initiates a txn with API parameters, but runs txn-continuing commands in a separate
+  # Thread object. Since those commands will not have API parameters appended, they will fail due
+  # to not matching the API parameters of the txn-initiating command.
+  - jstests/core/txns/kill_op_on_txn_expiry.js
+  exclude_with_any_tags:
+  - assumes_standalone_mongod
+  # These tests already pass in API parameters, so we avoid overwriting them.
+  - uses_api_parameters
+
+executor:
+  archive:
+    hooks:
+      - CheckReplOplogs
+      - CheckReplDBHash
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        testingReplication = true;
+        load('jstests/libs/override_methods/set_api_version.js');
+      readMode: commands
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_nodes: 2
