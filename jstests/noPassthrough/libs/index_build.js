@@ -238,15 +238,6 @@ var IndexBuildTest = class {
 
 const ResumableIndexBuildTest = class {
     /**
-     * Returns whether resumable index builds are supported.
-     */
-    static resumableIndexBuildsEnabled(conn) {
-        return assert
-            .commandWorked(conn.adminCommand({getParameter: 1, enableResumableIndexBuilds: 1}))
-            .enableResumableIndexBuilds;
-    }
-
-    /**
      * Returns a version of the given array that has been flattened into one dimension.
      */
     static flatten(array) {
@@ -656,12 +647,6 @@ const ResumableIndexBuildTest = class {
                postIndexBuildInserts = [],
                restartOptions) {
         const primary = rst.getPrimary();
-
-        if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(primary)) {
-            jsTestLog("Skipping test because resumable index builds are not enabled");
-            return;
-        }
-
         const coll = primary.getDB(dbName).getCollection(collName);
         const indexNames = ResumableIndexBuildTest.generateIndexNames(indexSpecs);
 
@@ -710,12 +695,6 @@ const ResumableIndexBuildTest = class {
                                           postIndexBuildInserts = []) {
         const resumeNode = rst.getPrimary();
         const resumeDB = resumeNode.getDB(dbName);
-
-        if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(resumeNode)) {
-            jsTestLog("Skipping test because resumable index builds are not enabled");
-            return;
-        }
-
         const secondary = rst.getSecondary();
         const coll = resumeDB.getCollection(collName);
         const indexName = "resumable_index_build";

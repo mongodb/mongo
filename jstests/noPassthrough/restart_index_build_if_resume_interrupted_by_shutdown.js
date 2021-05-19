@@ -23,12 +23,6 @@ rst.initiate();
 
 let primary = rst.getPrimary();
 
-if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(primary)) {
-    jsTestLog("Skipping test because resumable index builds are not enabled");
-    rst.stopSet();
-    return;
-}
-
 ResumableIndexBuildTest.runResumeInterruptedByShutdown(
     rst,
     dbName,

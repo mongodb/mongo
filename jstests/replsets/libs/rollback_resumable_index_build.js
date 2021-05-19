@@ -81,11 +81,6 @@ const RollbackResumableIndexBuildTest = class {
                {shouldComplete = true, skipDataConsistencyChecks = false} = {}) {
         const originalPrimary = rollbackTest.getPrimary();
 
-        if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(originalPrimary)) {
-            jsTestLog("Skipping test because resumable index builds are not enabled");
-            return;
-        }
-
         rollbackTest.awaitLastOpCommitted();
 
         assert.commandWorked(
@@ -257,11 +252,6 @@ const RollbackResumableIndexBuildTest = class {
     static runResumeInterruptedByRollback(
         rollbackTest, dbName, docs, indexSpec, insertsToBeRolledBack, sideWrites = []) {
         const originalPrimary = rollbackTest.getPrimary();
-
-        if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(originalPrimary)) {
-            jsTestLog("Skipping test because resumable index builds are not enabled");
-            return;
-        }
 
         const fp1 = configureFailPoint(originalPrimary, "hangAfterIndexBuildDumpsInsertsFromBulk");
         const fp2 = configureFailPoint(originalPrimary, "hangAfterIndexBuildFirstDrain");

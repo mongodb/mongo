@@ -24,12 +24,6 @@ rst.initiate();
 const primary = rst.getPrimary();
 const coll = primary.getDB(dbName).getCollection(collName);
 
-if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(primary)) {
-    jsTestLog("Skipping test because resumable index builds are not enabled");
-    rst.stopSet();
-    return;
-}
-
 assert.commandWorked(coll.insert({a: 1}));
 
 jsTestLog("Testing when primary shuts down in the middle of the first drain");

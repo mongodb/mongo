@@ -23,12 +23,6 @@ rst.initiate();
 let primary = rst.getPrimary();
 let coll = primary.getDB(dbName).getCollection(collName);
 
-if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(primary)) {
-    jsTestLog("Skipping test because resumable index builds are not enabled");
-    rst.stopSet();
-    return;
-}
-
 assert.commandWorked(coll.insert({a: 1}));
 
 ResumableIndexBuildTest.runFailToResume(rst,
