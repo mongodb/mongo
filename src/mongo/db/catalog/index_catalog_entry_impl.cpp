@@ -78,10 +78,11 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
 
     {
         stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
-        const bool isMultikey = _catalogIsMultikey(opCtx, &_indexMultikeyPathsForRead);
+        const bool isMultikey = _catalogIsMultikey(opCtx, &_indexMultikeyPathsForWrite);
         _isMultikeyForRead.store(isMultikey);
         _isMultikeyForWrite.store(isMultikey);
-        _indexTracksMultikeyPathsInCatalog = !_indexMultikeyPathsForRead.empty();
+        _indexMultikeyPathsForRead = _indexMultikeyPathsForWrite;
+        _indexTracksMultikeyPathsInCatalog = !_indexMultikeyPathsForWrite.empty();
     }
 
     auto nss = DurableCatalog::get(opCtx)->getEntry(_catalogId).nss;
@@ -183,12 +184,12 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
 
     if (_indexTracksMultikeyPathsInCatalog) {
         stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
-        invariant(multikeyPaths.size() == _indexMultikeyPathsForRead.size());
+        invariant(multikeyPaths.size() == _indexMultikeyPathsForWrite.size());
 
         bool newPathIsMultikey = false;
         for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-            if (!std::includes(_indexMultikeyPathsForRead[i].begin(),
-                               _indexMultikeyPathsForRead[i].end(),
+            if (!std::includes(_indexMultikeyPathsForWrite[i].begin(),
+                               _indexMultikeyPathsForWrite[i].end(),
                                multikeyPaths[i].begin(),
                                multikeyPaths[i].end())) {
                 // If 'multikeyPaths' contains a new path component that causes this index to be
@@ -273,10 +274,11 @@ void IndexCatalogEntryImpl::forceSetMultikey(OperationContext* const opCtx,
     // catalog entry.
     {
         stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
-        const bool isMultikey = _catalogIsMultikey(opCtx, &_indexMultikeyPathsForRead);
+        const bool isMultikey = _catalogIsMultikey(opCtx, &_indexMultikeyPathsForWrite);
         _isMultikeyForRead.store(isMultikey);
         _isMultikeyForWrite.store(isMultikey);
-        _indexTracksMultikeyPathsInCatalog = !_indexMultikeyPathsForRead.empty();
+        _indexMultikeyPathsForRead = _indexMultikeyPathsForWrite;
+        _indexTracksMultikeyPathsInCatalog = !_indexMultikeyPathsForWrite.empty();
     }
 
     // Since multikey metadata has changed, invalidate the query cache.
@@ -391,6 +393,7 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
     _isMultikeyForRead.store(true);
     if (_indexTracksMultikeyPathsInCatalog) {
         stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
+        _indexMultikeyPathsForRead = _indexMultikeyPathsForWrite;
         for (size_t i = 0; i < multikeyPaths.size(); ++i) {
             _indexMultikeyPathsForRead[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
         }
@@ -409,6 +412,8 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
         // transaction successfully commits. Only after this point may a writer optimize out
         // flipping multikey.
         _isMultikeyForWrite.store(true);
+        stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
+        _indexMultikeyPathsForWrite = _indexMultikeyPathsForRead;
     });
 }
 
