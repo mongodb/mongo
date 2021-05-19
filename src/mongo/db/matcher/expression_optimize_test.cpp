@@ -75,7 +75,10 @@ Status isValid(const std::string& queryStr, const FindCommandRequest& findComman
     BSONObj queryObj = fromjson(queryStr);
     std::unique_ptr<MatchExpression> me(parseMatchExpression(queryObj));
     me = MatchExpression::optimize(std::move(me));
-    return CanonicalQuery::isValid(me.get(), findCommand).getStatus();
+    if (auto status = CanonicalQuery::isValid(me.get(), findCommand).getStatus(); !status.isOK()) {
+        return status;
+    }
+    return CanonicalQuery::isValidNormalized(me.get());
 }
 
 TEST(ExpressionOptimizeTest, IsValidText) {

@@ -111,14 +111,23 @@ public:
      * for illegal combinations of operators. Returns a non-OK status if any such illegal
      * combination is found.
      *
+     * This method can be called both on normalized and non-normalized 'root'. However, some checks
+     * can only be performed once the match expressions is normalized. To perform these checks one
+     * can call 'isValidNormalized()'.
+     *
      * On success, returns a bitset indicating which types of metadata are *unavailable*. For
      * example, if 'root' does not contain a $text predicate, then the returned metadata bitset will
      * indicate that text score metadata is unavailable. This means that if subsequent
      * $meta:"textScore" expressions are found during analysis of the query, we should raise in an
      * error.
      */
-    static StatusWith<QueryMetadataBitSet> isValid(MatchExpression* root,
+    static StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
                                                    const FindCommandRequest& findCommand);
+
+    /**
+     * Perform additional validation checks on the normalized 'root'.
+     */
+    static Status isValidNormalized(const MatchExpression* root);
 
     const NamespaceString nss() const {
         invariant(_findCommand->getNamespaceOrUUID().nss());
