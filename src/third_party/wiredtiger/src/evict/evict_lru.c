@@ -844,7 +844,7 @@ __evict_clear_all_walks(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     TAILQ_FOREACH (dhandle, &conn->dhqh, q)
-        if (dhandle->type == WT_DHANDLE_TYPE_BTREE)
+        if (WT_DHANDLE_BTREE(dhandle))
             WT_WITH_DHANDLE(session, dhandle, WT_TRET(__evict_clear_walk(session)));
     return (ret);
 }
@@ -1463,7 +1463,7 @@ retry:
             break;
 
         /* Ignore non-btree handles, or handles that aren't open. */
-        if (dhandle->type != WT_DHANDLE_TYPE_BTREE || !F_ISSET(dhandle, WT_DHANDLE_OPEN))
+        if (!WT_DHANDLE_BTREE(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN))
             continue;
 
         /* Skip files that don't allow eviction. */
@@ -2661,7 +2661,7 @@ __verbose_dump_cache_apply(WT_SESSION_IMPL *session, uint64_t *total_bytesp,
             break;
 
         /* Skip if the tree is marked discarded by another thread. */
-        if (dhandle->type != WT_DHANDLE_TYPE_BTREE || !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
+        if (!WT_DHANDLE_BTREE(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
           F_ISSET(dhandle, WT_DHANDLE_DISCARD))
             continue;
 

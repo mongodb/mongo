@@ -61,7 +61,7 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
     WT_DECL_RET;
 
     dhandle = session->dhandle;
-    btree = dhandle->type == WT_DHANDLE_TYPE_BTREE ? dhandle->handle : NULL;
+    btree = WT_DHANDLE_BTREE(dhandle) ? dhandle->handle : NULL;
 
     /*
      * Acquire an exclusive lock on the handle and mark it dead.
