@@ -1177,8 +1177,8 @@ Status performAtomicTimeseriesWrites(
     // Since we are manually updating the "lastWriteOpTime" before committing, we'll also need to
     // manually reset if the storage transaction is aborted.
     if (slot && participant) {
-        opCtx->recoveryUnit()->onRollback([opCtx, &participant, &slot]() {
-            participant.setLastWriteOpTime(opCtx, repl::OpTime());
+        opCtx->recoveryUnit()->onRollback([opCtx] {
+            TransactionParticipant::get(opCtx).setLastWriteOpTime(opCtx, repl::OpTime());
         });
     }
 
