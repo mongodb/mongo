@@ -161,6 +161,23 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk(
     return rwc;
 }
 
+bool ReadWriteConcernDefaults::isCWWCSet(OperationContext* opCtx) {
+    // TODO (SERVER-57042): Call getDefault() instead and return writeConcernSource == KGlobal.
+    auto cached = _getDefaultCWRWCFromDisk(opCtx);
+    if (!cached) {
+        return false;
+    }
+
+    auto wc = cached.get().getDefaultWriteConcern();
+    if (!wc) {
+        return false;
+    }
+
+    // CWWC should have "usedDefault" flag set to false, as this flag only set to true if the
+    // default constructed WC is used.
+    return !wc.get().usedDefault;
+}
+
 void ReadWriteConcernDefaults::observeDirectWriteToConfigSettings(OperationContext* opCtx,
                                                                   BSONElement idElem,
                                                                   boost::optional<BSONObj> newDoc) {

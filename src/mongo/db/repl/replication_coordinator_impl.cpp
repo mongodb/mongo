@@ -3451,6 +3451,29 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
         return status;
     ReplSetConfig newConfig = newConfigStatus.getValue();
 
+    // If the new config changes the replica set's implicit default write concern, we fail the
+    // reconfig command. This includes force reconfigs, but excludes reconfigs that bump the config
+    // term during step-up. The user should set a cluster-wide write concern and attempt the
+    // reconfig command again. We also need to exclude shard servers from this validation, as shard
+    // servers don't store the cluster-wide write concern.
+    if (!skipSafetyChecks /* skipping step-up reconfig */ &&
+        repl::feature_flags::gDefaultWCMajority.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
+        serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
+        !repl::enableDefaultWriteConcernUpdatesForInitiate.load()) {
+        bool currIDWC = oldConfig.isImplicitDefaultWriteConcernMajority();
+        bool newIDWC = newConfig.isImplicitDefaultWriteConcernMajority();
+        bool isCWWCSet = ReadWriteConcernDefaults::get(opCtx).isCWWCSet(opCtx);
+        if (!isCWWCSet && currIDWC != newIDWC) {
+            return Status(
+                ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                str::stream()
+                    << "Reconfig attempted to install a config that would change the "
+                       "implicit default write concern. Use the setDefaultRWConcern command to "
+                       "set a cluster-wide write concern and try the reconfig again.");
+        }
+    }
+
     BSONObj oldConfigObj = oldConfig.toBSON();
     BSONObj newConfigObj = newConfig.toBSON();
     audit::logReplSetReconfig(opCtx->getClient(), &oldConfigObj, &newConfigObj);
