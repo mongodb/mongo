@@ -64,7 +64,7 @@ class statistic {
     virtual ~statistic() {}
 
     bool
-    is_enabled() const
+    enabled() const
     {
         return _enabled;
     }
@@ -154,7 +154,7 @@ class runtime_monitor : public component {
     do_work()
     {
         for (const auto &it : _stats) {
-            if (it->is_enabled())
+            if (it->enabled())
                 it->check(_cursor);
         }
     }

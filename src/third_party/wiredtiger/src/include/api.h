@@ -123,33 +123,30 @@
         if (__update)                                                       \
             F_SET((s)->txn, WT_TXN_UPDATE);
 
-/* End a transactional API call, optional retry on deadlock. */
-#define TXN_API_END_RETRY(s, ret, retry)                           \
-    API_END(s, ret);                                               \
-    if (__update)                                                  \
-        F_CLR((s)->txn, WT_TXN_UPDATE);                            \
-    if (__autotxn) {                                               \
-        if (F_ISSET((s)->txn, WT_TXN_AUTOCOMMIT))                  \
-            F_CLR((s)->txn, WT_TXN_AUTOCOMMIT);                    \
-        else if ((ret) == 0)                                       \
-            (ret) = __wt_txn_commit((s), NULL);                    \
-        else {                                                     \
-            if (retry)                                             \
-                WT_TRET(__wt_session_copy_values(s));              \
-            WT_TRET(__wt_txn_rollback((s), NULL));                 \
-            if (((ret) == 0 || (ret) == WT_ROLLBACK) && (retry)) { \
-                (ret) = 0;                                         \
-                continue;                                          \
-            }                                                      \
-            WT_TRET(__wt_session_reset_cursors(s, false));         \
-        }                                                          \
-    }                                                              \
-    break;                                                         \
-    }                                                              \
+/* End a transactional API call, optional retry on rollback. */
+#define TXN_API_END(s, ret, retry)                         \
+    API_END(s, ret);                                       \
+    if (__update)                                          \
+        F_CLR((s)->txn, WT_TXN_UPDATE);                    \
+    if (__autotxn) {                                       \
+        if (F_ISSET((s)->txn, WT_TXN_AUTOCOMMIT))          \
+            F_CLR((s)->txn, WT_TXN_AUTOCOMMIT);            \
+        else if ((ret) == 0)                               \
+            (ret) = __wt_txn_commit((s), NULL);            \
+        else {                                             \
+            if (retry)                                     \
+                WT_TRET(__wt_session_copy_values(s));      \
+            WT_TRET(__wt_txn_rollback((s), NULL));         \
+            if ((retry) && (ret) == WT_ROLLBACK) {         \
+                (ret) = 0;                                 \
+                continue;                                  \
+            }                                              \
+            WT_TRET(__wt_session_reset_cursors(s, false)); \
+        }                                                  \
+    }                                                      \
+    break;                                                 \
+    }                                                      \
     while (1)
-
-/* End a transactional API call, retry on deadlock. */
-#define TXN_API_END(s, ret) TXN_API_END_RETRY(s, ret, 1)
 
 /*
  * In almost all cases, API_END is returning immediately, make it simple. If a session or connection
@@ -265,7 +262,9 @@
     CURSOR_UPDATE_API_CALL(cur, s, n);             \
     JOINABLE_CURSOR_CALL_CHECK(cur)
 
-#define CURSOR_UPDATE_API_END(s, ret) \
-    if ((ret) == WT_PREPARE_CONFLICT) \
-        (ret) = WT_ROLLBACK;          \
-    TXN_API_END(s, ret)
+#define CURSOR_UPDATE_API_END_RETRY(s, ret, retry) \
+    if ((ret) == WT_PREPARE_CONFLICT)              \
+        (ret) = WT_ROLLBACK;                       \
+    TXN_API_END(s, ret, retry)
+
+#define CURSOR_UPDATE_API_END(s, ret) CURSOR_UPDATE_API_END_RETRY(s, ret, true)

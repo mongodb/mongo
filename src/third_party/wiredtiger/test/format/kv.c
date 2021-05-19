@@ -75,6 +75,10 @@ key_init(void)
     for (i = 0; i < WT_ELEMENTS(g.key_rand_len); ++i)
         fprintf(fp, "%" PRIu32 "\n", g.key_rand_len[i]);
     fclose_and_clear(&fp);
+
+    /* Fill in the common key prefix length (which is added to the key min/max). */
+    if (g.c_prefix != 0)
+        g.prefix_len = mmrand(NULL, 15, 80);
 }
 
 /*
@@ -87,7 +91,7 @@ key_gen_init(WT_ITEM *key)
     size_t i, len;
     char *p;
 
-    len = WT_MAX(KILOBYTE(100), g.c_key_max);
+    len = WT_MAX(KILOBYTE(100), g.c_key_max + g.prefix_len);
     p = dmalloc(len);
     for (i = 0; i < len; ++i)
         p[i] = "abcdefghijklmnopqrstuvwxyz"[i % 26];
@@ -111,45 +115,62 @@ key_gen_teardown(WT_ITEM *key)
 
 /*
  * key_gen_common --
- *     Key generation code shared between normal and insert key generation.
+ *     Row-store key generation code shared between normal and insert key generation.
  */
 void
 key_gen_common(WT_ITEM *key, uint64_t keyno, const char *const suffix)
 {
-    int len;
+    uint64_t n;
     char *p;
+    const char *bucket;
+
+    testutil_assert(g.type == ROW);
 
     p = key->mem;
 
     /*
-     * The key always starts with a 10-digit string (the specified row) followed by two digits, a
-     * random number between 1 and 15 if it's an insert, otherwise 00.
+     * The workload we're trying to mimic with a prefix is a long common prefix followed by a record
+     * number, the tricks are creating a prefix that won't re-order keys, and to change the prefix
+     * with some regularity to test prefix boundaries. Split the key space into power-of-2 buckets:
+     * that results in tiny runs of prefix strings at the beginning of the tree, and increasingly
+     * large common prefixes as the tree grows (with a testing sweet spot in the middle). After the
+     * bucket value, append a string of common bytes. The standard, zero-padded key itself sorts
+     * lexicographically, meaning the common key prefix will grow and shrink by a few bytes as the
+     * number increments, which is a good thing for testing.
      */
-    u64_to_string_zf(keyno, key->mem, 11);
+    if (g.prefix_len > 0) {
+        bucket = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        for (n = keyno; n > 0; n >>= 1) {
+            if (*bucket == 'z')
+                break;
+            ++bucket;
+        }
+        p[0] = *bucket;
+        memset(p + 1, 'C', g.prefix_len - 1);
+        p += g.prefix_len;
+    }
+
+    /*
+     * After any common prefix, the key starts with a 10-digit string (the specified row) followed
+     * by two digits (a random number between 1 and 15 if it's an insert, otherwise 00).
+     */
+    u64_to_string_zf(keyno, p, 11);
     p[10] = '.';
     p[11] = suffix[0];
     p[12] = suffix[1];
-    len = 13;
+    p[13] = '/';
 
     /*
-     * In a column-store, the key isn't used, it doesn't need a random length.
+     * Because we're doing table lookup for key sizes, we can't set overflow key sizes in the table,
+     * the table isn't big enough to keep our hash from selecting too many big keys and blowing out
+     * the cache. Handle that here, use a really big key 1 in 2500 times.
      */
-    if (g.type == ROW) {
-        p[len] = '/';
-
-        /*
-         * Because we're doing table lookup for key sizes, we weren't able to set really big keys
-         * sizes in the table, the table isn't big enough to keep our hash from selecting too many
-         * big keys and blowing out the cache. Handle that here, use a really big key 1 in 2500
-         * times.
-         */
-        len = keyno % 2500 == 0 && g.c_key_max < KILOBYTE(80) ?
-          KILOBYTE(80) :
-          (int)g.key_rand_len[keyno % WT_ELEMENTS(g.key_rand_len)];
-    }
-
     key->data = key->mem;
-    key->size = (size_t)len;
+    key->size = g.prefix_len;
+    key->size += keyno % 2500 == 0 && g.c_key_max < KILOBYTE(80) ?
+      KILOBYTE(80) :
+      g.key_rand_len[keyno % WT_ELEMENTS(g.key_rand_len)];
+    testutil_assert(key->size <= key->memsize);
 }
 
 static char *val_base;            /* Base/original value */

@@ -194,6 +194,9 @@ __slvg_checkpoint(WT_SESSION_IMPL *session, WT_REF *root)
      * We may not have found any pages during salvage and there's no tree to flush.
      */
     if (root->page != NULL) {
+        /* Make sure that the saved checkpoint information has been cleared. */
+        WT_ASSERT(session, btree->ckpt == NULL);
+
         btree->ckpt = ckptbase;
         ret = __wt_evict(session, root, WT_REF_MEM, WT_EVICT_CALL_CLOSING);
         root->page = NULL;
@@ -1993,12 +1996,10 @@ __slvg_row_ovfl(
      */
     for (rip = page->pg_row + start; start < stop; ++start, ++rip) {
         copy = WT_ROW_KEY_COPY(rip);
-        WT_IGNORE_RET_BOOL(__wt_row_leaf_key_info(page, copy, NULL, &cell, NULL, NULL));
-        if (cell != NULL) {
-            __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
-            WT_RET(__slvg_row_ovfl_single(session, trk, &unpack));
-        }
-        __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
+        __wt_row_leaf_key_info(page, copy, NULL, &cell, NULL, NULL, NULL);
+        __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
+        WT_RET(__slvg_row_ovfl_single(session, trk, &unpack));
+        __wt_row_leaf_value_cell(session, page, rip, &unpack);
         WT_RET(__slvg_row_ovfl_single(session, trk, &unpack));
     }
     return (0);

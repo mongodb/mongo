@@ -6,18 +6,11 @@ cache_size_mb=5000,
 enable_logging=true,
 runtime_monitor=
 (
-    rate_per_second=3,
     stat_cache_size=
     (
         enabled=true,
         limit=100
     )
-),
-timestamp_manager=
-(
-    enabled=true,
-    oldest_lag=1,
-    stable_lag=1
 ),
 workload_generator=
 (
@@ -33,7 +26,3 @@ workload_generator=
     update_threads=1,
     value_size=2000
 ),
-workload_tracking=
-(
-    enabled=true
-)

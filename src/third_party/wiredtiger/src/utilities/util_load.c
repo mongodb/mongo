@@ -440,12 +440,12 @@ config_update(WT_SESSION *session, char **list)
         return (util_err(session, errno, NULL));
 
     /*
-     * For each match, rewrite the dump configuration as described by any
-     * command-line configuration arguments.
+     * For each match, rewrite the dump configuration as described by any command-line configuration
+     * arguments.
      *
-     * New filenames will be chosen as part of the table load, remove all
-     * "filename=", "source=" and other configurations that foil loading
-     * from the values; we call an unpublished API to do the work.
+     * New filenames will be chosen as part of the table load, remove all "filename=", "source=" and
+     * other configurations that foil loading from the values; we call an unpublished API to do the
+     * work.
      */
     for (listp = list; *listp != NULL; listp += 2) {
         cnt = 0;

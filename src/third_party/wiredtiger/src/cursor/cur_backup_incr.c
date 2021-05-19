@@ -78,23 +78,28 @@ __curbackup_incr_blkmod(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_CURSOR_BAC
 
         /*
          * The rename configuration string component was added later. So don't error if we don't
-         * find it in the string. If we don't have it, we're not doing a rename.
+         * find it in the string. If we don't have it, we're not doing a rename. Otherwise rename
+         * forces full copies, there is no need to traverse the blocks information.
          */
         WT_ERR_NOTFOUND_OK(__wt_config_subgets(session, &v, "rename", &b), true);
-        if (ret == 0 && b.val)
+        if (ret == 0 && b.val) {
+            cb->nbits = 0;
+            cb->offset = 0;
+            cb->bit_offset = 0;
             F_SET(cb, WT_CURBACKUP_RENAME);
-        else
+        } else {
             F_CLR(cb, WT_CURBACKUP_RENAME);
 
-        /*
-         * We found a match. Load the block information into the cursor.
-         */
-        if ((ret = __wt_config_subgets(session, &v, "blocks", &b)) == 0) {
-            WT_ERR(__wt_backup_load_incr(session, &b, &cb->bitstring, cb->nbits));
-            cb->bit_offset = 0;
-            F_SET(cb, WT_CURBACKUP_INCR_INIT);
+            /*
+             * We found a match. Load the block information into the cursor.
+             */
+            if ((ret = __wt_config_subgets(session, &v, "blocks", &b)) == 0) {
+                WT_ERR(__wt_backup_load_incr(session, &b, &cb->bitstring, cb->nbits));
+                cb->bit_offset = 0;
+                F_SET(cb, WT_CURBACKUP_INCR_INIT);
+            }
+            WT_ERR_NOTFOUND_OK(ret, false);
         }
-        WT_ERR_NOTFOUND_OK(ret, false);
         break;
     }
     WT_ERR_NOTFOUND_OK(ret, false);

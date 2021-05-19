@@ -59,9 +59,9 @@ throttle_config = [
 # Record config specifies the format of the keys and values used in the database
 #
 record_config = throttle_config + [
-    Config('key_size', 0, r'''
+    Config('key_size', 5, r'''
         The size of the keys created''', min=0, max=10000),
-    Config('value_size', 0, r'''
+    Config('value_size', 5, r'''
         The size of the values created''', min=0, max=1000000000),
 ]
 
@@ -79,27 +79,33 @@ populate_config = [
 # A generic configuration used by various other configurations to define whether that component or
 # similar is enabled or not.
 #
-enable_config = [
+enabled_config_true = [
+    Config('enabled', 'true', r'''
+        Whether or not this is relevant to the workload''',
+        type='boolean'),
+]
+
+enabled_config_false = [
     Config('enabled', 'false', r'''
         Whether or not this is relevant to the workload''',
         type='boolean'),
 ]
 
-stat_config = enable_config
+stat_config = enabled_config_false
 
 limit_stat = stat_config + [
     Config('limit', 0, r'''
-    The limit value a statistic is allowed to reach''')
+    The limit value a statistic is allowed to reach''', min=0)
 ]
 
 range_config = [
     Config('min', 0, r'''
-        The minimum a value can be in a range'''),
+        The minimum a value can be in a range''', min=0),
     Config('max', 1, r'''
         The maximum a value can be in a range''')
 ]
 
-component_config = enable_config + throttle_config
+component_config = enabled_config_true + throttle_config
 
 transaction_config = [
     Config('ops_per_transaction', '', r'''
@@ -122,16 +128,16 @@ runtime_monitor = component_config + [
 # Configuration that applies to the timestamp_manager component.
 #
 timestamp_manager = component_config +  [
-    Config('oldest_lag', 0, r'''
+    Config('oldest_lag', 1, r'''
         The duration between the stable and oldest timestamps''', min=0, max=1000000),
-    Config('stable_lag', 0, r'''
+    Config('stable_lag', 1, r'''
         The duration between the latest and stable timestamps''', min=0, max=1000000),
 ]
 
 #
 # Configuration that applies to the workload tracking component.
 #
-workload_tracking = enable_config
+workload_tracking = component_config
 
 #
 # Configuration that applies to the workload_generator component.
@@ -173,7 +179,7 @@ test_config = [
         The cache size that wiredtiger will be configured to run with''', min=0, max=100000000000),
     Config('duration_seconds', 0, r'''
         The duration that the test run will last''', min=0, max=1000000),
-    Config('enable_logging', 'true', r'''
+    Config('enable_logging', 'false', r'''
         Enables write ahead logs''', type='boolean'),
 ]
 

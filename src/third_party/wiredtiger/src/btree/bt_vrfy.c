@@ -213,7 +213,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
      * Get a list of the checkpoints for this file. Empty objects have no checkpoints, in which case
      * there's no work to do.
      */
-    WT_ERR_NOTFOUND_OK(__wt_meta_ckptlist_get(session, name, false, &ckptbase), true);
+    WT_ERR_NOTFOUND_OK(__wt_meta_ckptlist_get(session, name, false, &ckptbase, NULL), true);
     if (ret == WT_NOTFOUND) {
         ret = 0;
         goto done;

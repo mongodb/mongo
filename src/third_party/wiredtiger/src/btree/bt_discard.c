@@ -360,22 +360,12 @@ __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-    WT_IKEY *ikey;
     WT_ROW *rip;
     uint32_t i;
-    void *copy;
 
-    /*
-     * Free the in-memory index array.
-     *
-     * For each entry, see if the key was an allocation (that is, if it points somewhere other than
-     * the original page), and if so, free the memory.
-     */
-    WT_ROW_FOREACH (page, rip, i) {
-        copy = WT_ROW_KEY_COPY(rip);
-        WT_IGNORE_RET_BOOL(__wt_row_leaf_key_info(page, copy, &ikey, NULL, NULL, NULL));
-        __wt_free(session, ikey);
-    }
+    /* Free any allocated memory used by instantiated keys. */
+    WT_ROW_FOREACH (page, rip, i)
+        __wt_row_leaf_key_free(session, page, rip);
 }
 
 /*

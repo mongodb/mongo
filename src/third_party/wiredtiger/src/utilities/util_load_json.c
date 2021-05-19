@@ -382,11 +382,9 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
         }
 
         /*
-         * Allow any ordering of 'config', 'colgroups',
-         * 'indices' before 'data', which must appear last.
-         * The non-'data' items build up a list of entries
-         * that created in our session before the data is
-         * inserted.
+         * Allow any ordering of 'config', 'colgroups', 'indices' before 'data', which must appear
+         * last. The non-'data' items build up a list of entries that created in our session before
+         * the data is inserted.
          */
         for (;;) {
             if (json_skip(session, ins, json_markers) != 0)

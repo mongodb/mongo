@@ -49,7 +49,7 @@
 
 namespace test_harness {
 /* Tracking operations. */
-enum class tracking_operation { CREATE, DELETE_COLLECTION, DELETE_KEY, INSERT, UPDATE };
+enum class tracking_operation { CREATE_COLLECTION, DELETE_COLLECTION, DELETE_KEY, INSERT, UPDATE };
 /* Class used to track operations performed on collections */
 class workload_tracking : public component {
 
@@ -107,41 +107,49 @@ class workload_tracking : public component {
         /* Does not do anything. */
     }
 
-    template <typename K, typename V>
-    int
-    save(const tracking_operation &operation, const std::string &collection_name, const K &key,
-      const V &value, wt_timestamp_t ts)
+    void
+    save_schema_operation(
+      const tracking_operation &operation, const std::string &collection_name, wt_timestamp_t ts)
     {
-        WT_CURSOR *cursor;
-        int error_code = 0;
+        std::string error_message;
 
         if (!_enabled)
-            return (error_code);
+            return;
 
-        /* Select the correct cursor to save in the collection associated to specific operations. */
-        switch (operation) {
-        case tracking_operation::CREATE:
-        case tracking_operation::DELETE_COLLECTION:
-            cursor = _cursor_schema;
-            cursor->set_key(cursor, collection_name.c_str(), ts);
-            cursor->set_value(cursor, static_cast<int>(operation));
-            break;
-
-        default:
-            cursor = _cursor_operations;
-            cursor->set_key(cursor, collection_name.c_str(), key, ts);
-            cursor->set_value(cursor, static_cast<int>(operation), value);
-            break;
+        if (operation == tracking_operation::CREATE_COLLECTION ||
+          operation == tracking_operation::DELETE_COLLECTION) {
+            _cursor_schema->set_key(_cursor_schema, collection_name.c_str(), ts);
+            _cursor_schema->set_value(_cursor_schema, static_cast<int>(operation));
+            testutil_check(_cursor_schema->insert(_cursor_schema));
+        } else {
+            error_message = "save_schema_operation: invalid operation " +
+              std::to_string(static_cast<int>(operation));
+            testutil_die(EINVAL, error_message.c_str());
         }
+        debug_print("save_schema_operation: workload tracking saved operation.", DEBUG_TRACE);
+    }
 
-        error_code = cursor->insert(cursor);
+    template <typename K, typename V>
+    void
+    save_operation(const tracking_operation &operation, const std::string &collection_name,
+      const K &key, const V &value, wt_timestamp_t ts)
+    {
+        std::string error_message;
 
-        if (error_code == 0)
-            debug_print("Workload tracking saved operation.", DEBUG_TRACE);
-        else
-            debug_print("Workload tracking failed to save operation !", DEBUG_ERROR);
+        if (!_enabled)
+            return;
 
-        return error_code;
+        if (operation == tracking_operation::CREATE_COLLECTION ||
+          operation == tracking_operation::DELETE_COLLECTION) {
+            error_message =
+              "save_operation: invalid operation " + std::to_string(static_cast<int>(operation));
+            testutil_die(EINVAL, error_message.c_str());
+        } else {
+            _cursor_operations->set_key(_cursor_operations, collection_name.c_str(), key, ts);
+            _cursor_operations->set_value(_cursor_operations, static_cast<int>(operation), value);
+            testutil_check(_cursor_operations->insert(_cursor_operations));
+        }
+        debug_print("save_operation: workload tracking saved operation.", DEBUG_TRACE);
     }
 
     private:

@@ -282,7 +282,7 @@ timestamp_once(bool allow_lag, bool final)
 
         /*
          * If a lag is permitted, move the oldest timestamp half the way to the current
-         * "all_durable" timestamp.  Move the stable timestamp to "all_durable".
+         * "all_durable" timestamp. Move the stable timestamp to "all_durable".
          */
         if (allow_lag)
             g.oldest_timestamp = (all_durable + g.oldest_timestamp) / 2;

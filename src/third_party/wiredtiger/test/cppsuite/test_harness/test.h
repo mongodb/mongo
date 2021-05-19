@@ -102,7 +102,7 @@ class test : public database_operation {
     run()
     {
         int64_t cache_size_mb, duration_seconds;
-        bool enable_logging, is_success = true;
+        bool enable_logging;
 
         /* Build the database creation config string. */
         std::string db_create_config = CONNECTION_CREATE;
@@ -124,6 +124,10 @@ class test : public database_operation {
         for (const auto &it : _components)
             _thread_manager->add_thread(&component::run, it);
 
+        /* The initial population phase needs to be finished before starting the actual test. */
+        while (_workload_generator->enabled() && !_workload_generator->db_populated())
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
         /* The test will run for the duration as defined in the config. */
         duration_seconds = _config->get_int(DURATION_SECONDS);
         testutil_assert(duration_seconds >= 0);
@@ -135,13 +139,13 @@ class test : public database_operation {
         _thread_manager->join();
 
         /* Validation stage. */
-        if (_workload_tracking->is_enabled()) {
+        if (_workload_tracking->enabled()) {
             workload_validation wv;
-            is_success = wv.validate(_workload_tracking->get_operation_table_name(),
+            wv.validate(_workload_tracking->get_operation_table_name(),
               _workload_tracking->get_schema_table_name(), _workload_generator->get_database());
         }
 
-        debug_print(is_success ? "SUCCESS" : "FAILED", DEBUG_INFO);
+        debug_print("SUCCESS", DEBUG_INFO);
         connection_manager::instance().close();
     }
 

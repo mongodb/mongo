@@ -28,16 +28,13 @@ __block_buffer_to_addr(WT_BLOCK *block, const uint8_t **pp, uint32_t *logidp, wt
     WT_RET(__wt_vunpack_uint(pp, 0, &c));
 
     /*
-     * To avoid storing large offsets, we minimize the value by subtracting
-     * a block for description information, then storing a count of block
-     * allocation units.  That implies there is no such thing as an
-     * "invalid" offset though, they could all be valid (other than very
-     * large numbers), which is what we didn't want to store in the first
-     * place.  Use the size: writing a block of size 0 makes no sense, so
-     * that's the out-of-band value.  Once we're out of this function and
-     * are working with a real file offset, size and checksum triplet, there
-     * can be invalid offsets, that's simpler than testing sizes of 0 all
-     * over the place.
+     * To avoid storing large offsets, we minimize the value by subtracting a block for description
+     * information, then storing a count of block allocation units. That implies there is no such
+     * thing as an "invalid" offset though, they could all be valid (other than very large numbers),
+     * which is what we didn't want to store in the first place. Use the size: writing a block of
+     * size 0 makes no sense, so that's the out-of-band value. Once we're out of this function and
+     * are working with a real file offset, size and checksum triplet, there can be invalid offsets,
+     * that's simpler than testing sizes of 0 all over the place.
      */
     if (s == 0) {
         *offsetp = 0;

@@ -1287,7 +1287,7 @@ __conn_query_timestamp(WT_CONNECTION *wt_conn, char *hex_timestamp, const char *
     conn = (WT_CONNECTION_IMPL *)wt_conn;
 
     CONNECTION_API_CALL(conn, session, query_timestamp, config, cfg);
-    WT_TRET(__wt_txn_query_timestamp(session, hex_timestamp, cfg, true));
+    ret = __wt_txn_query_timestamp(session, hex_timestamp, cfg, true);
 err:
     API_END_RET(session, ret);
 }
@@ -1306,7 +1306,7 @@ __conn_set_timestamp(WT_CONNECTION *wt_conn, const char *config)
     conn = (WT_CONNECTION_IMPL *)wt_conn;
 
     CONNECTION_API_CALL(conn, session, set_timestamp, config, cfg);
-    WT_TRET(__wt_txn_global_set_timestamp(session, cfg));
+    ret = __wt_txn_global_set_timestamp(session, cfg);
 err:
     API_END_RET(session, ret);
 }
@@ -1326,7 +1326,7 @@ __conn_rollback_to_stable(WT_CONNECTION *wt_conn, const char *config)
 
     CONNECTION_API_CALL(conn, session, rollback_to_stable, config, cfg);
     WT_STAT_CONN_INCR(session, txn_rts);
-    WT_TRET(__wt_rollback_to_stable(session, cfg, false));
+    ret = __wt_rollback_to_stable(session, cfg, false);
 err:
     API_END_RET(session, ret);
 }
@@ -2810,16 +2810,13 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__wt_tiered_conn_config(session, cfg, false));
 
     /*
-     * The metadata/log encryptor is configured after extensions, since
-     * extensions may load encryptors.  We have to do this before creating
-     * the metadata file.
+     * The metadata/log encryptor is configured after extensions, since extensions may load
+     * encryptors. We have to do this before creating the metadata file.
      *
-     * The encryption customize callback needs the fully realized set of
-     * encryption args, as simply grabbing "encryption" doesn't work.
-     * As an example, configuration for the current call may just be
-     * "encryption=(secretkey=xxx)", with encryption.name,
-     * encryption.keyid being 'inherited' from the stored base
-     * configuration.
+     * The encryption customize callback needs the fully realized set of encryption args, as simply
+     * grabbing "encryption" doesn't work. As an example, configuration for the current call may
+     * just be "encryption=(secretkey=xxx)", with encryption.name, encryption.keyid being
+     * 'inherited' from the stored base configuration.
      */
     WT_ERR(__wt_config_gets_none(session, cfg, "encryption.name", &cval));
     WT_ERR(__wt_config_gets_none(session, cfg, "encryption.keyid", &keyid));

@@ -1217,15 +1217,13 @@ __wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len, bool 
 
 done:
     /*
-     * Overflow values can be larger than the maximum page size but still be
-     * "on-page". If the next key/value pair is larger than space available
-     * after a split has happened (in other words, larger than the maximum
-     * page size), create a page sized to hold that one key/value pair. This
-     * generally splits the page into key/value pairs before a large object,
-     * the object, and key/value pairs after the object. It's possible other
-     * key/value pairs will also be aggregated onto the bigger page before
-     * or after, if the page happens to hold them, but it won't necessarily
-     * happen that way.
+     * Overflow values can be larger than the maximum page size but still be "on-page". If the next
+     * key/value pair is larger than space available after a split has happened (in other words,
+     * larger than the maximum page size), create a page sized to hold that one key/value pair. This
+     * generally splits the page into key/value pairs before a large object, the object, and
+     * key/value pairs after the object. It's possible other key/value pairs will also be aggregated
+     * onto the bigger page before or after, if the page happens to hold them, but it won't
+     * necessarily happen that way.
      */
     if (r->space_avail < next_len)
         WT_RET(__rec_split_grow(session, r, next_len));

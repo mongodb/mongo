@@ -146,21 +146,27 @@ __tiered_create_object(WT_SESSION_IMPL *session, WT_TIERED *tiered)
         WT_ERR(ret);
     }
     /*
-     * Create the name and metadata of the new shared object of the current local object.
-     * The data structure keeps this id so that we don't have to parse and manipulate strings.
-     *   I.e. if we have file:example-000000002.wt we want object:example-000000002.wtobj.
+     * Create the name and metadata of the new shared object of the current local object. The data
+     * structure keeps this id so that we don't have to parse and manipulate strings.
      */
     WT_ERR(
       __wt_tiered_name(session, &tiered->iface, tiered->current_id, WT_TIERED_NAME_OBJECT, &name));
     cfg[0] = WT_CONFIG_BASE(session, object_meta);
     cfg[1] = tiered->obj_config;
-    cfg[2] = "readonly=true";
+    cfg[2] = "flush=0,readonly=true";
     WT_ASSERT(session, tiered->obj_config != NULL);
     WT_ERR(__wt_config_merge(session, cfg, NULL, (const char **)&config));
     __wt_verbose(
       session, WT_VERB_TIERED, "TIER_CREATE_OBJECT: schema create %s : %s", name, config);
     /* Create the new shared object. */
     WT_ERR(__wt_schema_create(session, name, config));
+
+#if 0
+    /*
+     * If we get here we have successfully created the object. It is ready to be fully flushed to
+     * the cloud. Push a work element to let the internal thread do that here.
+     */
+#endif
 
 err:
     __wt_free(session, config);
@@ -307,6 +313,10 @@ static int
 __tiered_switch(WT_SESSION_IMPL *session, const char *config)
 {
     WT_DECL_RET;
+#if 0
+    WT_FILE_SYSTEM *fs;
+    WT_STORAGE_SOURCE *storage_source;
+#endif
     WT_TIERED *tiered;
     bool need_object, need_tree, tracking;
 
@@ -357,10 +367,31 @@ __tiered_switch(WT_SESSION_IMPL *session, const char *config)
     /* We always need to create a local object. */
     WT_ERR(__tiered_create_local(session, tiered));
 
+#if 0
     /*
-     * Note that removal of overlapping local objects is not in the purview of this function. Some
-     * other mechanism will remove outdated tiers. Here's where it could be done though.
+     * We expect this part to be done asynchronously in its own thread. First flush the contents of
+     * the data file to the new cloud object.
      */
+    storage_source = tiered->bstorage->storage_source;
+    fs = tiered->bucket_storage->file_system;
+    WT_ASSERT(session, storage_source != NULL);
+
+    /* This call make take a while, and may fail due to network timeout. */
+    WT_ERR(storage_source->ss_flush(storage_source, &session->iface,
+            fs, old_filename, object_name, NULL));
+
+    /*
+     * The metadata for the old local object will be initialized with "flush=0". When the flush call
+     * completes, it can be marked as "flush=1". When that's done, we can finish the flush. The
+     * flush finish call moves the file from the home directory to the extension's cache. Then the
+     * extension will own it.
+     *
+     * We may need a way to restart flushes for those not completed (after a crash), or failed (due
+     * to previous network outage).
+     */
+    WT_ERR(storage_source->ss_flush_finish(storage_source, &session->iface,
+            fs, old_filename, object_name, NULL));
+#endif
 
     /* Update the tiered: metadata to new object number and tiered array. */
     WT_ERR(__tiered_update_metadata(session, tiered, config));
@@ -424,7 +455,7 @@ __wt_tiered_name(
         if (LF_ISSET(WT_TIERED_NAME_PREFIX))
             WT_ERR(__wt_buf_fmt(session, tmp, "file:%s-", name));
         else
-            WT_ERR(__wt_buf_fmt(session, tmp, "file:%s-%010" PRIu64 ".wt", name, id));
+            WT_ERR(__wt_buf_fmt(session, tmp, "file:%s-%010" PRIu64 ".wtobj", name, id));
     } else if (LF_ISSET(WT_TIERED_NAME_OBJECT)) {
         if (LF_ISSET(WT_TIERED_NAME_PREFIX))
             WT_ERR(__wt_buf_fmt(session, tmp, "object:%s-", name));

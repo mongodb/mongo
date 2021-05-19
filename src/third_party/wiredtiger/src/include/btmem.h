@@ -232,8 +232,8 @@ struct __wt_ovfl_reuse {
  * We also configure a larger than default internal page size to accommodate for larger history
  * store keys. We do that to reduce the chances of having to create overflow keys on the page.
  */
-#ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
-#define WT_HS_COMPRESSOR "snappy"
+#ifdef HAVE_BUILTIN_EXTENSION_ZSTD
+#define WT_HS_COMPRESSOR "zstd"
 #else
 #define WT_HS_COMPRESSOR "none"
 #endif
@@ -635,13 +635,16 @@ struct __wt_page {
     } u;
 
     /*
-     * Page entries, type and flags are positioned at the end of the WT_PAGE union to reduce cache
-     * misses in the row-store search function.
+     * Page entry count, page-wide prefix information, type and flags are positioned at the end of
+     * the WT_PAGE union to reduce cache misses when searching row-store pages.
      *
      * The entries field only applies to leaf pages, internal pages use the page-index entries
      * instead.
      */
     uint32_t entries; /* Leaf page entries */
+
+    uint32_t prefix_start; /* Best page prefix starting slot */
+    uint32_t prefix_stop;  /* Maximum slot to which the best page prefix applies */
 
 #define WT_PAGE_IS_INTERNAL(page) \
     ((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
@@ -668,6 +671,19 @@ struct __wt_page {
     uint8_t flags_atomic;               /* Atomic flags, use F_*_ATOMIC */
 
     uint8_t unused[2]; /* Unused padding */
+
+    size_t memory_footprint; /* Memory attached to the page */
+
+    /* Page's on-disk representation: NULL for pages created in memory. */
+    const WT_PAGE_HEADER *dsk;
+
+    /* If/when the page is modified, we need lots more information. */
+    WT_PAGE_MODIFY *modify;
+
+    /*
+     * !!!
+     * This is the 64 byte boundary, try to keep hot fields above here.
+     */
 
 /*
  * The page's read generation acts as an LRU value for each page in the
@@ -697,16 +713,6 @@ struct __wt_page {
 #define WT_READGEN_START_VALUE 100
 #define WT_READGEN_STEP 100
     uint64_t read_gen;
-
-    size_t memory_footprint; /* Memory attached to the page */
-
-    /* Page's on-disk representation: NULL for pages created in memory. */
-    const WT_PAGE_HEADER *dsk;
-
-    /* If/when the page is modified, we need lots more information. */
-    WT_PAGE_MODIFY *modify;
-
-    /* This is the 64 byte boundary, try to keep hot fields above here. */
 
     uint64_t cache_create_gen; /* Page create timestamp */
     uint64_t evict_pass_gen;   /* Eviction pass generation */
@@ -1301,10 +1307,9 @@ struct __wt_insert_head {
         NULL :                                                          \
         (page)->modify->mod_row_update[WT_ROW_SLOT(page, ip)])
 /*
- * WT_ROW_INSERT_SMALLEST references an additional slot past the end of the
- * "one per WT_ROW slot" insert array.  That's because the insert array requires
- * an extra slot to hold keys that sort before any key found on the original
- * page.
+ * WT_ROW_INSERT_SMALLEST references an additional slot past the end of the "one per WT_ROW slot"
+ * insert array. That's because the insert array requires an extra slot to hold keys that sort
+ * before any key found on the original page.
  */
 #define WT_ROW_INSERT_SMALLEST(page)                                    \
     ((page)->modify == NULL || (page)->modify->mod_row_insert == NULL ? \

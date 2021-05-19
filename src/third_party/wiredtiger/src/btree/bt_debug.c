@@ -1345,7 +1345,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page, WT_CURSOR *hs_cursor)
         WT_RET(__wt_row_leaf_key(session, page, rip, ds->key, false));
         WT_RET(__debug_item_key(ds, "K", ds->key->data, ds->key->size));
 
-        __wt_row_leaf_value_cell(session, page, rip, NULL, unpack);
+        __wt_row_leaf_value_cell(session, page, rip, unpack);
         WT_RET(__debug_cell_kv(ds, page, WT_PAGE_ROW_LEAF, "V", unpack));
 
         if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)

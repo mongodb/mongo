@@ -590,6 +590,7 @@ static const WT_CONFIG_CHECK confchk_object_meta[] = {
   {"collator", "string", NULL, NULL, NULL, 0}, {"columns", "list", NULL, NULL, NULL, 0},
   {"dictionary", "int", NULL, "min=0", NULL, 0},
   {"encryption", "category", NULL, NULL, confchk_WT_SESSION_create_encryption_subconfigs, 2},
+  {"flush", "string", NULL, NULL, NULL, 0},
   {"format", "string", NULL, "choices=[\"btree\"]", NULL, 0},
   {"huffman_key", "string", NULL, NULL, NULL, 0}, {"huffman_value", "string", NULL, NULL, NULL, 0},
   {"id", "string", NULL, NULL, NULL, 0},
@@ -1264,7 +1265,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "block_compressor=,cache_resident=false,checkpoint=,"
     "checkpoint_backup_info=,checkpoint_lsn=,checksum=uncompressed,"
     "collator=,columns=,dictionary=0,encryption=(keyid=,name=),"
-    "format=btree,huffman_key=,huffman_value=,id=,"
+    "flush=0,format=btree,huffman_key=,huffman_value=,id=,"
     "ignore_in_memory_cache_size=false,internal_item_max=0,"
     "internal_key_max=0,internal_key_truncate=true,"
     "internal_page_max=4KB,key_format=u,key_gap=10,leaf_item_max=0,"
@@ -1276,7 +1277,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "tiered_storage=(auth_token=,bucket=,bucket_prefix=,"
     "local_retention=300,name=,object_target_size=10M),value_format=u"
     ",verbose=[],version=(major=0,minor=0),write_timestamp_usage=none",
-    confchk_object_meta, 46},
+    confchk_object_meta, 47},
   {"table.meta",
     "app_metadata=,assert=(commit_timestamp=none,"
     "durable_timestamp=none,read_timestamp=none,write_timestamp=off),"

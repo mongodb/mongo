@@ -426,8 +426,8 @@ __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key)
     WT_ERR(__wt_strdup(session, key, &trk->a));
 
     /*
-     * If there was a previous value, keep it around -- if not, then this
-     * "update" is really an insert.
+     * If there was a previous value, keep it around -- if not, then this "update" is really an
+     * insert.
      */
     if ((ret = __wt_metadata_search(session, key, &trk->b)) == WT_NOTFOUND) {
         trk->op = WT_ST_REMOVE;

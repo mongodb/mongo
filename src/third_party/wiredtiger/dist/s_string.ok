@@ -1035,6 +1035,7 @@ mbss
 mem
 memalign
 membar
+memcmp
 memcpy
 memdup
 memget
@@ -1493,6 +1494,7 @@ wtstats
 xF
 xdeadbeef
 xff
+xfff
 xxxx
 xxxxx
 xxxxxx

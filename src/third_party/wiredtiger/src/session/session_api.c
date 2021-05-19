@@ -1397,7 +1397,7 @@ __session_truncate(
         WT_ERR(__wt_session_range_truncate(session, uri, start, stop));
 
 err:
-    TXN_API_END_RETRY(session, ret, 0);
+    TXN_API_END(session, ret, false);
 
     if (ret != 0)
         WT_STAT_CONN_INCR(session, session_table_truncate_fail);

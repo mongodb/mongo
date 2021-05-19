@@ -336,7 +336,7 @@ union __wt_rand_state {
     do {                                                                        \
         size_t __len, __space;                                                  \
         va_list __ap;                                                           \
-        int __ret_xx; /* __ret already used by WT_RET */                        \
+        int __ret_xx; /* __ret already used by WT_ERR */                        \
         char *__p;                                                              \
                                                                                 \
         /*                                                                      \
@@ -355,7 +355,7 @@ union __wt_rand_state {
             va_start(__ap, fmt);                                                \
             __ret_xx = __wt_vsnprintf_len_set(__p, __space, &__len, fmt, __ap); \
             va_end(__ap);                                                       \
-            WT_RET(__ret_xx);                                                   \
+            WT_ERR(__ret_xx);                                                   \
                                                                                 \
             /* Check if there was enough space. */                              \
             if (__len < __space) {                                              \
@@ -368,6 +368,6 @@ union __wt_rand_state {
              * If not, double the size of the buffer: we're dealing             \
              * with strings, we don't expect the size to get huge.              \
              */                                                                 \
-            WT_RET(__wt_buf_extend(session, buf, (buf)->size + __len + 1));     \
+            WT_ERR(__wt_buf_extend(session, buf, (buf)->size + __len + 1));     \
         }                                                                       \
     } while (0)

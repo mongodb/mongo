@@ -1422,9 +1422,8 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin, WT_INDEX *idx
             WT_RET(__curjoin_open_main(session, cjoin, entry));
 
             /*
-             * When we are repacking index keys to remove the
-             * primary key, we never want to transform trailing
-             * 'u'.  Use no-op padding to force this.
+             * When we are repacking index keys to remove the primary key, we never want to
+             * transform trailing 'u'. Use no-op padding to force this.
              */
             cindex = (WT_CURSOR_INDEX *)ref_cursor;
             len = strlen(cindex->iface.key_format) + 3;

@@ -274,7 +274,7 @@ __stat_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **st
         if (upd == NULL || (upd->type != WT_UPDATE_RESERVE && upd->type != WT_UPDATE_TOMBSTONE))
             ++entry_cnt;
         if (upd == NULL) {
-            __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
+            __wt_row_leaf_value_cell(session, page, rip, &unpack);
             if (unpack.type == WT_CELL_VALUE_OVFL)
                 ++ovfl_cnt;
         }

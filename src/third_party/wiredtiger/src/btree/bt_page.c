@@ -539,10 +539,20 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
     WT_ROW *rip;
     WT_UPDATE *tombstone, *upd;
     size_t size, total_size;
+    uint32_t best_prefix_count, best_prefix_start, best_prefix_stop;
+    uint32_t last_slot, prefix_count, prefix_start, prefix_stop, slot;
+    uint8_t smallest_prefix;
 
     btree = S2BT(session);
     tombstone = upd = NULL;
+    last_slot = 0;
     size = total_size = 0;
+
+    /* The code depends on the prefix count variables, other initialization shouldn't matter. */
+    best_prefix_count = prefix_count = 0;
+    smallest_prefix = 0;                      /* [-Wconditional-uninitialized] */
+    prefix_start = prefix_stop = 0;           /* [-Wconditional-uninitialized] */
+    best_prefix_start = best_prefix_stop = 0; /* [-Wconditional-uninitialized] */
 
     /*
      * Optionally instantiate prepared updates. In-memory databases restore non-obsolete updates on
@@ -557,19 +567,74 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
     rip = page->pg_row;
     WT_CELL_FOREACH_KV (session, page->dsk, unpack) {
         switch (unpack.type) {
-        case WT_CELL_KEY_OVFL:
-            __wt_row_leaf_key_set_cell(page, rip, unpack.cell);
-            ++rip;
-            continue;
         case WT_CELL_KEY:
             /*
-             * Simple keys without prefix compression can be directly referenced on the page to
+             * Simple keys and prefix-compressed keys can be directly referenced on the page to
              * avoid repeatedly unpacking their cells.
+             *
+             * Review groups of prefix-compressed keys, and track the biggest group as the page's
+             * prefix. What we're finding is the biggest group of prefix-compressed keys we can
+             * immediately build using a previous key plus their suffix bytes, without rolling
+             * forward through intermediate keys. We save that information on the page and then
+             * never physically instantiate those keys, avoiding memory amplification for pages with
+             * a page-wide prefix. On the first of a group of prefix-compressed keys, track the slot
+             * of the fully-instantiated key from which it's derived and the current key's prefix
+             * length. On subsequent keys, if the key can be built from the original key plus the
+             * current key's suffix bytes, update the maximum slot to which the prefix applies and
+             * the smallest prefix length.
+             *
+             * Groups of prefix-compressed keys end when a key is not prefix-compressed (ignoring
+             * overflow keys), or the key's prefix length increases. A prefix length decreasing is
+             * OK, it only means fewer bytes taken from the original key. A prefix length increasing
+             * doesn't necessarily end a group of prefix-compressed keys as we might be able to
+             * build a subsequent key using the original key and the key's suffix bytes, that is the
+             * prefix length could increase and then decrease to the same prefix length as before
+             * and those latter keys could be built without rolling forward through intermediate
+             * keys.
+             *
+             * However, that gets tricky: once a key prefix grows, we can never include a prefix
+             * smaller than the smallest prefix found so far, in the group, as a subsequent key
+             * prefix larger than the smallest prefix found so far might include bytes not present
+             * in the original instantiated key. Growing and shrinking is complicated to track, so
+             * rather than code up that complexity, we close out a group whenever the prefix grows.
+             * Plus, growing has additional issues. Any key with a larger prefix cannot be
+             * instantiated without rolling forward through intermediate keys, and so while such a
+             * key isn't required to close out the prefix group in all cases, it's not a useful
+             * entry for finding the best group of prefix-compressed keys, either, it's only
+             * possible keys after the prefix shrinks again that are potentially worth including in
+             * a group.
              */
-            if (unpack.prefix == 0)
-                __wt_row_leaf_key_set(page, rip, &unpack);
-            else
-                __wt_row_leaf_key_set_cell(page, rip, unpack.cell);
+            slot = WT_ROW_SLOT(page, rip);
+            if (unpack.prefix == 0) {
+                /* If the last prefix group was the best, track it. */
+                if (prefix_count > best_prefix_count) {
+                    best_prefix_start = prefix_start;
+                    best_prefix_stop = prefix_stop;
+                    best_prefix_count = prefix_count;
+                }
+                prefix_count = 0;
+                prefix_start = slot;
+            } else {
+                /* Check for starting or continuing a prefix group. */
+                if (prefix_count == 0 ||
+                  (last_slot == slot - 1 && unpack.prefix <= smallest_prefix)) {
+                    smallest_prefix = unpack.prefix;
+                    last_slot = prefix_stop = slot;
+                    ++prefix_count;
+                }
+            }
+            __wt_row_leaf_key_set(page, rip, &unpack);
+            ++rip;
+            continue;
+        case WT_CELL_KEY_OVFL:
+            /*
+             * Prefix compression skips overflow items, ignore this slot. The last slot value is
+             * only used inside a group of prefix-compressed keys, so blindly increment it, it's not
+             * used unless the count of prefix-compressed keys is non-zero.
+             */
+            ++last_slot;
+
+            __wt_row_leaf_key_set(page, rip, &unpack);
             ++rip;
             continue;
         case WT_CELL_VALUE:
@@ -584,7 +649,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
               (WT_TIME_WINDOW_IS_EMPTY(&unpack.tw) ||
                 (!WT_TIME_WINDOW_HAS_STOP(&unpack.tw) &&
                   __wt_txn_tw_start_visible_all(session, &unpack.tw))))
-                __wt_row_leaf_value_set(page, rip - 1, &unpack);
+                __wt_row_leaf_value_set(rip - 1, &unpack);
             break;
         case WT_CELL_VALUE_OVFL:
             break;
@@ -610,6 +675,9 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
             prepare = PREPARE_INITIALIZED;
         }
 
+        /* Make sure that there is no in-memory update for this key. */
+        WT_ASSERT(session, page->modify->mod_row_update[WT_ROW_SLOT(page, rip - 1)] == NULL);
+
         /* Take the value from the page cell. */
         WT_ERR(__wt_page_cell_data_ref(session, page, &unpack, value));
 
@@ -618,6 +686,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
         upd->durable_ts = unpack.tw.durable_start_ts;
         upd->start_ts = unpack.tw.start_ts;
         upd->txnid = unpack.tw.start_txn;
+        F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
 
         /*
          * Instantiate both update and tombstone if the prepared update is a tombstone. This is
@@ -632,7 +701,6 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
             tombstone->txnid = unpack.tw.stop_txn;
             tombstone->prepare_state = WT_PREPARE_INPROGRESS;
             F_SET(tombstone, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
-            F_SET(upd, WT_UPDATE_RESTORED_FROM_DS);
 
             /*
              * Mark the update also as in-progress if the update and tombstone are from same
@@ -644,14 +712,12 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
               unpack.tw.start_txn == unpack.tw.stop_txn) {
                 upd->durable_ts = WT_TS_NONE;
                 upd->prepare_state = WT_PREPARE_INPROGRESS;
-                F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
             }
 
             tombstone->next = upd;
         } else {
             upd->durable_ts = WT_TS_NONE;
             upd->prepare_state = WT_PREPARE_INPROGRESS;
-            F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
             tombstone = upd;
         }
 
@@ -659,6 +725,23 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
         tombstone = upd = NULL;
     }
     WT_CELL_FOREACH_END;
+
+    /* If the last prefix group was the best, track it. Save the best prefix group for the page. */
+    if (prefix_count > best_prefix_count) {
+        best_prefix_start = prefix_start;
+        best_prefix_stop = prefix_stop;
+    }
+    page->prefix_start = best_prefix_start;
+    page->prefix_stop = best_prefix_stop;
+
+    /*
+     * Backward cursor traversal can be too slow if we're forced to process long stretches of
+     * prefix-compressed keys to create every key as we walk backwards through the page, and we
+     * handle that by instantiating periodic keys when backward cursor traversal enters a new page.
+     * Mark the page as not needing that work if there aren't stretches of prefix-compressed keys.
+     */
+    if (best_prefix_count <= 10)
+        F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 
     __wt_cache_page_inmem_incr(session, page, total_size);
 

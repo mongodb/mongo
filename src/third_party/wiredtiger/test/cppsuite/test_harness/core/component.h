@@ -88,7 +88,7 @@ class component {
     }
 
     bool
-    is_enabled() const
+    enabled() const
     {
         return _enabled;
     }

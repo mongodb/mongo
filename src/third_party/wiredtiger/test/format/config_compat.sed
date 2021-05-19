@@ -8,7 +8,6 @@ s/^btree.dictionary=/dictionary=/
 s/^btree.huffman_value=/huffman_value=/
 s/^btree.internal_key_truncation=/internal_key_truncation=/
 s/^btree.internal_page_max=/internal_page_max=/
-s/^btree.key_gap=/key_gap=/
 s/^btree.key_max=/key_max=/
 s/^btree.key_min=/key_min=/
 s/^btree.leaf_page_max=/leaf_page_max=/

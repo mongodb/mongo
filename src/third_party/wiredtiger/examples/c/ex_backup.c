@@ -50,13 +50,12 @@ compare_backups(int i)
     char buf[1024], msg[32];
 
     /*
-     * We run 'wt dump' on both the full backup directory and the
-     * incremental backup directory for this iteration.  Since running
-     * 'wt' runs recovery and makes both directories "live", we need
-     * a new directory for each iteration.
+     * We run 'wt dump' on both the full backup directory and the incremental backup directory for
+     * this iteration. Since running 'wt' runs recovery and makes both directories "live", we need a
+     * new directory for each iteration.
      *
-     * If i == 0, we're comparing against the main, original directory
-     * with the final incremental directory.
+     * If i == 0, we're comparing against the main, original directory with the final incremental
+     * directory.
      */
     if (i == 0)
         (void)snprintf(

@@ -38,7 +38,8 @@ bulk_begin_transaction(WT_SESSION *session)
     uint64_t ts;
     char buf[64];
 
-    wiredtiger_begin_transaction(session, "isolation=snapshot");
+    /* Writes require snapshot isolation. */
+    wiredtiger_begin_transaction(session, NULL);
     ts = __wt_atomic_addv64(&g.timestamp, 1);
     testutil_check(__wt_snprintf(buf, sizeof(buf), "read_timestamp=%" PRIx64, ts));
     testutil_check(session->timestamp_transaction(session, buf));
@@ -113,7 +114,6 @@ wts_load(void)
         bulk_begin_transaction(session);
 
     for (committed_keyno = keyno = 0; ++keyno <= g.c_rows;) {
-        key_gen(&key, keyno);
         val_gen(NULL, &value, keyno);
 
         switch (g.type) {
@@ -132,6 +132,7 @@ wts_load(void)
                 trace_msg("bulk %" PRIu32 " {%.*s}", keyno, (int)value.size, (char *)value.data);
             break;
         case ROW:
+            key_gen(&key, keyno);
             cursor->set_key(cursor, &key);
             cursor->set_value(cursor, &value);
             if (g.trace_all)
@@ -188,21 +189,21 @@ wts_load(void)
         }
     }
 
+    if (g.c_txn_timestamps)
+        bulk_commit_transaction(session);
+
     /*
      * Ideally, the insert loop runs until the number of rows plus one, in which case row counts are
      * correct. If the loop exited early, reset the counters and rewrite the CONFIG file (so reopens
      * aren't surprised).
      */
     if (keyno != g.c_rows + 1) {
-        testutil_assert(committed_keyno > 0);
+        g.c_rows = g.c_txn_timestamps ? committed_keyno : (keyno - 1);
+        testutil_assert(g.c_rows > 0);
+        g.rows = g.c_rows;
 
-        g.rows = committed_keyno;
-        g.c_rows = (uint32_t)committed_keyno;
         config_print(false);
     }
-
-    if (g.c_txn_timestamps)
-        bulk_commit_transaction(session);
 
     testutil_check(cursor->close(cursor));
 
