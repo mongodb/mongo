@@ -59,7 +59,7 @@ public:
 
     // Marks the beginning of a resharding operation. Not that only one resharding operation may run
     // at any time.
-    void onStart() noexcept;
+    void onStart(Date_t runningOperationStartTime) noexcept;
 
     // Marks the resumption of a resharding operation. Note that only one resharding operation may
     // run at any time.
@@ -76,9 +76,15 @@ public:
     // Allows updating metrics on "documents to copy" so long as the recipient is in cloning state.
     void onDocumentsCopied(int64_t documents, int64_t bytes) noexcept;
 
-    // Starts/ends the timer recording the time spent in the critical section.
-    void startInCriticalSection();
-    void endInCritcialSection();
+    // Starts/ends the timers recording the times spend in the named sections.
+    void startCopyingDocuments(Date_t start);
+    void endCopyingDocuments(Date_t end);
+
+    void startApplyingOplogEntries(Date_t start);
+    void endApplyingOplogEntries(Date_t end);
+
+    void startInCriticalSection(Date_t start);
+    void endInCriticalSection(Date_t end);
 
     // Allows updating "oplog entries to apply" metrics when the recipient is in applying state.
     void onOplogEntriesFetched(int64_t entries) noexcept;
@@ -94,7 +100,8 @@ public:
 
     // Marks the completion of the current (active) resharding operation. Aborts the process if no
     // resharding operation is in progress.
-    void onCompletion(ReshardingOperationStatusEnum) noexcept;
+    void onCompletion(ReshardingOperationStatusEnum status,
+                      Date_t runningOperationEndTime) noexcept;
 
     struct ReporterOptions {
         enum class Role { kDonor, kRecipient, kCoordinator };
@@ -145,9 +152,12 @@ private:
         public:
             explicit TimeInterval(ClockSource* clockSource) : _clockSource(clockSource) {}
 
-            void start() noexcept;
+            void start(Date_t start) noexcept;
 
-            void end() noexcept;
+            void end(Date_t end) noexcept;
+
+            // TODO Remove this function once all metrics classes can start from stepup.
+            void forceEnd(Date_t end) noexcept;
 
             Milliseconds duration() const noexcept;
 

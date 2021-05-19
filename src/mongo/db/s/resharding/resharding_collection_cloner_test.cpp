@@ -109,7 +109,7 @@ protected:
     void setUp() override {
         ServiceContextTest::setUp();
         _metrics = std::make_unique<ReshardingMetrics>(getServiceContext());
-        _metrics->onStart();
+        _metrics->onStart(getServiceContext()->getFastClockSource()->now());
         _metrics->setRecipientState(RecipientStateEnum::kCloning);
     }
 

@@ -80,6 +80,11 @@ bool shouldStopAttemptingToCreateIndex(Status status, const CancellationToken& t
     return status.isOK() || token.isCanceled();
 }
 
+Date_t getCurrentTime() {
+    const auto svcCtx = cc().getServiceContext();
+    return svcCtx->getFastClockSource()->now();
+}
+
 void assertNumDocsModifiedMatchesExpected(const BatchedCommandRequest& request,
                                           const BSONObj& response,
                                           int expected) {
@@ -1010,13 +1015,14 @@ void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
 }
 
 void markCompleted(const Status& status) {
+    auto currentTime = getCurrentTime();
     auto metrics = ReshardingMetrics::get(cc().getServiceContext());
     if (status.isOK())
-        metrics->onCompletion(ReshardingOperationStatusEnum::kSuccess);
+        metrics->onCompletion(ReshardingOperationStatusEnum::kSuccess, currentTime);
     else if (status == ErrorCodes::ReshardCollectionAborted)
-        metrics->onCompletion(ReshardingOperationStatusEnum::kCanceled);
+        metrics->onCompletion(ReshardingOperationStatusEnum::kCanceled, currentTime);
     else
-        metrics->onCompletion(ReshardingOperationStatusEnum::kFailure);
+        metrics->onCompletion(ReshardingOperationStatusEnum::kFailure, currentTime);
 }
 
 BSONObj createFlushReshardingStateChangeCommand(const NamespaceString& nss) {
@@ -1304,7 +1310,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChan
     _coordinatorDocWrittenPromise.emplaceValue();
 
     // TODO SERVER-53914 to accommodate loading metrics for the coordinator.
-    ReshardingMetrics::get(cc().getServiceContext())->onStart();
+    ReshardingMetrics::get(cc().getServiceContext())->onStart(getCurrentTime());
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::

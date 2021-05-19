@@ -176,11 +176,16 @@ private:
                           boost::optional<CloneDetails>&& cloneDetails,
                           boost::optional<mongo::Date_t> configStartTime);
 
-    // Transitions the on-disk and in-memory state to RecipientStateEnum::kCreatingCollection.
+    // The following functions transition the on-disk and in-memory state to the named state.
     void _transitionToCreatingCollection(CloneDetails cloneDetails,
                                          boost::optional<mongo::Date_t> startConfigTxnCloneTime);
 
-    // Transitions the on-disk and in-memory state to RecipientStateEnum::kError.
+    void _transitionToCloning();
+
+    void _transitionToApplying();
+
+    void _transitionToStrictConsistency();
+
     void _transitionToError(Status abortReason);
 
     BSONObj _makeQueryForCoordinatorUpdate(const ShardId& shardId, RecipientStateEnum newState);

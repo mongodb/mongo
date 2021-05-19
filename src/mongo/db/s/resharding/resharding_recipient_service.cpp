@@ -77,6 +77,11 @@ namespace {
 
 const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
+Date_t getCurrentTime() {
+    const auto svcCtx = cc().getServiceContext();
+    return svcCtx->getFastClockSource()->now();
+}
+
 /**
  * Fulfills the promise if it is not already. Otherwise, does nothing.
  */
@@ -327,7 +332,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     _cancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
 
     return ExecutorFuture<void>(**executor)
-        .then([this] { _metrics()->onStart(); })
+        .then([this] { _metrics()->onStart(getCurrentTime()); })
         .then([this, executor, abortToken] {
             return _runUntilStrictConsistencyOrErrored(executor, abortToken);
         })
@@ -372,7 +377,8 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                 // Interrupt occured, ensure the metrics get shut down.
                 // TODO SERVER-56500: Don't use ReshardingOperationStatusEnum::kCanceled here if it
                 // is not meant for failover cases.
-                _metrics()->onCompletion(ReshardingOperationStatusEnum::kCanceled);
+                _metrics()->onCompletion(ReshardingOperationStatusEnum::kCanceled,
+                                         getCurrentTime());
             }
 
             return status;
@@ -479,7 +485,7 @@ void ReshardingRecipientService::RecipientStateMachine::
             });
     }
 
-    _transitionState(RecipientStateEnum::kCloning);
+    _transitionToCloning();
 }
 
 std::unique_ptr<ReshardingDataReplicationInterface>
@@ -554,7 +560,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
 
     return future_util::withCancellation(_dataReplication->awaitCloningDone(), abortToken)
         .thenRunOn(**executor)
-        .then([this] { _transitionState(RecipientStateEnum::kApplying); });
+        .then([this] { _transitionToApplying(); });
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
@@ -603,7 +609,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                         ShardingCatalogClient::kLocalWriteConcern);
             }
 
-            _transitionState(RecipientStateEnum::kStrictConsistency);
+            _transitionToStrictConsistency();
         });
 }
 
@@ -679,6 +685,30 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToCreatingCol
     newRecipientCtx.setState(RecipientStateEnum::kCreatingCollection);
     _transitionState(
         std::move(newRecipientCtx), std::move(cloneDetails), std::move(startConfigTxnCloneTime));
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_transitionToCloning() {
+    auto newRecipientCtx = _recipientCtx;
+    newRecipientCtx.setState(RecipientStateEnum::kCloning);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none);
+    _metrics()->startCopyingDocuments(getCurrentTime());
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_transitionToApplying() {
+    auto newRecipientCtx = _recipientCtx;
+    newRecipientCtx.setState(RecipientStateEnum::kApplying);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none);
+    auto currentTime = getCurrentTime();
+    _metrics()->endCopyingDocuments(currentTime);
+    _metrics()->startApplyingOplogEntries(currentTime);
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_transitionToStrictConsistency() {
+    auto newRecipientCtx = _recipientCtx;
+    newRecipientCtx.setState(RecipientStateEnum::kStrictConsistency);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none);
+    auto currentTime = getCurrentTime();
+    _metrics()->endApplyingOplogEntries(currentTime);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToError(Status abortReason) {
@@ -862,9 +892,11 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
                 if (_abortReason) {
                     _metrics()->onCompletion(ErrorCodes::isCancellationError(_abortReason.get())
                                                  ? ReshardingOperationStatusEnum::kCanceled
-                                                 : ReshardingOperationStatusEnum::kFailure);
+                                                 : ReshardingOperationStatusEnum::kFailure,
+                                             getCurrentTime());
                 } else {
-                    _metrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess);
+                    _metrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess,
+                                             getCurrentTime());
                 }
 
                 _completionPromise.emplaceValue();
