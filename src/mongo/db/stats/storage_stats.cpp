@@ -45,7 +45,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
                                     BSONObjBuilder* result) {
     int scale = 1;
     if (param["scale"].isNumber()) {
-        scale = param["scale"].numberInt();
+        scale = param["scale"].safeNumberInt();
         if (scale < 1) {
             return {ErrorCodes::BadValue, "scale has to be >= 1"};
         }
