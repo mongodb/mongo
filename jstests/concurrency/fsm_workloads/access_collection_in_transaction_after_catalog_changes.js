@@ -234,7 +234,7 @@ var $config = (function() {
         function createIndex(db, collName) {
             assertWhenOwnColl.commandWorkedOrFailedWithCode(
                 db.getSiblingDB(this.ddlDBName)[this.ddlCollName].createIndex({x: 1}),
-                [ErrorCodes.IndexBuildAborted]);
+                [ErrorCodes.IndexBuildAborted, ErrorCodes.NoMatchingDocument]);
         }
 
         function dropColl(db, collName) {
