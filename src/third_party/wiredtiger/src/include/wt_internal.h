@@ -167,8 +167,6 @@ struct __wt_cursor_stat;
 typedef struct __wt_cursor_stat WT_CURSOR_STAT;
 struct __wt_cursor_table;
 typedef struct __wt_cursor_table WT_CURSOR_TABLE;
-struct __wt_cursor_tiered;
-typedef struct __wt_cursor_tiered WT_CURSOR_TIERED;
 struct __wt_data_handle;
 typedef struct __wt_data_handle WT_DATA_HANDLE;
 struct __wt_data_handle_cache;
