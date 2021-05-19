@@ -60,8 +60,7 @@ function runTest({failPoint, shouldFail = false}) {
             donorRst.nodes, migrationId, tenantId, TenantMigrationTest.DonorState.kAborted);
     } else {
         TenantMigrationTest.assertCommitted(
-            tenantMigrationTest.waitForMigrationToComplete(migrationOpts),
-            ErrorCodes.ConflictingOperationInProgress);
+            tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
         tenantMigrationTest.waitForDonorNodesToReachState(
             donorRst.nodes, migrationId, tenantId, TenantMigrationTest.DonorState.kCommitted);

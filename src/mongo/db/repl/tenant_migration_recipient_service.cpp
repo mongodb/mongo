@@ -138,6 +138,7 @@ MONGO_FAIL_POINT_DEFINE(skipFetchingRetryableWritesEntriesBeforeStartOpTime);
 // Fails before waiting for the state doc to be majority replicated.
 MONGO_FAIL_POINT_DEFINE(failWhilePersistingTenantMigrationRecipientInstanceStateDoc);
 MONGO_FAIL_POINT_DEFINE(fpAfterPersistingTenantMigrationRecipientInstanceStateDoc);
+MONGO_FAIL_POINT_DEFINE(fpBeforeFetchingDonorClusterTimeKeys);
 MONGO_FAIL_POINT_DEFINE(fpAfterConnectingTenantMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(fpAfterRecordingRecipientPrimaryStartingFCV);
 MONGO_FAIL_POINT_DEFINE(fpAfterComparingRecipientAndDonorFCV);
@@ -2014,6 +2015,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            _stateDoc.getStartFetchingDonorOpTime().has_value());
                    })
                    .then([this, self = shared_from_this(), token] {
+                       _stopOrHangOnFailPoint(&fpBeforeFetchingDonorClusterTimeKeys);
                        _fetchAndStoreDonorClusterTimeKeyDocs(token);
                    })
                    .then([this, self = shared_from_this()] {
