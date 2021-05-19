@@ -30,7 +30,6 @@ scons_cache_mode: nolinked
 is_commit_queue: "false"
 use_scons_cache: "false"
 npm_command: jstestfuzz
-connection_attempts: "25"
 tar: tar
 cmake_path: /opt/cmake/bin/cmake
 content_type: application/x-gzip

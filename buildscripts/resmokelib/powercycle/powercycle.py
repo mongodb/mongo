@@ -1369,11 +1369,11 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
     num_fsm_clients = powercycle_constants.NUM_FSM_CLIENTS
 
     # Windows task overrides:
-    #   - Execute no more than 10 test loops
+    #   - Execute no more than 3 test loops
     #   - Cap the maximum number of clients to 10 each
     if _IS_WINDOWS:
-        if test_loops > 10:
-            test_loops = 10
+        if test_loops > 3:
+            test_loops = 3
         num_crud_clients = 10
         num_fsm_clients = 10
 
@@ -1542,6 +1542,7 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
 
         ssh_tunnel_proc = setup_ssh_tunnel(mongod_host, secret_port, standard_port,
                                            ssh_connection_options, ssh_options, ssh_user_host)
+        verify_remote_access(local_ops)
 
         # Optionally validate canary document locally.
         if validate_canary_local:
@@ -1564,6 +1565,14 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
                                      "jstests/hooks/run_validate_collections.js", new_config_file)
         LOGGER.info("Local collection validation: %d %s", ret, output)
         if ret:
+            network_error = (
+                f"[js_test:run_validate_collections] Error: network error while attempting "
+                f"to run command 'isMaster' on host '{host_port}'")
+            # Mark this error as ssh failure, since it happens during the first test loop before
+            # the first server crash and likely related to port forwarding not working, which
+            # uses ssh tunnel command.
+            if loop_num == 1 and network_error in output:
+                ssh_failure_exit(ret, network_error)
             local_exit(ret)
 
         # Shutdown mongod on secret port.

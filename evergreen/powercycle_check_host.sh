@@ -15,7 +15,7 @@ echo $hostname
 echo $user
 
 attempts=0
-connection_attempts=${connection_attempts}
+connection_attempts=60
 
 # Check for remote connectivity
 while ! ssh \

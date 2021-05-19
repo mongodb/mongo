@@ -864,7 +864,6 @@ functions:
         workdir: ${workdir}
 
   "generate powercycle tasks":
-    - *set_task_expansion_macros
     - *f_expansions_write
     - *set_up_venv
     - *upload_pip_requirements
@@ -901,7 +900,6 @@ functions:
           - powercycle_tasks.json
 
   "run powercycle sentinel":
-    - *set_task_expansion_macros
     - *f_expansions_write
     - *set_up_venv
     - *upload_pip_requirements
@@ -1552,10 +1550,11 @@ functions:
 
     - *f_expansions_write
     - command: subprocess.exec
+      type: setup
       params:
         binary: bash
         args:
-          - "./src/evergreen/powercycle_system_exit.sh"
+          - "./src/evergreen/powercycle_ssh_failure_exit.sh"
         env:
           workdir: ${workdir}
     - command: subprocess.exec
@@ -6077,6 +6076,17 @@ tasks:
       resmoke_args: --suites=json_schema --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
+- name: powercycle_gen
+  commands:
+    - func: "generate powercycle tasks"
+      vars:
+        task_names: >-
+          powercycle
+          powercycle_kill_mongod
+          powercycle_replication_smalloplog
+          powercycle_syncdelay
+        num_tasks: 1
+
 - name: powercycle_smoke_skip_compile_gen
   commands:
     - func: "generate powercycle tasks"
@@ -6098,6 +6108,7 @@ tasks:
 
 - name: powercycle_smoke
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6107,24 +6118,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
-    timeout_secs: 1800 # 30 minute timeout for no output
-
-- name: powercycle_kill_mongod_smoke
-  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  depends_on:
-  - name: archive_dist_test_debug
-  commands:
-  - func: "do setup"
-  - func: "set up remote credentials"
-    vars:
-      <<: *powercycle_remote_credentials
-  - func: "set up EC2 instance"
-  - func: "run powercycle test"
-    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6134,11 +6132,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
-    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_kill_mongod
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6148,11 +6146,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
-    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_fcv4.4
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6162,11 +6160,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
-    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_replication
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6176,11 +6174,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
-    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_replication_smalloplog
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6190,11 +6188,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
-    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_syncdelay
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6204,11 +6202,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
-    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_write_concern_majority
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -7522,6 +7520,7 @@ buildvariants:
   - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
+  - name: .powercycle
   - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough
   - name: .sharding .txns
@@ -7928,7 +7927,7 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
-  - name: powercycle
+  - name: .powercycle
   - name: .replica_sets .common
   - name: sasl
   - name: serial_run
@@ -8397,8 +8396,6 @@ buildvariants:
     - name: mqlrun
     - name: noPassthrough_gen
     - name: noPassthroughWithMongod_gen
-    - name: powercycle_kill_mongod_smoke
-    - name: powercycle_smoke
     - name: .replica_sets .common
     - name: .replica_sets .multi_oplog
     - name: replica_sets_ese_gen
@@ -8513,7 +8510,6 @@ buildvariants:
   - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
   - name: multiversion_gen
   - name: multiversion_auth_gen
-  - name: powercycle_kill_mongod
   - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets_gen
@@ -8577,7 +8573,7 @@ buildvariants:
   - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
   - name: multiversion_gen
   - name: multiversion_auth_gen
-  - name: powercycle_kill_mongod
+  - name: powercycle_gen
   - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets_gen
@@ -8985,6 +8981,7 @@ buildvariants:
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
+  - name: powercycle_smoke
   - name: .query_fuzzer
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
@@ -9567,8 +9564,6 @@ buildvariants:
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: .replica_sets .multi_oplog
-  - name: powercycle_kill_mongod_smoke
-  - name: powercycle_smoke
   - name: sasl
   - name: search
   - name: search_auth

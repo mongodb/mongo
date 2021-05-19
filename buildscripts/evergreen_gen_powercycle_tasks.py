@@ -4,7 +4,7 @@ from collections import namedtuple
 from typing import Any, List, Tuple, Set
 
 import click
-from shrub.v2 import BuildVariant, FunctionCall, ShrubProject, Task, TaskDependency
+from shrub.v2 import BuildVariant, FunctionCall, ShrubProject, Task, TaskDependency, ExistingTask
 from shrub.v2.command import BuiltInCommand
 
 from buildscripts.util.fileops import write_file
@@ -12,6 +12,7 @@ from buildscripts.util.read_config import read_config_file
 from buildscripts.util.taskname import name_generated_task
 
 Config = namedtuple("config", [
+    "current_task_name",
     "task_names",
     "num_tasks",
     "timeout_params",
@@ -26,6 +27,7 @@ Config = namedtuple("config", [
 def make_config(expansions_file: Any) -> Config:
     """Group expansions into config."""
     expansions = read_config_file(expansions_file)
+    current_task_name = expansions.get("task_name", "powercycle")
     task_names = expansions.get("task_names", "powercycle_smoke_skip_compile")
     # Avoid duplicated task names
     task_names = {task_name for task_name in task_names.split(" ")}
@@ -47,7 +49,7 @@ def make_config(expansions_file: Any) -> Config:
     build_variant = expansions.get("build_variant")
     distro = expansions.get("distro_id")
 
-    return Config(task_names, num_tasks, timeout_params, remote_credentials_vars,
+    return Config(current_task_name, task_names, num_tasks, timeout_params, remote_credentials_vars,
                   set_up_ec2_instance_vars, run_powercycle_vars, build_variant, distro)
 
 
@@ -61,7 +63,6 @@ def get_setup_commands() -> Tuple[List[FunctionCall], Set[TaskDependency]]:
 def get_skip_compile_setup_commands() -> Tuple[List[FunctionCall], set]:
     """Return skip compile setup commands."""
     return [
-        FunctionCall("set task expansion macros"),
         FunctionCall("set up venv"),
         FunctionCall("upload pip requirements"),
         FunctionCall("f_expansions_write"),
@@ -79,6 +80,8 @@ def main(expansions_file: str = "expansions.yml",
 
     config = make_config(expansions_file)
     build_variant = BuildVariant(config.build_variant)
+
+    sub_tasks = set()
     for task_name in config.task_names:
         if "skip_compile" in task_name:
             commands, task_dependency = get_skip_compile_setup_commands()
@@ -92,14 +95,16 @@ def main(expansions_file: str = "expansions.yml",
             FunctionCall("run powercycle test", config.run_powercycle_vars),
         ])
 
-        build_variant.display_task(
-            task_name, {
-                Task(
-                    name_generated_task(task_name, index, config.num_tasks, config.build_variant),
-                    commands, task_dependency)
-                for index in range(config.num_tasks)
-            }, distros=[config.distro])
+        sub_tasks.update({
+            Task(
+                name_generated_task(task_name, index, config.num_tasks, config.build_variant),
+                commands, task_dependency)
+            for index in range(config.num_tasks)
+        })
 
+    build_variant.display_task(
+        config.current_task_name.replace("_gen", ""), sub_tasks, distros=[config.distro],
+        execution_existing_tasks={ExistingTask(config.current_task_name)})
     shrub_project = ShrubProject.empty()
     shrub_project.add_build_variant(build_variant)
 
