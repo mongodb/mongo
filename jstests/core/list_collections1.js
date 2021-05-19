@@ -10,6 +10,7 @@
  *   requires_getmore,
  *   requires_replication,
  *   requires_fcv_49,
+ *   uses_api_parameters,
  * ]
  *
  * Note that storage engines used to be allowed to advertise internal collections to the user (in
