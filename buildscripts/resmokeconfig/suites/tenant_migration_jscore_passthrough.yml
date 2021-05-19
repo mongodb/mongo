@@ -32,6 +32,7 @@ selector:
   - jstests/core/top.js
   - jstests/core/profile_sampling.js
   - jstests/core/profile_hide_index.js
+  - jstests/core/index_stats.js
   # The override cannot deep copy very large or small dates.
   - jstests/core/index_large_and_small_dates.js
   # This test expects that the connection (i.e. 'threadName') does not change throughout each test
