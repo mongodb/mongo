@@ -5,7 +5,6 @@
  * and verifies guarantees are not broken.
  *
  * @tags: [
- *   requires_fcv_50,
  *   requires_sharding,
  *   assumes_balancer_off,
  *   does_not_support_causal_consistency,

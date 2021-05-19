@@ -2,7 +2,9 @@
 //
 // This test assumes that collections are not implicitly sharded, since $out is prohibited if the
 // output collection is sharded.
-// @tags: [assumes_unsharded_collection, requires_fcv_50]
+// @tags: [
+//   assumes_unsharded_collection,
+// ]
 (function() {
 "use strict";
 

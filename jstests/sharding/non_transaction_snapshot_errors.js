@@ -9,7 +9,6 @@
  * SnapshotError, there's no point retrying.
  *
  * @tags: [
- *   requires_fcv_47,
  *   requires_majority_read_concern,
  *   requires_persistence,
  * ]

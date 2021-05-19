@@ -2,7 +2,6 @@
  * Tests that a wildcard index with an exclusion projection but including _id field gets saved
  * properly. Exercises the fix for SERVER-52814.
  * @tags: [
- *   requires_fcv_49,
  * ]
  */
 

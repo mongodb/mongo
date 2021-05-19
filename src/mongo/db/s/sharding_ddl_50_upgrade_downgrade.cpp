@@ -40,7 +40,10 @@ DatabaseEntryFormat::Format DatabaseEntryFormat::get(const FixedFCVRegion& fcvRe
     switch (fcvRegion->getVersion()) {
         case FCVersion::kUpgradingFrom44To50:
         case FCVersion::kUpgradingFrom49To50:
-        case FCVersion::kVersion50:
+        case FCVersion::kUpgradingFrom50To51:
+        case FCVersion::kDowngradingFrom51To50:
+        case FCVersion::kFullyDowngradedTo50:
+        case FCVersion::kVersion51:
             return feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()
                 ? Format::kUUIDandTimestamp
                 : Format::kUUIDOnly;
@@ -61,7 +64,10 @@ ChunkEntryFormat::Format ChunkEntryFormat::getForVersionCallerGuaranteesFCVStabi
             return feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()
                 ? Format::kNamespaceAndUUIDWithTimestamps
                 : Format::kNamespaceOnlyNoTimestamps;
-        case FCVersion::kVersion50:
+        case FCVersion::kFullyDowngradedTo50:
+        case FCVersion::kVersion51:
+        case FCVersion::kUpgradingFrom50To51:
+        case FCVersion::kDowngradingFrom51To50:
             return feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()
                 ? Format::kUUIDOnlyWithTimestamps
                 : Format::kNamespaceOnlyNoTimestamps;

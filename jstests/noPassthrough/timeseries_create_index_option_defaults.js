@@ -3,7 +3,6 @@
  * a time-series collection.
  *
  * @tags: [
- *   requires_fcv_49,
  *   requires_persistence,
  *   requires_wiredtiger,
  * ]

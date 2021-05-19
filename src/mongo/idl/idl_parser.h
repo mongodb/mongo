@@ -105,7 +105,7 @@ auto idlPreparsedValue(stdx::type_identity<T>) {
  */
 inline auto idlPreparsedValue(
     stdx::type_identity<ServerGlobalParams::FeatureCompatibility::Version>) {
-    return ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault44Behavior;
+    return ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault50Behavior;
 }
 
 }  // namespace preparsed_value_adl_barrier

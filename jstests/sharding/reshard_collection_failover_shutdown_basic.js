@@ -5,7 +5,6 @@
  * TODO SERVER-58343: re-enable this test.
  * @tags: [
  *   __TEMPORARILY_DISABLED__,
- *   requires_fcv_49,
  *   uses_atclustertime,
  * ]
  */

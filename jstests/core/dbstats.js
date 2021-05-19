@@ -2,7 +2,6 @@
 //
 // @tags: [
 //   requires_dbstats,
-//   requires_fcv_47,
 // ]
 
 (function() {

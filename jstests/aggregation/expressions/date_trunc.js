@@ -1,7 +1,6 @@
 /**
  * Tests $dateTrunc expression.
  * @tags: [
- *   requires_fcv_49
  * ]
  */
 (function() {

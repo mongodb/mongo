@@ -2,8 +2,7 @@
  * Checks that the server properly parses "API Version" parameters
  *
  * @tags: [
- *  requires_fcv_50,
- *  uses_api_parameters,
+ *   uses_api_parameters,
  * ]
  */
 

@@ -562,7 +562,7 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
                 serverGlobalParams.featureCompatibility.getVersion() == FCVersion::kVersion49) {
                 checkForExistingChunks(opCtx, nss, boost::none);
             } else if (serverGlobalParams.featureCompatibility.getVersion() ==
-                       FCVersion::kVersion50) {
+                       FCVersion::kFullyDowngradedTo50) {
                 if (auto optUUID = sharding_ddl_util::getCollectionUUID(opCtx, nss))
                     checkForExistingChunks(opCtx, nss, optUUID);
             } else {

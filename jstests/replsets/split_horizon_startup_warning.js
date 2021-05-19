@@ -1,7 +1,9 @@
 /**
  * Ensures that a startup warning is issued if a node starts with an IP address in its
  * ReplSetConfig's SplitHorizon configuration.
- * @tags: [requires_fcv_47, requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ * ]
  */
 
 (function() {

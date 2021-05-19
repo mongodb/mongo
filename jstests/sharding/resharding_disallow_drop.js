@@ -2,7 +2,6 @@
  * Tests that a drop can't happen while resharding is in progress.
  *
  * @tags: [
- *   requires_fcv_49,
  * ]
  */
 (function() {

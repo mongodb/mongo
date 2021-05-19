@@ -1,11 +1,12 @@
-/*
+/**
  * Tests that nodes in the same region as the primary eventually do not sync across data centers. We
  * do this with a three-node replica set (P, S1, and S2). P and S1 are in the same data center,
  * while S2 is in its own data center. Initially, S1 syncs from S2, and S2 syncs from P. We verify
  * that eventually S1 will decide to sync from P, because it is in the same datacenter as P and thus
  * has a lower ping time.
  *
- * @tags: [requires_fcv_47]
+ * @tags: [
+ * ]
  */
 
 (function() {

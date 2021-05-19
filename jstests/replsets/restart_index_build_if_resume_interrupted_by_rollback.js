@@ -3,7 +3,6 @@
  * fails to run to completion before a subsequent rollback, it will restart from the beginning.
  *
  * @tags: [
- *   requires_fcv_47,
  *   requires_majority_read_concern,
  *   requires_persistence,
  * ]

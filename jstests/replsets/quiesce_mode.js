@@ -3,7 +3,6 @@
  * operations are allowed to continue and new operations are accepted, but hello requests return
  * a ShutdownInProgress error, so that clients begin routing operations elsewhere.
  * @tags: [
- *   requires_fcv_47,
  *   live_record_incompatible,
  * ]
  */

@@ -4,7 +4,10 @@
  * concern with 'atClusterTime' as the timestamp of the second write for 'dbHash'. The
  * commands should block until the prepared transaction is committed or aborted.
  *
- * @tags: [uses_transactions, uses_prepare_transaction, requires_fcv_47]
+ * @tags: [
+ *   uses_prepare_transaction,
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";

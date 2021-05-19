@@ -11,7 +11,7 @@
  * add/configure the secondary to have {votes: 1, priority: 0}, to prevent it from being electable.
  * The second reconfig should then increase its priority to the desired level.
  *
- * @tags: [requires_fcv_50, disabled_due_to_server_58295]
+ * @tags: [disabled_due_to_server_58295]
  */
 
 (function() {

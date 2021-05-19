@@ -7,8 +7,6 @@
  * must be fetched to support the SHARDING_FILTER stage.
  * @tags: [
  *   assumes_unsharded_collection,
- *   # Sort optimizations added for hashed indexes in 4.7 can generate a different plan.
- *   requires_fcv_47,
  * ]
  */
 (function() {

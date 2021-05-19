@@ -1,7 +1,6 @@
 /**
  * Tests the validateDBMetaData commands with various input parameters.
  * @tags: [
- *   requires_fcv_49
  * ]
  */
 (function() {

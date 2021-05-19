@@ -4,7 +4,7 @@
  * txnCloners were not started until after waiting for reshardingMinimumOperationDurationMillis to
  * elapse.
  *
- * @tags: [requires_fcv_49, uses_atclustertime, disabled_due_to_server_58295]
+ * @tags: [uses_atclustertime, disabled_due_to_server_58295]
  */
 
 (function() {

@@ -1,7 +1,6 @@
 // Tests for $ projection operator.
 // @tags: [
 //   requires_getmore,
-//   requires_fcv_49
 // ]
 (function() {
 "use strict";

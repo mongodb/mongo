@@ -1,7 +1,6 @@
 /**
  * Tests for explaining find through the explain command.
  * @tags: [
- *   requires_fcv_49
  * ]
  */
 

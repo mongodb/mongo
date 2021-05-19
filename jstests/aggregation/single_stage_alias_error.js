@@ -2,7 +2,6 @@
  * Tests to verify that single aggregation stages that are input into an aggregation pipeline by
  * the user under an aliased name use that name when reporting errors back to the user.
  * @tags: [
- *   requires_fcv_50
  * ]
  */
 

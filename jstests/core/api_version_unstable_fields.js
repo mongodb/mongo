@@ -2,7 +2,6 @@
  * Checks that APIStrictError is thrown if unstable fields are used with 'apiStrict: true'.
  *
  * @tags: [
- *   requires_fcv_50,
  *   uses_api_parameters,
  *   # 'explain' does not support stepdowns.
  *   does_not_support_stepdowns,

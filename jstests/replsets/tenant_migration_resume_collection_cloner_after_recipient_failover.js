@@ -2,11 +2,11 @@
  * Tests that in tenant migration, the recipient set can resume collection cloning from the last
  * document cloned after a failover.
  * @tags: [
- *   requires_majority_read_concern,
- *   requires_fcv_49,
- *   incompatible_with_windows_tls,
  *   incompatible_with_eft,
- *   incompatible_with_macos, requires_persistence
+ *   incompatible_with_macos,
+ *   incompatible_with_windows_tls,
+ *   requires_majority_read_concern,
+ *   requires_persistence,
  * ]
  */
 

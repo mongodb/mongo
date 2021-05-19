@@ -13,7 +13,6 @@
  *
  *
  * @tags: [
- *   requires_fcv_49,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

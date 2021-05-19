@@ -1,13 +1,12 @@
-/*
+/**
  * This test reproduces the error reported in HELP-22995. It creates a jumbo chunk with documents
  * that are close to the 16MB document size limit to force the batching code in move chunk to
  * consider adding them together in a batch. It ensures that the proper document size is considered
  * and that we can still migrate when calling removeShard.
  *
  * @tags: [
- *  requires_fcv_44,
- *  multiversion_incompatible,
- *  does_not_support_stepdowns,
+ *   does_not_support_stepdowns,
+ *   multiversion_incompatible,
  * ]
  */
 

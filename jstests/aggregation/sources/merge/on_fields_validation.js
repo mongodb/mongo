@@ -4,8 +4,9 @@
  *
  * This test creates unique indexes on various combinations of fields, so it cannot be run in suites
  * that implicitly shard the collection with a hashed shard key.
- * @tags: [cannot_create_unique_index_when_using_hashed_shard_key,
- *         requires_fcv_50]
+ * @tags: [
+ *   cannot_create_unique_index_when_using_hashed_shard_key,
+ * ]
  */
 (function() {
 "use strict";

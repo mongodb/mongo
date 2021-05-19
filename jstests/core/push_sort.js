@@ -1,4 +1,6 @@
-// @tags: [requires_non_retryable_writes, requires_fcv_50]
+// @tags: [
+//   requires_non_retryable_writes,
+// ]
 
 //
 //  $push acquired the possibility of sorting the resulting array as part of SERVER-8008. This

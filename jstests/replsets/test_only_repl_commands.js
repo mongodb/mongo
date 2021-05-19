@@ -2,7 +2,6 @@
  * Tests that test-only replica-set only commands are truly test-only.
  *
  * @tags: [
- *   requires_fcv_47,
  * ]
  */
 

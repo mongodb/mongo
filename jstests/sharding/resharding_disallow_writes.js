@@ -2,7 +2,6 @@
  * Tests that writes are disallowed while in kCommitted.
  *
  * @tags: [
- *   requires_fcv_49,
  * ]
  */
 (function() {

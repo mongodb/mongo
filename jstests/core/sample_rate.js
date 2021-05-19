@@ -1,7 +1,6 @@
 /**
  * Test the $sampleRate match expression.
  * @tags: [
- *   requires_fcv_47,
  * ]
  */
 (function() {

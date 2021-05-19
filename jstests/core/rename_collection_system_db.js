@@ -1,5 +1,4 @@
 // @tags: [
-//   requires_fcv_50,
 //   assumes_superuser_permissions,
 //   requires_non_retryable_commands,
 // ]

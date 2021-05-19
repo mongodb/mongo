@@ -2,7 +2,6 @@
  * Test that renaming a collection to itself is not allowed
  *
  * @tags: [
- *   requires_fcv_50,
  *   requires_non_retryable_commands,
  * ]
  */

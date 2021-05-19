@@ -9,7 +9,6 @@
 //
 // @tags: [
 //   assumes_balancer_off,
-//   requires_fcv_49,
 // ]
 
 load("jstests/libs/analyze_plan.js");

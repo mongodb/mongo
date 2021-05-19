@@ -1,7 +1,6 @@
 /**
  * Tests for aggregation requests with the collectionUUID parameter.
  * @tags: [
- *   requires_fcv_47,
  *   # Change stream aggregations don't support read concerns other than 'majority'
  *   assumes_read_concern_unchanged,
  * ]

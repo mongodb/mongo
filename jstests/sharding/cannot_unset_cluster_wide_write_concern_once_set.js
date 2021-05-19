@@ -1,6 +1,7 @@
 /**
  * Tests that CWWC cannot be unset once it is set.
- * @tags: [requires_fcv_50]
+ * @tags: [
+ * ]
  */
 (function() {
 "use strict";

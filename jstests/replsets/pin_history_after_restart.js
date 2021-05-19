@@ -18,7 +18,10 @@
  * 5) Remove the pin at "original pin"
  * 6) Restart the node, see the incremented pin value from serverStatus.
  *
- * @tags: [requires_fcv_49, requires_majority_read_concern, requires_persistence]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ * ]
  */
 
 (function() {

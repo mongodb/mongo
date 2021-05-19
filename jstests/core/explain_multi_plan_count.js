@@ -4,9 +4,8 @@
 // This test is not prepared to handle explain output for sharded collections or when executed
 // against a mongos.
 // @tags: [
-//   requires_fcv_49,
-//   assumes_unsharded_collection,
 //   assumes_against_mongod_not_mongos,
+//   assumes_unsharded_collection,
 // ]
 
 (function() {

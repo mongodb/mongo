@@ -3,7 +3,8 @@
  *
  * +Inf is explicitly disallowed as a valid value for $min/maxDistance on 5.0, but not on
  * previous versions.
- * @tags: [requires_fcv_50]
+ * @tags: [
+ * ]
  */
 (function() {
 let coll = db.geo_validate;

@@ -3,9 +3,8 @@
  * collection.
  *
  * @tags: [
- *    requires_fastcount,
- *    requires_fcv_49,
- *    incompatible_with_embedded,
+ *   incompatible_with_embedded,
+ *   requires_fastcount,
  * ]
  */
 

@@ -3,7 +3,6 @@
  * $_requestReshardingResumeToken is specified for an aggregate command.
  *
  * @tags: [
- *   requires_fcv_47,
  * ]
  */
 (function() {

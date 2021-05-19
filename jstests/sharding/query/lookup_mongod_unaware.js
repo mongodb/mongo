@@ -7,13 +7,11 @@
  * expect it to still have all the previous data.
  *
  * @tags: [
- *  requires_fcv_47,
  *  requires_persistence,
  *  featureFlagShardedLookup,
  *  disabled_due_to_server_58295
  * ]
  *
- * TODO (SERVER-47265): Remove the requires_fcv_47 flag
  */
 (function() {
 "use strict";

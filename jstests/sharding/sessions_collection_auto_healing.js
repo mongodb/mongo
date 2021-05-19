@@ -1,5 +1,6 @@
 /**
- * @tags: [requires_fcv_49]
+ * @tags: [
+ * ]
  */
 load('jstests/libs/sessions_collection.js');
 

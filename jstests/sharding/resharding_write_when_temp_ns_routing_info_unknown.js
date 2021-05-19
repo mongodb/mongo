@@ -3,9 +3,8 @@
  * information for the associated temporary resharding collection isn't currently known.
  *
  * @tags: [
- *   requires_fcv_49,
  *   uses_atclustertime,
- *   uses_transactions
+ *   uses_transactions,
  * ]
  */
 (function() {

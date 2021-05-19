@@ -3,7 +3,6 @@
  * initialSyncReadPreference.
  *
  * @tags: [
- *   requires_fcv_47,
  * ]
  */
 (function() {

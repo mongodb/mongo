@@ -8,7 +8,9 @@
  *   1. The profile command never returns an inconsistent combination of {level, filter}.
  *   2. We never log or profile based on an inconsistent combination of {level, filter}.
  *
- * @tags: [requires_profiling, requires_fcv_47]
+ * @tags: [
+ *   requires_profiling,
+ * ]
  */
 
 var $config = (function() {

@@ -1,7 +1,6 @@
 /**
  * Tests basic functionality of the $getField expression.
  * @tags: [
- *   requires_fcv_50
  * ]
  */
 (function() {

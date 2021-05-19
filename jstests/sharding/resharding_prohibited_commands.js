@@ -4,7 +4,6 @@
  * operations are prohibited.
  *
  * @tags: [
- *   requires_fcv_49,
  *   uses_atclustertime,
  * ]
  */

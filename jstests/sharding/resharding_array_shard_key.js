@@ -2,7 +2,9 @@
  * Tests that during resharding, inserts and updates that specify an array for the new shard key
  * fail.
  *
- * @tags: [requires_fcv_49, uses_atclustertime]
+ * @tags: [
+ *   uses_atclustertime,
+ * ]
  */
 
 (function() {

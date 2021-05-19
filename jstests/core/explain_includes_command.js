@@ -1,7 +1,8 @@
-/*
+/**
  * Confirms that the explain command includes the command object that was run.
  *
- * @tags: [requires_fcv_49]
+ * @tags: [
+ * ]
  */
 (function() {
 "use strict";

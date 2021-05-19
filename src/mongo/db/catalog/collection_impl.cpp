@@ -863,7 +863,7 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
     }
 
     bool useOldCappedDeleteBehaviour = serverGlobalParams.featureCompatibility.isLessThan(
-        ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50);
 
     if (!useOldCappedDeleteBehaviour && !opCtx->isEnforcingConstraints()) {
         // With new capped delete behavior, secondaries only delete from capped collections via

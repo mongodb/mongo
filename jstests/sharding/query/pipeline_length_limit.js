@@ -1,6 +1,7 @@
 /**
  * Confirms that the limit on number of aggregragation pipeline stages is respected.
- * @tags: [requires_fcv_49]
+ * @tags: [
+ * ]
  */
 (function() {
 "use strict";

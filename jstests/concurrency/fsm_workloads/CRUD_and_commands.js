@@ -4,7 +4,8 @@
  * Perform CRUD operations, some of which may implicitly create collections, in parallel with
  * collection-dropping operations.
  *
- * @tags: [requires_fcv_49]
+ * @tags: [
+ * ]
  */
 var $config = (function() {
     const data = {numIds: 10};

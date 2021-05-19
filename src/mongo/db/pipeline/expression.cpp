@@ -7328,11 +7328,12 @@ void ExpressionDateTrunc::_doAddDependencies(DepsTracker* deps) const {
 }
 
 /* -------------------------- ExpressionGetField ------------------------------ */
-REGISTER_EXPRESSION_WITH_MIN_VERSION(getField,
-                                     ExpressionGetField::parse,
-                                     AllowedWithApiStrict::kNeverInVersion1,
-                                     AllowedWithClientType::kAny,
-                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    getField,
+    ExpressionGetField::parse,
+    AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithClientType::kAny,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50);
 
 intrusive_ptr<Expression> ExpressionGetField::parse(ExpressionContext* const expCtx,
                                                     BSONElement expr,
@@ -7439,18 +7440,20 @@ Value ExpressionGetField::serialize(const bool explain) const {
 }
 
 /* -------------------------- ExpressionSetField ------------------------------ */
-REGISTER_EXPRESSION_WITH_MIN_VERSION(setField,
-                                     ExpressionSetField::parse,
-                                     AllowedWithApiStrict::kNeverInVersion1,
-                                     AllowedWithClientType::kAny,
-                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    setField,
+    ExpressionSetField::parse,
+    AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithClientType::kAny,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50);
 
 // $unsetField is syntactic sugar for $setField where value is set to $$REMOVE.
-REGISTER_EXPRESSION_WITH_MIN_VERSION(unsetField,
-                                     ExpressionSetField::parse,
-                                     AllowedWithApiStrict::kNeverInVersion1,
-                                     AllowedWithClientType::kAny,
-                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    unsetField,
+    ExpressionSetField::parse,
+    AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithClientType::kAny,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50);
 
 intrusive_ptr<Expression> ExpressionSetField::parse(ExpressionContext* const expCtx,
                                                     BSONElement expr,
@@ -7581,11 +7584,12 @@ Value ExpressionTsSecond::evaluate(const Document& root, Variables* variables) c
     return Value(static_cast<long long>(operand.getTimestamp().getSecs()));
 }
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(tsSecond,
-                                     ExpressionTsSecond::parse,
-                                     AllowedWithApiStrict::kNeverInVersion1,
-                                     AllowedWithClientType::kAny,
-                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    tsSecond,
+    ExpressionTsSecond::parse,
+    AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithClientType::kAny,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50);
 
 /* ------------------------- ExpressionTsIncrement ----------------------------- */
 
@@ -7604,11 +7608,12 @@ Value ExpressionTsIncrement::evaluate(const Document& root, Variables* variables
     return Value(static_cast<long long>(operand.getTimestamp().getInc()));
 }
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(tsIncrement,
-                                     ExpressionTsIncrement::parse,
-                                     AllowedWithApiStrict::kNeverInVersion1,
-                                     AllowedWithClientType::kAny,
-                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    tsIncrement,
+    ExpressionTsIncrement::parse,
+    AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithClientType::kAny,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50);
 
 MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
 MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())

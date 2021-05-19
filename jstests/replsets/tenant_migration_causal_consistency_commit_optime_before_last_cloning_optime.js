@@ -2,9 +2,14 @@
  * Verify that causal consistency is respected if a tenant migration commits with an earlier optime
  * timestamp than the latest optime associated with cloning on the recipient.
  *
- * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
- * incompatible_with_windows_tls, incompatible_with_macos, requires_persistence,
- * featureFlagTenantMigrations]
+ * @tags: [
+ *   featureFlagTenantMigrations,
+ *   incompatible_with_eft,
+ *   incompatible_with_macos,
+ *   incompatible_with_windows_tls,
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ * ]
  */
 
 (function() {

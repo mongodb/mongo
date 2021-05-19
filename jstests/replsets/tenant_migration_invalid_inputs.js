@@ -4,8 +4,12 @@
  * connection string matches the donor's connection string or doesn't correspond to a replica set
  * with a least one host.
  *
- * @tags: [requires_fcv_47, incompatible_with_windows_tls, incompatible_with_eft,
- * incompatible_with_macos, requires_persistence]
+ * @tags: [
+ *   incompatible_with_eft,
+ *   incompatible_with_macos,
+ *   incompatible_with_windows_tls,
+ *   requires_persistence,
+ * ]
  */
 
 (function() {

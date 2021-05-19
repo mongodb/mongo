@@ -4,7 +4,6 @@
  * accepted. However, hello requests return a ShutdownInProgress error, so that clients can
  * begin re-routing operations.
  * @tags: [
- *   requires_fcv_47,
  *   live_record_incompatible,
  * ]
  */

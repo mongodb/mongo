@@ -1,6 +1,5 @@
 // Test that we support all the same BSON types throughout API Version 1.
 // @tags: [
-//       requires_fcv_49,
 // ]
 
 const OID = new ObjectId();

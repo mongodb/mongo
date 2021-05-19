@@ -1,6 +1,7 @@
 /**
  * Tests for serverStatus metrics.dotsAndDollarsFields stats.
- * @tags: [requires_fcv_50]
+ * @tags: [
+ * ]
  */
 (function() {
 "use strict";

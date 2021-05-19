@@ -1,5 +1,8 @@
 // Test invocations of {rolesInfo: ...} command
-// @tags: [requires_multi_updates, requires_non_retryable_commands,requires_fcv_47]
+// @tags: [
+//   requires_multi_updates,
+//   requires_non_retryable_commands,
+// ]
 
 (function() {
 'use strict';

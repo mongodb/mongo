@@ -2,7 +2,6 @@
 // collection.
 // @tags: [
 //   assumes_no_implicit_index_creation,
-//   requires_fcv_49,
 // ]
 
 // Test $text explain.  SERVER-12037.

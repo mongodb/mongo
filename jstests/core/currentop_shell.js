@@ -12,7 +12,6 @@
  *   assumes_read_preference_unchanged,
  *   # The aggregation stage $currentOp cannot run with a readConcern other than 'local'
  *   assumes_read_concern_unchanged,
- *   requires_fcv_50
  * ]
  */
 

@@ -4,7 +4,6 @@
 // This test is not prepared to handle explain output for sharded collections.
 // @tags: [
 //   assumes_unsharded_collection,
-//   requires_fcv_49
 // ]
 
 (function() {

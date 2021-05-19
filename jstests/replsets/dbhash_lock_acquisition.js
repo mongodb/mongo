@@ -2,7 +2,9 @@
  * Tests that the dbHash command acquires IS mode locks on the global, database, and collection
  * resources when reading a timestamp using the $_internalReadAtClusterTime option.
  *
- * @tags: [uses_transactions, requires_fcv_47]
+ * @tags: [
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";

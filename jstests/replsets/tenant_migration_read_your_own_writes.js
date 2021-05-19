@@ -3,8 +3,13 @@
  * so that we typically provide read-your-own-write guarantees for primary reads across tenant
  * migrations when there is no other failover.
  *
- * @tags: [requires_fcv_49, requires_majority_read_concern, incompatible_with_eft,
- * incompatible_with_windows_tls, incompatible_with_macos, requires_persistence]
+ * @tags: [
+ *   incompatible_with_eft,
+ *   incompatible_with_macos,
+ *   incompatible_with_windows_tls,
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ * ]
  */
 
 (function() {

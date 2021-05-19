@@ -2,10 +2,10 @@
 // expected.
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
+//   requires_fastcount,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
 //   requires_fastcount,
-//   requires_fcv_47,
 //   disabled_due_to_server_58295
 // ]
 

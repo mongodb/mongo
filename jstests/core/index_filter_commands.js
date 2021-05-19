@@ -30,9 +30,6 @@
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
- *   # This test makes assertions about the types of plans produced by the query engine, which has
- *   # changed from the classic engine starting in version 5.0.
- *   requires_fcv_50,
  * ]
  */
 

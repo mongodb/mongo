@@ -1,6 +1,9 @@
 /**
  * Test to verify that null queries can be fully covered by an index.
- * @tags: [assumes_unsharded_collection, requires_fcv_49, requires_non_retryable_writes]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   requires_non_retryable_writes,
+ * ]
  */
 (function() {
 "use strict";

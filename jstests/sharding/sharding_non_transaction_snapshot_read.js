@@ -2,7 +2,6 @@
  * Tests readConcern level snapshot outside of transactions.
  *
  * @tags: [
- *   requires_fcv_47,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   disabled_due_to_server_58295

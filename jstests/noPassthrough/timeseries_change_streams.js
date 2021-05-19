@@ -1,6 +1,5 @@
 // Tests that $changeStream aggregations against time-series collections fail cleanly.
 // @tags: [
-//  requires_fcv_50,
 //  requires_timeseries,
 //  requires_replication,
 // ]

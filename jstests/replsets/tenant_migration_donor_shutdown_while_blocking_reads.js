@@ -2,8 +2,13 @@
  * Tests that tenant migration donor can peacefully shut down when there are reads being blocked due
  * to an in-progress migration.
  *
- * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
- * incompatible_with_windows_tls, incompatible_with_macos, requires_persistence]
+ * @tags: [
+ *   incompatible_with_eft,
+ *   incompatible_with_macos,
+ *   incompatible_with_windows_tls,
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ * ]
  */
 
 (function() {

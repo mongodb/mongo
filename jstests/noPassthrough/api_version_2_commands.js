@@ -2,7 +2,6 @@
  * Checks that API version 2 will behave correctly with mongod/mongos.
  *
  * @tags: [
- *   requires_fcv_47,
  *   requires_journaling,
  * ]
  */

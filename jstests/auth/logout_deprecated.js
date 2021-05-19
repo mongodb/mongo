@@ -3,9 +3,8 @@
  *
  * @tags: [
  *   requires_auth,
- *   requires_sharding,
  *   requires_non_retryable_commands,
- *   requires_fcv_50
+ *   requires_sharding,
  * ]
  */
 (function() {

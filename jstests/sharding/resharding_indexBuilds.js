@@ -3,7 +3,6 @@
  * is an ongoing index build.
  *
  * @tags: [
- *   requires_fcv_49,
  *   uses_atclustertime,
  * ]
  */

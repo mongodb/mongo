@@ -4,10 +4,9 @@
  * collections using the output of listCollections, which includes the clusteredIndex option.
  *
  * @tags: [
- *     assumes_against_mongod_not_mongos,
- *     assumes_no_implicit_collection_creation_after_drop,
- *     does_not_support_stepdowns,
- *     requires_fcv_49,
+ *   assumes_against_mongod_not_mongos,
+ *   assumes_no_implicit_collection_creation_after_drop,
+ *   does_not_support_stepdowns,
  * ]
  */
 (function() {

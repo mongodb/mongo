@@ -7,10 +7,6 @@ selector:
   - jstests/sharding/query/*.js
   exclude_with_any_tags:
   - multiversion_incompatible
-  - requires_fcv_47
-  - requires_fcv_48
-  - requires_fcv_49
-  - requires_fcv_50
   - requires_fcv_51
   - backport_required_multiversion
   - replica_sets_multiversion_backport_required_multiversion

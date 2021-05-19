@@ -2,7 +2,6 @@
  * Tests adding two non-voting nodes to the replica set at the same time.
  *
  * @tags: [
- *   requires_fcv_47,
  * ]
  */
 

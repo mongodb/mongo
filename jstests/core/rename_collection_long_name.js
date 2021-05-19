@@ -4,7 +4,6 @@
 // and rename the collection to one with a much longer name. We use the test database
 // by default and we add this here to ensure we are using it
 // @tags: [
-//   requires_fcv_50,
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_non_retryable_commands,
 // ]

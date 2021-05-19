@@ -7,7 +7,6 @@
  *     do_not_wrap_aggregations_in_facets,
  *     does_not_support_stepdowns,
  *     does_not_support_transactions,
- *     requires_fcv_49,
  *     requires_pipeline_optimization,
  *     requires_timeseries,
  * ]

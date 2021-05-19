@@ -1,7 +1,6 @@
 // Tests that the aggregate command can use command-level let variables with $merge. Note $merge
 // tests must be run in a noPassthrough suite so the other operators are exercised in
 // jstests/core/command_let_variables.js.
-// @tags: [requires_fcv46]
 
 (function() {
 "use strict";

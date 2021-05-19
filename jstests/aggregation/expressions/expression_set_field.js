@@ -1,7 +1,8 @@
 /**
  * Tests basic functionality of the $setField expression and the $unsetField alias.
- * @tags: [assumes_unsharded_collection,
- *         requires_fcv_50]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ * ]
  */
 (function() {
 "use strict";

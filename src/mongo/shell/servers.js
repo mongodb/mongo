@@ -214,7 +214,7 @@ MongoRunner.binVersionSubs = [
     // To-be-updated when we branch for the next release.
     new MongoRunner.VersionSub("last-continuous", "5.0"),
     // To be updated when we branch for the next LTS release.
-    new MongoRunner.VersionSub("last-lts", "4.4")
+    new MongoRunner.VersionSub("last-lts", "5.0")
 ];
 
 MongoRunner.getBinVersionFor = function(version) {

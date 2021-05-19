@@ -6,7 +6,6 @@
  * @tags: [
  *   assumes_against_mongod_not_mongos,
  *   assumes_unsharded_collection,
- *   requires_fcv_50,
  *   uses_api_parameters,
  * ]
  */

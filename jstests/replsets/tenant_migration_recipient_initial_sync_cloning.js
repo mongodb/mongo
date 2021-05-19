@@ -3,8 +3,13 @@
  * initialized after initial sync, when 1) the node hasn't begun cloning data yet, 2) is cloning
  * data, and 3) is in the tenant oplog application phase.
  *
- * @tags: [requires_fcv_49, requires_majority_read_concern, requires_persistence,
- * incompatible_with_eft, incompatible_with_windows_tls, incompatible_with_macos]
+ * @tags: [
+ *   incompatible_with_eft,
+ *   incompatible_with_macos,
+ *   incompatible_with_windows_tls,
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ * ]
  */
 
 (function() {

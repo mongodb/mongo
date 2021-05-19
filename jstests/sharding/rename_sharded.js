@@ -1,7 +1,7 @@
 /**
  * Test all the possible succeed/fail cases around sharded collections renaming.
  *
- * @tags: [requires_fcv_49, disabled_due_to_server_58295]
+ * @tags: [disabled_due_to_server_58295]
  */
 load("jstests/libs/uuid_util.js");
 

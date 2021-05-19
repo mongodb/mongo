@@ -4,7 +4,6 @@
  *   assumes_unsharded_collection,
  *   do_not_wrap_aggregations_in_facets,
  *   requires_pipeline_optimization,
- *   requires_fcv_50,
  * ]
  */
 load("jstests/aggregation/extras/utils.js");  // For anyEq.

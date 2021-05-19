@@ -3,7 +3,6 @@
  * currentOp command.
  *
  * @tags: [
- *   requires_fcv_50,
  *   featureFlagShardingFullDDLSupport,
  *   disabled_due_to_server_58295
  * ]

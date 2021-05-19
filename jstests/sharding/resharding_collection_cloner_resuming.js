@@ -2,7 +2,6 @@
  * Tests the resuming behavior of resharding's collection cloning.
  *
  * @tags: [
- *   requires_fcv_49,
  *   uses_atclustertime,
  * ]
  */

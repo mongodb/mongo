@@ -679,7 +679,7 @@ void CreateCollectionCoordinator::_createPolicyAndChunks(OperationContext* opCtx
          *_collectionUUID,
          ShardingState::get(opCtx)->shardId(),
          ChunkEntryFormat::getForVersionCallerGuaranteesFCVStability(
-             ServerGlobalParams::FeatureCompatibility::Version::kVersion50)});
+             ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50)});
 
     // There must be at least one chunk.
     invariant(!_initialChunks.chunks.empty());

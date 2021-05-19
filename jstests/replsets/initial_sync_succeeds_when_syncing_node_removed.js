@@ -3,7 +3,8 @@
  * This behavior is desired because transient DNS failures can cause the node to falsely believe
  * that it is removed.
  *
- * @tags: [requires_fcv_47]
+ * @tags: [
+ * ]
  */
 (function() {
 "use strict";

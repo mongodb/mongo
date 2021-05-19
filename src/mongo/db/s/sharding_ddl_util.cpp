@@ -313,7 +313,7 @@ void shardedRenameMetadata(OperationContext* opCtx,
         // Only bump the epoch if the whole cluster is in FCV 5.0, so chunks do not contain epochs.
         FixedFCVRegion fixedFCVRegion(opCtx);
         if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                ServerGlobalParams::FeatureCompatibility::Version::kVersion50)) {
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50)) {
             fromCollType.setEpoch(OID::gen());
         }
     }

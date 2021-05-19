@@ -1,7 +1,8 @@
 /**
  * Test pipeline-style updates with delta oplog entries.
  *
- * @tags: [requires_fcv_47]
+ * @tags: [
+ * ]
  */
 
 (function() {

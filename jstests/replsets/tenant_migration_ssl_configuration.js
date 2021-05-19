@@ -4,8 +4,12 @@
  * Note: If a migration is started and SSL is not enabled on the recipient, we will repeatedly get
  * back HostUnreachable on the donor side.
  *
- * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
- * incompatible_with_macos, requires_persistence]
+ * @tags: [
+ *   incompatible_with_eft,
+ *   incompatible_with_macos,
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ * ]
  */
 
 (function() {

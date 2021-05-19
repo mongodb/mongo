@@ -9,7 +9,6 @@
  *   assumes_against_mongod_not_mongos,
  *   requires_getmore,
  *   requires_replication,
- *   requires_fcv_49,
  *   uses_api_parameters,
  * ]
  *

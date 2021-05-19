@@ -1,7 +1,6 @@
 /**
  * Tests for $dateAdd and $dateSubtract expressions.
  * @tags: [
- *    requires_fcv_49
  * ]
  */
 

@@ -2,7 +2,6 @@
  * Tests document validation errors with sample validators. Note that it uses some JSON Schemas from
  * schemastore.org.
  * @tags: [
- *   requires_fcv_49,
  * ]
  */
 (function() {

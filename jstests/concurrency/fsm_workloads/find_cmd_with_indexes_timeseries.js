@@ -11,7 +11,6 @@
  * regardless, the indexes should return the same data as collection scans.
  *
  * @tags: [
- *   requires_fcv_49,
  *   requires_timeseries,
  * ]
  */

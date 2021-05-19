@@ -4,8 +4,13 @@
  * interrupted by a primary step down, the recipient properly swaps the error code to the true code
  * (like primary step down) that the donor can retry on.
  *
- * @tags: [requires_fcv_49, requires_replication, incompatible_with_windows_tls,
- * incompatible_with_eft, incompatible_with_macos, requires_persistence]
+ * @tags: [
+ *   incompatible_with_eft,
+ *   incompatible_with_macos,
+ *   incompatible_with_windows_tls,
+ *   requires_persistence,
+ *   requires_replication,
+ * ]
  */
 
 (function() {

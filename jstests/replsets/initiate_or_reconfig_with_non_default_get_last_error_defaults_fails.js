@@ -1,7 +1,8 @@
-/*
+/**
  * Test that initiating and reconfiguring when settings.getLastErrorDefaults is set
  * and not {w:1, wtimeout: 0} will fail.
- * @tags: [requires_fcv_50]
+ * @tags: [
+ * ]
  */
 (function() {
 "use strict";

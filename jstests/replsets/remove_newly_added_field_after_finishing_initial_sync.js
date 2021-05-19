@@ -5,7 +5,6 @@
  * field.
  *
  * @tags: [
- *   requires_fcv_47,
  * ]
  */
 

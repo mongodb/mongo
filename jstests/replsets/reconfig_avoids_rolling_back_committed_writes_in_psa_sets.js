@@ -14,7 +14,8 @@
  *
  * Finally, we step up the secondary and verify that the oplog entry was not rolled back.
  *
- * @tags: [requires_fcv_50]
+ * @tags: [
+ * ]
  */
 
 (function() {

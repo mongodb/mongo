@@ -1,7 +1,6 @@
 // This test is to ensure that we do not increase the minWireversion or decrease the max
 // wire version in API Version 1.
 // @tags: [
-//        requires_fcv_49,
 // ]
 
 // See wire_version.h

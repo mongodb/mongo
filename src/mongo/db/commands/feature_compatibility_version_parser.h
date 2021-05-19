@@ -41,41 +41,29 @@ using FeatureCompatibilityParams = ServerGlobalParams::FeatureCompatibility;
  */
 class FeatureCompatibilityVersionParser {
 public:
-    static constexpr StringData kVersion44 = "4.4"_sd;
-    static constexpr StringData kVersion47 = "4.7"_sd;
-    static constexpr StringData kVersion48 = "4.8"_sd;
-    static constexpr StringData kVersionDowngradingFrom47To44 = "downgrading from 4.7 to 4.4"_sd;
-    static constexpr StringData kVersionDowngradingFrom48To44 = "downgrading from 4.8 to 4.4"_sd;
-    static constexpr StringData kVersionDowngradingFrom48To47 = "downgrading from 4.8 to 4.7"_sd;
-    static constexpr StringData kVersionUpgradingFrom44To47 = "upgrading from 4.4 to 4.7"_sd;
-    static constexpr StringData kVersionUpgradingFrom47To48 = "upgrading from 4.7 to 4.8"_sd;
-    static constexpr StringData kVersionUpgradingFrom44To48 = "upgrading from 4.4 to 4.8"_sd;
-    static constexpr StringData kVersionDowngradingFrom49To44 = "downgrading from 4.9 to 4.4"_sd;
-    static constexpr StringData kVersionUpgradingFrom44To49 = "upgrading from 4.4 to 4.9"_sd;
-    static constexpr StringData kVersionDowngradingFrom49To48 = "downgrading from 4.9 to 4.8"_sd;
-    static constexpr StringData kVersionUpgradingFrom48To49 = "upgrading from 4.8 to 4.9"_sd;
-    static constexpr StringData kVersion49 = "4.9"_sd;
-    static constexpr StringData kVersionDowngradingFrom50To44 = "downgrading from 5.0 to 4.4"_sd;
-    static constexpr StringData kVersionUpgradingFrom44To50 = "upgrading from 4.4 to 5.0"_sd;
-    static constexpr StringData kVersionDowngradingFrom50To49 = "downgrading from 5.0 to 4.9"_sd;
-    static constexpr StringData kVersionUpgradingFrom49To50 = "upgrading from 4.9 to 5.0"_sd;
+    static constexpr StringData kVersion44 = "4.4"_sd;  // Remove once old feature flags are deleted
+    static constexpr StringData kVersion47 = "4.7"_sd;  // Remove once old feature flags are deleted
+    static constexpr StringData kVersion48 = "4.8"_sd;  // Remove once old feature flags are deleted
+    static constexpr StringData kVersion49 = "4.9"_sd;  // Remove once old feature flags are deleted
     static constexpr StringData kVersion50 = "5.0"_sd;
+    static constexpr StringData kVersion51 = "5.1"_sd;
+    static constexpr StringData kVersionDowngradingFrom51To50 = "downgrading from 5.1 to 5.0"_sd;
+    static constexpr StringData kVersionUpgradingFrom50To51 = "upgrading from 5.0 to 5.1"_sd;
     static constexpr StringData kVersionUnset = "Unset"_sd;
 
     static constexpr StringData kParameterName = "featureCompatibilityVersion"_sd;
 
-    static constexpr StringData kLastLTS = kVersion44;
-    static constexpr StringData kLastContinuous = kVersion49;
-    static constexpr StringData kLatest = kVersion50;
-    static constexpr StringData kUpgradingFromLastLTSToLatest = kVersionUpgradingFrom44To50;
-    static constexpr StringData kUpgradingFromLastContinuousToLatest = kVersionUpgradingFrom49To50;
+    static constexpr StringData kLastLTS = kVersion50;
+    static constexpr StringData kLastContinuous = kVersion50;
+    static constexpr StringData kLatest = kVersion51;
+    static constexpr StringData kUpgradingFromLastLTSToLatest = kVersionUpgradingFrom50To51;
+    static constexpr StringData kUpgradingFromLastContinuousToLatest = kVersionUpgradingFrom50To51;
     // kVersionUpgradingFromLastLTSToLastContinuous should assigned kVersionUnset when kLastLTS and
     // kLastContinuous are equal.
-    static constexpr StringData kVersionUpgradingFromLastLTSToLastContinuous =
-        kVersionUpgradingFrom44To49;
-    static constexpr StringData kDowngradingFromLatestToLastLTS = kVersionDowngradingFrom50To44;
+    static constexpr StringData kVersionUpgradingFromLastLTSToLastContinuous = kVersionUnset;
+    static constexpr StringData kDowngradingFromLatestToLastLTS = kVersionDowngradingFrom51To50;
     static constexpr StringData kDowngradingFromLatestToLastContinuous =
-        kVersionDowngradingFrom50To49;
+        kVersionDowngradingFrom51To50;
 
     // Used to verify that FCV values in 'admin.system.version' are valid and equal to one of
     // { lastLTS, lastContinuous, latest }.
@@ -106,7 +94,7 @@ public:
      * Useful for message logging.
      */
     static StringData toString(FeatureCompatibilityParams::Version version) {
-        if (version == FeatureCompatibilityParams::Version::kUnsetDefault44Behavior) {
+        if (version == FeatureCompatibilityParams::Version::kUnsetDefault50Behavior) {
             return kVersionUnset;
         } else if (version == FeatureCompatibilityParams::kLastLTS) {
             return kLastLTS;

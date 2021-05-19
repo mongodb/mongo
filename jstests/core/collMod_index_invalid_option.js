@@ -2,8 +2,7 @@
  * Tests that collMod fails when an unrecognized field is included in its 'index' option.
  *
  * @tags: [
- *  requires_non_retryable_commands,
- *  requires_fcv_49
+ *   requires_non_retryable_commands,
  * ]
  */
 (function() {

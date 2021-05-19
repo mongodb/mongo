@@ -3,7 +3,6 @@
  * arguments will be permitted to pass validation.
  *
  * @tags: [
- *   requires_fcv_47,
  * ]
  */
 

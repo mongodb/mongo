@@ -95,16 +95,19 @@ enum WireVersion {
     // Supports features available from 5.0 and onwards.
     WIRE_VERSION_50 = 13,
 
+    // Supports features available from 5.1 and onwards.
+    WIRE_VERSION_51 = 14,
+
     // Set this to the highest value in this enum - it will be the default maxWireVersion for
     // the WireSpec values.
-    LATEST_WIRE_VERSION = WIRE_VERSION_50,
+    LATEST_WIRE_VERSION = WIRE_VERSION_51,
 
     // Set this to LATEST_WIRE_VERSION - 1.
     LAST_CONT_WIRE_VERSION = LATEST_WIRE_VERSION - 1,
 
     // Set this to the wire version of the previous LTS version. We expect to update this after
     // each LTS release.
-    LAST_LTS_WIRE_VERSION = RESUMABLE_INITIAL_SYNC,
+    LAST_LTS_WIRE_VERSION = WIRE_VERSION_50,
 };
 
 /**

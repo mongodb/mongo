@@ -1,6 +1,9 @@
 /**
  *  Tests for setting of profile levels
- *  @tags: [does_not_support_stepdowns, requires_profiling, requires_fcv_47]
+ * @tags: [
+ *   does_not_support_stepdowns,
+ *   requires_profiling,
+ * ]
  */
 
 (function() {

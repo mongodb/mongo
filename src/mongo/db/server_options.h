@@ -165,64 +165,58 @@ struct ServerGlobalParams {
          * (Y, Y, X): Only Y features are available and new storage engine entries use the
          *            Y format, but existing entries may have either the Y or X format
          *
-         * kUnsetDefault44Behavior
+         * kUnsetDefault{LTS}Behavior
          * (Unset, Unset, Unset): This is the case on startup before the fCV document is loaded into
          *                        memory. isVersionInitialized() will return false, and getVersion()
-         *                        will return the default (kUnsetDefault44Behavior).
+         *                        will return the default (kUnsetDefault{LTS}Behavior).
          *
          */
         enum class Version {
             // The order of these enums matter: sort by (version, targetVersion, previousVersion).
             kInvalid,
-            kUnsetDefault44Behavior,
-            kFullyDowngradedTo44,    // { version: 4.4 }
-            kDowngradingFrom47To44,  // { version: 4.4, targetVersion: 4.4, previousVersion: 4.7 }
-            kDowngradingFrom48To44,  // { version: 4.4, targetVersion: 4.4, previousVersion: 4.8 }
-            kDowngradingFrom49To44,  // { version: 4.4, targetVersion: 4.4, previousVersion: 4.9 }
-            kDowngradingFrom50To44,  // { version: 4.4, targetVersion: 4.4, previousVersion: 5.0 }
-            kUpgradingFrom44To47,    // { version: 4.4, targetVersion: 4.7 }
-            kUpgradingFrom44To48,    // { version: 4.4, targetVersion: 4.8 }
-            kUpgradingFrom44To49,    // { version: 4.4, targetVersion: 4.9 }
-            kUpgradingFrom44To50,    // { version: 4.4, targetVersion: 5.0 }
-            kVersion47,              // { version: 4.7 }
-            kDowngradingFrom48To47,  // { version: 4.7, targetVersion: 4.7, previousVersion: 4.8 }
-            kUpgradingFrom47To48,    // { version: 4.7, targetVersion: 4.8 }
-            kVersion48,              // { version: 4.8 }
-            kDowngradingFrom49To48,  // { version: 4.8, targetVersion: 4.8, previousVersion: 4.9 }
-            kUpgradingFrom48To49,    // { version: 4.8, targetVersion: 4.9 }
-            kVersion49,              // { version: 4.9 }
-            kDowngradingFrom50To49,  // { version: 4.9, targetVersion: 4.9, previousVersion: 5.0 }
-            kUpgradingFrom49To50,    // { version: 4.9, targetVersion: 5.0 }
-            kVersion50,              // { version: 5.0 }
+            kVersion44,              // To be removed once old feature flags are deleted
+            kVersion47,              // To be removed once old feature flags are deleted
+            kVersion48,              // To be removed once old feature flags are deleted
+            kVersion49,              // To be removed once old feature flags are deleted
+            kFullyDowngradedTo44,    // To be removed once old feature flags are deleted
+            kDowngradingFrom50To49,  // To be removed once old feature flags are deleted
+            kDowngradingFrom50To44,  // To be removed once old feature flags are deleted
+            kUpgradingFrom44To50,    // To be removed once old feature flags are deleted
+            kUpgradingFrom44To47,    // To be removed once old feature flags are deleted
+            kUpgradingFrom49To50,    // To be removed once old feature flags are deleted
+            kUnsetDefault50Behavior,
+            kFullyDowngradedTo50,    // { version: 5.0 }
+            kDowngradingFrom51To50,  // { version: 5.0, targetVersion: 5.0, previousVersion: 5.1 }
+            kUpgradingFrom50To51,    // { version: 5.0, targetVersion: 5.1 }
+            kVersion51,              // { version: 5.1 }
         };
 
         // These constants should only be used for generic FCV references. Generic references are
         // FCV references that are expected to exist across LTS binary versions.
-        static constexpr Version kLatest = Version::kVersion50;
-        static constexpr Version kLastContinuous = Version::kVersion49;
-        static constexpr Version kLastLTS = Version::kFullyDowngradedTo44;
+        static constexpr Version kLatest = Version::kVersion51;
+        static constexpr Version kLastContinuous = Version::kFullyDowngradedTo50;
+        static constexpr Version kLastLTS = Version::kFullyDowngradedTo50;
 
         // These constants should only be used for generic FCV references. Generic references are
         // FCV references that are expected to exist across LTS binary versions.
         // NOTE: DO NOT USE THEM FOR REGULAR FCV CHECKS.
-        static constexpr Version kUpgradingFromLastLTSToLatest = Version::kUpgradingFrom44To50;
+        static constexpr Version kUpgradingFromLastLTSToLatest = Version::kUpgradingFrom50To51;
         static constexpr Version kUpgradingFromLastContinuousToLatest =
-            Version::kUpgradingFrom49To50;
-        static constexpr Version kDowngradingFromLatestToLastLTS = Version::kDowngradingFrom50To44;
+            Version::kUpgradingFrom50To51;
+        static constexpr Version kDowngradingFromLatestToLastLTS = Version::kDowngradingFrom51To50;
         static constexpr Version kDowngradingFromLatestToLastContinuous =
-            Version::kDowngradingFrom50To49;
+            Version::kDowngradingFrom51To50;
         // kUpgradingFromLastLTSToLastContinuous is only ever set to a valid FCV when
         // kLastLTS and kLastContinuous are not equal. Otherwise, this value should be set to
         // kInvalid.
-        static constexpr Version kUpgradingFromLastLTSToLastContinuous =
-            Version::kUpgradingFrom44To49;
+        static constexpr Version kUpgradingFromLastLTSToLastContinuous = Version::kInvalid;
 
         /**
          * On startup, the featureCompatibilityVersion may not have been explicitly set yet. This
          * exposes the actual state of the featureCompatibilityVersion if it is uninitialized.
          */
         const bool isVersionInitialized() const {
-            return _version.load() != Version::kUnsetDefault44Behavior;
+            return _version.load() != Version::kUnsetDefault50Behavior;
         }
 
         /**
@@ -275,7 +269,7 @@ struct ServerGlobalParams {
         }
 
         void reset() {
-            _version.store(Version::kUnsetDefault44Behavior);
+            _version.store(Version::kUnsetDefault50Behavior);
         }
 
         void setVersion(Version version) {
@@ -283,7 +277,7 @@ struct ServerGlobalParams {
         }
 
     private:
-        AtomicWord<Version> _version{Version::kUnsetDefault44Behavior};
+        AtomicWord<Version> _version{Version::kUnsetDefault50Behavior};
 
     } mutableFeatureCompatibility;
 

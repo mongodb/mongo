@@ -3,8 +3,6 @@
  * listCollection and listIndexes commands can run while a MODE_X collection lock is held.
  *
  * @tags: [
- *     # Cannot run against older binaries because they do not have lock-free ops.
- *     requires_fcv_49,
  * ]
  */
 

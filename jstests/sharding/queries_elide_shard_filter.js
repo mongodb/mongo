@@ -2,7 +2,8 @@
 // Tests that queries in sharded collections will be properly optimized. In particular, queries
 // which specify the shard key fully with an equality predicate may omit a SHARDING_FILTER stage.
 //
-// @tags: [requires_fcv_49]
+// @tags: [
+// ]
 
 (function() {
 "use strict";

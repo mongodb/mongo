@@ -1,7 +1,6 @@
 /**
  * Ensures spherical queries report invalid latitude values in points and center positions.
  * @tags: [
- *   requires_fcv_49
  * ]
  */
 (function() {

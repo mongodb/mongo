@@ -2,7 +2,8 @@
  * Checks all the easily testable fields in the response object returned by the hello() command and
  * its aliases, isMaster() and ismaster(). This test also checks that fields that should not be in
  * the document are absent.
- * @tags: [requires_fcv_49]
+ * @tags: [
+ * ]
  */
 
 // Skip db hash check because node 2 is slave delayed and may time out on awaitReplication.

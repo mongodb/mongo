@@ -3,8 +3,7 @@
  * startup.
  *
  * @tags: [
- *   requires_fcv_47,
- *   requires_persistence
+ *   requires_persistence,
  * ]
  */
 

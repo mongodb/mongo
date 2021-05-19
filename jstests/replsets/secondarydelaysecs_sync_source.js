@@ -3,7 +3,8 @@
 // a write to the primary and ensure this write propagates
 // to the disconnected node via the delayed secondary.
 //
-// @tags: [requires_fcv_49]
+// @tags: [
+// ]
 load("jstests/replsets/rslib.js");
 
 var replTest = new ReplSetTest({nodes: 3, useBridge: true});

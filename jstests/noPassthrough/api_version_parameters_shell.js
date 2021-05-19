@@ -2,7 +2,9 @@
  * Test the shell's --apiVersion and other options related to the MongoDB Versioned API, and
  * test passing API parameters to the Mongo() constructor.
  *
- * @tags: [requires_journaling, requires_fcv_50]
+ * @tags: [
+ *   requires_journaling,
+ * ]
  */
 
 (function() {

@@ -1,7 +1,6 @@
 /**
  * Tests execution of pipeline-style update.
  * @tags: [
- *   requires_fcv_50,
  *   requires_multi_updates,
  *   requires_non_retryable_writes,
  * ]

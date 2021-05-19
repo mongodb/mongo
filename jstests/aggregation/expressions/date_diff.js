@@ -1,7 +1,6 @@
 /**
  * Tests $dateDiff expression.
  * @tags: [
- *   requires_fcv_49
  * ]
  */
 (function() {

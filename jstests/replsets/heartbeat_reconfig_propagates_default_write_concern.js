@@ -1,11 +1,12 @@
-/*
+/**
  * Test that a heartbeat reconfig propagated from the primary to a new secondary
  * successfully sets the default write concern on the secondary. To do this, we start either a PSS
  * or PSA replica set. We then add a fourth secondary to the replica set, and verify that it sets
  * its implicit default write concern correctly. We don't test cases with cluster-wide write concern
  * set, because then the secondary won't set its implicit default write concern from a heartbeat
  * reconfig.
- * @tags: [requires_fcv_50]
+ * @tags: [
+ * ]
  */
 
 (function() {

@@ -1,7 +1,8 @@
 /**
  * This tests the behavior of changing the default write concern to the implicit default if there is
  * no CWWC.
- * @tags: [requires_fcv_50]
+ * @tags: [
+ * ]
  */
 (function() {
 'use strict';

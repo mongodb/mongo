@@ -2,7 +2,10 @@
  * Tests that "$_internalReadAtClusterTime" and "snapshot" level
  * read concern are supported by the "dbHash" command.
  *
- * @tags: [uses_transactions, requires_fcv_47, requires_majority_read_concern]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";

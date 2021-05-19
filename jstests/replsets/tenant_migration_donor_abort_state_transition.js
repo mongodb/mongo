@@ -1,8 +1,13 @@
 /**
  * Tests that the migration still proceeds successfully after a state transition write aborts.
  *
- * @tags: [requires_fcv_47, incompatible_with_eft, requires_majority_read_concern,
- * incompatible_with_windows_tls, incompatible_with_macos, requires_persistence]
+ * @tags: [
+ *   incompatible_with_eft,
+ *   incompatible_with_macos,
+ *   incompatible_with_windows_tls,
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ * ]
  */
 (function() {
 "use strict";

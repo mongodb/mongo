@@ -2,7 +2,6 @@
  * Tests if queries against time-series collections in transactions work as expected.
  * @tags: [
  *   assumes_against_mongod_not_mongos,
- *   requires_fcv_49,
  *   uses_transactions,
  * ]
  */

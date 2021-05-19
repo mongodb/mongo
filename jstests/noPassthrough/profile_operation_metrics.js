@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_capped,
- *   requires_fcv_47,
  *   requires_replication,
  *   requires_wiredtiger,
  * ]

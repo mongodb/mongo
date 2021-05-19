@@ -13,7 +13,6 @@
  * without having to round-trip back to mongos.
  *
  * @tags: [
- *   requires_fcv_49,
  * ]
  */
 (function() {

@@ -1,8 +1,5 @@
 // @tags: [
 //   assumes_balancer_off,
-//   # This test makes assertions about the types of plans produced by the query engine, which has
-//   # changed from the classic engine starting in version 5.0.
-//   requires_fcv_50,
 //   requires_multi_updates,
 //   requires_non_retryable_writes,
 // ]

@@ -2,7 +2,8 @@
  * Tests that donor shard's secondaries correctly
  * block reads and refresh metadata cache when migration occurs.
  *
- * @tags: [requires_fcv_47]
+ * @tags: [
+ * ]
  */
 
 (function() {

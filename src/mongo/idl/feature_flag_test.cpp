@@ -85,13 +85,13 @@ TEST(IDLFeatureFlag, Basic) {
     ASSERT_NOT_OK(featureFlagToaster->setFromString("alpha"));
 
     ASSERT(feature_flags::gFeatureFlagToaster.getVersion() ==
-           ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
+           ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
 }
 
 // Verify getVersion works correctly when enabled and not enabled
 TEST_F(FeatureFlagTest, Version) {
     ASSERT(feature_flags::gFeatureFlagBlender.getVersion() ==
-           ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+           ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
 
     // NOTE: if you are hitting this assertion, the version in feature_flag_test.idl may need to be
     // changed to match the current kLastLTS
@@ -118,7 +118,7 @@ TEST_F(FeatureFlagTest, ServerStatus) {
 
         ASSERT_BSONOBJ_EQ(builder.obj(),
                           BSON("blender" << BSON("value" << true << "version"
-                                                         << "4.9")));
+                                                         << "5.1")));
     }
 
     {
@@ -138,7 +138,7 @@ TEST_F(FeatureFlagTest, IsEnabledTrue) {
     // Test FCV checks with enabled flag
     // Test newest version
     serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
+        ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
 
     ASSERT_TRUE(
         feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
@@ -164,7 +164,7 @@ TEST_F(FeatureFlagTest, IsEnabledFalse) {
     ASSERT_OK(_featureFlagSpoon->setFromString("false"));
 
     serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
+        ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
 
     ASSERT_FALSE(
         feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));

@@ -5,7 +5,6 @@
  * @tags: [
  *   # The test is designed to work with an unsharded collection.
  *   assumes_unsharded_collection,
- *   requires_fcv_47,
  *   # The test relies on the precise number of executions of commands.
  *   requires_non_retryable_writes,
  * ]

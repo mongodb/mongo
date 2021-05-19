@@ -5,7 +5,6 @@
  *
  * @tags: [
  *   assumes_read_preference_unchanged,
- *   requires_fcv_50,
  *   requires_majority_read_concern,
  *   uses_change_streams,
  * ]

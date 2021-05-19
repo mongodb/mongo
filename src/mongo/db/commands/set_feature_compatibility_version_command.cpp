@@ -566,7 +566,7 @@ private:
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            if (requestedVersion >= FeatureCompatibility::Version::kVersion50) {
+            if (requestedVersion == FeatureCompatibility::Version::kFullyDowngradedTo50) {
                 ShardingCatalogManager::get(opCtx)->upgradeMetadataFor50Phase1(opCtx);
             }
 
@@ -580,7 +580,7 @@ private:
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
 
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            if (requestedVersion >= FeatureCompatibility::Version::kVersion50) {
+            if (requestedVersion == FeatureCompatibility::Version::kFullyDowngradedTo50) {
                 ShardingCatalogManager::get(opCtx)->upgradeMetadataFor50Phase2(opCtx);
             }
 
@@ -685,7 +685,7 @@ private:
             abortAllReshardCollection(opCtx);
 
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            if (requestedVersion < FeatureCompatibility::Version::kVersion50) {
+            if (requestedVersion < FeatureCompatibility::Version::kFullyDowngradedTo50) {
                 ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre50Phase1(opCtx);
 
                 // TODO: SERVER-55912 remove after 5.0 becomes last-lts.
@@ -702,12 +702,12 @@ private:
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
 
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            if (requestedVersion < FeatureCompatibility::Version::kVersion50) {
+            if (requestedVersion < FeatureCompatibility::Version::kFullyDowngradedTo50) {
                 ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre50Phase2(opCtx);
             }
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
             // TODO: SERVER-55912 remove after 5.0 becomes last-lts.
-            if (requestedVersion < FeatureCompatibility::Version::kVersion50) {
+            if (requestedVersion < FeatureCompatibility::Version::kFullyDowngradedTo50) {
                 dropReshardingCollectionsOnShard(opCtx);
             }
         }

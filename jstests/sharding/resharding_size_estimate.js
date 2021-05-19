@@ -2,7 +2,6 @@
  * Tests the basic functionality of the estimated size used for auto commit calculation.
  *
  * @tags: [
- *   requires_fcv_49,
  *   uses_atclustertime,
  * ]
  */

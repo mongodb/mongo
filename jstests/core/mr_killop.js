@@ -8,7 +8,6 @@
 //   uses_parallel_shell,
 //   assumes_read_preference_unchanged,
 //   assumes_read_concern_unchanged,
-//   requires_fcv_50
 // ]
 (function() {
 "use strict";

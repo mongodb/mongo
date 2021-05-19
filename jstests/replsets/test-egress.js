@@ -1,5 +1,6 @@
 // Use TestOnly command replSetTestEgress to connect to members.
-// @tags: [requires_fcv_47]
+// @tags: [
+// ]
 
 (function() {
 'use strict';

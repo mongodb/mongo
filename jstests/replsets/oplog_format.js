@@ -3,7 +3,8 @@
  *
  * Do not add more tests here but instead add C++ unit tests in db/ops/modifier*_test files
  *
- * @tags: [requires_fcv_47]
+ * @tags: [
+ * ]
  */
 
 (function() {

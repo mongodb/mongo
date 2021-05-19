@@ -9,7 +9,6 @@
  *
  * @tags: [
  *   assumes_unsharded_collection,
- *   requires_fcv_49,
  * ]
  */
 (function() {

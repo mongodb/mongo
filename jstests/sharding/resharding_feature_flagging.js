@@ -2,7 +2,6 @@
  * Tests the resharding feature cannot be used when the feature flag is off.
  *
  * @tags: [
- *   requires_fcv_49,
  * ]
  */
 (function() {

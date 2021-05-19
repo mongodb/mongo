@@ -1,7 +1,6 @@
 /*
  * Test the _configsvrRemoveChunks internal command.
  * @tags: [
- *   requires_fcv_50,
  * ]
  */
 

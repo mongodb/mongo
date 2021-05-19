@@ -9,7 +9,10 @@
  * For the purposes of this test, the write is timestamped as its replicated in the oplog. If the
  * write gets rolled back, this test ensures any pinning effect it had is removed.
  *
- * @tags: [requires_fcv_49, requires_majority_read_concern, requires_persistence]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ * ]
  */
 (function() {
 "use strict";

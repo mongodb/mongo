@@ -1,7 +1,9 @@
 /**
  * Test the cursor server status "moreThanOneBatch" and "totalOpened" metric on mongoS.
  *
- * @tags: [requires_fcv_49, requires_sharding]
+ * @tags: [
+ *   requires_sharding,
+ * ]
  */
 (function() {
 "use strict";

@@ -1,9 +1,8 @@
 /**
  * Tests operations on indexes with the maximum number of compound index fields, 32.
  *
- *  @tags: [
+ * @tags: [
  *   assumes_unsharded_collection,
- *   requires_fcv_49,
  *   requires_non_retryable_writes,
  * ]
  */

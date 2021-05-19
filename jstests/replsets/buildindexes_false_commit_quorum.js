@@ -3,7 +3,6 @@
  * quorum options.
  *
  * @tags: [
- *  requires_fcv_49,
  * ]
  */
 

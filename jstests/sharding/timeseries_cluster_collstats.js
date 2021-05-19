@@ -21,7 +21,6 @@
  * }
  *
  * @tags: [
- *   requires_fcv_50,
  * ]
  */
 

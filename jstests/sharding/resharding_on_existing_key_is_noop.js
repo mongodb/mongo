@@ -3,7 +3,9 @@
  * collection's existing shard key is a noop (which can be done by confirming the collection's UUID
  * remains unchanged after the operation).
  *
- * @tags: [uses_atclustertime, requires_fcv_49,]
+ * @tags: [
+ *   uses_atclustertime,
+ * ]
  */
 (function() {
 "use strict";

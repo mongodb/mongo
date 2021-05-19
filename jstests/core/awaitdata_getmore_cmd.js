@@ -10,7 +10,6 @@
 //   uses_multiple_connections,
 //   uses_parallel_shell,
 //   assumes_read_concern_unchanged,
-//   requires_fcv_50
 // ]
 
 (function() {

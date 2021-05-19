@@ -1,9 +1,8 @@
 /**
  * Tests for ensuring api parameters propegate when pipelines are sent to shards.
  * @tags: [
- * requires_fcv_47,
- * requires_sharding,
- * uses_api_parameters,
+ *   requires_sharding,
+ *   uses_api_parameters,
  * ]
  */
 (function() {

@@ -3,7 +3,6 @@
  * recipient.
  *
  * @tags: [
- *   requires_fcv_49,
  *   uses_atclustertime,
  *   disabled_due_to_server_58295
  * ]

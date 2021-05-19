@@ -1,9 +1,8 @@
 /**
  * Tests that it is illegal to insert documents into a time-series collection within a transaction.
  * @tags: [
- *     assumes_no_implicit_collection_creation_after_drop,
- *     uses_transactions,
- *     requires_fcv_49,
+ *   assumes_no_implicit_collection_creation_after_drop,
+ *   uses_transactions,
  * ]
  */
 (function() {

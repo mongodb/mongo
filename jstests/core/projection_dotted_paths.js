@@ -2,9 +2,6 @@
 // shard key since the document needs to be fetched in order to apply the SHARDING_FILTER stage.
 // @tags: [
 //   assumes_unsharded_collection,
-//   # This test makes assertions about the types of plans produced by the query engine, which has
-//   # changed from the classic engine starting in version 5.0.
-//   requires_fcv_50,
 // ]
 
 /**

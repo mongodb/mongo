@@ -1,7 +1,8 @@
 /**
  * Checks that the API version metrics are properly stored and returned.
  *
- * @tags: [requires_fcv_47]
+ * @tags: [
+ * ]
  */
 
 (function() {

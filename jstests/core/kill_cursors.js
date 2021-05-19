@@ -1,7 +1,6 @@
 // @tags: [
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
-//   requires_fcv_47,
 // ]
 //
 // Does not support stepdowns because if a stepdown were to occur between running find() and

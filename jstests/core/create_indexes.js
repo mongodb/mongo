@@ -1,6 +1,5 @@
 /**
  * @tags: [
- *   requires_fcv_49,
  *   assumes_superuser_permissions,
  * ]
  * fcv49 for the change to error code in createIndexes invalid field reply.

@@ -2,7 +2,8 @@
  * Tests for resharding collection cloner's aggregation pipeline to ensure that $lookup on
  * config.cache.chunks is pushed down to shards to execute as part of the split pipeline.
  *
- * @tags: [requires_fcv_49]
+ * @tags: [
+ * ]
  */
 (function() {
 'use strict';

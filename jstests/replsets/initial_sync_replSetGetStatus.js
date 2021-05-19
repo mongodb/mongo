@@ -2,7 +2,7 @@
  * This test tests that replSetGetStatus returns initial sync stats while initial sync is in
  * progress.
  *
- * @tags: [requires_fcv_49, disabled_due_to_server_58295]
+ * @tags: [disabled_due_to_server_58295]
  */
 
 (function() {

@@ -5,7 +5,6 @@
  * to abort.
  *
  * @tags: [
- *   requires_fcv_49,
  *   uses_atclustertime,
  * ]
  */

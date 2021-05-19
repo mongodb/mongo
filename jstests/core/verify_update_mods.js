@@ -4,7 +4,6 @@
  * @tags: [
  *   # The test is designed to work with an unsharded collection.
  *   assumes_unsharded_collection,
- *   requires_fcv_47,
  *   # Performs modifications that if repeated would fail the test.
  *   requires_non_retryable_writes,
  * ]

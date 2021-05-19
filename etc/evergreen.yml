@@ -9442,7 +9442,7 @@ buildvariants:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-multiversion
     test_flags: >-
-      --excludeWithAnyTags=requires_fcv_47,requires_fcv_48,requires_fcv_49,requires_fcv_50,multiversion_incompatible,disabled_due_to_server_58295
+      --excludeWithAnyTags=requires_fcv_51,multiversion_incompatible,disabled_due_to_server_58295
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl

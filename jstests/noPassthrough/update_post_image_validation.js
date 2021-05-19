@@ -1,5 +1,6 @@
 // Verify that the update system correctly rejects invalid entries during post-image validation.
-// @tags: [requires_fcv_50]
+// @tags: [
+// ]
 (function() {
 "use strict";
 

@@ -1,7 +1,9 @@
 /**
  * Tests that the server can startup with time-series collections present.
  *
- * @tags: [requires_fcv_49, requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ * ]
  */
 (function() {
 "use strict";

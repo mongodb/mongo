@@ -7,9 +7,7 @@
  * - Blocking stages in cases where 'allowDiskUse' is false, e.g. $group, $bucketAuto.
  *
  * @tags: [
- *   requires_sharding,
  *   requires_profiling,
- *   requires_fcv_47,
  *   disabled_due_to_server_58295
  * ]
  */

@@ -3,7 +3,6 @@
  * replicated collection with two-phase drops.
  *
  * @tags: [
- *   requires_fcv_48,
  *   requires_majority_read_concern,
  *   requires_persistence,
  * ]

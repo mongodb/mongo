@@ -2,7 +2,6 @@
  * Tests the basic functionality of the resharding metrics section in server status.
  *
  * @tags: [
- *   requires_fcv_49,
  *   uses_atclustertime,
  * ]
  */

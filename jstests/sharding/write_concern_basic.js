@@ -1,5 +1,6 @@
 // Test that certain basic commands preserve write concern errors.
-// @tags: [ requires_fcv_49, ]
+// @tags: [
+// ]
 //
 
 (function() {

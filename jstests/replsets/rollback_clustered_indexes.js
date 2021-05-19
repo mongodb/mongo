@@ -1,7 +1,6 @@
 /**
  * Tests that writes on collections clustered by _id can be rolled back.
  * @tags: [
- *   requires_fcv_49,
  *   requires_replication,
  *   requires_wiredtiger,
  * ]

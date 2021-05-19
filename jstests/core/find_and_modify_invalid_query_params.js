@@ -2,7 +2,9 @@
  * Test that the 'findAndModify' command throws the expected errors for invalid query, sort and
  * projection parameters. This test exercises the fix for SERVER-41829.
  *
- * @tags: [assumes_unsharded_collection, requires_fcv_49]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ * ]
  */
 (function() {
 "use strict";

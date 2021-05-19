@@ -8,7 +8,8 @@
 // 3. Finally, we perform a reconfig to reduce the fourth node's delay from 30 seconds
 // to 15 seconds, and test that the delay behavior is the same as before.
 //
-// @tags: [requires_fcv_49]
+// @tags: [
+// ]
 load("jstests/replsets/rslib.js");
 
 doTest = function(signal) {

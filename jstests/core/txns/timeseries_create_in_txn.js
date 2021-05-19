@@ -1,8 +1,7 @@
 /**
  * Tests that it is illegal to create a time-series collection within a transaction.
  * @tags: [
- *     uses_transactions,
- *     requires_fcv_49,
+ *   uses_transactions,
  * ]
  */
 (function() {

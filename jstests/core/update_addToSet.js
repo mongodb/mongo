@@ -2,7 +2,9 @@
 // update/delete on a sharded collection must contain an exact match on _id or contain the shard
 // key.
 //
-// @tags: [assumes_unsharded_collection, requires_fcv_50]
+// @tags: [
+//   assumes_unsharded_collection,
+// ]
 
 (function() {
 "use strict";

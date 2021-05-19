@@ -2,7 +2,8 @@
  * Test that the client cannot gossip clusterTime from one replica set to another if it doesn't
  * have the advanceClusterTime privilege.
  *
- * @tags: [requires_fcv_47]
+ * @tags: [
+ * ]
  */
 
 (function() {

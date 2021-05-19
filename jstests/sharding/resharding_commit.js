@@ -1,7 +1,7 @@
 /**
  * Test the commitReshardCollection command.
  *
- * @tags: [requires_fcv_49, uses_atclustertime, disabled_due_to_server_58295]
+ * @tags: [uses_atclustertime, disabled_due_to_server_58295]
  */
 (function() {
 "use strict";

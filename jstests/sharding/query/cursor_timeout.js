@@ -15,7 +15,6 @@
 // that cursors #5 and #6 are killed as a result.
 //
 // @tags: [
-//   requires_fcv_47,
 //   requires_sharding,
 // ]
 (function() {

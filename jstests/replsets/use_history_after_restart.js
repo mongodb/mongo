@@ -9,7 +9,10 @@
  *    restart. This is a conservative behavior that is perfectly reasonable to later relax.
  * 4) Create a collection `dneAtOldestTs`. This collection should not be readable across a restart.
  *
- * @tags: [requires_fcv_49, requires_majority_read_concern, requires_persistence]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ * ]
  */
 (function() {
 "use strict";

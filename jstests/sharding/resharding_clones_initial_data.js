@@ -2,7 +2,6 @@
  * Tests the cloning portion of a resharding operation as part of the reshardCollection command.
  *
  * @tags: [
- *   requires_fcv_49,
  *   uses_atclustertime,
  * ]
  */

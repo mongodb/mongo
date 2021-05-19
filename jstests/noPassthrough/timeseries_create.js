@@ -3,7 +3,6 @@
  * configurations of options in conjunction with and within the timeseries option.
  *
  * @tags: [
- *   requires_fcv_49,
  * ]
  */
 (function() {

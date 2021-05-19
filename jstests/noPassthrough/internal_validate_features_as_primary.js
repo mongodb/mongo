@@ -1,7 +1,8 @@
 /**
  * Tests that the internalValidateFeaturesAsPrimary server parameter
  * and the deprecated alias internalValidateFeaturesAsMaster both work.
- * @tags: [requires_fcv_48]
+ * @tags: [
+ * ]
  */
 (function() {
 "use strict";

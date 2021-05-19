@@ -1,8 +1,13 @@
 /**
  * Tests tenant migration with time-series collections.
  *
- * @tags: [requires_fcv_49, requires_majority_read_concern, incompatible_with_eft,
- * incompatible_with_windows_tls, incompatible_with_macos, requires_persistence]
+ * @tags: [
+ *   incompatible_with_eft,
+ *   incompatible_with_macos,
+ *   incompatible_with_windows_tls,
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ * ]
  */
 
 (function() {

@@ -2,7 +2,6 @@
 // @tags: [
 //   requires_multi_updates,
 //   requires_non_retryable_writes,
-//   requires_fcv_50,
 // ]
 (function() {
 "use strict";

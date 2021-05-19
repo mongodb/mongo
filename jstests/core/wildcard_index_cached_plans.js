@@ -12,9 +12,6 @@
  *   # false when the test assumes they are true because the query has already been run many times.
  *   assumes_balancer_off,
  *   inspects_whether_plan_cache_entry_is_active,
- *   # This test makes assertions about the types of plans produced by the query engine, which has
- *   # changed from the classic engine starting in version 5.0.
- *   requires_fcv_50,
  * ]
  */
 (function() {

@@ -1,7 +1,6 @@
 //
 // Basic tests for reshardCollection.
 // @tags: [
-//   requires_fcv_47,
 //   uses_atclustertime,
 // ]
 //

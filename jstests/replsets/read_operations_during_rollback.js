@@ -1,9 +1,7 @@
-/*
+/**
  * This test makes sure 'find' and 'getMore' commands fail correctly during rollback.
  *
  * @tags: [
- *   # The 'getMoreHangAfterPinCursor' failpoint is not present in 4.4.
- *   requires_fcv_49,
  *   requires_majority_read_concern,
  * ]
  */

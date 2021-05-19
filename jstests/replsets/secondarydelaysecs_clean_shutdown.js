@@ -1,6 +1,8 @@
 // SERVER-21118 don't hang at shutdown or apply ops too soon with secondaryDelaySecs.
 //
-// @tags: [requires_persistence, requires_fcv_49]
+// @tags: [
+//   requires_persistence,
+// ]
 load('jstests/replsets/rslib.js');
 (function() {
 "use strict";

@@ -69,8 +69,12 @@ FeatureCompatibilityParams::Version FeatureCompatibilityVersionParser::parseVers
 
 FeatureCompatibilityParams::Version FeatureCompatibilityVersionParser::parseVersionForFeatureFlags(
     StringData versionString) {
+    if (versionString == kVersion51) {
+        return FeatureCompatibilityParams::Version::kVersion51;
+    }
+
     if (versionString == kVersion50) {
-        return FeatureCompatibilityParams::Version::kVersion50;
+        return FeatureCompatibilityParams::Version::kFullyDowngradedTo50;
     }
 
     if (versionString == kVersion49) {
@@ -111,7 +115,11 @@ StringData FeatureCompatibilityVersionParser::serializeVersion(
 
 StringData FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(
     FeatureCompatibilityParams::Version version) {
-    if (version == FeatureCompatibilityParams::Version::kVersion50) {
+    if (version == FeatureCompatibilityParams::Version::kVersion51) {
+        return kVersion51;
+    }
+
+    if (version == FeatureCompatibilityParams::Version::kFullyDowngradedTo50) {
         return kVersion50;
     }
 

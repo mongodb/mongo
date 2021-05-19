@@ -3,11 +3,10 @@
  *
  * Tests which create views aren't expected to work when collections are implicitly sharded.
  * @tags: [
- *   requires_fcv_49,
- *   uses_api_parameters,
- *   assumes_unsharded_collection,
+ *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
- *   assumes_read_concern_unchanged
+ *   assumes_unsharded_collection,
+ *   uses_api_parameters,
  * ]
  */
 

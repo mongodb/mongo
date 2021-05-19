@@ -2,7 +2,6 @@
  * Tests the cloning portion of a resharding operation in isolation.
  *
  * @tags: [
- *   requires_fcv_49,
  *   uses_atclustertime,
  * ]
  */

@@ -1,7 +1,8 @@
 /**
  * Tests it isn't possible to update an orphan document's shard key. Only multi=true updates skip
  * shard versioning. They are therefore the only case which skips ownership filtering.
- * @tags: [requires_fcv_47]
+ * @tags: [
+ * ]
  */
 (function() {
 "use strict";

@@ -4,8 +4,12 @@
  * Perform point-in-time snapshot reads that span a 'find' and multiple 'getmore's concurrently with
  * CRUD operations.
  *
- * @tags: [creates_background_indexes, requires_fcv_47, requires_replication,
- * does_not_support_causal_consistency, requires_majority_read_concern]
+ * @tags: [
+ *   creates_background_indexes,
+ *   does_not_support_causal_consistency,
+ *   requires_majority_read_concern,
+ *   requires_replication,
+ * ]
  */
 
 load('jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js');

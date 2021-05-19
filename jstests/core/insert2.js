@@ -4,7 +4,6 @@
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_collstats,
 //   uses_multiple_connections,
-//   requires_fcv_50,
 // ]
 
 // Create a new connection object so it won't affect the global connection when we modify

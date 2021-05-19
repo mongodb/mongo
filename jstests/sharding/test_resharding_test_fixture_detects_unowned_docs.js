@@ -4,7 +4,6 @@
  * Verifies that an exception is thrown if a recipient shard has a document it doesn't actually own.
  *
  * @tags: [
- *   requires_fcv_49,
  *   uses_atclustertime,
  * ]
  */

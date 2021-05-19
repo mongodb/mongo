@@ -1,7 +1,6 @@
 // Tests server parameter information shown by explain.
 // @tags: [
-//   requires_fcv_49,
-//   does_not_support_stepdowns
+//   does_not_support_stepdowns,
 // ]
 
 (function() {

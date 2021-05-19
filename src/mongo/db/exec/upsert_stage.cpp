@@ -279,7 +279,7 @@ void UpsertStage::_assertDocumentToBeInsertedIsValid(const mb::Document& documen
         bool allowTopLevelDollarPrefixes =
             serverGlobalParams.featureCompatibility.isVersionInitialized() &&
             serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                FeatureCompatibilityParams::Version::kVersion50);
+                FeatureCompatibilityParams::Version::kFullyDowngradedTo50);
         storage_validation::storageValid(document,
                                          allowTopLevelDollarPrefixes,
                                          true, /* Should validate for storage */

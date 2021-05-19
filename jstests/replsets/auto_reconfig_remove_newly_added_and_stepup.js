@@ -4,7 +4,6 @@
  * and are expected to retry until success.
  *
  * @tags: [
- *   requires_fcv_47,
  * ]
  */
 

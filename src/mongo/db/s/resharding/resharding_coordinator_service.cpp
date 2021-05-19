@@ -892,7 +892,7 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
             coordinatorDoc.getReshardingUUID(),
             *donorShardIds.begin(),
             ChunkEntryFormat::getForVersionCallerGuaranteesFCVStability(
-                ServerGlobalParams::FeatureCompatibility::Version::kVersion50)};
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50)};
         auto splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
         initialChunks = std::move(splitResult.chunks);
 

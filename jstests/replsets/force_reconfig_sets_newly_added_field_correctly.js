@@ -1,7 +1,8 @@
 /**
  * Verify that force reconfigs overwrite the 'newlyAdded' field correctly in a replica set.
  *
- * @tags: [ requires_fcv_47 ]
+ * @tags: [
+ * ]
  */
 
 (function() {

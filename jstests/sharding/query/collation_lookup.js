@@ -7,7 +7,6 @@
  * collection the "aggregate" command was performed on.
  *
  * @tags: [
- *   requires_fcv_50,
  *   featureFlagShardedLookup,
  *   disabled_due_to_server_58295
  * ]

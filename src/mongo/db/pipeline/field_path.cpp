@@ -100,7 +100,7 @@ void FieldPath::uassertValidFieldName(StringData fieldName) {
     const auto dotsAndDollarsHint =
         serverGlobalParams.featureCompatibility.isVersionInitialized() &&
             serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                FeatureCompatibilityParams::Version::kVersion50)
+                FeatureCompatibilityParams::Version::kFullyDowngradedTo50)
         ? " Consider using $getField or $setField."
         : "";
 

@@ -1,7 +1,8 @@
 // Test that dropping the config database is completely disabled via
 // mongos and via mongod, if started with --configsvr
 //
-// @tags: [requires_fcv_47]
+// @tags: [
+// ]
 (function() {
 "use strict";
 

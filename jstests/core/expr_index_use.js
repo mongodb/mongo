@@ -1,6 +1,5 @@
 // Confirms expected index use when performing a match with a $expr statement.
 // @tags: [
-//   requires_fcv_49
 // ]
 
 (function() {

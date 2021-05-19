@@ -2,7 +2,6 @@
 //   does_not_support_stepdowns,
 //   requires_non_retryable_writes,
 //   requires_profiling,
-//   requires_fcv_47,
 // ]
 
 // Confirms that profiled update execution contains all expected metrics with proper values.

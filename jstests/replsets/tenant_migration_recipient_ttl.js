@@ -2,8 +2,12 @@
  * Tests to check whether the TTL index is being created and is functioning correctly on the tenant
  * migration recipient.
  *
- * @tags: [requires_fcv_49, incompatible_with_eft, incompatible_with_macos, requires_persistence,
- * incompatible_with_windows_tls]
+ * @tags: [
+ *   incompatible_with_eft,
+ *   incompatible_with_macos,
+ *   incompatible_with_windows_tls,
+ *   requires_persistence,
+ * ]
  */
 
 (function() {

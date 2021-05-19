@@ -2,7 +2,6 @@
 // Test to verify that updates that would change the resharding key value are replicated as an
 // insert, delete pair.
 // @tags: [
-//   requires_fcv_47,
 //   uses_atclustertime,
 // ]
 //

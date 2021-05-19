@@ -3,7 +3,6 @@
  * 'getMore' requests and responses on the oplog.
  *
  * @tags: [
- *   requires_fcv_47,
  * ]
  */
 

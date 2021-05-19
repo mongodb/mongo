@@ -5,7 +5,8 @@
  * creations which may implicitly create collections. Performs these in parallel with collection-
  * dropping operations.
  *
- * @tags: [requires_fcv_49]
+ * @tags: [
+ * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
 load('jstests/concurrency/fsm_workloads/CRUD_and_commands.js');  // for $config

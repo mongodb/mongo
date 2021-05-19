@@ -2,9 +2,8 @@
  * Tests the findAndModify command under different scenarios with API versioning enabled.
  *
  * @tags: [
- *     uses_api_parameters,
- *     requires_fcv_49,
- *     assumes_unsharded_collection,
+ *   assumes_unsharded_collection,
+ *   uses_api_parameters,
  * ]
  */
 (function() {

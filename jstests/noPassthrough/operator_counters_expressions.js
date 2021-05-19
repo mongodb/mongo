@@ -1,7 +1,8 @@
 /**
  * Tests aggregate expression counters.
  * Initially limited to $getField and $setField.
- * @tags: [requires_fcv_50]
+ * @tags: [
+ * ]
  */
 
 (function() {
