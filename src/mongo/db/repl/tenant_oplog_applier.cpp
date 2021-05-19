@@ -601,6 +601,12 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             noopEntry.setSessionId(sessionId);
             noopEntry.setTxnNumber(txnNumber);
 
+            // Write a fake applyOps with the tenantId as the namespace so that this will be picked
+            // up by the committed transaction prefetch pipeline in subsequent migrations.
+            noopEntry.setObject(
+                BSON("applyOps" << BSON_ARRAY(BSON(OplogEntry::kNssFieldName
+                                                   << NamespaceString(_tenantId + "_", "").ns()))));
+
             // Use the same wallclock time as the noop entry.
             sessionTxnRecord.emplace(sessionId, txnNumber, OpTime(), noopEntry.getWallClockTime());
             sessionTxnRecord->setState(DurableTxnStateEnum::kCommitted);
@@ -774,11 +780,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                 // Write the noop entry and update config.transactions.
                 auto oplogOpTime = repl::logOp(opCtx.get(), &noopEntry);
                 if (sessionTxnRecord) {
-                    // We do not need to record the last write op time for migrated transactions, so
-                    // we leave it null for consistency with transactions completed before the
-                    // migration..
-                    if (!opCtx->inMultiDocumentTransaction())
-                        sessionTxnRecord->setLastWriteOpTime(oplogOpTime);
+                    sessionTxnRecord->setLastWriteOpTime(oplogOpTime);
                     TransactionParticipant::get(opCtx.get())
                         .onWriteOpCompletedOnPrimary(opCtx.get(), {stmtIds}, *sessionTxnRecord);
                 }
