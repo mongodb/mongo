@@ -16,7 +16,6 @@ int
 __wt_hs_row_search(WT_CURSOR_BTREE *hs_cbt, WT_ITEM *srch_key, bool insert)
 {
     WT_BTREE *hs_btree;
-    WT_CURSOR *hs_cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     bool leaf_found;
@@ -26,14 +25,13 @@ __wt_hs_row_search(WT_CURSOR_BTREE *hs_cbt, WT_ITEM *srch_key, bool insert)
 
     hs_btree = CUR2BT(hs_cbt);
     session = CUR2S(hs_cbt);
-    hs_cursor = &hs_cbt->iface;
     leaf_found = false;
 
     /*
      * Check whether the search key can be find in the provided leaf page, if exists. Otherwise
      * perform a full search.
      */
-    if (hs_cbt->ref != NULL) {
+    if (__wt_cursor_page_pinned(hs_cbt, true)) {
 #ifdef HAVE_DIAGNOSTIC
         WT_ORDERED_READ(page, hs_cbt->ref->page);
 #endif
@@ -44,7 +42,7 @@ __wt_hs_row_search(WT_CURSOR_BTREE *hs_cbt, WT_ITEM *srch_key, bool insert)
         WT_ASSERT(session, __wt_hazard_check(session, hs_cbt->ref, NULL) != NULL);
         WT_WITH_BTREE(session, hs_btree,
           ret = __wt_row_search(hs_cbt, srch_key, insert, hs_cbt->ref, false, &leaf_found));
-        WT_RET(ret);
+        WT_ERR(ret);
 
         /*
          * Only use the pinned page search results if search returns an exact match or a slot other
@@ -58,13 +56,13 @@ __wt_hs_row_search(WT_CURSOR_BTREE *hs_cbt, WT_ITEM *srch_key, bool insert)
 
         /* Ensure there is no eviction happened on this page. */
         WT_ASSERT(session, page == hs_cbt->ref->page);
-        if (!leaf_found)
-            hs_cursor->reset(hs_cursor);
     }
 
-    if (!leaf_found)
+    if (!leaf_found) {
+        WT_ERR(__wt_cursor_func_init(hs_cbt, true));
         WT_WITH_BTREE(
           session, hs_btree, ret = __wt_row_search(hs_cbt, srch_key, insert, NULL, false, NULL));
+    }
 
     if (ret == 0 && !insert) {
         WT_ERR(__wt_key_return(hs_cbt));

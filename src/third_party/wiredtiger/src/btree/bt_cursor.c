@@ -50,59 +50,6 @@ __cursor_state_restore(WT_CURSOR *cursor, WT_CURFILE_STATE *state)
 }
 
 /*
- * __cursor_page_pinned --
- *     Return if we have a page pinned.
- */
-static inline bool
-__cursor_page_pinned(WT_CURSOR_BTREE *cbt, bool search_operation)
-{
-    WT_CURSOR *cursor;
-    WT_SESSION_IMPL *session;
-
-    cursor = &cbt->iface;
-    session = CUR2S(cbt);
-
-    /*
-     * Check the page active flag, asserting the page reference with any external key.
-     */
-    if (!F_ISSET(cbt, WT_CBT_ACTIVE)) {
-        WT_ASSERT(session, cbt->ref == NULL && !F_ISSET(cursor, WT_CURSTD_KEY_INT));
-        return (false);
-    }
-
-    /*
-     * Check if the key references an item on a page. When returning from search, the page is pinned
-     * and the key is internal. After the application sets a key, the key becomes external. For the
-     * search and search-near operations, we assume locality and check any pinned page first on each
-     * new search operation. For operations other than search and search-near, check if we have an
-     * internal key. If the page is pinned and we're pointing into the page, we don't need to search
-     * at all, we can proceed with the operation. However, if the key has been set, that is, it's an
-     * external key, we're going to have to do a full search.
-     */
-    if (!search_operation && !F_ISSET(cursor, WT_CURSTD_KEY_INT))
-        return (false);
-
-    /*
-     * XXX No fast-path searches at read-committed isolation. Underlying transactional functions
-     * called by the fast and slow path search code handle transaction IDs differently, resulting in
-     * different search results at read-committed isolation. This makes no difference for the update
-     * functions, but in the case of a search, we will see different results based on the cursor's
-     * initial location. See WT-5134 for the details.
-     */
-    if (search_operation && session->txn->isolation == WT_ISO_READ_COMMITTED)
-        return (false);
-
-    /*
-     * Fail if the page is flagged for forced eviction (so we periodically release pages grown too
-     * large).
-     */
-    if (cbt->ref->page->read_gen == WT_READGEN_OLDEST)
-        return (false);
-
-    return (true);
-}
-
-/*
  * __cursor_size_chk --
  *     Return if an inserted item is too large.
  */
@@ -541,7 +488,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
      * pinned page doesn't find an exact match, search from the root.
      */
     valid = false;
-    if (__cursor_page_pinned(cbt, true)) {
+    if (__wt_cursor_page_pinned(cbt, true)) {
         __wt_txn_cursor_op(session);
 
         if (btree->type == BTREE_ROW) {
@@ -555,7 +502,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
         }
     }
     if (!valid) {
-        WT_ERR(__cursor_func_init(cbt, true));
+        WT_ERR(__wt_cursor_func_init(cbt, true));
 
         if (btree->type == BTREE_ROW) {
             WT_ERR(__cursor_row_search(cbt, false, NULL, NULL));
@@ -640,7 +587,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
      * search.
      */
     valid = false;
-    if (btree->type == BTREE_ROW && __cursor_page_pinned(cbt, true)) {
+    if (btree->type == BTREE_ROW && __wt_cursor_page_pinned(cbt, true)) {
         __wt_txn_cursor_op(session);
 
         /*
@@ -661,7 +608,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
             WT_ERR(__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid));
     }
     if (!valid) {
-        WT_ERR(__cursor_func_init(cbt, true));
+        WT_ERR(__wt_cursor_func_init(cbt, true));
 
         /*
          * Set the "insert" flag for row-store search; we may intend to position the cursor at the
@@ -804,7 +751,7 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
      * Fixed-length column store can never use a positioned cursor to update because the cursor may
      * not be positioned to the correct record in the case of implicit records in the append list.
      */
-    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt, false) &&
+    if (btree->type != BTREE_COL_FIX && __wt_cursor_page_pinned(cbt, false) &&
       F_ISSET(cursor, WT_CURSTD_OVERWRITE) && !append_key) {
         WT_ERR(__wt_txn_autocommit_check(session));
         /*
@@ -838,7 +785,7 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
     __cursor_state_save(cursor, &state);
 
 retry:
-    WT_ERR(__cursor_func_init(cbt, true));
+    WT_ERR(__wt_cursor_func_init(cbt, true));
 
     if (btree->type == BTREE_ROW) {
         WT_ERR(__cursor_row_search(cbt, true, NULL, NULL));
@@ -969,7 +916,7 @@ __wt_btcur_insert_check(WT_CURSOR_BTREE *cbt)
     __cursor_novalue(cursor);
 
 retry:
-    WT_ERR(__cursor_func_init(cbt, true));
+    WT_ERR(__wt_cursor_func_init(cbt, true));
     WT_ERR(__cursor_row_search(cbt, true, NULL, NULL));
 
     /* Just check for conflicts. */
@@ -1035,7 +982,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt, bool positioned)
      * Fixed-length column store can never use a positioned cursor to update because the cursor may
      * not be positioned to the correct record in the case of implicit records in the append list.
      */
-    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt, false)) {
+    if (btree->type != BTREE_COL_FIX && __wt_cursor_page_pinned(cbt, false)) {
         WT_ERR(__wt_txn_autocommit_check(session));
 
         /*
@@ -1062,7 +1009,7 @@ retry:
     __cursor_state_save(cursor, &state);
     searched = true;
 
-    WT_ERR(__cursor_func_init(cbt, true));
+    WT_ERR(__wt_cursor_func_init(cbt, true));
 
     if (btree->type == BTREE_ROW) {
         WT_ERR_NOTFOUND_OK(__cursor_row_search(cbt, false, NULL, NULL), true);
@@ -1212,7 +1159,7 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
      * Fixed-length column store can never use a positioned cursor to update because the cursor may
      * not be positioned to the correct record in the case of implicit records in the append list.
      */
-    if (btree->type != BTREE_COL_FIX && __cursor_page_pinned(cbt, false)) {
+    if (btree->type != BTREE_COL_FIX && __wt_cursor_page_pinned(cbt, false)) {
         WT_ERR(__wt_txn_autocommit_check(session));
 
         /*
@@ -1245,7 +1192,7 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
     __cursor_state_save(cursor, &state);
 
 retry:
-    WT_ERR(__cursor_func_init(cbt, true));
+    WT_ERR(__wt_cursor_func_init(cbt, true));
     WT_ERR(btree->type == BTREE_ROW ? __cursor_row_search(cbt, true, NULL, NULL) :
                                       __cursor_col_search(cbt, NULL, NULL));
 
