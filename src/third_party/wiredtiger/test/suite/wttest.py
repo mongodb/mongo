@@ -404,8 +404,19 @@ class WiredTigerTestCase(unittest.TestCase):
     def setUp(self):
         if not hasattr(self.__class__, 'wt_ntests'):
             self.__class__.wt_ntests = 0
+
+        # We want to have a unique execution directory name for each test.
+        # When a test fails, or with the -p option, we want to preserve the
+        # directory.  For the non concurrent case, this is easy, we use the
+        # class name (like test_base02) and append a class-specific counter.
+        # This is short, somewhat descriptive, and unique.
+        #
+        # Class-specific counters won't work for the concurrent case. To
+        # get uniqueness we use a sanitized "short" identifier.  Despite its name,
+        # this is not short (with scenarios at least), but it is descriptive
+        # and unique.
         if WiredTigerTestCase._concurrent:
-            self.testsubdir = self.shortid() + '.' + str(self.__class__.wt_ntests)
+            self.testsubdir = self.sanitized_shortid()
         else:
             self.testsubdir = self.className() + '.' + str(self.__class__.wt_ntests)
         self.testdir = os.path.join(WiredTigerTestCase._parentTestdir, self.testsubdir)
@@ -748,6 +759,15 @@ class WiredTigerTestCase(unittest.TestCase):
 
     def shortid(self):
         return self.id().replace("__main__.","")
+
+    def sanitized_shortid(self):
+        """
+        Return a name that is suitable for creating file system names.
+        In particular, names with scenarios look like
+        'test_file.test_file.test_funcname(scen1.scen2.scen3)'.
+        So transform '(', but remove final ')'.
+        """
+        return self.shortid().translate(str.maketrans('($[]/ ','______', ')'))
 
     def className(self):
         return self.__class__.__name__
