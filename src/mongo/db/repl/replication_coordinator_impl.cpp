@@ -605,23 +605,6 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     }
     LOGV2_DEBUG(4280509, 1, "Local configuration validated for startup");
 
-    if (serverGlobalParams.enableMajorityReadConcern && localConfig.isPSASet()) {
-        LOGV2_OPTIONS(21315, {logv2::LogTag::kStartupWarnings}, "");
-        LOGV2_OPTIONS(
-            21316,
-            {logv2::LogTag::kStartupWarnings},
-            "** WARNING: This replica set has a Primary-Secondary-Arbiter architecture, but "
-            "readConcern:majority is enabled ");
-        LOGV2_OPTIONS(
-            21317,
-            {logv2::LogTag::kStartupWarnings},
-            "**          for this node. This is not a recommended configuration. Please see ");
-        LOGV2_OPTIONS(21318,
-                      {logv2::LogTag::kStartupWarnings},
-                      "**          https://dochub.mongodb.org/core/psa-disable-rc-majority");
-        LOGV2_OPTIONS(21319, {logv2::LogTag::kStartupWarnings}, "");
-    }
-
     // Do not check optime, if this node is an arbiter.
     bool isArbiter =
         myIndex.getValue() != -1 && localConfig.getMemberAt(myIndex.getValue()).isArbiter();
