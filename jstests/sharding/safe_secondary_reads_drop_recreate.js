@@ -17,8 +17,9 @@
  * performed.
  *
  * @tags: [
- *   # SERVER-56565
- *   does_not_support_stepdowns
+ *   # SERVER-56565 avoid CS stepdowns, since  an election may trigger a  refresh of stale metadata
+ *   #              that form part of the test setup.
+ *   does_not_support_stepdowns,
  *  ]
  */
 (function() {
