@@ -11,14 +11,49 @@ import pymongo.errors
 
 import buildscripts.resmokelib.multiversionconstants as multiversion
 import buildscripts.resmokelib.utils.registry as registry
-from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
+
+_VERSIONS = {}  # type: ignore
+
+# FIXTURE_API_VERSION versions the API presented by interface.py,
+# registry.py, and fixturelib.py. Increment this when making
+# changes to them. Follow semantic versioning so that back-branch
+# fixtures are compatible when new features are added.
+
+
+# Note for multiversion fixtures: The formal API version here describes what
+# features a fixture can expect resmokelib to provide (e.g. new_fixture_node_logger
+# in fixturelib). It also provides a definition of _minimum_ functionality
+# (defined in the Fixture base class) that resmoke at large can expect from a fixture.
+# It is possible for fixtures to define additional public members beyond the minimum
+# in the Fixture base class, for use in hooks, builders, etc. (e.g. the initial
+# sync node in ReplicaSetFixture). These form an informal API of their own, which has
+# less of a need to be formalized because we expect major changes to it to occur on the
+# current master, allowing backwards-compatibility. On the other hand, the
+# interface.py and fixturelib API establishes forward-compatibility of fixture files.
+# If the informal API becomes heavily used and needs forward-compatibility,
+# consider adding it to the formal API.
+class APIVersion(object, metaclass=registry.make_registry_metaclass(_VERSIONS)):  # pylint: disable=invalid-metaclass
+    """Class storing fixture API version info."""
+
+    REGISTERED_NAME = "APIVersion"
+
+    FIXTURE_API_VERSION = "0.1.0"
+
+    @classmethod
+    def check_api_version(cls, actual):
+        """Check that we are compatible with the actual API version."""
+
+        def to_major(version):
+            return int(version.split(".")[0])
+
+        def to_minor(version):
+            return int(version.split(".")[1])
+
+        expected = cls.FIXTURE_API_VERSION
+        return to_major(expected) == to_major(actual) and to_minor(expected) <= to_minor(actual)
+
 
 _FIXTURES = {}  # type: ignore
-
-# Represents the version of the API presented by interface.py,
-# registry.py, and fixturelib.py. Increment this when making
-# possibly-breaking changes to them.
-FIXTURE_API_VERSION = 0.1
 
 
 class TeardownMode(Enum):
@@ -32,16 +67,6 @@ class TeardownMode(Enum):
     TERMINATE = 15
     KILL = 9
     ABORT = 6
-
-
-def make_fixture(class_name, logger, job_num, *args, **kwargs):
-    """Provide factory function for creating Fixture instances."""
-
-    fixturelib = FixtureLib()
-
-    if class_name not in _FIXTURES:
-        raise ValueError("Unknown fixture class '%s'" % class_name)
-    return _FIXTURES[class_name](logger, job_num, fixturelib, *args, **kwargs)
 
 
 class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  # pylint: disable=invalid-metaclass

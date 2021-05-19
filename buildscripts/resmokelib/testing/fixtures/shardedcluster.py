@@ -294,11 +294,16 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "config")
         mongod_options["replSet"] = ShardedClusterFixture._CONFIGSVR_REPLSET_NAME
         mongod_options["storageEngine"] = "wiredTiger"
+        config_svr_mixed_bin_version = None
+        if self.mixed_bin_versions is not None:
+            config_svr_mixed_bin_version = self.fixturelib.get_config(
+            ).CONFIG_SVR_MIXED_BIN_VERSIONS
 
-        return interface.make_fixture(
+        return self.fixturelib.make_fixture(
             "ReplicaSetFixture", mongod_logger, self.job_num, mongod_options=mongod_options,
             mongod_executable=self.mongod_executable, preserve_dbpath=preserve_dbpath,
-            num_nodes=num_nodes, auth_options=auth_options, mixed_bin_versions=None,
+            num_nodes=num_nodes, auth_options=auth_options,
+            mixed_bin_versions=config_svr_mixed_bin_version,
             replset_config_options=replset_config_options,
             shard_logging_prefix=shard_logging_prefix, **configsvr_options)
 
@@ -331,7 +336,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard{}".format(index))
         mongod_options["replSet"] = ShardedClusterFixture._SHARD_REPLSET_NAME_PREFIX + str(index)
 
-        return interface.make_fixture(
+        return self.fixturelib.make_fixture(
             "ReplicaSetFixture", mongod_logger, self.job_num,
             mongod_executable=self.mongod_executable, mongod_options=mongod_options,
             preserve_dbpath=preserve_dbpath, num_nodes=num_rs_nodes_per_shard,
@@ -402,7 +407,9 @@ class _MongoSFixture(interface.Fixture):
             self.fixturelib.default_if_none(mongos_options, {})).copy()
 
         self.mongos = None
-        self.port = None
+        self.port = fixturelib.get_next_port(job_num)
+        self.mongos_options["port"] = self.port
+
         self._dbpath_prefix = dbpath_prefix
 
     def setup(self):
@@ -413,9 +420,9 @@ class _MongoSFixture(interface.Fixture):
             self.mongos_options["logappend"] = ""
 
         launcher = MongosLauncher(self.fixturelib)
-        mongos, self.port = launcher.launch_mongos_program(self.logger, self.job_num,
-                                                           executable=self.mongos_executable,
-                                                           mongos_options=self.mongos_options)
+        mongos, _ = launcher.launch_mongos_program(self.logger, self.job_num,
+                                                   executable=self.mongos_executable,
+                                                   mongos_options=self.mongos_options)
         self.mongos_options["port"] = self.port
         try:
             self.logger.info("Starting mongos on port %d...\n%s", self.port, mongos.as_command())
@@ -507,9 +514,6 @@ class _MongoSFixture(interface.Fixture):
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""
-        if self.mongos is None:
-            raise ValueError("Must call setup() before calling get_internal_connection_string()")
-
         return "localhost:%d" % self.port
 
     def get_driver_connection_url(self):

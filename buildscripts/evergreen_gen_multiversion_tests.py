@@ -19,7 +19,8 @@ import structlog
 from shrub.v2 import ShrubProject, FunctionCall, Task, TaskDependency, BuildVariant, ExistingTask
 from evergreen.api import RetryingEvergreenApi, EvergreenApi
 
-from buildscripts.resmokelib.multiversionconstants import (LAST_LTS_MONGO_BINARY, REQUIRES_FCV_TAG)
+from buildscripts.resmokelib.multiversionconstants import (
+    LAST_LTS_MONGO_BINARY, LAST_CONTINUOUS_MONGO_BINARY, REQUIRES_FCV_TAG)
 import buildscripts.util.taskname as taskname
 from buildscripts.util.fileops import write_file_to_dir, read_yaml_file
 import buildscripts.evergreen_generate_resmoke_tasks as generate_resmoke
@@ -89,10 +90,9 @@ def get_multiversion_resmoke_args(is_sharded: bool) -> str:
     return "--numReplSetNodes=3 --linearChain=on "
 
 
-def get_backports_required_last_lts_hash(task_path_suffix: str):
+def get_backports_required_hash_for_shell_version(mongo_shell_path=None):
     """Parse the last-lts shell binary to get the commit hash."""
-    last_lts_shell_exec = os.path.join(task_path_suffix, LAST_LTS_MONGO_BINARY)
-    shell_version = check_output([last_lts_shell_exec, "--version"]).decode('utf-8')
+    shell_version = check_output([mongo_shell_path, "--version"]).decode('utf-8')
     for line in shell_version.splitlines():
         if "gitVersion" in line:
             version_line = line.split(':')[1]
@@ -101,7 +101,7 @@ def get_backports_required_last_lts_hash(task_path_suffix: str):
             if result:
                 commit_hash = result.group().strip('"')
                 if not commit_hash.isalnum():
-                    raise ValueError(f"Error parsing last-lts commit hash. Expected an "
+                    raise ValueError(f"Error parsing commit hash. Expected an "
                                      f"alpha-numeric string but got: {commit_hash}")
                 return commit_hash
             else:
@@ -109,15 +109,15 @@ def get_backports_required_last_lts_hash(task_path_suffix: str):
     raise ValueError("Could not find a valid commit hash from the last-lts mongo binary.")
 
 
-def get_last_lts_yaml(last_lts_commit_hash):
+def get_last_lts_yaml(commit_hash):
     """Download BACKPORTS_REQUIRED_FILE from the last LTS commit and return the yaml."""
-    LOGGER.info(f"Downloading file from commit hash of last-lts branch {last_lts_commit_hash}")
+    LOGGER.info(f"Downloading file from commit hash of last-lts branch {commit_hash}")
     response = requests.get(
-        f'{BACKPORTS_REQUIRED_BASE_URL}/{last_lts_commit_hash}/{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}')
+        f'{BACKPORTS_REQUIRED_BASE_URL}/{commit_hash}/{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}')
     # If the response was successful, no exception will be raised.
     response.raise_for_status()
 
-    last_lts_file = f"{last_lts_commit_hash}_{BACKPORTS_REQUIRED_FILE}"
+    last_lts_file = f"{commit_hash}_{BACKPORTS_REQUIRED_FILE}"
     temp_dir = tempfile.mkdtemp()
     with open(os.path.join(temp_dir, last_lts_file), "w") as fileh:
         fileh.write(response.text)
@@ -375,11 +375,9 @@ def run_generate_tasks(expansion_file: str, evergreen_config: Optional[str] = No
 
 
 @main.command("generate-exclude-tags")
-@click.option("--task-path-suffix", type=str, required=True,
-              help="The directory in which multiversion binaries are stored.")
 @click.option("--output", type=str, default=os.path.join(CONFIG_DIR, EXCLUDE_TAGS_FILE),
               show_default=True, help="Where to output the generated tags.")
-def generate_exclude_yaml(task_path_suffix: str, output: str) -> None:
+def generate_exclude_yaml(output: str) -> None:
     # pylint: disable=too-many-locals
     """
     Create a tag file associating multiversion tests to tags for exclusion.
@@ -400,7 +398,8 @@ def generate_exclude_yaml(task_path_suffix: str, output: str) -> None:
     # Get the state of the backports_required_for_multiversion_tests.yml file for the last-lts
     # binary we are running tests against. We do this by using the commit hash from the last-lts
     # mongo shell executable.
-    last_lts_commit_hash = get_backports_required_last_lts_hash(task_path_suffix)
+    last_lts_commit_hash = get_backports_required_hash_for_shell_version(
+        mongo_shell_path=LAST_LTS_MONGO_BINARY)
 
     # Get the yaml contents from the last-lts commit.
     backports_required_last_lts = get_last_lts_yaml(last_lts_commit_hash)

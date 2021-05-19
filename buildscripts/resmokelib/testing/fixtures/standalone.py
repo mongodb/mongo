@@ -19,7 +19,6 @@ class MongoDFixture(interface.Fixture):
             self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
             dbpath_prefix=None, preserve_dbpath=False):
         """Initialize MongoDFixture with different options for the mongod process."""
-
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
         self.mongod_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(mongod_options, {}))
@@ -49,7 +48,8 @@ class MongoDFixture(interface.Fixture):
             self.preserve_dbpath = preserve_dbpath
 
         self.mongod = None
-        self.port = None
+        self.port = fixturelib.get_next_port(job_num)
+        self.mongod_options["port"] = self.port
 
     def setup(self):
         """Set up the mongod."""
@@ -63,10 +63,11 @@ class MongoDFixture(interface.Fixture):
             pass
 
         launcher = MongodLauncher(self.fixturelib)
-        mongod, self.port = launcher.launch_mongod_program(self.logger, self.job_num,
-                                                           executable=self.mongod_executable,
-                                                           mongod_options=self.mongod_options)
-        self.mongod_options["port"] = self.port
+        # Second return val is the port, which we ignore because we explicitly created the port above.
+        # The port is used to set other mongod_option's here: https://github.com/mongodb/mongo/blob/532a6a8ae7b8e7ab5939e900759c00794862963d/buildscripts/resmokelib/testing/fixtures/replicaset.py#L136
+        mongod, _ = launcher.launch_mongod_program(self.logger, self.job_num,
+                                                   executable=self.mongod_executable,
+                                                   mongod_options=self.mongod_options)
         try:
             self.logger.info("Starting mongod on port %d...\n%s", self.port, mongod.as_command())
             mongod.start()
@@ -166,9 +167,6 @@ class MongoDFixture(interface.Fixture):
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""
-        if self.mongod is None:
-            raise ValueError("Must call setup() before calling get_internal_connection_string()")
-
         return "localhost:%d" % self.port
 
     def get_driver_connection_url(self):

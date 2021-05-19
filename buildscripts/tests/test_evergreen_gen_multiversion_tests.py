@@ -84,7 +84,7 @@ class TestGenerateExcludeYaml(unittest.TestCase):
         Helper to patch and run the test.
         """
         mock_multiversion_methods = {
-            'get_backports_required_last_lts_hash': MagicMock(),
+            'get_backports_required_hash_for_shell_version': MagicMock(),
             'get_last_lts_yaml': MagicMock(return_value=last_lts)
         }
 
@@ -95,14 +95,12 @@ class TestGenerateExcludeYaml(unittest.TestCase):
 
                 output = os.path.join(self._tmpdir.name, under_test.EXCLUDE_TAGS_FILE)
                 runner = CliRunner()
-                result = runner.invoke(
-                    under_test.generate_exclude_yaml,
-                    [f"--output={output}", '--task-path-suffix=/data/multiversion'])
+                result = runner.invoke(under_test.generate_exclude_yaml, [f"--output={output}"])
 
                 self.assertEqual(result.exit_code, 0, result)
                 mock_read_yaml.assert_called_once()
                 mock_multiversion_methods[
-                    'get_backports_required_last_lts_hash'].assert_called_once()
+                    'get_backports_required_hash_for_shell_version'].assert_called_once()
                 mock_multiversion_methods['get_last_lts_yaml'].assert_called_once()
 
     def test_create_yaml_suite1(self):

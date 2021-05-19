@@ -7,4 +7,5 @@ set -o errexit
 set -o verbose
 
 activate_venv
-$python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=${use_multiversion}
+PATH="$PATH:/data/multiversion"
+$python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags
