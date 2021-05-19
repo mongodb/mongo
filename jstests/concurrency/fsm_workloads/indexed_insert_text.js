@@ -34,10 +34,15 @@ var $config = (function() {
     var transitions = {init: {insert: 1}, insert: {insert: 1}};
 
     function setup(db, collName, cluster) {
-        var ixSpec = {};
-        ixSpec[this.indexedField] = 'text';
+        const ixSpec = {name: `${this.indexedField}_text`, key: {}};
+        ixSpec.key[this.indexedField] = "text";
+        // Need to specify "majority" writeConcern because the find command at the insert phase
+        // depends on the availability of the text index. Otherwise, the text index may not always
+        // be visible to other transactions, depending on readConcern/writeConcern settings.
+        const wcMajority = {w: "majority"};
         // Only allowed to create one text index, other tests may create one.
-        assertWhenOwnColl.commandWorked(db[collName].createIndex(ixSpec));
+        assertAlways.commandWorked(
+            db.runCommand({createIndexes: collName, indexes: [ixSpec], writeConcern: wcMajority}));
     }
 
     var text = [
