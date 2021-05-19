@@ -39,7 +39,15 @@ TASKS_FACTORS = [{"task": r"replica_sets.*", "factor": 0.5}, {"task": r"sharding
 DISTRO_MULTIPLIERS = {"rhel80-large": 1.618}
 
 # Apply factor for a task based on the machine type it is running on.
-MACHINE_TASK_FACTOR_OVERRIDES = {"aarch64": TASKS_FACTORS}
+MACHINE_TASK_FACTOR_OVERRIDES = {
+    "aarch64":
+        TASKS_FACTORS,
+    "ppc64le": [
+        dict(task=r"causally_consistent_hedged_reads_jscore_passthrough.*", factor=0.125),
+        dict(task=r"causally_consistent_read_concern_snapshot_passthrough.*", factor=0.125),
+        dict(task=r"sharded_causally_consistent_read_concern_snapshot_passthrough.*", factor=0.125),
+    ],
+}
 
 # Apply factor for a task based on the platform it is running on.
 PLATFORM_TASK_FACTOR_OVERRIDES = {"win32": TASKS_FACTORS, "cygwin": TASKS_FACTORS}
