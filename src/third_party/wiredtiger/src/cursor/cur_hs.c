@@ -651,9 +651,17 @@ __curhs_search_near(WT_CURSOR *cursor, int *exactp)
                         break;
 
                     /*
-                     * We are now smaller than the key range, which indicates nothing is visible to
-                     * us in the specified key range.
+                     * We're comparing the entire history store key (as opposed to just the data
+                     * store component) because ordering can be different between the data store and
+                     * history store due to packing. Since we know we're NOT in the specified key
+                     * range due to the check above, checking whether we're before or after the full
+                     * history store key that we're running a `search near` on will tell us whether
+                     * we're before or after the specified key range.
+                     *
+                     * If we're before the specified key range, that means nothing is visible to us
+                     * in the specified key range and we should terminate the search.
                      */
+                    WT_ERR(__wt_compare(session, NULL, &file_cursor->key, srch_key, &cmp));
                     if (cmp < 0) {
                         ret = WT_NOTFOUND;
                         goto err;
@@ -719,9 +727,17 @@ __curhs_search_near(WT_CURSOR *cursor, int *exactp)
                         break;
 
                     /*
-                     * We are now larger than the key range, which indicates nothing is visible to
-                     * us in the specified key range.
+                     * We're comparing the entire history store key (as opposed to just the data
+                     * store component) because ordering can be different between the data store and
+                     * history store due to packing. Since we know we're NOT in the specified key
+                     * range due to the check above, checking whether we're before or after the full
+                     * history store key that we're running a `search near` on will tell us whether
+                     * we're before or after the specified key range.
+                     *
+                     * If we're after the specified key range, that means nothing is visible to us
+                     * in the specified key range and we should terminate the search.
                      */
+                    WT_ERR(__wt_compare(session, NULL, &file_cursor->key, srch_key, &cmp));
                     if (cmp > 0) {
                         ret = WT_NOTFOUND;
                         goto err;
