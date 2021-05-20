@@ -215,7 +215,6 @@ void statsToBSON(const sbe::PlanStageStats* stats,
     if (stats->common.executionTimeMillis) {
         bob->appendNumber("executionTimeMillisEstimate", *stats->common.executionTimeMillis);
     }
-    bob->appendNumber("advances", static_cast<long long>(stats->common.advances));
     bob->appendNumber("opens", static_cast<long long>(stats->common.opens));
     bob->appendNumber("closes", static_cast<long long>(stats->common.closes));
     bob->appendNumber("saveState", static_cast<long long>(stats->common.yields));

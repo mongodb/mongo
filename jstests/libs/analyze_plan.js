@@ -413,7 +413,7 @@ function getChunkSkipsFromShard(shardPlan, shardExecutionStages) {
         // excluded.
         const filters = getPlanStages(shardExecutionStages.executionStages, "filter")
                             .filter(stage => (stage.planNodeId === shardFilterNodeId));
-        return filters.reduce((numSkips, stage) => (numSkips + (stage.numTested - stage.advances)),
+        return filters.reduce((numSkips, stage) => (numSkips + (stage.numTested - stage.nReturned)),
                               0);
     } else {
         // Otherwise, we assume that execution used a "classic" SHARDING_FILTER stage, which
