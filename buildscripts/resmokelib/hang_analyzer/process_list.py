@@ -50,14 +50,19 @@ def get_processes(process_ids, interesting_processes, process_match, logger):
 
     processes_to_keep = []
     for process in all_processes:
+        # skip self
         if process.pidv == os.getpid():
             continue
 
+        # if we've been given a list of pids, and the pid isn't in that list
+        # skip it
         if process_ids and process.pidv not in process_ids:
             continue
 
-        if interesting_processes and not _pname_match(process_match, process.name,
-                                                      interesting_processes):
+        # if we don't have a list of pids, make sure the process matches
+        # the list of interesting processes
+        if not process_ids and interesting_processes and not _pname_match(
+                process_match, process.name, interesting_processes):
             continue
 
         processes_to_keep.append(process)

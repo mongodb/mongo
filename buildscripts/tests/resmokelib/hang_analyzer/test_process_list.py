@@ -48,13 +48,9 @@ class TestGetProcesses(unittest.TestCase):
     @patch(ns("_get_lister"))
     def test_interesting_processes_and_process_ids(self, lister_mock, os_mock):
         os_mock.return_value = -1
-        lister_mock.return_value.dump_processes.return_value = [
-            (1, "python"),
-            (2, "mongo"),
-            (3, "python"),
-            (4, "mongod"),
-            (5, "java")  # this should be ignored.
-        ]
+        lister_mock.return_value.dump_processes.return_value = [(1, "python"), (2, "mongo"),
+                                                                (3, "python"), (4, "mongod"),
+                                                                (5, "java")]
 
         process_ids = [1, 2, 5]
         interesting_processes = ['python', 'mongo', 'mongod']
@@ -66,6 +62,7 @@ class TestGetProcesses(unittest.TestCase):
         self.assertCountEqual(processes, [
             Pinfo(name="python", pidv=[1]),
             Pinfo(name="mongo", pidv=[2]),
+            Pinfo(name="java", pidv=[5]),
         ])
 
     @patch(ns("os.getpid"))
