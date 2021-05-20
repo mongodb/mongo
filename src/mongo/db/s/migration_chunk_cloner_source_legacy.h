@@ -252,9 +252,6 @@ private:
     // pre-allocation (initial clone).
     uint64_t _averageObjectSizeForCloneLocs{0};
 
-    // The estimated average object _id size during the clone phase.
-    uint64_t _averageObjectIdSize{0};
-
     // List of _id of documents that were modified that must be re-cloned (xfer mods)
     std::list<BSONObj> _reload;
 

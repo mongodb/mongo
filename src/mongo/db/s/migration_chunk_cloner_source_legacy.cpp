@@ -41,13 +41,11 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -64,12 +62,6 @@
 
 namespace mongo {
 namespace {
-
-/**
- * The maximum percentage of untrasferred chunk mods at the end of a catch up iteration
- * that may be deferred to the next phase of the migration protocol (where new writes get blocked).
- */
-MONGO_EXPORT_SERVER_PARAMETER(maxCatchUpPercentageBeforeBlockingWrites, int, 10);
 
 const char kRecvChunkStatus[] = "_recvChunkStatus";
 const char kRecvChunkCommit[] = "_recvChunkCommit";
@@ -302,32 +294,6 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
             }
 
             return Status::OK();
-        }
-
-        bool supportsCriticalSectionDuringCatchUp = false;
-        if (auto featureSupportedField =
-                res[StartChunkCloneRequest::kSupportsCriticalSectionDuringCatchUp]) {
-            if (!featureSupportedField.booleanSafe()) {
-                return {ErrorCodes::Error(563070),
-                        str::stream()
-                            << "Illegal value for "
-                            << StartChunkCloneRequest::kSupportsCriticalSectionDuringCatchUp};
-            }
-            supportsCriticalSectionDuringCatchUp = true;
-        }
-
-        if (res["state"].String() == "catchup" && supportsCriticalSectionDuringCatchUp) {
-            int64_t estimatedUntransferredModsSize = _deleted.size() * _averageObjectIdSize +
-                _reload.size() * _averageObjectSizeForCloneLocs;
-            auto estimatedUntransferredChunkPercentage =
-                (std::min(_args.getMaxChunkSizeBytes(), estimatedUntransferredModsSize) * 100) /
-                _args.getMaxChunkSizeBytes();
-            if (estimatedUntransferredChunkPercentage <
-                maxCatchUpPercentageBeforeBlockingWrites.load()) {
-                // The recipient is sufficiently caught-up with the writes on the donor.
-                // Block writes, so that it can drain everything.
-                return Status::OK();
-            }
         }
 
         if (res["state"].String() == "fail") {
@@ -643,11 +609,11 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
 
     // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore, any
     // multi-key index prefixed by shard key cannot be multikey over the shard key fields.
-    IndexDescriptor* const shardKeyIdx =
+    IndexDescriptor* const idx =
         collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx,
                                                                  _shardKeyPattern.toBSON(),
                                                                  false);  // requireSingleKey
-    if (!shardKeyIdx) {
+    if (!idx) {
         return {ErrorCodes::IndexNotFound,
                 str::stream() << "can't find index with prefix " << _shardKeyPattern.toBSON()
                               << " in storeCurrentLocs for "
@@ -668,7 +634,7 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
     _deleteNotifyExec = std::move(statusWithDeleteNotificationPlanExecutor.getValue());
 
     // Assume both min and max non-empty, append MinKey's to make them fit chosen index
-    const KeyPattern kp(shardKeyIdx->keyPattern());
+    const KeyPattern kp(idx->keyPattern());
 
     BSONObj min = Helpers::toKeyFormat(kp.extendRangeBound(_args.getMinKey(), false));
     BSONObj max = Helpers::toKeyFormat(kp.extendRangeBound(_args.getMaxKey(), false));
@@ -677,7 +643,7 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
     // being queued and will migrate in the 'transferMods' stage.
     auto exec = InternalPlanner::indexScan(opCtx,
                                            collection,
-                                           shardKeyIdx,
+                                           idx,
                                            min,
                                            max,
                                            BoundInclusion::kIncludeStartKeyOnly,
@@ -732,19 +698,6 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
 
     const uint64_t collectionAverageObjectSize = collection->averageObjectSize(opCtx);
 
-    uint64_t averageObjectIdSize = 0;
-    const uint64_t defaultObjectIdSize = OID::kOIDSize;
-    if (totalRecs > 0) {
-        const auto indexCatalog = collection->getIndexCatalog();
-        const auto idIdx = indexCatalog->findIdIndex(opCtx);
-        if (!idIdx) {
-            return {ErrorCodes::IndexNotFound,
-                    str::stream() << "can't find index '_id' in storeCurrentLocs for "
-                                  << _args.getNss().ns()};
-        }
-        averageObjectIdSize = indexCatalog->getIndex(idIdx)->getSpaceUsedBytes(opCtx) / totalRecs;
-    }
-
     if (isLargeChunk) {
         return {
             ErrorCodes::ChunkTooBig,
@@ -766,8 +719,8 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
     }
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _averageObjectSizeForCloneLocs = collectionAverageObjectSize + defaultObjectIdSize;
-    _averageObjectIdSize = std::max(averageObjectIdSize, defaultObjectIdSize);
+    _averageObjectSizeForCloneLocs = collectionAverageObjectSize + 12;
+
     return Status::OK();
 }
 
