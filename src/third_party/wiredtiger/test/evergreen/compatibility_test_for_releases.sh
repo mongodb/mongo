@@ -68,6 +68,7 @@ run_format()
         flags="-1q $(bflag $1)"
 
         args=""
+        args+="runs.type=row "                  # Temporarily disable column store tests
         args+="cache=80 "                       # Medium cache so there's eviction
         args+="checkpoints=1 "                  # Force periodic writes
         args+="compression=snappy "             # We only built with snappy, force the choice
