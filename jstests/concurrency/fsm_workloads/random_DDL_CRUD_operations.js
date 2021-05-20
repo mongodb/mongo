@@ -5,6 +5,7 @@
  * and verifies guarantees are not broken.
  *
  * @tags: [
+ *   requires_fcv_50,
  *   requires_sharding,
  *   assumes_balancer_off,
  *   assumes_autosplit_off,
@@ -15,8 +16,6 @@
  *   does_not_support_stepdowns,
  *   # Can be removed once PM-1965-Milestone-1 is completed.
  *   does_not_support_transactions,
- *   # TODO (SERVER-57031): remove tag once 5.0 branches out
- *   multiversion_incompatible,
  *   featureFlagShardingFullDDLSupport
  *  ]
  */

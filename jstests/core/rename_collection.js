@@ -2,8 +2,7 @@
  * Basic test around rename collection
  *
  * @tags: [
- *   # renameCollection is not supported on sharded collections
- *   assumes_unsharded_collection,
+ *   requires_fcv_50,
  *   requires_non_retryable_commands,
  * ]
  */
@@ -14,73 +13,79 @@
 const collNamePrefix = "rename_coll_test_";
 let collCounter = 0;
 
+function getNewCollName() {
+    return collNamePrefix + collCounter++;
+}
+
 function getNewColl() {
-    let coll = db[collNamePrefix + collCounter++];
+    let coll = db[getNewCollName()];
     coll.drop();
     return coll;
 }
 
 jsTest.log("Rename collection with documents");
 {
-    let a = getNewColl();
-    let b = getNewColl();
+    const src = getNewColl();
+    const dstName = getNewCollName();
 
-    a.save({x: 1});
-    a.save({x: 2});
-    a.save({x: 3});
+    src.save({x: 1});
+    src.save({x: 2});
+    src.save({x: 3});
 
-    assert.eq(3, a.countDocuments({}));
-    assert.eq(0, b.countDocuments({}));
+    assert.eq(3, src.countDocuments({}));
 
-    assert.commandWorked(a.renameCollection(b.getName()));
+    assert.commandWorked(src.renameCollection(dstName));
 
-    assert.eq(0, a.countDocuments({}));
-    assert.eq(3, b.countDocuments({}));
+    assert.eq(0, src.countDocuments({}));
+    assert.eq(3, db[dstName].countDocuments({}));
 }
 
 jsTest.log("Rename collection with indexes");
 {
-    let a = getNewColl();
-    let b = getNewColl();
-    let c = getNewColl();
+    const src = getNewColl();
+    const dstName = getNewCollName();
+    const existingDst = getNewColl();
 
-    a.save({a: 1});
-    a.save({a: 2});
-    a.createIndex({a: 1});
-    a.createIndex({b: 1});
+    src.save({a: 1});
+    src.save({a: 2});
+    src.createIndex({a: 1});
+    src.createIndex({b: 1});
 
-    c.save({a: 100});
-    assert.commandFailed(db.adminCommand({renameCollection: a.getFullName(), to: c.getFullName()}));
+    existingDst.save({a: 100});
+    assert.commandFailed(
+        db.adminCommand({renameCollection: src.getFullName(), to: existingDst.getFullName()}));
 
-    assert.commandWorked(db.adminCommand({renameCollection: a.getFullName(), to: b.getFullName()}));
-    assert.eq(0, a.countDocuments({}));
+    const originalNumberOfIndexes = src.getIndexes().length;
+    assert.commandWorked(src.renameCollection(dstName));
+    assert.eq(0, src.countDocuments({}));
 
-    assert.eq(2, b.countDocuments({}));
-    assert(db.getCollectionNames().indexOf(b.getName()) >= 0);
-    assert(db.getCollectionNames().indexOf(a.getName()) < 0);
-    assert.eq(3, b.getIndexes().length);
-    assert.eq(0, a.getIndexes().length);
+    const dst = db[dstName];
+    assert.eq(2, dst.countDocuments({}));
+    assert(db.getCollectionNames().indexOf(dst.getName()) >= 0);
+    assert(db.getCollectionNames().indexOf(src.getName()) < 0);
+    assert.eq(originalNumberOfIndexes, dst.getIndexes().length);
+    assert.eq(0, src.getIndexes().length);
 }
 
 jsTest.log("Rename collection with existing target");
 {
-    let a = getNewColl();
-    let b = getNewColl();
+    const dst = getNewColl();
+    const src = getNewColl();
 
-    a.save({x: 1});
-    b.save({x: 2});
+    src.save({x: 1});
+    dst.save({x: 2});
 
-    assert.eq(1, a.countDocuments({x: 1}));
-    assert.eq(1, b.countDocuments({x: 2}));
+    assert.eq(1, src.countDocuments({x: 1}));
+    assert.eq(1, dst.countDocuments({x: 2}));
 
-    assert.commandFailed(b.renameCollection(a.getName()));
+    assert.commandFailed(src.renameCollection(dst.getName()));
 
-    assert.eq(1, a.countDocuments({x: 1}));
-    assert.eq(1, b.countDocuments({x: 2}));
+    assert.eq(1, src.countDocuments({x: 1}));
+    assert.eq(1, dst.countDocuments({x: 2}));
 
-    assert.commandWorked(b.renameCollection(a.getName(), true));
+    assert.commandWorked(src.renameCollection(dst.getName(), true /* dropTarget */));
 
-    assert.eq(1, a.countDocuments({x: 2}));
-    assert.eq(0, b.countDocuments({}));
+    assert.eq(0, src.countDocuments({x: 2}));
+    assert.eq(1, dst.countDocuments({}));
 }
 })();

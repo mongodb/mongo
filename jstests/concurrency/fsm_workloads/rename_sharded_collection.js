@@ -11,13 +11,12 @@
  * concurrency
  *
  * @tags: [
+ *   requires_fcv_50,
  *   requires_sharding,
  *   # TODO (SERVER-56879): Support add/remove shards in new DDL paths
  *   does_not_support_add_remove_shards,
  *   # This test just performs rename operations that can't be executed in transactions
  *   does_not_support_transactions,
- *   # TODO (SERVER-57031): remove tag once 5.0 branches out
- *   multiversion_incompatible,
  *   # Can be removed once PM-1965-Milestone-1 is completed.
  *   featureFlagShardingFullDDLSupport
  *  ]

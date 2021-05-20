@@ -76,17 +76,6 @@ selector:
   # our .remove(query, {justOne: true}) calls lack shard keys
   - jstests/concurrency/fsm_workloads/remove_single_document.js
 
-  # The rename_* workloads are disabled since renameCollection doesn't work with sharded
-  # collections
-  - jstests/concurrency/fsm_workloads/rename_capped_collection_chain.js
-  - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_chain.js
-  - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_droptarget.js
-  - jstests/concurrency/fsm_workloads/rename_capped_collection_droptarget.js
-  - jstests/concurrency/fsm_workloads/rename_collection_chain.js
-  - jstests/concurrency/fsm_workloads/rename_collection_dbname_chain.js
-  - jstests/concurrency/fsm_workloads/rename_collection_dbname_droptarget.js
-  - jstests/concurrency/fsm_workloads/rename_collection_droptarget.js
-
   # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
   - jstests/concurrency/fsm_workloads/update_where.js
 
@@ -120,6 +109,7 @@ selector:
   - requires_profiling
   # mongos does not support inserts on timeseries collections
   - requires_timeseries
+  - assumes_unsharded_collection
 
 executor:
   archive:

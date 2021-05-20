@@ -2,8 +2,7 @@
  * Test that renaming a collection to itself is not allowed
  *
  * @tags: [
- *   # TODO (SERVER-57031): remove tag once 5.0 branches out
- *   multiversion_incompatible,
+ *   requires_fcv_50,
  *   requires_non_retryable_commands,
  * ]
  */
