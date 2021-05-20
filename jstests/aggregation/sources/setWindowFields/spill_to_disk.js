@@ -42,6 +42,35 @@ seedWithTickerData(coll, 10);
 // Run $sum test with memory limits that cause spilling to disk.
 testAccumAgainstGroup(coll, "$sum", 0);
 
+function checkProfilerForDiskWrite(dbToCheck) {
+    if (!FixtureHelpers.isMongos) {
+        const profileObj = getLatestProfilerEntry(dbToCheck, {
+            $or: [
+                {originatingCommand: {pipeline: {$setWindowFields: {$exists: true}}}},
+                {command: {pipeline: {$setWindowFields: {$exists: true}}}}
+            ]
+        });
+        assert(profileObj.usedDisk, tojson(profileObj));
+    }
+}
+
+FixtureHelpers.runCommandOnEachPrimary({db: db, cmdObj: {profile: 2}});
+// Test that a query that spills to disk succeeds across getMore requests.
+const wfResults =
+    coll.aggregate(
+            [
+                {
+                    $setWindowFields: {
+                        sortBy: {_id: 1},
+                        output: {res: {$sum: "$price", window: {documents: ["unbounded", 5]}}}
+                    },
+                },
+            ],
+            {allowDiskUse: true, cursor: {batchSize: 1}})
+        .toArray();
+assert.eq(wfResults.length, 20);
+checkProfilerForDiskWrite(db);
+
 // Test a small, in memory, partition and a larger partition that requires spilling to disk.
 coll.drop();
 // Create small partition.
@@ -53,19 +82,6 @@ for (let i = 0; i < largePartitionSize; i++) {
     assert.commandWorked(coll.insert({_id: i + smallPartitionSize, val: i, partition: 2}));
 }
 
-function checkProfilerForDiskWrite(dbToCheck) {
-    if (!FixtureHelpers.isMongos) {
-        let profileObj = getLatestProfilerEntry(dbToCheck, {
-            $or: [
-                {originatingCommand: {pipeline: {$setWindowFields: {$exists: true}}}},
-                {command: {pipeline: {$setWindowFields: {$exists: true}}}}
-            ]
-        });
-        assert(profileObj.usedDisk, tojson(profileObj));
-    }
-}
-
-FixtureHelpers.runCommandOnEachPrimary({db: db, cmdObj: {profile: 2}});
 // Run an aggregation that will keep all documents in the cache for all documents.
 let results =
     coll.aggregate(
