@@ -95,7 +95,7 @@ public:
                         request().getZones());
             }
 
-            if (request().get_presetReshardedChunks()) {
+            if (const auto& presetChunks = request().get_presetReshardedChunks()) {
                 uassert(ErrorCodes::BadValue,
                         "Test commands must be enabled when a value is provided for field: "
                         "_presetReshardedChunks",
@@ -105,9 +105,8 @@ public:
                         "Must specify only one of _presetReshardedChunks or numInitialChunks",
                         !(bool(request().getNumInitialChunks())));
 
-                validateReshardedChunks(request().get_presetReshardedChunks().get(),
-                                        opCtx,
-                                        ShardKeyPattern(request().getKey()).getKeyPattern());
+                validateReshardedChunks(
+                    *presetChunks, opCtx, ShardKeyPattern(request().getKey()).getKeyPattern());
             }
 
             auto instance = ([&] {

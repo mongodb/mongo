@@ -38,7 +38,6 @@
 #include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/resharded_chunk_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/string_map.h"

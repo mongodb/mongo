@@ -235,3 +235,16 @@ structs:
             max:
                 type: object_owned
                 description: "The max key of the chunk range assigned to the zone."
+
+    ReshardedChunk:
+        description: "ReshardedChunk"
+        fields:
+            recipientShardId:
+                type: shard_id
+                description: "The id of the recipient shard."
+            min:
+                type: object_owned
+                description: "The min key of the chunk range."
+            max:
+                type: object_owned
+                description: "The max key of the chunk range."

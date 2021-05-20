@@ -168,12 +168,11 @@ void checkForHolesAndOverlapsInChunks(std::vector<ReshardedChunk>& chunks,
     }
 }
 
-void validateReshardedChunks(const std::vector<mongo::BSONObj>& chunks,
+void validateReshardedChunks(const std::vector<ReshardedChunk>& chunks,
                              OperationContext* opCtx,
                              const KeyPattern& keyPattern) {
     std::vector<ReshardedChunk> validChunks;
-    for (const BSONObj& obj : chunks) {
-        auto chunk = ReshardedChunk::parse(IDLParserErrorContext("reshardedChunks"), obj);
+    for (const auto& chunk : chunks) {
         uassertStatusOK(
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk.getRecipientShardId()));
         validChunks.push_back(chunk);
