@@ -319,6 +319,20 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
         .on(**executor, stepdownToken);
 }
 
+ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMandatoryCleanup(
+    Status status) {
+    return _dataReplicationQuiesced.thenRunOn(_recipientService->getInstanceCleanupExecutor())
+        .onCompletion([this, self = shared_from_this(), outerStatus = status](
+                          Status dataReplicationHaltStatus) {
+            // Wait for all of the data replication components to halt. We ignore any data
+            // replication errors because resharding is known to have failed already.
+            stdx::lock_guard<Latch> lk(_mutex);
+            ensureFulfilledPromise(lk, _completionPromise, outerStatus);
+
+            return outerStatus;
+        });
+}
+
 SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& stepdownToken) noexcept {
@@ -378,18 +392,20 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
 
             return status;
         })
+        .thenRunOn(_recipientService->getInstanceCleanupExecutor())
+        .onCompletion([this, self = shared_from_this()](Status status) {
+            // On stepdown or shutdown, the _scopedExecutor may have already been shut down.
+            // Everything in this function runs on the instance's cleanup executor, and will
+            // execute regardless of any work on _scopedExecutor ever running.
+            return _runMandatoryCleanup(status);
+        })
         .semi();
 }
 
 void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status) {
-    // Resolve any unresolved promises to avoid hanging.
     stdx::lock_guard<Latch> lk(_mutex);
     if (_dataReplication) {
         _dataReplication->shutdown();
-    }
-
-    if (!_completionPromise.getFuture().isReady()) {
-        _completionPromise.setError(status);
     }
 }
 

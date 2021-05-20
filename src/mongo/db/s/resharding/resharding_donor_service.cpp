@@ -338,7 +338,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
     });
 }
 
-void ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(Status status) {
+Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(Status status) {
     if (!status.isOK()) {
         stdx::lock_guard<Latch> lk(_mutex);
 
@@ -347,6 +347,8 @@ void ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(Status stat
 
         ensureFulfilledPromise(lk, _completionPromise, status);
     }
+
+    return status;
 }
 
 SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(

@@ -149,6 +149,12 @@ public:
     void abort();
 
 private:
+    /**
+     * The work inside this function must be run regardless of any work on _scopedExecutor ever
+     * running.
+     */
+    ExecutorFuture<void> _runMandatoryCleanup(Status status);
+
     // The following functions correspond to the actions to take at a particular recipient state.
     ExecutorFuture<void> _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -220,6 +226,7 @@ private:
     // Should only be called once per lifetime.
     CancellationToken _initAbortSource(const CancellationToken& stepdownToken);
 
+    // The primary-only service instance corresponding to the recipient instance. Not owned.
     const ReshardingRecipientService* const _recipientService;
 
     // The in-memory representation of the immutable portion of the document in
