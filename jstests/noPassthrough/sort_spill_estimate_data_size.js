@@ -50,7 +50,7 @@ function createPipeline(collection) {
     return collection.aggregate(
         [
             {$unwind: "$data"},
-            {$sort: {'_id': -1, 'data.val': -1}},
+            {$sort: {'_id': -1, 'data.uniqueValue': -1}},
             {$limit: 900},
             {$group: {_id: 0, sumTop900UniqueValues: {$sum: '$data.uniqueValue'}}}
         ],
@@ -67,7 +67,7 @@ const dataBytesSorted = sort["totalDataSizeSortedBytesEstimate"];
 // The total data size sorted is no greater than 3x the total size of all documents sorted.
 assert.lt(dataBytesSorted, 3 * totalSize, explain);
 
-assert.eq(createPipeline(coll).toArray(), [{_id: 0, sumTop900UniqueValues: 84550}], explain);
+assert.eq(createPipeline(coll).toArray(), [{_id: 0, sumTop900UniqueValues: 94550}], explain);
 
 MongoRunner.stopMongod(conn);
 })();
