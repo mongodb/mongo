@@ -37,4 +37,14 @@ assert.eq(col.find({'d': NumberLong(1)}).count(), '4');
 assert.eq(col.find({'d': NumberInt(1)}).count(), '4');
 // NaN and -NaN are both evaluated to NaN
 assert.eq(col.find({'d': NumberDecimal('NaN')}).count(), 2);
+
+// Verify that shell 'assert.eq' considers precision during comparison.
+assert.neq(NumberDecimal('1'), NumberDecimal('1.000'));
+assert.neq(NumberDecimal('0'), NumberDecimal('-0'));
+
+// Verify the behavior of 'numberDecimalsEqual' helper.
+assert(numberDecimalsEqual(NumberDecimal('10.20'), NumberDecimal('10.2')));
+assert.throws(
+    () => numberDecimalsEqual(NumberDecimal('10.20'), NumberDecimal('10.2'), "Third parameter"));
+assert.throws(() => numberDecimalsEqual(NumberDecimal('10.20'), "Wrong parameter type"));
 }());
