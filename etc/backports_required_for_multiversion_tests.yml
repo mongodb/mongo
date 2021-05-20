@@ -129,6 +129,8 @@ all:
     test_file: jstests/replsets/dont_refresh_session_prepare_secondary.js
   - ticket: SERVER-55725
     test_file: jstests/sharding/time_zone_info_mongos.js
+  - ticket: SERVER-53760
+    test_file: jstests/core/sort_spill_estimate_data_size.js
 
 suites:
 

@@ -355,6 +355,57 @@ TEST(DocumentGetFieldNonCaching, TraverseArray) {
     checkArrayTagIsReturned();
 }
 
+TEST(DocumentCache, DocumentmemUsageForSorterShouldNotCountAllMemory) {
+    int numDocs = 5;
+    int bigStrLen = numDocs * 40;
+    int arrLen = numDocs * 40;
+
+    auto bigStr = std::ostringstream{};
+    for (int i = 0; i < bigStrLen; ++i) {
+        bigStr << "a";
+    }
+
+    // Create `numDocs` documents using a backing BSON, where each document has a big array field
+    // (i.e., `data`)
+    int totalApproxSize = 0;
+    vector<Document> docs;
+    for (int i = 0; i < numDocs; ++i) {
+        BSONArrayBuilder arrBuilder;
+        for (int j = 0; j < arrLen; ++j) {
+            arrBuilder << BSON("bigString" << bigStr.str() << "uniqueValue" << j);
+        }
+
+        Document doc = fromBson(BSON("_id" << i << "foo" << i * 2 << "data" << arrBuilder.arr()));
+        docs.push_back(doc);
+        totalApproxSize += doc.getApproximateSize();
+    }
+
+    // Update the documents stored in `docs` and replace their big array field (i.e., `data`) with
+    // an integer.
+    int totalUpdatedApproxSize = 0;
+    int totalUpdatedSortedSize = 0;
+    int i = 0;
+    for (auto& doc : docs) {
+        ++i;
+        MutableDocument mdoc(doc);
+        mdoc.getFieldNonLeaf("data") = Value(i);
+        Document fdoc = mdoc.freeze();
+
+        totalUpdatedApproxSize += fdoc.getApproximateSize();
+        totalUpdatedSortedSize += fdoc.memUsageForSorter();
+    }
+
+    // As these updated documents still share the same backing BSON as the documents prior to the
+    // update, it's expected that `getApproximateSize` for the updated documents returns a slightly
+    // bigger number, as it counts both the backing BSON and the added inetegr field, which is in
+    // the cache.
+    ASSERT(totalUpdatedApproxSize < 2 * totalApproxSize);
+    // However, the returned value from `memUsageForSorter` is going to be much smaller (i.e., 150x)
+    // than the result returned from `getApproximateSize`, as it won't count for the `data` field in
+    // the backing BSON, as it's already brought into the cache.
+    ASSERT(150 * totalUpdatedSortedSize < totalApproxSize);
+}
+
 /** Add Document fields. */
 class AddField {
 public:
