@@ -97,7 +97,7 @@ structs:
                 description: "The number of chunks the new collection should have after resharding."
                 optional: true
             presetReshardedChunks:
-                type: array<object_owned>
+                type: array<ReshardedChunk>
                 description: >-
                     Mapping of chunk ranges to be used as the initial split output. This is only
                     for testing purposes.

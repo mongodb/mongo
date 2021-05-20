@@ -80,14 +80,6 @@ protected:
         return _nss;
     }
 
-    BSONObj makeReshardedChunk(const ChunkRange range, std::string shardId) {
-        BSONObjBuilder reshardedchunkBuilder;
-        reshardedchunkBuilder.append(ReshardedChunk::kRecipientShardIdFieldName, shardId);
-        reshardedchunkBuilder.append(ReshardedChunk::kMinFieldName, range.getMin());
-        reshardedchunkBuilder.append(ReshardedChunk::kMaxFieldName, range.getMax());
-        return reshardedchunkBuilder.obj();
-    }
-
     ReshardingZoneType makeZone(const ChunkRange range, std::string zoneName) {
         return ReshardingZoneType(zoneName, range.getMin(), range.getMax());
     }
@@ -133,64 +125,48 @@ TEST(ReshardingUtilTest, HighestMinFetchTimestampSucceedsWithDonorStateGTkDonati
 // Validate resharded chunks tests.
 
 TEST_F(ReshardingUtilTest, SuccessfulValidateReshardedChunkCase) {
-    std::vector<mongo::BSONObj> chunks;
-    const std::vector<ChunkRange> chunkRanges = {
-        ChunkRange(keyPattern().globalMin(), BSON(shardKey() << 0)),
-        ChunkRange(BSON(shardKey() << 0), keyPattern().globalMax()),
-    };
-    chunks.push_back(makeReshardedChunk(chunkRanges[0], "a"));
-    chunks.push_back(makeReshardedChunk(chunkRanges[1], "b"));
+    std::vector<ReshardedChunk> chunks;
+    chunks.emplace_back(ShardId("a"), keyPattern().globalMin(), BSON(shardKey() << 0));
+    chunks.emplace_back(ShardId("b"), BSON(shardKey() << 0), keyPattern().globalMax());
 
     validateReshardedChunks(chunks, operationContext(), keyPattern());
 }
 
 TEST_F(ReshardingUtilTest, FailWhenHoleInChunkRange) {
-    std::vector<mongo::BSONObj> chunks;
-    const std::vector<ChunkRange> chunkRanges = {
-        ChunkRange(keyPattern().globalMin(), BSON(shardKey() << 0)),
-        ChunkRange(BSON(shardKey() << 20), keyPattern().globalMax()),
-    };
-    chunks.push_back(makeReshardedChunk(chunkRanges[0], "a"));
-    chunks.push_back(makeReshardedChunk(chunkRanges[1], "b"));
+    std::vector<ReshardedChunk> chunks;
+    chunks.emplace_back(ShardId("a"), keyPattern().globalMin(), BSON(shardKey() << 0));
+    chunks.emplace_back(ShardId("b"), BSON(shardKey() << 20), keyPattern().globalMax());
+
     ASSERT_THROWS_CODE(validateReshardedChunks(chunks, operationContext(), keyPattern()),
                        DBException,
                        ErrorCodes::BadValue);
 }
 
 TEST_F(ReshardingUtilTest, FailWhenOverlapInChunkRange) {
-    const std::vector<ChunkRange> overlapChunkRanges = {
-        ChunkRange(keyPattern().globalMin(), BSON(shardKey() << 10)),
-        ChunkRange(BSON(shardKey() << 5), keyPattern().globalMax()),
-    };
-    std::vector<mongo::BSONObj> chunks;
-    chunks.push_back(makeReshardedChunk(overlapChunkRanges[0], "a"));
-    chunks.push_back(makeReshardedChunk(overlapChunkRanges[1], "b"));
+    std::vector<ReshardedChunk> chunks;
+    chunks.emplace_back(ShardId("a"), keyPattern().globalMin(), BSON(shardKey() << 10));
+    chunks.emplace_back(ShardId("b"), BSON(shardKey() << 5), keyPattern().globalMax());
+
     ASSERT_THROWS_CODE(validateReshardedChunks(chunks, operationContext(), keyPattern()),
                        DBException,
                        ErrorCodes::BadValue);
 }
 
 TEST_F(ReshardingUtilTest, FailWhenChunkRangeDoesNotStartAtGlobalMin) {
-    std::vector<mongo::BSONObj> chunks;
-    const std::vector<ChunkRange> chunkRanges = {
-        ChunkRange(BSON(shardKey() << 10), BSON(shardKey() << 20)),
-        ChunkRange(BSON(shardKey() << 20), keyPattern().globalMax()),
-    };
-    chunks.push_back(makeReshardedChunk(chunkRanges[0], "a"));
-    chunks.push_back(makeReshardedChunk(chunkRanges[1], "b"));
+    std::vector<ReshardedChunk> chunks;
+
+    chunks.emplace_back(ShardId("a"), BSON(shardKey() << 10), BSON(shardKey() << 20));
+    chunks.emplace_back(ShardId("b"), BSON(shardKey() << 20), keyPattern().globalMax());
+
     ASSERT_THROWS_CODE(validateReshardedChunks(chunks, operationContext(), keyPattern()),
                        DBException,
                        ErrorCodes::BadValue);
 }
 
 TEST_F(ReshardingUtilTest, FailWhenChunkRangeDoesNotEndAtGlobalMax) {
-    std::vector<mongo::BSONObj> chunks;
-    const std::vector<ChunkRange> chunkRanges = {
-        ChunkRange(keyPattern().globalMin(), BSON(shardKey() << 0)),
-        ChunkRange(BSON(shardKey() << 0), BSON(shardKey() << 10)),
-    };
-    chunks.push_back(makeReshardedChunk(chunkRanges[0], "a"));
-    chunks.push_back(makeReshardedChunk(chunkRanges[1], "b"));
+    std::vector<ReshardedChunk> chunks;
+    chunks.emplace_back(ShardId("a"), keyPattern().globalMin(), BSON(shardKey() << 0));
+    chunks.emplace_back(ShardId("b"), BSON(shardKey() << 0), BSON(shardKey() << 10));
 
     ASSERT_THROWS_CODE(validateReshardedChunks(chunks, operationContext(), keyPattern()),
                        DBException,

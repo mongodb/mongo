@@ -749,12 +749,9 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
 
         // Use the provided shardIds from presetReshardedChunks to construct the
         // recipient list.
-        for (const BSONObj& obj : *chunks) {
-            recipientShardIds.emplace(
-                obj.getStringField(ReshardedChunk::kRecipientShardIdFieldName));
+        for (const auto& reshardedChunk : *chunks) {
+            recipientShardIds.emplace(reshardedChunk.getRecipientShardId());
 
-            auto reshardedChunk =
-                ReshardedChunk::parse(IDLParserErrorContext("ReshardedChunk"), obj);
             if (version.getTimestamp()) {
                 initialChunks.emplace_back(
                     coordinatorDoc.getReshardingUUID(),

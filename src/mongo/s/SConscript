@@ -178,7 +178,6 @@ env.Library(
         'request_types/split_chunk_request_type.cpp',
         'request_types/update_zone_key_range_request_type.cpp',
         'request_types/wait_for_fail_point.idl',
-        'resharded_chunk.idl',
         'resharding/common_types.idl',
         'resharding/resharding_feature_flag.idl',
         'resharding/resume_token.idl',

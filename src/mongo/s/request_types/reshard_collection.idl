@@ -65,7 +65,7 @@ commands:
         description: "The zones for the new shard key."
         optional: true
       _presetReshardedChunks:
-        type: array<object>
+        type: array<ReshardedChunk>
         description: "Mapping of chunk ranges. This is only for testing purposes."
         optional: true
 
@@ -99,7 +99,7 @@ commands:
         description: "The zones associated with the new shard key."
         optional: true
       _presetReshardedChunks:
-        type: array<object>
+        type: array<ReshardedChunk>
         description: >-
           "Mapping of chunk ranges to be used as the initial split output. This is only for 
           testing purposes."
