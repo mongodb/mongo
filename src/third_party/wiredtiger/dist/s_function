@@ -40,6 +40,16 @@ done | python dist/s_function_loop.py |
     egrep '\{@[^@]*(WT_RET[_A-Z]*)\([^@]*(WT_ERR[_A-Z]*)\(.*err:' |
     sed -e 's/^\([^:]*\): *\([^:]*\):.*/\1:\2: mix of returns and jump to the error label within a loop/'
 
+# Early exits from WT_WITH_* macros.
+for f in $(grep -l 'WT_WITH_' $(find bench examples ext src test -name '*.c' -o -name '*_inline.h')); do
+    echo "===$f==="
+    cat $f
+done | python dist/s_function_with.py 2>&1 $t || exit 1
+test -s $t && {
+    echo "Misuse of WT_WITH_* macros:"
+    cat $t
+}
+
 # Return of 0 in functions after a jump to the error label.
 for f in `find bench examples ext src test -name '*.c' -o -name '*._inline.h'`; do
 	file_parse $f |
