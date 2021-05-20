@@ -58,6 +58,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_lookup.h"
@@ -411,6 +412,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
         bool indexExists = writeConflictRetry(opCtx, "createCollectionWithIndexes", ns.ns(), [&] {
             AutoGetCollection collection(opCtx, ns, MODE_IS);
+            CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
 
             // Before potentially taking an exclusive collection lock, check if all indexes already
             // exist while holding an intent lock.
