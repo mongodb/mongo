@@ -349,7 +349,13 @@ private:
             return !(*this == other);
         }
         bool operator>(const Time& other) const {
-            return topologyTime > other.topologyTime || rsmIncrement > other.rsmIncrement ||
+            // SERVER-56950: When setFCV(v4.4) overlaps with a ShardRegistry reload,
+            // the ShardRegistry can fall into an infinite loop of lookups
+            if ((!topologyTime.isNull() && !other.topologyTime.isNull()) &&
+                (topologyTime > other.topologyTime)) {
+                return true;
+            }
+            return rsmIncrement > other.rsmIncrement ||
                 forceReloadIncrement > other.forceReloadIncrement;
         }
         bool operator>=(const Time& other) const {
