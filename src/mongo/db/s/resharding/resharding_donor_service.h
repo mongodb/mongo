@@ -133,7 +133,7 @@ private:
      * The work inside this function must be run regardless of any work on _scopedExecutor ever
      * running.
      */
-    void _runMandatoryCleanup(Status status);
+    Status _runMandatoryCleanup(Status status);
 
     // The following functions correspond to the actions to take at a particular donor state.
     void _transitionToPreparingToDonate();
