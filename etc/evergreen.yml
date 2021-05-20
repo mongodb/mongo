@@ -7940,6 +7940,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amzn64
     compile_flags: --ssl MONGO_DISTMOD=amzn64 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
     multiversion_platform: amzn64
     multiversion_edition: enterprise
     has_packages: true
@@ -7992,6 +7993,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-amazon
     compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
     multiversion_platform: amazon
     multiversion_edition: targeted
     has_packages: true
@@ -8043,7 +8045,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -8095,7 +8097,7 @@ buildvariants:
   - amazon2-test
   expansions:
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -8155,6 +8157,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-enterprise-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: aarch64
@@ -8205,6 +8208,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
