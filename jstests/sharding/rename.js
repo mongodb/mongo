@@ -83,8 +83,9 @@ jsTest.log("Testing that rename operations involving views are not allowed");
     const sameColl = db[sameCollName];
     assert.commandWorked(sameColl.insert({a: 1}));
 
+    // TODO SERVER-54879 just check for ErrorCodes.IllegalOperation
     assert.commandFailedWithCode(sameColl.renameCollection(sameCollName, true /* dropTarget */),
-                                 ErrorCodes.IllegalOperation);
+                                 [ErrorCodes.IllegalOperation, ErrorCodes.NamespaceNotFound]);
 
     assert.eq(1, sameColl.countDocuments({}), "Rename a collection to itself must not loose data");
 }
