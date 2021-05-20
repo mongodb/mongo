@@ -1,0 +1,17 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstestfuzz/out/*.js
+
+executor:
+  archive:
+    tests: true
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands
+      global_vars:
+        TestData:
+          setParameters:
+            failpoint.reshardingApplyOplogBatchTwice: "{mode: 'alwaysOn'}"

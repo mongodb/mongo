@@ -41,9 +41,14 @@
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+namespace {
+MONGO_FAIL_POINT_DEFINE(reshardingApplyOplogBatchTwice);
+}
 
 ReshardingOplogApplier::ReshardingOplogApplier(
     std::unique_ptr<Env> env,
@@ -131,6 +136,17 @@ SemiFuture<void> ReshardingOplogApplier::run(
                        _currentBatchToApply = std::move(batch);
 
                        return _applyBatch(executor, cancelToken, factory);
+                   })
+                   .then([this, executor, cancelToken, factory] {
+                       if (MONGO_unlikely(reshardingApplyOplogBatchTwice.shouldFail())) {
+                           LOGV2(5687600,
+                                 "reshardingApplyOplogBatchTwice failpoint enabled, applying batch "
+                                 "a second time",
+                                 "batchSize"_attr = _currentBatchToApply.size());
+                           _currentDerivedOps.clear();
+                           return _applyBatch(executor, cancelToken, factory);
+                       }
+                       return SemiFuture<void>();
                    })
                    .then([this, factory] {
                        if (_currentBatchToApply.empty()) {
