@@ -17,8 +17,10 @@ import re
 import signal
 import sys
 import traceback
+import getpass
 
 import psutil
+import distro
 
 from buildscripts.resmokelib.hang_analyzer import extractor
 from buildscripts.resmokelib.hang_analyzer import dumper
@@ -168,22 +170,18 @@ class HangAnalyzer(Subcommand):
 
         try:
             if sys.platform == "win32" or sys.platform == "cygwin":
-                distro = platform.win32_ver()
-                self.root_logger.info("Windows Distribution: %s", distro)
+                self.root_logger.info("Windows Distribution: %s", platform.win32_ver())
             else:
-                distro = platform.linux_distribution()
-                self.root_logger.info("Linux Distribution: %s", distro)
+                self.root_logger.info("Linux Distribution: %s", distro.linux_distribution())
 
         except AttributeError:
             self.root_logger.warning("Cannot determine Linux distro since Python is too old")
 
         try:
-            uid = os.getuid()
-            self.root_logger.info("Current User: %s", uid)
-            current_login = os.getlogin()
+            current_login = getpass.getuser()
             self.root_logger.info("Current Login: %s", current_login)
-        except OSError:
-            self.root_logger.warning("Cannot determine Unix Current Login")
+            uid = os.getuid()
+            self.root_logger.info("Current UID: %s", uid)
         except AttributeError:
             self.root_logger.warning(
                 "Cannot determine Unix Current Login, not supported on Windows")
