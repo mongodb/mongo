@@ -106,10 +106,14 @@ def mongos_program(  # pylint: disable=too-many-arguments
 
 def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches,too-many-locals,too-many-statements
         logger, job_num, test_id=None, executable=None, connection_string=None, filename=None,
-        process_kwargs=None, **kwargs):
+        test_filename=None, process_kwargs=None, **kwargs):
     """Return a Process instance that starts a mongo shell.
 
     The shell is started with the given connection string and arguments constructed from 'kwargs'.
+
+    :param filename: the file run by the mongo shell
+    :param test_filename: The test file - it's usually  `filename`, but may be different for
+                          tests that use JS runner files, which in turn run real JS files.
     """
 
     executable = utils.default_if_none(
@@ -119,10 +123,16 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
     eval_sb = []  # String builder.
     global_vars = kwargs.pop("global_vars", {}).copy()
 
-    if filename is not None:
-        test_name = os.path.splitext(os.path.basename(filename))[0]
+    def basename(filepath):
+        return os.path.splitext(os.path.basename(filepath))[0]
+
+    if test_filename is not None:
+        test_name = basename(test_filename)
+    elif filename is not None:
+        test_name = basename(filename)
     else:
         test_name = None
+
     shortcut_opts = {
         "backupOnRestartDir": (config.BACKUP_ON_RESTART_DIR, None),
         "enableMajorityReadConcern": (config.MAJORITY_READ_CONCERN, True),
