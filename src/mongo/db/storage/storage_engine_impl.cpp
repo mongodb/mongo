@@ -51,6 +51,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/exit_code.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -230,7 +232,23 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
             }
         }
 
-        _initCollection(opCtx, entry.catalogId, entry.nss, _options.forRepair);
+        try {
+            _initCollection(opCtx, entry.catalogId, entry.nss, _options.forRepair);
+        } catch (const DBException& ex) {
+            if (ex.code() == ErrorCodes::InvalidOptions) {
+                LOGV2_FATAL_CONTINUE(5692900,
+                                     "The collection uses features not recognized by this version "
+                                     "of mongod. Please consult our documentation when trying to "
+                                     "downgrade to a previous major release",
+                                     "collection"_attr = entry.nss,
+                                     "error"_attr = redact(ex.toStatus()));
+                quickExit(EXIT_NEED_UPGRADE);
+                MONGO_UNREACHABLE;
+            }
+
+            throw;
+        }
+
         auto maxPrefixForCollection = _catalog->getMetaData(opCtx, entry.catalogId).getMaxPrefix();
         maxSeenPrefix = std::max(maxSeenPrefix, maxPrefixForCollection);
 
