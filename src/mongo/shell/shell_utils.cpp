@@ -360,6 +360,19 @@ BSONObj isInteractive(const BSONObj& a, void*) {
     return BSON("" << shellGlobalParams.runShell);
 }
 
+BSONObj numberDecimalsEqual(const BSONObj& input, void*) {
+    uassert(5760500, "numberDecimalsEqual expects two arguments", input.nFields() == 2);
+
+    BSONObjIterator i(input);
+    auto first = i.next();
+    auto second = i.next();
+    uassert(5760501,
+            "Both the arguments of numberDecimalsEqual should be of type 'NumberDecimal'",
+            first.type() == BSONType::NumberDecimal && second.type() == BSONType::NumberDecimal);
+
+    return BSON("" << first.numberDecimal().isEqual(second.numberDecimal()));
+}
+
 void installShellUtils(Scope& scope) {
     scope.injectNative("getMemInfo", JSGetMemInfo);
     scope.injectNative("_replMonitorStats", replMonitorStats);
@@ -373,6 +386,7 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("convertShardKeyToHashed", convertShardKeyToHashed);
     scope.injectNative("fileExists", fileExistsJS);
     scope.injectNative("isInteractive", isInteractive);
+    scope.injectNative("numberDecimalsEqual", numberDecimalsEqual);
 
 #ifndef MONGO_SAFE_SHELL
     // can't launch programs

@@ -389,6 +389,10 @@ if (typeof NumberDecimal !== 'undefined') {
     NumberDecimal.prototype.tojson = function() {
         return this.toString();
     };
+
+    NumberDecimal.prototype.equals = function(other) {
+        return compareNumberDecimals(this, other);
+    };
 }
 
 // ObjectId
