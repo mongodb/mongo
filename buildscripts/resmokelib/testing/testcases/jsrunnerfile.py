@@ -49,4 +49,4 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
         return core.programs.mongo_shell_program(
             self.logger, self.fixture.job_num, test_id=self._id, executable=self.shell_executable,
             connection_string=self.fixture.get_driver_connection_url(),
-            filename=self.test_runner_file, **self.shell_options)
+            filename=self.test_runner_file, test_filename=self.test_name, **self.shell_options)
