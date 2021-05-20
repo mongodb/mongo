@@ -54,6 +54,20 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  OID newCollectionEpoch,
                                  boost::optional<Timestamp> newCollectionTimestamp);
 
+void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
+                                          const ReshardingCoordinatorDocument& coordinatorDoc);
+
+void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
+                                           const ReshardingCoordinatorDocument& coordinatorDoc,
+                                           std::vector<ChunkType> initialChunks,
+                                           std::vector<BSONObj> zones);
+
+void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);
+
+void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
+                                             const ReshardingCoordinatorDocument& coordinatorDoc,
+                                             boost::optional<Status> abortReason = boost::none);
 }  // namespace resharding
 
 class ReshardingCoordinatorExternalState {
@@ -65,45 +79,29 @@ public:
     };
 
     virtual ~ReshardingCoordinatorExternalState() = default;
-    virtual void insertCoordDocAndChangeOrigCollEntry(
-        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
+
     virtual ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
 
-    virtual void writeParticipantShardsAndTempCollInfo(
-        OperationContext* opCtx,
-        const ReshardingCoordinatorDocument& coordinatorDoc,
-        std::vector<ChunkType> initialChunks,
-        std::vector<BSONObj> zones) = 0;
+    ChunkVersion calculateChunkVersionForInitialChunks(OperationContext* opCtx);
 
-    virtual void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
-        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
-
-    virtual void removeCoordinatorDocAndReshardingFields(
-        OperationContext* opCtx,
-        const ReshardingCoordinatorDocument& coordinatorDoc,
-        boost::optional<Status> abortReason = boost::none) = 0;
+    virtual void sendCommandToShards(OperationContext* opCtx,
+                                     StringData dbName,
+                                     const BSONObj& command,
+                                     const std::vector<ShardId>& shardIds,
+                                     const std::shared_ptr<executor::TaskExecutor>& executor) = 0;
 };
 
 class ReshardingCoordinatorExternalStateImpl final : public ReshardingCoordinatorExternalState {
 public:
-    void insertCoordDocAndChangeOrigCollEntry(
-        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override;
     ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override;
 
-    void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
-                                               const ReshardingCoordinatorDocument& coordinatorDoc,
-                                               std::vector<ChunkType> initialChunks,
-                                               std::vector<BSONObj> zones) override;
-
-    void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
-        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override;
-
-    void removeCoordinatorDocAndReshardingFields(
-        OperationContext* opCtx,
-        const ReshardingCoordinatorDocument& coordinatorDoc,
-        boost::optional<Status> abortReason = boost::none) override;
+    void sendCommandToShards(OperationContext* opCtx,
+                             StringData dbName,
+                             const BSONObj& command,
+                             const std::vector<ShardId>& shardIds,
+                             const std::shared_ptr<executor::TaskExecutor>& executor) override;
 };
 
 /**
@@ -168,7 +166,7 @@ private:
     CancellationToken _abortToken;
 };
 
-class ReshardingCoordinatorService final : public repl::PrimaryOnlyService {
+class ReshardingCoordinatorService : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "ReshardingCoordinatorService"_sd;
 

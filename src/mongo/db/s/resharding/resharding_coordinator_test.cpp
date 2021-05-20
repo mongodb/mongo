@@ -52,6 +52,8 @@
 namespace mongo {
 namespace {
 
+using namespace resharding;
+
 class ReshardingCoordinatorPersistenceTest : public ConfigServerTestFixture {
 protected:
     void setUp() override {
@@ -209,7 +211,7 @@ protected:
             opCtx->getServiceContext()->getPreciseClockSource()->now());
         client.insert(CollectionType::ConfigNS.ns(), originalNssCatalogEntry.toBSON());
 
-        auto tempNssCatalogEntry = resharding::createTempReshardingCollectionType(
+        auto tempNssCatalogEntry = createTempReshardingCollectionType(
             opCtx,
             coordinatorDoc,
             ChunkVersion(1, 1, OID::gen(), boost::none /* timestamp */),
@@ -500,14 +502,14 @@ protected:
         // collection should have been removed.
         boost::optional<CollectionType> expectedTempCollType = boost::none;
         if (expectedCoordinatorDoc.getState() < CoordinatorStateEnum::kCommitting) {
-            expectedTempCollType = resharding::createTempReshardingCollectionType(
+            expectedTempCollType = createTempReshardingCollectionType(
                 opCtx,
                 expectedCoordinatorDoc,
                 ChunkVersion(1, 1, OID::gen(), boost::none /* timestamp */),
                 BSONObj());
 
             // It's necessary to add the userCanceled field because the call into
-            // resharding::createTempReshardingCollectionType assumes that the collection entry is
+            // createTempReshardingCollectionType assumes that the collection entry is
             // being created in a non-aborted state.
             if (auto abortReason = expectedCoordinatorDoc.getAbortReason()) {
                 auto reshardingFields = expectedTempCollType->getReshardingFields();
@@ -562,8 +564,7 @@ protected:
 
         auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
 
-        reshardingCoordinatorExternalState.insertCoordDocAndChangeOrigCollEntry(
-            opCtx, expectedCoordinatorDoc);
+        insertCoordDocAndChangeOrigCollEntry(opCtx, expectedCoordinatorDoc);
 
         auto shardsAndChunks =
             reshardingCoordinatorExternalState.calculateParticipantShardsAndChunks(
@@ -582,8 +583,7 @@ protected:
         expectedCoordinatorDoc.setZones(boost::none);
         expectedCoordinatorDoc.setPresetReshardedChunks(boost::none);
 
-        reshardingCoordinatorExternalState.writeParticipantShardsAndTempCollInfo(
-            opCtx, expectedCoordinatorDoc, initialChunks, zones);
+        writeParticipantShardsAndTempCollInfo(opCtx, expectedCoordinatorDoc, initialChunks, zones);
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
@@ -597,10 +597,7 @@ protected:
 
     void writeStateTransitionUpdateExpectSuccess(
         OperationContext* opCtx, ReshardingCoordinatorDocument expectedCoordinatorDoc) {
-        auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
-        reshardingCoordinatorExternalState
-            .writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(opCtx,
-                                                                        expectedCoordinatorDoc);
+        writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(opCtx, expectedCoordinatorDoc);
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
@@ -613,7 +610,7 @@ protected:
         Timestamp fetchTimestamp,
         std::vector<ChunkType> expectedChunks,
         std::vector<TagsType> expectedZones) {
-        resharding::writeDecisionPersistedState(
+        writeDecisionPersistedState(
             operationContext(), expectedCoordinatorDoc, _finalEpoch, _finalTimestamp);
 
         // Check that config.reshardingOperations and config.collections entries are updated
@@ -638,9 +635,7 @@ protected:
 
     void removeCoordinatorDocAndReshardingFieldsExpectSuccess(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
-        auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
-        reshardingCoordinatorExternalState.removeCoordinatorDocAndReshardingFields(opCtx,
-                                                                                   coordinatorDoc);
+        removeCoordinatorDocAndReshardingFields(opCtx, coordinatorDoc);
 
         auto expectedCoordinatorDoc = coordinatorDoc;
         expectedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
@@ -897,10 +892,8 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWhenCoordinatorDocDo
     // Do not insert initial entry into config.reshardingOperations. Attempt to update coordinator
     // state documents.
     auto coordinatorDoc = makeCoordinatorDoc(CoordinatorStateEnum::kCloning, Timestamp(1, 1));
-    auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
-    ASSERT_THROWS_CODE(reshardingCoordinatorExternalState
-                           .writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
-                               operationContext(), coordinatorDoc),
+    ASSERT_THROWS_CODE(writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+                           operationContext(), coordinatorDoc),
                        AssertionException,
                        5514600);
 }
@@ -913,9 +906,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest,
     expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
 
     // Do not create the config.collections entry for the original collection
-    auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
-    ASSERT_THROWS_CODE(reshardingCoordinatorExternalState.insertCoordDocAndChangeOrigCollEntry(
-                           operationContext(), coordinatorDoc),
+    ASSERT_THROWS_CODE(insertCoordDocAndChangeOrigCollEntry(operationContext(), coordinatorDoc),
                        AssertionException,
                        5514600);
 }

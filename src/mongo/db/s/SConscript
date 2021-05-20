@@ -574,6 +574,7 @@ env.CppUnitTest(
         'resharding/resharding_coordinator_commit_monitor_test.cpp',
         'resharding/resharding_coordinator_observer_test.cpp',
         'resharding/resharding_coordinator_test.cpp',
+        'resharding/resharding_coordinator_service_test.cpp',
         'resharding/resharding_util_test.cpp',
         'sharding_ddl_util_test.cpp',
         'sharding_util_refresh_test.cpp',
