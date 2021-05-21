@@ -16,6 +16,7 @@ load("jstests/libs/write_concern_util.js");
 const oplogApplierBatchSize = 100;
 
 function runTest(crashAfterRollbackTruncation) {
+    jsTestLog(`Running test with crashAfterRollbackTruncation = ${crashAfterRollbackTruncation}`);
     const rst = new ReplSetTest({
         nodes: {
             n0: {},
@@ -114,10 +115,7 @@ function runTest(crashAfterRollbackTruncation) {
     // Step up one of the other secondaries and do a write which becomes majority committed to force
     // secondary1 to go into rollback.
     rst.freeze(secondary1);
-    let hangAfterTruncate;
-    if (crashAfterRollbackTruncation) {
-        hangAfterTruncate = configureFailPoint(secondary1, 'hangAfterOplogTruncationInRollback');
-    }
+    let hangAfterTruncate = configureFailPoint(secondary1, 'hangAfterOplogTruncationInRollback');
     assert.commandWorked(secondary2.adminCommand({replSetStepUp: 1}));
     rst.freeze(primary);
     rst.awaitNodesAgreeOnPrimary(undefined, undefined, secondary2);
@@ -133,14 +131,14 @@ function runTest(crashAfterRollbackTruncation) {
     assert.commandWorked(
         secondary2.getCollection("test.dummy").insert({}, {writeConcern: {w: 'majority'}}));
 
-    if (crashAfterRollbackTruncation) {
-        // Entering rollback will close connections so we expect some network errors when waiting
-        // on the failpoint.
-        assert.soonNoExcept(() => {
-            hangAfterTruncate.wait();
-            return true;
-        }, `failed to wait for fail point ${hangAfterTruncate.failPointName}`);
+    // Wait for rollback to finish truncating oplog.
+    // Entering rollback will close connections so we expect some network errors while waiting.
+    assert.soonNoExcept(() => {
+        hangAfterTruncate.wait();
+        return true;
+    }, `failed to wait for fail point ${hangAfterTruncate.failPointName}`);
 
+    if (crashAfterRollbackTruncation) {
         // Crash the node after it performs oplog truncation.
         rst.stop(secondary1, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
         secondary1 = rst.restart(secondary1, {
@@ -154,6 +152,10 @@ function runTest(crashAfterRollbackTruncation) {
             secondary1.getCollection('config.transactions').findOne({"_id.id": lsid.id});
         assert.neq(null, restoredDoc);
         secondary1.adminCommand({configureFailPoint: "stopReplProducer", mode: "off"});
+    } else {
+        // Lift the failpoint to let rollback complete and wait for state to change to SECONDARY.
+        hangAfterTruncate.off();
+        rst.waitForState(secondary1, ReplSetTest.State.SECONDARY);
     }
 
     // Reconnect to secondary1 after it completes its rollback and step it up to be the new primary.
