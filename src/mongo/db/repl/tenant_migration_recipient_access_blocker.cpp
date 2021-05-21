@@ -71,8 +71,7 @@ Status TenantMigrationRecipientAccessBlocker::checkIfCanWrite() {
     return Status::OK();
 }
 
-Status TenantMigrationRecipientAccessBlocker::waitUntilCommittedOrAborted(
-    OperationContext* opCtx, OperationType operationType) {
+Status TenantMigrationRecipientAccessBlocker::waitUntilCommittedOrAborted(OperationContext* opCtx) {
     // Recipient nodes will not throw TenantMigrationConflict errors and so we should never need
     // to wait for a migration to commit/abort on the recipient set.
     MONGO_UNREACHABLE;

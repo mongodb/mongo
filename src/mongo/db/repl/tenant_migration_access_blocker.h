@@ -52,18 +52,13 @@ public:
     TenantMigrationAccessBlocker(BlockerType type) : _type(type) {}
     virtual ~TenantMigrationAccessBlocker() = default;
 
-    /**
-     * The operation type determines the states during which we need to block.
-     */
-    enum OperationType { kWrite, kIndexBuild };
-
     //
     // Called by all writes and reads against the database.
     //
 
     virtual Status checkIfCanWrite() = 0;
-    virtual Status waitUntilCommittedOrAborted(OperationContext* opCtx,
-                                               OperationType operationType) = 0;
+    virtual Status waitUntilCommittedOrAborted(OperationContext* opCtx) = 0;
+
 
     virtual Status checkIfLinearizableReadWasAllowed(OperationContext* opCtx) = 0;
     virtual SharedSemiFuture<void> getCanReadFuture(OperationContext* opCtx,

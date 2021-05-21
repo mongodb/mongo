@@ -318,8 +318,7 @@ boost::optional<BSONObj> generateError(OperationContext* opCtx,
 
             auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker();
 
-            auto migrationStatus =
-                mtab->waitUntilCommittedOrAborted(opCtx, migrationConflictInfo->getOperationType());
+            auto migrationStatus = mtab->waitUntilCommittedOrAborted(opCtx);
             mtab->recordTenantMigrationError(migrationStatus);
             error.append("code", static_cast<int>(migrationStatus.code()));
 

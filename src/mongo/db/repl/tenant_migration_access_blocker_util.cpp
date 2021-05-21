@@ -374,8 +374,7 @@ void handleTenantMigrationConflict(OperationContext* opCtx, Status status) {
     invariant(migrationConflictInfo);
     auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker();
     invariant(mtab);
-    auto migrationStatus =
-        mtab->waitUntilCommittedOrAborted(opCtx, migrationConflictInfo->getOperationType());
+    auto migrationStatus = mtab->waitUntilCommittedOrAborted(opCtx);
     mtab->recordTenantMigrationError(migrationStatus);
     uassertStatusOK(migrationStatus);
 }

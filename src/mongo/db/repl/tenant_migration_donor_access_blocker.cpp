@@ -99,8 +99,7 @@ Status TenantMigrationDonorAccessBlocker::checkIfCanWrite() {
     }
 }
 
-Status TenantMigrationDonorAccessBlocker::waitUntilCommittedOrAborted(OperationContext* opCtx,
-                                                                      OperationType operationType) {
+Status TenantMigrationDonorAccessBlocker::waitUntilCommittedOrAborted(OperationContext* opCtx) {
     // Source to cancel the timeout if the operation completed in time.
     CancellationSource cancelTimeoutSource;
     auto executor = getAsyncBlockingOperationsExecutor();
@@ -200,7 +199,7 @@ Status TenantMigrationDonorAccessBlocker::checkIfCanBuildIndex() {
         case BlockerState::State::kAllow:
         case BlockerState::State::kBlockWrites:
         case BlockerState::State::kBlockWritesAndReads:
-            return {TenantMigrationConflictInfo(_tenantId, shared_from_this(), kIndexBuild),
+            return {TenantMigrationConflictInfo(_tenantId, shared_from_this()),
                     "Index build must block until tenant migration is committed or aborted."};
         case BlockerState::State::kReject:
             return {ErrorCodes::TenantMigrationCommitted,
