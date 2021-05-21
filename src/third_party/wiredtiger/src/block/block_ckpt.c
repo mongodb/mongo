@@ -95,7 +95,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint
         if (ci->root_offset != WT_BLOCK_INVALID_OFFSET) {
             endp = root_addr;
             WT_ERR(__wt_block_addr_to_buffer(
-              block, &endp, ci->root_logid, ci->root_offset, ci->root_size, ci->root_checksum));
+              block, &endp, ci->root_objectid, ci->root_offset, ci->root_size, ci->root_checksum));
             *root_addr_sizep = WT_PTRDIFF(endp, root_addr);
 
             WT_ERR(__wt_block_tiered_load(session, block, ci));
@@ -115,7 +115,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint
      * the end of the file, that was done when the checkpoint was first written (re-writing the
      * checkpoint might possibly make it relevant here, but it's unlikely enough I don't bother).
      */
-    if (!checkpoint && !block->log_structured)
+    if (!checkpoint && !block->has_objects)
         WT_ERR(__wt_block_truncate(session, block, ci->file_size));
 
     if (0) {
@@ -239,9 +239,9 @@ __wt_block_checkpoint(
      */
     if (buf == NULL) {
         ci->root_offset = WT_BLOCK_INVALID_OFFSET;
-        ci->root_logid = ci->root_size = ci->root_checksum = 0;
+        ci->root_objectid = ci->root_size = ci->root_checksum = 0;
     } else
-        WT_ERR(__wt_block_write_off(session, block, buf, &ci->root_logid, &ci->root_offset,
+        WT_ERR(__wt_block_write_off(session, block, buf, &ci->root_objectid, &ci->root_offset,
           &ci->root_size, &ci->root_checksum, data_checksum, true, false));
 
     /*
@@ -612,7 +612,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
      * lists, and the freed blocks will then be included when writing the live extent lists.
      */
     WT_CKPT_FOREACH (ckptbase, ckpt) {
-        if (F_ISSET(ckpt, WT_CKPT_FAKE) || !F_ISSET(ckpt, WT_CKPT_DELETE) || block->log_structured)
+        if (F_ISSET(ckpt, WT_CKPT_FAKE) || !F_ISSET(ckpt, WT_CKPT_DELETE) || block->has_objects)
             continue;
 
         if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
@@ -750,7 +750,7 @@ live_update:
      * TODO: tiered: for now we are switching files on a checkpoint, we'll want to do it only on
      * flush_tier.
      */
-    if (block->log_structured)
+    if (block->has_objects)
         WT_ERR(__wt_block_tiered_newfile(session, block));
 
 #ifdef HAVE_DIAGNOSTIC

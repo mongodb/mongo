@@ -390,7 +390,7 @@ __wt_debug_offset(
      */
     block = S2BT(session)->bm->block;
     endp = addr;
-    WT_RET(__wt_block_addr_to_buffer(block, &endp, block->logid, offset, size, checksum));
+    WT_RET(__wt_block_addr_to_buffer(block, &endp, block->objectid, offset, size, checksum));
 
     /*
      * Read the address through the btree I/O functions (so the block is decompressed as necessary).

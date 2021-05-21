@@ -1068,10 +1068,8 @@ struct __wt_session {
 	 * empty.}
 	 * @config{block_allocation, configure block allocation.  Permitted values are \c "best" or
 	 * \c "first"; the \c "best" configuration uses a best-fit algorithm\, the \c "first"
-	 * configuration uses a first-available algorithm during block allocation\, the \c
-	 * "log-structure" configuration allocates a new file for each checkpoint., a string\,
-	 * chosen from the following options: \c "best"\, \c "first"\, \c "log-structured"; default
-	 * \c best.}
+	 * configuration uses a first-available algorithm during block allocation., a string\,
+	 * chosen from the following options: \c "best"\, \c "first"; default \c best.}
 	 * @config{block_compressor, configure a compressor for file blocks.  Permitted values are
 	 * \c "none" or custom compression engine name created with WT_CONNECTION::add_compressor.
 	 * If WiredTiger has builtin support for \c "lz4"\, \c "snappy"\, \c "zlib" or \c "zstd"

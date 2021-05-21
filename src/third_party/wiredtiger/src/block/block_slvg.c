@@ -104,13 +104,13 @@ __wt_block_salvage_next(
     WT_DECL_RET;
     WT_FH *fh;
     wt_off_t max, offset;
-    uint32_t allocsize, checksum, logid, size;
+    uint32_t allocsize, checksum, objectid, size;
     uint8_t *endp;
 
     *eofp = 0;
 
-    /* FIXME: salvage across all chunks in a log-structured tree. */
-    logid = 0;
+    /* TODO: tiered: salvage across all objects in a tiered tree. */
+    objectid = 0;
 
     fh = block->fh;
     allocsize = block->allocsize;
@@ -140,19 +140,19 @@ __wt_block_salvage_next(
          * otherwise, move past it.
          */
         if (!__wt_block_offset_invalid(block, offset, size) &&
-          __wt_block_read_off(session, block, tmp, logid, offset, size, checksum) == 0)
+          __wt_block_read_off(session, block, tmp, objectid, offset, size, checksum) == 0)
             break;
 
         /* Free the allocation-size block. */
         __wt_verbose(session, WT_VERB_SALVAGE, "skipping %" PRIu32 "B at file offset %" PRIuMAX,
           allocsize, (uintmax_t)offset);
-        WT_ERR(__wt_block_off_free(session, block, logid, offset, (wt_off_t)allocsize));
+        WT_ERR(__wt_block_off_free(session, block, objectid, offset, (wt_off_t)allocsize));
         block->slvg_off += allocsize;
     }
 
     /* Re-create the address cookie that should reference this block. */
     endp = addr;
-    WT_ERR(__wt_block_addr_to_buffer(block, &endp, logid, offset, size, checksum));
+    WT_ERR(__wt_block_addr_to_buffer(block, &endp, objectid, offset, size, checksum));
     *addr_sizep = WT_PTRDIFF(endp, addr);
 
 done:
@@ -170,7 +170,7 @@ __wt_block_salvage_valid(
   WT_SESSION_IMPL *session, WT_BLOCK *block, uint8_t *addr, size_t addr_size, bool valid)
 {
     wt_off_t offset;
-    uint32_t size, logid, checksum;
+    uint32_t size, objectid, checksum;
 
     WT_UNUSED(addr_size);
 
@@ -178,11 +178,11 @@ __wt_block_salvage_valid(
      * Crack the cookie. If the upper layer took the block, move past it; if the upper layer
      * rejected the block, move past an allocation size chunk and free it.
      */
-    WT_RET(__wt_block_buffer_to_addr(block, addr, &logid, &offset, &size, &checksum));
+    WT_RET(__wt_block_buffer_to_addr(block, addr, &objectid, &offset, &size, &checksum));
     if (valid)
         block->slvg_off = offset + size;
     else {
-        WT_RET(__wt_block_off_free(session, block, logid, offset, (wt_off_t)block->allocsize));
+        WT_RET(__wt_block_off_free(session, block, objectid, offset, (wt_off_t)block->allocsize));
         block->slvg_off = offset + block->allocsize;
     }
 
