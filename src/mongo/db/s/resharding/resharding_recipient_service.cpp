@@ -161,11 +161,6 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
     invariant(_externalState);
 }
 
-ReshardingRecipientService::RecipientStateMachine::~RecipientStateMachine() {
-    stdx::lock_guard<Latch> lg(_mutex);
-    invariant(_completionPromise.getFuture().isReady());
-}
-
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrErrored(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,

@@ -984,10 +984,6 @@ ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(
     _reshardingCoordinatorObserver = std::make_shared<ReshardingCoordinatorObserver>();
 }
 
-ReshardingCoordinatorService::ReshardingCoordinator::~ReshardingCoordinator() {
-    invariant(_completionPromise.getFuture().isReady());
-}
-
 void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& doc) noexcept {
     invariant(doc.getReshardingUUID() == _coordinatorDoc.getReshardingUUID());

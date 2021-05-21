@@ -95,7 +95,7 @@ public:
         std::unique_ptr<RecipientStateMachineExternalState> externalState,
         ReshardingDataReplicationFactory dataReplicationFactory);
 
-    ~RecipientStateMachine();
+    ~RecipientStateMachine() = default;
 
     /**
      *  Runs up until the recipient is in state kStrictConsistency or encountered an error.

@@ -226,11 +226,6 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
     invariant(_externalState);
 }
 
-ReshardingDonorService::DonorStateMachine::~DonorStateMachine() {
-    stdx::lock_guard<Latch> lg(_mutex);
-    invariant(_completionPromise.getFuture().isReady());
-}
-
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockingWritesOrErrored(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& abortToken) noexcept {
