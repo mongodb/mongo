@@ -1,6 +1,6 @@
 /**
- * Intergration test for read preference with hedging mode. The more comprehensive
- * unit test can be found in dbtests/read_preference_test.cpp and s/hedge_options_util_test.cpp.
+ * Integration test for read preference with hedging mode. The more comprehensive unit test can be
+ * found in dbtests/read_preference_test.cpp and s/hedge_options_util_test.cpp.
  */
 (function() {
 
@@ -18,6 +18,11 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandFailedWithCode(
     testDB.runCommand({query: {count: collName}, $readPreference: {mode: "primary", hedge: {}}}),
     ErrorCodes.InvalidOptions);
+
+assert.commandFailedWithCode(
+    testDB.runCommand(
+        {query: {count: collName}, $readPreference: {mode: "secondaryPreferred", hedge: "_1"}}),
+    ErrorCodes.TypeMismatch);
 
 // Test "readHedgingMode" server parameter validation.
 assert.commandFailedWithCode(st.s.adminCommand({setParameter: 1, readHedgingMode: "invalidMode"}),
