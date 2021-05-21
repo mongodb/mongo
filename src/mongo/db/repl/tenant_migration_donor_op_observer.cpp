@@ -138,10 +138,29 @@ public:
 
     void commit(boost::optional<Timestamp>) override {
         if (_donorStateDoc.getExpireAt()) {
-            // The TenantMigrationDonorAccessBlocker entry needs to be removed to re-allow writes,
-            // reads and future migrations with the same tenantId as this migration has already
-            // been aborted and forgotten.
+            auto mtab = tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
+                _opCtx->getServiceContext(), _donorStateDoc.getTenantId());
+            invariant(mtab);
+
+            if (!_opCtx->writesAreReplicated()) {
+                // Setting expireAt implies that the TenantMigrationDonorAccessBlocker for this
+                // migration will be removed shortly after this. However, a lagged secondary
+                // might not manage to advance its majority commit point past the migration commit
+                // or abort opTime and consequently transition out of the blocking state before the
+                // TenantMigrationDonorAccessBlocker is removed. When this occurs, blocked reads or
+                // writes will be left waiting for the migration decision indefinitely. To avoid
+                // that, notify the TenantMigrationDonorAccessBlocker here that the commit or
+                // abort opTime has been majority committed (guaranteed to be true since by design
+                // the donor never marks its state doc as garbage collectable before the migration
+                // decision is majority committed).
+                mtab->onMajorityCommitPointUpdate(_donorStateDoc.getCommitOrAbortOpTime().get());
+            }
+
             if (_donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
+                invariant(mtab->inStateAborted());
+                // The migration durably aborted and is now marked as garbage collectable, remove
+                // its TenantMigrationDonorAccessBlocker right away to allow back-to-back migration
+                // retries.
                 TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
                     .remove(_donorStateDoc.getTenantId(),
                             TenantMigrationAccessBlocker::BlockerType::kDonor);
