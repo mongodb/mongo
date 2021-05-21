@@ -138,6 +138,12 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
 
     boost::optional<HedgingMode> hedgingMode;
     if (auto hedgingModeEl = readPrefObj[kHedgeFieldName]) {
+        if (hedgingModeEl.type() != BSONType::Object) {
+            return Status(ErrorCodes::TypeMismatch,
+                          str::stream() << kHedgeFieldName
+                                        << " field must be of type object if provided; found "
+                                        << hedgingModeEl);
+        }
         hedgingMode = HedgingMode::parse(IDLParserErrorContext(kHedgeFieldName),
                                          hedgingModeEl.embeddedObject());
         if (hedgingMode->getEnabled() && mode == ReadPreference::PrimaryOnly) {
