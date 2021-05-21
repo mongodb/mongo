@@ -73,7 +73,7 @@ public:
                                const ReshardingDonorDocument& donorDoc,
                                std::unique_ptr<DonorStateMachineExternalState> externalState);
 
-    ~DonorStateMachine();
+    ~DonorStateMachine() = default;
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& stepdownToken) noexcept override;

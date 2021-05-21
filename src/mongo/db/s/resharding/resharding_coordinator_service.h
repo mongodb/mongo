@@ -210,7 +210,7 @@ public:
         const ReshardingCoordinatorService* coordinatorService,
         const BSONObj& state,
         std::shared_ptr<ReshardingCoordinatorExternalState> externalState);
-    ~ReshardingCoordinator();
+    ~ReshardingCoordinator() = default;
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& token) noexcept override;
