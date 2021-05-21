@@ -9,6 +9,7 @@ let MongosAPIParametersUtil = (function() {
     load('jstests/replsets/rslib.js');
     load('jstests/sharding/libs/last_lts_mongos_commands.js');
     load('jstests/sharding/libs/sharded_transactions_helpers.js');
+    load('jstests/libs/auto_retry_transaction_in_sharding.js');
 
     function validateTestCase(testCase) {
         assert(testCase.skip || testCase.run,
@@ -107,24 +108,27 @@ let MongosAPIParametersUtil = (function() {
                 setUp: (context) => {
                     // Start a session and transaction.
                     const session = st.s0.startSession();
-                    context.lsid = session.getSessionId();
+                    const txnOptions = {autocommit: false};
+                    session.startTransaction(txnOptions);
+
                     const cmd = {
                         insert: "collection",
                         // A doc on each shard in the 2-shard configuration.
                         documents: [{_id: 1}, {_id: 21}],
-                        lsid: context.lsid,
-                        txnNumber: NumberLong(1),
-                        autocommit: false,
-                        startTransaction: true
                     };
 
-                    assert.commandWorked(
-                        st.s0.getDB("db").runCommand(Object.assign(cmd, context.apiParameters)));
+                    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+                        assert.commandWorked(session.getDatabase("db").runCommand(
+                            Object.assign(cmd, context.apiParameters)));
+                    }, txnOptions);
+
+                    context.lsid = session.getSessionId();
+                    context.txnNum = session.getTxnNumber_forTesting();
                 },
                 command: (context) => ({
                     abortTransaction: 1,
                     lsid: context.lsid,
-                    txnNumber: NumberLong(1),
+                    txnNumber: context.txnNum,
                     autocommit: false
                 })
             }
@@ -232,24 +236,27 @@ let MongosAPIParametersUtil = (function() {
                 setUp: (context) => {
                     // Start a session and transaction.
                     const session = st.s0.startSession();
-                    context.lsid = session.getSessionId();
+                    const txnOptions = {autocommit: false};
+                    session.startTransaction(txnOptions);
+
                     const cmd = {
                         insert: "collection",
                         // A doc on each shard in the 2-shard configuration.
                         documents: [{_id: 1}, {_id: 21}],
-                        lsid: context.lsid,
-                        txnNumber: NumberLong(1),
-                        autocommit: false,
-                        startTransaction: true
                     };
 
-                    assert.commandWorked(
-                        st.s0.getDB("db").runCommand(Object.assign(cmd, context.apiParameters)));
+                    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+                        assert.commandWorked(session.getDatabase("db").runCommand(
+                            Object.assign(cmd, context.apiParameters)));
+                    }, txnOptions);
+
+                    context.lsid = session.getSessionId();
+                    context.txnNum = session.getTxnNumber_forTesting();
                 },
                 command: (context) => ({
                     commitTransaction: 1,
                     lsid: context.lsid,
-                    txnNumber: NumberLong(1),
+                    txnNumber: context.txnNum,
                     autocommit: false
                 })
             }
