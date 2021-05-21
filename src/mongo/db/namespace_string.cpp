@@ -77,6 +77,9 @@ const NamespaceString NamespaceString::kSystemReplSetNamespace(NamespaceString::
 const NamespaceString NamespaceString::kIndexBuildEntryNamespace(NamespaceString::kConfigDb,
                                                                  "system.indexBuilds");
 
+const NamespaceString NamespaceString::kConfigImagesNamespace(NamespaceString::kConfigDb,
+                                                              "image_collection");
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }

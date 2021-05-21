@@ -101,6 +101,9 @@ public:
     // Namespace for index build entries.
     static const NamespaceString kIndexBuildEntryNamespace;
 
+    // Namespace used for storing retryable findAndModify images.
+    static const NamespaceString kConfigImagesNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

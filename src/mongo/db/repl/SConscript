@@ -40,6 +40,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'dbcheck',
         'local_oplog_info',
+        'image_collection_entry',
         'repl_coordinator_interface',
         'repl_settings',
         'timestamp_block',

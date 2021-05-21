@@ -56,6 +56,8 @@ struct UpdateResult {
 
     // if something was upserted, the new _id of the object
     BSONObj upserted;
+
+    BSONObj requestedDocImage;
 };
 
 }  // namespace mongo

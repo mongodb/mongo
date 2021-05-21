@@ -72,6 +72,7 @@
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/dbcheck.h"
+#include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -326,6 +327,38 @@ void createIndexForApplyOps(OperationContext* opCtx,
 
     if (incrementOpsAppliedStats) {
         incrementOpsAppliedStats();
+    }
+}
+
+void writeToImageCollection(OperationContext* opCtx,
+                            const BSONObj& op,
+                            const BSONObj& image,
+                            repl::RetryImageEnum imageKind,
+                            bool* upsertConfigImage) {
+    AutoGetCollection autoColl(opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
+    repl::ImageEntry imageEntry;
+    LogicalSessionId sessionId =
+        LogicalSessionId::parse(IDLParserErrorContext("ParseSessionIdWhenWritingToImageCollection"),
+                                op.getField(OplogEntryBase::kSessionIdFieldName).Obj());
+    imageEntry.set_id(sessionId);
+    imageEntry.setTs(op["ts"].timestamp());
+    imageEntry.setImageKind(imageKind);
+    imageEntry.setImage(image);
+
+    UpdateRequest request(NamespaceString::kConfigImagesNamespace);
+    request.setQuery(
+        BSON("_id" << imageEntry.get_id().toBSON() << "ts" << BSON("$lt" << imageEntry.getTs())));
+    request.setUpsert(*upsertConfigImage);
+    request.setUpdateModification(imageEntry.toBSON());
+    request.setFromOplogApplication(true);
+    try {
+        // This code path can also be hit by `applyOps`.
+        repl::UnreplicatedWritesBlock dontReplicate(opCtx);
+        ::mongo::update(opCtx, autoColl.getDb(), request);
+    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+        // We can get a duplicate key when two upserts race on inserting a document.
+        *upsertConfigImage = false;
+        throw WriteConflictException();
     }
 }
 
@@ -1656,6 +1689,17 @@ Status applyOperation_inlock(OperationContext* opCtx,
         request.setUpdateModification(o);
         request.setUpsert(upsert);
         request.setFromOplogApplication(true);
+        boost::optional<repl::RetryImageEnum> imageKind;
+        if (op.hasField(OplogEntryBase::kNeedsRetryImageFieldName)) {
+            imageKind = repl::RetryImage_parse(
+                IDLParserErrorContext("applyUpdate"),
+                op.getField(OplogEntryBase::kNeedsRetryImageFieldName).String());
+            if (imageKind == repl::RetryImageEnum::kPreImage) {
+                request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
+            } else if (imageKind == repl::RetryImageEnum::kPostImage) {
+                request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_NEW);
+            }
+        }
 
         Timestamp timestamp;
         if (assignOperationTimestamp) {
@@ -1663,6 +1707,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         }
 
         const StringData ns = fieldNs.valueStringDataSafe();
+        bool upsertConfigImage = true;
         auto status = writeConflictRetry(opCtx, "applyOps_update", ns, [&] {
             WriteUnitOfWork wuow(opCtx);
             if (timestamp != Timestamp::min()) {
@@ -1708,7 +1753,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     }
                 }
             }
-
+            if (op.hasField(OplogEntryBase::kNeedsRetryImageFieldName)) {
+                invariant(imageKind);
+                writeToImageCollection(
+                    opCtx, op, ur.requestedDocImage, *imageKind, &upsertConfigImage);
+            }
             wuow.commit();
             return Status::OK();
         });

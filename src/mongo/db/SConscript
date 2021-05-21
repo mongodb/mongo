@@ -874,6 +874,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
     ],
 )
 
@@ -914,6 +915,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'transaction',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
+        '$BUILD_DIR/mongo/db/repl/image_collection_entry',
     ],
 )
 
