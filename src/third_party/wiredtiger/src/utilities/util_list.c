@@ -101,8 +101,8 @@ list_init_block(WT_SESSION *session, const char *key, WT_BLOCK *block)
     else if (ret != WT_NOTFOUND)
         WT_ERR(util_err(session, ret, "WT_CONFIG_PARSER.get"));
 
-    if ((ret = parser->get(parser, "block_allocation", &cval)) == 0)
-        block->log_structured = WT_STRING_MATCH("log_structured", cval.str, cval.len);
+    if (WT_PREFIX_MATCH(key, "tiered:"))
+        block->has_objects = true;
 
 err:
     if (parser != NULL && (tret = parser->close(parser)) != 0) {

@@ -14,12 +14,12 @@
  *     reference so it can be called repeatedly to load a buffer.
  */
 static int
-__block_buffer_to_addr(WT_BLOCK *block, const uint8_t **pp, uint32_t *logidp, wt_off_t *offsetp,
+__block_buffer_to_addr(WT_BLOCK *block, const uint8_t **pp, uint32_t *objectidp, wt_off_t *offsetp,
   uint32_t *sizep, uint32_t *checksump)
 {
     uint64_t l, o, s, c;
 
-    if (block->log_structured)
+    if (block->has_objects)
         WT_RET(__wt_vunpack_uint(pp, 0, &l));
     else
         l = 0;
@@ -38,9 +38,9 @@ __block_buffer_to_addr(WT_BLOCK *block, const uint8_t **pp, uint32_t *logidp, wt
      */
     if (s == 0) {
         *offsetp = 0;
-        *logidp = *sizep = *checksump = 0;
+        *objectidp = *sizep = *checksump = 0;
     } else {
-        *logidp = (uint32_t)l;
+        *objectidp = (uint32_t)l;
         *offsetp = (wt_off_t)(o + 1) * block->allocsize;
         *sizep = (uint32_t)s * block->allocsize;
         *checksump = (uint32_t)c;
@@ -53,8 +53,8 @@ __block_buffer_to_addr(WT_BLOCK *block, const uint8_t **pp, uint32_t *logidp, wt
  *     Convert the filesystem components into its address cookie.
  */
 int
-__wt_block_addr_to_buffer(
-  WT_BLOCK *block, uint8_t **pp, uint32_t logid, wt_off_t offset, uint32_t size, uint32_t checksum)
+__wt_block_addr_to_buffer(WT_BLOCK *block, uint8_t **pp, uint32_t objectid, wt_off_t offset,
+  uint32_t size, uint32_t checksum)
 {
     uint64_t l, o, s, c;
 
@@ -63,12 +63,12 @@ __wt_block_addr_to_buffer(
         o = WT_BLOCK_INVALID_OFFSET;
         l = s = c = 0;
     } else {
-        l = logid;
+        l = objectid;
         o = (uint64_t)offset / block->allocsize - 1;
         s = size / block->allocsize;
         c = checksum;
     }
-    if (block->log_structured)
+    if (block->has_objects)
         WT_RET(__wt_vpack_uint(pp, 0, l));
     WT_RET(__wt_vpack_uint(pp, 0, o));
     WT_RET(__wt_vpack_uint(pp, 0, s));
@@ -82,10 +82,10 @@ __wt_block_addr_to_buffer(
  *     reference.
  */
 int
-__wt_block_buffer_to_addr(WT_BLOCK *block, const uint8_t *p, uint32_t *logidp, wt_off_t *offsetp,
+__wt_block_buffer_to_addr(WT_BLOCK *block, const uint8_t *p, uint32_t *objectidp, wt_off_t *offsetp,
   uint32_t *sizep, uint32_t *checksump)
 {
-    return (__block_buffer_to_addr(block, &p, logidp, offsetp, sizep, checksump));
+    return (__block_buffer_to_addr(block, &p, objectidp, offsetp, sizep, checksump));
 }
 
 /*
@@ -97,14 +97,14 @@ __wt_block_addr_invalid(
   WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, size_t addr_size, bool live)
 {
     wt_off_t offset;
-    uint32_t checksum, logid, size;
+    uint32_t checksum, objectid, size;
 
     WT_UNUSED(session);
     WT_UNUSED(addr_size);
     WT_UNUSED(live);
 
     /* Crack the cookie. */
-    WT_RET(__wt_block_buffer_to_addr(block, addr, &logid, &offset, &size, &checksum));
+    WT_RET(__wt_block_buffer_to_addr(block, addr, &objectid, &offset, &size, &checksum));
 
 #ifdef HAVE_DIAGNOSTIC
     /*
@@ -116,7 +116,7 @@ __wt_block_addr_invalid(
 #endif
 
     /* Check if the address is past the end of the file. */
-    return (logid == block->logid && offset + size > block->size ? EINVAL : 0);
+    return (objectid == block->objectid && offset + size > block->size ? EINVAL : 0);
 }
 
 /*
@@ -128,16 +128,16 @@ __wt_block_addr_string(
   WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, const uint8_t *addr, size_t addr_size)
 {
     wt_off_t offset;
-    uint32_t checksum, logid, size;
+    uint32_t checksum, objectid, size;
 
     WT_UNUSED(addr_size);
 
     /* Crack the cookie. */
-    WT_RET(__wt_block_buffer_to_addr(block, addr, &logid, &offset, &size, &checksum));
+    WT_RET(__wt_block_buffer_to_addr(block, addr, &objectid, &offset, &size, &checksum));
 
     /* Printable representation. */
     WT_RET(__wt_buf_fmt(session, buf,
-      "[%" PRIu32 ": %" PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]", logid,
+      "[%" PRIu32 ": %" PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]", objectid,
       (uintmax_t)offset, (uintmax_t)offset + size, size, checksum));
 
     return (0);
@@ -160,12 +160,12 @@ __block_buffer_to_ckpt(
 
     pp = &p;
     WT_RET(__block_buffer_to_addr(
-      block, pp, &ci->root_logid, &ci->root_offset, &ci->root_size, &ci->root_checksum));
+      block, pp, &ci->root_objectid, &ci->root_offset, &ci->root_size, &ci->root_checksum));
     WT_RET(__block_buffer_to_addr(
-      block, pp, &ci->alloc.logid, &ci->alloc.offset, &ci->alloc.size, &ci->alloc.checksum));
+      block, pp, &ci->alloc.objectid, &ci->alloc.offset, &ci->alloc.size, &ci->alloc.checksum));
     WT_RET(__block_buffer_to_addr(
-      block, pp, &ci->avail.logid, &ci->avail.offset, &ci->avail.size, &ci->avail.checksum));
-    WT_RET(__block_buffer_to_addr(block, pp, &ci->discard.logid, &ci->discard.offset,
+      block, pp, &ci->avail.objectid, &ci->avail.offset, &ci->avail.size, &ci->avail.checksum));
+    WT_RET(__block_buffer_to_addr(block, pp, &ci->discard.objectid, &ci->discard.offset,
       &ci->discard.size, &ci->discard.checksum));
     WT_RET(__wt_vunpack_uint(pp, 0, &a));
     ci->file_size = (wt_off_t)a;
@@ -209,9 +209,9 @@ __wt_block_ckpt_to_buffer(
   WT_SESSION_IMPL *session, WT_BLOCK *block, uint8_t **pp, WT_BLOCK_CKPT *ci, bool skip_avail)
 {
     uint64_t a;
-    uint32_t logid;
+    uint32_t objectid;
 
-    logid = block->logid;
+    objectid = block->objectid;
 
     if (ci->version != WT_BM_CHECKPOINT_VERSION)
         WT_RET_MSG(session, WT_ERROR, "unsupported checkpoint version");
@@ -220,16 +220,16 @@ __wt_block_ckpt_to_buffer(
     (*pp)++;
 
     WT_RET(__wt_block_addr_to_buffer(
-      block, pp, logid, ci->root_offset, ci->root_size, ci->root_checksum));
+      block, pp, objectid, ci->root_offset, ci->root_size, ci->root_checksum));
     WT_RET(__wt_block_addr_to_buffer(
-      block, pp, logid, ci->alloc.offset, ci->alloc.size, ci->alloc.checksum));
+      block, pp, objectid, ci->alloc.offset, ci->alloc.size, ci->alloc.checksum));
     if (skip_avail)
         WT_RET(__wt_block_addr_to_buffer(block, pp, 0, 0, 0, 0));
     else
         WT_RET(__wt_block_addr_to_buffer(
-          block, pp, logid, ci->avail.offset, ci->avail.size, ci->avail.checksum));
+          block, pp, objectid, ci->avail.offset, ci->avail.size, ci->avail.checksum));
     WT_RET(__wt_block_addr_to_buffer(
-      block, pp, logid, ci->discard.offset, ci->discard.size, ci->discard.checksum));
+      block, pp, objectid, ci->discard.offset, ci->discard.size, ci->discard.checksum));
     a = (uint64_t)ci->file_size;
     WT_RET(__wt_vpack_uint(pp, 0, a));
     a = ci->ckpt_size;
