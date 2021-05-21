@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <deque>
 #include <string>
 #include <vector>
 
@@ -115,7 +116,13 @@ public:
     /**
      * Retrieves the names of all sets tracked by this manager.
      */
-    std::vector<std::string> getAllSetNames();
+    std::vector<std::string> getAllSetNames() const;
+
+    /**
+     * Returns current cache size including empty items, that will be garbage
+     * collected later. This is intended for tests.
+     */
+    size_t getNumMonitors() const;
 
     /**
      * Removes the specified replica set monitor from being tracked, if it exists. Otherwise
@@ -125,9 +132,10 @@ public:
     void removeMonitor(StringData setName);
 
     /**
-     * Removes the already deleted monitor for 'setName' from the internal map.
+     * Adds the 'setName' to the garbage collect queue for later cleanup.
+     * The 2-step GC is implemented to avoid deadlocks.
      */
-    void garbageCollect(StringData setName);
+    void registerForGarbageCollection(StringData setName);
 
     std::shared_ptr<ReplicaSetMonitor> getMonitorForHost(const HostAndPort& host);
 
@@ -158,6 +166,13 @@ public:
 
     void installMonitor_forTests(std::shared_ptr<ReplicaSetMonitor> monitor);
 
+    /**
+     *  Returns garbage collected monitors count for tests.
+     */
+    size_t getGarbageCollectedMonitorsCount() const {
+        return _monitorsGarbageCollected.get();
+    }
+
 private:
     /**
      * Returns an EgressTagCloser controlling the executor's network interface.
@@ -166,9 +181,11 @@ private:
 
     using ReplicaSetMonitorsMap = StringMap<std::weak_ptr<ReplicaSetMonitor>>;
 
-    // Protects access to the replica set monitors
+    // Protects access to the replica set monitors and several fields.
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(6), "ReplicaSetMonitorManager::_mutex");
+
+    // Fields guarded by _mutex:
 
     // Executor for monitoring replica sets.
     std::shared_ptr<executor::TaskExecutor> _taskExecutor;
@@ -177,7 +194,7 @@ private:
     // _taskExecutor instance
     std::shared_ptr<ReplicaSetMonitorConnectionManager> _connectionManager;
 
-    // Widget to notify listeners when a RSM notices a change
+    // Widget to notify listeners when a RSM notices a change.
     ReplicaSetChangeNotifier _notifier;
 
     // Needs to be after `_taskExecutor`, so that it will be destroyed before the `_taskExecutor`.
@@ -187,8 +204,27 @@ private:
 
     void _setupTaskExecutorInLock();
 
-    // set to true when shutdown has been called.
+    // Set to true when shutdown has been called.
     bool _isShutdown{false};
+
+    // Leaf lvl 1 mutex guarding the pending garbage collection.
+    // It is necessary to avoid deadlock while invoking the 'registerForGarbageCollection()' while
+    // already holding any lvl 2-6 mutex up the stack. The 'registerForGarbageCollection()' method
+    // is not locking the lvl 6 _mutex above.
+    mutable Mutex _gcMutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "ReplicaSetMonitorManager::_gcMutex");
+
+    // Fields guarded by _gcMutex.
+
+    std::deque<std::string> _gcQueue;
+
+    // Removes the already deleted monitors pending in '_gcQueue' from the internal map.
+    // Do nothing if the queue is empty.
+    // This requires the parent lvl 6 _mutex to be already locked.
+    void _doGarbageCollectionLocked(WithLock);
+
+    // Used for tests.
+    Counter64 _monitorsGarbageCollected;
 };
 
 }  // namespace mongo

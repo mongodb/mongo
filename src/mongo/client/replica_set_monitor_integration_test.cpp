@@ -194,6 +194,38 @@ TEST_F(ReplicaSetMonitorFixture, ReplicaSetMonitorCleanup) {
     ASSERT_TRUE(cleanupInvoked);
 }
 
+// Tests that RSM Manager registerForGarbageCollection() could be invoked while holding a
+// lvl 2 mutex. Tests that GC is invoked before creating a new monitor.
+TEST_F(ReplicaSetMonitorFixture, LockOrderingAndGC) {
+    ReplicaSetMonitor::cleanup();
+    ASSERT_EQ(0, ReplicaSetMonitorManager::get()->getAllSetNames().size());
+    auto monitor = ReplicaSetMonitor::createIfNeeded(replSetUri);
+    ASSERT_EQ(1, ReplicaSetMonitorManager::get()->getAllSetNames().size());
+    const auto previousGCCount =
+        ReplicaSetMonitorManager::get()->getGarbageCollectedMonitorsCount();
+
+    {
+        auto lvl2mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "lvl2mutex");
+        stdx::unique_lock lk(lvl2mutex);
+        // This invokes delayed GC that locks only lvl 1 mutex.
+        monitor.reset();
+        // Tests that GC was not run yet.
+        ASSERT_EQ(previousGCCount,
+                  ReplicaSetMonitorManager::get()->getGarbageCollectedMonitorsCount());
+    }
+
+    // Tests that GC was not invoked yet and the empty pointer is still in the cache.
+    ASSERT_EQ(1, ReplicaSetMonitorManager::get()->getNumMonitors());
+    // getAllSetNames() checks that each pointer is valid, thus it returns 0.
+    ASSERT_EQ(0, ReplicaSetMonitorManager::get()->getAllSetNames().size());
+
+    ReplicaSetMonitor::createIfNeeded(replSetUri);
+    // Tests that GC was run.
+    ASSERT_EQ(previousGCCount + 1,
+              ReplicaSetMonitorManager::get()->getGarbageCollectedMonitorsCount());
+    ASSERT_EQ(0, ReplicaSetMonitorManager::get()->getAllSetNames().size());
+}
+
 }  // namespace
 }  // namespace executor
 }  // namespace mongo
