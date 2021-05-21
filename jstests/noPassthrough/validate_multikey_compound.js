@@ -70,9 +70,9 @@ assert(result.indexDetails.c_hashed.valid, tojson(result));
 
 // Check multikey index.
 assert.eq(6, result.keysPerIndex.a_1_b_1, tojson(result));
-assert(result.indexDetails.a_1_b_1.valid, tojson(result));
+assert(!result.indexDetails.a_1_b_1.valid, tojson(result));
 
-assert(result.valid, tojson(result));
+assert(!result.valid, tojson(result));
 
-rst.stopSet();
+rst.stopSet(/*signal=*/undefined, /*forRestart=*/undefined, {skipValidation: true});
 })();
