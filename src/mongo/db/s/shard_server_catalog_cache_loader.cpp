@@ -63,6 +63,7 @@ using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunk
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangPersistCollectionAndChangedChunksAfterDropChunks);
+MONGO_FAIL_POINT_DEFINE(hangCollectionFlush);
 
 AtomicWord<unsigned long long> taskIdGenerator{0};
 
@@ -1026,6 +1027,11 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
                     getGlobalServiceContext());
     auto context = _contexts.makeOperationContext(*tc);
 
+    if (MONGO_unlikely(hangCollectionFlush.shouldFail())) {
+        LOGV2(5710200, "Hit hangCollectionFlush failpoint");
+        hangCollectionFlush.pauseWhileSet();
+    }
+
     bool taskFinished = false;
     bool inShutdown = false;
     try {
@@ -1289,10 +1295,10 @@ ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVer
         LOGV2_FOR_CATALOG_REFRESH(
             24114,
             1,
-            "Cache loader read meatadata while updates were being applied: this metadata may be "
+            "Cache loader read metadata while updates were being applied: this metadata may be "
             "incomplete. Retrying. Refresh state before read: {beginRefreshState}. Current refresh "
             "state: {endRefreshState}",
-            "Cache loader read meatadata while updates were being applied: this metadata may be "
+            "Cache loader read metadata while updates were being applied: this metadata may be "
             "incomplete. Retrying",
             "beginRefreshState"_attr = beginRefreshState,
             "endRefreshState"_attr = endRefreshState);
@@ -1358,6 +1364,11 @@ void ShardServerCatalogCacheLoader::CollAndChunkTaskList::addTask(CollAndChunkTa
     }
 
     const auto& lastTask = _tasks.back();
+    if (lastTask.termCreated != task.termCreated) {
+        _tasks.emplace_back(std::move(task));
+        return;
+    }
+
     if (task.dropped) {
         invariant(lastTask.maxQueryVersion == task.minQueryVersion,
                   str::stream() << "The version of the added task is not contiguous with that of "
@@ -1483,7 +1494,7 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
             // Make sure we do not append a duplicate chunk. The diff query is GTE, so there can
             // be duplicates of the same exact versioned chunk across tasks. This is no problem
             // for our diff application algorithms, but it can return unpredictable numbers of
-            // chunks for testing purposes. Eliminate unpredicatable duplicates for testing
+            // chunks for testing purposes. Eliminate unpredictable duplicates for testing
             // stability.
             auto taskCollectionAndChangedChunksIt =
                 task.collectionAndChangedChunks->changedChunks.begin();
