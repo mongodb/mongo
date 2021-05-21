@@ -306,6 +306,13 @@ Value GranularityRounderPreferredNumbers::roundDown(Value value) {
             multiplier /= 10.0;
         }
 
+        // It is possible to get a number so small that the resulting multiplier would have to be
+        // smaller than the precision of a double, in which case the multiplier would equal 0. In
+        // this case, we can round down to 0.0.
+        if (multiplier == 0) {
+            return Value(0.0);
+        }
+
         double previousMax;
         while (number > (_baseSeries.back() * multiplier)) {
             previousMax = _baseSeries.back() * multiplier;
