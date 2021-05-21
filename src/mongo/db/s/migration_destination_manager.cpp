@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -1037,7 +1038,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     }
 
     AlternativeClientRegion acr(newClient);
-    auto newOpCtxPtr = cc().makeOperationContext();
+    auto executor =
+        Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
+    auto newOpCtxPtr = CancelableOperationContext(
+        cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
     auto opCtx = newOpCtxPtr.get();
 
     {
