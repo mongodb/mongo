@@ -20,7 +20,6 @@ $python buildscripts/resmoke.py setup-multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --githubOauthToken "${github_token}" \
   --useLatest 3.6 4.0
 
 # The platform and architecture for how some of the binaries are reported in
@@ -46,8 +45,7 @@ $python buildscripts/resmoke.py setup-multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --githubOauthToken "${github_token}" \
-  --useLatest 4.2 4.2.1
+  --useLatest 4.2
 
 # The platform and architecture for how some of the binaries are reported in
 # https://downloads.mongodb.org/full.json changed between MongoDB 4.2 and MongoDB 4.4.
@@ -72,5 +70,4 @@ $python buildscripts/resmoke.py setup-multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --githubOauthToken "${github_token}" \
   --useLatest 4.4 4.7 4.8 4.9
