@@ -249,6 +249,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/db/update/update_document_diff',
         '$BUILD_DIR/mongo/unittest/unittest',
     ],
     LIBDEPS_TYPEINFO=[

@@ -954,7 +954,7 @@ void apply(mongo::BSONObj* obj, const mmb::DamageVector& damages, const char* so
     mmb::DamageVector::const_iterator where = damages.begin();
     char* const target = const_cast<char*>(obj->objdata());
     for (; where != end; ++where) {
-        std::memcpy(target + where->targetOffset, source + where->sourceOffset, where->size);
+        std::memcpy(target + where->targetOffset, source + where->sourceOffset, where->sourceSize);
     }
 }
 }  // namespace
@@ -2871,7 +2871,7 @@ TEST(DocumentInPlace, GettingInPlaceUpdatesWhenDisabledClearsArguments) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
     mmb::DamageVector damages;
-    const mmb::DamageEvent event = {0};
+    const mmb::DamageEvent event{};
     damages.push_back(event);
     const char* source = "foo";
     ASSERT_FALSE(doc.getInPlaceUpdates(&damages, &source));
@@ -3244,7 +3244,7 @@ TEST(DocumentComparison, SimpleComparisonWithDeserializedElements) {
     ASSERT_EQUALS(0, doc1Copy.compareWith(doc1, nullptr));
 
     // Perform an operation on 'c' that doesn't change the serialized value, but
-    // deserializeds the node.
+    // deserializes the node.
     mmb::Document doc2(obj.getOwned());
     const mmb::Document doc2Copy(obj.getOwned());
     mmb::Element c = doc2.root()["c"];

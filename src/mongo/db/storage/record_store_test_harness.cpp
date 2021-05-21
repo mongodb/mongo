@@ -285,8 +285,9 @@ TEST(RecordStoreTestHarness, UpdateInPlace1) {
             mutablebson::DamageVector dv;
             dv.push_back(mutablebson::DamageEvent());
             dv[0].sourceOffset = 0;
+            dv[0].sourceSize = 3;
             dv[0].targetOffset = 3;
-            dv[0].size = 3;
+            dv[0].targetSize = 3;
 
             auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, s1Rec, damageSource, dv);
             ASSERT_OK(newRecStatus.getStatus());

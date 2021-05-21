@@ -110,6 +110,87 @@ DocumentDiffTables buildObjDiffTables(DocumentDiffReader* reader) {
     return out;
 }
 
+// Computes the damage vector from doc diffs. Currently only supports time-series updates.
+void computeDamageOnObject(const BSONObj& preImage,
+                           DocumentDiffReader* reader,
+                           mutablebson::DamageVector* damages,
+                           BufBuilder* bufBuilder,
+                           bool mustCheckExistenceForInsertOperations) {
+    const DocumentDiffTables tables = buildObjDiffTables(reader);
+    int32_t diffSize = 0;
+
+    if (!mustCheckExistenceForInsertOperations && tables.insertOnly) {
+        for (auto&& elt : tables.fieldsToInsert) {
+            // The end of 'preImage' with the offset from the updates made already.
+            auto targetOffset = preImage.end()->rawdata() - preImage.objdata() + diffSize;
+            // Inserts the field to the end.
+            damages->emplace_back(bufBuilder->len(), elt.size(), targetOffset, 0);
+            diffSize += elt.size();
+            bufBuilder->appendBuf(elt.rawdata(), elt.size());
+        }
+        // Updates the bytes of total size.
+        damages->emplace_back(bufBuilder->len(), 4, 0, 4);
+        bufBuilder->appendNum(preImage.objsize() + diffSize);
+        return;
+    }
+
+    // Keeps track of what fields we already appended, so that we can insert the rest at the end.
+    StringDataSet fieldsToSkipInserting;
+
+    for (auto&& elt : preImage) {
+        auto it = tables.fieldMap.find(elt.fieldNameStringData());
+        if (it == tables.fieldMap.end()) {
+            // Field is not modified.
+            continue;
+        }
+
+        stdx::visit(
+            visit_helper::Overloaded{
+                [](Delete) {
+                    // Not applicable for time-series.
+                },
+
+                [&](const Update& update) {
+                    auto newElt = update.newElt;
+                    // The beginning of 'elt' with the offset from the updates made already.
+                    auto targetOffset = elt.rawdata() - preImage.objdata() + diffSize;
+                    // Updates with the new BSONElement.
+                    damages->emplace_back(
+                        bufBuilder->len(), newElt.size(), targetOffset, elt.size());
+                    diffSize += newElt.size() - elt.size();
+                    bufBuilder->appendBuf(newElt.rawdata(), newElt.size());
+                    fieldsToSkipInserting.insert(elt.fieldNameStringData());
+                },
+
+                [&](const Insert&) {
+                    // Deletes the pre-image version of the field. We'll add it at the end.
+                    damages->emplace_back(
+                        0, 0, elt.rawdata() - preImage.objdata() + diffSize, elt.size());
+                    diffSize -= elt.size();
+                },
+
+                [](const SubDiff& subDiff) {
+                    // TODO (SERVER-56520)
+                }},
+            it->second);
+    }
+
+    for (auto&& elt : tables.fieldsToInsert) {
+        if (!fieldsToSkipInserting.count(elt.fieldNameStringData())) {
+            // The end of 'preImage' with the offset from the updates made already.
+            auto targetOffset = preImage.end()->rawdata() - preImage.objdata() + diffSize;
+            // Inserts the field to the end.
+            damages->emplace_back(bufBuilder->len(), elt.size(), targetOffset, 0);
+            bufBuilder->appendBuf(elt.rawdata(), elt.size());
+            diffSize += elt.size();
+        }
+    }
+
+    // Updates the bytes of total size.
+    damages->emplace_back(bufBuilder->len(), 4, 0, 4);
+    bufBuilder->appendNum(preImage.objsize() + diffSize);
+}
+
 class DiffApplier {
 public:
     DiffApplier(const UpdateIndexData* indexData, bool mustCheckExistenceForInsertOperations)
@@ -352,5 +433,15 @@ ApplyDiffOutput applyDiff(const BSONObj& pre,
     FieldRef path;
     applier.applyDiffToObject(pre, &path, &reader, &out);
     return {out.obj(), applier.indexesAffected()};
+}
+
+DamagesOutput computeDamages(const BSONObj& pre,
+                             const Diff& diff,
+                             bool mustCheckExistenceForInsertOperations) {
+    DocumentDiffReader reader(diff);
+    mutablebson::DamageVector damages;
+    BufBuilder b;
+    computeDamageOnObject(pre, &reader, &damages, &b, mustCheckExistenceForInsertOperations);
+    return {pre, b.release(), std::move(damages)};
 }
 }  // namespace mongo::doc_diff

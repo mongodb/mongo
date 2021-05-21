@@ -203,7 +203,6 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
     }
 }
 
-
 StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
                                 unique_ptr<RecordStore>& rs,
                                 const Timestamp& opTime) {
@@ -855,7 +854,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_AscendingOrder) {
 
 // Ensure that if we sample and create duplicate oplog stones, perform truncation correctly, and
 // with no crashing behavior. This scenario may be possible if the same record is sampled multiple
-// times during startup, which can be very likely if the size storer is very innacurate.
+// times during startup, which can be very likely if the size storer is very inaccurate.
 TEST(WiredTigerRecordStoreTest, OplogStones_Duplicates) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     auto wtHarnessHelper = dynamic_cast<WiredTigerHarnessHelper*>(harnessHelper.get());
@@ -878,7 +877,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_Duplicates) {
     wtKvEngine->getOplogManager()->setOplogReadTimestamp(Timestamp(4, 0));
 
     {
-        // Force initialize the oplog stones to use sampling by providing very large, innacurate
+        // Force initialize the oplog stones to use sampling by providing very large, inaccurate
         // sizes. This should cause us to oversample the records in the oplog.
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         wtrs->setNumRecords(1024 * 1024);

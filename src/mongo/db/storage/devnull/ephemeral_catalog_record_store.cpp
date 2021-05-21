@@ -440,23 +440,53 @@ StatusWith<RecordData> EphemeralForTestRecordStore::updateWithDamages(
     stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
     EphemeralForTestRecord* oldRecord = recordFor(lock, loc);
-    const int len = oldRecord->size;
+    const int len = std::accumulate(
+        damages.begin(), damages.end(), oldRecord->size, [](int bytes, const auto& damage) {
+            return bytes + damage.sourceSize - damage.targetSize;
+        });
 
     EphemeralForTestRecord newRecord(len);
-    memcpy(newRecord.data.get(), oldRecord->data.get(), len);
 
     opCtx->recoveryUnit()->registerChange(
         std::make_unique<RemoveChange>(opCtx, _data, loc, *oldRecord));
-    *oldRecord = newRecord;
+
+    mutablebson::DamageVector damages_sorted(damages.size());
+    std::partial_sort_copy(damages.begin(),
+                           damages.end(),
+                           damages_sorted.begin(),
+                           damages_sorted.end(),
+                           [](const auto& damage1, const auto& damage2) {
+                               return damage1.targetOffset < damage2.targetOffset;
+                           });
 
     char* root = newRecord.data.get();
-    mutablebson::DamageVector::const_iterator where = damages.begin();
-    const mutablebson::DamageVector::const_iterator end = damages.end();
+    char* old = oldRecord->data.get();
+    mutablebson::DamageVector::const_iterator where = damages_sorted.begin();
+    const mutablebson::DamageVector::const_iterator end = damages_sorted.end();
+    // Since the 'targetOffset' is referring to the location in the new record, we need to subtract
+    // the accumulated change of size by the damages to get the offset in the old record.
+    int diffSize = 0;
+    int curSize = 0;
+    int oldOffset = 0;
     for (; where != end; ++where) {
+        // First copies all bytes before the damage from the old record.
+        // Bytes between the current location in the oldRecord and the start of the damage.
+        auto oldSize = (where->targetOffset - diffSize) - oldOffset;
+        std::memcpy(root + curSize, old + oldOffset, oldSize);
+
+        // Then copies from the damage source according to the damage event info.
         const char* sourcePtr = damageSource + where->sourceOffset;
         char* targetPtr = root + where->targetOffset;
-        std::memcpy(targetPtr, sourcePtr, where->size);
+        std::memcpy(targetPtr, sourcePtr, where->sourceSize);
+
+        // Moves after the current damaged area in the old record. Updates the size difference due
+        // to the current damage. Increases the current size in the new record.
+        oldOffset = where->targetOffset - diffSize + where->targetSize;
+        diffSize += where->sourceSize - where->targetSize;
+        curSize += oldSize + where->sourceSize;
     }
+    // Copies the rest of the old record.
+    std::memcpy(root + curSize, old + oldOffset, oldRecord->size - oldOffset);
 
     *oldRecord = newRecord;
 
