@@ -66,24 +66,30 @@ def _extracted_files_to_copy():
 
 def download_symbols_from_patch_build(root_logger):
     """Download debug symbol from patch build."""
-    if config.DEBUG_SYMBOL_PATCH_URL is not None:
-        retry_secs = 10
+    if config.DEBUG_SYMBOL_PATCH_URL is None:
+        root_logger.info("Skipping downloading debug symbols since DEBUG_SYMBOLS_PATCH_URL is None")
+        return
 
-        while True:
-            try:
+    retry_secs = 10
+
+    while True:
+        try:
+            if config.DEBUG_SYMBOL_PATCH_URL is not None:
                 SetupMultiversion.setup_mongodb(artifacts_url=None, binaries_url=None,
                                                 symbols_url=config.DEBUG_SYMBOL_PATCH_URL,
                                                 install_dir=os.getcwd())
-                break
-            except tarfile.ReadError:
-                root_logger.info("Debug symbols unavailable after %s secs, retrying in %s secs",
-                                 compare_start_time(time.time()), retry_secs)
-                time.sleep(retry_secs)
 
-            ten_min = 10 * 60
-            if compare_start_time(time.time()) > ten_min:
-                root_logger.info(
-                    'Debug-symbols archive-file does not exist after %s secs; '
-                    'Hang-Analyzer may not complete successfully. Download URL: %s', ten_min,
-                    config.DEBUG_SYMBOL_PATCH_URL)
-                break
+            break
+
+        except tarfile.ReadError:
+            root_logger.info("Debug symbols unavailable after %s secs, retrying in %s secs",
+                             compare_start_time(time.time()), retry_secs)
+            time.sleep(retry_secs)
+
+        ten_min = 10 * 60
+        if compare_start_time(time.time()) > ten_min:
+            root_logger.info(
+                'Debug-symbols archive-file does not exist after %s secs; '
+                'Hang-Analyzer may not complete successfully. Download URL: %s', ten_min,
+                config.DEBUG_SYMBOL_PATCH_URL)
+            break

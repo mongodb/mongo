@@ -311,17 +311,17 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.CEDAR_RPC_PORT = config.pop("cedar_rpc_port")
 
     def calculate_debug_symbol_url():
-        url = "https://mciuploads.s3.amazonaws.com/"
+        url = "https://mciuploads.s3.amazonaws.com"
         project_name = _config.EVERGREEN_PROJECT_NAME
         variant_name = _config.EVERGREEN_VARIANT_NAME
         revision = _config.EVERGREEN_REVISION
         task_id = _config.EVERGREEN_TASK_ID
         if (variant_name is not None) and (revision is not None) and (task_id is not None):
             url = "/".join([
-                project_name, variant_name, revision, task_id,
-                f"/debugsymbols/debugsymbols-{task_id}"
+                url, project_name, variant_name, revision,
+                f"debugsymbols/debugsymbols-{_config.EVERGREEN_BUILD_ID}"
             ])
-            url = url + ".tgz" if sys.platform == "win32" else ".zip"
+            url = url + (".zip" if sys.platform == "win32" else ".tgz")
             return url
         return None
 
