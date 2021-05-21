@@ -476,6 +476,22 @@ class Component:
             if name == "Mozilla Firefox":
                 versions = [ver for ver in versions if "esr" in ver]
 
+            # For yaml-cpp, we need to clean the list of versions a little
+            # yaml-cpp uses #.#.# but there are some entires with #.#.#.# so the later needs to
+            # be filtered out.
+            if name == "jbeder/yaml-cpp":
+                ver_regex = re.compile(r"\d+\.\d+\.\d+$")
+                versions = [ver for ver in versions if ver_regex.match(ver)]
+
+            # For Boost C++ Libraries - boost, we need to clean the list of versions a little
+            # All boost versions for the last 10 years start with 1.x.x. Black Duck thinks some
+            # versions are 4.x.x which are bogus and throw off the sorting.
+            # Also, boost uses #.#.# but there are some entires with #.#.#.# so the later needs to
+            # be filtered out.
+            if name == "Boost C++ Libraries - boost":
+                ver_regex = re.compile(r"\d+\.\d+\.\d+$")
+                versions = [ver for ver in versions if ver.startswith("1") and ver_regex.match(ver)]
+
             ver_info = [VersionInfo(ver) for ver in versions]
             ver_info = [ver for ver in ver_info if ver.production_version]
             LOGGER.info("Filtered versions: %s ", ver_info)
