@@ -249,6 +249,19 @@ void TenantMigrationDonorAccessBlocker::rollBackStartBlocking() {
     _transitionOutOfBlockingPromise.setFrom(Status::OK());
 }
 
+void TenantMigrationDonorAccessBlocker::interrupt() {
+    stdx::unique_lock<Latch> lk(_mutex);
+    const Status status(
+        ErrorCodes::Interrupted,
+        "Blocked read or write interrupted while waiting for tenant migration to commit or abort");
+    if (!_transitionOutOfBlockingPromise.getFuture().isReady()) {
+        _transitionOutOfBlockingPromise.setFrom(status);
+    }
+    if (!_completionPromise.getFuture().isReady()) {
+        _completionPromise.setError(status);
+    }
+}
+
 void TenantMigrationDonorAccessBlocker::setCommitOpTime(OperationContext* opCtx,
                                                         repl::OpTime opTime) {
     {

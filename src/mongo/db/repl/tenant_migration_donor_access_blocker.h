@@ -230,6 +230,13 @@ public:
     void rollBackStartBlocking();
 
     /**
+     * Called when this mtab is about to be removed from the TenantMigrationAccessBlockerRegistry.
+     * Resolves all unfulfilled promises with an Interrupted error to unblock any blocked reads or
+     * writes.
+     */
+    void interrupt();
+
+    /**
      * Stores the commit opTime and calls _onMajorityCommitCommitOpTime if the opTime is already
      * majority-committed.
      */
@@ -240,6 +247,10 @@ public:
      * majority-committed.
      */
     void setAbortOpTime(OperationContext* opCtx, repl::OpTime opTime);
+
+    bool inStateAborted() const {
+        return _state.isAborted();
+    }
 
 private:
     /**
