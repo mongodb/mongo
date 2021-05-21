@@ -520,12 +520,25 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx) {
     LOGV2_DEBUG(5277902, 2, "Create collection _checkCommandArguments", "namespace"_attr = nss());
 
-    const auto dbInfo = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, nss().db()));
+    const auto dbEnabledForSharding = [&, this] {
+        // The modification of the 'sharded' flag for the db does not imply a database version
+        // change so we can't use the DatabaseShardingState to look it up. Instead we will do a
+        // first attempt through the catalog cache and if it is unset we will attempt another time
+        // after a forced catalog cache refresh.
+        auto catalogCache = Grid::get(opCtx)->catalogCache();
+
+        auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss().db()));
+        if (dbInfo.shardingEnabled()) {
+            return true;
+        }
+
+        dbInfo = uassertStatusOK(catalogCache->getDatabaseWithRefresh(opCtx, nss().db()));
+        return dbInfo.shardingEnabled();
+    }();
 
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "sharding not enabled for db " << nss().db(),
-            dbInfo.shardingEnabled());
+            dbEnabledForSharding);
 
     if (nss().db() == NamespaceString::kConfigDb) {
         // Only allowlisted collections in config may be sharded (unless we are in test mode)
