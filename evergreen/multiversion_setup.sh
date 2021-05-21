@@ -20,7 +20,7 @@ $python buildscripts/resmoke.py setup-multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --githubOauthToken "${global_github_oauth_token}" \
+  --githubOauthToken "${github_token}" \
   --useLatest 3.6 4.0
 
 # The platform and architecture for how some of the binaries are reported in
@@ -46,7 +46,7 @@ $python buildscripts/resmoke.py setup-multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --githubOauthToken "${global_github_oauth_token}" \
+  --githubOauthToken "${github_token}" \
   --useLatest 4.2 4.2.1
 
 # The platform and architecture for how some of the binaries are reported in
@@ -72,5 +72,5 @@ $python buildscripts/resmoke.py setup-multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --githubOauthToken "${global_github_oauth_token}" \
+  --githubOauthToken "${github_token}" \
   --useLatest 4.4 4.7 4.8 4.9
