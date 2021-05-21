@@ -82,7 +82,7 @@ public:
     //
 
     Status checkIfCanWrite() final;
-    Status waitUntilCommittedOrAborted(OperationContext* opCtx, OperationType operationType) final;
+    Status waitUntilCommittedOrAborted(OperationContext* opCtx) final;
 
     Status checkIfLinearizableReadWasAllowed(OperationContext* opCtx) final;
     SharedSemiFuture<void> getCanReadFuture(OperationContext* opCtx, StringData command) final;
