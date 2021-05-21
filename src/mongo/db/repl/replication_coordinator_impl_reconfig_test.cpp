@@ -809,6 +809,322 @@ TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary
     ASSERT_GREATER_THAN(result.obj()["config"].Obj()["version"].numberInt(), 3);
 }
 
+TEST_F(ReplCoordTest, ReconfigThatChangesIDWCFromWMajToW1WithoutCWWCSetFails) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345"))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+    BSONObjBuilder result;
+    ReplSetReconfigArgs args;
+    args.force = false;
+    // Adding an arbiter would change the default write concern from {w: majority} to {w: 1}.
+    args.newConfigObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 3 << "protocolVersion" << 1 << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"
+                                                         << "arbiterOnly" << true)));
+
+    const auto opCtx = makeOperationContext();
+    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+}
+
+TEST_F(ReplCoordTest, ReconfigThatChangesIDWCFromW1toWMajWithoutCWWCSetFails) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345")
+                                          << BSON("_id" << 3 << "host"
+                                                        << "node3:12345"
+                                                        << "arbiterOnly" << true))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+    BSONObjBuilder result;
+    ReplSetReconfigArgs args;
+    args.force = false;
+    // Removing an arbiter would change the default write concern from {w: 1} to {w: majority}.
+    args.newConfigObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 3 << "protocolVersion" << 1 << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")));
+
+    const auto opCtx = makeOperationContext();
+    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+}
+
+
+TEST_F(ReplCoordTest, ReconfigThatChangesIDWCWMajToW1WithCWWCSetPasses) {
+    RWConcernDefault newDefaults;
+    WriteConcernOptions wc;
+    wc.wMode = "majority";
+    wc.usedDefaultConstructedWC = false;
+    wc.notExplicitWValue = false;
+    newDefaults.setDefaultWriteConcern(wc);
+    lookupMock.setLookupCallReturnValue(std::move(newDefaults));
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345"))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+    const auto opCtx = makeOperationContext();
+    // It's not safe to assert from any other thread other than the main thread in our unit tests.
+    // Doing so can prevent other tests in the suite from running. As a result, we define
+    // 'status' here, and check its value after the reconfig thread has finished.
+    Status status(ErrorCodes::InternalError, "Not Set");
+    stdx::thread reconfigThread([&] {
+        BSONObjBuilder result;
+        ReplSetReconfigArgs args;
+        args.force = false;
+        args.newConfigObj = BSON("_id"
+                                 << "mySet"
+                                 << "version" << 3 << "term" << 1 << "protocolVersion" << 1
+                                 << "members"
+                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                          << "node1:12345")
+                                               << BSON("_id" << 2 << "host"
+                                                             << "node2:12345")
+                                               << BSON("_id" << 3 << "host"
+                                                             << "node3:12345"
+                                                             << "arbiterOnly" << true)));
+        status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    });
+    ReplSetHeartbeatArgsV1 hbArgs;
+    hbArgs.setSetName("mySet");
+    hbArgs.setConfigVersion(2);
+    hbArgs.setSenderId(2);
+    hbArgs.setSenderHost(HostAndPort("node2", 12345));
+    hbArgs.setTerm(0);
+    ReplSetHeartbeatResponse hbResp;
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    hbArgs.setSenderId(3);
+    hbArgs.setSenderHost(HostAndPort("node3", 12345));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    replyToReceivedHeartbeatV1();
+    replyToReceivedHeartbeatV1();
+    // As we have set the cluster-wide write concern, the reconfig should succeed.
+    reconfigThread.join();
+    ASSERT_OK(status);
+}
+
+TEST_F(ReplCoordTest, ReconfigThatChangesIDWCW1ToWMajWithCWWCSetPasses) {
+    RWConcernDefault newDefaults;
+    WriteConcernOptions wc;
+    wc.wMode = "majority";
+    wc.usedDefaultConstructedWC = false;
+    wc.notExplicitWValue = false;
+    newDefaults.setDefaultWriteConcern(wc);
+    lookupMock.setLookupCallReturnValue(std::move(newDefaults));
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345")
+                                          << BSON("_id" << 3 << "host"
+                                                        << "node3:12345"
+                                                        << "arbiterOnly" << true))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+    const auto opCtx = makeOperationContext();
+    // It's not safe to assert from any other thread other than the main thread in our unit tests.
+    // Doing so can prevent other tests in the suite from running. As a result, we define
+    // 'status' here, and check its value after the reconfig thread has finished.
+    Status status(ErrorCodes::InternalError, "Not Set");
+    stdx::thread reconfigThread([&] {
+        BSONObjBuilder result;
+        ReplSetReconfigArgs args;
+        args.force = false;
+        args.newConfigObj = BSON("_id"
+                                 << "mySet"
+                                 << "version" << 3 << "term" << 1 << "protocolVersion" << 1
+                                 << "members"
+                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                          << "node1:12345")
+                                               << BSON("_id" << 2 << "host"
+                                                             << "node2:12345")));
+        status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    });
+    ReplSetHeartbeatArgsV1 hbArgs;
+    hbArgs.setSetName("mySet");
+    hbArgs.setConfigVersion(2);
+    hbArgs.setSenderId(2);
+    hbArgs.setSenderHost(HostAndPort("node2", 12345));
+    hbArgs.setTerm(0);
+    ReplSetHeartbeatResponse hbResp;
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    hbArgs.setSenderId(3);
+    hbArgs.setSenderHost(HostAndPort("node3", 12345));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    replyToReceivedHeartbeatV1();
+    replyToReceivedHeartbeatV1();
+    // As we have set the cluster-wide write concern, the reconfig should succeed.
+    reconfigThread.join();
+    ASSERT_OK(status);
+}
+
+TEST_F(ReplCoordTest, ReconfigThatKeepsIDWCAtW1WithoutCWWCSetPasses) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345")
+                                          << BSON("_id" << 3 << "host"
+                                                        << "node3:12345"
+                                                        << "arbiterOnly" << true))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+    const auto opCtx = makeOperationContext();
+    // It's not safe to assert from any other thread other than the main thread in our unit tests.
+    // Doing so can prevent other tests in the suite from running. As a result, we define
+    // 'status' here, and check its value after the reconfig thread has finished.
+    Status status(ErrorCodes::InternalError, "Not Set");
+    stdx::thread reconfigThread([&] {
+        BSONObjBuilder result;
+        ReplSetReconfigArgs args;
+        args.force = false;
+        // Adding another arbiter would keep the default write concern at {w: 1}.
+        args.newConfigObj = BSON("_id"
+                                 << "mySet"
+                                 << "version" << 3 << "term" << 1 << "protocolVersion" << 1
+                                 << "members"
+                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                          << "node1:12345")
+                                               << BSON("_id" << 2 << "host"
+                                                             << "node2:12345")
+                                               << BSON("_id" << 3 << "host"
+                                                             << "node3:12345"
+                                                             << "arbiterOnly" << true)
+                                               << BSON("_id" << 4 << "host"
+                                                             << "node4:12345"
+                                                             << "arbiterOnly" << true)));
+        status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    });
+    ReplSetHeartbeatArgsV1 hbArgs;
+    hbArgs.setSetName("mySet");
+    hbArgs.setConfigVersion(2);
+    hbArgs.setSenderId(2);
+    hbArgs.setSenderHost(HostAndPort("node2", 12345));
+    hbArgs.setTerm(0);
+    ReplSetHeartbeatResponse hbResp;
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    hbArgs.setSenderId(3);
+    hbArgs.setSenderHost(HostAndPort("node3", 12345));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    hbArgs.setSenderId(4);
+    hbArgs.setSenderHost(HostAndPort("node4", 12345));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    replyToReceivedHeartbeatV1();
+    replyToReceivedHeartbeatV1();
+    replyToReceivedHeartbeatV1();
+    reconfigThread.join();
+    ASSERT_OK(status);
+}
+
+TEST_F(ReplCoordTest, ReconfigThatKeepsIDWCAtWMajWithoutCWWCSetPasses) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345"))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+    const auto opCtx = makeOperationContext();
+    // It's not safe to assert from any other thread other than the main thread in our unit tests.
+    // Doing so can prevent other tests in the suite from running. As a result, we define
+    // 'status' here, and check its value after the reconfig thread has finished.
+    Status status(ErrorCodes::InternalError, "Not Set");
+    stdx::thread reconfigThread([&] {
+        BSONObjBuilder result;
+        ReplSetReconfigArgs args;
+        args.force = false;
+        // Adding another data-bearing node would keep the default write concern at {w: majority}.
+        args.newConfigObj = BSON("_id"
+                                 << "mySet"
+                                 << "version" << 3 << "term" << 1 << "protocolVersion" << 1
+                                 << "members"
+                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                          << "node1:12345")
+                                               << BSON("_id" << 2 << "host"
+                                                             << "node2:12345")
+                                               << BSON("_id" << 3 << "host"
+                                                             << "node3:12345")));
+        status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    });
+    ReplSetHeartbeatArgsV1 hbArgs;
+    hbArgs.setSetName("mySet");
+    hbArgs.setConfigVersion(2);
+    hbArgs.setSenderId(2);
+    hbArgs.setSenderHost(HostAndPort("node2", 12345));
+    hbArgs.setTerm(0);
+    ReplSetHeartbeatResponse hbResp;
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    hbArgs.setSenderId(3);
+    hbArgs.setSenderHost(HostAndPort("node3", 12345));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    replyToReceivedHeartbeatV1();
+    replyToReceivedHeartbeatV1();
+    reconfigThread.join();
+    ASSERT_OK(status);
+}
+
 class ReplCoordReconfigTest : public ReplCoordTest {
 public:
     int counter = 0;
