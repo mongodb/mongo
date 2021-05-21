@@ -50,7 +50,7 @@ namespace mongo {
 
 namespace {
 
-const auto getTimeZoneDatabase =
+const auto getTimeZoneDatabaseDecorable =
     ServiceContext::declareDecoration<std::unique_ptr<TimeZoneDatabase>>();
 
 std::unique_ptr<_timelib_time, TimeZone::TimelibTimeDeleter> createTimelibTime() {
@@ -134,12 +134,12 @@ void validateFormat(StringData format,
 }  // namespace
 
 const TimeZoneDatabase* TimeZoneDatabase::get(ServiceContext* serviceContext) {
-    return getTimeZoneDatabase(serviceContext).get();
+    return getTimeZoneDatabaseDecorable(serviceContext).get();
 }
 
 void TimeZoneDatabase::set(ServiceContext* serviceContext,
                            std::unique_ptr<TimeZoneDatabase> dateTimeSupport) {
-    getTimeZoneDatabase(serviceContext) = std::move(dateTimeSupport);
+    getTimeZoneDatabaseDecorable(serviceContext) = std::move(dateTimeSupport);
 }
 
 TimeZoneDatabase::TimeZoneDatabase() {
