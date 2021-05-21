@@ -42,5 +42,5 @@ $python buildscripts/resmoke.py setup-multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --githubOauthToken "${global_github_oauth_token}" \
+  --githubOauthToken "${github_token}" \
   --useLatest master
