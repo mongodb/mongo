@@ -150,6 +150,8 @@ all:
     test_file: jstests/sharding/retryable_writes.js
   - ticket: SERVER-59952
     test_file: jstests/sharding/move_chunk_find_and_modify_with_write_retryability.js
+  - ticket: SERVER-57117
+    test_file: jstests/sharding/read_pref_with_hedging_mode.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
