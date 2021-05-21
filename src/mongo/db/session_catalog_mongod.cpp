@@ -40,6 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -212,6 +213,21 @@ void abortInProgressTransactions(OperationContext* opCtx) {
         opCtx->resetMultiDocumentTransactionState();
     }
 }
+
+void createRetryableFindAndModifyTable(OperationContext* opCtx) {
+    auto serviceCtx = opCtx->getServiceContext();
+    CollectionOptions options;
+    auto status = repl::StorageInterface::get(serviceCtx)
+                      ->createCollection(opCtx, NamespaceString::kConfigImagesNamespace, options);
+    if (status == ErrorCodes::NamespaceExists) {
+        return;
+    }
+
+    uassertStatusOKWithContext(status,
+                               str::stream() << "Failed to create the "
+                                             << NamespaceString::kConfigImagesNamespace.ns()
+                                             << " collection");
+}
 }  // namespace
 
 void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
@@ -259,6 +275,9 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     abortInProgressTransactions(opCtx);
 
     createTransactionTable(opCtx);
+    if (repl::gStoreFindAndModifyImagesInSideCollection.load()) {
+        createRetryableFindAndModifyTable(opCtx);
+    }
 }
 
 boost::optional<UUID> MongoDSessionCatalog::getTransactionTableUUID(OperationContext* opCtx) {
