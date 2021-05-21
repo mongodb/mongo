@@ -105,7 +105,11 @@ var ChunkHelper = (function() {
 
     function mergeChunks(db, collName, bounds) {
         var cmd = {mergeChunks: db[collName].getFullName(), bounds: bounds};
-        return runCommandWithRetries(db, cmd, res => res.code === ErrorCodes.LockBusy);
+        return runCommandWithRetries(
+            db,
+            cmd,
+            res => (res.code === ErrorCodes.ConflictingOperationInProgress ||
+                    res.code === ErrorCodes.LockBusy));
     }
 
     // Take a set of connections to a shard (replica set or standalone mongod),
