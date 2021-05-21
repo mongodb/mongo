@@ -37,6 +37,8 @@
 
 (function() {
 
+load("jstests/replsets/rslib.js");
+
 var name = 'user_defined_roles_on_secondaries';
 var m0, m1;
 
@@ -121,10 +123,17 @@ rstest.nodes.forEach(function(node) {
     assertListContainsRole(role.roles, {role: "dbAdmin", db: "db1"});
 });
 
+setLogVerbosity(rstest.nodes, {"command": {"verbosity": 2}});
+
 // Verify that dropping roles propagates.
+jsTestLog("Dropping role r2");
 assert.eq(true, rstest.getPrimary().getDB("db1").dropRole("r2", {w: 2}));
 assert.eq(null, rstest.getPrimary().getDB("db1").getRole("r2"));
 rstest.nodes.forEach(function(node) {
+    jsTestLog(`Testing node ${node}`);
+    const roles = assert.commandWorked(node.getDB("db1").runCommand({rolesInfo: 1}));
+    jsTestLog(`Roles: ${tojson(roles)}`);
+
     assert.eq(null, node.getDB("db1").getRole("r2"));
     var role = node.getDB("db1").getRole("r3");
     assert.eq(1, role.roles.length, tojson(node));
