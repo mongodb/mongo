@@ -34,4 +34,6 @@ ca = env.SharedLibrary(
     LIBDEPS_NO_INHERIT=[
         '$BUILD_DIR/third_party/shim_allocator',
     ],
+    AIB_COMPONENT='msi-util',
+    AIB_ROLE='runtime',
 )

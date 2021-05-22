@@ -109,81 +109,92 @@ if float(major_version) > 6.0:
 
 
 # candle: compile .wxs files into .wixobjs
-env.Command(objects,
-            sources,
-            '"$WIXCANDLE" -wx'
-            # cannot have anything other than x.x.x.x in version string.
-            # we should choose a fourth version number that reflects pre-ness.
-            ' -dMongoDBMajorVersion=' + major_version +
-            ' -dMongoDBVersion=' + full_version +
-            ' -dLicenseSource=distsrc'
-            r' -dEnterpriseBase=' + enterprisebase + '\\'
-            ' -dBinarySource=' + "\"$DESTDIR\\$PREFIX_BINDIR\"" +
-            ' -dMergeModulesBasePath=' + "\"${MSVS['VCREDISTMERGEMODULEPATH']}\"" +
-            ' -dMergeModuleFileCRT=' + env.GetMergeModuleNameForFeature('CRT') +
-            ' -dEdition=' + msi_edition +
-            ' -d"ProductId=*\"'
-            ' -dUpgradeCode=' + upgrade_code +
-            ' -dCustomActionDll=' + "\"$DESTDIR\\$PREFIX_BINDIR\\mongoca.dll\"" +
-            ' -dConfiguration=Release'
-            ' -dOutDir=' + buildDir + r'\msi'
-            ' -dPlatform=' + msi_platform +
-            ' -dFlavor=' + msi_flavor +
-            r' -dProjectDir=buildscripts\packaging\msi\\'
-            ' -dProjectName=MongoDB'
-            ' -dTargetDir=' + buildDir + r'\msi'
-            ' -dTargetExt=.msi'
-            ' -dTargetFileName=${SERVER_ARCHIVE}'
-            r' -dSaslSource=c:\sasl\bin'
-            r' -dSnmpSource=c:\snmp\bin'
-            r' -dSslSource=' + env['WINDOWS_OPENSSL_BIN'] +
-            ' -out ' + buildDir + r'\msi\\'
-            ' -arch ' + msi_platform +
-            ' -ext "$WIXUIEXT"'
-            ' -ext "$WIXUTILEXT"'
-            ' $SOURCES')
+candle_targets = env.Command(
+    target=objects,
+    source=sources,
+    action=[
+        '"$WIXCANDLE" -wx'
+        # cannot have anything other than x.x.x.x in version string.
+        # we should choose a fourth version number that reflects pre-ness.
+        ' -dMongoDBMajorVersion=' + major_version +
+        ' -dMongoDBVersion=' + full_version +
+        ' -dLicenseSource=distsrc'
+        r' -dEnterpriseBase=' + enterprisebase + '\\'
+        ' -dBinarySource=' + "\"$DESTDIR\\$PREFIX_BINDIR\"" +
+        ' -dMergeModulesBasePath=' + "\"${MSVS['VCREDISTMERGEMODULEPATH']}\"" +
+        ' -dMergeModuleFileCRT=' + env.GetMergeModuleNameForFeature('CRT') +
+        ' -dEdition=' + msi_edition +
+        ' -d"ProductId=*\"'
+        ' -dUpgradeCode=' + upgrade_code +
+        ' -dCustomActionDll=' + "\"$DESTDIR\\$PREFIX_BINDIR\\mongoca.dll\"" +
+        ' -dConfiguration=Release'
+        ' -dOutDir=' + buildDir + r'\msi'
+        ' -dPlatform=' + msi_platform +
+        ' -dFlavor=' + msi_flavor +
+        r' -dProjectDir=buildscripts\packaging\msi\\'
+        ' -dProjectName=MongoDB'
+        ' -dTargetDir=' + buildDir + r'\msi'
+        ' -dTargetExt=.msi'
+        ' -dTargetFileName=${SERVER_ARCHIVE}'
+        r' -dSaslSource=c:\sasl\bin'
+        r' -dSnmpSource=c:\snmp\bin'
+        r' -dSslSource=' + env['WINDOWS_OPENSSL_BIN'] +
+        ' -out ' + buildDir + r'\msi\\'
+        ' -arch ' + msi_platform +
+        ' -ext "$WIXUIEXT"'
+        ' -ext "$WIXUTILEXT"'
+        ' $SOURCES'
+    ]
+)
 
-#light: link .objs into an msi
-pre_msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.pre.msi"
+pre_msi = env.Command(
+    target='$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.pre.msi',
+    source=candle_targets,
+    action=[
+        '"$WIXLIGHT" -out ${TARGET} -wx -cultures:null'
 
-# Suppress VC140_CRT_CRT.MSM Internal Consistency Errors
-# ICE03 - Supress "String overflow"
-# -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa369037(v=vs.85).aspx
-# ICE82 - Suppress "duplicate sequence number"
-# -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa368798(v=vs.85).aspx
-# ICE30 - Suppress "different components install same file"
-# -- mongod.exe is installed in two different components but only one is ever used during an install
-#    so this consistency check can be ignored.
-# -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa368954(v=vs.85).aspx
+        # Suppress VC140_CRT_CRT.MSM Internal Consistency Errors
 
-pre_msi_cmd = env.Command(pre_msi,
-            objects,
-            '"$WIXLIGHT" -out ${TARGET} -wx -cultures:null -sice:ICE82  -sice:ICE03 -sice:ICE30'
-            ' -ext "$WIXUIEXT"'
-            ' -ext "$WIXUTILEXT"'
-            ' ${SOURCES}')
-env.NoCache(pre_msi_cmd)
+        # ICE82 - Suppress "duplicate sequence number"
+        # -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa368798(v=vs.85).aspx
+        ' -sice:ICE82'
 
-# Generated Dependencies
-env.Depends(pre_msi_cmd, '$DESTDIR/$PREFIX_BINDIR/mongo.exe')
-env.Depends(pre_msi_cmd, '$DESTDIR/$PREFIX_BINDIR/mongod.exe')
-env.Depends(pre_msi_cmd, '$DESTDIR/$PREFIX_BINDIR/mongos.exe')
-env.Depends(pre_msi_cmd, '$DESTDIR/$PREFIX_BINDIR/mongoca.dll')
-env.Depends(pre_msi_cmd, '$DESTDIR/$PREFIX_BINDIR/Install-Compass.ps1')
+        # ICE03 - Supress "String overflow"
+        # -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa369037(v=vs.85).aspx
+        ' -sice:ICE03'
 
-# Source Dependencies
-env.Depends(pre_msi_cmd, '#buildscripts/packaging/msi/mongod.yaml')
+        # ICE30 - Suppress "different components install same file"
+        # -- mongod.exe is installed in two different components but only one is ever used during an install
+        #    so this consistency check can be ignored.
+        # -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa368954(v=vs.85).aspx
+        ' -sice:ICE30'
 
-if 'enterprise' in env['MONGO_MODULES']:
-    env.Depends(pre_msi_cmd, "$DESTDIR/$PREFIX_BINDIR/mongodecrypt.exe")
-    env.Depends(pre_msi_cmd, "$DESTDIR/$PREFIX_BINDIR/mongokerberos.exe")
-    env.Depends(pre_msi_cmd, "$DESTDIR/$PREFIX_BINDIR/mongoldap.exe")
-    env.Depends(pre_msi_cmd, "$DESTDIR/$PREFIX_BINDIR/mongocryptd.exe")
+        ' -ext "$WIXUIEXT"'
+        ' -ext "$WIXUTILEXT"'
+        ' ${SOURCES}'
+    ]
+)
 
-msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi"
-env.Command(msi,
-            pre_msi,
-            r'$PYTHON buildscripts\msitrim.py ${SOURCES} ${TARGET}')
+env.Depends(pre_msi, [
+    '#/buildscripts/packaging/msi/mongod.yaml',
+
+    # This could potentially be a superset of what we actually
+    # require to build the MSI, but it should never be a subset.
+    env.Alias('install-dist'),
+
+    # We also need the mongoca DLL.
+    env.Alias('install-msi-util')
+])
+
+env.NoCache(pre_msi)
+
+msi = env.Command(
+    target='$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi',
+    source=pre_msi,
+    action=[
+        r'$PYTHON buildscripts\msitrim.py ${SOURCES} ${TARGET}'
+    ]
+)
 env.AlwaysBuild(msi)
 env.NoCache(msi)
 
