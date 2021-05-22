@@ -1,9 +1,10 @@
 /*
  * @tags: [
+ *   # renameCollection is not supported on sharded collections
+ *   assumes_unsharded_collection,
  *   requires_non_retryable_commands,
  *   requires_replication,
  *   # applyOps is not supported on mongos
- *   assumes_unsharded_collection,
  *   assumes_against_mongod_not_mongos,
  * ]
  */

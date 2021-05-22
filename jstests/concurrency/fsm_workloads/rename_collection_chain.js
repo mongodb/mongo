@@ -6,11 +6,6 @@
  * Creates a collection and then repeatedly executes the renameCollection
  * command against it. The previous "to" namespace is used as the next "from"
  * namespace.
- *
- * @tags: [
- *   # TODO SERVER-57128: remove the following tag once mongos retries will be resilient
- *   assumes_unsharded_collection,
- * ]
  */
 
 var $config = (function() {
