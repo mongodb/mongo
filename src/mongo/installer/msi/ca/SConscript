@@ -30,4 +30,6 @@ ca = env.SharedLibrary(
         'customaction.cpp',
         'customaction.def',
     ],
+    AIB_COMPONENT='msi-util',
+    AIB_ROLE='runtime',
 )
