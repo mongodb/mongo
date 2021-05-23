@@ -110,7 +110,7 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
     const donorRst = new ReplSetTest({
         nodes: 3,
         name: "donorRst",
-        nodeOptions: Object.assign(migrationX509Options.donor, {
+        nodeOptions: Object.assign({}, migrationX509Options.donor, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
@@ -120,7 +120,7 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
     const recipientRst = new ReplSetTest({
         nodes: 1,
         name: "recipientRst",
-        nodeOptions: Object.assign(migrationX509Options.recipient, {
+        nodeOptions: Object.assign({}, migrationX509Options.recipient, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
@@ -190,7 +190,7 @@ function testDonorAbortMigrationInterrupt(interruptFunc, fpName, isShutdown = fa
     const donorRst = new ReplSetTest({
         nodes: 3,
         name: "donorRst",
-        nodeOptions: Object.assign(migrationX509Options.donor, {
+        nodeOptions: Object.assign({}, migrationX509Options.donor, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
@@ -200,7 +200,7 @@ function testDonorAbortMigrationInterrupt(interruptFunc, fpName, isShutdown = fa
     const recipientRst = new ReplSetTest({
         nodes: 1,
         name: "recipientRst",
-        nodeOptions: Object.assign(migrationX509Options.recipient, {
+        nodeOptions: Object.assign({}, migrationX509Options.recipient, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: kTTLMonitorSleepSecs,

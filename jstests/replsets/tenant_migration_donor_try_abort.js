@@ -519,8 +519,8 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 (() => {
     jsTestLog("Test sending donorAbortMigration for a non-existent tenant migration.");
 
-    const donorRst = new ReplSetTest(
-        {nodes: 2, name: "donorRst", nodeOptions: Object.assign(migrationX509Options.donor)});
+    const donorRst =
+        new ReplSetTest({nodes: 2, name: "donorRst", nodeOptions: migrationX509Options.donor});
 
     donorRst.startSet();
     donorRst.initiate();

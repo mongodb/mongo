@@ -28,7 +28,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 const recipientRst = new ReplSetTest({
     name: "recipientRst",
     nodes: 1,
-    nodeOptions: Object.assign(migrationX509Options.recipient, {
+    nodeOptions: Object.assign({}, migrationX509Options.recipient, {
         setParameter: {
             tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
             ttlMonitorSleepSecs: 1,
@@ -63,7 +63,7 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
     const donorRst = new ReplSetTest({
         name: "donorRst",
         nodes: 3,
-        nodeOptions: Object.assign(migrationX509Options.donor, {
+        nodeOptions: Object.assign({}, migrationX509Options.donor, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: 1,

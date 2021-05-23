@@ -149,9 +149,9 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     ];
     for (let fpName of fpNames) {
         tenantMigrationTest.getDonorRst().stopSet();
-        tenantMigrationTest.getDonorRst().startSet(
-            Object.assign(migrationX509Options.donor,
-                          {setParameter: {['failpoint.' + fpName]: tojson({mode: 'alwaysOn'})}}));
+        tenantMigrationTest.getDonorRst().startSet(Object.assign({}, migrationX509Options.donor, {
+            setParameter: {['failpoint.' + fpName]: tojson({mode: 'alwaysOn'})}
+        }));
         tenantMigrationTest.getDonorRst().initiate();
         TenantMigrationUtil.createTenantMigrationRecipientRoleIfNotExist(
             tenantMigrationTest.getDonorRst());
@@ -195,14 +195,14 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     // This section is testing behavior during garbage collection.
     tenantMigrationTest.getDonorRst().stopSet();
     tenantMigrationTest.getDonorRst().startSet(
-        Object.assign(migrationX509Options.donor, {setParameter: garbageCollectionOpts}));
+        Object.assign({}, migrationX509Options.donor, {setParameter: garbageCollectionOpts}));
     tenantMigrationTest.getDonorRst().initiate();
     TenantMigrationUtil.createTenantMigrationRecipientRoleIfNotExist(
         tenantMigrationTest.getDonorRst());
 
     tenantMigrationTest.getRecipientRst().stopSet();
     tenantMigrationTest.getRecipientRst().startSet(
-        Object.assign(migrationX509Options.recipient, {setParameter: garbageCollectionOpts}));
+        Object.assign({}, migrationX509Options.recipient, {setParameter: garbageCollectionOpts}));
     tenantMigrationTest.getRecipientRst().initiate();
     TenantMigrationUtil.createTenantMigrationDonorRoleIfNotExist(
         tenantMigrationTest.getRecipientRst());

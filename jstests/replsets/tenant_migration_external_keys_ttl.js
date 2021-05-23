@@ -16,7 +16,6 @@ load("jstests/libs/parallelTester.js");
 
 const kExternalKeysTTLIndexName = "ExternalKeysTTLIndex";
 const kTenantIdPrefix = "testTenantId";
-const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 const ttlMonitorOptions = {
     ttlMonitorSleepSecs: 1
 };
@@ -199,6 +198,7 @@ function makeTestParams() {
 //
 
 (() => {
+    const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const donorRst = new ReplSetTest({
         nodes: 3,
         name: "donorRst",
