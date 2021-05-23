@@ -49,7 +49,7 @@ DatabaseVersion DatabaseVersion::makeUpdated() const {
 }
 
 ComparableDatabaseVersion ComparableDatabaseVersion::makeComparableDatabaseVersion(
-    const DatabaseVersion& version) {
+    const boost::optional<DatabaseVersion>& version) {
     return ComparableDatabaseVersion(version,
                                      _uuidDisambiguatingSequenceNumSource.fetchAndAdd(1),
                                      _forcedRefreshSequenceNumSource.load());

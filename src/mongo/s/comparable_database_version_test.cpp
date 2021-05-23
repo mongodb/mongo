@@ -77,7 +77,6 @@ TEST(ComparableDatabaseVersionTest, CompareVersionDifferentTimestamps) {
     ASSERT_FALSE(version2 > version1);
 }
 
-
 TEST(ComparableDatabaseVersionTest, CompareEpochBasedVersionAgainstEpochAndTimestampBasedVersion) {
     {
         auto equalVersions = [](const DatabaseVersion& v1, const DatabaseVersion& v2) {
@@ -217,6 +216,14 @@ TEST(ComparableDatabaseVersionTest, CompareTwoForcedRefreshVersions) {
     ASSERT_FALSE(forcedRefreshVersion1 == forcedRefreshVersion2);
     ASSERT(forcedRefreshVersion1 < forcedRefreshVersion2);
     ASSERT_FALSE(forcedRefreshVersion1 > forcedRefreshVersion2);
+}
+
+TEST(ComparableDatabaseVersionTest, CompareTwoComparableChunkVersionsWithBoostNone) {
+    const auto version1 = ComparableDatabaseVersion::makeComparableDatabaseVersion(boost::none);
+    const auto version2 = ComparableDatabaseVersion::makeComparableDatabaseVersion(boost::none);
+
+    ASSERT_TRUE(version1 < version2);
+    ASSERT_FALSE(version1 > version2);
 }
 
 }  // namespace

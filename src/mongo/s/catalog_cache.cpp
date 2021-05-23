@@ -497,7 +497,7 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
     LOGV2_FOR_CATALOG_REFRESH(24102, 2, "Refreshing cached database entry", "db"_attr = dbName);
 
     // This object will define the new time of the database info obtained by this refresh
-    auto newDbVersion = ComparableDatabaseVersion::makeComparableDatabaseVersion({});
+    auto newDbVersion = ComparableDatabaseVersion::makeComparableDatabaseVersion(boost::none);
 
     Timer t{};
     try {
