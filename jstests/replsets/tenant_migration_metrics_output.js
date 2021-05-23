@@ -13,8 +13,6 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
-
 // Verify that the server status response has the fields that we expect.
 function verifyServerStatus(conn) {
     const res = assert.commandWorked(conn.adminCommand({serverStatus: 1}));
@@ -33,7 +31,7 @@ const testPath = MongoRunner.toRealPath("ftdc_dir_repl_node");
 const donorRst = new ReplSetTest({
     nodes: 1,
     name: "donorRst",
-    nodeOptions: Object.assign(migrationX509Options.donor,
+    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor,
                                {setParameter: {diagnosticDataCollectionDirectoryPath: testPath}})
 });
 
