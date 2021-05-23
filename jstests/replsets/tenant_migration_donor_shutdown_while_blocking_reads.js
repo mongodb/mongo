@@ -38,8 +38,8 @@ const migrationOpts = {
 };
 
 let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
-assert.commandWorked(tenantMigrationTest.startMigration(
-    migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+assert.commandWorked(
+    tenantMigrationTest.startMigration(migrationOpts, false /* retryOnRetryableErrors */));
 
 fp.wait();
 const donorDoc =
