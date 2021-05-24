@@ -140,6 +140,18 @@ public:
         return _pipeline;
     }
 
+    void initialize() override {
+        // This implies that the stage will soon start to write, so it's safe to verify the target
+        // collection version. This is done here instead of parse time since it requires that locks
+        // are not held.
+        if (!pExpCtx->inMongos && _targetCollectionVersion) {
+            // If mongos has sent us a target shard version, we need to be sure we are prepared to
+            // act as a router which is at least as recent as that mongos.
+            pExpCtx->mongoProcessInterface->checkRoutingInfoEpochOrThrow(
+                pExpCtx, getOutputNs(), *_targetCollectionVersion);
+        }
+    }
+
 private:
     /**
      * Builds a new $merge stage which will merge all documents into 'outputNs'. If

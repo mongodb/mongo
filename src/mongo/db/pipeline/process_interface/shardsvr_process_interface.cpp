@@ -73,6 +73,7 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     ChunkVersion targetCollectionVersion) const {
+
     auto const shardId = ShardingState::get(expCtx->opCtx)->shardId();
     auto* catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
 
@@ -81,11 +82,8 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         nss, targetCollectionVersion, shardId);
 
-    // This will throw a 'ShardCannotRefreshDueToLocksHeldInfo' exception if the cache entry is
-    // staler than 'targetCollectionVersion' and 'checkRoutingInfoEpochOrThrow' is called under a DB
-    // lock.
     const auto routingInfo =
-        uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss, true));
+        uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss));
 
     auto foundVersion = routingInfo.getVersion(shardId);
     uassert(StaleEpochInfo(nss),

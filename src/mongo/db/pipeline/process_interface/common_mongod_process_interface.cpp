@@ -546,12 +546,9 @@ CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     boost::optional<std::set<FieldPath>> fieldPaths,
     boost::optional<ChunkVersion> targetCollectionVersion,
     const NamespaceString& outputNs) const {
-    if (targetCollectionVersion) {
-        uassert(51123, "Unexpected target chunk version specified", expCtx->fromMongos);
-        // If mongos has sent us a target shard version, we need to be sure we are prepared to
-        // act as a router which is at least as recent as that mongos.
-        checkRoutingInfoEpochOrThrow(expCtx, outputNs, *targetCollectionVersion);
-    }
+    uassert(51123,
+            "Unexpected target chunk version specified",
+            !targetCollectionVersion || expCtx->fromMongos);
 
     if (!fieldPaths) {
         uassert(51124, "Expected fields to be provided from mongos", !expCtx->fromMongos);
