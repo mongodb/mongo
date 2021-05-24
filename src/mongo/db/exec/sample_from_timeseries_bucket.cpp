@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/exec/sample_from_timeseries_bucket.h"
-#include "mongo/db/timeseries/timeseries_field_names.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo {
 const char* SampleFromTimeseriesBucket::kStageType = "SAMPLE_FROM_TIMESERIES_BUCKET";

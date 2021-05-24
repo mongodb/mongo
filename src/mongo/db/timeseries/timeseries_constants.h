@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/commands/create_gen.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace timeseries {
@@ -48,6 +50,13 @@ static constexpr StringData kMetaFieldName = "metaField"_sd;
 
 // These are hard-coded field names in index specs.
 static constexpr StringData kKeyFieldName = "key"_sd;
+
+static const StringDataSet kAllowedCollectionCreationOptions{
+    CreateCommand::kStorageEngineFieldName,
+    CreateCommand::kIndexOptionDefaultsFieldName,
+    CreateCommand::kCollationFieldName,
+    CreateCommand::kTimeseriesFieldName,
+    CreateCommand::kExpireAfterSecondsFieldName};
 
 }  // namespace timeseries
 }  // namespace mongo

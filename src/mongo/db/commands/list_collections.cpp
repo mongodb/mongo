@@ -63,6 +63,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 
@@ -142,9 +143,11 @@ void _addWorkingSetMember(OperationContext* opCtx,
 }
 
 BSONObj buildViewBson(const ViewDefinition& view, bool nameOnly) {
+    invariant(!view.timeseries());
+
     BSONObjBuilder b;
     b.append("name", view.name().coll());
-    b.append("type", view.timeseries() ? "timeseries" : "view");
+    b.append("type", "view");
 
     if (nameOnly) {
         return b.obj();
@@ -158,9 +161,45 @@ BSONObj buildViewBson(const ViewDefinition& view, bool nameOnly) {
     }
     optionsBuilder.doneFast();
 
-    BSONObj info = BSON("readOnly" << !view.timeseries());
+    BSONObj info = BSON("readOnly" << true);
     b.append("info", info);
     return b.obj();
+}
+
+BSONObj buildTimeseriesBson(OperationContext* opCtx,
+                            const CollectionPtr& collection,
+                            bool nameOnly) {
+    invariant(collection);
+
+    BSONObjBuilder builder;
+    builder.append("name", collection->ns().getTimeseriesViewNamespace().coll());
+    builder.append("type", "timeseries");
+
+    if (nameOnly) {
+        return builder.obj();
+    }
+
+    builder.append("options",
+                   collection->getCollectionOptions().toBSON(
+                       false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions));
+    builder.append("info", BSON("readOnly" << false));
+
+    return builder.obj();
+}
+
+BSONObj buildTimeseriesBson(StringData collName, bool nameOnly) {
+    BSONObjBuilder builder;
+    builder.append("name", collName);
+    builder.append("type", "timeseries");
+
+    if (nameOnly) {
+        return builder.obj();
+    }
+
+    builder.append("options", BSONObj{});
+    builder.append("info", BSON("readOnly" << false));
+
+    return builder.obj();
 }
 
 /**
@@ -323,11 +362,32 @@ public:
                                 clk.emplace(opCtx, nss, MODE_IS);
                             }
 
-                            CollectionPtr collection =
-                                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
-                                                                                           nss);
-                            BSONObj collBson = buildCollectionBson(
-                                opCtx, collection, includePendingDrops, nameOnly);
+                            auto collBson = [&] {
+                                if (auto collection =
+                                        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+                                            opCtx, nss)) {
+                                    return buildCollectionBson(
+                                        opCtx, collection, includePendingDrops, nameOnly);
+                                }
+
+                                auto view = viewCatalog->lookupWithoutValidatingDurableViews(
+                                    opCtx, nss.ns());
+                                if (view && view->timeseries()) {
+                                    if (auto bucketsCollection = CollectionCatalog::get(opCtx)
+                                                                     ->lookupCollectionByNamespace(
+                                                                         opCtx, view->viewOn())) {
+                                        return buildTimeseriesBson(
+                                            opCtx, bucketsCollection, nameOnly);
+                                    } else {
+                                        // The buckets collection does not exist, so the time-series
+                                        // view will be appended when we iterate through the view
+                                        // catalog below.
+                                    }
+                                }
+
+                                return BSONObj{};
+                            }();
+
                             if (!collBson.isEmpty()) {
                                 _addWorkingSetMember(
                                     opCtx, collBson, matcher.get(), ws.get(), root.get());
@@ -340,12 +400,27 @@ public:
                                     ResourcePattern::forExactNamespace(collection->ns())))) {
                                 return true;
                             }
+
                             BSONObj collBson = buildCollectionBson(
                                 opCtx, collection, includePendingDrops, nameOnly);
                             if (!collBson.isEmpty()) {
                                 _addWorkingSetMember(
                                     opCtx, collBson, matcher.get(), ws.get(), root.get());
                             }
+
+                            if (collection && collection->getTimeseriesOptions() &&
+                                viewCatalog->lookupWithoutValidatingDurableViews(
+                                    opCtx, collection->ns().getTimeseriesViewNamespace().ns())) {
+                                // The time-series view for this buckets namespace exists, so add it
+                                // here while we have the collection options.
+                                _addWorkingSetMember(
+                                    opCtx,
+                                    buildTimeseriesBson(opCtx, collection, nameOnly),
+                                    matcher.get(),
+                                    ws.get(),
+                                    root.get());
+                            }
+
                             return true;
                         };
 
@@ -376,6 +451,23 @@ public:
                             if (authorizedCollections &&
                                 !as->isAuthorizedForAnyActionOnResource(
                                     ResourcePattern::forExactNamespace(view.name()))) {
+                                return true;
+                            }
+
+                            if (view.timeseries()) {
+                                if (!CollectionCatalog::get(opCtx)
+                                         ->lookupCollectionByNamespaceForRead(opCtx,
+                                                                              view.viewOn())) {
+                                    // There is no buckets collection backing this time-series view,
+                                    // which means that it was not already added along with the
+                                    // buckets collection above.
+                                    _addWorkingSetMember(
+                                        opCtx,
+                                        buildTimeseriesBson(view.name().coll(), nameOnly),
+                                        matcher.get(),
+                                        ws.get(),
+                                        root.get());
+                                }
                                 return true;
                             }
 

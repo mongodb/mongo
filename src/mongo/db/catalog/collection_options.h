@@ -92,10 +92,13 @@ struct CollectionOptions {
 
     /**
      * Serialize to BSON. The 'includeUUID' parameter is used for the listCollections command to do
-     * special formatting for the uuid.
+     * special formatting for the uuid. Aside from the UUID, if 'includeFields' is non-empty, only
+     * the specified fields will be included.
      */
-    void appendBSON(BSONObjBuilder* builder, bool includeUUID) const;
-    BSONObj toBSON(bool includeUUID = true) const;
+    void appendBSON(BSONObjBuilder* builder,
+                    bool includeUUID,
+                    const StringDataSet& includeFields) const;
+    BSONObj toBSON(bool includeUUID = true, const StringDataSet& includeFields = {}) const;
 
     /**
      * Returns true if given options matches to this.
