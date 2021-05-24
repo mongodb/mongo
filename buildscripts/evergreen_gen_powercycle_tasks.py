@@ -63,9 +63,13 @@ def get_setup_commands() -> Tuple[List[FunctionCall], Set[TaskDependency]]:
 def get_skip_compile_setup_commands() -> Tuple[List[FunctionCall], set]:
     """Return skip compile setup commands."""
     return [
+        BuiltInCommand("manifest.load", {}),
+        FunctionCall("git get project"),
+        FunctionCall("f_expansions_write"),
+        FunctionCall("kill processes"),
+        FunctionCall("cleanup environment"),
         FunctionCall("set up venv"),
         FunctionCall("upload pip requirements"),
-        FunctionCall("f_expansions_write"),
         FunctionCall("configure evergreen api credentials"),
         FunctionCall("get compiled binaries"),
     ], set()
