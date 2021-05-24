@@ -77,9 +77,20 @@ public:
     static constexpr StringData kDowngradingFromLatestToLastContinuous =
         kVersionDowngradingFrom50To49;
 
+    // Used to verify that FCV values in 'admin.system.version' are valid and equal to one of
+    // { lastLTS, lastContinuous, latest }.
     static FeatureCompatibilityParams::Version parseVersion(StringData versionString);
 
+    // Used to parse FCV values for feature flags. It is acceptable to have feature flag versions
+    // that are not one of { lastLTS, lastContinuous, latest } while the server code is
+    // transitioning to the next LTS release. This is to avoid having the upgrade of FCV constants
+    // be blocked on old code removal.
+    static FeatureCompatibilityParams::Version parseVersionForFeatureFlags(
+        StringData versionString);
+
     static StringData serializeVersion(FeatureCompatibilityParams::Version version);
+
+    static StringData serializeVersionForFeatureFlags(FeatureCompatibilityParams::Version version);
 
     static Status validatePreviousVersionField(FeatureCompatibilityParams::Version version);
 

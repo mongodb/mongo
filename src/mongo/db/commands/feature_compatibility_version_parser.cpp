@@ -67,6 +67,32 @@ FeatureCompatibilityParams::Version FeatureCompatibilityVersionParser::parseVers
                             << ".");
 }
 
+FeatureCompatibilityParams::Version FeatureCompatibilityVersionParser::parseVersionForFeatureFlags(
+    StringData versionString) {
+    if (versionString == kVersion50) {
+        return FeatureCompatibilityParams::Version::kVersion50;
+    }
+
+    if (versionString == kVersion49) {
+        return FeatureCompatibilityParams::Version::kVersion49;
+    }
+
+    if (versionString == kVersion48) {
+        return FeatureCompatibilityParams::Version::kVersion48;
+    }
+
+    if (versionString == kVersion47) {
+        return FeatureCompatibilityParams::Version::kVersion47;
+    }
+
+    if (versionString == kVersion44) {
+        return FeatureCompatibilityParams::Version::kFullyDowngradedTo44;
+    }
+
+    uasserted(5715400,
+              str::stream() << "Invalid FCV version " << versionString << " for feature flag");
+}
+
 StringData FeatureCompatibilityVersionParser::serializeVersion(
     FeatureCompatibilityParams::Version version) {
     if (version == FeatureCompatibilityParams::kLastLTS) {
@@ -80,6 +106,32 @@ StringData FeatureCompatibilityVersionParser::serializeVersion(
     }
     // It is a bug if we hit here.
     invariant(false, "Invalid version value for featureCompatibilityVersion documents");
+    MONGO_UNREACHABLE
+}
+
+StringData FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(
+    FeatureCompatibilityParams::Version version) {
+    if (version == FeatureCompatibilityParams::Version::kVersion50) {
+        return kVersion50;
+    }
+
+    if (version == FeatureCompatibilityParams::Version::kVersion49) {
+        return kVersion49;
+    }
+
+    if (version == FeatureCompatibilityParams::Version::kVersion48) {
+        return kVersion48;
+    }
+
+    if (version == FeatureCompatibilityParams::Version::kVersion47) {
+        return kVersion47;
+    }
+
+    if (version == FeatureCompatibilityParams::Version::kFullyDowngradedTo44) {
+        return kVersion44;
+    }
+    // It is a bug if we hit here.
+    invariant(false, "Invalid version value for feature flag");
     MONGO_UNREACHABLE
 }
 

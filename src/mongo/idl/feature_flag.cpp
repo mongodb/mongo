@@ -51,7 +51,7 @@ FeatureFlag::FeatureFlag(bool enabled, StringData versionString)
     }
 
     if (!versionString.empty()) {
-        _version = FeatureCompatibilityVersionParser::parseVersion(versionString);
+        _version = FeatureCompatibilityVersionParser::parseVersionForFeatureFlags(versionString);
     }
 }
 
@@ -91,7 +91,8 @@ void FeatureFlagServerParameter::append(OperationContext* opCtx,
 
         if (enabled) {
             sub.append("version",
-                       FeatureCompatibilityVersionParser::serializeVersion(_storage.getVersion()));
+                       FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(
+                           _storage.getVersion()));
         }
     }
 }
