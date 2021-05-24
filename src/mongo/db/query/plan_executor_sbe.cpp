@@ -104,7 +104,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         _yieldPolicy->registerPlan(_root.get());
     }
 
-    const auto isMultiPlan = candidates.plans.size() > 0;
+    const auto isMultiPlan = candidates.plans.size() > 1;
 
     uassert(5088500, "Query does not have a valid CanonicalQuery", _cq);
     if (!_cq->getExpCtx()->explain) {

@@ -55,5 +55,13 @@ for (const planStats of explain.executionStats.allPlansExecution) {
     assert.eq(planStats.nReturned, maxResults, explain);
 }
 
+// If there was a single plan, allPlansExecution array should be present but empty.
+const explainSinglePlan = coll.find().explain("allPlansExecution");
+assert(explainSinglePlan.hasOwnProperty("executionStats"), explainSinglePlan);
+assert.eq(explainSinglePlan.executionStats.nReturned, numDocs);
+assert(explainSinglePlan.executionStats.hasOwnProperty("allPlansExecution"), explainSinglePlan);
+assert(Array.isArray(explainSinglePlan.executionStats.allPlansExecution), explainSinglePlan);
+assert.eq(explainSinglePlan.executionStats.allPlansExecution.length, 0, explainSinglePlan);
+
 assert(coll.drop());
 }());
