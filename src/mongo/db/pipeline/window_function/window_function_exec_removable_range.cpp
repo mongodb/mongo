@@ -105,7 +105,7 @@ void WindowFunctionExecRemovableRange::update() {
     if (added) {
         auto [lower, upper] = *added;
         for (auto i = lower; i <= upper; ++i) {
-            addValue(_input->evaluate(*_iter[i], nullptr));
+            addValue(_input->evaluate(*_iter[i], &_input->getExpressionContext()->variables));
         }
     }
     if (removed) {

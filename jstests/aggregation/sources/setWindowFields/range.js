@@ -233,4 +233,31 @@ assert.sameMembers(run([range('unbounded', -3)]), [
     {x: 3, y: [0, 0, 0, 0]},
     {x: 3, y: [0, 0, 0, 0]},
 ]);
+
+// Test variable evaluation for input expressions.
+assert.sameMembers(
+    run([
+        {
+            $setWindowFields: {
+                partitionBy: "$partition",
+                sortBy: {x: 1},
+                output: {
+                    y: {
+                        $sum: {$filter: {input: [], as: 'num', cond: {$gte: ['$$num', 2]}}},
+                        window: {range: [-1, 1]}
+                    },
+                }
+            }
+        },
+        {$unset: '_id'}
+    ]),
+    [
+        {x: 0, y: 0},
+        {x: 0, y: 0},
+        {x: 0, y: 0},
+        {x: 0, y: 0},
+        {x: 3, y: 0},
+        {x: 3, y: 0},
+        {x: 3, y: 0},
+    ]);
 })();
