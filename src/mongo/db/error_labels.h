@@ -48,13 +48,15 @@ public:
                       const std::string& commandName,
                       boost::optional<ErrorCodes::Error> code,
                       boost::optional<ErrorCodes::Error> wcCode,
-                      bool isInternalClient)
+                      bool isInternalClient,
+                      bool isMongos)
         : _opCtx(opCtx),
           _sessionOptions(sessionOptions),
           _commandName(commandName),
           _code(code),
           _wcCode(wcCode),
-          _isInternalClient(isInternalClient) {}
+          _isInternalClient(isInternalClient),
+          _isMongos(isMongos) {}
 
     void build(BSONArrayBuilder& labels) const;
 
@@ -71,6 +73,7 @@ private:
     boost::optional<ErrorCodes::Error> _code;
     boost::optional<ErrorCodes::Error> _wcCode;
     bool _isInternalClient;
+    bool _isMongos;
 };
 
 /**
@@ -81,7 +84,8 @@ BSONObj getErrorLabels(OperationContext* opCtx,
                        const std::string& commandName,
                        boost::optional<ErrorCodes::Error> code,
                        boost::optional<ErrorCodes::Error> wcCode,
-                       bool isInternalClient);
+                       bool isInternalClient,
+                       bool isMongos);
 
 /**
  * Whether a write error in a transaction should be labelled with "TransientTransactionError".

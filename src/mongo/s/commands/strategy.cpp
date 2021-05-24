@@ -903,10 +903,13 @@ void runCommand(OperationContext* opCtx,
         // 2. For other commands in a transaction, they shouldn't get a writeConcern error so
         //    this setting doesn't apply.
         //
-        // isInternalClient is set to true to suppress mongos from returning the RetryableWriteError
-        // label.
-        auto errorLabels = getErrorLabels(
-            opCtx, osi, command->getName(), e.code(), boost::none, true /* isInternalClient */);
+        auto errorLabels = getErrorLabels(opCtx,
+                                          osi,
+                                          command->getName(),
+                                          e.code(),
+                                          boost::none,
+                                          false /* isInternalClient */,
+                                          true /* isMongos */);
         errorBuilder->appendElements(errorLabels);
         throw;
     }

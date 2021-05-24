@@ -503,8 +503,8 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
                                          boost::optional<ErrorCodes::Error> code,
                                          boost::optional<ErrorCodes::Error> wcCode,
                                          bool isInternalClient) {
-    auto errorLabels =
-        getErrorLabels(opCtx, sessionOptions, commandName, code, wcCode, isInternalClient);
+    auto errorLabels = getErrorLabels(
+        opCtx, sessionOptions, commandName, code, wcCode, isInternalClient, false /* isMongos */);
     commandBodyFieldsBob->appendElements(errorLabels);
 
     auto isNotPrimaryError = false;
