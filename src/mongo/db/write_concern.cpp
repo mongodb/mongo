@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
@@ -108,10 +109,20 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                  isTransactionCommand(cmdObj.firstElementFieldName())) &&
                 !opCtx->getClient()->isInDirectClient() && !isInternalClient) {
 
-                auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                                     .getDefaultWriteConcern(opCtx);
+                const auto rwcDefaults =
+                    ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
+                auto wcDefault = rwcDefaults.getDefaultWriteConcern();
                 if (wcDefault) {
-                    customDefaultWasApplied = true;
+                    if (repl::feature_flags::gDefaultWCMajority.isEnabled(
+                            serverGlobalParams.featureCompatibility)) {
+                        const auto defaultWriteConcernSource =
+                            rwcDefaults.getDefaultWriteConcernSource();
+                        customDefaultWasApplied = defaultWriteConcernSource &&
+                            defaultWriteConcernSource == DefaultWriteConcernSourceEnum::kGlobal;
+                    } else {
+                        customDefaultWasApplied = true;
+                    }
+
                     LOGV2_DEBUG(22548,
                                 2,
                                 "Applying default writeConcern on {cmdObj_firstElementFieldName} "

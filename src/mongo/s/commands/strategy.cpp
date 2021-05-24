@@ -665,10 +665,19 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         } else {
             // This command is not from a DBDirectClient or internal client, and supports WC, but
             // wasn't given one - so apply the default, if there is one.
-            if (const auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                                           .getDefaultWriteConcern(opCtx)) {
+            const auto rwcDefaults =
+                ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
+            if (const auto wcDefault = rwcDefaults.getDefaultWriteConcern()) {
                 _parc->_wc = *wcDefault;
-                customDefaultWriteConcernWasApplied = true;
+                if (repl::feature_flags::gDefaultWCMajority.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    const auto defaultWriteConcernSource =
+                        rwcDefaults.getDefaultWriteConcernSource();
+                    customDefaultWriteConcernWasApplied = defaultWriteConcernSource &&
+                        defaultWriteConcernSource == DefaultWriteConcernSourceEnum::kGlobal;
+                } else {
+                    customDefaultWriteConcernWasApplied = true;
+                }
                 LOGV2_DEBUG(22766,
                             2,
                             "Applying default writeConcern on {command} of {writeConcern}",
