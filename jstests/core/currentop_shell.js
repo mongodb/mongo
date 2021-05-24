@@ -57,28 +57,31 @@ function shellOp() {
         aggregate: "currentOp_cursor",
         pipeline: [{
             $addFields: {
-                newVal: {$function: {args: [], body: "sleep(300000)", lang: "js"}},
+                newVal: {$function: {args: [], body: "sleep(1000000)", lang: "js"}},
                 bigDoc: createLargeDoc()
             }
         }],
+        comment: TestData.comment,
         cursor: {}
     }),
                                  ErrorCodes.Interrupted);
 }
 
-function startShellWithOp() {
+function startShellWithOp(comment) {
+    TestData.comment = comment;
     const awaitShell = startParallelShell(shellOp);
 
     // Confirm that the operation has started in the parallel shell.
     assert.soon(
         function() {
-            let aggRes = db.getSiblingDB("admin")
-                             .aggregate([
-                                 {$currentOp: {allUsers: true, localOps: true}},
-                                 {$match: {ns: "test.currentOp_cursor"}}
-                             ])
-                             .toArray();
-            return aggRes.length === 1;
+            let aggRes =
+                db.getSiblingDB("admin")
+                    .aggregate([
+                        {$currentOp: {}},
+                        {$match: {ns: "test.currentOp_cursor", "command.comment": TestData.comment}}
+                    ])
+                    .toArray();
+            return aggRes.length >= 1;
         },
         function() {
             return "Failed to find parallel shell operation in $currentOp output: " +
@@ -88,8 +91,8 @@ function startShellWithOp() {
 }
 
 // Test that the currentOp server command truncates long operations with a warning logged.
-const serverCommandTest = startShellWithOp();
-res = db.adminCommand({currentOp: true, "ns": "test.currentOp_cursor", $all: true});
+const serverCommandTest = startShellWithOp("currentOp_server");
+res = db.adminCommand({currentOp: true, "ns": "test.currentOp_cursor"});
 
 if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
     // Assert currentOp truncation behavior for each shard in the cluster.
@@ -115,7 +118,7 @@ res.inprog.forEach((op) => {
 serverCommandTest();
 
 // Test that the db.currentOp() shell helper does not truncate ops.
-const shellHelperTest = startShellWithOp();
+const shellHelperTest = startShellWithOp("currentOp_shell");
 res = db.currentOp({"ns": "test.currentOp_cursor"});
 
 if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
