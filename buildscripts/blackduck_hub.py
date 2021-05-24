@@ -772,7 +772,7 @@ class ReportManager:
 
         self._data.add_value(comp_name, metric)
 
-    def finish(self, reports_file: Optional[str]):
+    def finish(self, reports_file: Optional[str], vulnerabilties_only: bool):
         """Generate final summary of all reports run."""
 
         if reports_file:
@@ -780,8 +780,12 @@ class ReportManager:
 
         stream = io.StringIO()
 
-        self._data.write(
-            ["Component", "Vulnerability", "Upgrade", "Current Version", "Newest Version"], stream)
+        if vulnerabilties_only:
+            self._data.write(["Component", "Vulnerability"], stream)
+        else:
+            self._data.write(
+                ["Component", "Vulnerability", "Upgrade", "Current Version", "Newest Version"],
+                stream)
 
         print(stream.getvalue())
 
@@ -1044,16 +1048,20 @@ class Analyzer:
         self.black_duck_components = None
         self.mgr = None
 
-    def _do_reports(self):
+    def _do_reports(self, vulnerabilties_only: bool):
         for comp in self.black_duck_components:
             # 1. Validate if this is in the YAML file
-            if self._verify_yaml_contains_component(comp):
+            if self._verify_yaml_contains_component(comp, vulnerabilties_only):
 
                 # 2. Validate there are no security issues
                 self._verify_vulnerability_status(comp)
 
-                # 3. Check for upgrade issues
-                self._verify_upgrade_status(comp)
+                # 3. Check for upgrade issue
+                if not vulnerabilties_only:
+                    self._verify_upgrade_status(comp)
+
+        if vulnerabilties_only:
+            return
 
         # 4. Validate that each third_party directory is in the YAML file
         self._verify_directories_in_yaml()
@@ -1061,11 +1069,12 @@ class Analyzer:
         # 5. Verify the YAML file has all the entries in Black Duck
         self._verify_components_in_yaml()
 
-    def _verify_yaml_contains_component(self, comp: Component):
+    def _verify_yaml_contains_component(self, comp: Component, vulnerabilties_only: bool):
         # It should be rare that Black Duck detects something that is not in the YAML file
         # As a result, we do not generate a "pass" report for simply be consistent between Black Duck and the yaml file
         if comp.name not in [c.name for c in self.third_party_components]:
-            _generate_report_missing_yaml_component(self.mgr, comp)
+            if not vulnerabilties_only:
+                _generate_report_missing_yaml_component(self.mgr, comp)
             return False
 
         return True
@@ -1123,7 +1132,7 @@ class Analyzer:
 
         return mcomp
 
-    def run(self, logger: ReportLogger, report_file: Optional[str]):
+    def run(self, logger: ReportLogger, report_file: Optional[str], vulnerabilties_only: bool):
         """Run analysis of Black Duck scan and local files."""
 
         self.third_party_directories = _get_third_party_directories()
@@ -1161,9 +1170,9 @@ class Analyzer:
 
         self.mgr = ReportManager(logger)
 
-        self._do_reports()
+        self._do_reports(vulnerabilties_only)
 
-        self.mgr.finish(report_file)
+        self.mgr.finish(report_file, vulnerabilties_only)
 
 
 # Derived from buildscripts/resmokelib/logging/buildlogger.py
@@ -1208,7 +1217,7 @@ def _generate_reports_args(args):
         logger = BuildLoggerReportLogger(build_logger)
 
     analyzer = Analyzer()
-    analyzer.run(logger, args.report_file)
+    analyzer.run(logger, args.report_file, args.vulnerabilities_only)
 
 
 def _scan_and_report_args(args):
@@ -1242,6 +1251,8 @@ def main() -> None:
                                       help="build logger task id")
     generate_reports_cmd.add_argument("--build_logger_local", action='store_true',
                                       help="Log to local build logger, logs to disk by default")
+    generate_reports_cmd.add_argument("--vulnerabilities_only", action='store_true',
+                                      help="Only check for security vulnerabilities")
     generate_reports_cmd.set_defaults(func=_generate_reports_args)
 
     scan_cmd = sub.add_parser('scan', help='Do Black Duck Scan')
@@ -1260,6 +1271,8 @@ def main() -> None:
                                      help="build logger task id")
     scan_and_report_cmd.add_argument("--build_logger_local", action='store_true',
                                      help="Log to local build logger, logs to disk by default")
+    scan_and_report_cmd.add_argument("--vulnerabilities_only", action='store_true',
+                                     help="Only check for security vulnerabilities")
     scan_and_report_cmd.set_defaults(func=_scan_and_report_args)
 
     args = parser.parse_args()
