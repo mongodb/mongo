@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
@@ -53,10 +53,12 @@
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/map_reduce_output_format.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo::map_reduce_agg {
 
 namespace {
+Rarely _sampler;
 
 auto makeExpressionContext(OperationContext* opCtx,
                            const MapReduceCommandRequest& parsedMr,
@@ -112,6 +114,13 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                              const BSONObj& cmd,
                              BSONObjBuilder& result,
                              boost::optional<ExplainOptions::Verbosity> verbosity) {
+
+    if (_sampler.tick()) {
+        LOGV2_WARNING(5725801,
+                      "The map reduce command is deprecated. For more information, see "
+                      "https://docs.mongodb.com/manual/core/map-reduce/");
+    }
+
     auto exhaustPipelineIntoBSONArray = [](auto&& exec) {
         BSONArrayBuilder bab;
         BSONObj obj;

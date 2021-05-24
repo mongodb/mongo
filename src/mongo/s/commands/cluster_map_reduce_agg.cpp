@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonobj.h"
@@ -47,6 +47,7 @@
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/map_reduce_output_format.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_map_reduce_agg.h"
@@ -55,7 +56,7 @@
 
 namespace mongo {
 namespace {
-
+Rarely _sampler;
 auto makeExpressionContext(OperationContext* opCtx,
                            const MapReduceCommandRequest& parsedMr,
                            const ChunkManager& cm,
@@ -151,6 +152,12 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto hasOutDB = parsedMr.getOutOptions().getDatabaseName();
     auto resolvedOutNss = NamespaceString{hasOutDB ? *hasOutDB : parsedMr.getNamespace().db(),
                                           parsedMr.getOutOptions().getCollectionName()};
+
+    if (_sampler.tick()) {
+        LOGV2_WARNING(5725800,
+                      "The map reduce command is deprecated. For more information, see "
+                      "https://docs.mongodb.com/manual/core/map-reduce/");
+    }
 
     if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
         involvedNamespaces.insert(resolvedOutNss);
