@@ -130,7 +130,7 @@ boost::optional<std::string> replaceRootNestsRoot(
     }
     auto&& [nestedName, expression] = children[0];
     if (!dynamic_cast<ExpressionFieldPath*>(expression.get()) ||
-        !dynamic_cast<ExpressionFieldPath*>(expression.get())->isRootFieldPath()) {
+        !dynamic_cast<ExpressionFieldPath*>(expression.get())->isROOT()) {
         return boost::none;
     }
     return nestedName;
