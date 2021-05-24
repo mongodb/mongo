@@ -119,10 +119,9 @@ struct StorageGlobalParams {
     // Controls whether we allow the OplogStones mechanism to delete oplog history on WT.
     bool allowOplogTruncation;
 
-    // Disables lock-free reads, adjustable via setParameter. Can be disabled by certain user
-    // settings with which lock-free reads are incompatible: standalone mode; and
+    // Disables lock-free reads. Lock-free reads is incompatible with
     // enableMajorityReadConcern=false.
-    bool disableLockFreeReads = true;
+    bool disableLockFreeReads = false;
 
     // Delay in seconds between triggering the next checkpoint after the completion of the previous
     // one. A value of 0 indicates that checkpointing will be skipped.

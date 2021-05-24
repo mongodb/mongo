@@ -308,6 +308,12 @@ private:
 };
 
 TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5551105,
               "Running case",
@@ -332,6 +338,12 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
                                                           RecipientStateEnum::kApplying,
                                                           RecipientStateEnum::kStrictConsistency,
                                                           RecipientStateEnum::kDone};
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5551106,
               "Running case",
@@ -480,6 +492,12 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
 }
 
 TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenDone) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
     // The temporary collection is renamed by the donor service when the shard is also a donor. Only
     // on non-donor shards will the recipient service rename the temporary collection.
     bool isAlsoDonor = false;

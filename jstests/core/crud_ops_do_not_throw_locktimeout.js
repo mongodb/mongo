@@ -22,17 +22,13 @@ const doc = {
 };
 assert.commandWorked(coll.insert(doc));
 
-// Take storageEngine setting into account when checking featureFlagLockFreeReads as
-// ephemeralForTest automatically uses enableMajorityReadConcern=false and will disable the feature
-// even when the flag is enabled.
-//
-// Note: must check that the parameter is found in case this is running against an older server in a
-// multiversion test suite.
-const getParameterLockFreeReads = db.adminCommand({getParameter: 1, featureFlagLockFreeReads: 1});
-const isLockFreeReadsEnabled = "featureFlagLockFreeReads" in getParameterLockFreeReads
-    ? getParameterLockFreeReads.featureFlagLockFreeReads.value &&
-        jsTest.options().storageEngine !== "ephemeralForTest"
-    : false;
+// Figure out if lock-free reads is supported so we know the expected behavior later.
+// (1) ephemeralForTest automatically uses enableMajorityReadConcern=false, which disable lock-free
+// reads.
+// (2) lock-free reads are only supported in server versions 4.9+
+const maxWireVersion = assert.commandWorked(db.runCommand({isMaster: 1})).maxWireVersion;
+const isLockFreeReadsEnabled = jsTest.options().storageEngine !== "ephemeralForTest" &&
+    maxWireVersion >= 12 /* WIRE_VERSION_49 */;
 
 const failpoint = 'hangAfterDatabaseLock';
 assert.commandWorked(db.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn"}));

@@ -486,11 +486,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.noTableScan.store(params["notablescan"].as<bool>());
     }
 
-    // Initialize lock-free reads support from feature flag. This may be adjusted later based on
-    // replica set config.
-    storageGlobalParams.disableLockFreeReads =
-        !feature_flags::gLockFreeReads.isEnabledAndIgnoreFCV();
-
     repl::ReplSettings replSettings;
     if (params.count("replication.replSet")) {
         /* seed list of hosts for the repl set */
@@ -541,10 +536,7 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
 
     if (!serverGlobalParams.enableMajorityReadConcern) {
-        // Lock-free reads are not supported with enableMajorityReadConcern=false, so we disable
-        // them. If the user tries to explicitly enable lock-free reads by specifying
-        // disableLockFreeReads=false, log a warning so that the user knows these are not
-        // compatible settings.
+        // Lock-free reads is not supported with enableMajorityReadConcern=false, so we disable it.
         if (!storageGlobalParams.disableLockFreeReads) {
             LOGV2_WARNING(4788401,
                           "Lock-free reads is not compatible with "

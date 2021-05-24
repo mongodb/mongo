@@ -246,6 +246,12 @@ public:
 };
 
 TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
     auto shards = setupNShards(2);
 
     // Shard kOrigNss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1"
@@ -294,6 +300,12 @@ TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) 
 
 TEST_F(RecipientServiceExternalStateTest,
        CreatingLocalReshardingCollectionRetriesOnStaleVersionErrors) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
     auto shards = setupNShards(2);
 
     // Shard kOrigNss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1"
@@ -347,6 +359,12 @@ TEST_F(RecipientServiceExternalStateTest,
 
 TEST_F(RecipientServiceExternalStateTest,
        CreateLocalReshardingCollectionCollectionAlreadyExistsWithNoIndexes) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
     auto shards = setupNShards(2);
 
     // Shard kOrigNss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1"
@@ -410,6 +428,12 @@ TEST_F(RecipientServiceExternalStateTest,
 
 TEST_F(RecipientServiceExternalStateTest,
        CreateLocalReshardingCollectionCollectionAlreadyExistsWithSomeIndexes) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
     auto shards = setupNShards(2);
 
     // Shard kOrigNss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1"
@@ -475,6 +499,12 @@ TEST_F(RecipientServiceExternalStateTest,
 
 TEST_F(RecipientServiceExternalStateTest,
        CreateLocalReshardingCollectionCollectionAlreadyExistsWithAllIndexes) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
     auto shards = setupNShards(2);
 
     // Shard kOrigNss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1"

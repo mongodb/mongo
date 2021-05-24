@@ -842,6 +842,12 @@ TEST_F(TenantCollectionClonerTest, QueryPlanKilledThenNamespaceNotFoundSubsequen
 }
 
 TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingAllSecondaryIndexes) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
     TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
     auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
 
@@ -874,6 +880,12 @@ TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingAllSecondaryI
 }
 
 TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingSomeSecondaryIndexes) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
     TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
     auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
 
@@ -908,6 +920,12 @@ TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingSomeSecondary
 }
 
 TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingNoSecondaryIndexes) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
     TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
     auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
 
@@ -967,6 +985,12 @@ TEST_F(TenantCollectionClonerTest, ResumeFromNonEmptyCollection) {
 }
 
 TEST_F(TenantCollectionClonerTest, ResumeFromRenamedCollection) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
     TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
     auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
 
