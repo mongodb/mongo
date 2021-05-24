@@ -168,7 +168,10 @@ public:
 
             // We don't know the order that we will encounter the count and size, so we save them
             // until we've iterated through all the fields before updating unscaledCollSize
-            const auto shardObjCount = static_cast<long long>(res["count"].Number());
+            // Timeseries bucket collection does not provide 'count' or 'avgObjSize'.
+            BSONElement countField = res.getField("count");
+            const auto shardObjCount =
+                static_cast<long long>(!countField.eoo() ? countField.Number() : 0);
 
             for (const auto& e : res) {
                 StringData fieldName = e.fieldNameStringData();
@@ -192,6 +195,7 @@ public:
                     counts[e.fieldName()] += e.numberLong();
                 } else if (fieldName == "avgObjSize") {
                     const auto shardAvgObjSize = e.numberLong();
+                    uassert(5688300, "'avgObjSize' provided but not 'count'", !countField.eoo());
                     unscaledCollSize += shardAvgObjSize * shardObjCount;
                 } else if (fieldName == "maxSize") {
                     const auto shardMaxSize = e.numberLong();
