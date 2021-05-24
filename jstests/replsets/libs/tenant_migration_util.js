@@ -276,77 +276,134 @@ var TenantMigrationUtil = (function() {
                                  recipientRst,
                                  tenantId,
                                  excludedDBs = [],
+                                 retryOnRetryableErrors = false,
                                  msgPrefix = 'checkTenantDBHashes',
                                  ignoreUUIDs = false) {
         // Always skip db hash checks for the config, admin, and local database.
         excludedDBs = [...excludedDBs, "config", "admin", "local"];
 
-        const donorPrimary = donorRst.getPrimary();
-        const recipientPrimary = recipientRst.getPrimary();
+        while (true) {
+            try {
+                // If a cluster has authentication enabled, then we would need to also log in as
+                // users with the proper roles for each session client as well. Since authentication
+                // is only relevant in certain jstests, we can split the code path such that we only
+                // run within a session if we set the retryOnRetryableErrors flag to be true.
+                let donorPrimaryConn;
+                let recipientPrimaryConn;
+                let donorSession;
+                let recipientSession;
 
-        // Allows listCollections and listIndexes on donor after migration for consistency checks.
-        const donorAllowsReadsAfterMigration =
-            assert
-                .commandWorked(donorPrimary.adminCommand({
-                    getParameter: 1,
-                    "failpoint.tenantMigrationDonorAllowsNonTimestampedReads": 1
-                }))["failpoint.tenantMigrationDonorAllowsNonTimestampedReads"]
-                .mode;
-        // Only turn on the failpoint if it is not already.
-        if (!donorAllowsReadsAfterMigration) {
-            assert.commandWorked(donorPrimary.adminCommand({
-                configureFailPoint: "tenantMigrationDonorAllowsNonTimestampedReads",
-                mode: "alwaysOn"
-            }));
-        }
+                // In failover suites we want to run within a session to allow for retryable
+                // operations to retry.
+                if (retryOnRetryableErrors) {
+                    donorSession =
+                        new Mongo(donorRst.getPrimary().host).startSession({retryWrites: true});
+                    recipientSession =
+                        new Mongo(recipientRst.getPrimary().host).startSession({retryWrites: true});
+                    donorPrimaryConn = donorSession.getClient();
+                    recipientPrimaryConn = recipientSession.getClient();
+                } else {
+                    donorPrimaryConn = donorRst.getPrimary();
+                    recipientPrimaryConn = recipientRst.getPrimary();
+                }
 
-        // Filter out all dbs that don't belong to the tenant.
-        let combinedDBNames = [...donorPrimary.getDBNames(), ...recipientPrimary.getDBNames()];
-        combinedDBNames = combinedDBNames.filter(
-            dbName => (isNamespaceForTenant(tenantId, dbName) && !excludedDBs.includes(dbName)));
-        combinedDBNames = new Set(combinedDBNames);
+                // Allows listCollections and listIndexes on donor after migration for consistency
+                // checks.
+                const donorAllowsReadsAfterMigration =
+                    assert
+                        .commandWorked(donorPrimaryConn.adminCommand({
+                            getParameter: 1,
+                            "failpoint.tenantMigrationDonorAllowsNonTimestampedReads": 1
+                        }))["failpoint.tenantMigrationDonorAllowsNonTimestampedReads"]
+                        .mode;
+                // Only turn on the failpoint if it is not already.
+                if (!donorAllowsReadsAfterMigration) {
+                    assert.commandWorked(donorPrimaryConn.adminCommand({
+                        configureFailPoint: "tenantMigrationDonorAllowsNonTimestampedReads",
+                        mode: "alwaysOn"
+                    }));
+                }
 
-        for (const dbName of combinedDBNames) {
-            // Pass in an empty array for the secondaries, since we only wish to compare the DB
-            // hashes between the donor and recipient primary in this test.
-            const donorDBHash = assert.commandWorked(donorRst.getHashes(dbName, []).primary);
-            const recipientDBHash =
-                assert.commandWorked(recipientRst.getHashes(dbName, []).primary);
+                // Filter out all dbs that don't belong to the tenant.
+                let combinedDBNames =
+                    [...donorPrimaryConn.getDBNames(), ...recipientPrimaryConn.getDBNames()];
+                combinedDBNames =
+                    combinedDBNames.filter(dbName => (isNamespaceForTenant(tenantId, dbName) &&
+                                                      !excludedDBs.includes(dbName)));
+                combinedDBNames = new Set(combinedDBNames);
 
-            const donorCollections = Object.keys(donorDBHash.collections);
-            const donorCollInfos = new CollInfos(donorPrimary, 'donorPrimary', dbName);
-            donorCollInfos.filter(donorCollections);
+                for (const dbName of combinedDBNames) {
+                    let donorDBHash;
+                    let recipientDBHash;
 
-            const recipientCollections = Object.keys(recipientDBHash.collections);
-            const recipientCollInfos = new CollInfos(recipientPrimary, 'recipientPrimary', dbName);
-            recipientCollInfos.filter(recipientCollections);
+                    // If a failover occurs while we run getHashes(), it is possible that the
+                    // self._primary referenced in a ReplSetTest is currently undefined which will
+                    // cause issues when it tries to get a session from an undefined variable. Thus,
+                    // we use the underlying helper function getHashesUsingSessions() and pass in
+                    // the donor and recipient connection sessions manually to circumvent the issue.
+                    if (retryOnRetryableErrors) {
+                        donorDBHash = donorRst.getHashesUsingSessions([donorSession], dbName)[0];
+                        recipientDBHash =
+                            recipientRst.getHashesUsingSessions([recipientSession], dbName)[0];
+                    } else {
+                        // Pass in an empty array for the secondaries, since we only wish to compare
+                        // the DB hashes between the donor and recipient primary in this test.
+                        donorDBHash = assert.commandWorked(donorRst.getHashes(dbName, []).primary);
+                        recipientDBHash =
+                            assert.commandWorked(recipientRst.getHashes(dbName, []).primary);
+                    }
 
-            print(`checking db hash between donor: ${donorPrimary} and recipient: ${
-                recipientPrimary}`);
+                    const donorCollections = Object.keys(donorDBHash.collections);
+                    const donorCollInfos = new CollInfos(donorPrimaryConn, 'donorPrimary', dbName);
+                    donorCollInfos.filter(donorCollections);
 
-            const collectionPrinted = new Set();
-            const success = DataConsistencyChecker.checkDBHash(donorDBHash,
-                                                               donorCollInfos,
-                                                               recipientDBHash,
-                                                               recipientCollInfos,
-                                                               msgPrefix,
-                                                               ignoreUUIDs,
-                                                               true, /* syncingHasIndexes */
-                                                               collectionPrinted);
-            if (!success) {
-                print(`checkTenantDBHashes dumping donor and recipient primary oplogs`);
-                donorRst.dumpOplog(donorPrimary, {}, 100);
-                recipientRst.dumpOplog(recipientPrimary, {}, 100);
+                    const recipientCollections = Object.keys(recipientDBHash.collections);
+                    const recipientCollInfos =
+                        new CollInfos(recipientPrimaryConn, 'recipientPrimary', dbName);
+                    recipientCollInfos.filter(recipientCollections);
+
+                    print(`checking db hash between donor: ${donorPrimaryConn} and recipient: ${
+                        recipientPrimaryConn}`);
+
+                    const collectionPrinted = new Set();
+                    const success = DataConsistencyChecker.checkDBHash(donorDBHash,
+                                                                       donorCollInfos,
+                                                                       recipientDBHash,
+                                                                       recipientCollInfos,
+                                                                       msgPrefix,
+                                                                       ignoreUUIDs,
+                                                                       true, /* syncingHasIndexes */
+                                                                       collectionPrinted);
+                    if (!success) {
+                        print(`checkTenantDBHashes dumping donor and recipient primary oplogs`);
+                        donorRst.dumpOplog(donorPrimaryConn, {}, 100);
+                        recipientRst.dumpOplog(recipientPrimaryConn, {}, 100);
+                    }
+                    assert(success, 'dbhash mismatch between donor and recipient primaries');
+                }
+
+                // Reset failpoint on the donor after consistency checks if it wasn't enabled
+                // before.
+                if (!donorAllowsReadsAfterMigration) {
+                    // We unset the failpoint for every node in case there was a failover at some
+                    // point before this.
+                    donorRst.nodes.forEach(node => {
+                        assert.commandWorked(node.adminCommand({
+                            configureFailPoint: "tenantMigrationDonorAllowsNonTimestampedReads",
+                            mode: "off"
+                        }));
+                    });
+                }
+
+                break;
+            } catch (e) {
+                if (!checkIfRetriableErrorForTenantDbHashCheck(e)) {
+                    throw e;
+                } else {
+                    print(`Got error: ${tojson(e)}. Failover occurred during tenant dbhash check, retrying 
+                        tenant dbhash check.`);
+                }
             }
-            assert(success, 'dbhash mismatch between donor and recipient primaries');
-        }
-
-        // Reset failpoint on the donor after consistency checks if it wasn't enabled before.
-        if (!donorAllowsReadsAfterMigration) {
-            assert.commandWorked(donorPrimary.adminCommand({
-                configureFailPoint: "tenantMigrationDonorAllowsNonTimestampedReads",
-                mode: "off"
-            }));
         }
     }
 
@@ -368,6 +425,25 @@ var TenantMigrationUtil = (function() {
             ],
             roles: []
         }));
+    }
+
+    /**
+     * Checks if an error gotten while doing a tenant dbhash check is retriable.
+     */
+    function checkIfRetriableErrorForTenantDbHashCheck(error) {
+        return isRetryableError(error) || isNetworkError(error) ||
+            // If there's a failover while we're running a dbhash check, the elected secondary might
+            // not have set the tenantMigrationDonorAllowsNonTimestampedReads failpoint, which means
+            // that the listCollections command run when we call CollInfos would throw a
+            // TenantMigrationCommitted error.
+            ErrorCodes.isTenantMigrationError(error.code) ||
+            // If there's a failover as we're creating a ReplSetTest from either the donor or
+            // recipient URLs, it's possible to get back a NotYetInitialized error, so we want to
+            // retry creating the ReplSetTest.
+            error.code == ErrorCodes.NotYetInitialized ||
+            // TODO (SERVER-54026): Remove check for error message once the shell correctly
+            // propagates the error code.
+            error.message.includes("The server is in quiesce mode and will shut down");
     }
 
     /**
@@ -433,6 +509,7 @@ var TenantMigrationUtil = (function() {
         checkTenantDBHashes,
         createTenantMigrationDonorRoleIfNotExist,
         createTenantMigrationRecipientRoleIfNotExist,
-        roleExists
+        roleExists,
+        checkIfRetriableErrorForTenantDbHashCheck
     };
 })();
