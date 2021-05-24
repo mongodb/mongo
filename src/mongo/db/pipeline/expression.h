@@ -1526,12 +1526,26 @@ public:
 
 class ExpressionFieldPath final : public Expression {
 public:
-    bool isRootFieldPath() const {
+    /**
+     * Checks whether this field path is exactly "$$ROOT".
+     */
+    bool isROOT() const {
         return _variable == Variables::kRootId && _fieldPath.getPathLength() == 1;
     }
 
+    /**
+     * Checks whether this field path starts with a variable besides ROOT.
+     *
+     * For example, these are variable references:
+     *   "$$NOW"
+     *   "$$NOW.x"
+     * and these are not:
+     *   "$x"
+     *   "$$ROOT"
+     *   "$$ROOT.x"
+     */
     bool isVariableReference() const {
-        return Variables::isUserDefinedVariable(_variable);
+        return _variable != Variables::kRootId;
     }
 
     boost::intrusive_ptr<Expression> optimize() final;
