@@ -6,6 +6,7 @@
 // shard 1, then some third write 'C' could occur.  This test ensures that in that case, both 'A'
 // and 'B' will be seen in the changestream before 'C'.
 // @tags: [
+//   does_not_support_stepdowns,
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
@@ -46,7 +47,7 @@ function checkStream() {
 
     db = db.getSiblingDB(jsTestName());
     let coll = db[jsTestName()];
-    let changeStream = coll.aggregate([{$changeStream: {}}]);
+    let changeStream = coll.aggregate([{$changeStream: {}}], {comment: jsTestName()});
 
     assert.soon(() => changeStream.hasNext());
     assertChangeStreamEventEq(changeStream.next(), {
@@ -74,22 +75,37 @@ function checkStream() {
     changeStream.close();
 }
 
+// Helper function to list all idle cursors on the test namespace, with an optional extra filter.
+function listIdleCursorsOnTestNs(rs, filter = {}) {
+    return rs.getPrimary()
+        .getDB('admin')
+        .aggregate([
+            {$currentOp: {idleCursors: true}},
+            {
+                $match: {
+                    ns: mongosColl.getFullName(),
+                    type: "idleCursor",
+                }
+            },
+            {$match: filter}
+        ])
+        .toArray();
+}
+
 // Start the $changeStream with shard 1 unavailable on the second mongos (s1).  We will be
 // writing through the first mongos (s0), which will remain connected to all shards.
 st.rs1.getPrimary().disconnect(st.s1);
 let waitForShell = startParallelShell(checkStream, st.s1.port);
 
-// Wait for the aggregate cursor to appear in currentOp on the current shard.
+// Helper function which waits for a $changeStream cursor to appear in currentOp on the given shard.
 function waitForShardCursor(rs) {
-    assert.soon(() => rs.getPrimary()
-                          .getDB('admin')
-                          .aggregate([
-                              {"$currentOp": {"idleCursors": true}},
-                              {"$match": {ns: mongosColl.getFullName(), type: "idleCursor"}}
-
-                          ])
-                          .itcount() === 1);
+    assert.soon(() => listIdleCursorsOnTestNs(rs, {
+                          "cursor.originatingCommand.aggregate": {$exists: true},
+                          "cursor.originatingCommand.comment": jsTestName()
+                      }).length === 1,
+                () => tojson(listIdleCursorsOnTestNs(rs)));
 }
+
 // Make sure the shard 0 $changeStream cursor is established before doing the first writes.
 waitForShardCursor(st.rs0);
 
