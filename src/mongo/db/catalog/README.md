@@ -1659,6 +1659,25 @@ units = ceil (datum bytes / unit size in bytes)
 This has the tendency to overstate small datums when the unit size is large. These unit sizes are
 tunable with the server parameters `documentUnitSizeBytes` and `indexEntryUnitSizeBytes`.
 
+## Total Write Units
+
+For writes, the code also calculates a special combined document and index unit. The code attempts 
+to associate index writes with an associated document write, and takes those bytes collectively to 
+calculate units. For each set of bytes written, a unit is calculated as the following:
+```
+units = ceil (set bytes / unit size in bytes)
+```
+
+To associate index writes with document writes, the algorithm is the following:
+Within a storage transaction, if a document write precedes as-yet-unassigned index writes, assign 
+such index bytes with the preceding document bytes, up until the next document write.
+If a document write follows as-yet-unassigned index writes, assign such index bytes with the 
+following document bytes.
+
+The `totalUnitWriteSizeBytes` server parameter affects the unit calculation size for the above 
+calculation.
+
+
 ## CPU Time
 
 Operations that collect metrics will also collect the amount of active CPU time spent on the command
@@ -1717,6 +1736,9 @@ schema, per returned document:
   idxEntryBytesWritten: 0,
   // The number of index entry units attempted to be written to or deleted from the storage engine
   idxEntryUnitsWritten: 0,
+  // The total number of document plus associated index entry units attempted to be written to 
+  // or deleted from the storage engine
+  totalUnitsWritten: 0
 }
 ```
 
