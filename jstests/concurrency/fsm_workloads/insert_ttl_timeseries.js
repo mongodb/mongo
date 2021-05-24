@@ -185,8 +185,8 @@ var $config = (function() {
             timeseries: {
                 timeField: timeFieldName,
                 metaField: metaFieldName,
-                expireAfterSeconds: ttlSeconds,
-            }
+            },
+            expireAfterSeconds: ttlSeconds,
         }));
     }
 

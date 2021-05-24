@@ -263,7 +263,6 @@ env.Library(
         'create_command_validation.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/clustered_index_options_idl',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_idl',
     ],
     LIBDEPS_PRIVATE=[

@@ -179,7 +179,7 @@ public:
 
             WriteUnitOfWork wuow(&_opCtx);
             CollectionOptions collOptions;
-            collOptions.clusteredIndex = ClusteredIndexOptions{};
+            collOptions.clusteredIndex = true;
             const bool createIdIndex = false;
             db->createCollection(&_opCtx, ns, collOptions, createIdIndex);
             wuow.commit();

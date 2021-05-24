@@ -50,8 +50,8 @@ const testCase = (testFn) => {
         timeseries: {
             timeField: timeFieldName,
             metaField: metaFieldName,
-            expireAfterSeconds: expireAfterSeconds,
-        }
+        },
+        expireAfterSeconds: expireAfterSeconds,
     }));
 
     testFn(coll, bucketsColl);
@@ -166,7 +166,7 @@ testCase((coll, bucketsColl) => {
     if (TimeseriesTest.supportsClusteredIndexes(conn)) {
         assert.commandWorked(testDB.runCommand({
             collMod: 'system.buckets.ts',
-            clusteredIndex: {expireAfterSeconds: expireAfterSeconds}
+            expireAfterSeconds: expireAfterSeconds,
         }));
     } else {
         assert.commandWorked(bucketsColl.createIndex({['control.min.' + timeFieldName]: 1},

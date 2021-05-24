@@ -415,7 +415,7 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
 
     const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
-    options.clusteredIndex = ClusteredIndexOptions{};
+    options.clusteredIndex = true;
     std::unique_ptr<RecordStore> rs = harnessHelper->newNonCappedRecordStore(ns, options);
     invariant(rs->keyFormat() == KeyFormat::String);
 
@@ -526,7 +526,7 @@ TEST(RecordStoreTestHarness, ClusteredRecordStoreSeekNear) {
 
     const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
-    options.clusteredIndex = ClusteredIndexOptions{};
+    options.clusteredIndex = true;
     std::unique_ptr<RecordStore> rs = harnessHelper->newNonCappedRecordStore(ns, options);
     invariant(rs->keyFormat() == KeyFormat::String);
 

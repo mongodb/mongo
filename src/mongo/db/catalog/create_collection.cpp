@@ -245,15 +245,14 @@ Status _createTimeseries(OperationContext* opCtx,
             // If possible, cluster time-series buckets collections by _id.
             const bool useClusteredIdIndex = gTimeseriesBucketsCollectionClusterById &&
                 opCtx->getServiceContext()->getStorageEngine()->supportsClusteredIdIndex();
-            auto expireAfterSeconds = options.timeseries->getExpireAfterSeconds();
+            auto expireAfterSeconds = options.expireAfterSeconds;
             if (useClusteredIdIndex) {
-                ClusteredIndexOptions clusteredOptions;
                 if (expireAfterSeconds) {
                     uassertStatusOK(
                         index_key_validate::validateExpireAfterSeconds(*expireAfterSeconds));
-                    clusteredOptions.setExpireAfterSeconds(*expireAfterSeconds);
+                    bucketsOptions.expireAfterSeconds = expireAfterSeconds;
                 }
-                bucketsOptions.clusteredIndex = clusteredOptions;
+                bucketsOptions.clusteredIndex = true;
             }
 
             // Create a TTL index on 'control.min.[timeField]' if 'expireAfterSeconds' is provided

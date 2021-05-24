@@ -76,7 +76,7 @@ public:
 
         CollectionOptions options;
         if (clustered && _supportsClusteredIdIndex) {
-            options.clusteredIndex = ClusteredIndexOptions{};
+            options.clusteredIndex = true;
         }
 
         const bool createIdIndex = !clustered;
