@@ -33,7 +33,7 @@
 
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
-#include "mongo/db/timeseries/timeseries_field_names.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"

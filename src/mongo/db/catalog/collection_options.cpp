@@ -316,81 +316,90 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
     return options;
 }
 
-BSONObj CollectionOptions::toBSON(bool includeUUID) const {
+BSONObj CollectionOptions::toBSON(bool includeUUID, const StringDataSet& includeFields) const {
     BSONObjBuilder b;
-    appendBSON(&b, includeUUID);
+    appendBSON(&b, includeUUID, includeFields);
     return b.obj();
 }
 
-void CollectionOptions::appendBSON(BSONObjBuilder* builder, bool includeUUID) const {
+void CollectionOptions::appendBSON(BSONObjBuilder* builder,
+                                   bool includeUUID,
+                                   const StringDataSet& includeFields) const {
     if (uuid && includeUUID) {
         builder->appendElements(uuid->toBSON());
     }
 
-    if (capped) {
-        builder->appendBool("capped", true);
-        builder->appendNumber("size", cappedSize);
+    auto shouldAppend = [&](StringData option) {
+        return includeFields.empty() || includeFields.contains(option);
+    };
+
+    if (capped && shouldAppend(CreateCommand::kCappedFieldName)) {
+        builder->appendBool(CreateCommand::kCappedFieldName, true);
+        builder->appendNumber(CreateCommand::kSizeFieldName, cappedSize);
 
         if (cappedMaxDocs)
-            builder->appendNumber("max", cappedMaxDocs);
+            builder->appendNumber(CreateCommand::kMaxFieldName, cappedMaxDocs);
     }
 
-    if (autoIndexId != DEFAULT)
-        builder->appendBool("autoIndexId", autoIndexId == YES);
+    if (autoIndexId != DEFAULT && shouldAppend(CreateCommand::kAutoIndexIdFieldName))
+        builder->appendBool(CreateCommand::kAutoIndexIdFieldName, autoIndexId == YES);
 
-    if (temp)
-        builder->appendBool("temp", true);
+    if (temp && shouldAppend(CreateCommand::kTempFieldName))
+        builder->appendBool(CreateCommand::kTempFieldName, true);
 
-    if (recordPreImages) {
-        builder->appendBool("recordPreImages", true);
+    if (recordPreImages && shouldAppend(CreateCommand::kRecordPreImagesFieldName)) {
+        builder->appendBool(CreateCommand::kRecordPreImagesFieldName, true);
     }
 
-    if (!storageEngine.isEmpty()) {
-        builder->append("storageEngine", storageEngine);
+    if (!storageEngine.isEmpty() && shouldAppend(CreateCommand::kStorageEngineFieldName)) {
+        builder->append(CreateCommand::kStorageEngineFieldName, storageEngine);
     }
 
-    if (indexOptionDefaults.getStorageEngine()) {
-        builder->append("indexOptionDefaults", indexOptionDefaults.toBSON());
+    if (indexOptionDefaults.getStorageEngine() &&
+        shouldAppend(CreateCommand::kIndexOptionDefaultsFieldName)) {
+        builder->append(CreateCommand::kIndexOptionDefaultsFieldName, indexOptionDefaults.toBSON());
     }
 
-    if (!validator.isEmpty()) {
-        builder->append("validator", validator);
+    if (!validator.isEmpty() && shouldAppend(CreateCommand::kValidatorFieldName)) {
+        builder->append(CreateCommand::kValidatorFieldName, validator);
     }
 
-    if (validationLevel) {
-        builder->append("validationLevel", ValidationLevel_serializer(*validationLevel));
+    if (validationLevel && shouldAppend(CreateCommand::kValidationLevelFieldName)) {
+        builder->append(CreateCommand::kValidationLevelFieldName,
+                        ValidationLevel_serializer(*validationLevel));
     }
 
-    if (validationAction) {
-        builder->append("validationAction", ValidationAction_serializer(*validationAction));
+    if (validationAction && shouldAppend(CreateCommand::kValidationActionFieldName)) {
+        builder->append(CreateCommand::kValidationActionFieldName,
+                        ValidationAction_serializer(*validationAction));
     }
 
-    if (!collation.isEmpty()) {
-        builder->append("collation", collation);
+    if (!collation.isEmpty() && shouldAppend(CreateCommand::kCollationFieldName)) {
+        builder->append(CreateCommand::kCollationFieldName, collation);
     }
 
-    if (clusteredIndex) {
-        builder->append("clusteredIndex", true);
+    if (clusteredIndex && shouldAppend(CreateCommand::kClusteredIndexFieldName)) {
+        builder->append(CreateCommand::kClusteredIndexFieldName, true);
     }
 
-    if (expireAfterSeconds) {
-        builder->append("expireAfterSeconds", *expireAfterSeconds);
+    if (expireAfterSeconds && shouldAppend(CreateCommand::kExpireAfterSecondsFieldName)) {
+        builder->append(CreateCommand::kExpireAfterSecondsFieldName, *expireAfterSeconds);
     }
 
-    if (!viewOn.empty()) {
-        builder->append("viewOn", viewOn);
+    if (!viewOn.empty() && shouldAppend(CreateCommand::kViewOnFieldName)) {
+        builder->append(CreateCommand::kViewOnFieldName, viewOn);
     }
 
-    if (!pipeline.isEmpty()) {
-        builder->appendArray("pipeline", pipeline);
+    if (!pipeline.isEmpty() && shouldAppend(CreateCommand::kPipelineFieldName)) {
+        builder->appendArray(CreateCommand::kPipelineFieldName, pipeline);
     }
 
-    if (!idIndex.isEmpty()) {
-        builder->append("idIndex", idIndex);
+    if (!idIndex.isEmpty() && shouldAppend(CreateCommand::kIdIndexFieldName)) {
+        builder->append(CreateCommand::kIdIndexFieldName, idIndex);
     }
 
-    if (timeseries) {
-        builder->append("timeseries", timeseries->toBSON());
+    if (timeseries && shouldAppend(CreateCommand::kTimeseriesFieldName)) {
+        builder->append(CreateCommand::kTimeseriesFieldName, timeseries->toBSON());
     }
 }
 

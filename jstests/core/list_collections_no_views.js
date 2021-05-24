@@ -52,7 +52,7 @@ assert.eq(allExpected,
                   return 0;
               }));
 
-// {type: {$exists: false}} is needed for versions <= 3.2
+// TODO (SERVER-25493): {type: {$exists: false}} is needed for versions <= 3.2
 let collOnlyCommand = {
     listCollections: 1,
     filter: {$or: [{type: 'collection'}, {type: {$exists: false}}]}

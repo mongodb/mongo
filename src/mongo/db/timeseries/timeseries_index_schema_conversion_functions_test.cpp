@@ -32,7 +32,7 @@
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/timeseries/timeseries_field_names.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/unittest/unittest.h"
 

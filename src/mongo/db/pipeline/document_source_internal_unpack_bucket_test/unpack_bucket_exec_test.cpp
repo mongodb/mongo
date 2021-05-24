@@ -31,7 +31,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/timeseries/timeseries_field_names.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo {
 namespace {

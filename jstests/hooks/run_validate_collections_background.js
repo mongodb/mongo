@@ -94,6 +94,7 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
     for (let dbName of dbNames) {
         let db = conn.getDB(dbName);
 
+        // TODO (SERVER-25493): Change filter to {type: 'collection'}.
         const listCollRes = assert.commandWorked(db.runCommand({
             "listCollections": 1,
             "nameOnly": true,

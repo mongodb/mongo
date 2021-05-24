@@ -30,7 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/bucket_unpacker.h"
-#include "mongo/db/timeseries/timeseries_field_names.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo {
 
