@@ -14,3 +14,4 @@ run_time=20
 threads=((count=2,reads=1),(count=2,inserts=1))
 value_sz=100
 warmup=10
+backup_interval=5
