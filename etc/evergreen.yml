@@ -19,6 +19,32 @@
 # - 'build_variant' (references the executing task's buildvariant).
 # - 'config_root' (references the root directory for the executor's configuration artifacts).
 
+
+#####################################################
+#          Setup environment in a new task          #
+#####################################################
+
+# There are several ways to setup the environment in your task.
+#
+# 1. If your task depends on 'archive_dist_test'/'archive_dist_test_debug' task you can call the function "do setup"
+# - func: "do setup"
+# Or alternatively call the functions in the sequence below, if you don't need everything else from "do setup"
+# - func: "fetch artifacts" (includes python, shell scripts, jstests etc. from the mongo and enterprise repos)
+# - func: "f_expansions_write"
+# - func: "kill processes"
+# - func: "cleanup environment"
+# - func: "set up venv"
+#
+# 2. If your task does not depend on 'archive_dist_test'/'archive_dist_test_debug' task use the following functions
+# call sequence
+# - command: manifest.load
+# - func: "git get project" (clone the entire mongo and enterprise repos)
+# - func: "f_expansions_write"
+# - func: "kill processes"
+# - func: "cleanup environment"
+# - func: "set up venv"
+
+
 stepback: true
 command_type: system
 pre_error_fails_task: true
@@ -171,12 +197,12 @@ variables:
         ${archive_file|src/archive.json}
   setup_group_can_fail_task: true
   setup_group:
-  - func: "f_expansions_write"
   - command: manifest.load
   - func: "git get project"
+  - func: "set task expansion macros"
+  - func: "f_expansions_write"
   - func: "kill processes"
   - func: "cleanup environment"
-  - func: "set task expansion macros"
   # The python virtual environment is installed in ${workdir}, which is created in
   # "set up venv".
   - func: "set up venv"
@@ -250,15 +276,17 @@ variables:
   setup_task:
     - func: "apply compile expansions"
     - func: "set task expansion macros"
+    - func: "f_expansions_write"
   teardown_task:
   - func: "attach scons logs"
   setup_group_can_fail_task: true
   setup_group:
     - command: manifest.load
     - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "f_expansions_write"
     - func: "kill processes"
     - func: "cleanup environment"
-    - func: "set task expansion macros"
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "get buildnumber"
@@ -406,12 +434,12 @@ functions:
         selected_tests_auth_token: ${selected_tests_auth_token}
 
   "git get project": &git_get_project
-    - command: git.get_project
-      params:
-        directory: ${git_project_directory|src}
-        revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
-          enterprise: ${enterprise_rev}
-          wtdevelop: ${wtdevelop_rev}
+    command: git.get_project
+    params:
+      directory: ${git_project_directory|src}
+      revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+        enterprise: ${enterprise_rev}
+        wtdevelop: ${wtdevelop_rev}
 
   "fetch artifacts": &fetch_artifacts
     command: s3.get
@@ -714,7 +742,6 @@ functions:
       exec_timeout_secs: ${exec_timeout_secs}
 
   ### Set expansion macros used in each task.
-  ### Note that this function will override task expansions set in update_bypass_expansions
   "set task expansion macros": &set_task_expansion_macros
     command: expansions.update
     params:
@@ -770,15 +797,30 @@ functions:
       name: perf
       file: src/perf.json
 
+  "cleanup environment": &cleanup_environment
+    command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "./src/evergreen/cleanup_environment.sh"
+
+  "kill processes": &kill_processes
+    command: subprocess.exec
+    params:
+      silent: true
+      binary: bash
+      args:
+        - "./src/evergreen/kill_processes.sh"
+
   "do setup":
   - *f_expansions_write
-  - *set_up_venv
-  - *upload_pip_requirements
-  - *set_task_expansion_macros
-  - *f_expansions_write
   - *fetch_artifacts
+  - *kill_processes
+  - *cleanup_environment
   - *fetch_binaries
   - *fetch_debugsymbols_archive
+  - *set_up_venv
+  - *upload_pip_requirements
   - *extract_binaries
   - *check_binary_version
   - *get_buildnumber
@@ -789,9 +831,11 @@ functions:
   - *collect_system_resource_info
 
   "do non-compile setup":
+  - command: manifest.load
+  - *git_get_project
   - *f_expansions_write
-  - *set_task_expansion_macros
-  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
   - *set_up_venv
   - *upload_pip_requirements
   - *get_buildnumber
@@ -799,9 +843,11 @@ functions:
   - *set_up_credentials
 
   "do benchmark setup":
+  - command: manifest.load
+  - *git_get_project
   - *f_expansions_write
-  - *set_task_expansion_macros
-  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
   - *set_up_venv
   - *upload_pip_requirements
   - *get_buildnumber
@@ -829,7 +875,11 @@ functions:
         - "./src/evergreen/compiled_binaries_get.sh"
 
   "generate powercycle tasks":
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - *set_up_venv
     - *upload_pip_requirements
 
@@ -863,7 +913,11 @@ functions:
           - powercycle_tasks.json
 
   "run powercycle sentinel":
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - *set_up_venv
     - *upload_pip_requirements
     - *configure_evergreen_api_credentials
@@ -902,9 +956,6 @@ functions:
 
   "generate selected tests":
     - *f_expansions_write
-    - command: expansions.write
-      params:
-        file: expansions.yml
     - *configure_evergreen_api_credentials
     - *configure_selected_tests_credentials
     - command: subprocess.exec
@@ -967,9 +1018,11 @@ functions:
           - src/generated_burn_in_tags_config/burn_in_tags_gen.json
 
   "generate randomized multiversion tasks":
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
-    - *set_task_expansion_macros
-    - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - *set_up_venv
     - *upload_pip_requirements
     - *configure_evergreen_api_credentials
@@ -1022,9 +1075,11 @@ functions:
           - src/generated_resmoke_config/*.json
 
   "generate resmoke tasks":
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
-    - *set_task_expansion_macros
-    - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - *set_up_venv
     - *upload_pip_requirements
     - *f_expansions_write
@@ -1218,13 +1273,12 @@ functions:
 
 
   "generate explicit multiversion tasks":
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
-    - *set_task_expansion_macros
-    - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - *set_up_venv
-    - command: expansions.write
-      params:
-        file: expansions.yml
     - *upload_pip_requirements
     - *f_expansions_write
     - *configure_evergreen_api_credentials
@@ -1270,15 +1324,12 @@ functions:
           - src/generated_resmoke_config/*.json
 
   "generate implicit multiversion tasks":
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
-    - *set_task_expansion_macros
-    - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - *set_up_venv
-    - *f_expansions_write
-    - *configure_evergreen_api_credentials
-    - command: expansions.write
-      params:
-        file: expansions.yml
     - *configure_evergreen_api_credentials
     - *f_expansions_write
     - *do_multiversion_setup
@@ -1325,13 +1376,12 @@ functions:
           - src/generated_resmoke_config/*.json
 
   "generate fuzzer tasks":
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
-    - *set_task_expansion_macros
-    - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - *set_up_venv
-    - command: expansions.write
-      params:
-        file: expansions.yml
     - *upload_pip_requirements
 
     - *f_expansions_write
@@ -1458,12 +1508,6 @@ functions:
         ignore_missing_file: true
         file: src/powercycle_exit.yml
     - *f_expansions_write
-
-    - command: expansions.write
-      params:
-        file: expansions.yml
-
-    - *f_expansions_write
     - command: subprocess.exec
       type: setup
       params:
@@ -1498,21 +1542,6 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/do_watchdog_setup.sh"
-
-  "cleanup environment":
-    command: subprocess.exec
-    params:
-      binary: bash
-      args:
-        - "./src/evergreen/cleanup_environment.sh"
-
-  "kill processes":
-    command: subprocess.exec
-    params:
-      silent: true
-      binary: bash
-      args:
-        - "./src/evergreen/kill_processes.sh"
 
   "run kitchen":
     - *f_expansions_write
@@ -2001,12 +2030,6 @@ functions:
 
 # Pre task steps
 pre:
-  - func: "f_expansions_write"
-  - command: manifest.load
-  - func: "git get project"
-  - func: "kill processes"
-  - func: "cleanup environment"
-  - func: "set up venv"
   - func: "set task expansion macros"
   - func: "f_expansions_write"
 
@@ -2098,6 +2121,7 @@ tasks:
         include:
           - "./build/**.gcno"
           - "./etc/*san.suppressions"
+          - "./etc/expansions.default.yml"
           - "./etc/pip/**"
           - "./etc/repo_config.yaml"
           - "./etc/scons/**"
@@ -2108,7 +2132,7 @@ tasks:
           - "jstests/**"
           - "library_dependency_graph.json"
           - "patch_files.txt"
-          - "pytests/**"
+          - "evergreen/**"
           - "src/mongo/client/sdam/json_tests/sdam_tests/**"
           - "src/mongo/client/sdam/json_tests/server_selection_tests/**"
           - "src/mongo/db/modules/enterprise/docs/**"
@@ -2631,9 +2655,11 @@ tasks:
 - name: compile_benchmarks
   depends_on: []
   commands:
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
-    - func: "set task expansion macros"
-    - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "get buildnumber"
@@ -2673,14 +2699,16 @@ tasks:
 ## lint ##
 - name: lint_pylinters
   commands:
-    - *f_expansions_write
     - command: timeout.update
       params:
         # 40 minutes
         exec_timeout_secs: 2400
     - *f_expansions_write
-    - func: "set task expansion macros"
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
@@ -2689,14 +2717,16 @@ tasks:
 
 - name: lint_clang_format
   commands:
-    - *f_expansions_write
     - command: timeout.update
       params:
         # 40 minutes
         exec_timeout_secs: 2400
     - *f_expansions_write
-    - func: "set task expansion macros"
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
@@ -2705,14 +2735,16 @@ tasks:
 
 - name: lint_eslint
   commands:
-    - *f_expansions_write
     - command: timeout.update
       params:
         # 40 minutes
         exec_timeout_secs: 2400
     - *f_expansions_write
-    - func: "set task expansion macros"
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
@@ -2721,14 +2753,16 @@ tasks:
 
 - name: lint_cpplint
   commands:
-    - *f_expansions_write
     - command: timeout.update
       params:
         # 40 minutes
         exec_timeout_secs: 2400
     - *f_expansions_write
-    - func: "set task expansion macros"
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
@@ -2738,9 +2772,11 @@ tasks:
 - name: lint_yaml
   depends_on: []
   commands:
+  - command: manifest.load
+  - *git_get_project
   - *f_expansions_write
-  - func: "set task expansion macros"
-  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "f_expansions_write"
@@ -2753,7 +2789,11 @@ tasks:
 
 - name: lint_shellscripts
   commands:
+  - command: manifest.load
+  - *git_get_project
   - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
   - command: subprocess.exec
     type: test
     params:
@@ -2763,9 +2803,11 @@ tasks:
 
 - name: lint_errorcodes
   commands:
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
-    - func: "set task expansion macros"
-    - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
@@ -2776,9 +2818,11 @@ tasks:
   depends_on:
     - name: archive_dist_test_debug
   commands:
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
-    - func: "set task expansion macros"
-    - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "do setup"
@@ -2792,9 +2836,11 @@ tasks:
 
 - name: burn_in_tests_gen
   commands:
+  - command: manifest.load
+  - *git_get_project
   - *f_expansions_write
-  - func: "set task expansion macros"
-  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
@@ -2829,9 +2875,11 @@ tasks:
 
 - name: burn_in_tests_multiversion_gen
   commands:
+  - command: manifest.load
+  - *git_get_project
   - *f_expansions_write
-  - func: "set task expansion macros"
-  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "f_expansions_write"
@@ -3752,9 +3800,12 @@ tasks:
 - name: lint_fuzzer_sanity_patch
   patch_only: true
   commands:
+  - command: manifest.load
+  - *git_get_project
   - *f_expansions_write
-  - func: "set task expansion macros"
-  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - *set_up_venv
   - func: "get added and modified patch files"
   - func: "setup jstestfuzz"
   - func: "lint fuzzer sanity patch"
@@ -3762,9 +3813,12 @@ tasks:
 # Check that the mutational fuzzer can parse all JS filess.
 - name: lint_fuzzer_sanity_all
   commands:
+  - command: manifest.load
+  - *git_get_project
   - *f_expansions_write
-  - func: "set task expansion macros"
-  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - *set_up_venv
   - func: "setup jstestfuzz"
   - func: "lint fuzzer sanity all"
 
@@ -3923,9 +3977,11 @@ tasks:
   depends_on:
     - name: archive_dist_test_debug
   commands:
+  - command: manifest.load
+  - *git_get_project
   - *f_expansions_write
-  - func: "set task expansion macros"
-  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
@@ -3939,9 +3995,11 @@ tasks:
 
 - name: selected_tests_gen
   commands:
+  - command: manifest.load
+  - *git_get_project
   - *f_expansions_write
-  - func: "set task expansion macros"
-  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "generate selected tests"
@@ -4237,6 +4295,8 @@ tasks:
   name: integration_tests_standalone
   tags: ["integration", "standalone"]
   commands:
+  - command: manifest.load
+  - *git_get_project
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -4254,6 +4314,8 @@ tasks:
   name: integration_tests_standalone_audit
   tags: ["integration", "audit"]
   commands:
+  - command: manifest.load
+  - *git_get_project
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -4271,6 +4333,8 @@ tasks:
   name: integration_tests_replset
   tags: ["integration"]
   commands:
+  - command: manifest.load
+  - *git_get_project
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -4288,6 +4352,8 @@ tasks:
   name: integration_tests_replset_ssl_auth
   tags: ["integration"]
   commands:
+  - command: manifest.load
+  - *git_get_project
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -4305,6 +4371,8 @@ tasks:
   name: integration_tests_sharded
   tags: ["integration", "sharded"]
   commands:
+  - command: manifest.load
+  - *git_get_project
   - *f_expansions_write
   - func: "do setup"
   - func: "set up win mount script"
@@ -6111,9 +6179,11 @@ tasks:
   depends_on:
   - name: archive_dist_test_debug
   commands:
+  - command: manifest.load
+  - *git_get_project
   - *f_expansions_write
-  - func: "set task expansion macros"
-  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "run idl tests"
@@ -6178,6 +6248,12 @@ tasks:
   depends_on:
   - name: package
   commands:
+    - command: manifest.load
+    - *git_get_project
+    - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
+    - *set_up_venv
     - func: "fetch packages"
     - func: "set up remote credentials"
       vars:
@@ -6191,7 +6267,12 @@ tasks:
   depends_on:
     - name: compile_dist_test
   commands:
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
+    - *set_up_venv
     - func: "scons compile"
       vars:
         targets: >-
@@ -6947,23 +7028,36 @@ tasks:
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on: []
   commands:
+  - command: manifest.load
+  - *git_get_project
+  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - *set_up_venv
   - func: "shared scons cache pruning"
 
 - name: win_shared_scons_cache_pruning
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on: []
   commands:
+  - command: manifest.load
+  - *git_get_project
+  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - *set_up_venv
   - func: "set up win mount script"
   - func: "shared scons cache pruning"
 
 - name: validate_commit_message
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
+  - command: manifest.load
+  - *git_get_project
   - *f_expansions_write
-  - func: "set task expansion macros"
-  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
   - func: "set up venv"
-  - *f_expansions_write
   - command: subprocess.exec
     type: test
     params:
@@ -6974,11 +7068,13 @@ tasks:
 - name: check_for_todos
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
+    - command: manifest.load
+    - *git_get_project
     - *f_expansions_write
-    - func: "set task expansion macros"
-    - *f_expansions_write
-    - func: "configure evergreen api credentials"
+    - *kill_processes
+    - *cleanup_environment
     - func: "set up venv"
+    - func: "configure evergreen api credentials"
     - command: subprocess.exec
       type: test
       params:
@@ -7119,12 +7215,12 @@ task_groups:
   setup_group:
     - command: manifest.load
     - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "f_expansions_write"
     - func: "kill processes"
     - func: "cleanup environment"
     - func: "set up venv"
     - func: "upload pip requirements"
-    - func: "set task expansion macros"
-    - func: "f_expansions_write"
     - func: "configure evergreen api credentials"
     - func: "get buildnumber"
     - func: "f_expansions_write"
@@ -7137,6 +7233,7 @@ task_groups:
   setup_task:
     - func: "apply compile expansions"
     - func: "set task expansion macros"
+    - func: "f_expansions_write"
   teardown_task:
   tasks:
   - clang_tidy
@@ -7147,11 +7244,11 @@ task_groups:
   setup_group:
     - command: manifest.load
     - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "f_expansions_write"
     - func: "get buildnumber"
     - func: "set up venv"
     - func: "upload pip requirements"
-    - func: "set task expansion macros"
-    - func: "f_expansions_write"
     - func: "set up credentials"
     - func: "set up win mount script"
     - func: "generate compile expansions"
@@ -7160,6 +7257,7 @@ task_groups:
   setup_task:
     - func: "set task expansion macros"
     - func: "apply compile expansions"
+    - func: "f_expansions_write"
   teardown_task:
       - func: "attach scons logs"
   tasks:
@@ -7171,11 +7269,11 @@ task_groups:
   setup_group:
     - command: manifest.load
     - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "f_expansions_write"
     - func: "get buildnumber"
     - func: "set up venv"
     - func: "upload pip requirements"
-    - func: "set task expansion macros"
-    - func: "f_expansions_write"
     - func: "set up credentials"
     - func: "set up win mount script"
     - func: "generate compile expansions"
@@ -7184,6 +7282,7 @@ task_groups:
   setup_task:
     - func: "set task expansion macros"
     - func: "apply compile expansions"
+    - func: "f_expansions_write"
   teardown_task:
       - func: "attach scons logs"
   tasks:
