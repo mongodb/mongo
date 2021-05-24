@@ -98,7 +98,8 @@ public:
 
         // Initialize ReshardingMetrics to a recipient state compatible with fetching.
         _metrics = std::make_unique<ReshardingMetrics>(_svcCtx);
-        _metrics->onStart(_svcCtx->getFastClockSource()->now());
+        _metrics->onStart(ReshardingMetrics::Role::kRecipient,
+                          _svcCtx->getFastClockSource()->now());
         _metrics->setRecipientState(RecipientStateEnum::kCloning);
 
         for (const auto& shardId : kTwoShardIdList) {
@@ -314,8 +315,7 @@ public:
 
     long long metricsFetchedCount() const {
         BSONObjBuilder bob;
-        _metrics->serializeCurrentOpMetrics(&bob,
-                                            ReshardingMetrics::ReporterOptions::Role::kRecipient);
+        _metrics->serializeCurrentOpMetrics(&bob, ReshardingMetrics::Role::kRecipient);
         return bob.obj()["oplogEntriesFetched"_sd].Long();
     }
 
