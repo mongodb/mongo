@@ -1009,14 +1009,19 @@ void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
 }
 
 void markCompleted(const Status& status) {
-    auto currentTime = getCurrentTime();
     auto metrics = ReshardingMetrics::get(cc().getServiceContext());
-    if (status.isOK())
-        metrics->onCompletion(ReshardingOperationStatusEnum::kSuccess, currentTime);
-    else if (status == ErrorCodes::ReshardCollectionAborted)
-        metrics->onCompletion(ReshardingOperationStatusEnum::kCanceled, currentTime);
-    else
-        metrics->onCompletion(ReshardingOperationStatusEnum::kFailure, currentTime);
+    auto metricsOperationStatus = [&] {
+        if (status.isOK()) {
+            return ReshardingOperationStatusEnum::kSuccess;
+        } else if (status == ErrorCodes::ReshardCollectionAborted) {
+            return ReshardingOperationStatusEnum::kCanceled;
+        } else {
+            return ReshardingOperationStatusEnum::kFailure;
+        }
+    }();
+
+    metrics->onCompletion(
+        ReshardingMetrics::Role::kCoordinator, metricsOperationStatus, getCurrentTime());
 }
 
 BSONObj createFlushReshardingStateChangeCommand(const NamespaceString& nss) {
@@ -1200,7 +1205,8 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             // On stepdown or shutdown, the _scopedExecutor may have already been shut down.
             // Schedule cleanup work on the parent executor.
             if (_ctHolder->isSteppingOrShuttingDown()) {
-                ReshardingMetrics::get(cc().getServiceContext())->onStepDown();
+                ReshardingMetrics::get(cc().getServiceContext())
+                    ->onStepDown(ReshardingMetrics::Role::kCoordinator);
             }
 
             if (!status.isOK()) {
@@ -1264,12 +1270,11 @@ void ReshardingCoordinatorService::ReshardingCoordinator::abort() {
 boost::optional<BSONObj> ReshardingCoordinatorService::ReshardingCoordinator::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode,
     MongoProcessInterface::CurrentOpSessionsMode) noexcept {
-    ReshardingMetrics::ReporterOptions options(
-        ReshardingMetrics::ReporterOptions::Role::kCoordinator,
-        _coordinatorDoc.getReshardingUUID(),
-        _coordinatorDoc.getSourceNss(),
-        _coordinatorDoc.getReshardingKey().toBSON(),
-        false);
+    ReshardingMetrics::ReporterOptions options(ReshardingMetrics::Role::kCoordinator,
+                                               _coordinatorDoc.getReshardingUUID(),
+                                               _coordinatorDoc.getSourceNss(),
+                                               _coordinatorDoc.getReshardingKey().toBSON(),
+                                               false);
     return ReshardingMetrics::get(cc().getServiceContext())->reportForCurrentOp(options);
 }
 
@@ -1289,7 +1294,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::onOkayToEnterCritical(
 void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kUnused) {
         _coordinatorDocWrittenPromise.emplaceValue();
-        ReshardingMetrics::get(cc().getServiceContext())->onStepUp();
+        ReshardingMetrics::get(cc().getServiceContext())
+            ->onStepUp(ReshardingMetrics::Role::kCoordinator);
         return;
     }
 
@@ -1303,7 +1309,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChan
     _coordinatorDocWrittenPromise.emplaceValue();
 
     // TODO SERVER-53914 to accommodate loading metrics for the coordinator.
-    ReshardingMetrics::get(cc().getServiceContext())->onStart(getCurrentTime());
+    ReshardingMetrics::get(cc().getServiceContext())
+        ->onStart(ReshardingMetrics::Role::kCoordinator, getCurrentTime());
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::

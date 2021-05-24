@@ -341,7 +341,8 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     _cancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
 
     return ExecutorFuture<void>(**executor)
-        .then([this] { _metrics()->onStart(getCurrentTime()); })
+        .then(
+            [this] { _metrics()->onStart(ReshardingMetrics::Role::kRecipient, getCurrentTime()); })
         .then([this, executor, abortToken] {
             return _runUntilStrictConsistencyOrErrored(executor, abortToken);
         })
@@ -386,7 +387,8 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                 // Interrupt occured, ensure the metrics get shut down.
                 // TODO SERVER-56500: Don't use ReshardingOperationStatusEnum::kCanceled here if it
                 // is not meant for failover cases.
-                _metrics()->onCompletion(ReshardingOperationStatusEnum::kCanceled,
+                _metrics()->onCompletion(ReshardingMetrics::Role::kRecipient,
+                                         ReshardingOperationStatusEnum::kCanceled,
                                          getCurrentTime());
             }
 
@@ -412,7 +414,7 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
 boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode,
     MongoProcessInterface::CurrentOpSessionsMode) noexcept {
-    ReshardingMetrics::ReporterOptions options(ReshardingMetrics::ReporterOptions::Role::kRecipient,
+    ReshardingMetrics::ReporterOptions options(ReshardingMetrics::Role::kRecipient,
                                                _metadata.getReshardingUUID(),
                                                _metadata.getSourceNss(),
                                                _metadata.getReshardingKey().toBSON(),
@@ -901,10 +903,12 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
                 [this, aborted](boost::optional<Timestamp> unusedCommitTime) {
                     stdx::lock_guard<Latch> lk(_mutex);
                     if (aborted) {
-                        _metrics()->onCompletion(ReshardingOperationStatusEnum::kFailure,
+                        _metrics()->onCompletion(ReshardingMetrics::Role::kRecipient,
+                                                 ReshardingOperationStatusEnum::kFailure,
                                                  getCurrentTime());
                     } else {
-                        _metrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess,
+                        _metrics()->onCompletion(ReshardingMetrics::Role::kRecipient,
+                                                 ReshardingOperationStatusEnum::kSuccess,
                                                  getCurrentTime());
                     }
 
