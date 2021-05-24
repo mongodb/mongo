@@ -234,18 +234,18 @@ void generateExecutionInfo(PlanExecutor* exec,
         // collected during the trial period.
         BSONArrayBuilder allPlansBob(execBob.subarrayStart("allPlansExecution"));
 
-        if (winningPlanTrialStats) {
+        // If the winning plan was uncontested, leave the `allPlansExecution` array empty.
+        if (explainer.isMultiPlan()) {
             BSONObjBuilder planBob(allPlansBob.subobjStart());
             generateSinglePlanExecutionInfo(*winningPlanTrialStats, boost::none, &planBob);
             planBob.doneFast();
-        }
 
-        for (auto&& stats : explainer.getRejectedPlansStats(verbosity)) {
-            BSONObjBuilder planBob(allPlansBob.subobjStart());
-            generateSinglePlanExecutionInfo(stats, boost::none, &planBob);
-            planBob.doneFast();
+            for (auto&& stats : explainer.getRejectedPlansStats(verbosity)) {
+                BSONObjBuilder planBob(allPlansBob.subobjStart());
+                generateSinglePlanExecutionInfo(stats, boost::none, &planBob);
+                planBob.doneFast();
+            }
         }
-
         allPlansBob.doneFast();
     }
 
