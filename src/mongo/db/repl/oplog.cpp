@@ -68,6 +68,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/bgsync.h"
@@ -1791,6 +1792,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         }
 
         const StringData ns = fieldNs.valueStringDataSafe();
+        bool upsertConfigImage = true;
         writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
             WriteUnitOfWork wuow(opCtx);
             if (timestamp != Timestamp::min()) {
@@ -1798,8 +1800,22 @@ Status applyOperation_inlock(OperationContext* opCtx,
             }
 
             if (opType[1] == 0) {
-                const auto justOne = true;
-                deleteObjects(opCtx, collection, requestNss, deleteCriteria, justOne);
+                const bool kNeedsRetryImage =
+                    op.hasField(OplogEntryBase::kNeedsRetryImageFieldName);
+                DeleteRequest request(requestNss);
+                request.setQuery(deleteCriteria);
+                if (kNeedsRetryImage) {
+                    request.setReturnDeleted(true);
+                }
+
+                DeleteResult result = deleteObject(opCtx, collection, request);
+                if (result.nDeleted == 1 && kNeedsRetryImage) {
+                    writeToImageCollection(opCtx,
+                                           op,
+                                           result.requestedPreImage.get(),
+                                           repl::RetryImageEnum::kPreImage,
+                                           &upsertConfigImage);
+                }
             } else
                 verify(opType[1] == 'b');  // "db" advertisement
             wuow.commit();

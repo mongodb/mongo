@@ -64,4 +64,24 @@ long long deleteObjects(OperationContext* opCtx,
     return DeleteStage::getNumDeleted(*exec);
 }
 
+DeleteResult deleteObject(OperationContext* opCtx,
+                          Collection* collection,
+                          const DeleteRequest& request) {
+    ParsedDelete parsedDelete(opCtx, &request);
+    uassertStatusOK(parsedDelete.parseRequest());
+
+    // This method doesn't support multi-deletes.
+    invariant(!request.isMulti());
+
+    auto exec = uassertStatusOK(
+        getExecutorDelete(opCtx, &CurOp::get(opCtx)->debug(), collection, &parsedDelete));
+
+    BSONObj docImage;
+    if (exec->getNext(&docImage, nullptr) == PlanExecutor::IS_EOF) {
+        return {};
+    }
+
+    return {1, request.shouldReturnDeleted() ? docImage.getOwned() : BSONObj()};
+}
+
 }  // namespace mongo

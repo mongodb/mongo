@@ -761,6 +761,7 @@ env.Library(
         'session_catalog',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',

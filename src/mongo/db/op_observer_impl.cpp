@@ -171,22 +171,6 @@ struct OpTimeBundle {
     Date_t wallClockTime;
 };
 
-void writeToImagesCollection(OperationContext* opCtx,
-                             BSONObj image,
-                             repl::RetryImageEnum imageKind,
-                             Timestamp ts) {
-    repl::ImageEntry imageEntry;
-    invariant(opCtx->getLogicalSessionId());
-    imageEntry.set_id(*opCtx->getLogicalSessionId());
-    imageEntry.setTs(ts);
-    imageEntry.setImage(std::move(image));
-    imageEntry.setImageKind(imageKind);
-    repl::UnreplicatedWritesBlock unreplicated(opCtx);
-    AutoGetCollection imageCollectionRaii(
-        opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
-    Helpers::upsert(opCtx, NamespaceString::kConfigImagesNamespace.toString(), imageEntry.toBSON());
-}
-
 /**
  * Write oplog entry(ies) for the update operation.
  */
@@ -352,6 +336,25 @@ OpTimeBundle replLogApplyOps(OperationContext* opCtx,
                                      oplogSlot,
                                      {});
     return times;
+}
+
+void writeToImageCollection(OperationContext* opCtx,
+                            const LogicalSessionId& sessionId,
+                            const Timestamp timestamp,
+                            repl::RetryImageEnum imageKind,
+                            const BSONObj& dataImage) {
+    repl::ImageEntry imageEntry;
+    invariant(opCtx->getLogicalSessionId());
+    imageEntry.set_id(sessionId);
+    imageEntry.setTxnNumber(opCtx->getTxnNumber().get());
+    imageEntry.setTs(timestamp);
+    imageEntry.setImageKind(imageKind);
+    imageEntry.setImage(dataImage);
+
+    repl::UnreplicatedWritesBlock unreplicated(opCtx);
+    AutoGetCollection imageCollectionRaii(
+        opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
+    Helpers::upsert(opCtx, NamespaceString::kConfigImagesNamespace.toString(), imageEntry.toBSON());
 }
 
 }  // namespace
@@ -621,7 +624,11 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                 imageDoc = args.updateArgs.updatedDoc;
                 imageKind = repl::RetryImageEnum::kPostImage;
             }
-            writeToImagesCollection(opCtx, imageDoc, imageKind, opTime.writeOpTime.getTimestamp());
+            writeToImageCollection(opCtx,
+                                   *opCtx->getLogicalSessionId(),
+                                   opTime.writeOpTime.getTimestamp(),
+                                   imageKind,
+                                   imageDoc);
         }
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
@@ -687,6 +694,15 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             args.deletedDoc ? boost::optional<BSONObj>(*(args.deletedDoc)) : boost::none;
         opTime = replLogDelete(
             opCtx, nss, uuid, stmtId, args.fromMigrate, deletedDoc, storeImagesInSideCollection);
+
+        if (storeImagesInSideCollection && deletedDoc && opCtx->getTxnNumber()) {
+            writeToImageCollection(opCtx,
+                                   *opCtx->getLogicalSessionId(),
+                                   opTime.writeOpTime.getTimestamp(),
+                                   repl::RetryImageEnum::kPreImage,
+                                   *deletedDoc);
+        }
+
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
