@@ -658,9 +658,8 @@ Status exceptionToStatus() noexcept;
     }
 
 /**
- * The purpose of this macro is to instruct the compiler that a line of code will never be reached.
- *
- * Example:
+ * Produces an invariant failure if executed. Use when reaching this statement indicates a
+ * programming error. Example:
  *     // code above checks that expr can only be FOO or BAR
  *     switch (expr) {
  *     case FOO: { ... }
@@ -668,7 +667,9 @@ Status exceptionToStatus() noexcept;
  *     default:
  *         MONGO_UNREACHABLE;
  */
-
 #define MONGO_UNREACHABLE ::mongo::invariantFailed("Hit a MONGO_UNREACHABLE!", __FILE__, __LINE__);
 
+/**
+ * Like `MONGO_UNREACHABLE`, but triggers a `tassert` instead of an `invariant`
+ */
 #define MONGO_UNREACHABLE_TASSERT(msgid) tasserted(msgid, "Hit a MONGO_UNREACHABLE_TASSERT!")
