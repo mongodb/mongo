@@ -383,7 +383,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
 
     if (collectionOptions.clusteredIndex) {
         _clustered = true;
-        if (collectionOptions.clusteredIndex->getExpireAfterSeconds()) {
+        if (collectionOptions.expireAfterSeconds) {
             // TTL indexes are not compatible with capped collections.
             invariant(!collectionOptions.capped);
 
@@ -1283,7 +1283,7 @@ void CollectionImpl::updateClusteredIndexTTLSetting(OperationContext* opCtx,
             _metadata->options.clusteredIndex);
 
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
-        md.options.clusteredIndex->setExpireAfterSeconds(expireAfterSeconds);
+        md.options.expireAfterSeconds = expireAfterSeconds;
     });
 }
 

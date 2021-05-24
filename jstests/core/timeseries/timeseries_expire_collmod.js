@@ -33,7 +33,7 @@ const timeFieldName = 'time';
 const expireAfterSeconds = NumberLong(5);
 assert.commandWorked(db.createCollection(
     coll.getName(),
-    {timeseries: {timeField: timeFieldName, expireAfterSeconds: expireAfterSeconds}}));
+    {timeseries: {timeField: timeFieldName}, expireAfterSeconds: expireAfterSeconds}));
 
 const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
@@ -42,45 +42,37 @@ const collNotClustered = db.getCollection(coll.getName() + '_not_clustered');
 collNotClustered.drop();
 assert.commandWorked(db.createCollection(collNotClustered.getName()));
 assert.commandFailedWithCode(
-    db.runCommand({collMod: collNotClustered.getName(), clusteredIndex: {expireAfterSeconds: 10}}),
+    db.runCommand({collMod: collNotClustered.getName(), expireAfterSeconds: 10}),
     ErrorCodes.InvalidOptions);
 
 // Check for invalid input on the time-series collection.
-assert.commandFailedWithCode(
-    db.runCommand({collMod: coll.getName(), clusteredIndex: {expireAfterSeconds: "10"}}),
-    ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(
-    db.runCommand({collMod: coll.getName(), clusteredIndex: {expireAfterSeconds: {}}}),
-    ErrorCodes.TypeMismatch);
-assert.commandFailedWithCode(
-    db.runCommand({collMod: coll.getName(), clusteredIndex: {expireAfterSeconds: -10}}),
-    ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(db.runCommand({collMod: coll.getName(), clusteredIndex: {}}), 40414);
+assert.commandFailedWithCode(db.runCommand({collMod: coll.getName(), expireAfterSeconds: "10"}),
+                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(db.runCommand({collMod: coll.getName(), expireAfterSeconds: {}}),
+                             ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(db.runCommand({collMod: coll.getName(), expireAfterSeconds: -10}),
+                             ErrorCodes.InvalidOptions);
 
 // Check for invalid input on the underlying bucket collection.
 assert.commandFailedWithCode(
-    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: "10"}}),
+    db.runCommand({collMod: bucketsColl.getName(), expireAfterSeconds: "10"}),
     ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(
-    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: {}}}),
+    db.runCommand({collMod: bucketsColl.getName(), expireAfterSeconds: {}}),
     ErrorCodes.TypeMismatch);
 assert.commandFailedWithCode(
-    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: -10}}),
+    db.runCommand({collMod: bucketsColl.getName(), expireAfterSeconds: -10}),
     ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(db.runCommand({
     collMod: bucketsColl.getName(),
-    clusteredIndex: {expireAfterSeconds: NumberLong("4611686018427387904")}
+    expireAfterSeconds: NumberLong("4611686018427387904"),
 }),
                              ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {}}),
-                             40414);
 
 let res = assert.commandWorked(
     db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
-assert(res.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex"),
-       bucketsColl.getName() + ': ' + expireAfterSeconds + ': ' + tojson(res));
 assert.eq(expireAfterSeconds,
-          res.cursor.firstBatch[0].options.clusteredIndex.expireAfterSeconds,
+          res.cursor.firstBatch[0].options.expireAfterSeconds,
           bucketsColl.getName() + ': ' + expireAfterSeconds + ': ' + tojson(res));
 
 /**
@@ -90,19 +82,18 @@ assert.eq(expireAfterSeconds,
 const runTest = function(collToChange, expireAfterSeconds) {
     assert.commandWorked(db.runCommand({
         collMod: collToChange.getName(),
-        clusteredIndex: {expireAfterSeconds: expireAfterSeconds}
+        expireAfterSeconds: expireAfterSeconds,
     }));
 
     res = assert.commandWorked(
         db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
     if (expireAfterSeconds !== 'off') {
         assert.eq(expireAfterSeconds,
-                  res.cursor.firstBatch[0].options.clusteredIndex.expireAfterSeconds,
+                  res.cursor.firstBatch[0].options.expireAfterSeconds,
                   collToChange.getFullName() + ': ' + expireAfterSeconds + ': ' + tojson(res));
     } else {
-        assert(
-            !res.cursor.firstBatch[0].options.clusteredIndex.hasOwnProperty("expireAfterSeconds"),
-            collToChange.getFullName() + ': ' + expireAfterSeconds + ': ' + tojson(res));
+        assert(!res.cursor.firstBatch[0].options.hasOwnProperty("expireAfterSeconds"),
+               collToChange.getFullName() + ': ' + expireAfterSeconds + ': ' + tojson(res));
     }
 };
 

@@ -55,19 +55,19 @@ const testOptions = function(allowed,
         assert(bucketsColl, collections);
         assert.eq(bucketsColl.type, "collection", bucketsColl);
         if (TimeseriesTest.supportsClusteredIndexes(conn)) {
-            assert(bucketsColl.options.hasOwnProperty('clusteredIndex'), bucketsColl);
+            assert(bucketsColl.options.clusteredIndex, bucketsColl);
         }
-        if (timeseriesOptions.expireAfterSeconds) {
+        if (createOptions.expireAfterSeconds) {
             if (TimeseriesTest.supportsClusteredIndexes(conn)) {
-                assert.eq(bucketsColl.options.clusteredIndex.expireAfterSeconds,
-                          timeseriesOptions.expireAfterSeconds,
+                assert.eq(bucketsColl.options.expireAfterSeconds,
+                          createOptions.expireAfterSeconds,
                           bucketsColl);
             } else {
                 assert.docEq(testDB[collName].getIndexes(), [{
                                  v: 2,
                                  key: {time: 1},
                                  name: 'control.min.time_1',
-                                 expireAfterSeconds: timeseriesOptions.expireAfterSeconds.valueOf(),
+                                 expireAfterSeconds: createOptions.expireAfterSeconds.valueOf(),
                              }]);
             }
         }
@@ -91,8 +91,8 @@ const testInvalidTimeseriesOptions = function(timeseriesOptions, errorCode) {
     testOptions(false, {}, timeseriesOptions, errorCode);
 };
 
-const testIncompatibleCreateOptions = function(createOptions) {
-    testOptions(false, createOptions);
+const testIncompatibleCreateOptions = function(createOptions, errorCode) {
+    testOptions(false, createOptions, {timeField: 'time'}, errorCode);
 };
 
 const testCompatibleCreateOptions = function(createOptions) {
@@ -110,9 +110,6 @@ const testTimeseriesNamespaceExists = function(setUp) {
 
 testValidTimeseriesOptions({timeField: "time"});
 testValidTimeseriesOptions({timeField: "time", metaField: "meta"});
-testValidTimeseriesOptions({timeField: "time", expireAfterSeconds: NumberLong(100)});
-testValidTimeseriesOptions(
-    {timeField: "time", metaField: "meta", expireAfterSeconds: NumberLong(100)});
 testValidTimeseriesOptions({timeField: "time", metaField: "meta", granularity: "seconds"});
 
 // A bucketMaxSpanSeconds may be provided, but only if they are the default for the granularity.
@@ -137,16 +134,6 @@ testValidTimeseriesOptions({timeField: "time", metaField: "meta", granularity: "
 testInvalidTimeseriesOptions("", ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: 100}, ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: "time", metaField: 100}, ErrorCodes.TypeMismatch);
-testInvalidTimeseriesOptions({timeField: "time", expireAfterSeconds: ""}, ErrorCodes.TypeMismatch);
-
-const errorCodeForInvalidExpireAfterSecondsValue = TimeseriesTest.supportsClusteredIndexes(conn)
-    ? ErrorCodes.InvalidOptions
-    : ErrorCodes.CannotCreateIndex;
-testInvalidTimeseriesOptions({timeField: "time", expireAfterSeconds: NumberLong(-10)},
-                             errorCodeForInvalidExpireAfterSecondsValue);
-testInvalidTimeseriesOptions(
-    {timeField: "time", expireAfterSeconds: NumberLong("4611686018427387904")},
-    errorCodeForInvalidExpireAfterSecondsValue);
 
 testInvalidTimeseriesOptions({timeField: "time", invalidOption: {}}, 40415);
 testInvalidTimeseriesOptions({timeField: "sub.time"}, ErrorCodes.InvalidOptions);
@@ -159,12 +146,21 @@ testInvalidTimeseriesOptions(
     {timeField: "time", metaField: "meta", granularity: 'minutes', bucketMaxSpanSeconds: 3600},
     5510500);
 
+testCompatibleCreateOptions({expireAfterSeconds: NumberLong(100)});
 testCompatibleCreateOptions({storageEngine: {}});
 testCompatibleCreateOptions({indexOptionDefaults: {}});
 testCompatibleCreateOptions({collation: {locale: "ja"}});
 testCompatibleCreateOptions({writeConcern: {}});
 testCompatibleCreateOptions({comment: ""});
 
+const errorCodeForInvalidExpireAfterSecondsValue = TimeseriesTest.supportsClusteredIndexes(conn)
+    ? ErrorCodes.InvalidOptions
+    : ErrorCodes.CannotCreateIndex;
+testIncompatibleCreateOptions({expireAfterSeconds: NumberLong(-10)},
+                              errorCodeForInvalidExpireAfterSecondsValue);
+testIncompatibleCreateOptions({expireAfterSeconds: NumberLong("4611686018427387904")},
+                              errorCodeForInvalidExpireAfterSecondsValue);
+testIncompatibleCreateOptions({expireAfterSeconds: ""}, ErrorCodes.TypeMismatch);
 testIncompatibleCreateOptions({capped: true, size: 100});
 testIncompatibleCreateOptions({capped: true, max: 100});
 testIncompatibleCreateOptions({autoIndexId: true});
@@ -174,6 +170,8 @@ testIncompatibleCreateOptions({validationLevel: "off"});
 testIncompatibleCreateOptions({validationAction: "warn"});
 testIncompatibleCreateOptions({viewOn: "coll"});
 testIncompatibleCreateOptions({viewOn: "coll", pipeline: []});
+testIncompatibleCreateOptions({clusteredIndex: true});
+testIncompatibleCreateOptions({clusteredIndex: false});
 
 testTimeseriesNamespaceExists((testDB, collName) => {
     assert.commandWorked(testDB.createCollection(collName));

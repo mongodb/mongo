@@ -194,16 +194,17 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
 
             collectionOptions.collation = e.Obj().getOwned();
         } else if (fieldName == "clusteredIndex") {
-            if (e.type() != mongo::Object) {
-                return Status(ErrorCodes::BadValue, "'clusteredIndex' has to be a document.");
+            if (e.type() != mongo::Bool) {
+                return Status(ErrorCodes::BadValue, "'clusteredIndex' has to be a boolean.");
             }
 
-            try {
-                collectionOptions.clusteredIndex =
-                    ClusteredIndexOptions::parse({"CollectionOptions::parse"}, e.Obj());
-            } catch (const DBException& ex) {
-                return ex.toStatus();
+            collectionOptions.clusteredIndex = e.Bool();
+        } else if (fieldName == "expireAfterSeconds") {
+            if (e.type() != mongo::NumberLong) {
+                return {ErrorCodes::BadValue, "'expireAfterSeconds' must be a number."};
             }
+
+            collectionOptions.expireAfterSeconds = e.Long();
         } else if (fieldName == "viewOn") {
             if (e.type() != mongo::String) {
                 return Status(ErrorCodes::BadValue, "'viewOn' has to be a string.");
@@ -303,7 +304,10 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
         options.timeseries = std::move(*timeseries);
     }
     if (auto clusteredIndex = cmd.getClusteredIndex()) {
-        options.clusteredIndex = std::move(*clusteredIndex);
+        options.clusteredIndex = *clusteredIndex;
+    }
+    if (auto expireAfterSeconds = cmd.getExpireAfterSeconds()) {
+        options.expireAfterSeconds = expireAfterSeconds;
     }
     if (auto temp = cmd.getTemp()) {
         options.temp = *temp;
@@ -366,7 +370,11 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder, bool includeUUID) co
     }
 
     if (clusteredIndex) {
-        builder->append("clusteredIndex", clusteredIndex->toBSON());
+        builder->append("clusteredIndex", true);
+    }
+
+    if (expireAfterSeconds) {
+        builder->append("expireAfterSeconds", *expireAfterSeconds);
     }
 
     if (!viewOn.empty()) {
@@ -458,9 +466,11 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
         return false;
     }
 
-    if ((clusteredIndex && other.clusteredIndex &&
-         clusteredIndex->toBSON().woCompare(other.clusteredIndex->toBSON())) ||
-        (!clusteredIndex != !other.clusteredIndex)) {
+    if (clusteredIndex != other.clusteredIndex) {
+        return false;
+    }
+
+    if (expireAfterSeconds != other.expireAfterSeconds) {
         return false;
     }
 

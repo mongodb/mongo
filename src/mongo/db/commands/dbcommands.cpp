@@ -143,7 +143,7 @@ std::unique_ptr<CollMod> makeTimeseriesCollModCommand(OperationContext* opCtx,
     cmd->setViewOn(origCmd.getViewOn());
     cmd->setPipeline(origCmd.getPipeline());
     cmd->setRecordPreImages(origCmd.getRecordPreImages());
-    cmd->setClusteredIndex(origCmd.getClusteredIndex());
+    cmd->setExpireAfterSeconds(origCmd.getExpireAfterSeconds());
 
     return cmd;
 }

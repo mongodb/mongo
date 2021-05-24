@@ -306,16 +306,15 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             cmr.recordPreImages = e.trueValue();
-        } else if (fieldName == "clusteredIndex") {
+        } else if (fieldName == "expireAfterSeconds") {
             if (coll->getRecordStore()->keyFormat() != KeyFormat::String) {
-                return Status(
-                    ErrorCodes::InvalidOptions,
-                    "'clusteredIndex' option is only supported on collections clustered by _id");
+                return Status(ErrorCodes::InvalidOptions,
+                              "'expireAfterSeconds' option is only supported on collections "
+                              "clustered by _id");
             }
 
-            BSONElement elem = e.Obj()["expireAfterSeconds"];
-            if (elem.type() == mongo::String) {
-                const std::string elemStr = elem.String();
+            if (e.type() == mongo::String) {
+                const std::string elemStr = e.String();
                 if (elemStr != "off") {
                     return Status(
                         ErrorCodes::InvalidOptions,
@@ -324,12 +323,12 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                             << "option. Got: '" << elemStr << "'. Accepted value is 'off'");
                 }
             } else {
-                invariant(elem.type() == mongo::NumberLong);
-                const int64_t elemNum = elem.safeNumberLong();
+                invariant(e.type() == mongo::NumberLong);
+                const int64_t elemNum = e.safeNumberLong();
                 uassertStatusOK(index_key_validate::validateExpireAfterSeconds(elemNum));
             }
 
-            cmr.clusteredIndexExpireAfterSeconds = e.Obj()["expireAfterSeconds"];
+            cmr.clusteredIndexExpireAfterSeconds = e;
         } else {
             if (isView) {
                 return Status(ErrorCodes::InvalidOptions,
@@ -386,10 +385,9 @@ void _setClusteredExpireAfterSeconds(OperationContext* opCtx,
                                      const CollectionOptions& oldCollOptions,
                                      Collection* coll,
                                      const BSONElement& clusteredIndexExpireAfterSeconds) {
-    invariant(oldCollOptions.clusteredIndex.has_value());
+    invariant(oldCollOptions.clusteredIndex);
 
-    boost::optional<int64_t> oldExpireAfterSeconds =
-        oldCollOptions.clusteredIndex->getExpireAfterSeconds();
+    boost::optional<int64_t> oldExpireAfterSeconds = oldCollOptions.expireAfterSeconds;
 
     if (clusteredIndexExpireAfterSeconds.type() == mongo::String) {
         const std::string newExpireAfterSeconds = clusteredIndexExpireAfterSeconds.String();

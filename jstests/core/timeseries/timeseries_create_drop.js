@@ -42,7 +42,7 @@ coll.drop();
 // Create should create both bucket collection and view
 assert.commandWorked(db.createCollection(
     coll.getName(),
-    {timeseries: {timeField: timeFieldName, expireAfterSeconds: expireAfterSecondsNum}}));
+    {timeseries: {timeField: timeFieldName}, expireAfterSeconds: expireAfterSecondsNum}));
 assert.contains(viewName, db.getCollectionNames());
 assert.contains(bucketsCollName, db.getCollectionNames());
 
@@ -56,7 +56,7 @@ assert.commandWorked(
     db.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn", data: {ns: viewNs}}));
 assert.commandFailed(db.createCollection(
     coll.getName(),
-    {timeseries: {timeField: timeFieldName, expireAfterSeconds: expireAfterSecondsNum}}));
+    {timeseries: {timeField: timeFieldName}, expireAfterSeconds: expireAfterSecondsNum}));
 assert.eq(db.getCollectionNames().findIndex(c => c == viewName), -1);
 assert.contains(bucketsCollName, db.getCollectionNames());
 
@@ -69,7 +69,7 @@ assert.eq(db.getCollectionNames().findIndex(c => c == bucketsCollName), -1);
 // Trying to create again yields the same result as fail point is still enabled
 assert.commandFailed(db.createCollection(
     coll.getName(),
-    {timeseries: {timeField: timeFieldName, expireAfterSeconds: expireAfterSecondsNum}}));
+    {timeseries: {timeField: timeFieldName}, expireAfterSeconds: expireAfterSecondsNum}));
 assert.eq(db.getCollectionNames().findIndex(c => c == viewName), -1);
 assert.contains(bucketsCollName, db.getCollectionNames());
 
@@ -79,14 +79,14 @@ assert.commandWorked(db.adminCommand({configureFailPoint: failpoint, mode: "off"
 // Different timeField should fail
 assert.commandFailed(db.createCollection(
     coll.getName(),
-    {timeseries: {timeField: timeFieldName + "2", expireAfterSeconds: expireAfterSecondsNum}}));
+    {timeseries: {timeField: timeFieldName + "2"}, expireAfterSeconds: expireAfterSecondsNum}));
 assert.eq(db.getCollectionNames().findIndex(c => c == viewName), -1);
 assert.contains(bucketsCollName, db.getCollectionNames());
 
 // Different expireAfterSeconds should fail
 assert.commandFailed(db.createCollection(
     coll.getName(),
-    {timeseries: {timeField: timeFieldName, expireAfterSeconds: expireAfterSecondsNum + 1}}));
+    {timeseries: {timeField: timeFieldName}, expireAfterSeconds: expireAfterSecondsNum + 1}));
 assert.eq(db.getCollectionNames().findIndex(c => c == viewName), -1);
 assert.contains(bucketsCollName, db.getCollectionNames());
 
@@ -98,7 +98,7 @@ assert.contains(bucketsCollName, db.getCollectionNames());
 // Same parameters should succeed
 assert.commandWorked(db.createCollection(
     coll.getName(),
-    {timeseries: {timeField: timeFieldName, expireAfterSeconds: expireAfterSecondsNum}}));
+    {timeseries: {timeField: timeFieldName}, expireAfterSeconds: expireAfterSecondsNum}));
 assert.contains(viewName, db.getCollectionNames());
 assert.contains(bucketsCollName, db.getCollectionNames());
 })();

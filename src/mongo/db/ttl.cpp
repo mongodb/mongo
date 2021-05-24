@@ -453,7 +453,7 @@ private:
                 collOptions.clusteredIndex);
         invariant(collection->isClustered());
 
-        auto expireAfterSeconds = collOptions.clusteredIndex->getExpireAfterSeconds();
+        auto expireAfterSeconds = collOptions.expireAfterSeconds;
         if (!expireAfterSeconds) {
             ttlCollectionCache->deregisterTTLInfo(collection->uuid(),
                                                   TTLCollectionCache::ClusteredId{});

@@ -25,7 +25,7 @@ TimeseriesTest.run((insert) => {
     const expireAfterSeconds = NumberLong(5);
     assert.commandWorked(db.createCollection(
         coll.getName(),
-        {timeseries: {timeField: timeFieldName, expireAfterSeconds: expireAfterSeconds}}));
+        {timeseries: {timeField: timeFieldName}, expireAfterSeconds: expireAfterSeconds}));
     assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     // Inserts a measurement with a time in the past to ensure the measurement will be removed

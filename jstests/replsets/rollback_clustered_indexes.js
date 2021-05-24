@@ -19,7 +19,7 @@ const collName = 'test.system.buckets.t';
 const collNameShort = 'system.buckets.t';
 let commonOps = (node) => {
     const db = node.getDB(dbName);
-    assert.commandWorked(db.createCollection(collNameShort, {clusteredIndex: {}}));
+    assert.commandWorked(db.createCollection(collNameShort, {clusteredIndex: true}));
     const coll = node.getCollection(collName);
     assert.commandWorked(coll.createIndex({a: 1, b: -1}));
     assert.commandWorked(coll.insert({a: 0, b: 0}));

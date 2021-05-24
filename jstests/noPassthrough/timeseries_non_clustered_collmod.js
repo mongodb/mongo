@@ -29,7 +29,7 @@ const timeFieldName = 'time';
 const expireAfterSeconds = NumberLong(5);
 assert.commandWorked(db.createCollection(
     coll.getName(),
-    {timeseries: {timeField: timeFieldName, expireAfterSeconds: expireAfterSeconds}}));
+    {timeseries: {timeField: timeFieldName}, expireAfterSeconds: expireAfterSeconds}));
 
 let indexes = assert.commandWorked(db.runCommand({listIndexes: coll.getName()})).cursor.firstBatch;
 assert.eq(1, indexes.length);
@@ -45,7 +45,7 @@ assert.commandWorked(db.runCommand({
 // Changing the clustered expireAfterSeconds option in the catalog can't happen on a non-clustered
 // time-series collection.
 assert.commandFailedWithCode(
-    db.runCommand({collMod: coll.getName(), clusteredIndex: {expireAfterSeconds: NumberLong(10)}}),
+    db.runCommand({collMod: coll.getName(), expireAfterSeconds: NumberLong(10)}),
     ErrorCodes.InvalidOptions);
 
 MongoRunner.stopMongod(conn);

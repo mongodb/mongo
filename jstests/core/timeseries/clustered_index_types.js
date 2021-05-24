@@ -26,7 +26,7 @@ const collName = 'system.buckets.test';
 const coll = db[collName];
 coll.drop();
 
-assert.commandWorked(db.createCollection(collName, {clusteredIndex: {}}));
+assert.commandWorked(db.createCollection(collName, {clusteredIndex: true}));
 
 // Expect that duplicates are rejected.
 let oid = new ObjectId();

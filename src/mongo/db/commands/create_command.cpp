@@ -166,12 +166,16 @@ public:
                     ErrorCodes::InvalidOptions, timeseriesNotAllowedWith("size"), !cmd.getSize());
                 uassert(ErrorCodes::InvalidOptions, timeseriesNotAllowedWith("max"), !cmd.getMax());
 
-                // The 'timeseries' option may be passed with a 'validator' if a buckets collection
-                // is being restored. We assume the caller knows what they are doing.
+                // The 'timeseries' option may be passed with a 'validator' or 'clusteredIndex' if a
+                // buckets collection is being restored. We assume the caller knows what they are
+                // doing.
                 if (!cmd.getNamespace().isTimeseriesBucketsCollection()) {
                     uassert(ErrorCodes::InvalidOptions,
                             timeseriesNotAllowedWith("validator"),
                             !cmd.getValidator());
+                    uassert(ErrorCodes::InvalidOptions,
+                            timeseriesNotAllowedWith("clusteredIndex"),
+                            !cmd.getClusteredIndex());
                 }
                 uassert(ErrorCodes::InvalidOptions,
                         timeseriesNotAllowedWith("validationLevel"),
@@ -209,6 +213,14 @@ public:
                             mustBeTopLevel("metaField"),
                             !hasDot(*metaField));
                 }
+            }
+
+            if (cmd.getExpireAfterSeconds()) {
+                uassert(ErrorCodes::InvalidOptions,
+                        "'expireAfterSeconds' is only supported on time-series collections",
+                        cmd.getTimeseries() ||
+                            (cmd.getClusteredIndex() &&
+                             cmd.getNamespace().isTimeseriesBucketsCollection()));
             }
 
             // Validate _id index spec and fill in missing fields.

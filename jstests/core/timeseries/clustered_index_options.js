@@ -32,20 +32,20 @@ const tsColl = testDB.clustered_index_options;
 const tsCollName = tsColl.getName();
 const bucketsCollName = 'system.buckets.' + tsCollName;
 
-assert.commandWorked(testDB.createCollection(bucketsCollName, {clusteredIndex: {}}));
+assert.commandWorked(testDB.createCollection(bucketsCollName, {clusteredIndex: false}));
 assert.commandWorked(testDB.dropDatabase());
 
-assert.commandWorked(testDB.createCollection(bucketsCollName, {clusteredIndex: {}}));
+assert.commandWorked(testDB.createCollection(bucketsCollName, {clusteredIndex: true}));
 assert.commandWorked(testDB.dropDatabase());
 
 assert.commandWorked(
-    testDB.createCollection(bucketsCollName, {clusteredIndex: {expireAfterSeconds: 10}}));
+    testDB.createCollection(bucketsCollName, {clusteredIndex: true, expireAfterSeconds: 10}));
 assert.commandWorked(testDB.dropDatabase());
 
 // Round-trip creating a time-series collection.  Use the output of listCollections to re-create
 // the buckets collection.
 assert.commandWorked(
-    testDB.createCollection(tsCollName, {timeseries: {timeField: 'time', expireAfterSeconds: 10}}));
+    testDB.createCollection(tsCollName, {timeseries: {timeField: 'time'}, expireAfterSeconds: 10}));
 
 let res =
     assert.commandWorked(testDB.runCommand({listCollections: 1, filter: {name: bucketsCollName}}));
@@ -59,16 +59,25 @@ res =
 assert.eq(options, res.cursor.firstBatch[0].options);
 assert.commandWorked(testDB.dropDatabase());
 
-assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, {clusteredIndex: {bad: 1}}),
-                             40415);
+assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, {clusteredIndex: {}}),
+                             ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, {clusteredIndex: 'a'}),
+                             ErrorCodes.TypeMismatch);
 assert.commandFailedWithCode(
     testDB.createCollection(bucketsCollName,
-                            {clusteredIndex: {}, idIndex: {key: {_id: 1}, name: '_id_'}}),
+                            {clusteredIndex: true, idIndex: {key: {_id: 1}, name: '_id_'}}),
     ErrorCodes.InvalidOptions);
 
 // Using the 'clusteredIndex' option on any namespace other than a buckets namespace should fail.
-assert.commandFailedWithCode(testDB.createCollection(tsCollName, {clusteredIndex: {}}),
+assert.commandFailedWithCode(testDB.createCollection(tsCollName, {clusteredIndex: true}),
                              ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(testDB.createCollection('test', {clusteredIndex: {}}),
+assert.commandFailedWithCode(testDB.createCollection('test', {clusteredIndex: true}),
+                             ErrorCodes.InvalidOptions);
+
+// Using the 'expireAfterSeconds' option on any namespace other than a time-series namespace or a
+// clustered time-series buckets namespace should fail.
+assert.commandFailedWithCode(testDB.createCollection('test', {expireAfterSeconds: 10}),
+                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, {expireAfterSeconds: 10}),
                              ErrorCodes.InvalidOptions);
 })();

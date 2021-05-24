@@ -87,11 +87,6 @@ structs:
                               be \"_id\" or the same as 'timeField'."
                 type: string
                 optional: true
-            expireAfterSeconds:
-                description: "The number of seconds after which old time-series data should be
-                              deleted."
-                type: safeInt64
-                optional: true
             granularity:
                 description: "Describes the expected interval between subsequent measurements"
                 type: BucketGranularity
