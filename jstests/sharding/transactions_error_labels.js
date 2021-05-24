@@ -35,12 +35,6 @@ const abortTransactionDirectlyOnParticipant = function(rst, lsid, txnNumber) {
     }));
 };
 
-const commitTransaction = function(mongosSession) {
-    let res = mongosSession.commitTransaction_forTesting();
-    print("commitTransaction response from mongos: " + tojson(res));
-    return res;
-};
-
 const checkMongosResponse = function(
     res, expectedErrorCode, expectedErrorLabel, writeConcernErrorExpected) {
     if (expectedErrorCode) {
@@ -143,7 +137,6 @@ assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns}
 assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
 
 let mongosSession = st.s.startSession();
-let mongosSessionDB = mongosSession.getDatabase(dbName);
 
 let res;
 

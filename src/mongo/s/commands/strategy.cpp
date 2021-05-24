@@ -1051,15 +1051,13 @@ void ParseAndRunCommand::RunInvocation::_tapOnError(const Status& status) {
     //    delegated to the shards. Mongos simply propagates the shard's response up to the client.
     // 2. For other commands in a transaction, they shouldn't get a writeConcern error so this
     //    setting doesn't apply.
-    //
-    // isInternalClient is set to true to suppress mongos from returning the RetryableWriteError
-    // label.
     auto errorLabels = getErrorLabels(opCtx,
                                       *_parc->_osi,
                                       command->getName(),
                                       status.code(),
                                       boost::none,
-                                      true /* isInternalClient */);
+                                      false /* isInternalClient */,
+                                      true /* isMongos */);
     _parc->_errorBuilder->appendElements(errorLabels);
 }
 
