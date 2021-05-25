@@ -6,6 +6,11 @@
  * Creates a collection and then repeatedly executes the renameCollection
  * command against it. The previous "to" namespace is used as the next "from"
  * namespace.
+ *
+ * @tags: [
+ *   # TODO SERVER-57128: remove the following tag once mongos retries will be resilient
+ *   assumes_unsharded_collection,
+ * ]
  */
 
 var $config = (function() {
@@ -29,7 +34,11 @@ var $config = (function() {
         function rename(db, collName) {
             var toCollName = uniqueCollectionName(this.prefix, this.tid, this.num++);
             var res = db[this.fromCollName].renameCollection(toCollName, false /* dropTarget */);
-            assertWhenOwnDB.commandWorked(res);
+
+            // SERVER-57128: NamespaceNotFound is an acceptable error if the mongos retries
+            // the rename after the coordinator has already fulfilled the original request
+            assertWhenOwnDB.commandWorkedOrFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+
             this.fromCollName = toCollName;
         }
 

@@ -277,6 +277,9 @@ selector:
   # Does not support tojson of command objects.
   - jstests/core/SERVER-23626.js
 
+  # This suite is using zones for migrations but the following test is expecting no entries in config.tags
+  - jstests/core/rename_collection.js
+
   exclude_with_any_tags:
   # "Cowardly refusing to override read concern of command: ..."
   - assumes_read_concern_unchanged

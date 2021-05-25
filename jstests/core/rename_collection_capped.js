@@ -2,7 +2,7 @@
  * Test renaming capped collection
  *
  * @tags: [
- *   # renameCollection is not supported on sharded collections
+ *   # capped collections can't be sharded
  *   assumes_unsharded_collection,
  *   requires_non_retryable_commands,
  *   requires_capped,

@@ -8,6 +8,8 @@
  * Inserts documents into the "to" namespace and specifies dropTarget=true.
  *
  * @tags: [
+ *   # Rename between DBs with different shard primary is not supported
+ *   assumes_unsharded_collection,
  *   requires_capped,
  * ]
  */

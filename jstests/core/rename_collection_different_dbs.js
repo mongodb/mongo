@@ -2,7 +2,7 @@
  * Test renameCollection functionality across different databases.
  *
  * @tags: [
- *   # renameCollection is not supported on sharded collections
+ *   # Rename between DBs with different shard primary is not supported
  *   assumes_unsharded_collection,
  *   requires_non_retryable_commands,
  *   requires_collstats,
