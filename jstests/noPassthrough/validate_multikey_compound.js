@@ -18,7 +18,7 @@ rst.startSet();
 rst.initiate();
 
 let primary = rst.getPrimary();
-let testColl = primary.getCollection('test.validate_multikey_restart');
+let testColl = primary.getCollection('test.validate_multikey_compound');
 
 assert.commandWorked(testColl.getDB().createCollection(testColl.getName()));
 
@@ -48,6 +48,7 @@ primary = rst.restart(primary, {skipValidation: true}, /*signal=*/undefined, /*w
 testColl = primary.getCollection(testColl.getFullName());
 
 jsTestLog('Checking documents in collection after restart');
+rst.awaitReplication();
 docs = testColl.find().sort({_id: 1}).toArray();
 assert.eq(2, docs.length, 'too many docs in collection: ' + tojson(docs));
 assert.eq(0, docs[0]._id, 'unexpected document content in collection: ' + tojson(docs));
