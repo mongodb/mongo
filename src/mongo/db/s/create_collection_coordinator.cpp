@@ -725,7 +725,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
     updateCatalogEntry(opCtx, nss(), coll);
 }
 
-void CreateCollectionCoordinator::_finalize(OperationContext* opCtx) noexcept {
+void CreateCollectionCoordinator::_finalize(OperationContext* opCtx) {
     LOGV2_DEBUG(5277907, 2, "Create collection _finalize", "namespace"_attr = nss());
 
     try {
