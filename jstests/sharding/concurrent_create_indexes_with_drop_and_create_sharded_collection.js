@@ -3,7 +3,9 @@
  * interleaved with drop and shard collection.
  * @tags: [
  *   # Cannot step down while the abort failpoint is active.
- *   does_not_support_stepdowns
+ *   does_not_support_stepdowns,
+ *   # We need to wait for replication after restarting a shard, this requires persistence.
+ *   requires_persistence
  * ]
  */
 (function() {
