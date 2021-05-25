@@ -419,27 +419,6 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     ->acquireRecoverableCriticalSectionBlockWrites(
                         opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
-                // Check if the collection was already created, this time under the critical
-                // section.
-                if (auto createCollectionResponseOpt =
-                        sharding_ddl_util::checkIfCollectionAlreadySharded(
-                            opCtx,
-                            nss(),
-                            _shardKeyPattern->getKeyPattern().toBSON(),
-                            getCollation(opCtx, nss(), _doc.getCollation()),
-                            _doc.getUnique().value_or(false))) {
-                    _result = createCollectionResponseOpt;
-                    // The collection was already created and commited but there was a
-                    // stepdown after the commit.
-                    RecoverableCriticalSectionService::get(opCtx)
-                        ->releaseRecoverableCriticalSection(
-                            opCtx,
-                            nss(),
-                            _critSecReason,
-                            ShardingCatalogClient::kMajorityWriteConcern);
-                    return;
-                }
-
                 if (_recoveredFromDisk) {
                     auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
                     // If the collection can be found locally, then we clean up the config.chunks
