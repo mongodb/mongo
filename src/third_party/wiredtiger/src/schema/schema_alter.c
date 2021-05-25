@@ -79,6 +79,19 @@ __alter_file(WT_SESSION_IMPL *session, const char *newcfg[])
 }
 
 /*
+ * __alter_object --
+ *     Alter a tiered object. There are no object dhandles.
+ */
+static int
+__alter_object(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
+{
+    if (!WT_PREFIX_MATCH(uri, "object:"))
+        return (__wt_unexpected_object_type(session, uri, "object:"));
+
+    return (__alter_apply(session, uri, newcfg, WT_CONFIG_BASE(session, object_meta)));
+}
+
+/*
  * __alter_tree --
  *     Alter an index or colgroup reference.
  */
@@ -218,6 +231,8 @@ __schema_alter(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
         return (__alter_tree(session, uri, newcfg));
     if (WT_PREFIX_MATCH(uri, "lsm:"))
         return (__wt_lsm_tree_worker(session, uri, __alter_file, NULL, newcfg, flags));
+    if (WT_PREFIX_MATCH(uri, "object:"))
+        return (__alter_object(session, uri, newcfg));
     if (WT_PREFIX_MATCH(uri, "table:"))
         return (__alter_table(session, uri, newcfg, exclusive_refreshed));
     if (WT_PREFIX_MATCH(uri, "tiered:"))
