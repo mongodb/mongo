@@ -376,5 +376,120 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesScalar) {
     }
 }
 
+// Insert a record with nested documents and try to perform updates on it.
+TEST(RecordStoreTestHarness, UpdateWithDamagesNested) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    if (!rs->updateWithDamagesSupported())
+        return;
+
+    BSONObj obj0 = fromjson(
+        "{a: 0, "
+        " b: {p: 1, q: 1, r: 2}, "
+        " c: 3, "
+        " d: {p: {x: {i: 1}, y: {q: 1}}}}");
+    BSONObj obj1 = fromjson(
+        "{a: 0, "
+        " b: {p: 1, r: 2, q: 1}, "
+        " c: '3', "
+        " d: {p: {x: {j: '1'}, y: {q: 1}}}}");
+
+    RecordId loc;
+    const RecordData obj0Rec(obj0.objdata(), obj0.objsize());
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), obj0Rec.data(), obj0Rec.size(), Timestamp());
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
+        }
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(obj0.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            // {u: {c: "3"}, sb: {i: {q: 1}}, sd: {sp: {u: {x: {j: "1"}}}}}
+            auto diffOutput = doc_diff::computeDiff(obj0, obj1, 0, nullptr);
+            ASSERT(diffOutput);
+            auto [_, damageSource, damages] =
+                doc_diff::computeDamages(obj0, diffOutput->diff, true);
+            auto newRecStatus1 =
+                rs->updateWithDamages(opCtx.get(), loc, obj0Rec, damageSource.get(), damages);
+            ASSERT_OK(newRecStatus1.getStatus());
+            ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
+            uow.commit();
+        }
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(obj1.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
+    }
+}
+
+// Insert a record with nested arrays and try to perform updates on it.
+TEST(RecordStoreTestHarness, UpdateWithDamagesArray) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    if (!rs->updateWithDamagesSupported())
+        return;
+
+    BSONObj obj0 =
+        fromjson("{field1: 'abcd', field2: [1, 2, 3, [1, 'longString', [2], 4, 5, 6], 5, 5, 5]}");
+    BSONObj obj1 = fromjson("{field1: 'abcd', field2: [1, 2, 3, [1, 'longString', [4], 4], 5, 6]}");
+
+    RecordId loc;
+    const RecordData obj0Rec(obj0.objdata(), obj0.objsize());
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(), obj0Rec.data(), obj0Rec.size(), Timestamp());
+            ASSERT_OK(res.getStatus());
+            loc = res.getValue();
+            uow.commit();
+        }
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(obj0.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            // {sfield2: {a: true, l: 6, 's3': {a: true, l: 4, 'u2': [4]}, 'u5': 6}}
+            auto diffOutput = doc_diff::computeDiff(obj0, obj1, 0, nullptr);
+            ASSERT(diffOutput);
+            auto [_, damageSource, damages] =
+                doc_diff::computeDamages(obj0, diffOutput->diff, true);
+            auto newRecStatus1 =
+                rs->updateWithDamages(opCtx.get(), loc, obj0Rec, damageSource.get(), damages);
+            ASSERT_OK(newRecStatus1.getStatus());
+            ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
+            uow.commit();
+        }
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(obj1.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
+    }
+}
+
 }  // namespace
 }  // namespace mongo

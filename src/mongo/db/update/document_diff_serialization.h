@@ -146,8 +146,8 @@ struct Node {
 
 /**
  * This class represents insertion of a BSONElement or mutablebson Element. Note that
- * 'DocumentInsertionNode' also repesent an insert for the cases where an object is created
- * implicity.
+ * 'DocumentInsertionNode' also represent an insert for the cases where an object is created
+ * implicitly.
  */
 struct InsertNode : public Node {
     InsertNode(mutablebson::Element el) : elt(el) {}

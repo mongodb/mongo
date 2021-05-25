@@ -110,50 +110,82 @@ DocumentDiffTables buildObjDiffTables(DocumentDiffReader* reader) {
     return out;
 }
 
-// Computes the damage vector from doc diffs. Currently only supports time-series updates.
-void computeDamageOnObject(const BSONObj& preImage,
-                           DocumentDiffReader* reader,
-                           mutablebson::DamageVector* damages,
-                           BufBuilder* bufBuilder,
-                           bool mustCheckExistenceForInsertOperations) {
+int32_t computeDamageOnArray(const BSONObj& preImageRoot,
+                             const BSONObj& arrayPreImage,
+                             ArrayDiffReader* reader,
+                             mutablebson::DamageVector* damages,
+                             BufBuilder* bufBuilder,
+                             size_t offsetRoot,
+                             bool mustCheckExistenceForInsertOperations);
+
+void appendTypeByte(BufBuilder* bufBuilder, char typeByte) {
+    bufBuilder->appendChar(typeByte);
+}
+
+size_t targetOffsetInPostImage(const char* cur,
+                               const char* start,
+                               size_t globalOffset,
+                               size_t localOffset = 0) {
+    return cur - start + globalOffset + localOffset;
+}
+
+// Computes the damage vector and constructs the damage source from doc diffs.
+// The 'preImageRoot' is kept to calculate the offset of current (sub)document 'preImageSub' in the
+// root document. The diff for the current (sub)document is stored in the 'reader'. The 'damages'
+// and 'bufBuilder' are passed down to the recursive calls to build the damage vector and damage
+// source. The 'offsetRoot' is an extra offset in the root document to account for bytes changed by
+// updates made already.
+int32_t computeDamageOnObject(const BSONObj& preImageRoot,
+                              const BSONObj& preImageSub,
+                              DocumentDiffReader* reader,
+                              mutablebson::DamageVector* damages,
+                              BufBuilder* bufBuilder,
+                              size_t offsetRoot,
+                              bool mustCheckExistenceForInsertOperations) {
     const DocumentDiffTables tables = buildObjDiffTables(reader);
     int32_t diffSize = 0;
 
     if (!mustCheckExistenceForInsertOperations && tables.insertOnly) {
         for (auto&& elt : tables.fieldsToInsert) {
-            // The end of 'preImage' with the offset from the updates made already.
-            auto targetOffset = preImage.end()->rawdata() - preImage.objdata() + diffSize;
+            // The end of 'preImageSub' with the offset from the updates made already.
+            auto targetOffset = targetOffsetInPostImage(
+                preImageSub.end()->rawdata(), preImageRoot.objdata(), offsetRoot, diffSize);
             // Inserts the field to the end.
             damages->emplace_back(bufBuilder->len(), elt.size(), targetOffset, 0);
             diffSize += elt.size();
             bufBuilder->appendBuf(elt.rawdata(), elt.size());
         }
+        // The start of 'preImageSub' with the offset from the updates made already.
+        auto targetOffset =
+            targetOffsetInPostImage(preImageSub.objdata(), preImageRoot.objdata(), offsetRoot);
         // Updates the bytes of total size.
-        damages->emplace_back(bufBuilder->len(), 4, 0, 4);
-        bufBuilder->appendNum(preImage.objsize() + diffSize);
-        return;
+        damages->emplace_back(bufBuilder->len(), 4, targetOffset, 4);
+        bufBuilder->appendNum(preImageSub.objsize() + diffSize);
+        return diffSize;
     }
 
     // Keeps track of what fields we already appended, so that we can insert the rest at the end.
     StringDataSet fieldsToSkipInserting;
 
-    for (auto&& elt : preImage) {
+    for (auto&& elt : preImageSub) {
         auto it = tables.fieldMap.find(elt.fieldNameStringData());
         if (it == tables.fieldMap.end()) {
             // Field is not modified.
             continue;
         }
 
+        // The start of 'elt' with the offset from the updates made already.
+        auto targetOffset =
+            targetOffsetInPostImage(elt.rawdata(), preImageRoot.objdata(), offsetRoot, diffSize);
         stdx::visit(
             visit_helper::Overloaded{
-                [](Delete) {
-                    // Not applicable for time-series.
+                [&](Delete) {
+                    damages->emplace_back(0, 0, targetOffset, elt.size());
+                    diffSize -= elt.size();
                 },
 
                 [&](const Update& update) {
                     auto newElt = update.newElt;
-                    // The beginning of 'elt' with the offset from the updates made already.
-                    auto targetOffset = elt.rawdata() - preImage.objdata() + diffSize;
                     // Updates with the new BSONElement.
                     damages->emplace_back(
                         bufBuilder->len(), newElt.size(), targetOffset, elt.size());
@@ -164,31 +196,197 @@ void computeDamageOnObject(const BSONObj& preImage,
 
                 [&](const Insert&) {
                     // Deletes the pre-image version of the field. We'll add it at the end.
-                    damages->emplace_back(
-                        0, 0, elt.rawdata() - preImage.objdata() + diffSize, elt.size());
+                    damages->emplace_back(0, 0, targetOffset, elt.size());
                     diffSize -= elt.size();
                 },
 
-                [](const SubDiff& subDiff) {
-                    // TODO (SERVER-56520)
+                [&](const SubDiff& subDiff) {
+                    const auto type = subDiff.type();
+                    if (elt.type() == BSONType::Object && type == DiffType::kDocument) {
+                        auto reader = stdx::get<DocumentDiffReader>(subDiff.reader);
+                        diffSize += computeDamageOnObject(preImageRoot,
+                                                          elt.embeddedObject(),
+                                                          &reader,
+                                                          damages,
+                                                          bufBuilder,
+                                                          offsetRoot + diffSize,
+                                                          mustCheckExistenceForInsertOperations);
+                    } else if (elt.type() == BSONType::Array && type == DiffType::kArray) {
+                        auto reader = stdx::get<ArrayDiffReader>(subDiff.reader);
+                        diffSize += computeDamageOnArray(preImageRoot,
+                                                         elt.embeddedObject(),
+                                                         &reader,
+                                                         damages,
+                                                         bufBuilder,
+                                                         offsetRoot + diffSize,
+                                                         mustCheckExistenceForInsertOperations);
+                    }
                 }},
             it->second);
     }
 
     for (auto&& elt : tables.fieldsToInsert) {
         if (!fieldsToSkipInserting.count(elt.fieldNameStringData())) {
-            // The end of 'preImage' with the offset from the updates made already.
-            auto targetOffset = preImage.end()->rawdata() - preImage.objdata() + diffSize;
+            // The end of 'preImageSub' with the offset from the updates made already.
+            auto targetOffset = targetOffsetInPostImage(
+                preImageSub.end()->rawdata(), preImageRoot.objdata(), offsetRoot, diffSize);
             // Inserts the field to the end.
             damages->emplace_back(bufBuilder->len(), elt.size(), targetOffset, 0);
-            bufBuilder->appendBuf(elt.rawdata(), elt.size());
             diffSize += elt.size();
+            bufBuilder->appendBuf(elt.rawdata(), elt.size());
         }
     }
 
+    // The start of 'preImageSub' with the offset from the updates made already.
+    auto targetOffset = preImageSub.objdata() - preImageRoot.objdata() + offsetRoot;
     // Updates the bytes of total size.
-    damages->emplace_back(bufBuilder->len(), 4, 0, 4);
-    bufBuilder->appendNum(preImage.objsize() + diffSize);
+    damages->emplace_back(bufBuilder->len(), 4, targetOffset, 4);
+    bufBuilder->appendNum(preImageSub.objsize() + diffSize);
+    return diffSize;
+}
+
+int32_t computeDamageForArrayIndex(const BSONObj& preImageRoot,
+                                   const BSONObj& arrayPreImage,
+                                   boost::optional<BSONElement> preImageValue,
+                                   const ArrayDiffReader::ArrayModification& modification,
+                                   mutablebson::DamageVector* damages,
+                                   BufBuilder* bufBuilder,
+                                   size_t offsetRoot,
+                                   bool mustCheckExistenceForInsertOperations) {
+    int32_t diffSize = 0;
+    stdx::visit(
+        visit_helper::Overloaded{
+            [&](const BSONElement& update) {
+                invariant(!update.eoo());
+                auto preValuePos = arrayPreImage.end()->rawdata();
+                auto targetSize = 0;
+                if (preImageValue) {
+                    preValuePos = preImageValue->rawdata();
+                    targetSize = preImageValue->size();
+                }
+                // The start of 'preImageValue' if existed otherwise the end of the array, with the
+                // offset from the updates made already.
+                auto targetOffset =
+                    targetOffsetInPostImage(preValuePos, preImageRoot.objdata(), offsetRoot);
+                // Updates with the new BSONElement except for the 'u' byte.
+                auto sourceSize = update.size() - 1;
+                damages->emplace_back(bufBuilder->len(), sourceSize, targetOffset, targetSize);
+                diffSize += sourceSize - targetSize;
+                auto source = update.rawdata();
+                appendTypeByte(bufBuilder, *source++);
+                // Skips the byte of 'u' and appends the data after the type byte.
+                bufBuilder->appendBuf(source + 1, sourceSize - 1);
+            },
+            [&](auto reader) {
+                if (preImageValue) {
+                    if constexpr (std::is_same_v<decltype(reader), ArrayDiffReader>) {
+                        if (preImageValue->type() == BSONType::Array) {
+                            diffSize += computeDamageOnArray(preImageRoot,
+                                                             preImageValue->embeddedObject(),
+                                                             &reader,
+                                                             damages,
+                                                             bufBuilder,
+                                                             offsetRoot,
+                                                             mustCheckExistenceForInsertOperations);
+                            return;
+                        }
+                    } else if constexpr (std::is_same_v<decltype(reader), DocumentDiffReader>) {
+                        if (preImageValue->type() == BSONType::Object) {
+                            diffSize +=
+                                computeDamageOnObject(preImageRoot,
+                                                      preImageValue->embeddedObject(),
+                                                      &reader,
+                                                      damages,
+                                                      bufBuilder,
+                                                      offsetRoot,
+                                                      mustCheckExistenceForInsertOperations);
+                            return;
+                        }
+                    }
+                }
+            },
+        },
+        modification);
+    return diffSize;
+}
+
+// Mutually recursive with computeDamageOnObject().
+int32_t computeDamageOnArray(const BSONObj& preImageRoot,
+                             const BSONObj& arrayPreImage,
+                             ArrayDiffReader* reader,
+                             mutablebson::DamageVector* damages,
+                             BufBuilder* bufBuilder,
+                             size_t offsetRoot,
+                             bool mustCheckExistenceForInsertOperations) {
+    int32_t diffSize = 0;
+    const auto resizeVal = reader->newSize();
+    // Each modification is an optional pair where the first component is the array index and
+    // the second is the modification type.
+    auto nextMod = reader->next();
+    BSONObjIterator preImageIt(arrayPreImage);
+
+    size_t idx = 0;
+    for (; preImageIt.more() && (!resizeVal || idx < *resizeVal); ++idx, ++preImageIt) {
+        if (nextMod && idx == nextMod->first) {
+            diffSize += computeDamageForArrayIndex(preImageRoot,
+                                                   arrayPreImage,
+                                                   *preImageIt,
+                                                   nextMod->second,
+                                                   damages,
+                                                   bufBuilder,
+                                                   offsetRoot + diffSize,
+                                                   mustCheckExistenceForInsertOperations);
+            nextMod = reader->next();
+        }
+    }
+
+    // Removes the remaining fields in 'arrayPreImage' if resizing to a shorter array.
+    if (preImageIt.more()) {
+        // The element 'preImageIt' points to with the offset from the updates made already.
+        auto targetOffset = targetOffsetInPostImage(
+            (*preImageIt).rawdata(), preImageRoot.objdata(), offsetRoot, diffSize);
+        // The size of bytes from current element to the end of the array.
+        auto targetSize = arrayPreImage.end()->rawdata() - (*preImageIt).rawdata();
+        // Deletes the rest of the array in the 'arrayPreImage'.
+        damages->emplace_back(0, 0, targetOffset, targetSize);
+        diffSize -= targetSize;
+    }
+
+    // Deals with remaining fields in the diff if the pre image was too short.
+    for (; (resizeVal && idx < *resizeVal) || nextMod; ++idx) {
+        if (nextMod && idx == nextMod->first) {
+            diffSize += computeDamageForArrayIndex(preImageRoot,
+                                                   arrayPreImage,
+                                                   boost::none,
+                                                   nextMod->second,
+                                                   damages,
+                                                   bufBuilder,
+                                                   offsetRoot + diffSize,
+                                                   mustCheckExistenceForInsertOperations);
+            nextMod = reader->next();
+        } else {
+            // This field is not mentioned in the diff so we pad the post image with null.
+            auto idxAsStr = std::to_string(idx);
+            // The end of 'arrayPreImage' with the offset from the updates made already.
+            auto targetOffset = targetOffsetInPostImage(
+                arrayPreImage.end()->rawdata(), preImageRoot.objdata(), offsetRoot, diffSize);
+            // Inserts the BSON type byte, index string, and terminating null byte to the end.
+            auto sourceSize = idxAsStr.size() + 2;
+            damages->emplace_back(bufBuilder->len(), sourceSize, targetOffset, 0);
+            diffSize += sourceSize;
+            appendTypeByte(bufBuilder, BSONType::jstNULL);
+            bufBuilder->appendStr(idxAsStr);
+        }
+    }
+
+    invariant(!resizeVal || *resizeVal == idx);
+    // The start of 'arrayPreImage' with the offset from the updates made already.
+    auto targetOffset =
+        targetOffsetInPostImage(arrayPreImage.objdata(), preImageRoot.objdata(), offsetRoot);
+    // Updates the bytes of total size.
+    damages->emplace_back(bufBuilder->len(), 4, targetOffset, 4);
+    bufBuilder->appendNum(arrayPreImage.objsize() + diffSize);
+    return diffSize;
 }
 
 class DiffApplier {
@@ -441,7 +639,8 @@ DamagesOutput computeDamages(const BSONObj& pre,
     DocumentDiffReader reader(diff);
     mutablebson::DamageVector damages;
     BufBuilder b;
-    computeDamageOnObject(pre, &reader, &damages, &b, mustCheckExistenceForInsertOperations);
+    computeDamageOnObject(
+        pre, pre, &reader, &damages, &b, 0, mustCheckExistenceForInsertOperations);
     return {pre, b.release(), std::move(damages)};
 }
 }  // namespace mongo::doc_diff
