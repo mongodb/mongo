@@ -321,7 +321,7 @@ protected:
 };
 
 TEST_F(CollectionCatalogResourceTest, RemoveAllResources) {
-    catalog.deregisterAllCollections();
+    catalog.deregisterAllCollectionsAndViews();
 
     const std::string dbName = "resourceDb";
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
@@ -534,7 +534,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     std::vector<std::string> dbNames = {"dbA", "dbB", "dbC", "dbD", "testdb"};
     ASSERT(catalog.getAllDbNames() == dbNames);
 
-    catalog.deregisterAllCollections();
+    catalog.deregisterAllCollectionsAndViews();
 }
 
 // Test setting and fetching the profile level for a database.
@@ -618,7 +618,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
     std::vector<std::string> dbList = {"testdb"};
     ASSERT(catalog.getAllDbNames() == dbList);
 
-    catalog.deregisterAllCollections();
+    catalog.deregisterAllCollectionsAndViews();
 }
 
 class ForEachCollectionFromDbTest : public CatalogTestFixture {
