@@ -100,6 +100,7 @@ primary = rst.restart(primary, {skipValidation: true}, /*signal=*/undefined, /*w
 testColl = primary.getCollection(testColl.getFullName());
 
 jsTestLog('Checking documents in collection after restart');
+rst.awaitReplication();
 docs = testColl.find(geoQuery).sort({_id: 1}).toArray();
 assert.eq(1, docs.length, 'too many docs in collection: ' + tojson(docs));
 assert.eq(
