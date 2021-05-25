@@ -343,6 +343,11 @@ public:
     std::string toString() const;
     friend std::ostream& operator<<(std::ostream& out, const Value& v);
 
+    /**
+     * Populates the internal cache by recursively walking the underlying BSON.
+     */
+    void fillCache() const;
+
     void swap(Value& rhs) {
         _storage.swap(rhs._storage);
     }

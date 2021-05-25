@@ -520,15 +520,40 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForArraysInDocumentIteratorCach
     // triple the size of the document. The reason for this is that 'largeStr' is cached twice; once
     // for the 'arr' element and once for the nested 'subObj' element.
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
-    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
-    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 1024);
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 3);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 3 + 1024);
 
     // Pull in the second document. Both docs remain in the cache so the reported memory should
     // include both.
     advance();
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
-    ASSERT_GT(_iter->getApproximateSize(), (initialDocSize * 2) * 2);
-    ASSERT_LT(_iter->getApproximateSize(), (initialDocSize * 2) * 2 + 1024);
+    ASSERT_GT(_iter->getApproximateSize(), (initialDocSize * 3) * 2);
+    ASSERT_LT(_iter->getApproximateSize(), (initialDocSize * 3) * 2 + 1024);
+}
+
+TEST_F(PartitionIteratorTest, MemoryUsageAccountsForNestedArraysInDocumentIteratorCache) {
+    std::string largeStr(1024, 'x');
+    auto bsonDoc = BSON("arr" << BSON_ARRAY(BSON_ARRAY(BSON("subObj" << largeStr))));
+    const auto docs =
+        std::deque<DocumentSource::GetNextResult>{Document(bsonDoc), Document(bsonDoc)};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+
+    [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
+    size_t initialDocSize = docs[0].getDocument().getApproximateSize();
+
+    // Pull in the first document, and verify the reported size of the iterator is roughly
+    // triple the size of the document. The reason for this is that 'largeStr' is cached twice; once
+    // for the 'arr' element and once for the nested 'subObj' element.
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 3);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 3 + 1024);
+
+    // Pull in the second document. Both docs remain in the cache so the reported memory should
+    // include both.
+    advance();
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), (initialDocSize * 3) * 2);
+    ASSERT_LT(_iter->getApproximateSize(), (initialDocSize * 3) * 2 + 1024);
 }
 
 TEST_F(PartitionIteratorTest, MemoryUsageAccountsForNestedObjInDocumentIteratorCache) {
