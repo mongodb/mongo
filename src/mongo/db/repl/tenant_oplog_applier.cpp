@@ -663,6 +663,13 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                         opCtx->getServiceContext()->getFastClockSource()->now());
                     // Clear the old tenant migration UUID.
                     noopEntry.setFromTenantMigration(boost::none);
+
+                    // Set the inner 'o2' optime to the donor entry's optime because the recipient
+                    // uses the timestamp in 'o2' to determine where to resume applying from.
+                    auto o2Entry = uassertStatusOK(MutableOplogEntry::parse(*entry.getObject2()));
+                    o2Entry.setOpTime(entry.getOpTime());
+                    o2Entry.setWallClockTime(entry.getWallClockTime());
+                    noopEntry.setObject2(o2Entry.toBSON());
                 }
             }
             stmtIds.insert(stmtIds.end(), entryStmtIds.begin(), entryStmtIds.end());
