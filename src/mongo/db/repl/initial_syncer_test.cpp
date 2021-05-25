@@ -640,7 +640,8 @@ OplogEntry makeOplogEntry(int t,
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
                               boost::none,    // ShardId of resharding recipient
-                              boost::none)};  // _id
+                              boost::none,    // _id
+                              boost::none)};  // needsRetryImage
 }
 
 BSONObj makeOplogEntryObj(int t, OpTypeEnum opType, int version) {

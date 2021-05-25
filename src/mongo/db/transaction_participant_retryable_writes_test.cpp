@@ -85,7 +85,8 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         boost::none,                   // pre-image optime
         boost::none,                   // post-image optime
         boost::none,                   // ShardId of resharding recipient
-        boost::none)};                 // _id
+        boost::none,                   // _id
+        boost::none)};                 // needsRetryImage
 }
 
 class OpObserverMock : public OpObserverNoop {

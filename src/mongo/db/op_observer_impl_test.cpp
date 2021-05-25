@@ -50,6 +50,7 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_participant_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/clock_source_mock.h"
@@ -624,11 +625,7 @@ DEATH_TEST_REGEX_F(OpObserverTest,
     opObserver.onReplicationRollback(opCtx.get(), rbInfo);
 }
 
-/**
- * Test fixture for testing OpObserver behavior specific to multi-document transactions.
- */
-
-class OpObserverTransactionTest : public OpObserverTest {
+class OpObserverTxnParticipantTest : public OpObserverTest {
 public:
     void setUp() override {
         OpObserverTest::setUp();
@@ -643,9 +640,7 @@ public:
         opCtx()->setTxnNumber(txnNum());
         opCtx()->setInMultiDocumentTransaction();
         _sessionCheckout = std::make_unique<MongoDOperationContextSession>(opCtx());
-
-        auto txnParticipant = TransactionParticipant::get(opCtx());
-        txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), false, true);
+        _txnParticipant.emplace(TransactionParticipant::get(opCtx()));
     }
 
     void tearDown() override {
@@ -656,6 +651,54 @@ public:
         OpObserverTest::tearDown();
     }
 
+
+protected:
+    Session* session() {
+        return OperationContextSession::get(opCtx());
+    }
+
+    OpObserverImpl& opObserver() {
+        return *_opObserver;
+    }
+
+    OperationContext* opCtx() {
+        return _opCtx.get();
+    }
+
+    TxnNumber& txnNum() {
+        return _txnNum;
+    }
+
+    TransactionParticipant::Participant& txnParticipant() {
+        return *_txnParticipant;
+    }
+
+private:
+    class ExposeOpObserverTimes : public OpObserver {
+    public:
+        typedef OpObserver::ReservedTimes ReservedTimes;
+    };
+
+    ServiceContext::UniqueOperationContext _opCtx;
+
+    boost::optional<OpObserverImpl> _opObserver;
+    boost::optional<ExposeOpObserverTimes::ReservedTimes> _times;
+    boost::optional<TransactionParticipant::Participant> _txnParticipant;
+
+    std::unique_ptr<MongoDOperationContextSession> _sessionCheckout;
+    TxnNumber _txnNum = 0;
+};
+
+/**
+ * Test fixture for testing OpObserver behavior specific to multi-document transactions.
+ */
+
+class OpObserverTransactionTest : public OpObserverTxnParticipantTest {
+public:
+    void setUp() override {
+        OpObserverTxnParticipantTest::setUp();
+        txnParticipant().beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), false, true);
+    }
 
 protected:
     void checkSessionAndTransactionFields(const BSONObj& oplogEntry) {
@@ -723,36 +766,6 @@ protected:
             ASSERT_EQ(*startOpTime, *txnRecord.getStartOpTime());
         }
     }
-
-    Session* session() {
-        return OperationContextSession::get(opCtx());
-    }
-
-    OpObserverImpl& opObserver() {
-        return *_opObserver;
-    }
-
-    OperationContext* opCtx() {
-        return _opCtx.get();
-    }
-
-    TxnNumber& txnNum() {
-        return _txnNum;
-    }
-
-private:
-    class ExposeOpObserverTimes : public OpObserver {
-    public:
-        typedef OpObserver::ReservedTimes ReservedTimes;
-    };
-
-    ServiceContext::UniqueOperationContext _opCtx;
-
-    boost::optional<OpObserverImpl> _opObserver;
-    boost::optional<ExposeOpObserverTimes::ReservedTimes> _times;
-
-    std::unique_ptr<MongoDOperationContextSession> _sessionCheckout;
-    TxnNumber _txnNum = 0;
 };
 
 TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
@@ -1363,6 +1376,113 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionSingleStatementTest) {
                                                         << "ns" << nss.toString() << "ui" << uuid
                                                         << "o" << BSON("_id" << 0))));
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntry.getObject());
+}
+
+/**
+ * Test fixture for testing OpObserver behavior specific to retryable findAndModify.
+ */
+class OpObserverRetryableFindAndModifyTest : public OpObserverTxnParticipantTest {
+public:
+    void setUp() override {
+        OpObserverTxnParticipantTest::setUp();
+        // Set parameter to indicate that pre- and post- images should be stored in a side
+        // collection rather than the oplog.
+        std::ignore = ServerParameterSet::getGlobal()
+                          ->getMap()
+                          .find("storeFindAndModifyImagesInSideCollection")
+                          ->second->setFromString("true");
+        txnParticipant().beginOrContinue(opCtx(), txnNum(), boost::none, boost::none);
+    }
+
+    void tearDown() override {
+        // Ensure the server parameter is set back to the default if we fail the test midway.
+        std::ignore = ServerParameterSet::getGlobal()
+                          ->getMap()
+                          .find("storeFindAndModifyImagesInSideCollection")
+                          ->second->setFromString("false");
+        OpObserverTxnParticipantTest::tearDown();
+    }
+};
+
+TEST_F(OpObserverRetryableFindAndModifyTest,
+       RetryableFindAndModifyUpdateRequestingPostImageHasNeedsRetryImage) {
+    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
+    NamespaceString nss = {"test", "coll"};
+    const auto uuid = CollectionUUID::gen();
+
+    CollectionUpdateArgs updateArgs;
+    updateArgs.stmtIds = {0};
+    updateArgs.updatedDoc = BSON("_id" << 0 << "data"
+                                       << "x");
+    updateArgs.update = BSON("$set" << BSON("data"
+                                            << "x"));
+    updateArgs.criteria = BSON("_id" << 0);
+    updateArgs.storeDocOption = CollectionUpdateArgs::StoreDocOption::PostImage;
+    OplogUpdateEntryArgs update(std::move(updateArgs), nss, uuid);
+
+    WriteUnitOfWork wunit(opCtx());
+    AutoGetDb autoDb(opCtx(), nss.db(), MODE_X);
+    opObserver().onUpdate(opCtx(), update);
+    // Asserts that only a single oplog entry was created. In essence, we did not create any
+    // no-op image entries in the oplog.
+    const auto oplogEntry = getSingleOplogEntry(opCtx());
+    ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPreImageOpTimeFieldName));
+    ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPostImageOpTimeFieldName));
+    ASSERT_TRUE(oplogEntry.hasField(repl::OplogEntryBase::kNeedsRetryImageFieldName));
+    ASSERT_EQUALS(oplogEntry.getStringField(repl::OplogEntryBase::kNeedsRetryImageFieldName),
+                  "postImage"_sd);
+}
+
+TEST_F(OpObserverRetryableFindAndModifyTest,
+       RetryableFindAndModifyUpdateRequestingPreImageHasNeedsRetryImage) {
+    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
+    NamespaceString nss = {"test", "coll"};
+    const auto uuid = CollectionUUID::gen();
+
+    CollectionUpdateArgs updateArgs;
+    updateArgs.stmtIds = {0};
+    updateArgs.preImageDoc = BSON("_id" << 0 << "data"
+                                        << "y");
+    updateArgs.update = BSON("$set" << BSON("data"
+                                            << "x"));
+    updateArgs.criteria = BSON("_id" << 0);
+    updateArgs.storeDocOption = CollectionUpdateArgs::StoreDocOption::PreImage;
+    OplogUpdateEntryArgs update(std::move(updateArgs), nss, uuid);
+
+    WriteUnitOfWork wunit(opCtx());
+    AutoGetDb autoDb(opCtx(), nss.db(), MODE_X);
+    opObserver().onUpdate(opCtx(), update);
+    // Asserts that only a single oplog entry was created. In essence, we did not create any
+    // no-op image entries in the oplog.
+    const auto oplogEntry = getSingleOplogEntry(opCtx());
+    ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPreImageOpTimeFieldName));
+    ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPostImageOpTimeFieldName));
+    ASSERT_TRUE(oplogEntry.hasField(repl::OplogEntryBase::kNeedsRetryImageFieldName));
+    ASSERT_EQUALS(oplogEntry.getStringField(repl::OplogEntryBase::kNeedsRetryImageFieldName),
+                  "preImage"_sd);
+}
+
+TEST_F(OpObserverRetryableFindAndModifyTest, RetryableFindAndModifyDeleteHasNeedsRetryImage) {
+    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
+    NamespaceString nss = {"test", "coll"};
+    const auto uuid = CollectionUUID::gen();
+
+    WriteUnitOfWork wunit(opCtx());
+    AutoGetDb autoDb(opCtx(), nss.db(), MODE_X);
+    const auto deletedDoc = BSON("_id" << 0 << "data"
+                                       << "x");
+    opObserver().aboutToDelete(opCtx(), nss, deletedDoc);
+    OpObserver::OplogDeleteEntryArgs args;
+    args.deletedDoc = &deletedDoc;
+    opObserver().onDelete(opCtx(), nss, uuid, 0, args);
+    // Asserts that only a single oplog entry was created. In essence, we did not create any
+    // no-op image entries in the oplog.
+    const auto oplogEntry = getSingleOplogEntry(opCtx());
+    ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPreImageOpTimeFieldName));
+    ASSERT_FALSE(oplogEntry.hasField(repl::OplogEntryBase::kPostImageOpTimeFieldName));
+    ASSERT_TRUE(oplogEntry.hasField(repl::OplogEntryBase::kNeedsRetryImageFieldName));
+    ASSERT_EQUALS(oplogEntry.getStringField(repl::OplogEntryBase::kNeedsRetryImageFieldName),
+                  "preImage"_sd);
 }
 
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {

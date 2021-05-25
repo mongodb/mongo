@@ -70,7 +70,8 @@ OplogEntry createOplogEntryForTransactionTableUpdate(repl::OpTime opTime,
                                     boost::none,    // preImageOpTime
                                     boost::none,    // postImageOpTime
                                     boost::none,    // destinedRecipient
-                                    boost::none)};  // _id
+                                    boost::none,    // _id
+                                    boost::none)};  // needsRetryImage
 }
 
 /**
