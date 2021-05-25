@@ -1253,6 +1253,16 @@ ostream& operator<<(ostream& out, const Value& val) {
     verify(false);
 }
 
+void Value::fillCache() const {
+    if (isObject()) {
+        getDocument().fillCache();
+    } else if (isArray()) {
+        for (auto&& val : getArray()) {
+            val.fillCache();
+        }
+    }
+}
+
 void Value::serializeForSorter(BufBuilder& buf) const {
     buf.appendChar(getType());
     switch (getType()) {
