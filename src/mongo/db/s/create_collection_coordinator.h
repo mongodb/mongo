@@ -121,7 +121,7 @@ private:
     /**
      * Refresh all participant shards and log creation.
      */
-    void _finalize(OperationContext* opCtx) noexcept;
+    void _finalize(OperationContext* opCtx);
 
     /**
      * Helper function to audit and log the shard collection event.
