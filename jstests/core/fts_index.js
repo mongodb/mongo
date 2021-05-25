@@ -249,6 +249,15 @@ coll.drop();
 assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: "$foo"}),
                              ErrorCodes.CannotCreateIndex);
 jsTestLog('indexes ' + coll.getFullName() + ':' + tojson(coll.getIndexes()));
+coll = db.getCollection(collNamePrefix + collCount++);
+coll.drop();
+assert.commandWorked(coll.insert({_id: 0, a: 'abc', b: 100}));
+assert.commandFailedWithCode(coll.createIndex({a: 'text'}, {weights: {b: Number.MAX_VALUE}}),
+                             ErrorCodes.CannotCreateIndex);
+jsTestLog('indexes ' + coll.getFullName() + ':' + tojson(coll.getIndexes()));
+assert.commandFailedWithCode(coll.createIndex({a: 'text'}, {weights: {b: -Number.MAX_VALUE}}),
+                             ErrorCodes.CannotCreateIndex);
+jsTestLog('indexes ' + coll.getFullName() + ':' + tojson(coll.getIndexes()));
 
 //
 // 6. Bad direction value for non-text key in compound index.
