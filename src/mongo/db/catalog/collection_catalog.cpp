@@ -913,11 +913,26 @@ CollectionCatalog::Stats CollectionCatalog::getStats() const {
     return _stats;
 }
 
+CollectionCatalog::ViewCatalogSet CollectionCatalog::getViewCatalogDbNames() const {
+    ViewCatalogSet results;
+    for (const auto& dbNameViewSetPair : _views) {
+        results.insert(dbNameViewSetPair.first);
+    }
+    return results;
+}
+
 void CollectionCatalog::registerCollection(OperationContext* opCtx,
                                            CollectionUUID uuid,
                                            std::shared_ptr<Collection> coll) {
     auto ns = coll->ns();
-    if (_collections.find(ns) != _collections.end()) {
+    bool conflict = _collections.find(ns) != _collections.end();
+    if (!conflict) {
+        auto it = _views.find(ns.db());
+        if (it != _views.end()) {
+            conflict = it->second.contains(ns);
+        }
+    }
+    if (conflict) {
         auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
         auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(ns);
         // If we have an uncommitted drop of this collection we can defer the creation, the register
@@ -951,10 +966,6 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
     _catalog[uuid] = coll;
     _collections[ns] = coll;
     _orderedCollections[dbIdPair] = coll;
-
-    if (ns.isSystemDotViews()) {
-        _viewCatalogs.emplace(dbName);
-    }
 
     if (!ns.isOnInternalDb() && !ns.isSystem()) {
         _stats.userCollections += 1;
@@ -993,10 +1004,6 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
     _collections.erase(ns);
     _catalog.erase(uuid);
 
-    if (ns.isSystemDotViews()) {
-        _viewCatalogs.erase(dbName);
-    }
-
     if (!ns.isOnInternalDb() && !ns.isSystem()) {
         _stats.userCollections -= 1;
         if (coll->isCapped()) {
@@ -1016,7 +1023,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
     return coll;
 }
 
-void CollectionCatalog::deregisterAllCollections() {
+void CollectionCatalog::deregisterAllCollectionsAndViews() {
     LOGV2(20282, "Deregistering all the collections");
     for (auto& entry : _catalog) {
         auto uuid = entry.first;
@@ -1033,9 +1040,40 @@ void CollectionCatalog::deregisterAllCollections() {
     _collections.clear();
     _orderedCollections.clear();
     _catalog.clear();
+    _views.clear();
     _stats = {};
 
     _resourceInformation.clear();
+}
+
+void CollectionCatalog::registerView(const NamespaceString& ns) {
+    if (_collections.contains(ns)) {
+        LOGV2(5706100, "Conflicted creating a view", "ns"_attr = ns);
+        throw WriteConflictException();
+    }
+
+    _views[ns.db()].insert(ns);
+}
+void CollectionCatalog::deregisterView(const NamespaceString& ns) {
+    auto it = _views.find(ns.db());
+    if (it == _views.end()) {
+        return;
+    }
+
+    auto& viewsForDb = it->second;
+    viewsForDb.erase(ns);
+    if (viewsForDb.empty()) {
+        _views.erase(it);
+    }
+}
+
+void CollectionCatalog::replaceViewsForDatabase(StringData dbName,
+                                                absl::flat_hash_set<NamespaceString> views) {
+    if (views.empty())
+        _views.erase(dbName);
+    else {
+        _views[dbName] = std::move(views);
+    }
 }
 
 CollectionCatalog::iterator CollectionCatalog::begin(OperationContext* opCtx, StringData db) const {

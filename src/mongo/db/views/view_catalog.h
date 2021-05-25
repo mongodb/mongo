@@ -212,7 +212,9 @@ private:
                                             StringData ns,
                                             ViewCatalogLookupBehavior lookupBehavior);
 
-    Status _reload(OperationContext* opCtx, ViewCatalogLookupBehavior lookupBehavior);
+    Status _reload(OperationContext* opCtx,
+                   ViewCatalogLookupBehavior lookupBehavior,
+                   bool reloadForCollectionCatalog);
 
     /**
      * uasserts with the InvalidViewDefinition error if the current in-memory state of the view

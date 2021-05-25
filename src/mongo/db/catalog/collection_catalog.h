@@ -183,9 +183,28 @@ public:
     std::shared_ptr<Collection> deregisterCollection(OperationContext* opCtx, CollectionUUID uuid);
 
     /**
-     * Deregister all the collection objects.
+     * Deregister all the collection objects and view namespaces.
      */
-    void deregisterAllCollections();
+    void deregisterAllCollectionsAndViews();
+
+    /**
+     * Register the namespace to be used as a view.
+     *
+     * Throws WriteConflictException if namespace is used by a Collection
+     */
+    void registerView(const NamespaceString& ns);
+
+    /**
+     * Deregister the namespace from being used as a view.
+     */
+    void deregisterView(const NamespaceString& ns);
+
+    /**
+     * Sets all namespaces used by views for a database. Does not validate if they are used by
+     * Collections. When creating new view its namespace should be registered with registerView()
+     * above.
+     */
+    void replaceViewsForDatabase(StringData dbName, absl::flat_hash_set<NamespaceString> views);
 
     /**
      * This function gets the Collection pointer that corresponds to the CollectionUUID.
@@ -330,9 +349,7 @@ public:
      * Returns a set of databases, by name, that have view catalogs.
      */
     using ViewCatalogSet = StringSet;
-    ViewCatalogSet getViewCatalogDbNames() const {
-        return _viewCatalogs;
-    }
+    ViewCatalogSet getViewCatalogDbNames() const;
 
     /**
      * Puts the catalog in closed state. In this state, the lookupNSSByUUID method will fall back
@@ -408,6 +425,9 @@ private:
     OrderedCollectionMap _orderedCollections;  // Ordered by <dbName, collUUID> pair
     NamespaceCollectionMap _collections;
 
+    // Map of database names to a set of their views. Only databases with views are present.
+    StringMap<absl::flat_hash_set<NamespaceString>> _views;
+
     // Incremented whenever the CollectionCatalog gets closed and reopened (onCloseCatalog and
     // onOpenCatalog).
     //
@@ -422,9 +442,6 @@ private:
 
     // Mapping from ResourceId to a set of strings that contains collection and database namespaces.
     std::map<ResourceId, std::set<std::string>> _resourceInformation;
-
-    // Set of database names that have view catalogs.
-    ViewCatalogSet _viewCatalogs;
 
     /**
      * Contains non-default database profile settings. New collections, current collections and
