@@ -83,7 +83,8 @@ OplogEntry makeOplogEntry(int ts) {
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
                               boost::none,    // ShardId of resharding recipient
-                              boost::none)};  // _id
+                              boost::none,    // _id
+                              boost::none)};  // needsRetryImage
 }
 
 TEST_F(MultiApplierTest, InvalidConstruction) {

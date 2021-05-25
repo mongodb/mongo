@@ -63,7 +63,8 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
                           const boost::optional<OpTime>& preImageOpTime,
                           const boost::optional<OpTime>& postImageOpTime,
                           const boost::optional<ShardId>& destinedRecipient,
-                          const boost::optional<Value>& idField) {
+                          const boost::optional<Value>& idField,
+                          const boost::optional<repl::RetryImageEnum>& needsRetryImage) {
     BSONObjBuilder builder;
     if (idField) {
         idField->addToBsonObj(&builder, OplogEntryBase::k_idFieldName);
@@ -109,13 +110,18 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
         const BSONObj localObject = postImageOpTime.get().toBSON();
         builder.append(OplogEntryBase::kPostImageOpTimeFieldName, localObject);
     }
+
     if (destinedRecipient) {
         builder.append(OplogEntryBase::kDestinedRecipientFieldName,
                        destinedRecipient.get().toString());
     }
+
+    if (needsRetryImage) {
+        builder.append(OplogEntryBase::kNeedsRetryImageFieldName,
+                       RetryImage_serializer(needsRetryImage.get()));
+    }
     return builder.obj();
 }
-
 }  // namespace
 
 DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
@@ -319,7 +325,8 @@ DurableOplogEntry::DurableOplogEntry(OpTime opTime,
                                      const boost::optional<OpTime>& preImageOpTime,
                                      const boost::optional<OpTime>& postImageOpTime,
                                      const boost::optional<ShardId>& destinedRecipient,
-                                     const boost::optional<Value>& idField)
+                                     const boost::optional<Value>& idField,
+                                     const boost::optional<repl::RetryImageEnum>& needsRetryImage)
     : DurableOplogEntry(makeOplogEntryDoc(opTime,
                                           hash,
                                           opType,
@@ -337,7 +344,8 @@ DurableOplogEntry::DurableOplogEntry(OpTime opTime,
                                           preImageOpTime,
                                           postImageOpTime,
                                           destinedRecipient,
-                                          idField)) {}
+                                          idField,
+                                          needsRetryImage)) {}
 
 bool DurableOplogEntry::isCommand() const {
     return getOpType() == OpTypeEnum::kCommand;

@@ -103,7 +103,8 @@ OplogEntry makeOplogEntry(OpTime opTime,
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
                               boost::none,    // ShardId of resharding recipient
-                              boost::none)};  // _id
+                              boost::none,    // _id
+                              boost::none)};  // needsRetryImage
 }
 
 MutableOplogEntry makeNoOpOplogEntry(OpTime opTime,

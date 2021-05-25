@@ -407,7 +407,8 @@ public:
                                     preImageOpTime,  // pre-image optime
                                     boost::none,     // post-image optime
                                     boost::none,     // ShardId of resharding recipient
-                                    boost::none)};   // _id
+                                    boost::none,     // _id
+                                    boost::none)};   // needsRetryImage
     }
 
     /**
@@ -1310,7 +1311,8 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
                                 boost::none,     // pre-image optime
                                 boost::none,     // post-image optime
                                 boost::none,     // ShardId of resharding recipient
-                                boost::none);    // _id
+                                boost::none,     // _id
+                                boost::none);    // needsRetryImage
 
     // When the DocumentSourceChangeStreamTransform sees the "commitTransaction" oplog entry, we
     // expect it to return the insert op within our 'preparedApplyOps' oplog entry.
@@ -1719,7 +1721,8 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
         boost::none,                      // pre-image optime
         boost::none,                      // post-image optime
         boost::none,                      // ShardId of resharding recipient
-        boost::none);                     // _id
+        boost::none,                      // _id
+        boost::none);                     // needsRetryImage
 
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
@@ -1854,7 +1857,8 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
         boost::none,                      // pre-image optime
         boost::none,                      // post-image optime
         boost::none,                      // ShardId of resharding recipient
-        boost::none);                     // _id
+        boost::none,                      // _id
+        boost::none);                     // needsRetryImage
 
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.

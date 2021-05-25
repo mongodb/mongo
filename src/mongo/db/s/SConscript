@@ -525,6 +525,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/pipeline/process_interface/shardsvr_process_interface',
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/repl/image_collection_entry',
         '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
         '$BUILD_DIR/mongo/db/repl/oplog_application',
         '$BUILD_DIR/mongo/db/repl/oplog_interface_local',

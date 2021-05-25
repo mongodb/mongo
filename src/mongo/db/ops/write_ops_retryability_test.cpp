@@ -84,7 +84,8 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 preImageOpTime,  // pre-image optime
                                 postImageOpTime,  // post-image optime
                                 boost::none,      // ShardId of resharding recipient
-                                boost::none)};    // _id
+                                boost::none,      // _id
+                                boost::none)};    // needsRetryImage
 }
 
 void setUpReplication(ServiceContext* svcCtx) {

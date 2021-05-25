@@ -232,7 +232,8 @@ public:
                                         boost::none /* preImage */,
                                         boost::none /* postImage */,
                                         kMyShardId,
-                                        Value(id.toBSON()))};
+                                        Value(id.toBSON()),
+                                        boost::none /* needsRetryImage) */)};
     }
 
     const NamespaceString& appliedToNs() {

@@ -187,7 +187,8 @@ OplogEntry makeInsertOplogEntry(int t, const NamespaceString& nss, boost::option
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
                               boost::none,    // ShardId of resharding recipient
-                              boost::none)};  // _id
+                              boost::none,    // _id
+                              boost::none)};  // needsRetryImage
 }
 
 /**
@@ -218,7 +219,8 @@ OplogEntry makeUpdateOplogEntry(int t,
                               preImageOpTime,
                               postImageOpTime,
                               boost::none,    // ShardId of resharding recipient
-                              boost::none)};  // _id
+                              boost::none,    // _id
+                              boost::none)};  // needsRetryImage
 }
 
 OplogEntry makeNoopOplogEntry(int t, const StringData& msg) {
@@ -240,7 +242,8 @@ OplogEntry makeNoopOplogEntry(int t, const StringData& msg) {
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
                               boost::none,    // ShardId of resharding recipient
-                              boost::none)};  // _id
+                              boost::none,    // _id
+                              boost::none)};  // needsRetryImage
 }
 
 /**
@@ -274,7 +277,8 @@ OplogEntry makeApplyOpsOplogEntry(int t, bool prepare, const std::vector<OplogEn
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
                               boost::none,    // ShardId of resharding recipient
-                              boost::none)};  // _id
+                              boost::none,    // _id
+                              boost::none)};  // needsRetryImage
 }
 
 /**
@@ -308,7 +312,8 @@ OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepar
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
                               boost::none,    // ShardId of resharding recipient
-                              boost::none)};  // _id
+                              boost::none,    // _id
+                              boost::none)};  // needsRetryImage
 }
 
 /**
@@ -369,7 +374,8 @@ OplogEntry makeLargeTransactionOplogEntries(int t,
                               boost::none,      // pre-image optime
                               boost::none,      // post-image optime
                               boost::none,      // ShardId of resharding recipient
-                              boost::none)};    // _id
+                              boost::none,      // _id
+                              boost::none)};    // needsRetryImage
 }
 
 /**

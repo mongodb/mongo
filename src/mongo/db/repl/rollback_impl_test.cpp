@@ -1505,7 +1505,8 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
                                                 boost::none,   // preImageOpTime
                                                 boost::none,   // postImageOpTime
                                                 boost::none,   // ShardId of resharding recipient
-                                                boost::none);  // _id
+                                                boost::none,   // _id
+                                                boost::none);  // needsRetryImage
     ASSERT_OK(_insertOplogEntry(partialApplyOpsOplogEntry.toBSON()));
     ops.push_back(std::make_pair(partialApplyOpsOplogEntry.toBSON(), insertOp2.second));
 
@@ -1539,7 +1540,8 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
         boost::none,                // preImageOpTime
         boost::none,                // postImageOpTime
         boost::none,                // ShardId of resharding recipient
-        boost::none);               // _id
+        boost::none,                // _id
+        boost::none);               // needsRetryImage
     ASSERT_OK(_insertOplogEntry(commitApplyOpsOplogEntry.toBSON()));
     ops.push_back(std::make_pair(commitApplyOpsOplogEntry.toBSON(), insertOp3.second));
 
