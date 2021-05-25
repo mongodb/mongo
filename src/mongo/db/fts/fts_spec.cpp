@@ -385,7 +385,7 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
             if (!e.isNumber()) {
                 return {ErrorCodes::CannotCreateIndex, "weight for text index needs numeric type"};
             }
-            m[e.fieldName()] = e.numberInt();
+            m[e.fieldName()] = e.safeNumberInt();
         }
     } else if (spec["weights"].str() == WILDCARD) {
         m[WILDCARD] = 1;
