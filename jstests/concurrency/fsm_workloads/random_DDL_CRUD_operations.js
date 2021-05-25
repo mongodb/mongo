@@ -6,6 +6,7 @@
  *
  * @tags: [
  *   requires_sharding,
+ *   requires_fcv_50,
  *   assumes_balancer_off,
  *   assumes_autosplit_off,
  *   does_not_support_causal_consistency,
