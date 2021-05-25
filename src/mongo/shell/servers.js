@@ -1289,6 +1289,11 @@ function appendSetParameterArgs(argArray) {
                             continue;
                         }
 
+                        if (paramName === "storeFindAndModifyImagesInSideCollection" &&
+                            argArrayContains("storeFindAndModifyImagesInSideCollection")) {
+                            continue;
+                        }
+
                         const paramVal = ((param) => {
                             if (typeof param === "object") {
                                 return JSON.stringify(param);

@@ -47,8 +47,12 @@ def _validate_options(parser, args):
         errors = []
         for key, values in agg_set_params.items():
             if len(values) > 1:
-                errors.append(f"setParameter has multiple values. Key: {key} Values: {values}")
-
+                for left, _ in enumerate(values):
+                    for right in range(left + 1, len(values)):
+                        if values[left] != values[right]:
+                            errors.append(
+                                f"setParameter has multiple distinct values. Key: {key} Values: {values}"
+                            )
         return errors
 
     config = vars(args)
