@@ -1,6 +1,17 @@
 'use strict';
 
 var fsm = (function() {
+    const kIsRunningInsideTransaction = Symbol('isRunningInsideTransaction');
+
+    function forceRunningOutsideTransaction(data) {
+        if (data[kIsRunningInsideTransaction]) {
+            const err =
+                new Error('Intentionally thrown to stop state function from running inside of a' +
+                          ' multi-statement transaction');
+            err.isNotSupported = true;
+            throw err;
+        }
+    }
     // args.data = 'this' object of the state functions
     // args.db = database object
     // args.collName = collection name
@@ -57,14 +68,16 @@ var fsm = (function() {
                         // so that if the transaction aborts, then we haven't speculatively modified
                         // the thread-local state.
                         const data = deepCopyObject({}, args.data);
+                        data[kIsRunningInsideTransaction] = true;
                         fn.call(data, args.db, args.collName, connCache);
+                        delete data[kIsRunningInsideTransaction];
                         args.data = data;
                     });
                 } catch (e) {
                     // Retry state functions that threw OperationNotSupportedInTransaction or
                     // InvalidOptions errors outside of a transaction. Rethrow any other error.
                     if (e.code !== ErrorCodes.OperationNotSupportedInTransaction &&
-                        e.code !== ErrorCodes.InvalidOptions) {
+                        e.code !== ErrorCodes.InvalidOptions && !e.isNotSupported) {
                         throw e;
                     }
 
@@ -145,5 +158,9 @@ var fsm = (function() {
         assert(false, 'not reached');
     }
 
-    return {run: runFSM, _getWeightedRandomChoice: getWeightedRandomChoice};
+    return {
+        forceRunningOutsideTransaction,
+        run: runFSM,
+        _getWeightedRandomChoice: getWeightedRandomChoice
+    };
 })();
