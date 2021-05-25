@@ -47,6 +47,32 @@ struct __wt_tiered_manager {
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 
 /*
+ * Different types of work units for tiered trees.
+ */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_TIERED_WORK_DROP_LOCAL 0x1u  /* Drop object from local storage. */
+#define WT_TIERED_WORK_DROP_SHARED 0x2u /* Drop object from tier. */
+#define WT_TIERED_WORK_FLUSH 0x4u       /* Flush object to tier. */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
+
+/*
+ * WT_TIERED_WORK_UNIT --
+ *	A definition of maintenance that a tiered tree needs done.
+ */
+struct __wt_tiered_work_unit {
+    TAILQ_ENTRY(__wt_tiered_work_unit) q; /* Worker unit queue */
+    uint32_t type;                        /* Type of operation */
+    uint64_t op_val;                      /* A value for the operation */
+    WT_TIERED *tiered;                    /* Tiered tree */
+    uint64_t id;                          /* Id of the object */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_TIERED_WORK_FORCE 0x1u /* Force operation */
+#define WT_TIERED_WORK_FREE 0x2u  /* Free data after operation */
+                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint32_t flags;               /* Flags for operation */
+};
+
+/*
  * WT_TIERED_TIERS --
  *	Information we need to keep about each tier such as its data handle and name.
  *	We define operations that each tier can accept. The local tier should be able to accept

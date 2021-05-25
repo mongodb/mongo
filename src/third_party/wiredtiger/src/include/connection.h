@@ -229,6 +229,7 @@ struct __wt_connection_impl {
     WT_SPINLOCK reconfig_lock;   /* Single thread reconfigure */
     WT_SPINLOCK schema_lock;     /* Schema operation spinlock */
     WT_RWLOCK table_lock;        /* Table list lock */
+    WT_SPINLOCK tiered_lock;     /* Tiered work queue spinlock */
     WT_SPINLOCK turtle_lock;     /* Turtle file spinlock */
     WT_RWLOCK dhandle_lock;      /* Data handle list lock */
 
@@ -278,13 +279,15 @@ struct __wt_connection_impl {
     TAILQ_HEAD(__wt_dhhash, __wt_data_handle) * dhhash;
     /* Locked: data handle list */
     TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) dhqh;
-    /* Locked: LSM handle list. */
-    TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
+    /* Locked: dynamic library handle list */
+    TAILQ_HEAD(__wt_dlh_qh, __wt_dlh) dlhqh;
     /* Locked: file list */
     TAILQ_HEAD(__wt_fhhash, __wt_fh) * fhhash;
     TAILQ_HEAD(__wt_fh_qh, __wt_fh) fhqh;
-    /* Locked: library list */
-    TAILQ_HEAD(__wt_dlh_qh, __wt_dlh) dlhqh;
+    /* Locked: LSM handle list. */
+    TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
+    /* Locked: Tiered system work queue. */
+    TAILQ_HEAD(__wt_tiered_qh, __wt_tiered_work_unit) tieredqh;
 
     WT_SPINLOCK block_lock; /* Locked: block manager list */
     TAILQ_HEAD(__wt_blockhash, __wt_block) * blockhash;
@@ -413,6 +416,7 @@ struct __wt_connection_impl {
     const char *stat_stamp; /* Statistics log entry timestamp */
     uint64_t stat_usecs;    /* Statistics log period */
 
+    uint64_t tiered_retention;       /* Earliest time to check to remove local overlap copies */
     WT_SESSION_IMPL *tiered_session; /* Tiered thread session */
     wt_thread_t tiered_tid;          /* Tiered thread */
     bool tiered_tid_set;             /* Tiered thread set */

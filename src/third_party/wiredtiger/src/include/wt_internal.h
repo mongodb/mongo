@@ -325,6 +325,8 @@ struct __wt_tiered_tiers;
 typedef struct __wt_tiered_tiers WT_TIERED_TIERS;
 struct __wt_tiered_tree;
 typedef struct __wt_tiered_tree WT_TIERED_TREE;
+struct __wt_tiered_work_unit;
+typedef struct __wt_tiered_work_unit WT_TIERED_WORK_UNIT;
 struct __wt_time_aggregate;
 typedef struct __wt_time_aggregate WT_TIME_AGGREGATE;
 struct __wt_time_window;
