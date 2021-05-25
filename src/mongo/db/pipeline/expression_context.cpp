@@ -141,6 +141,8 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
       _valueComparator(_collator.get()) {
     if (runtimeConstants) {
         variables.setRuntimeConstants(*runtimeConstants);
+    } else {
+        variables.setDefaultRuntimeConstants(opCtx);
     }
 
     jsHeapLimitMB = internalQueryJavaScriptHeapSizeLimitMB.load();

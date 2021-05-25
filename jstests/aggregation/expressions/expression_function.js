@@ -139,4 +139,20 @@ pipeline = [{
 }];
 assert.commandFailedWithCode(
     db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}), 31266);
+
+// Test that using $function when runtime constants are not set does not crash the server. This
+// reproduces SERVER-56465.
+coll.drop();
+assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.remove({
+    $expr: {
+        $function: {
+            body: function(a) {
+                return a;
+            },
+            args: ["$a"],
+            lang: "js"
+        }
+    }
+}));
 })();

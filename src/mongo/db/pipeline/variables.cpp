@@ -207,7 +207,7 @@ RuntimeConstants Variables::generateRuntimeConstants(OperationContext* opCtx) {
     // On a standalone, the clock may not be running and $$CLUSTER_TIME is unavailable. If the
     // logical clock is available, set the clusterTime in the runtime constants. Otherwise, the
     // clusterTime is set to the null Timestamp.
-    if (opCtx->getClient()) {
+    if (opCtx && opCtx->getClient()) {
         if (auto logicalClock = LogicalClock::get(opCtx); logicalClock) {
             auto clusterTime = logicalClock->getClusterTime();
             if (clusterTime != LogicalTime::kUninitialized) {
