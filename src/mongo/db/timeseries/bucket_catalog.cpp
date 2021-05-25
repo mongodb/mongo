@@ -310,6 +310,7 @@ void BucketCatalog::finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& 
         auto lk = _lockExclusive();
         if (_allBuckets.contains(ptr)) {
             stdx::unique_lock blk{ptr->_mutex};
+            ptr->_preparedBatch.reset();
             _abort(blk, ptr, nullptr, boost::none);
         }
     } else if (bucket->allCommitted()) {
@@ -504,15 +505,23 @@ void BucketCatalog::_abort(stdx::unique_lock<Mutex>& lk,
     }
     bucket->_batches.clear();
 
+    bool doRemove = true;  // We shouldn't remove the bucket if there's a prepared batch outstanding
+                           // and it's not the on we manage. In that case, we don't know what the
+                           // user is doing with it, but we need to keep the bucket around until
+                           // that batch is finished.
     if (auto& prepared = bucket->_preparedBatch) {
         if (prepared == batch) {
             prepared->_abort(status, true);
+        } else {
+            doRemove = false;
         }
         prepared.reset();
     }
 
     lk.unlock();
-    [[maybe_unused]] bool removed = _removeBucket(bucket, false /* expiringBuckets */);
+    if (doRemove) {
+        [[maybe_unused]] bool removed = _removeBucket(bucket, false /* expiringBuckets */);
+    }
 }
 
 void BucketCatalog::_markBucketIdle(Bucket* bucket) {
@@ -848,7 +857,7 @@ BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog, Bucket* bucket
     auto statesIt = _catalog->_bucketStates.find(_bucket->_id);
     invariant(statesIt != _catalog->_bucketStates.end());
     auto& [_, state] = *statesIt;
-    if (state == BucketState::kCleared) {
+    if (state == BucketState::kCleared || state == BucketState::kPreparedAndCleared) {
         release();
     }
 }

@@ -574,6 +574,49 @@ TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
     ASSERT_EQ(batch->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 }
 
+TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
+    auto batch1 = _bucketCatalog
+                      ->insert(_opCtx,
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << Date_t::now()),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
+                      .getValue();
+    ASSERT(batch1->claimCommitRights());
+    _bucketCatalog->prepareCommit(batch1);
+    ASSERT_EQ(batch1->measurements().size(), 1);
+    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements(), 0);
+
+    // Insert before clear so there's a second batch live at the same time.
+    auto batch2 = _bucketCatalog
+                      ->insert(_opCtx,
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << Date_t::now()),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
+                      .getValue();
+    ASSERT_NE(batch1, batch2);
+
+    // Now clear the bucket. Since there's a prepared batch it should conflict.
+    ASSERT_THROWS(_bucketCatalog->clear(batch1->bucket()->id()), WriteConflictException);
+
+    // Now try to prepare the second batch. Ensure it aborts the batch.
+    ASSERT(batch2->claimCommitRights());
+    _bucketCatalog->prepareCommit(batch2);
+    ASSERT(batch2->finished());
+    ASSERT_EQ(batch2->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
+
+    // Make sure we didn't clear the bucket state when we aborted the second batch.
+    ASSERT_THROWS(_bucketCatalog->clear(batch1->bucket()->id()), WriteConflictException);
+
+    // Make sure we can finish the cleanly prepared batch.
+    _bucketCatalog->finish(batch1, {});
+    ASSERT(batch1->finished());
+    ASSERT_OK(batch1->getResult().getStatus());
+}
+
 TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
     auto batch = _bucketCatalog
                      ->insert(_opCtx,
