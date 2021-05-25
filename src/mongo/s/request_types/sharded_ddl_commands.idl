@@ -36,6 +36,7 @@ imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/s/chunk_version.idl"
     - "mongo/s/database_version.idl"
+    - "mongo/s/resharding/common_types.idl"
 
 structs:
 
@@ -225,7 +226,7 @@ commands:
                 description: "The collation to use for the shard key index."
                 optional: true
             zones:
-                type: array<object>
+                type: array<ReshardingZoneType>
                 description: "The zones associated with the new shard key."
                 optional: true
             _presetReshardedChunks:

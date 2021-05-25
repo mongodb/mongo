@@ -126,16 +126,8 @@ public:
                     nss.db(), getCollectionUUIDFromChunkManger(nss, cm));
 
 
-                boost::optional<std::vector<ReshardingZoneType>> zones;
-                if (request().getZones()) {
-                    zones.emplace();
-                    zones->reserve(request().getZones()->size());
-                    for (const BSONObj& obj : request().getZones().get()) {
-                        zones->push_back(ReshardingZoneType::parse(
-                            IDLParserErrorContext("ReshardingZoneType"), obj));
-                    }
-
-                    checkForOverlappingZones(zones.get());
+                if (auto zones = request().getZones()) {
+                    checkForOverlappingZones(*zones);
                 }
 
                 auto coordinatorDoc =
@@ -152,7 +144,7 @@ public:
                                                                std::move(tempReshardingNss),
                                                                request().getKey());
                 coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
-                coordinatorDoc.setZones(std::move(zones));
+                coordinatorDoc.setZones(request().getZones());
                 coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
                 coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
 
