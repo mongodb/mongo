@@ -495,6 +495,8 @@ void Parser::walkRelopExpr(AstQuery& ast) {
             op = EPrimBinary::greaterEq;
         } else if (ast.nodes[1]->token == ">") {
             op = EPrimBinary::greater;
+        } else {
+            MONGO_UNREACHABLE;
         }
 
         if (ast.nodes.size() == 4) {
