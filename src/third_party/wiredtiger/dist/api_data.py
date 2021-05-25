@@ -596,6 +596,9 @@ connection_runtime_config = [
             versions of WiredTiger. These operations are informational and
             skipped in recovery.''',
             type='boolean'),
+        Config('update_restore_evict', 'false', r'''
+            if true, control the page eviction through forcing update restore eviction.''',
+            type='boolean'),
         ]),
     Config('error_prefix', '', r'''
         prefix string for error messages'''),

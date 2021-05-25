@@ -633,7 +633,9 @@ __evict_update_work(WT_SESSION_IMPL *session)
         if (bytes_dirty < (uint64_t)((dirty_target + dirty_trigger) * bytes_max) / 200 &&
           bytes_updates < (uint64_t)((updates_target + updates_trigger) * bytes_max) / 200)
             LF_SET(WT_CACHE_EVICT_SCRUB);
-    } else
+    } else if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_UPDATE_RESTORE_EVICT))
+        LF_SET(WT_CACHE_EVICT_SCRUB);
+    else
         LF_SET(WT_CACHE_EVICT_NOKEEP);
 
     /*
