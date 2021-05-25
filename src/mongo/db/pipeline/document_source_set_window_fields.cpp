@@ -215,20 +215,29 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     }
 
     // $sort
-    if (simplePartitionBy || sortBy) {
-        // Generate a combined SortPattern for the partition key and sortBy.
-        std::vector<SortPatternPart> combined;
+    // Generate a combined SortPattern for the partition key and sortBy.
+    std::vector<SortPatternPart> combined;
 
-        if (simplePartitionBy) {
-            SortPatternPart part;
-            part.fieldPath = simplePartitionBy->fullPath();
-            combined.emplace_back(std::move(part));
+    if (simplePartitionBy) {
+        SortPatternPart part;
+        part.fieldPath = simplePartitionBy->fullPath();
+        combined.emplace_back(std::move(part));
+    }
+    if (sortBy) {
+        for (auto part : *sortBy) {
+            combined.push_back(part);
         }
-        if (sortBy) {
-            for (auto part : *sortBy) {
-                combined.push_back(part);
-            }
-        }
+    }
+
+    // This is for our testing framework. If this knob is set we append an _id to the translated
+    // sortBy in order to ensure deterministic output.
+    if (internalQueryAppendIdToSetWindowFieldsSort.load()) {
+        SortPatternPart part;
+        part.fieldPath = "_id"_sd;
+        combined.push_back(part);
+    }
+
+    if (!combined.empty()) {
         result.push_back(DocumentSourceSort::create(expCtx, SortPattern{combined}));
     }
 
