@@ -77,6 +77,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(WTCompactIndexEBUSY);
 MONGO_FAIL_POINT_DEFINE(WTEmulateOutOfOrderNextIndexKey);
+MONGO_FAIL_POINT_DEFINE(WTIndexPauseAfterSearchNear);
 
 using std::string;
 using std::vector;
@@ -1047,8 +1048,8 @@ protected:
         WT_CURSOR* c = _cursor->get();
 
         int cmp = -1;
-        const WiredTigerItem keyItem(query.getBuffer(), query.getSize());
-        setKey(c, keyItem.Get());
+        const WiredTigerItem searchKey(query.getBuffer(), query.getSize());
+        setKey(c, searchKey.Get());
 
         int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search_near(c, &cmp); });
         if (ret == WT_NOTFOUND) {
@@ -1061,14 +1062,56 @@ protected:
 
         TRACE_CURSOR << "\t cmp: " << cmp;
 
+        MONGO_FAIL_POINT_BLOCK(WTIndexPauseAfterSearchNear, data) {
+            if (data.getData()["indexName"].str() == _idx.indexName()) {
+                log() << "hanging after search_near";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET(WTIndexPauseAfterSearchNear);
+            }
+        }
+
         if (cmp == 0) {
             // Found it!
             return true;
         }
 
         // Make sure we land on a matching key (after/before for forward/reverse).
-        if (_forward ? cmp < 0 : cmp > 0) {
+        // If this operation is ignoring prepared updates and search_near() lands on a key that
+        // compares lower than the search key (for a forward cursor), calling next() is not
+        // guaranteed to return a key that compares greater than the search key. This is because
+        // ignoring prepare conflicts does not provide snapshot isolation and the call to next()
+        // may land on a newly-committed prepared entry. We must advance our cursor until we find a
+        // key that compares greater than the search key. The same principle applies to reverse
+        // cursors. See SERVER-56839.
+        const bool enforcingPrepareConflicts =
+            _opCtx->recoveryUnit()->getPrepareConflictBehavior() ==
+            PrepareConflictBehavior::kEnforce;
+        WT_ITEM curKey;
+        while (_forward ? cmp < 0 : cmp > 0) {
             advanceWTCursor();
+            if (_cursorAtEof) {
+                break;
+            }
+
+            if (!kDebugBuild && enforcingPrepareConflicts) {
+                break;
+            }
+
+            getKey(c, &curKey);
+            cmp = std::memcmp(curKey.data, searchKey.data, std::min(searchKey.size, curKey.size));
+
+            TRACE_CURSOR << "cmp after advance: " << cmp;
+
+            // We do not expect any exact matches or matches of prefixes by comparing keys of
+            // different lengths. Callers either seek using keys with discriminators that always
+            // compare unequally, or in the case of restoring a cursor, perform exact searches. In
+            // the case of an exact search, we will have returned earlier.
+            dassert(cmp);
+
+            if (enforcingPrepareConflicts) {
+                // If we are enforcing prepare conflicts, calling next() or prev() must always give
+                // us a key that compares, respectively, greater than or less than our search key.
+                dassert(_forward ? cmp > 0 : cmp < 0);
+            }
         }
 
         return false;
