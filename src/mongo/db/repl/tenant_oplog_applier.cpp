@@ -727,15 +727,6 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                                            boost::none /* autocommit */,
                                            boost::none /* startTransaction */);
 
-            // We should never process the same donor statement twice, except in failover
-            // cases where we'll also have "forgotten" the statement was executed.
-            uassert(5350902,
-                    str::stream() << "Tenant oplog application processed same retryable write "
-                                     "twice for transaction "
-                                  << txnNumber << " statement " << entryStmtIds.front()
-                                  << " on session " << sessionId,
-                    !txnParticipant.checkStatementExecutedNoOplogEntryFetch(entryStmtIds.front()));
-
             // We could have an existing lastWriteOpTime for the same retryable write chain from a
             // previously aborted migration. This could also happen if the tenant being migrated has
             // previously resided in this replica set. So we want to start a new history chain
@@ -746,7 +737,36 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                 prevWriteOpTime = txnParticipant.getLastWriteOpTime();
             } else {
                 prevWriteOpTime = OpTime();
+
+                // Before we start a new history chain, reset the in-memory retryable write
+                // state in the txnParticipant so it can be built up from scratch again with
+                // the new chain.
+                LOGV2_DEBUG(5709800,
+                            2,
+                            "Tenant oplog applier resetting existing retryable write state",
+                            "lastWriteOpTime"_attr = txnParticipant.getLastWriteOpTime(),
+                            "_cloneFinishedRecipientOpTime"_attr = _cloneFinishedRecipientOpTime,
+                            "sessionId"_attr = sessionId,
+                            "txnNumber"_attr = txnNumber,
+                            "statementIds"_attr = entryStmtIds,
+                            "tenant"_attr = _tenantId,
+                            "migrationUuid"_attr = _migrationUuid);
+                txnParticipant.invalidate(opCtx.get());
+                txnParticipant.refreshFromStorageIfNeededNoOplogEntryFetch(opCtx.get());
+                txnParticipant.beginOrContinue(opCtx.get(),
+                                               txnNumber,
+                                               boost::none /* autocommit */,
+                                               boost::none /* startTransaction */);
             }
+
+            // We should never process the same donor statement twice, except in failover
+            // cases where we'll also have "forgotten" the statement was executed.
+            uassert(5350902,
+                    str::stream() << "Tenant oplog application processed same retryable write "
+                                     "twice for transaction "
+                                  << txnNumber << " statement " << entryStmtIds.front()
+                                  << " on session " << sessionId,
+                    !txnParticipant.checkStatementExecutedNoOplogEntryFetch(entryStmtIds.front()));
 
             // Set sessionId, txnNumber, and statementId for all ops in a retryable write.
             noopEntry.setSessionId(sessionId);
