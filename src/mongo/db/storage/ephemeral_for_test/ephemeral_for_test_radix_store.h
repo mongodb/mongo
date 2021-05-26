@@ -331,6 +331,27 @@ public:
             updateTreeView(/*stopIfMultipleCursors=*/true);
         }
 
+        reverse_radix_iterator(const reverse_radix_iterator& originalIterator) {
+            _root = originalIterator._root;
+            _current = originalIterator._current;
+        }
+
+        reverse_radix_iterator& operator=(const reverse_radix_iterator& originalIterator) {
+            if (this != &originalIterator) {
+                _root = originalIterator._root;
+                _current = originalIterator._current;
+            }
+            return *this;
+        }
+
+        reverse_radix_iterator& operator=(reverse_radix_iterator&& originalIterator) {
+            if (this != &originalIterator) {
+                _root = std::move(originalIterator._root);
+                _current = std::move(originalIterator._current);
+            }
+            return *this;
+        }
+
         reverse_radix_iterator& operator++() {
             repositionIfChanged();
             _findNextReverse();
