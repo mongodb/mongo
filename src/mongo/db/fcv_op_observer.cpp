@@ -51,7 +51,12 @@ namespace mongo {
 using FeatureCompatibilityParams = ServerGlobalParams::FeatureCompatibility;
 
 void FcvOpObserver::_setVersion(OperationContext* opCtx,
-                                ServerGlobalParams::FeatureCompatibility::Version newVersion) {
+                                ServerGlobalParams::FeatureCompatibility::Version newVersion,
+                                boost::optional<Timestamp> commitTs) {
+    // We set the last FCV update timestamp before setting the new FCV, to make sure we never
+    // read an FCV that is not stable.  We might still read a stale one.
+    if (commitTs)
+        FeatureCompatibilityVersion::advanceLastFCVUpdateTimestamp(*commitTs);
     boost::optional<FeatureCompatibilityParams::Version> prevVersion;
 
     if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
@@ -132,7 +137,7 @@ void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& do
     }
 
     opCtx->recoveryUnit()->onCommit(
-        [opCtx, newVersion](boost::optional<Timestamp>) { _setVersion(opCtx, newVersion); });
+        [opCtx, newVersion](boost::optional<Timestamp> ts) { _setVersion(opCtx, newVersion, ts); });
 }
 
 void FcvOpObserver::onInserts(OperationContext* opCtx,
@@ -192,6 +197,8 @@ void FcvOpObserver::onReplicationRollback(OperationContext* opCtx,
                   "newVersion"_attr = FeatureCompatibilityVersionParser::toString(diskFcv),
                   "oldVersion"_attr = FeatureCompatibilityVersionParser::toString(memoryFcv));
             _setVersion(opCtx, diskFcv);
+            // The rollback FCV is already in the stable snapshot.
+            FeatureCompatibilityVersion::clearLastFCVUpdateTimestamp();
         }
     }
 }

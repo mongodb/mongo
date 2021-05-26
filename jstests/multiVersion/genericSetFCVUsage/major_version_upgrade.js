@@ -203,6 +203,14 @@ for (let i = 0; i < versions.length; i++) {
         assert.commandWorked(primaryAdminDB.runCommand(
             {setFeatureCompatibilityVersion: version.featureCompatibilityVersion}));
         rst.awaitReplication();
+        // Make sure we reach the new featureCompatibilityVersion in the committed snapshot on
+        // on all nodes before continuing to upgrade.
+        // checkFCV does not work for version 3.4 (and below)
+        if (version.featureCompatibilityVersion != '3.4') {
+            for (let n of rst.nodes) {
+                checkFCV(n.getDB("admin"), version.featureCompatibilityVersion);
+            }
+        }
     }
 }
 

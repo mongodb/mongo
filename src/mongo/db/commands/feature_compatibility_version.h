@@ -109,6 +109,19 @@ public:
      * concurrent 'FixedFCVRegions'.
      */
     static Lock::ExclusiveLock enterFCVChangeRegion(OperationContext* opCtx);
+
+    /**
+     * Used by the FCV OpObserver to set the timestamp of the last opTime where the FCV was updated.
+     * We use this to ensure the user does not see a non-transitional FCV that is not in the
+     * majority snapshot, since upgrading or downgrading will not work in that circumstance.
+     */
+    static void advanceLastFCVUpdateTimestamp(Timestamp fcvUpdateTimestamp);
+
+    /**
+     * Used by the FCV OpObserver at rollback time.  The rollback FCV is always in the
+     * majority snapshot, so it is safe to clear the lastFCVUpdateTimestamp then.
+     */
+    static void clearLastFCVUpdateTimestamp();
 };
 
 /**
