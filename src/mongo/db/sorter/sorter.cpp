@@ -1132,6 +1132,14 @@ void SortedFileWriter<Key, Value>::spill() {
     try {
         _file.write(reinterpret_cast<const char*>(&size), sizeof(size));
         _file.write(outBuffer, std::abs(size));
+    } catch (const std::system_error& ex) {
+        if (ex.code() == std::errc::no_space_on_device) {
+            msgasserted(ErrorCodes::OutOfDiskSpace,
+                        str::stream() << ex.what() << ": " << _fileFullPath);
+        }
+        msgasserted(5642403,
+                    str::stream() << "error writing to file \"" << _fileFullPath
+                                  << "\": " << sorter::myErrnoWithDescription());
     } catch (const std::exception&) {
         msgasserted(16821,
                     str::stream() << "error writing to file \"" << _fileFullPath
