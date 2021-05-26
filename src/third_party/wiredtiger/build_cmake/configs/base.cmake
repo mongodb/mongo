@@ -15,9 +15,9 @@ config_choice(
     "Target architecture for WiredTiger"
     OPTIONS
         "x86;WT_X86;"
-        "arm64;WT_ARM64;"
-        "ppc64;WT_PPC64;"
-        "zseries;WT_ZSERIES;"
+        "aarch64;WT_AARCH64;"
+        "ppc64le;WT_PPC64;"
+        "s390x;WT_S390X;"
 )
 
 config_choice(
@@ -166,7 +166,7 @@ config_string(
 config_string(
     VERSION_PATCH
     "Path version number for WiredTiger"
-    DEFAULT 0
+    DEFAULT 1
 )
 
 
@@ -174,11 +174,18 @@ string(TIMESTAMP config_date "%Y-%m-%d")
 config_string(
     VERSION_STRING
     "Version string for WiredTiger"
-    DEFAULT "\"WiredTiger 10.0.0 (${config_date})\""
+    DEFAULT "\"WiredTiger ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH} (${config_date})\""
 )
 
-if(HAVE_DIAGNOSTIC)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g" CACHE STRING "" FORCE)
+if(HAVE_DIAGNOSTIC AND (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug"))
+    # Avoid setting diagnostic flags if we are building with Debug mode.
+    # CMakes Debug config sets compilation with debug symbols by default.
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 endif()
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CC_OPTIMIZE_LEVEL}" CACHE STRING "" FORCE)
+if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+    # Don't use the optimization level if we have specified a release config.
+    # CMakes Release config sets compilation to the highest optimization level
+    # by default.
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CC_OPTIMIZE_LEVEL}")
+endif()

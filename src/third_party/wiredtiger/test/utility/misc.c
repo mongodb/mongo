@@ -141,10 +141,16 @@ testutil_clean_work_dir(const char *dir)
  *     Get the git top level directory and concatenate the build directory.
  */
 void
-testutil_build_dir(char *buf, int size)
+testutil_build_dir(TEST_OPTS *opts, char *buf, int size)
 {
     FILE *fp;
     char *p;
+
+    /* If a build directory was manually given as an option we can directly return this instead. */
+    if (opts->build_dir != NULL) {
+        strncpy(buf, opts->build_dir, (size_t)size);
+        return;
+    }
 
     /* Get the git top level directory. */
 #ifdef _WIN32

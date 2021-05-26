@@ -2074,10 +2074,7 @@ struct __wt_connection {
 	 * operations\, even operations for tables with logging turned off.  This setting introduces
 	 * a log format change that may break older versions of WiredTiger.  These operations are
 	 * informational and skipped in recovery., a boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\, control the page eviction
-	 * through forcing update restore eviction., a boolean flag; default \c false.}
-	 * @config{
-	 * ),,}
+	 * @config{ ),,}
 	 * @config{error_prefix, prefix string for error messages., a string; default empty.}
 	 * @config{eviction = (, eviction configuration options., a set of related configuration
 	 * options defined below.}
@@ -2741,8 +2738,6 @@ struct __wt_connection {
  * tables with logging turned off.  This setting introduces a log format change that may break older
  * versions of WiredTiger.  These operations are informational and skipped in recovery., a boolean
  * flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\, control
- * the page eviction through forcing update restore eviction., a boolean flag; default \c false.}
  * @config{ ),,}
  * @config{direct_io, Use \c O_DIRECT on POSIX systems\, and \c FILE_FLAG_NO_BUFFERING on Windows to
  * access files.  Options are given as a list\, such as <code>"direct_io=[data]"</code>. Configuring

@@ -203,7 +203,7 @@ class WiredTigerTestCase(unittest.TestCase):
     @staticmethod
     def globalSetup(preserveFiles = False, removeAtStart = True, useTimestamp = False,
                     gdbSub = False, lldbSub = False, verbose = 1, builddir = None, dirarg = None,
-                    longtest = False, ignoreStdout = False, seedw = 0, seedz = 0, hookmgr = None):
+                    longtest = False, zstdtest = False, ignoreStdout = False, seedw = 0, seedz = 0, hookmgr = None):
         WiredTigerTestCase._preserveFiles = preserveFiles
         d = 'WT_TEST' if dirarg == None else dirarg
         if useTimestamp:
@@ -219,6 +219,7 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._gdbSubprocess = gdbSub
         WiredTigerTestCase._lldbSubprocess = lldbSub
         WiredTigerTestCase._longtest = longtest
+        WiredTigerTestCase._zstdtest = zstdtest
         WiredTigerTestCase._verbose = verbose
         WiredTigerTestCase._ignoreStdout = ignoreStdout
         WiredTigerTestCase._dupout = os.dup(sys.stdout.fileno())
@@ -771,6 +772,19 @@ class WiredTigerTestCase(unittest.TestCase):
 
     def className(self):
         return self.__class__.__name__
+
+def zstdtest(description):
+    """
+    Used as a function decorator, for example, @wttest.zstdtest("description").
+    The decorator indicates that this test function should only be included
+    when running the test suite with the --zstd option.
+    """
+    def runit_decorator(func):
+        return func
+    if not WiredTigerTestCase._zstdtest:
+        return unittest.skip(description + ' (enable with --zstd)')
+    else:
+        return runit_decorator
 
 def longtest(description):
     """

@@ -418,7 +418,7 @@ __wt_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
     WT_ERR(ret);
     WT_ERR(__wt_conn_optrack_setup(session, cfg, true));
     WT_ERR(__wt_conn_statistics_config(session, cfg));
-    WT_ERR(__wt_cache_config(session, true, cfg));
+    WT_ERR(__wt_cache_config(session, cfg, true));
     WT_ERR(__wt_capacity_server_create(session, cfg));
     WT_ERR(__wt_checkpoint_server_create(session, cfg));
     WT_ERR(__wt_debug_mode_config(session, cfg));

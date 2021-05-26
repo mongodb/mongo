@@ -770,8 +770,26 @@ class SyscallCommand:
     def parse_args(self, argv):
         srcdir = os.path.join(self.disttop, 'test', 'syscall')
         self.exetopdir = os.path.join(self.builddir, 'test', 'syscall')
-        self.incdir1 = os.path.join(self.disttop, 'src', 'include')
-        self.incdir2 = self.builddir
+        self.incdirs = []
+
+        if self.disttop == self.builddir:
+            # CTest runs a copy of the script in the build directory, so the src include
+            # is a level above.
+            self.incdirs.append(os.path.join(self.disttop, '..', 'src', 'include'))
+        else:
+            self.incdirs.append(os.path.join(self.disttop, 'src', 'include'))
+
+        if os.path.isfile(os.path.join(self.builddir, 'wiredtiger_config.h')) and \
+            os.path.isfile(os.path.join(self.builddir, 'wiredtiger.h')):
+            # When building with autoconf, the generated includes will be at the top level
+            # of the build directory.
+            self.incdirs.append(self.builddir)
+        elif os.path.isfile(os.path.join(self.builddir, 'config', 'wiredtiger_config.h')) and \
+            os.path.isfile(os.path.join(self.builddir, 'include', 'wiredtiger.h')):
+            # When building with CMake, the generated includes will be in the config and include
+            # sub-directories.
+            self.incdirs.append(os.path.join(self.builddir, 'config'))
+            self.incdirs.append(os.path.join(self.builddir, 'include'))
 
         ap = argparse.ArgumentParser('Syscall test runner')
         ap.add_argument('--systype',
@@ -881,8 +899,8 @@ class SyscallCommand:
         with open(probe_c, "w") as f:
             f.write(program)
         ccargs = ['cc', '-o', probe_exe]
-        ccargs.append('-I' + self.incdir1)
-        ccargs.append('-I' + self.incdir2)
+        for inc in self.incdirs:
+            ccargs.append('-I' + inc)
         if self.args.systype == 'Linux':
             ccargs.append('-D_GNU_SOURCE')
         ccargs.append(probe_c)

@@ -112,7 +112,7 @@ functions:
           if [ "$OS" != "Windows_NT" ]; then
             CC=/opt/mongodbtoolchain/v3/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC -fno-omit-frame-pointer -fsanitize=address" CXXFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb -fPIC" \
               ../configure ${configure_python_setting|} \
-              --enable-diagnostic --with-builtins=lz4,snappy,zlib
+              --enable-diagnostic --with-builtins=lz4,snappy,zlib,zstd
           fi
     - *make_wiredtiger
   "compile wiredtiger with builtins":
@@ -519,7 +519,7 @@ variables:
           configure_env_vars:
             CC="/opt/mongodbtoolchain/v3/bin/clang -fsanitize=address"
             PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC -fno-omit-frame-pointer" CXXFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb -fPIC"
-          posix_configure_flags: --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib
+          posix_configure_flags: --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib,zstd
       - func: "format test script"
         vars:
           format_test_script_args: -R -t 360
@@ -1502,6 +1502,16 @@ tasks:
       - func: "compile wiredtiger"
       - func: "unit test"
 
+  - name: unit-test-zstd
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 --zstd
+
   - name: unit-test-long
     tags: ["python"]
     depends_on:
@@ -2041,7 +2051,7 @@ tasks:
       - func: "compile wiredtiger"
         vars:
           configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="--coverage -fPIC -ggdb" LDFLAGS=--coverage
-          posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-strict --enable-python --with-builtins=lz4,snappy,zlib
+          posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-strict --enable-python --with-builtins=lz4,snappy,zlib,zstd
       - func: "make check all"
       - func: "unit test"
         vars:
@@ -2301,7 +2311,7 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          posix_configure_flags: --enable-strict --disable-shared --with-builtins=snappy,zlib
+          posix_configure_flags: --enable-strict --disable-shared --with-builtins=snappy,zlib,zstd
       - command: shell.exec
         params:
           working_dir: "wiredtiger/build_posix"
@@ -2545,6 +2555,7 @@ buildvariants:
     - name: syscall-linux
     - name: configure-combinations
     - name: checkpoint-filetypes-test
+    - name: unit-test-zstd
     - name: unit-test-long
     - name: unit-test-random-seed
     - name: spinlock-gcc-test
@@ -2668,6 +2679,7 @@ buildvariants:
       distros: rhel80-build
     - name: syscall-linux
     - name: checkpoint-filetypes-test
+    - name: unit-test-zstd
     - name: unit-test-long
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test

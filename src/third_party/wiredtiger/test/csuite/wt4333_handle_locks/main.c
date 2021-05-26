@@ -31,6 +31,7 @@
 
 #define MAXKEY 10000
 #define PERIOD 60
+#define HOME_LEN 256
 
 static WT_CONNECTION *conn;
 static uint64_t worker, worker_busy, verify, verify_busy;
@@ -38,6 +39,8 @@ static u_int workers, uris;
 static bool done = false;
 static bool verbose = false;
 static char *uri_list[750];
+static char home[HOME_LEN];
+extern char *__wt_optarg;
 
 static void
 uri_init(void)
@@ -248,11 +251,10 @@ runone(bool config_cache)
 {
     pthread_t idlist[1000];
     u_int i, j;
-    char buf[256], home[256];
+    char buf[256];
 
     done = false;
 
-    testutil_work_dir_from_path(home, sizeof(home), "WT_TEST.wt4333_handle_locks");
     testutil_make_work_dir(home);
 
     testutil_check(__wt_snprintf(buf, sizeof(buf),
@@ -320,22 +322,31 @@ run(int argc, char *argv[])
     WT_RAND_STATE rnd;
     u_int i, n;
     int ch;
+    bool default_home;
 
     (void)testutil_set_progname(argv);
     __wt_random_init_seed(NULL, &rnd);
 
-    while ((ch = __wt_getopt(argv[0], argc, argv, "v")) != EOF) {
+    default_home = true;
+    while ((ch = __wt_getopt(argv[0], argc, argv, "vh:")) != EOF) {
         switch (ch) {
         case 'v':
             verbose = true;
+            break;
+        case 'h':
+            strncpy(home, __wt_optarg, HOME_LEN);
+            home[HOME_LEN - 1] = '\0';
+            default_home = false;
             break;
         default:
             fprintf(stderr, "usage: %s [-v]\n", argv[0]);
             return (EXIT_FAILURE);
         }
     }
-
     (void)signal(SIGALRM, on_alarm);
+
+    if (default_home)
+        testutil_work_dir_from_path(home, sizeof(home), "WT_TEST.wt4333_handle_locks");
 
     /* Each test in the table runs for a minute, run 5 tests at random. */
     for (i = 0; i < 5; ++i) {
