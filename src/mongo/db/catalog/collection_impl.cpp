@@ -1509,7 +1509,9 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, ValidationLev
     }
 
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+        md.options.validator = _validator.validatorDoc;
         md.options.validationLevel = storedValidationLevel;
+        md.options.validationAction = validationActionOrDefault(md.options.validationAction);
     });
 
     return Status::OK();
@@ -1533,6 +1535,8 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx,
     }
 
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+        md.options.validator = _validator.validatorDoc;
+        md.options.validationLevel = validationLevelOrDefault(md.options.validationLevel);
         md.options.validationAction = storedValidationAction;
     });
 
