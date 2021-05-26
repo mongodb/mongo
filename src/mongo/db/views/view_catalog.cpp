@@ -186,6 +186,7 @@ Status ViewCatalog::_reload(OperationContext* opCtx, ViewCatalogLookupBehavior l
     _viewMap.clear();
     _valid = false;
     _viewGraphNeedsRefresh = true;
+    _stats = {};
 
     auto reloadCallback = [&](const BSONObj& view) -> Status {
         BSONObj collationSpec = view.hasField("collation") ? view["collation"].Obj() : BSONObj();
@@ -206,11 +207,23 @@ Status ViewCatalog::_reload(OperationContext* opCtx, ViewCatalogLookupBehavior l
             }
         }
 
-        _viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(viewName.db(),
-                                                                   viewName.coll(),
-                                                                   view["viewOn"].str(),
-                                                                   pipeline,
-                                                                   std::move(collator.getValue()));
+        auto viewDef = std::make_shared<ViewDefinition>(viewName.db(),
+                                                        viewName.coll(),
+                                                        view["viewOn"].str(),
+                                                        pipeline,
+                                                        std::move(collator.getValue()));
+
+        if (!viewName.isOnInternalDb() && !viewName.isSystem()) {
+            if (viewDef->timeseries()) {
+                _stats.userTimeseries += 1;
+            } else {
+                _stats.userViews += 1;
+            }
+        } else {
+            _stats.internal += 1;
+        }
+
+        _viewMap[viewName.ns()] = std::move(viewDef);
         return Status::OK();
     };
 
@@ -251,6 +264,7 @@ void ViewCatalog::clear(OperationContext* opCtx, const Database* db) {
     catalog.writable()->_viewGraph.clear();
     catalog.writable()->_valid = true;
     catalog.writable()->_viewGraphNeedsRefresh = false;
+    catalog.writable()->_stats = {};
     catalog.commit();
 }
 
@@ -751,5 +765,9 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
         }
     };
     MONGO_UNREACHABLE;
+}
+
+ViewCatalog::Stats ViewCatalog::getStats() const {
+    return _stats;
 }
 }  // namespace mongo

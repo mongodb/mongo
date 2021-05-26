@@ -309,6 +309,32 @@ public:
     void clearDatabaseProfileSettings(StringData dbName);
 
     /**
+     * Statistics for the types of collections in the catalog.
+     * Total collections = 'internal' + 'userCollections'
+     */
+    struct Stats {
+        // Non-system collections on non-internal databases
+        int userCollections = 0;
+        // Non-system capped collections on non-internal databases
+        int userCapped = 0;
+        // System collections or collections on internal databases
+        int internal = 0;
+    };
+
+    /**
+     * Returns statistics for the collection catalog.
+     */
+    Stats getStats() const;
+
+    /**
+     * Returns a set of databases, by name, that have view catalogs.
+     */
+    using ViewCatalogSet = StringSet;
+    ViewCatalogSet getViewCatalogDbNames() const {
+        return _viewCatalogs;
+    }
+
+    /**
      * Puts the catalog in closed state. In this state, the lookupNSSByUUID method will fall back
      * to the pre-close state to resolve queries for currently unknown UUIDs. This allows processes,
      * like authorization and replication, which need to do lookups outside of database locks, to
@@ -397,12 +423,18 @@ private:
     // Mapping from ResourceId to a set of strings that contains collection and database namespaces.
     std::map<ResourceId, std::set<std::string>> _resourceInformation;
 
+    // Set of database names that have view catalogs.
+    ViewCatalogSet _viewCatalogs;
+
     /**
      * Contains non-default database profile settings. New collections, current collections and
      * views must all be able to access the correct profile settings for the database in which they
      * reside. Simple database name to struct ProfileSettings map.
      */
     DatabaseProfileSettingsMap _databaseProfileSettings;
+
+    // Tracks usage of collection usage features (e.g. capped).
+    Stats _stats;
 };
 
 /**

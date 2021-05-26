@@ -369,6 +369,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_engine_impl',
         '$BUILD_DIR/mongo/db/system_index',
         '$BUILD_DIR/mongo/db/views/views_mongod',
+        'catalog_stats',
         'collection',
         'collection_options',
         'database_holder',
@@ -395,6 +396,21 @@ env.Library(
         'validate_idl',
         'validate_state',
     ],
+)
+
+env.Library(
+    target='catalog_stats',
+    source=[
+        'catalog_stats.cpp',
+    ],
+    LIBDEPS=[
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/views/views',
+        'database_holder',
+    ]
 )
 
 env.Library(
