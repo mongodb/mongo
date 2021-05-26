@@ -2155,6 +2155,12 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     // Index builds only check index constraints when committing. If an error occurs at that point,
     // then the build is cleaned up while still holding the appropriate locks. The only errors that
     // we cannot anticipate are user interrupts and shutdown errors.
+    if (status == ErrorCodes::OutOfDiskSpace) {
+        LOGV2_ERROR(5642401,
+                    "Index build unable to proceed due to insufficient disk space",
+                    "error"_attr = status);
+        fassertFailedNoTrace(5642402);
+    }
     invariant(status.isA<ErrorCategory::Interruption>() ||
                   status.isA<ErrorCategory::ShutdownError>(),
               str::stream() << "Unexpected error code during index build cleanup: " << status);
