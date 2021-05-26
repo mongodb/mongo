@@ -44,11 +44,13 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/text.h"
@@ -347,52 +349,54 @@ TEST_F(MongodbCAPITest, InsertMultipleDocuments) {
 }
 
 TEST_F(MongodbCAPITest, KillOp) {
-    auto client = createClient();
-
-    mongo::stdx::thread killOpThread([this]() {
+    mongo::unittest::threadAssertionMonitoredTest([&](auto& assertionMonitor) {
         auto client = createClient();
 
-        mongo::BSONObj currentOpObj = mongo::fromjson("{currentOp: 1}");
-        auto currentOpMsg = mongo::OpMsgRequest::fromDBAndBody("admin", currentOpObj);
-        mongo::BSONObj outputBSON;
+        auto killOpThread = assertionMonitor.spawn([&]() {
+            auto client = createClient();
 
-        // Wait for the sleep command to start in the main test thread.
-        int opid = -1;
-        do {
-            outputBSON = performRpc(client, currentOpMsg);
-            auto inprog = outputBSON.getObjectField("inprog");
+            mongo::BSONObj currentOpObj = mongo::fromjson("{currentOp: 1}");
+            auto currentOpMsg = mongo::OpMsgRequest::fromDBAndBody("admin", currentOpObj);
+            mongo::BSONObj outputBSON;
 
-            // See if we find the sleep command among the running commands
-            for (const auto& elt : inprog) {
-                auto inprogObj = inprog.getObjectField(elt.fieldNameStringData());
-                std::string ns = inprogObj.getStringField("ns");
-                if (ns == "admin.$cmd") {
-                    opid = inprogObj.getIntField("opid");
-                    break;
+            // Wait for the sleep command to start in the main test thread.
+            int opid = -1;
+            do {
+                outputBSON = performRpc(client, currentOpMsg);
+                auto inprog = outputBSON.getObjectField("inprog");
+
+                // See if we find the sleep command among the running commands
+                for (const auto& elt : inprog) {
+                    auto inprogObj = inprog.getObjectField(elt.fieldNameStringData());
+                    std::string ns = inprogObj.getStringField("ns");
+                    if (ns == "admin.$cmd") {
+                        opid = inprogObj.getIntField("opid");
+                        break;
+                    }
                 }
-            }
-        } while (opid == -1);
+            } while (opid == -1);
 
-        // Sleep command found, kill it.
-        std::stringstream ss;
-        ss << "{'killOp': 1, 'op': " << opid << "}";
-        mongo::BSONObj killOpObj = mongo::fromjson(ss.str());
-        auto killOpMsg = mongo::OpMsgRequest::fromDBAndBody("admin", killOpObj);
-        outputBSON = performRpc(client, killOpMsg);
+            // Sleep command found, kill it.
+            std::stringstream ss;
+            ss << "{'killOp': 1, 'op': " << opid << "}";
+            mongo::BSONObj killOpObj = mongo::fromjson(ss.str());
+            auto killOpMsg = mongo::OpMsgRequest::fromDBAndBody("admin", killOpObj);
+            outputBSON = performRpc(client, killOpMsg);
+
+            ASSERT(outputBSON.hasField("ok"));
+            ASSERT(outputBSON.getField("ok").numberDouble() == 1.0);
+        });
+
+        auto guard = mongo::makeGuard([&] { killOpThread.join(); });
+
+        mongo::BSONObj sleepObj = mongo::fromjson("{'sleep': {'secs': 1000}}");
+        auto sleepOpMsg = mongo::OpMsgRequest::fromDBAndBody("admin", sleepObj);
+        auto outputBSON = performRpc(client, sleepOpMsg);
 
         ASSERT(outputBSON.hasField("ok"));
-        ASSERT(outputBSON.getField("ok").numberDouble() == 1.0);
+        ASSERT(outputBSON.getField("ok").numberDouble() != 1.0);
+        ASSERT(outputBSON.getIntField("code") == mongo::ErrorCodes::Interrupted);
     });
-
-    mongo::BSONObj sleepObj = mongo::fromjson("{'sleep': {'secs': 1000}}");
-    auto sleepOpMsg = mongo::OpMsgRequest::fromDBAndBody("admin", sleepObj);
-    auto outputBSON = performRpc(client, sleepOpMsg);
-
-    ASSERT(outputBSON.hasField("ok"));
-    ASSERT(outputBSON.getField("ok").numberDouble() != 1.0);
-    ASSERT(outputBSON.getIntField("code") == mongo::ErrorCodes::Interrupted);
-
-    killOpThread.join();
 }
 
 TEST_F(MongodbCAPITest, ReadDB) {
