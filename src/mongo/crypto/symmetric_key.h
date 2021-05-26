@@ -34,6 +34,7 @@
 
 #include "mongo/base/secure_allocator.h"
 #include "mongo/platform/atomic_word.h"
+#include "third_party/murmurhash3/MurmurHash3.h"
 
 namespace mongo {
 class Status;
@@ -66,6 +67,18 @@ public:
     const std::string& name() const {
         return _name;
     }
+
+    /**
+     * Custom hash function so that SymmetricKeyId can be used by ESE's LRUCache.
+     */
+    struct Hash {
+        std::size_t operator()(const SymmetricKeyId& keyid) const {
+            auto rep = keyid.toString();
+            uint32_t hash;
+            MurmurHash3_x86_32(rep.data(), rep.size(), 0, &hash);
+            return hash;
+        }
+    };
 
 private:
     std::string _initStrRep() const;
