@@ -88,6 +88,9 @@ assert.commandWorked(initialSyncNodeDb.adminCommand(
 assert.commandWorked(initialSyncSource.getDB("admin").adminCommand(
     {configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 
+// Wait for the fassert to stop the initial sync node.
+assert.eq(MongoRunner.EXIT_ABRUPT, waitMongoProgram(initialSyncNode.port));
+
 // We skip validation and dbhashes because the initial sync failed so the initial sync node is
 // invalid and unreachable.
 TestData.skipCheckDBHashes = true;
