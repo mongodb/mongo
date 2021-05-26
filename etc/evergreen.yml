@@ -406,6 +406,10 @@ functions:
         - "src/evergreen/functions/selected_tests_credentials_configure.sh"
       env:
         workdir: ${workdir}
+        project: ${project}
+        selected_tests_auth_user: ${selected_tests_auth_user}
+        selected_tests_auth_token: ${selected_tests_auth_token}
+
 
   "git get project": &git_get_project
     - command: git.get_project
