@@ -9,6 +9,6 @@
 # We are not cross-compiling if our system is Darwin, hence the "x86_64-apple-darwin-"
 # prefix is not necessary when we are not cross-compiling. Just default to the host
 # installed 'gcc' binary.
-if (NOT "${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Darwin")
-    set(CROSS_COMPILER_PREFIX "x86_64-apple-darwin-" CACHE INTERNAL "" FORCE)
+if(CMAKE_CROSSCOMPILING)
+    set(CROSS_COMPILER_PREFIX "x86_64-apple-darwin-")
 endif()

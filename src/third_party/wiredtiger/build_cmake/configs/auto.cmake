@@ -282,6 +282,14 @@ config_compile(
     DEPENDS "HAVE_LIBPTHREAD"
 )
 
+include(TestBigEndian)
+test_big_endian(is_big_endian)
+config_bool(
+    WORDS_BIGENDIAN
+    "If the target system is big endian"
+    DEFAULT ${is_big_endian}
+)
+
 set(wiredtiger_includes_decl)
 if(HAVE_SYS_TYPES_H)
     list(APPEND wiredtiger_includes_decl "#include <sys/types.h>")

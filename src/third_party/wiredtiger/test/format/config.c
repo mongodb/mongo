@@ -611,6 +611,15 @@ config_directio(void)
     }
 
     /*
+     * Direct I/O may not work with imports for the same reason as for backups.
+     */
+    if (g.c_import) {
+        if (config_is_perm("import"))
+            testutil_die(EINVAL, "direct I/O is incompatible with import configurations");
+        config_single("import=0", false);
+    }
+
+    /*
      * Direct I/O may not work with mmap. Theoretically, Linux ignores direct I/O configurations in
      * the presence of shared cache configurations (including mmap), but we've seen file corruption
      * and it doesn't make much sense (the library disallows the combination).

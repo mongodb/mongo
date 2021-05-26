@@ -9,8 +9,12 @@ set -e
 top_builddir=${top_builddir:-../../build_posix}
 top_srcdir=${top_srcdir:-../..}
 
-RUN_TEST_CMD="$TEST_WRAPPER $top_builddir/test/csuite/test_random_directio"
-
+if [ -n "$1" ]
+then
+    RUN_TEST_CMD="$TEST_WRAPPER $1"
+else
+    RUN_TEST_CMD="$TEST_WRAPPER $top_builddir/test/csuite/test_random_directio"
+fi
 # Replace for more complete testing
 #TEST_THREADS="1 5 10"
 TEST_THREADS="5"

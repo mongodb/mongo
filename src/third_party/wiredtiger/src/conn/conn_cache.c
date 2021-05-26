@@ -163,7 +163,7 @@ __cache_config_local(WT_SESSION_IMPL *session, bool shared, const char *cfg[])
  *     Configure or reconfigure the current cache and shared cache.
  */
 int
-__wt_cache_config(WT_SESSION_IMPL *session, bool reconfigure, const char *cfg[])
+__wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
@@ -178,10 +178,10 @@ __wt_cache_config(WT_SESSION_IMPL *session, bool reconfigure, const char *cfg[])
     was_shared = F_ISSET(conn, WT_CONN_CACHE_POOL);
 
     /* Cleanup if reconfiguring */
-    if (reconfigure && was_shared && !now_shared)
+    if (reconfig && was_shared && !now_shared)
         /* Remove ourselves from the pool if necessary */
         WT_RET(__wt_conn_cache_pool_destroy(session));
-    else if (reconfigure && !was_shared && now_shared)
+    else if (reconfig && !was_shared && now_shared)
         /*
          * Cache size will now be managed by the cache pool - the start size always needs to be zero
          * to allow the pool to manage how much memory is in-use.
@@ -203,7 +203,7 @@ __wt_cache_config(WT_SESSION_IMPL *session, bool reconfigure, const char *cfg[])
      * Resize the thread group if reconfiguring, otherwise the thread group will be initialized as
      * part of creating the cache.
      */
-    if (reconfigure)
+    if (reconfig)
         WT_RET(__wt_thread_group_resize(session, &conn->evict_threads, conn->evict_threads_min,
           conn->evict_threads_max, WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL));
 
@@ -231,7 +231,7 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
     cache = conn->cache;
 
     /* Use a common routine for run-time configuration options. */
-    WT_RET(__wt_cache_config(session, false, cfg));
+    WT_RET(__wt_cache_config(session, cfg, false));
 
     /*
      * The lowest possible page read-generation has a special meaning, it marks a page for forcible

@@ -5,9 +5,13 @@ ActiveState
 Adler's
 ASAN
 Atomicity
+autoconf
 BLOBs
 BLRrVv
+ccache
 CFLAGS
+cmake
+CMake
 COV
 CPPFLAGS
 CPUs
@@ -31,7 +35,13 @@ Datastore
 DbCursor
 DbEnv
 DbMultiple
+DCC
+DCMAKE
+DENABLE
+DHAVE
+DSPINLOCK
 Durations
+DWT
 EAGAIN
 EB
 EBUSY
@@ -566,6 +576,7 @@ superset
 svg
 sys
 syscalls
+SYSV
 sz
 tRuE
 tablename
@@ -581,6 +592,7 @@ timestamp
 timestamps
 todo
 toolchain
+toolchains
 touchpad
 tpc
 tpcb
@@ -631,6 +643,7 @@ wtstats
 xa
 xaa
 xad
+xargs
 xbe
 xde
 xdeadbeef

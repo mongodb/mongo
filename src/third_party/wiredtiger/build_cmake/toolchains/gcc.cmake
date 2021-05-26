@@ -6,7 +6,7 @@
 # See the file LICENSE for redistribution information.
 #
 
-cmake_minimum_required(VERSION 3.11.0)
+cmake_minimum_required(VERSION 3.10.0)
 
 if(NOT "${COMPILE_DEFINITIONS}" STREQUAL "")
     ### Additional check to overcome check_[symbol|include|function]_exits using toolchain file without passing WT_ARCH and WT_OS.
