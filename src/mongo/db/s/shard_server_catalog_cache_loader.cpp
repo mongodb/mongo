@@ -56,6 +56,8 @@ using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunk
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangCollectionFlush);
+
 AtomicWord<unsigned long long> taskIdGenerator{0};
 
 /**
@@ -919,6 +921,11 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(Oper
 void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString& nss) {
     auto context = _contexts.makeOperationContext(*Client::getCurrent());
 
+    if (MONGO_unlikely(hangCollectionFlush.shouldFail())) {
+        LOG(0) << "Hit hangCollectionFlush failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangCollectionFlush);
+    }
+
     bool taskFinished = false;
     try {
         _updatePersistedCollAndChunksMetadata(context.opCtx(), nss);
@@ -1115,7 +1122,7 @@ ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVer
         }
 
         LOG_CATALOG_REFRESH(1)
-            << "Cache loader read meatadata while updates were being applied: this metadata may"
+            << "Cache loader read metadata while updates were being applied: this metadata may"
             << " be incomplete. Retrying. Refresh state before read: " << beginRefreshState
             << ". Current refresh state: '" << endRefreshState << "'.";
     }
@@ -1162,6 +1169,11 @@ void ShardServerCatalogCacheLoader::CollAndChunkTaskList::addTask(collAndChunkTa
     }
 
     const auto& lastTask = _tasks.back();
+    if (lastTask.termCreated != task.termCreated) {
+        _tasks.emplace_back(std::move(task));
+        return;
+    }
+
     if (task.dropped) {
         invariant(lastTask.maxQueryVersion == task.minQueryVersion,
                   str::stream() << "The version of the added task is not contiguous with that of "
@@ -1280,7 +1292,7 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
                 // Make sure we do not append a duplicate chunk. The diff query is GTE, so there can
                 // be duplicates of the same exact versioned chunk across tasks. This is no problem
                 // for our diff application algorithms, but it can return unpredictable numbers of
-                // chunks for testing purposes. Eliminate unpredicatable duplicates for testing
+                // chunks for testing purposes. Eliminate unpredictable duplicates for testing
                 // stability.
                 auto taskCollectionAndChangedChunksIt =
                     task.collectionAndChangedChunks->changedChunks.begin();
