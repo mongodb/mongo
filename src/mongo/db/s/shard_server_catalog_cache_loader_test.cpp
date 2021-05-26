@@ -81,6 +81,8 @@ public:
      */
     vector<ChunkType> setUpChunkLoaderWithFiveChunks();
 
+    void refreshCollectionEpochOnRemoteLoader();
+
     const KeyPattern kKeyPattern = KeyPattern(BSON(kPattern << 1));
 
     CatalogCacheLoaderMock* _remoteLoaderMock;
@@ -521,6 +523,36 @@ TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedO
 
     auto collAndChunksRes = _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED()).get();
     ASSERT(collAndChunksRes.timeseriesFields.is_initialized());
+}
+
+void ShardServerCatalogCacheLoaderTest::refreshCollectionEpochOnRemoteLoader() {
+    ChunkVersion collectionVersion(1, 2, OID::gen(), boost::none);
+    CollectionType collectionType = makeCollectionType(collectionVersion);
+    vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
+    _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
+    _remoteLoaderMock->setChunkRefreshReturnValue(chunks);
+}
+
+TEST_F(ShardServerCatalogCacheLoaderTest, CollAndChunkTasksConsistency) {
+    // Put some metadata in the persisted cache (config.cache.chunks.*)
+    refreshCollectionEpochOnRemoteLoader();
+    _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED()).get();
+    _shardLoader->waitForCollectionFlush(operationContext(), kNss);
+
+    // Pause the thread processing the pending updates on metadata
+    FailPointEnableBlock failPoint("hangCollectionFlush");
+
+    // Put a first task in the list of pending updates on metadata (in-memory)
+    refreshCollectionEpochOnRemoteLoader();
+    _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED()).get();
+
+    // Bump the shard's term
+    _shardLoader->onStepUp();
+
+    // Putting a second task causes a verification of the contiguous versions in the list pending
+    // updates on metadata
+    refreshCollectionEpochOnRemoteLoader();
+    _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED()).get();
 }
 
 }  // namespace
