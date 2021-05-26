@@ -358,20 +358,6 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         return abort_reason["code"] == self.INTERNAL_ERR_CODE and abort_reason[
             "errmsg"] == "simulate a tenant migration error"
 
-    def _is_missing_uuid_in_collection_info_err(self, abort_reason):
-        # TODO (SERVER-55352): Missing uuid in collection info returned by TenantDatabaseCloner's
-        # listCollections command.
-        err_msg_regex = r"Collection info could not be parsed.*uuid\' is missing but a required field"
-        return abort_reason["code"] == self.FAIL_TO_PARSE_ERR_CODE and re.search(
-            err_msg_regex, abort_reason["errmsg"])
-
-    def _is_denylisted_abort_reason(self, abort_reason):
-        is_recipient_err = abort_reason["errmsg"].startswith(
-            "Tenant migration recipient command failed")
-        if not is_recipient_err:
-            return False
-        return self._is_missing_uuid_in_collection_info_err(abort_reason)
-
     def _create_migration_opts(self, donor_rs_index, recipient_rs_index):
         donor_rs = self._tenant_migration_fixture.get_replset(donor_rs_index)
         recipient_rs = self._tenant_migration_fixture.get_replset(recipient_rs_index)
@@ -439,12 +425,6 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 self.logger.info(
                     "Tenant migration '%s' with donor replica set '%s' aborted due to failpoint: " +
                     "%s.", migration_opts.migration_id, migration_opts.get_donor_name(), str(res))
-                return False
-            if self._is_denylisted_abort_reason(abort_reason):
-                self.logger.info(
-                    "Tenant migration '%s' with donor replica set '%s' aborted due to a " +
-                    "denylisted error: %s.", migration_opts.migration_id,
-                    migration_opts.get_donor_name(), str(res))
                 return False
             raise errors.ServerFailure("Tenant migration '" + str(migration_opts.migration_id) +
                                        "' with donor replica set '" +
