@@ -301,12 +301,12 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                        return _updateCoordinator(opCtx.get(), executor);
                    })
-                   .then([this] {
+                   .then([this, aborted] {
                        {
                            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                            removeRecipientDocFailpoint.pauseWhileSet(opCtx.get());
                        }
-                       _removeRecipientDocument();
+                       _removeRecipientDocument(aborted);
                    });
            })
         .onTransientError([](const Status& status) {
@@ -867,7 +867,7 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
     }
 }
 
-void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument() {
+void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument(bool aborted) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
     const auto& nss = NamespaceString::kRecipientReshardingOperationsNamespace;
@@ -881,20 +881,19 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
 
             WriteUnitOfWork wuow(opCtx.get());
 
-            opCtx->recoveryUnit()->onCommit([this](boost::optional<Timestamp> unusedCommitTime) {
-                stdx::lock_guard<Latch> lk(_mutex);
-                if (_abortReason) {
-                    _metrics()->onCompletion(ErrorCodes::isCancellationError(_abortReason.get())
-                                                 ? ReshardingOperationStatusEnum::kCanceled
-                                                 : ReshardingOperationStatusEnum::kFailure,
-                                             getCurrentTime());
-                } else {
-                    _metrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess,
-                                             getCurrentTime());
-                }
+            opCtx->recoveryUnit()->onCommit(
+                [this, aborted](boost::optional<Timestamp> unusedCommitTime) {
+                    stdx::lock_guard<Latch> lk(_mutex);
+                    if (aborted) {
+                        _metrics()->onCompletion(ReshardingOperationStatusEnum::kFailure,
+                                                 getCurrentTime());
+                    } else {
+                        _metrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess,
+                                                 getCurrentTime());
+                    }
 
-                _completionPromise.emplaceValue();
-            });
+                    _completionPromise.emplaceValue();
+                });
 
             deleteObjects(opCtx.get(),
                           *coll,
@@ -935,8 +934,6 @@ CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortS
 void ReshardingRecipientService::RecipientStateMachine::abort() {
     auto abortSource = [&]() -> boost::optional<CancellationSource> {
         stdx::lock_guard<Latch> lk(_mutex);
-        _abortReason = Status(ErrorCodes::ReshardCollectionAborted, "aborted");
-        invariant(!_abortReason->isOK());
 
         if (_dataReplication) {
             _dataReplication->shutdown();
@@ -949,7 +946,8 @@ void ReshardingRecipientService::RecipientStateMachine::abort() {
             // error. Abort is allowed to be retried, so setError only if it has not yet been
             // done before.
             if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
-                _coordinatorHasDecisionPersisted.setError(_abortReason.get());
+                _coordinatorHasDecisionPersisted.setError(
+                    {ErrorCodes::ReshardCollectionAborted, "aborted"});
             }
             return boost::none;
         }

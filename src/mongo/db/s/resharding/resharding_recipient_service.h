@@ -203,7 +203,7 @@ private:
                                   boost::optional<mongo::Date_t> configStartTime);
 
     // Removes the local recipient document from disk.
-    void _removeRecipientDocument();
+    void _removeRecipientDocument(bool aborted);
 
     std::unique_ptr<ReshardingDataReplicationInterface> _makeDataReplication(
         OperationContext* opCtx, bool cloningDone);
@@ -255,10 +255,6 @@ private:
 
     // Canceled when there is an unrecoverable error or stepdown.
     boost::optional<CancellationSource> _abortSource;
-
-    // Contains the status with which the operation was aborted.
-    // TODO SERVER-56902: Remove the _abortReason completely.
-    boost::optional<Status> _abortReason;
 
     // The identifier associated to the recoverable critical section.
     const BSONObj _critSecReason;
