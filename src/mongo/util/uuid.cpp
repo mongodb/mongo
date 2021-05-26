@@ -35,10 +35,10 @@
 #include <pcrecpp.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/static_immortal.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 
@@ -46,8 +46,7 @@ namespace {
 
 using namespace fmt::literals;
 
-Mutex uuidGenMutex;
-SecureRandom uuidGen;
+StaticImmortal<synchronized_value<SecureRandom>> uuidGen;
 
 }  // namespace
 
@@ -103,10 +102,7 @@ bool UUID::isRFC4122v4() const {
 
 UUID UUID::gen() {
     UUIDStorage randomBytes;
-    {
-        stdx::lock_guard<Latch> lk(uuidGenMutex);
-        uuidGen.fill(&randomBytes, sizeof(randomBytes));
-    }
+    (*uuidGen)->fill(&randomBytes, sizeof(randomBytes));
 
     // Set version in high 4 bits of byte 6 and variant in high 2 bits of byte 8, see RFC 4122,
     // section 4.1.1, 4.1.2 and 4.1.3.
