@@ -95,9 +95,11 @@ beforeFinishFailPoint.wait();
 const res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 // The initial sync should have failed.
 assert.eq(res.initialSyncStatus.failedInitialSyncAttempts, 1, () => tojson(res.initialSyncStatus));
+beforeFinishFailPoint.off();
 
-// Get rid of the failed node so the fixture can stop properly.
-rst.stop(initialSyncNode);
+// Get rid of the failed node so the fixture can stop properly.  We expect it to stop with
+// an fassert.
+assert.eq(MongoRunner.EXIT_ABRUPT, waitMongoProgram(initialSyncNode.port));
 rst.remove(initialSyncNode);
 
 rst.stopSet();
