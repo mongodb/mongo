@@ -481,6 +481,27 @@ public:
             _runDowngrade(opCtx, request, changeTimestamp);
         }
 
+        // We do not log this warning for shard servers since they don't set a cluster-wide write
+        // concern.
+        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
+            !ReadWriteConcernDefaults::get(opCtx).isCWWCSet(opCtx)) {
+            if (requestedVersion == FeatureCompatibility::kLatest &&
+                actualVersion < requestedVersion) {
+                LOGV2_WARNING(5569200,
+                              "The default write concern has been changed by upgrading the "
+                              "featureCompatibilityVersion to 5.0."
+                              "To keep the default write concern the same as before, use "
+                              "setDefaultRWConcern to set a cluster-wide write concern.");
+            } else if (actualVersion == FeatureCompatibility::kLatest &&
+                       actualVersion > requestedVersion) {
+                LOGV2_WARNING(5569201,
+                              "The default write concern has been changed by downgrading the "
+                              "featureCompatibilityVersion from 5.0. "
+                              "To keep the default write concern the same as before, use "
+                              "setDefaultRWConcern to set a cluster-wide write concern.");
+            }
+        }
+
         {
             // Complete transition by updating the local FCV document to the fully upgraded or
             // downgraded requestedVersion.

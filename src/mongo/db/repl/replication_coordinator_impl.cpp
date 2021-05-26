@@ -668,6 +668,20 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig(lock, opCtx.get(), localConfig, myIndex.getValue());
 
+    // We do not log this warning for shard servers since they don't set a cluster-wide write
+    // concern.
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.isLessThan(
+            ServerGlobalParams::FeatureCompatibility::Version::kVersion50) &&
+        serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
+        !ReadWriteConcernDefaults::get(opCtx.get()).isCWWCSet(opCtx.get())) {
+        LOGV2_OPTIONS(5569202,
+                      {logv2::LogTag::kStartupWarnings},
+                      "** WARNING: The default write concern may change when upgrading to 5.0. Use "
+                      "setDefaultRWConcern to set a cluster-wide default write concern that "
+                      "won't change.");
+    }
+
     // Set our last applied and durable optimes to the top of the oplog, if we have one.
     if (!lastOpTime.isNull()) {
         LOGV2_DEBUG(4280510,

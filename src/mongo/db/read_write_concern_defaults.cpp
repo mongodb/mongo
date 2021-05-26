@@ -150,11 +150,16 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk(
 }
 
 bool ReadWriteConcernDefaults::isCWWCSet(OperationContext* opCtx) {
-    // This function is only valid if the gDefaultWCMajority feature flag is enabled. It only
-    // returns true if the gDefaultWCMajority feature flag is enabled, and the cluster-wide write
-    // concern has been set. It will return false otherwise.
-    auto rwcd = getDefault(opCtx);
-    return rwcd.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal;
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        repl::feature_flags::gDefaultWCMajority.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        auto rwcd = getDefault(opCtx);
+        return rwcd.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal;
+    } else {
+        auto cached = _getDefaultCWRWCFromDisk(opCtx).value_or(RWConcernDefaultAndTime());
+        return cached.getDefaultWriteConcern() &&
+            !cached.getDefaultWriteConcern().get().usedDefault;
+    }
 }
 
 void ReadWriteConcernDefaults::observeDirectWriteToConfigSettings(OperationContext* opCtx,
