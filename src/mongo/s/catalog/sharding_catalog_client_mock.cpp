@@ -115,6 +115,7 @@ bool ShardingCatalogClientMock::runUserManagementReadCommand(OperationContext* o
 Status ShardingCatalogClientMock::applyChunkOpsDeprecated(OperationContext* opCtx,
                                                           const BSONArray& updateOps,
                                                           const BSONArray& preCondition,
+                                                          const NamespaceStringOrUUID& nsOrUUID,
                                                           const NamespaceString& nss,
                                                           const ChunkVersion& lastChunkVersion,
                                                           const WriteConcernOptions& writeConcern,

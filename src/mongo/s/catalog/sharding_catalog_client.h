@@ -235,13 +235,14 @@ public:
      *
      * @param updateOps: documents to write to the chunks collection.
      * @param preCondition: preconditions for applying documents.
+     * @param nsOrUUID: collection name if version < 5.0, collection UUID otherwise.
      * @param nss: namespace string for the chunks collection.
      * @param lastChunkVersion: version of the last document being written to the chunks
      * collection.
      * @param writeConcern: writeConcern to use for applying documents.
      * @param readConcern: readConcern to use for verifying that documents have been applied.
      *
-     * 'nss' and 'lastChunkVersion' uniquely identify the last document being written, which is
+     * 'nsOrUUID' and 'lastChunkVersion' uniquely identify the last document being written, which is
      * expected to appear in the chunks collection on success. This is important for the
      * case where network problems cause a retry of a successful write, which then returns
      * failure because the precondition no longer matches. If a query of the chunks collection
@@ -250,6 +251,7 @@ public:
     virtual Status applyChunkOpsDeprecated(OperationContext* opCtx,
                                            const BSONArray& updateOps,
                                            const BSONArray& preCondition,
+                                           const NamespaceStringOrUUID& nsOrUUID,
                                            const NamespaceString& nss,
                                            const ChunkVersion& lastChunkVersion,
                                            const WriteConcernOptions& writeConcern,

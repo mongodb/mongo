@@ -950,6 +950,7 @@ bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* o
 Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCtx,
                                                           const BSONArray& updateOps,
                                                           const BSONArray& preCondition,
+                                                          const NamespaceStringOrUUID& nsOrUUID,
                                                           const NamespaceString& nss,
                                                           const ChunkVersion& lastChunkVersion,
                                                           const WriteConcernOptions& writeConcern,
@@ -1003,7 +1004,11 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
         // mod made it to the config server, then transaction was successful.
         BSONObjBuilder query;
         lastChunkVersion.appendLegacyWithField(&query, ChunkType::lastmod());
-        query.append(ChunkType::ns(), nss.ns());
+        if (nsOrUUID.uuid()) {
+            query.append(ChunkType::collectionUUID(), nsOrUUID.uuid()->toBSON());
+        } else {
+            query.append(ChunkType::ns(), nsOrUUID.nss()->ns());
+        }
         auto chunkWithStatus = getChunks(opCtx, query.obj(), BSONObj(), 1, nullptr, readConcern);
 
         if (!chunkWithStatus.isOK()) {
