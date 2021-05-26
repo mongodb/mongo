@@ -1,3 +1,7 @@
+/**
+ * TODO SERVER-57202: Re-enable this test.
+ * @tags: [__TEMPORARILY_DISABLED__]
+ */
 (function() {
 "use strict";
 
