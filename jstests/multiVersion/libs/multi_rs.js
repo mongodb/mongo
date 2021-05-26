@@ -14,8 +14,12 @@ ReplSetTest.prototype.upgradeSet = function(options, user, pwd) {
     this.upgradeSecondaries(primary, options, user, pwd);
 
     // Then upgrade the primary after stepping down.
-    this.upgradePrimary(primary, options, user, pwd);
-
+    if (this.getPrimary() == primary) {
+        this.upgradePrimary(primary, Object.assign({}, options), user, pwd);
+    } else {
+        // An election occured during upgrade, old primary is now a secondary.
+        this.upgradeMembers([primary], Object.assign({}, options), user, pwd);
+    }
 };
 
 ReplSetTest.prototype.upgradeSecondaries = function(primary, options, user, pwd) {
