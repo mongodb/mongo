@@ -197,7 +197,8 @@ private:
      * servers and closing open transactions if necessary. Increments the server TopologyVersion.
      */
     static void _setVersion(OperationContext* opCtx,
-                            ServerGlobalParams::FeatureCompatibility::Version newVersion);
+                            ServerGlobalParams::FeatureCompatibility::Version newVersion,
+                            boost::optional<Timestamp> commitTs = boost::none);
 
     /**
      * Examines a document inserted or updated in the server configuration collection
