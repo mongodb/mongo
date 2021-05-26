@@ -255,7 +255,7 @@ public:
     }
 
     bool isCapped() const {
-        std::abort();
+        return false;
     }
 
     long long getCappedMaxDocs() const {

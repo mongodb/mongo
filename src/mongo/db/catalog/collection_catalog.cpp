@@ -909,6 +909,10 @@ void CollectionCatalog::clearDatabaseProfileSettings(StringData dbName) {
     _databaseProfileSettings.erase(dbName);
 }
 
+CollectionCatalog::Stats CollectionCatalog::getStats() const {
+    return _stats;
+}
+
 void CollectionCatalog::registerCollection(OperationContext* opCtx,
                                            CollectionUUID uuid,
                                            std::shared_ptr<Collection> coll) {
@@ -948,6 +952,21 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
     _collections[ns] = coll;
     _orderedCollections[dbIdPair] = coll;
 
+    if (ns.isSystemDotViews()) {
+        _viewCatalogs.emplace(dbName);
+    }
+
+    if (!ns.isOnInternalDb() && !ns.isSystem()) {
+        _stats.userCollections += 1;
+        if (coll->isCapped()) {
+            _stats.userCapped += 1;
+        }
+    } else {
+        _stats.internal += 1;
+    }
+
+    invariant(static_cast<size_t>(_stats.internal + _stats.userCollections) == _collections.size());
+
     auto dbRid = ResourceId(RESOURCE_DATABASE, dbName);
     addResource(dbRid, dbName);
 
@@ -974,6 +993,21 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
     _collections.erase(ns);
     _catalog.erase(uuid);
 
+    if (ns.isSystemDotViews()) {
+        _viewCatalogs.erase(dbName);
+    }
+
+    if (!ns.isOnInternalDb() && !ns.isSystem()) {
+        _stats.userCollections -= 1;
+        if (coll->isCapped()) {
+            _stats.userCapped -= 1;
+        }
+    } else {
+        _stats.internal -= 1;
+    }
+
+    invariant(static_cast<size_t>(_stats.internal + _stats.userCollections) == _collections.size());
+
     coll->onDeregisterFromCatalog(opCtx);
 
     auto collRid = ResourceId(RESOURCE_COLLECTION, ns.ns());
@@ -999,6 +1033,7 @@ void CollectionCatalog::deregisterAllCollections() {
     _collections.clear();
     _orderedCollections.clear();
     _catalog.clear();
+    _stats = {};
 
     _resourceInformation.clear();
 }
