@@ -156,6 +156,14 @@ void BM_DateAddEvaluate10Days(benchmark::State& state) {
                           state);
 }
 
+void BM_DateAddEvaluate600Minutes(benchmark::State& state) {
+    testDateAddExpression(1604131115000LL,
+                          "minute",
+                          600LL,
+                          boost::none, /* timezone */
+                          state);
+}
+
 void BM_DateAddEvaluate100KSeconds(benchmark::State& state) {
     testDateAddExpression(1604131115000LL,
                           "second",
@@ -177,6 +185,7 @@ void BM_DateAddEvaluate12HoursWithTimezone(benchmark::State& state) {
 }
 
 BENCHMARK(BM_DateAddEvaluate10Days);
+BENCHMARK(BM_DateAddEvaluate600Minutes);
 BENCHMARK(BM_DateAddEvaluate100KSeconds);
 BENCHMARK(BM_DateAddEvaluate100Years);
 BENCHMARK(BM_DateAddEvaluate12HoursWithTimezone);
