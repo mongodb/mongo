@@ -142,6 +142,20 @@ private:
 
         // The term in which the loader scheduled this task.
         uint32_t termCreated;
+
+        std::string toString() const {
+            std::stringstream ss;
+            ss << "CollAndChunkTask -"
+               << " taskNum: " << taskNum << ", collectionAndChangedChunksSize: "
+               << (collectionAndChangedChunks ? collectionAndChangedChunks->changedChunks.size()
+                                              : -1)
+               << ", minQueryVersion: "
+               << (minQueryVersion.isSet() ? minQueryVersion.toString() : "(unset)")
+               << ", maxQueryVersion: "
+               << (maxQueryVersion.isSet() ? maxQueryVersion.toString() : "(unset)")
+               << ", dropped: " << dropped << ", termCreated: " << termCreated;
+            return ss.str();
+        }
     };
 
     /**
