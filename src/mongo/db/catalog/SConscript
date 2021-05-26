@@ -42,8 +42,8 @@ env.Library(
 )
 
 env.Library(
-    target = 'catalog_test_fixture',
-    source =[
+    target='catalog_test_fixture',
+    source=[
         'catalog_test_fixture.cpp',
     ],
     LIBDEPS=[
@@ -471,6 +471,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/db/write_ops',
         'collection',

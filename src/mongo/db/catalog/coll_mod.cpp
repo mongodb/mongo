@@ -56,6 +56,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/idl/command_generic_argument.h"
@@ -105,12 +106,42 @@ struct CollModRequest {
     BSONElement clusteredIndexExpireAfterSeconds = {};
     BSONElement indexHidden = {};
     BSONElement viewPipeLine = {};
+    BSONElement timeseries = {};
     std::string viewOn = {};
     boost::optional<Collection::Validator> collValidator;
     boost::optional<ValidationActionEnum> collValidationAction;
     boost::optional<ValidationLevelEnum> collValidationLevel;
     bool recordPreImages = false;
 };
+
+bool isValidTimeseriesGranularityTransition(BucketGranularityEnum current,
+                                            BucketGranularityEnum target) {
+    bool validTransition = true;
+    if (current == target) {
+        return validTransition;
+    }
+
+    switch (current) {
+        case BucketGranularityEnum::Seconds: {
+            if (target != BucketGranularityEnum::Minutes) {
+                validTransition = false;
+            }
+            break;
+        }
+        case BucketGranularityEnum::Minutes: {
+            if (target != BucketGranularityEnum::Hours) {
+                validTransition = false;
+            }
+            break;
+        }
+        case BucketGranularityEnum::Hours: {
+            validTransition = false;
+            break;
+        }
+    }
+
+    return validTransition;
+}
 
 StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                                const NamespaceString& nss,
@@ -329,6 +360,28 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             cmr.clusteredIndexExpireAfterSeconds = e;
+        } else if (fieldName == "timeseries" && !isView) {
+            auto tsOptions = coll->getTimeseriesOptions();
+            if (!tsOptions) {
+                return Status(ErrorCodes::InvalidOptions,
+                              str::stream() << "option only supported on a timeseries collection: "
+                                            << fieldName);
+            }
+
+            if (e.Obj().hasField("granularity")) {
+                BSONElement elem = e.Obj().getField("granularity");
+                BucketGranularityEnum target = BucketGranularity_parse(
+                    IDLParserErrorContext("BucketGranularity"), elem.valueStringData());
+                if (!isValidTimeseriesGranularityTransition(tsOptions->getGranularity(), target)) {
+                    return Status(
+                        ErrorCodes::InvalidOptions,
+                        str::stream()
+                            << "Invalid transition for timeseries.granularity. Can only transition "
+                               "from 'seconds' to 'minutes' or 'minutes' to 'hours'.");
+                }
+            }
+
+            cmr.timeseries = e;
         } else {
             if (isView) {
                 return Status(ErrorCodes::InvalidOptions,
@@ -489,6 +542,7 @@ Status _collModInternal(OperationContext* opCtx,
     // WriteConflictExceptions thrown in the writeConflictRetry loop below can cause cmrNew.idx to
     // become invalid, so save a copy to use in the loop until we can refresh it.
     auto idx = cmrNew.idx;
+    auto ts = cmrNew.timeseries;
 
     return writeConflictRetry(opCtx, "collMod", nss.ns(), [&] {
         WriteUnitOfWork wunit(opCtx);
@@ -601,6 +655,27 @@ Status _collModInternal(OperationContext* opCtx,
 
         if (cmrNew.recordPreImages != oldCollOptions.recordPreImages) {
             coll.getWritableCollection()->setRecordPreImages(opCtx, cmrNew.recordPreImages);
+        }
+
+        if (ts.isABSONObj()) {
+            TimeseriesOptions newOptions = *oldCollOptions.timeseries;
+            bool changed = false;
+
+            if (ts.Obj().hasField("granularity")) {
+                BSONElement granularityElem = ts.Obj().getField("granularity");
+                BucketGranularityEnum target = BucketGranularity_parse(
+                    IDLParserErrorContext("BucketGranularity"), granularityElem.valueStringData());
+                if (target != oldCollOptions.timeseries->getGranularity()) {
+                    newOptions.setGranularity(target);
+                    newOptions.setBucketMaxSpanSeconds(
+                        timeseries::getMaxSpanSecondsFromGranularity(target));
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                coll.getWritableCollection()->setTimeseriesOptions(opCtx, newOptions);
+            }
         }
 
         // Only observe non-view collMods, as view operations are observed as operations on the

@@ -313,6 +313,10 @@ public:
         std::abort();
     }
 
+    void setTimeseriesOptions(OperationContext* opCtx, const TimeseriesOptions& tsOptions) {
+        std::abort();
+    }
+
     const CollatorInterface* getDefaultCollator() const {
         std::abort();
     }

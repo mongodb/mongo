@@ -42,9 +42,9 @@ env.Library(
 )
 
 env.Library(
-    target='timeseries_lookup',
+    target='timeseries_options',
     source=[
-        'timeseries_lookup.cpp',
+        'timeseries_options.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

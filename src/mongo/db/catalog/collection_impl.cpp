@@ -379,8 +379,6 @@ void CollectionImpl::init(OperationContext* opCtx) {
                               "validatorStatus"_attr = _validator.getStatus());
     }
 
-    _timeseriesOptions = collectionOptions.timeseries;
-
     if (collectionOptions.clusteredIndex) {
         _clustered = true;
         if (collectionOptions.expireAfterSeconds) {
@@ -1562,7 +1560,14 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
 }
 
 boost::optional<TimeseriesOptions> CollectionImpl::getTimeseriesOptions() const {
-    return _timeseriesOptions;
+    return _metadata->options.timeseries;
+}
+
+void CollectionImpl::setTimeseriesOptions(OperationContext* opCtx,
+                                          const TimeseriesOptions& tsOptions) {
+    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+        md.options.timeseries = tsOptions;
+    });
 }
 
 const CollatorInterface* CollectionImpl::getDefaultCollator() const {

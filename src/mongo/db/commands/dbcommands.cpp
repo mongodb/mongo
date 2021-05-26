@@ -91,7 +91,7 @@
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
-#include "mongo/db/timeseries/timeseries_lookup.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/async_request_executor.h"
@@ -144,6 +144,7 @@ std::unique_ptr<CollMod> makeTimeseriesCollModCommand(OperationContext* opCtx,
     cmd->setPipeline(origCmd.getPipeline());
     cmd->setRecordPreImages(origCmd.getRecordPreImages());
     cmd->setExpireAfterSeconds(origCmd.getExpireAfterSeconds());
+    cmd->setTimeseries(origCmd.getTimeseries());
 
     return cmd;
 }

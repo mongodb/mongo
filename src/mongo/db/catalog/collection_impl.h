@@ -383,6 +383,7 @@ public:
     void setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) final;
 
     boost::optional<TimeseriesOptions> getTimeseriesOptions() const final;
+    void setTimeseriesOptions(OperationContext* opCtx, const TimeseriesOptions& tsOptions) final;
 
     /**
      * Get a pointer to the collection's default collator. The pointer must not be used after this
@@ -577,9 +578,6 @@ private:
 
     // Whether or not this collection is clustered on _id values.
     bool _clustered = false;
-
-    // If this is a time-series buckets collection, the metadata for this collection.
-    boost::optional<TimeseriesOptions> _timeseriesOptions;
 
     // The earliest snapshot that is allowed to use this collection.
     boost::optional<Timestamp> _minVisibleSnapshot;

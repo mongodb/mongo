@@ -700,6 +700,12 @@ public:
     virtual boost::optional<TimeseriesOptions> getTimeseriesOptions() const = 0;
 
     /**
+     * Sets the time-series options for this buckets collection.
+     */
+    virtual void setTimeseriesOptions(OperationContext* opCtx,
+                                      const TimeseriesOptions& tsOptions) = 0;
+
+    /**
      * Get a pointer to the collection's default collator. The pointer must not be used after this
      * Collection is destroyed.
      */

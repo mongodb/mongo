@@ -382,7 +382,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/primary_only_service',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_lookup',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
         '$BUILD_DIR/mongo/s/sharding_initialization',
         '$BUILD_DIR/mongo/s/sharding_router_api',
@@ -472,7 +472,8 @@ env.CppUnitTest(
         'namespace_metadata_change_notifications_test.cpp',
         'op_observer_sharding_test.cpp',
         'persistent_task_queue_test.cpp',
-        'range_deletion_util_test.cpp' if not env.TargetOSIs('windows') else [],
+        'range_deletion_util_test.cpp' if not env.TargetOSIs(
+            'windows') else [],
         'resharding_collection_test.cpp',
         'resharding_destined_recipient_test.cpp',
         'resharding/resharding_agg_test.cpp',
