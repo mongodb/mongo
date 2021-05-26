@@ -31,9 +31,12 @@ ReplSetTest.prototype.upgradeSet = function(options, user, pwd) {
         }
     }
 
-    assert.eq(
-        this.getPrimary(), primary, "Primary changed unexpectedly after upgrading secondaries");
-    this.upgradePrimary(primary, Object.assign({}, options), user, pwd);
+    if (this.getPrimary() == primary) {
+        this.upgradePrimary(primary, Object.assign({}, options), user, pwd);
+    } else {
+        // An election occured during upgrade, old primary is now a secondary.
+        this.upgradeMembers([primary], Object.assign({}, options), user, pwd);
+    }
 };
 
 function mergeNodeOptions(nodeOptions, options) {
