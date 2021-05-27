@@ -80,11 +80,14 @@ TenantMigrationDonorAccessBlocker::TenantMigrationDonorAccessBlocker(
                                            .getOrCreateBlockedOperationsExecutor();
 }
 
-Status TenantMigrationDonorAccessBlocker::checkIfCanWrite() {
+Status TenantMigrationDonorAccessBlocker::checkIfCanWrite(Timestamp writeTs) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     switch (_state.getState()) {
         case BlockerState::State::kAllow:
+            // As a sanity check, we track the highest allowed write timestamp to ensure no
+            // writes are allowed with a timestamp higher than the block timestamp.
+            _highestAllowedWriteTimestamp = std::max(writeTs, _highestAllowedWriteTimestamp);
         case BlockerState::State::kAborted:
             return Status::OK();
         case BlockerState::State::kBlockWrites:
@@ -233,6 +236,13 @@ void TenantMigrationDonorAccessBlocker::startBlockingReadsAfter(const Timestamp&
     invariant(!_blockTimestamp);
     invariant(!_commitOpTime);
     invariant(!_abortOpTime);
+
+    invariant(
+        blockTimestamp > _highestAllowedWriteTimestamp,
+        str::stream() << "The block timestamp must be higher than the timestamp of any allowed "
+                         "write, blockTimestamp: "
+                      << blockTimestamp.toString() << ", highestAllowedWriteTimestamp: "
+                      << _highestAllowedWriteTimestamp.toString());
 
     _state.transitionTo(BlockerState::State::kBlockWritesAndReads);
     _blockTimestamp = blockTimestamp;

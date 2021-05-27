@@ -56,7 +56,7 @@ public:
     // Called by all writes and reads against the database.
     //
 
-    virtual Status checkIfCanWrite() = 0;
+    virtual Status checkIfCanWrite(Timestamp writeTs) = 0;
     virtual Status waitUntilCommittedOrAborted(OperationContext* opCtx) = 0;
 
 

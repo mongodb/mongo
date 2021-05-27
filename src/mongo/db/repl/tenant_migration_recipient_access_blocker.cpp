@@ -65,7 +65,7 @@ TenantMigrationRecipientAccessBlocker::TenantMigrationRecipientAccessBlocker(
                                            .getOrCreateBlockedOperationsExecutor();
 }
 
-Status TenantMigrationRecipientAccessBlocker::checkIfCanWrite() {
+Status TenantMigrationRecipientAccessBlocker::checkIfCanWrite(Timestamp writeTs) {
     // This is guaranteed by the migration protocol. The recipient will not get any writes until the
     // migration is committed on the donor.
     return Status::OK();
