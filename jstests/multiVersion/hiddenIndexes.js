@@ -211,8 +211,9 @@ try {
 st.rs0.start(secondaryNodeOfShard,
              Object.assign(nodeOptionsLatest, {startClean: true, shardsvr: ""}));
 st.rs0.awaitReplication();
-st.upgradeCluster(nodeOptionsLatest.binVersion,
-                  {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false});
+st.upgradeCluster(
+    nodeOptionsLatest.binVersion,
+    {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false, waitUntilStable: true});
 })();
 
 //
@@ -221,7 +222,7 @@ st.upgradeCluster(nodeOptionsLatest.binVersion,
 (function() {
 mongosDB = st.s.getDB(kDbName);
 coll = mongosDB.coll;
-coll.dropIndexes();
+assert.commandWorked(coll.dropIndexes());
 
 assert.commandWorked(coll.insert({s: 1, t: 1}));
 assert.commandWorked(mongosDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
@@ -236,11 +237,13 @@ assert.commandWorked(mongosDB.runCommand({
     "index": {"name": "t_1", "hidden": false},
 }));
 
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+assert.commandWorked(mongosDB.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+assertVersionAndFCV(["4.4", "4.3"], lastStableFCV);
 
 // Test that we can downgrade the cluster to 4.2.
-st.upgradeCluster(nodeOptionsLastStable.binVersion,
-                  {upgradeMongos: true, upgradeShards: true, upgradeConfigs: true});
+st.upgradeCluster(
+    nodeOptionsLastStable.binVersion,
+    {upgradeMongos: true, upgradeShards: true, upgradeConfigs: true, waitUntilStable: true});
 
 mongosDB = st.s.getDB(kDbName);
 coll = mongosDB.coll;
