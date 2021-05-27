@@ -58,9 +58,6 @@ assert.eq(numDocs, coll.count(), "unexpected number of documents after bulk inse
 // Make sure the documents make it to the secondaries.
 replTest.awaitReplication();
 
-// Ensure we can create an index through replication.
-assert.commandWorked(coll.createIndex({a: 1}, {name: "replicated_index_a_1"}));
-
 const secondaries = replTest.getSecondaries();
 assert.eq(nodes.length - 1,
           secondaries.length,
