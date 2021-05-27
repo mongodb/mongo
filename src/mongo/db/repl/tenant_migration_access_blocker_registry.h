@@ -70,11 +70,15 @@ public:
 
         void clearAccessBlocker(TenantMigrationAccessBlocker::BlockerType type) {
             if (type == TenantMigrationAccessBlocker::BlockerType::kDonor) {
-                invariant(_donor);
+                if (!_donor) {
+                    return;
+                }
                 checked_pointer_cast<TenantMigrationDonorAccessBlocker>(_donor)->interrupt();
                 _donor.reset();
             } else {
-                invariant(_recipient);
+                if (!_recipient) {
+                    return;
+                }
                 _recipient.reset();
             }
         }
