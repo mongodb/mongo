@@ -149,7 +149,8 @@ Status OplogApplierImplTest::_applyOplogEntryOrGroupedInsertsWrapper(
     OplogApplication::Mode oplogApplicationMode) {
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
-    return applyOplogEntryOrGroupedInserts(opCtx, batch, oplogApplicationMode);
+    const bool dataIsConsistent = true;
+    return applyOplogEntryOrGroupedInserts(opCtx, batch, oplogApplicationMode, dataIsConsistent);
 }
 
 void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
@@ -216,7 +217,9 @@ Status OplogApplierImplTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
         opsPtrs.push_back(&op);
     }
     WorkerMultikeyPathInfo pathInfo;
-    return oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &opsPtrs, &pathInfo);
+    const bool dataIsConsistent = true;
+    return oplogApplier.applyOplogBatchPerWorker(
+        _opCtx.get(), &opsPtrs, &pathInfo, dataIsConsistent);
 }
 
 Status OplogApplierImplTest::runOpInitialSync(const OplogEntry& op) {

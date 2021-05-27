@@ -180,6 +180,16 @@ void abortTwoPhaseIndexBuilds(OperationContext* opCtx,
     }
 }
 
+StringData getInvalidatingReason(const OplogApplication::Mode mode, const bool isDataConsistent) {
+    if (mode == OplogApplication::Mode::kInitialSync) {
+        return "initial sync"_sd;
+    } else if (!isDataConsistent) {
+        return "minvalid suggests inconsistent snapshot"_sd;
+    }
+
+    return ""_sd;
+}
+
 }  // namespace
 
 void setOplogCollectionName(ServiceContext* service) {
@@ -257,6 +267,7 @@ void writeToImageCollection(OperationContext* opCtx,
                             const Timestamp timestamp,
                             repl::RetryImageEnum imageKind,
                             const BSONObj& dataImage,
+                            const StringData& invalidatedReason,
                             bool* upsertConfigImage) {
     AutoGetCollection autoColl(opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
     repl::ImageEntry imageEntry;
@@ -267,7 +278,7 @@ void writeToImageCollection(OperationContext* opCtx,
     imageEntry.setImage(dataImage);
     if (dataImage.isEmpty()) {
         imageEntry.setInvalidated(true);
-        imageEntry.setInvalidatedReason("initial sync"_sd);
+        imageEntry.setInvalidatedReason(invalidatedReason);
     }
 
     UpdateRequest request(NamespaceString::kConfigImagesNamespace);
@@ -1016,6 +1027,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                              const OplogEntryOrGroupedInserts& opOrGroupedInserts,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
+                             const bool isDataConsistent,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
     // Get the single oplog entry to be applied or the first oplog entry of grouped inserts.
     auto op = opOrGroupedInserts.getOp();
@@ -1314,7 +1326,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             request.setUpdateModification(o);
             request.setUpsert(upsert);
             request.setFromOplogApplication(true);
-            if (mode != OplogApplication::Mode::kInitialSync) {
+            if (mode != OplogApplication::Mode::kInitialSync && isDataConsistent) {
                 if (op.getNeedsRetryImage() == repl::RetryImageEnum::kPreImage) {
                     request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
                 } else if (op.getNeedsRetryImage() == repl::RetryImageEnum::kPostImage) {
@@ -1417,6 +1429,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                            // initial sync, the value passed in here is conveniently
                                            // the empty BSONObj.
                                            ur.requestedDocImage,
+                                           getInvalidatingReason(mode, isDataConsistent),
                                            &upsertConfigImage);
                 }
 
@@ -1467,7 +1480,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 DeleteRequest request(requestNss);
                 request.setQuery(deleteCriteria);
                 if (mode != OplogApplication::Mode::kInitialSync &&
-                    op.getNeedsRetryImage() == repl::RetryImageEnum::kPreImage) {
+                    op.getNeedsRetryImage() == repl::RetryImageEnum::kPreImage &&
+                    isDataConsistent) {
                     // When in initial sync, we'll pass an empty image into
                     // `writeToImageCollection`.
                     request.setReturnDeleted(true);
@@ -1483,6 +1497,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                            op.getTimestamp(),
                                            repl::RetryImageEnum::kPreImage,
                                            preImage.value_or(BSONObj()),
+                                           getInvalidatingReason(mode, isDataConsistent),
                                            &upsertConfigImage);
                 }
                 wuow.commit();

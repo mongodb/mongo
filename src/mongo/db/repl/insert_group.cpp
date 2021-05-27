@@ -126,7 +126,9 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
     OplogEntryOrGroupedInserts groupedInserts(it, endOfGroupableOpsIterator);
     try {
         // Apply the group of inserts by passing in groupedInserts.
-        uassertStatusOK(applyOplogEntryOrGroupedInserts(_opCtx, groupedInserts, _mode));
+        const bool isDataConsistent = true;
+        uassertStatusOK(
+            applyOplogEntryOrGroupedInserts(_opCtx, groupedInserts, _mode, isDataConsistent));
         // It succeeded, advance the oplogEntriesIterator to the end of the
         // group of inserts.
         return endOfGroupableOpsIterator - 1;

@@ -301,14 +301,16 @@ public:
 
     Status applyOplogBatchPerWorker(OperationContext* opCtx,
                                     std::vector<const OplogEntry*>* ops,
-                                    WorkerMultikeyPathInfo* workerMultikeyPathInfo) override;
+                                    WorkerMultikeyPathInfo* workerMultikeyPathInfo,
+                                    const bool isDataConsistent) override;
     std::vector<OplogEntry> operationsApplied;
 };
 
 Status TrackOpsAppliedApplier::applyOplogBatchPerWorker(
     OperationContext* opCtx,
     std::vector<const OplogEntry*>* ops,
-    WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
+    WorkerMultikeyPathInfo* workerMultikeyPathInfo,
+    const bool isDataConsistent) {
     for (auto&& opPtr : *ops) {
         operationsApplied.push_back(*opPtr);
     }
@@ -395,7 +397,9 @@ TEST_F(OplogApplierImplTest,
 
     TestApplyOplogGroupApplier oplogApplier(
         nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
-    ASSERT_OK(oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo));
+    const bool dataIsConsistent = true;
+    ASSERT_OK(
+        oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo, dataIsConsistent));
     // Collection should be created after applyOplogEntryOrGroupedInserts() processes operation.
     ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
 }
@@ -1310,7 +1314,8 @@ void testWorkerMultikeyPaths(OperationContext* opCtx,
         nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
     WorkerMultikeyPathInfo pathInfo;
     std::vector<const OplogEntry*> ops = {&op};
-    ASSERT_OK(oplogApplier.applyOplogBatchPerWorker(opCtx, &ops, &pathInfo));
+    const bool dataIsConsistent = true;
+    ASSERT_OK(oplogApplier.applyOplogBatchPerWorker(opCtx, &ops, &pathInfo, dataIsConsistent));
     ASSERT_EQ(pathInfo.size(), numPaths);
 }
 
@@ -1376,7 +1381,9 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsMultipleWorkerMultike
             nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
         WorkerMultikeyPathInfo pathInfo;
         std::vector<const OplogEntry*> ops = {&opA, &opB};
-        ASSERT_OK(oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo));
+        const bool dataIsConsistent = true;
+        ASSERT_OK(
+            oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo, dataIsConsistent));
         ASSERT_EQ(pathInfo.size(), 2UL);
     }
 }
@@ -1421,8 +1428,10 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncFailsWhenCollectionCreati
     TestApplyOplogGroupApplier oplogApplier(
         nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary));
     std::vector<const OplogEntry*> ops = {&op};
-    ASSERT_EQUALS(ErrorCodes::InvalidOptions,
-                  oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, nullptr));
+    const bool dataIsConsistent = true;
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidOptions,
+        oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, nullptr, dataIsConsistent));
 }
 
 TEST_F(OplogApplierImplTest,
@@ -1806,7 +1815,9 @@ TEST_F(OplogApplierImplTest, ApplyGroupIgnoresUpdateOperationIfDocumentIsMissing
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     std::vector<const OplogEntry*> ops = {&op};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo));
+    const bool dataIsConsistent = true;
+    ASSERT_OK(
+        oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo, dataIsConsistent));
 
     // Since the document was missing when we cloned data from the sync source, the collection
     // referenced by the failed operation should not be automatically created.
@@ -1829,7 +1840,9 @@ TEST_F(OplogApplierImplTest,
     auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
     std::vector<const OplogEntry*> ops = {&op0, &op1, &op2, &op3};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo));
+    const bool dataIsConsistent = true;
+    ASSERT_OK(
+        oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo, dataIsConsistent));
 
     CollectionReader collectionReader(_opCtx.get(), nss);
     ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(collectionReader.next()));
@@ -1855,7 +1868,9 @@ TEST_F(OplogApplierImplTest,
     auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
     std::vector<const OplogEntry*> ops = {&op0, &op1, &op2, &op3};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo));
+    const bool dataIsConsistent = true;
+    ASSERT_OK(
+        oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo, dataIsConsistent));
 
     CollectionReader collectionReader(_opCtx.get(), nss);
     ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(collectionReader.next()));
