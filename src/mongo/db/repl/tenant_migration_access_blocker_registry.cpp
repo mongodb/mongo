@@ -64,7 +64,11 @@ void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
 
 void TenantMigrationAccessBlockerRegistry::_remove(WithLock, StringData tenantId, MtabType type) {
     auto it = _tenantMigrationAccessBlockers.find(tenantId);
-    invariant(it != _tenantMigrationAccessBlockers.end());
+
+    if (it == _tenantMigrationAccessBlockers.end()) {
+        return;
+    }
+
     auto mtabPair = it->second;
     mtabPair.clearAccessBlocker(type);
     if (!mtabPair.getAccessBlocker(MtabType::kDonor) &&

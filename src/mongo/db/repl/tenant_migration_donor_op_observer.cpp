@@ -140,7 +140,13 @@ public:
         if (_donorStateDoc.getExpireAt()) {
             auto mtab = tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
                 _opCtx->getServiceContext(), _donorStateDoc.getTenantId());
-            invariant(mtab);
+
+            if (!mtab) {
+                // The state doc and TenantMigrationDonorAccessBlocker for this migration were
+                // removed immediately after expireAt was set. This is unlikely to occur in
+                // production where the garbage collection delay should be sufficiently large.
+                return;
+            }
 
             if (!_opCtx->writesAreReplicated()) {
                 // Setting expireAt implies that the TenantMigrationDonorAccessBlocker for this
