@@ -12,6 +12,7 @@
  *
  * @tags: [
  *   requires_replication,
+ *   uses_transactions,
  * ]
  */
 (function() {
