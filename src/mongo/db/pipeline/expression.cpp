@@ -3435,6 +3435,12 @@ Value ExpressionIndexOfCP::evaluate(const Document& root, Variables* variables) 
             std::min(codePointLength, static_cast<size_t>(endIndexArg.coerceToInt()));
     }
 
+    // If the start index is past the end, then always return -1 since 'token' does not exist within
+    // these invalid bounds.
+    if (endCodePointIndex < startCodePointIndex) {
+        return Value(-1);
+    }
+
     if (startByteIndex == 0 && input.empty() && token.empty()) {
         // If we are finding the index of "" in the string "", the below loop will not loop, so we
         // need a special case for this.
