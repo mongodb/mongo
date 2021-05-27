@@ -168,16 +168,16 @@ functions:
       params:
         script: ./src/dsi/run-dsi determine_failure -m TEST
   f_dsi_post_run:
+    - command: json.send
+      params:
+        name: perf
+        file: ./build/LegacyPerfJson/perf.json
     - command: shell.exec
       params:
         script: ./src/dsi/run-dsi post_run
     - command: attach.results
       params:
         file_location: ./build/EvergreenResultsJson/results.json
-    - command: json.send
-      params:
-        name: perf
-        file: ./build/LegacyPerfJson/perf.json
     - command: s3.put
       params:
         aws_key: ${aws_key}
