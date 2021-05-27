@@ -352,6 +352,7 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                 ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist ||
                 swNumDeleted.getStatus() ==
                 ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist ||
+                swNumDeleted.getStatus().code() == ErrorCodes::KeyPatternShorterThanBound ||
                 ErrorCodes::isShutdownError(swNumDeleted.getStatus()) ||
                 ErrorCodes::isNotPrimaryError(swNumDeleted.getStatus());
         })

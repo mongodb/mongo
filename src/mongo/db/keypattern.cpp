@@ -79,7 +79,7 @@ BSONObj KeyPattern::extendRangeBound(const BSONObj& bound, bool makeUpperInclusi
     BSONObjIterator pat(_pattern);
 
     while (src.more()) {
-        massert(16649,
+        massert(ErrorCodes::KeyPatternShorterThanBound,
                 str::stream() << "keyPattern " << _pattern << " shorter than bound " << bound,
                 pat.more());
         BSONElement srcElt = src.next();
