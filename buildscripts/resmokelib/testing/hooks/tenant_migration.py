@@ -211,6 +211,14 @@ class _TenantMigrationOptions:
         """Return a connection to the recipient primary."""
         return get_primary(self.recipient_rs, self.logger)
 
+    def get_donor_nodes(self):
+        """Return a list of connections to donor replica set nodes."""
+        return self.donor_rs.nodes
+
+    def get_recipient_nodes(self):
+        """Return a list of connections to recipient replica set nodes."""
+        return self.recipient_rs.nodes
+
     def __str__(self):
         opts = {
             "donor": self.get_donor_name(), "recipient": self.get_recipient_name(),
@@ -546,52 +554,61 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         garbage collected on both the donor and recipient.
         """
         try:
-            donor_primary = migration_opts.get_donor_primary()
-            self.logger.info(
-                "Waiting for tenant migration '%s' to be garbage collected on donor primary on port"
-                + " %d of replica set '%s'.", migration_opts.migration_id, donor_primary.port,
-                migration_opts.get_donor_name())
-            while True:
-                try:
-                    donor_primary_client = self._create_client(donor_primary)
-                    res = donor_primary_client.config.command({
-                        "count": "tenantMigrationDonors",
-                        "query": {"tenantId": migration_opts.tenant_id}
-                    })
-                    if res["n"] == 0:
-                        break
-                except (pymongo.errors.AutoReconnect, pymongo.errors.NotMasterError):
-                    donor_primary = migration_opts.get_donor_primary()
-                    self.logger.info(
-                        "Retrying waiting for tenant migration '%s' to be garbage collected on donor"
-                        + " primary on port %d of replica set '%s'.", migration_opts.migration_id,
-                        donor_primary.port, migration_opts.get_donor_name())
-                    continue
-                time.sleep(self.POLL_INTERVAL_SECS)
+            donor_nodes = migration_opts.get_donor_nodes()
+            for donor_node in donor_nodes:
+                self.logger.info(
+                    "Waiting for tenant migration '%s' to be garbage collected on donor node on " +
+                    "port %d of replica set '%s'.", migration_opts.migration_id, donor_node.port,
+                    migration_opts.get_donor_name())
 
-            recipient_primary = migration_opts.get_recipient_primary()
-            self.logger.info(
-                "Waiting for tenant migration '%s' to be garbage collected on recipient primary on "
-                + "port %d of replica set '%s'.", migration_opts.migration_id,
-                recipient_primary.port, migration_opts.get_recipient_name())
-            while True:
-                try:
-                    recipient_primary_client = self._create_client(recipient_primary)
-                    res = recipient_primary_client.config.command({
-                        "count": "tenantMigrationRecipients",
-                        "query": {"tenantId": migration_opts.tenant_id}
-                    })
-                    if res["n"] == 0:
-                        break
-                except (pymongo.errors.AutoReconnect, pymongo.errors.NotMasterError):
-                    recipient_primary = migration_opts.get_recipient_primary()
-                    self.logger.info(
-                        "Retrying waiting for tenant migration '%s' to be garbage collected on " +
-                        "recipient primary on port %d of replica set '%s'.",
-                        migration_opts.migration_id, recipient_primary.port,
-                        migration_opts.get_recipient_name())
-                    continue
-                time.sleep(self.POLL_INTERVAL_SECS)
+                while True:
+                    try:
+                        donor_node_client = self._create_client(donor_node)
+                        res = donor_node_client.config.command({
+                            "count": "tenantMigrationDonors",
+                            "query": {"tenantId": migration_opts.tenant_id}
+                        })
+                        if res["n"] == 0:
+                            break
+                    except (pymongo.errors.AutoReconnect, pymongo.errors.NotMasterError):
+                        # Ignore NotMasterErrors because it's possible to fail with
+                        # InterruptedDueToReplStateChange if the donor primary steps down or shuts
+                        # down during the garbage collection check.
+                        self.logger.info(
+                            "Retrying waiting for tenant migration '%s' to be garbage collected on"
+                            + " donor node on port %d of replica set '%s'.",
+                            migration_opts.migration_id, donor_node.port,
+                            migration_opts.get_donor_name())
+                        continue
+                    time.sleep(self.POLL_INTERVAL_SECS)
+
+            recipient_nodes = migration_opts.get_recipient_nodes()
+            for recipient_node in recipient_nodes:
+                self.logger.info(
+                    "Waiting for tenant migration '%s' to be garbage collected on recipient node on"
+                    + " port %d of replica set '%s'.", migration_opts.migration_id,
+                    recipient_node.port, migration_opts.get_recipient_name())
+
+                while True:
+                    try:
+                        recipient_node_client = self._create_client(recipient_node)
+                        res = recipient_node_client.config.command({
+                            "count": "tenantMigrationRecipients",
+                            "query": {"tenantId": migration_opts.tenant_id}
+                        })
+                        if res["n"] == 0:
+                            break
+                    except (pymongo.errors.AutoReconnect, pymongo.errors.NotMasterError):
+                        # Ignore NotMasterErrors because it's possible to fail with
+                        # InterruptedDueToReplStateChange if the recipient primary steps down or
+                        # shuts down during the garbage collection check.
+                        self.logger.info(
+                            "Retrying waiting for tenant migration '%s' to be garbage collected on"
+                            + " recipient node on port %d of replica set '%s'.",
+                            migration_opts.migration_id, recipient_node.port,
+                            migration_opts.get_recipient_name())
+                        continue
+                    time.sleep(self.POLL_INTERVAL_SECS)
         except pymongo.errors.PyMongoError:
             self.logger.exception(
                 "Error waiting for tenant migration '%s' from donor replica set '%s" +
