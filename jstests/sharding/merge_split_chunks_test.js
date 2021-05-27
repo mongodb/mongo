@@ -40,11 +40,14 @@ st.printShardingStatus();
 
 // Insert some data into each of the consolidated ranges
 let numDocs = 0;
-for (let i = 120; i <= 240; i++) {
-    assert.commandWorked(coll.insert({_id: i}));
+const bulk = coll.initializeUnorderedBulkOp();
+for (let i = 0; i <= 120; i++) {
+    bulk.insert({_id: i});
     numDocs++;
 }
+assert.commandWorked(bulk.execute({w: "majority"}));
 
+var staleAdmin = staleMongos.getDB("admin");
 var staleCollection = staleMongos.getCollection(coll + "");
 
 // S0: min->0, 0->10, 20->40, 40->50, 50->90, 100->110, 110->max
@@ -64,13 +67,15 @@ assert.eq(numDocs, staleCollection.find().itcount());
 // Make sure merging three chunks in the middle works
 assert.commandWorked(admin.runCommand({mergeChunks: coll + "", bounds: [{_id: 20}, {_id: 90}]}));
 assert.eq(6, findChunksUtil.findChunksByNs(st.s0.getDB('config'), 'foo.bar').itcount());
+assert.eq(numDocs, coll.find().itcount());
 assert.eq(numDocs, staleCollection.find().itcount());
 // S0: min->10, 20->90, 100->110, 110->max
 // S1: 10->20, 90->100
 
 // Make sure splitting chunks after merging works
-assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 55}}));
+assert.commandWorked(staleAdmin.runCommand({split: coll + "", middle: {_id: 55}}));
 assert.eq(7, findChunksUtil.findChunksByNs(st.s0.getDB('config'), 'foo.bar').itcount());
+assert.eq(numDocs, coll.find().itcount());
 assert.eq(numDocs, staleCollection.find().itcount());
 // S0: min->10, 20->55, 55->90, 100->110, 110->max
 // S1: 10->20, 90->100
@@ -81,6 +86,7 @@ assert.commandWorked(
 assert.commandWorked(
     admin.runCommand({moveChunk: coll + "", find: {_id: 55}, to: st.shard1.shardName}));
 assert.eq(7, findChunksUtil.findChunksByNs(st.s0.getDB('config'), 'foo.bar').itcount());
+assert.eq(numDocs, coll.find().itcount());
 assert.eq(numDocs, staleCollection.find().itcount());
 // S0: min->10, 100->110, 110->max
 // S1: 10->20, 20->55, 55->90, 90->100
@@ -95,7 +101,7 @@ assert.eq(6, findChunksUtil.findChunksByNs(st.s0.getDB('config'), 'foo.bar').itc
 
 // Make sure merging chunks after a chunk has been moved out of a shard succeeds
 assert.commandWorked(
-    admin.runCommand({moveChunk: coll + "", find: {_id: 110}, to: st.shard1.shardName}));
+    staleAdmin.runCommand({moveChunk: coll + "", find: {_id: 110}, to: st.shard1.shardName}));
 assert.commandWorked(
     admin.runCommand({moveChunk: coll + "", find: {_id: 10}, to: st.shard0.shardName}));
 assert.eq(numDocs, staleCollection.find().itcount());
@@ -113,7 +119,7 @@ assert.eq(numDocs, staleCollection.find().itcount());
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 15}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 30}}));
 assert.commandWorked(
-    admin.runCommand({moveChunk: coll + "", find: {_id: 30}, to: st.shard0.shardName}));
+    staleAdmin.runCommand({moveChunk: coll + "", find: {_id: 30}, to: st.shard0.shardName}));
 assert.eq(numDocs, staleCollection.find().itcount());
 // S0: min->10, 10->15, 15->20, 30->90
 // S1: 20->30, 90->max
@@ -124,9 +130,9 @@ assert.commandFailed(
 
 // Make sure merge on the other shard after a chunk has been merged succeeds
 assert.commandWorked(
-    admin.runCommand({moveChunk: coll + "", find: {_id: 20}, to: st.shard0.shardName}));
+    staleAdmin.runCommand({moveChunk: coll + "", find: {_id: 20}, to: st.shard0.shardName}));
 assert.commandWorked(
-    admin.runCommand({mergeChunks: coll + "", bounds: [{_id: MinKey}, {_id: 90}]}));
+    staleAdmin.runCommand({mergeChunks: coll + "", bounds: [{_id: MinKey}, {_id: 90}]}));
 // S0: min->90
 // S1: 90->max
 
