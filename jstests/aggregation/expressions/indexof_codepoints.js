@@ -48,7 +48,7 @@ function testExpressionCodePoints(coll, expression, result, shouldTestEquivalenc
 
 const coll = db.indexofcp;
 coll.drop();
-assert.commandWorked(coll.insert({item: 'foobar foobar'}));
+assert.commandWorked(coll.insert({item: 'foobar foobar', emptyStr: ''}));
 
 // Test that $indexOfCP throws an error when given a string or substring that is not a string.
 assert.commandFailedWithCode(
@@ -119,6 +119,18 @@ assert.eq(null,
           coll.aggregate({$project: {byteLocation: {$indexOfCP: ['$missing', '$missing']}}})
               .toArray()[0]
               .byteLocation);
+
+// Test the edge case of searching for an empty string inside an empty string, where the start index
+// is past the end index. These cases are designed to reproduce SERVER-56819.
+assert.eq(-1,
+          coll.aggregate({$project: {byteLocation: {$indexOfCP: ['', '$emptyStr', 3]}}})
+              .toArray()[0]
+              .byteLocation);
+assert.eq(-1,
+          coll.aggregate({$project: {byteLocation: {$indexOfCP: ['', '$emptyStr', 3, 1]}}})
+              .toArray()[0]
+              .byteLocation);
+
 coll.drop();
 
 // Test that $indexOfCP works with ASCII strings and substrings.
