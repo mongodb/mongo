@@ -130,6 +130,7 @@ ReplicaSetMonitorManager* ReplicaSetMonitorManager::get() {
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData setName) {
     stdx::lock_guard<Latch> lk(_mutex);
+    _doGarbageCollectionLocked(lk);
 
     if (auto monitor = _monitors[setName].lock()) {
         return monitor;
@@ -177,6 +178,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
             str::stream() << "Unable to get monitor for '" << uri << "' due to shutdown",
             !_isShutdown);
 
+    _doGarbageCollectionLocked(lk);
     _setupTaskExecutorInLock();
     const auto& setName = uri.getSetName();
     auto monitor = _monitors[setName].lock();
@@ -223,7 +225,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitorForHost(const 
     return shared_ptr<ReplicaSetMonitor>();
 }
 
-vector<string> ReplicaSetMonitorManager::getAllSetNames() {
+vector<string> ReplicaSetMonitorManager::getAllSetNames() const {
     vector<string> allNames;
 
     stdx::lock_guard<Latch> lk(_mutex);
@@ -235,6 +237,11 @@ vector<string> ReplicaSetMonitorManager::getAllSetNames() {
     }
 
     return allNames;
+}
+
+size_t ReplicaSetMonitorManager::getNumMonitors() const {
+    stdx::lock_guard<Latch> lk(_mutex);
+    return _monitors.size();
 }
 
 void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
@@ -252,11 +259,25 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
     }
 }
 
-void ReplicaSetMonitorManager::garbageCollect(StringData setName) {
-    stdx::lock_guard<Latch> lk(_mutex);
-    ReplicaSetMonitorsMap::const_iterator it = _monitors.find(setName);
-    if (it != _monitors.end() && !it->second.lock()) {
-        _monitors.erase(it);
+void ReplicaSetMonitorManager::registerForGarbageCollection(StringData setName) {
+    stdx::lock_guard<Latch> lk(_gcMutex);
+    _gcQueue.emplace_back(setName);
+}
+
+void ReplicaSetMonitorManager::_doGarbageCollectionLocked(WithLock) {
+    if (_isShutdown) {
+        return;
+    }
+    stdx::lock_guard<Latch> lk(_gcMutex);
+
+    while (!_gcQueue.empty()) {
+        std::string setName = std::move(_gcQueue.front());
+        _gcQueue.pop_front();
+        ReplicaSetMonitorsMap::const_iterator it = _monitors.find(setName);
+        if (it != _monitors.end() && !it->second.lock()) {
+            _monitors.erase(it);
+            _monitorsGarbageCollected.increment();
+        }
     }
 }
 
