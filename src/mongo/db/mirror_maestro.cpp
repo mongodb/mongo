@@ -425,8 +425,13 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
         auto status =
             _executor->scheduleRemoteCommand(newRequest, std::move(mirrorResponseCallback))
                 .getStatus();
-        tassert(status);
 
+        if (ErrorCodes::isShutdownError(status.code())) {
+            LOGV2_DEBUG(5723501, 1, "Aborted mirroring due to shutdown", "reason"_attr = status);
+            return;
+        }
+
+        tassert(status);
         gMirroredReadsSection.sent.fetchAndAdd(1);
     }
 } catch (const DBException& e) {
