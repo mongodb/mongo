@@ -4,14 +4,6 @@
 (function() {
 "use strict";
 
-const featureEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagWindowFunctions: 1}))
-        .featureFlagWindowFunctions.value;
-if (!featureEnabled) {
-    jsTestLog("Skipping test because the window function feature flag is disabled");
-    return;
-}
-
 const coll = db[jsTestName()];
 coll.drop();
 coll.insert({a: 1});

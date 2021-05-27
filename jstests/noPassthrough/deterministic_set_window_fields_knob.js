@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-const conn = MongoRunner.runMongod({setParameter: {featureFlagWindowFunctions: true}});
+const conn = MongoRunner.runMongod();
 
 const dbName = jsTestName();
 const db = conn.getDB(dbName);

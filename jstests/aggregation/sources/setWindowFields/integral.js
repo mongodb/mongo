@@ -6,14 +6,6 @@
 
 load("jstests/aggregation/extras/window_function_helpers.js");
 
-const getParam = db.adminCommand({getParameter: 1, featureFlagWindowFunctions: 1});
-jsTestLog(getParam);
-const featureEnabled = assert.commandWorked(getParam).featureFlagWindowFunctions.value;
-if (!featureEnabled) {
-    jsTestLog("Skipping test because the window function feature flag is disabled");
-    return;
-}
-
 const coll = db.setWindowFields_integral;
 
 // Like most other window functions, the default window for $integral is [unbounded, unbounded].

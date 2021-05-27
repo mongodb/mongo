@@ -4,15 +4,6 @@
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");  // documentEq
-const featureEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagWindowFunctions: 1}))
-        .featureFlagWindowFunctions.value;
-if (!featureEnabled) {
-    jsTestLog("Skipping test because the window function feature flag is disabled");
-    return;
-}
-
 const coll = db[jsTestName()];
 coll.drop();
 
