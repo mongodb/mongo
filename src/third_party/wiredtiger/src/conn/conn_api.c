@@ -1150,6 +1150,7 @@ err:
      * the sweep server.
      */
     WT_TRET(__wt_sweep_destroy(session));
+    WT_TRET(__wt_tiered_storage_destroy(session));
 
     /*
      * Shut down the checkpoint and capacity server threads: we don't want to throttle writes and

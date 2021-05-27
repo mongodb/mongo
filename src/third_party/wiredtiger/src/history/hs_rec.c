@@ -495,11 +495,10 @@ __wt_hs_insert_updates(
          * away.
          */
         modify_cnt = 0;
-        for (; updates.size > 0 &&
-             !(upd->txnid == list->onpage_upd->txnid &&
-               upd->start_ts == list->onpage_upd->start_ts);
-             tmp = full_value, full_value = prev_full_value, prev_full_value = tmp,
-             upd = prev_upd) {
+        for (; updates.size > 0; tmp = full_value, full_value = prev_full_value,
+                                 prev_full_value = tmp, upd = prev_upd) {
+            /* We should never insert the onpage value to the history store. */
+            WT_ASSERT(session, upd != list->onpage_upd);
             WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD || upd->type == WT_UPDATE_MODIFY);
 
             tombstone = NULL;
@@ -651,11 +650,10 @@ __wt_hs_insert_updates(
             }
         }
 
-        /* If we squash the onpage value, there may be one or more updates left in the stack. */
-        if (updates.size > 0)
+        /* If we squash the onpage value, we increase the counter here. */
+        if (squashed)
             WT_STAT_CONN_DATA_INCR(session, cache_hs_write_squash);
 
-        __wt_update_vector_clear(&updates);
         /*
          * In the case that the onpage value is an out of order timestamp update and the update
          * older than it is a tombstone, it remains in the stack. Clean it up.

@@ -160,9 +160,11 @@ class test_tiered04(wttest.WiredTigerTestCase):
         self.conn.reconfigure(config)
         retain = self.get_stat(stat.conn.tiered_retention, None)
         self.assertEqual(retain, new)
-        #self.session.flush_tier(None)
-        #calls = self.get_stat(stat.conn.flush_tier, None)
-        #self.assertEqual(calls, 5)
+        self.pr("reconfigure flush_tier")
+        self.session.flush_tier(None)
+        self.pr("reconfigure get stat")
+        calls = self.get_stat(stat.conn.flush_tier, None)
+        self.assertEqual(calls, 5)
 
 if __name__ == '__main__':
     wttest.run()
