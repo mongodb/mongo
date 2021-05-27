@@ -408,7 +408,32 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                 }
             }
 
-            return cleanUpRange(serviceContext, executor, deletionTask);
+            return AsyncTry([=]() {
+                       return cleanUpRange(serviceContext, executor, deletionTask)
+                           .onError<ErrorCodes::KeyPatternShorterThanBound>([=](Status status) {
+                               ThreadClient tc(kRangeDeletionThreadName, serviceContext);
+                               {
+                                   stdx::lock_guard<Client> lk(*tc.get());
+                                   tc->setSystemOperationKillableByStepdown(lk);
+                               }
+                               auto uniqueOpCtx = tc->makeOperationContext();
+                               uniqueOpCtx->setAlwaysInterruptAtStepDownOrUp();
+
+                               LOGV2(55557,
+                                     "cleanUpRange failed due to keyPattern shorter than range "
+                                     "deletion bounds. Refreshing collection metadata to retry.",
+                                     "nss"_attr = deletionTask.getNss(),
+                                     "status"_attr = redact(status));
+
+                               onShardVersionMismatch(
+                                   uniqueOpCtx.get(), deletionTask.getNss(), boost::none);
+
+                               return status;
+                           });
+                   })
+                .until(
+                    [](Status status) { return status != ErrorCodes::KeyPatternShorterThanBound; })
+                .on(executor, CancellationToken::uncancelable());
         })
         .onError([=](const Status status) {
             ThreadClient tc(kRangeDeletionThreadName, serviceContext);

@@ -440,6 +440,8 @@ error_codes:
     
     - {code: 348,name: ChangeStreamTopologyChange, extra: ChangeStreamTopologyChangeInfo}
 
+    - {code: 349, name: KeyPatternShorterThanBound}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
