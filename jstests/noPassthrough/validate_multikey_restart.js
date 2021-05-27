@@ -35,6 +35,15 @@ let docs = testColl.find().sort({_id: 1}).toArray();
 assert.eq(1, docs.length, 'too many docs in collection: ' + tojson(docs));
 assert.eq(1, docs[0]._id, 'unexpected document content in collection: ' + tojson(docs));
 
+jsTestLog('Checking multikey query before restart');
+let multikeyQueryDocs = testColl.find({a: {$in: [4, 5, 6]}}).toArray();
+assert.eq(1,
+          multikeyQueryDocs.length,
+          'too many docs in multikey query result: ' + tojson(multikeyQueryDocs));
+assert.eq(1,
+          multikeyQueryDocs[0]._id,
+          'unexpected document content in multikey query result: ' + tojson(multikeyQueryDocs));
+
 // For the purpose of reproducing the validation error in a_1, it is important to skip validation
 // when restarting the primary node. Enabling validation here has an effect on the validate
 // command's behavior after restarting.
@@ -46,6 +55,21 @@ rst.awaitReplication();
 docs = testColl.find().sort({_id: 1}).toArray();
 assert.eq(1, docs.length, 'too many docs in collection: ' + tojson(docs));
 assert.eq(1, docs[0]._id, 'unexpected document content in collection: ' + tojson(docs));
+
+jsTestLog('Checking multikey query after restart');
+multikeyQueryDocs = testColl.find({a: {$in: [4, 5, 6]}}).toArray();
+assert.eq(3,
+          multikeyQueryDocs.length,
+          'too many docs in multikey query result: ' + tojson(multikeyQueryDocs));
+assert.eq(1,
+          multikeyQueryDocs[0]._id,
+          'unexpected document content in multikey query result: ' + tojson(multikeyQueryDocs));
+assert.eq(1,
+          multikeyQueryDocs[1]._id,
+          'unexpected document content in multikey query result: ' + tojson(multikeyQueryDocs));
+assert.eq(1,
+          multikeyQueryDocs[2]._id,
+          'unexpected document content in multikey query result: ' + tojson(multikeyQueryDocs));
 
 jsTestLog('Validating collection after restart');
 const result = assert.commandWorked(testColl.validate({full: true}));
