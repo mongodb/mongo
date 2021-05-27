@@ -411,16 +411,20 @@ public:
                 auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
                     IDLParserErrorContext("featureCompatibilityVersionDocument"), fcvObj.get());
                 changeTimestamp = fcvDoc.getChangeTimestamp();
-                invariant(changeTimestamp);
+                uassert(5722800,
+                        "The 'changeTimestamp' field is missing in the FCV document persisted by "
+                        "the Config Server. This may indicate that this document has been "
+                        "explicitly amended causing an internal data inconsistency.",
+                        changeTimestamp);
             }
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
                    request.getPhase()) {
             // Shards receive the timestamp from the Config Server's request.
             changeTimestamp = request.getChangeTimestamp();
             uassert(5563500,
-                    "The 'timestamp' field is missing even though the node is running as a shard. "
-                    "This may indicate that the 'setFeatureCompatibilityVersion' command was "
-                    "invoked directly against the shard or that the config server has not been "
+                    "The 'changeTimestamp' field is missing even though the node is running as a "
+                    "shard. This may indicate that the 'setFeatureCompatibilityVersion' command "
+                    "was invoked directly against the shard or that the config server has not been "
                     "upgraded to at least version 5.0.",
                     changeTimestamp);
         }
