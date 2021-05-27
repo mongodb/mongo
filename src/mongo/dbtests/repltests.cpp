@@ -248,8 +248,9 @@ protected:
                 }
                 repl::UnreplicatedWritesBlock uwb(&_opCtx);
                 auto entry = uassertStatusOK(OplogEntry::parse(*i));
+                const bool dataIsConsistent = true;
                 uassertStatusOK(applyOperation_inlock(
-                    &_opCtx, ctx.db(), &entry, false, getOplogApplicationMode()));
+                    &_opCtx, ctx.db(), &entry, false, getOplogApplicationMode(), dataIsConsistent));
             }
         }
     }

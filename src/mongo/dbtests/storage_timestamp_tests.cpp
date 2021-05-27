@@ -801,8 +801,9 @@ public:
         }
 
         repl::OplogEntryOrGroupedInserts groupedInserts(opPtrs.cbegin(), opPtrs.cend());
+        const bool dataIsConsistent = true;
         ASSERT_OK(repl::applyOplogEntryOrGroupedInserts(
-            _opCtx, groupedInserts, repl::OplogApplication::Mode::kSecondary));
+            _opCtx, groupedInserts, repl::OplogApplication::Mode::kSecondary, dataIsConsistent));
 
         for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
             OneOffRead oor(_opCtx, firstInsertTime.addTicks(idx).asTimestamp());
@@ -2876,7 +2877,8 @@ public:
 
     Status applyOplogBatchPerWorker(OperationContext* opCtx,
                                     std::vector<const repl::OplogEntry*>* operationsToApply,
-                                    WorkerMultikeyPathInfo* pathInfo) override;
+                                    WorkerMultikeyPathInfo* pathInfo,
+                                    bool isDataConsistent) override;
 
 private:
     // Pointer to the test's op context. This is distinct from the op context used in
@@ -2893,13 +2895,16 @@ private:
 Status SecondaryReadsDuringBatchApplicationAreAllowedApplier::applyOplogBatchPerWorker(
     OperationContext* opCtx,
     std::vector<const repl::OplogEntry*>* operationsToApply,
-    WorkerMultikeyPathInfo* pathInfo) {
+    WorkerMultikeyPathInfo* pathInfo,
+    const bool isDataConsistent) {
     if (!_testOpCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode, MODE_X)) {
         return {ErrorCodes::BadValue, "Batch applied was not holding PBWM lock in MODE_X"};
     }
 
     // Insert the document. A reader without a PBWM lock should not see it yet.
-    auto status = OplogApplierImpl::applyOplogBatchPerWorker(opCtx, operationsToApply, pathInfo);
+    const bool dataIsConsistent = true;
+    auto status = OplogApplierImpl::applyOplogBatchPerWorker(
+        opCtx, operationsToApply, pathInfo, dataIsConsistent);
     if (!status.isOK()) {
         return status;
     }
@@ -3232,8 +3237,9 @@ public:
 
                 auto start = repl::makeStartIndexBuildOplogEntry(
                     startBuildOpTime, nss, "field_1", keyPattern, collUUID, indexBuildUUID);
+                const bool dataIsConsistent = true;
                 ASSERT_OK(repl::applyOplogEntryOrGroupedInserts(
-                    _opCtx, &start, repl::OplogApplication::Mode::kSecondary));
+                    _opCtx, &start, repl::OplogApplication::Mode::kSecondary, dataIsConsistent));
 
                 // We cannot use the OperationContext to wait for the thread to reach the fail point
                 // because it also uses the ClockSourceMock.
@@ -3259,8 +3265,9 @@ public:
 
             auto commit = repl::makeCommitIndexBuildOplogEntry(
                 startBuildOpTime, nss, "field_1", keyPattern, collUUID, indexBuildUUID);
+            const bool dataIsConsistent = true;
             ASSERT_OK(repl::applyOplogEntryOrGroupedInserts(
-                _opCtx, &commit, repl::OplogApplication::Mode::kSecondary));
+                _opCtx, &commit, repl::OplogApplication::Mode::kSecondary, dataIsConsistent));
 
             // Reacquire read lock to check index metadata.
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);

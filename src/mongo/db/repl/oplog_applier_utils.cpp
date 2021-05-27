@@ -189,6 +189,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     OperationContext* opCtx,
     const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
     OplogApplication::Mode oplogApplicationMode,
+    const bool isDataConsistent,
     IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
     OpCounters* opCounters) {
     invariant(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
@@ -230,6 +231,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                                                           entryOrGroupedInserts,
                                                           shouldAlwaysUpsert,
                                                           oplogApplicationMode,
+                                                          isDataConsistent,
                                                           incrementOpsAppliedStats);
                     if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
                         throw WriteConflictException();
@@ -276,6 +278,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
     std::vector<const OplogEntry*>* ops,
     OplogApplication::Mode oplogApplicationMode,
     bool allowNamespaceNotFoundErrorsOnCrudOps,
+    const bool isDataConsistent,
     InsertGroup::ApplyFunc applyOplogEntryOrGroupedInserts) noexcept {
 
     // We cannot do document validation, because document validation could have been disabled when
@@ -284,7 +287,8 @@ Status OplogApplierUtils::applyOplogBatchCommon(
     // Group the operations by namespace in order to get larger groups for bulk inserts, but do not
     // mix up the current order of oplog entries within the same namespace (thus *stable* sort).
     stableSortByNamespace(ops);
-    InsertGroup insertGroup(ops, opCtx, oplogApplicationMode, applyOplogEntryOrGroupedInserts);
+    InsertGroup insertGroup(
+        ops, opCtx, oplogApplicationMode, isDataConsistent, applyOplogEntryOrGroupedInserts);
 
     for (auto it = ops->cbegin(); it != ops->cend(); ++it) {
         const OplogEntry& entry = **it;
@@ -299,8 +303,8 @@ Status OplogApplierUtils::applyOplogBatchCommon(
 
         // If we didn't create a group, try to apply the op individually.
         try {
-            const Status status =
-                applyOplogEntryOrGroupedInserts(opCtx, &entry, oplogApplicationMode);
+            const Status status = applyOplogEntryOrGroupedInserts(
+                opCtx, &entry, oplogApplicationMode, isDataConsistent);
 
             if (!status.isOK()) {
                 // Tried to apply an update operation but the document is missing, there must be

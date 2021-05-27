@@ -72,8 +72,13 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
             // inside. TODO(SERVER-46105)
             invariant(!op.isCommand());
             AutoGetCollection coll(opCtx, op.getNss(), MODE_IX);
-            auto status = repl::applyOperation_inlock(
-                opCtx, coll.getDb(), &op, false /*alwaysUpsert*/, oplogApplicationMode);
+            const bool isDataConsistent = true;
+            auto status = repl::applyOperation_inlock(opCtx,
+                                                      coll.getDb(),
+                                                      &op,
+                                                      false /*alwaysUpsert*/,
+                                                      oplogApplicationMode,
+                                                      isDataConsistent);
             if (!status.isOK()) {
                 return status;
             }
