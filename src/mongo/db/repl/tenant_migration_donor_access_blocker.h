@@ -187,7 +187,7 @@ public:
     // Called by all writes and reads against the database.
     //
 
-    Status checkIfCanWrite() final;
+    Status checkIfCanWrite(Timestamp writeTs) final;
     Status waitUntilCommittedOrAborted(OperationContext* opCtx) final;
 
     Status checkIfLinearizableReadWasAllowed(OperationContext* opCtx) final;
@@ -331,6 +331,7 @@ private:
 
     BlockerState _state;
 
+    Timestamp _highestAllowedWriteTimestamp;
     boost::optional<Timestamp> _blockTimestamp;
     boost::optional<repl::OpTime> _commitOpTime;
     boost::optional<repl::OpTime> _abortOpTime;

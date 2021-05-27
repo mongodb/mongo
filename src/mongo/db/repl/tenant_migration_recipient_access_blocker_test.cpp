@@ -125,7 +125,7 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, NoopFunctions) {
         getServiceContext(), getMigrationId(), getTenantId(), getDonorConnectionString());
 
     // These functions are noop functions and should not throw even in reject state.
-    ASSERT_OK(mtab.checkIfCanWrite());
+    ASSERT_OK(mtab.checkIfCanWrite(Timestamp()));
     ASSERT_OK(mtab.checkIfLinearizableReadWasAllowed(opCtx()));
     ASSERT_OK(mtab.checkIfCanBuildIndex());
 }

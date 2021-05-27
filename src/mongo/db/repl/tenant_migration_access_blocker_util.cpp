@@ -243,14 +243,14 @@ void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringDat
     }
 }
 
-void checkIfCanWriteOrThrow(OperationContext* opCtx, StringData dbName) {
+void checkIfCanWriteOrThrow(OperationContext* opCtx, StringData dbName, Timestamp writeTs) {
     // The migration protocol guarantees the recipient will not get writes until the migration
     // is committed.
     auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .getTenantMigrationAccessBlockerForDbName(dbName, MtabType::kDonor);
 
     if (mtab) {
-        auto status = mtab->checkIfCanWrite();
+        auto status = mtab->checkIfCanWrite(writeTs);
         mtab->recordTenantMigrationError(status);
         uassertStatusOK(status);
     }
