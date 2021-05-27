@@ -467,6 +467,11 @@ private:
     Status _initConfigIndexes(OperationContext* opCtx);
 
     /**
+     * Ensure that config.collections exists upon configsvr startup
+     */
+    Status _initConfigCollections(OperationContext* opCtx);
+
+    /**
      * Used during addShard to determine if there is already an existing shard that matches the
      * shard that is currently being added.  An OK return with boost::none indicates that there
      * is no conflicting shard, and we can proceed trying to add the new shard.  An OK return
