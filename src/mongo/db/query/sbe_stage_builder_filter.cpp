@@ -80,6 +80,7 @@ namespace mongo::stage_builder {
 namespace {
 
 struct MatchExpressionVisitorContext;
+const size_t kMaxChildrenForTopLevelAndOptimization = 25;
 
 /**
  * Output of the tree can come from two places:
@@ -131,7 +132,8 @@ struct MatchExpressionVisitorContext {
 
         // If the root node is an $and, store it in 'topLevelAnd'.
         // TODO: SERVER-50673: Revisit how we implement the top-level $and optimization.
-        if (root->matchType() == MatchExpression::AND) {
+        if (root->matchType() == MatchExpression::AND &&
+            root->numChildren() <= kMaxChildrenForTopLevelAndOptimization) {
             topLevelAnd = root;
         }
     }
@@ -165,7 +167,8 @@ struct MatchExpressionVisitorContext {
 
         // If the root node is an $and, store it in 'topLevelAnd'.
         // TODO: SERVER-50673: Revisit how we implement the top-level $and optimization.
-        if (root->matchType() == MatchExpression::AND) {
+        if (root->matchType() == MatchExpression::AND &&
+            root->numChildren() <= kMaxChildrenForTopLevelAndOptimization) {
             topLevelAnd = root;
         }
     }
