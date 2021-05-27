@@ -502,6 +502,25 @@ public:
             }
         }
 
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+            !ReadWriteConcernDefaults::get(opCtx).isCWRCSet(opCtx)) {
+            if (requestedVersion == FeatureCompatibility::kLatest &&
+                actualVersion < requestedVersion) {
+                LOGV2_WARNING(5686200,
+                              "The default read concern has been changed by upgrading the "
+                              "featureCompatibilityVersion to 5.0."
+                              "To keep the default read concern the same as before, use "
+                              "setDefaultRWConcern to set a cluster-wide read concern.");
+            } else if (actualVersion == FeatureCompatibility::kLatest &&
+                       actualVersion > requestedVersion) {
+                LOGV2_WARNING(5686201,
+                              "The default read concern has been changed by downgrading the "
+                              "featureCompatibilityVersion from 5.0. "
+                              "To keep the default read concern the same as before, use "
+                              "setDefaultRWConcern to set a cluster-wide read concern.");
+            }
+        }
+
         {
             // Complete transition by updating the local FCV document to the fully upgraded or
             // downgraded requestedVersion.

@@ -149,6 +149,17 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk(
     return rwc;
 }
 
+bool ReadWriteConcernDefaults::isCWRCSet(OperationContext* opCtx) {
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        repl::feature_flags::gDefaultRCLocal.isEnabled(serverGlobalParams.featureCompatibility)) {
+        auto rwcd = getDefault(opCtx);
+        return rwcd.getDefaultReadConcernSource() == DefaultReadConcernSourceEnum::kGlobal;
+    } else {
+        auto cached = _getDefaultCWRWCFromDisk(opCtx).value_or(RWConcernDefaultAndTime());
+        return cached.getDefaultReadConcern() && !cached.getDefaultReadConcern().get().isEmpty();
+    }
+}
+
 bool ReadWriteConcernDefaults::isCWWCSet(OperationContext* opCtx) {
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         repl::feature_flags::gDefaultWCMajority.isEnabled(
