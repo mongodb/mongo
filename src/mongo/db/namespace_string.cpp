@@ -335,7 +335,7 @@ NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
 }
 
 NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
-    invariant(isTimeseriesBucketsCollection());
+    invariant(isTimeseriesBucketsCollection(), ns());
     return {db(), coll().substr(kTimeseriesBucketsCollectionPrefix.size())};
 }
 
