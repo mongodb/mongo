@@ -35,7 +35,11 @@ var $config = (function() {
         function rename(db, collName) {
             var toCollName = uniqueCollectionName(this.prefix, this.tid, this.num++);
             var res = db[this.fromCollName].renameCollection(toCollName, false /* dropTarget */);
-            assertWhenOwnDB.commandWorked(res);
+
+            // SERVER-57128: NamespaceNotFound is an acceptable error if the mongos retries
+            // the rename after the coordinator has already fulfilled the original request
+            assertWhenOwnDB.commandWorkedOrFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+
             assertWhenOwnDB(db[toCollName].isCapped());
             this.fromCollName = toCollName;
         }
