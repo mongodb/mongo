@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
 
@@ -35,7 +36,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/find_and_modify_result.h"
 #include "mongo/db/query/find_and_modify_request.h"
+#include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/logger/redaction.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -50,6 +53,7 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
                                        const repl::OplogEntry& oplogWithCorrectLinks) {
     auto opType = oplogEntry.getOpType();
     auto ts = oplogEntry.getTimestamp();
+    const bool needsRetryImage = oplogEntry.getNeedsRetryImage().is_initialized();
 
     if (opType == repl::OpTypeEnum::kDelete) {
         uassert(
@@ -62,7 +66,7 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
         uassert(40607,
                 str::stream() << "No pre-image available for findAndModify retry request:"
                               << redact(request.toBSON({})),
-                oplogWithCorrectLinks.getPreImageOpTime());
+                oplogWithCorrectLinks.getPreImageOpTime() || needsRetryImage);
     } else if (opType == repl::OpTypeEnum::kInsert) {
         uassert(
             40608,
@@ -86,14 +90,14 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
                                   << " wants the document after update returned, but only before "
                                      "update document is stored, oplogTs: "
                                   << ts.toString() << ", oplog: " << redact(oplogEntry.toBSON()),
-                    oplogWithCorrectLinks.getPostImageOpTime());
+                    oplogWithCorrectLinks.getPostImageOpTime() || needsRetryImage);
         } else {
             uassert(40612,
                     str::stream() << "findAndModify retry request: " << redact(request.toBSON({}))
                                   << " wants the document before update returned, but only after "
                                      "update document is stored, oplogTs: "
                                   << ts.toString() << ", oplog: " << redact(oplogEntry.toBSON()),
-                    oplogWithCorrectLinks.getPreImageOpTime());
+                    oplogWithCorrectLinks.getPreImageOpTime() || needsRetryImage);
         }
     }
 }
@@ -103,11 +107,64 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
  * oplog.
  */
 BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& oplog) {
-    invariant(oplog.getPreImageOpTime() || oplog.getPostImageOpTime());
+    invariant(oplog.getPreImageOpTime() || oplog.getPostImageOpTime() ||
+              oplog.getNeedsRetryImage());
+    DBDirectClient client(opCtx);
+    if (oplog.getNeedsRetryImage()) {
+        // Extract image from side collection.
+        const LogicalSessionId sessionId = oplog.getSessionId().get();
+        const auto sessionIdBson = sessionId.toBSON();
+        TxnNumber txnNumber = oplog.getTxnNumber().get();
+        Timestamp ts = oplog.getTimestamp();
+        const auto query = BSON("_id" << sessionIdBson);
+        BSONObj imageDoc = client.findOne(NamespaceString::kConfigImagesNamespace.ns(), query);
+        if (imageDoc.isEmpty()) {
+            warning() << "Image lookup for a retryable findAndModify was not found for sessionId: "
+                      << sessionIdBson << " txnNumber " << txnNumber << " timestamp " << ts;
+            uasserted(
+                5637601,
+                str::stream()
+                    << "image collection no longer contains the complete write history of this "
+                       "transaction, record with sessionId: "
+                    << sessionIdBson << " cannot be found");
+        }
+
+        auto entry =
+            repl::ImageEntry::parse(IDLParserErrorContext("ImageEntryForRequest"), imageDoc);
+        if (entry.getInvalidated()) {
+            // This case is expected when a node could not correctly compute a retry image due
+            // to data inconsistency while in initial sync.
+            uasserted(ErrorCodes::IncompleteTransactionHistory,
+                      str::stream() << "Incomplete transaction history for sessionId: "
+                                    << sessionIdBson << " txnNumber: " << txnNumber);
+        }
+
+        if (entry.getTs() != oplog.getTimestamp() || entry.getTxnNumber() != oplog.getTxnNumber()) {
+            // We found a corresponding image document, but the timestamp and transaction number
+            // associated with the session record did not match the expected values from the oplog
+            // entry.
+
+            // Otherwise, it's unclear what went wrong.
+            warning() << "Image lookup for a retryable findAndModify was unable to be verified for "
+                         "sessionId: "
+                      << sessionIdBson << " txnNumberRequested: " << txnNumber
+                      << " timestampRequested " << ts << " txnNumberFound " << entry.getTxnNumber()
+                      << " timestampFound " << entry.getTs();
+            uasserted(
+                5637602,
+                str::stream()
+                    << "image collection no longer contains the complete write history of this "
+                       "transaction, record with sessionId: "
+                    << sessionIdBson << " cannot be found");
+        }
+
+        return entry.getImage();
+    }
+
+    // Extract image from oplog.
     auto opTime = oplog.getPreImageOpTime() ? oplog.getPreImageOpTime().value()
                                             : oplog.getPostImageOpTime().value();
 
-    DBDirectClient client(opCtx);
     auto oplogDoc = client.findOne(NamespaceString::kRsOplogNamespace.ns(),
                                    opTime.asQuery(),
                                    nullptr,

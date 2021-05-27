@@ -2086,6 +2086,9 @@ env.Library(
         'service_context',
         'update/update_driver',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/repl/image_collection_entry',
+    ],
 )
 
 env.CppUnitTest(

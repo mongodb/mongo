@@ -103,6 +103,7 @@ public:
     using OplogEntryBase::getDurableReplOperation;
     using OplogEntryBase::getFromMigrate;
     using OplogEntryBase::getHash;
+    using OplogEntryBase::getNeedsRetryImage;
     using OplogEntryBase::getNss;
     using OplogEntryBase::getObject;
     using OplogEntryBase::getObject2;
@@ -178,7 +179,8 @@ public:
                const boost::optional<StmtId>& statementId,
                const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
                const boost::optional<OpTime>& preImageOpTime,
-               const boost::optional<OpTime>& postImageOpTime);
+               const boost::optional<OpTime>& postImageOpTime,
+               const boost::optional<repl::RetryImageEnum>& needsRetryImage = boost::none);
 
     // DEPRECATED: This constructor can throw. Use static parse method instead.
     explicit OplogEntry(BSONObj raw);
