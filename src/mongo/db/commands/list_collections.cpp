@@ -409,6 +409,7 @@ public:
                             }
 
                             if (collection && collection->getTimeseriesOptions() &&
+                                !collection->ns().isDropPendingNamespace() &&
                                 viewCatalog->lookupWithoutValidatingDurableViews(
                                     opCtx, collection->ns().getTimeseriesViewNamespace().ns())) {
                                 // The time-series view for this buckets namespace exists, so add it
