@@ -370,7 +370,12 @@ Status ShardingCatalogManager::initializeConfigDatabaseIfNeeded(OperationContext
         }
     }
 
-    Status status = _initConfigIndexes(opCtx);
+    Status status = _initConfigCollections(opCtx);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = _initConfigIndexes(opCtx);
     if (!status.isOK()) {
         return status;
     }
@@ -513,6 +518,27 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
         return result.withContext("couldn't create ns_1_tag_1 index on config db");
     }
 
+    return Status::OK();
+}
+
+/**
+ * Ensure that config.collections exists upon configsvr startup
+ */
+Status ShardingCatalogManager::_initConfigCollections(OperationContext* opCtx) {
+    // Ensure that config.collections exist so that snapshot reads on it don't fail with
+    // SnapshotUnavailable error when it is implicitly created (when sharding a
+    // collection for the first time) but not in yet in the committed snapshot).
+    DBDirectClient client(opCtx);
+
+    BSONObj cmd = BSON("create" << CollectionType::ConfigNS.coll());
+    BSONObj result;
+    const bool ok = client.runCommand(CollectionType::ConfigNS.db().toString(), cmd, result);
+    if (!ok) {  // create returns error NamespaceExists if collection already exists
+        Status status = getStatusFromCommandResult(result);
+        if (status != ErrorCodes::NamespaceExists) {
+            return status.withContext("Could not create config.collections");
+        }
+    }
     return Status::OK();
 }
 
