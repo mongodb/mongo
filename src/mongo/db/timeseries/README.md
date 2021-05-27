@@ -29,13 +29,13 @@ certain properties:
 
 ```
 {
-    _id: <Object ID with time component equal to first measurement in this bucket>,
+    _id: <Object ID with time component equal to control.min.<time field>>,
     control: {
         // <Some statistics on the measurements such min/max values of data fields>
         version: 1,  // Version of bucket schema. Currently fixed at 1 since this is the
                      // first iteration of time-series collections.
         min: {
-            <time field>: <time of first measurement in this bucket>,
+            <time field>: <time of first measurement in this bucket, rounded down based on granularity>,
             <field0>: <minimum value of 'field0' across all measurements>,
             <field1>: <maximum value of 'field1' across all measurements>,
             ...
@@ -141,6 +141,26 @@ The first time a write batch is committed for a given bucket, the newly-formed d
 inserted. On subsequent batch commits, we perform an update operation. Instead of generating the
 full document (a so-called "classic" update), we create a DocDiff directly (a "delta" or "v2"
 update).
+
+# Granularity
+
+The `granularity` option for a time-series collection can be set at creation to be 'seconds',
+'minutes' or 'hours'. A later `collMod` operation can change the option from 'seconds' to 'minutes'
+or from 'minutes' to 'hours', but no other transitions are currently allowed. This parameter is
+intended to convey the rough time period between measurements in a given time-series, and is used to
+tweak other internal parameters that affect bucketing.
+
+The maximum span of time that a single bucket is allowed to cover is controlled by `granularity`,
+with the maximum span being set to one hour for 'seconds', 24 hours for 'minutes', and 30 days
+for 'hours'.
+
+When a new bucket is opened by the `BucketCatalog`, the timestamp component of its `_id`, and
+equivalently the value of its `control.min.<time field>`, will be taken from the first measurement
+inserted to the bucket and rounded down based on the `granularity`. It will be rounded down to the
+nearest minute for 'seconds', the nearest hour for 'minutes', and the nearest day for 'hours'. This
+rounding may not be perfect in the case of leap seconds and other irregularities in the calendar,
+and will generally be accomplished by basic modulus aritmetic operating on the number of seconds
+since the epoch, assuming 60 seconds per minute, 60 minutes per hour, and 24 hours per day.
 
 # References
 See:
