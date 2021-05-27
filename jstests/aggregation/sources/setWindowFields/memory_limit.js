@@ -10,14 +10,6 @@ load("jstests/libs/fixture_helpers.js");                         // For FixtureH
 load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
 load("jstests/libs/discover_topology.js");                       // For findNonConfigNodes.
 
-const featureEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagWindowFunctions: 1}))
-        .featureFlagWindowFunctions.value;
-if (!featureEnabled) {
-    jsTestLog("Skipping test because the window function feature flag is disabled");
-    return;
-}
-
 const coll = db[jsTestName()];
 coll.drop();
 

@@ -20,14 +20,6 @@ const nPartitions = 50;
 // Not const because post-cache doc size changes based on the number of fields accessed.
 let docSize = 2332;
 
-const featureEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagWindowFunctions: 1}))
-        .featureFlagWindowFunctions.value;
-if (!featureEnabled) {
-    jsTestLog("Skipping test because the window function feature flag is disabled");
-    return;
-}
-
 let bulk = coll.initializeUnorderedBulkOp();
 for (let i = 1; i <= nDocs; i++) {
     bulk.insert({_id: i, key: i % nPartitions, bigStr: bigStr});

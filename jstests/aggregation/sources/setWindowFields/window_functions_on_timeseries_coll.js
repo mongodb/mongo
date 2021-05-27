@@ -18,16 +18,11 @@
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 load("jstests/libs/analyze_plan.js");         // For getAggPlanStage().
 
-const windowFunctionsEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagWindowFunctions: 1}))
-        .featureFlagWindowFunctions.value;
 const timeseriesEnabled =
     assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagTimeseriesCollection: 1}))
         .featureFlagTimeseriesCollection.value;
-
-if (!windowFunctionsEnabled || !timeseriesEnabled) {
-    jsTestLog(
-        "Skipping test because the window function or time-series collection feature flag is disabled");
+if (!timeseriesEnabled) {
+    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
     return;
 }
 

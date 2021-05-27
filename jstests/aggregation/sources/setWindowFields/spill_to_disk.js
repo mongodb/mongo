@@ -15,13 +15,6 @@ load("jstests/libs/analyze_plan.js");         // For getAggPlanStages().
 load("jstests/aggregation/extras/utils.js");  // arrayEq.
 load("jstests/libs/profiler.js");             // getLatestProfileEntry.
 
-const featureEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagWindowFunctions: 1}))
-        .featureFlagWindowFunctions.value;
-if (!featureEnabled) {
-    jsTestLog("Skipping test because the window function feature flag is disabled");
-    return;
-}
 const origParamValue = assert.commandWorked(db.adminCommand({
     getParameter: 1,
     internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 1

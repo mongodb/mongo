@@ -245,10 +245,10 @@ def main(ticket: Optional[str], base_dir: str, commit_message: Optional[str],
         \b
         Search for any TODO references to a given ticket.
         ```
-        > python buildscripts/todo_check.py --ticket SERVER-56197
-        SERVER-56197
-        ./src/mongo/db/query/query_feature_flags.idl
-            33: # TODO SERVER-56197: Remove feature flag.
+        > python buildscripts/todo_check.py --ticket SERVER-1234
+        SERVER-1234
+        ./src/mongo/db/file.cpp
+            140: // TODO: SERVER-1234: Need to fix this.
         ```
 
     \b

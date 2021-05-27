@@ -4,14 +4,6 @@
 (function() {
 "use strict";
 
-const getParam = db.adminCommand({getParameter: 1, featureFlagWindowFunctions: 1});
-jsTestLog(getParam);
-const featureEnabled = assert.commandWorked(getParam).featureFlagWindowFunctions.value;
-if (!featureEnabled) {
-    jsTestLog("Skipping test because the window function feature flag is disabled");
-    return;
-}
-
 const coll = db.setWindowFields_derivative;
 
 // The default window is usually [unbounded, unbounded], but this would be surprising for

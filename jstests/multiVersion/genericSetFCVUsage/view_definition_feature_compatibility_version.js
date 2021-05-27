@@ -13,7 +13,7 @@ const testName = "view_definition_feature_compatibility_version_multiversion";
 const dbpath = MongoRunner.dataPath + testName;
 
 // An array of feature flags that must be enabled to run feature flag tests.
-const featureFlagsToEnable = ["featureFlagWindowFunctions"];
+const featureFlagsToEnable = [];
 
 // These arrays should be populated with aggregation pipelines that use
 // aggregation features in new versions of mongod. This test ensures that a view

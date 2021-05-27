@@ -37,7 +37,6 @@
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/util/visit_helper.h"
@@ -74,23 +73,19 @@ bool modifiedSortPaths(const SortPattern& pat, const DocumentSource::GetModPaths
 }
 }  // namespace
 
-REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
+REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(
     setWindowFields,
     LiteParsedDocumentSourceDefault::parse,
     document_source_set_window_fields::createFromBson,
     LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1,
-    LiteParsedDocumentSource::AllowedWithClientType::kAny,
-    ServerGlobalParams::FeatureCompatibility::Version::kVersion50,
-    ::mongo::feature_flags::gFeatureFlagWindowFunctions.isEnabledAndIgnoreFCV());
+    ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
 
-REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
+REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(
     _internalSetWindowFields,
     LiteParsedDocumentSourceDefault::parse,
     DocumentSourceInternalSetWindowFields::createFromBson,
     LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1,
-    LiteParsedDocumentSource::AllowedWithClientType::kAny,
-    ServerGlobalParams::FeatureCompatibility::Version::kVersion50,
-    ::mongo::feature_flags::gFeatureFlagWindowFunctions.isEnabledAndIgnoreFCV());
+    ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
 
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
