@@ -9,6 +9,15 @@
 # Establishes build configuration modes we can use when compiling.
 
 # Create an ASAN build variant
+
+# Clang and GCC have slightly different linker names for the ASAN library.
+set(libasan)
+if("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_C_COMPILER_ID}" STREQUAL "AppleClang")
+    set(libasan "-static-libsan")
+else()
+    set(libasan "-static-libasan")
+endif()
+
 set(CMAKE_C_FLAGS_ASAN
     "${CMAKE_C_FLAGS_DEBUG} -fsanitize=address -fno-omit-frame-pointer" CACHE STRING
     "Flags used by the C compiler for ASan build type or configuration." FORCE)
@@ -18,11 +27,11 @@ set(CMAKE_CXX_FLAGS_ASAN
     "Flags used by the C++ compiler for ASan build type or configuration." FORCE)
 
 set(CMAKE_EXE_LINKER_FLAGS_ASAN
-    "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} -fsanitize=address -static-libasan" CACHE STRING
+    "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} -fsanitize=address ${libasan}" CACHE STRING
     "Linker flags to be used to create executables for ASan build type." FORCE)
 
 set(CMAKE_SHARED_LINKER_FLAGS_ASAN
-    "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} -fsanitize=address -static-libasan" CACHE STRING
+    "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} -fsanitize=address ${libasan}" CACHE STRING
     "Linker lags to be used to create shared libraries for ASan build type." FORCE)
 
 mark_as_advanced(
@@ -33,6 +42,13 @@ mark_as_advanced(
 )
 
 # Create an UBSAN build variant
+
+# Clang doesn't need to link ubsan, this is only a GCC requirement.
+set(libubsan "")
+if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
+    set(libubsan "-lubsan")
+endif()
+
 set(CMAKE_C_FLAGS_UBSAN
     "${CMAKE_C_FLAGS_DEBUG} -fsanitize=undefined -fno-omit-frame-pointer" CACHE STRING
     "Flags used by the C compiler for UBSan build type or configuration." FORCE)
@@ -42,11 +58,11 @@ set(CMAKE_CXX_FLAGS_UBSAN
     "Flags used by the C++ compiler for UBSan build type or configuration." FORCE)
 
 set(CMAKE_EXE_LINKER_FLAGS_UBSAN
-    "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} -fsanitize=undefined -lubsan" CACHE STRING
+    "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} -fsanitize=undefined ${libubsan}" CACHE STRING
     "Linker flags to be used to create executables for UBSan build type." FORCE)
 
 set(CMAKE_SHARED_LINKER_FLAGS_UBSAN
-    "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} -fsanitize=undefined -lubsan" CACHE STRING
+    "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} -fsanitize=undefined ${libubsan}" CACHE STRING
     "Linker lags to be used to create shared libraries for UBSan build type." FORCE)
 
 mark_as_advanced(

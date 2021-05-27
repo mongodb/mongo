@@ -2557,6 +2557,7 @@ buildvariants:
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: unit-test-long
+      distros: ubuntu1804-large
     - name: unit-test-random-seed
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
@@ -2681,6 +2682,7 @@ buildvariants:
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: unit-test-long
+      distros: rhel80-large
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
     - name: compile-wtperf

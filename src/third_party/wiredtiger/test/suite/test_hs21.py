@@ -47,7 +47,7 @@ class test_hs21(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     file_name = 'test_hs21'
     numfiles = 10
-    nrows = 10000
+    nrows = 1000
 
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records, we'll hang if the history store table isn't working.

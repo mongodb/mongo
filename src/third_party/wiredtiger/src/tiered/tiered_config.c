@@ -42,6 +42,8 @@ __tiered_common_config(WT_SESSION_IMPL *session, const char **cfg, WT_BUCKET_STO
 {
     WT_CONFIG_ITEM cval;
 
+    if (bstorage == NULL)
+        return (0);
     WT_RET(__wt_config_gets(session, cfg, "tiered_storage.local_retention", &cval));
     bstorage->retain_secs = (uint64_t)cval.val;
 
@@ -153,6 +155,8 @@ __wt_tiered_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfi
 
     if (!reconfig)
         WT_RET(__wt_tiered_bucket_config(session, cfg, &conn->bstorage));
+    else
+        WT_ERR(__tiered_common_config(session, cfg, conn->bstorage));
 
     /* If the connection is not set up for tiered storage there is nothing more to do. */
     if (conn->bstorage == NULL)
@@ -161,13 +165,7 @@ __wt_tiered_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfi
     __wt_verbose(
       session, WT_VERB_TIERED, "TIERED_CONFIG: prefix %s", conn->bstorage->bucket_prefix);
 
-    /*
-     * If reconfiguring, see if the other settings have changed on the system bucket storage.
-     */
     WT_ASSERT(session, conn->bstorage != NULL);
-    if (reconfig)
-        WT_ERR(__tiered_common_config(session, cfg, conn->bstorage));
-
     WT_STAT_CONN_SET(session, tiered_object_size, conn->bstorage->object_size);
     WT_STAT_CONN_SET(session, tiered_retention, conn->bstorage->retain_secs);
 
