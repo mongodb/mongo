@@ -118,6 +118,7 @@ namespace mongo {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(WTPauseStableTimestamp);
 MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
 MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
 
@@ -1965,6 +1966,10 @@ void WiredTigerKVEngine::setJournalListener(JournalListener* jl) {
 }
 
 void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool force) {
+    if (MONGO_unlikely(WTPauseStableTimestamp.shouldFail())) {
+        return;
+    }
+
     if (stableTimestamp.isNull()) {
         return;
     }

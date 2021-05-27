@@ -124,6 +124,7 @@ public:
         OperationContext* opCtx,
         const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
         OplogApplication::Mode oplogApplicationMode,
+        bool isDataConsistent,
         IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
         OpCounters* opCounters);
 
@@ -136,6 +137,7 @@ public:
         std::vector<const OplogEntry*>* ops,
         OplogApplication::Mode oplogApplicationMode,
         bool allowNamespaceNotFoundErrorsOnCrudOps,
+        bool isDataConsistent,
         InsertGroup::ApplyFunc applyOplogEntryOrGroupedInserts) noexcept;
 };
 

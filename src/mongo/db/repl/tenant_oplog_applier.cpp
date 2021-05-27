@@ -926,7 +926,8 @@ std::vector<std::vector<const OplogEntry*>> TenantOplogApplier::_fillWriterVecto
 Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
     OperationContext* opCtx,
     const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
-    OplogApplication::Mode oplogApplicationMode) {
+    OplogApplication::Mode oplogApplicationMode,
+    const bool isDataConsistent) {
     // We must ensure the opCtx uses replicated writes, because that will ensure we get a
     // NotWritablePrimary error if a stepdown occurs.
     invariant(opCtx->writesAreReplicated());
@@ -975,12 +976,14 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
     }
     // We don't count tenant application in the ops applied stats.
     auto incrementOpsAppliedStats = [] {};
-    // We always use oplog application mode 'kInitialSync', because we're applying oplog entries to
-    // a cloned database the way initial sync does.
+    // We always use oplog application mode 'kInitialSync' and isDataConsistent 'false', because
+    // we're applying oplog entries to a cloned database the way initial sync does.
+    invariant(isDataConsistent == false);
     auto status = OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
         opCtx,
         entryOrGroupedInserts,
         OplogApplication::Mode::kInitialSync,
+        isDataConsistent,
         incrementOpsAppliedStats,
         nullptr /* opCounters*/);
     LOGV2_DEBUG(4886009,
@@ -1003,15 +1006,18 @@ Status TenantOplogApplier::_applyOplogBatchPerWorker(std::vector<const OplogEntr
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
     const bool allowNamespaceNotFoundErrorsOnCrudOps(true);
+    const bool isDataConsistent = false;
     auto status = OplogApplierUtils::applyOplogBatchCommon(
         opCtx.get(),
         ops,
         OplogApplication::Mode::kInitialSync,
         allowNamespaceNotFoundErrorsOnCrudOps,
+        isDataConsistent,
         [this](OperationContext* opCtx,
                const OplogEntryOrGroupedInserts& opOrInserts,
-               OplogApplication::Mode mode) {
-            return _applyOplogEntryOrGroupedInserts(opCtx, opOrInserts, mode);
+               OplogApplication::Mode mode,
+               const bool isDataConsistent) {
+            return _applyOplogEntryOrGroupedInserts(opCtx, opOrInserts, mode, isDataConsistent);
         });
     if (!status.isOK()) {
         LOGV2_ERROR(4886008,
