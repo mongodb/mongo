@@ -738,8 +738,8 @@ void CreateCollectionCoordinator::_finalize(OperationContext* opCtx) {
         CollectionShardingRuntime::get(opCtx, nss())->clearFilteringMetadata(opCtx);
     }
 
-    // Is it really necessary to refresh all shards? or can I assume that the shard version will be
-    // unknown and refreshed eventually?
+    // Best effort refresh to warm up cache of all involved shards so we can have a cluster ready to
+    // receive operations.
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto dbPrimaryShardId = ShardingState::get(opCtx)->shardId();
 
@@ -752,22 +752,11 @@ void CreateCollectionCoordinator::_finalize(OperationContext* opCtx) {
         }
 
         auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, chunkShardId));
-        try {
-            auto refreshCmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                "admin",
-                BSON("_flushRoutingTableCacheUpdates" << nss().ns()),
-                Seconds{30},
-                Shard::RetryPolicy::kIdempotent));
+        shard->runFireAndForgetCommand(opCtx,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       NamespaceString::kAdminDb.toString(),
+                                       BSON("_flushRoutingTableCacheUpdates" << nss().ns()));
 
-            uassertStatusOK(refreshCmdResponse.commandStatus);
-        } catch (const DBException& ex) {
-            LOGV2_WARNING(5277909,
-                          "Could not refresh shard",
-                          "shardId"_attr = shard->getId(),
-                          "error"_attr = redact(ex.reason()));
-        }
         shardsRefreshed.emplace(chunkShardId);
     }
 
