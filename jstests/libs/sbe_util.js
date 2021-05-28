@@ -32,12 +32,10 @@ function checkSBEEnabled(theDB) {
                     continue;
                 }
 
-                const getParam = conn.adminCommand(
-                    {getParameter: 1, featureFlagSBE: 1, internalQueryForceClassicEngine: 1});
-                checkResult = getParam.hasOwnProperty("featureFlagSBE") &&
-                    getParam.featureFlagSBE.value &&
-                    getParam.hasOwnProperty("internalQueryForceClassicEngine") &&
-                    !getParam.internalQueryForceClassicEngine.value;
+                const getParam =
+                    conn.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1});
+                checkResult = getParam.hasOwnProperty("internalQueryForceClassicEngine") &&
+                    !getParam.internalQueryForceClassicEngine;
                 return true;
             } catch (e) {
                 continue;
