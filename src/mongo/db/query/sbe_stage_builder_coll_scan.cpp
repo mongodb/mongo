@@ -363,7 +363,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
         // inner branch, and the execution will continue from this point further on, without
         // applying the filter.
         if (csn->stopApplyingFilterAfterFirstMatch) {
-            invariant(csn->minRecord);
             invariant(csn->direction == CollectionScanParams::FORWARD);
 
             seekRecordIdSlot = recordIdSlot;
@@ -584,7 +583,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     PlanYieldPolicy* yieldPolicy,
     bool isTailableResumeBranch,
     sbe::LockAcquisitionCallback lockAcquisitionCallback) {
-    if (csn->minRecord || csn->maxRecord) {
+    if (csn->minRecord || csn->maxRecord || csn->stopApplyingFilterAfterFirstMatch) {
         return generateOptimizedOplogScan(state,
                                           collection,
                                           csn,
