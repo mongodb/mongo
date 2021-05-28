@@ -1,6 +1,8 @@
 /**
  * Tests that retryable findAndModify will store images in the oplog while the server is in the
  * downgraded FCV, even if storeFindAndModifyImagesInSideCollection=true.
+ *
+ * @tags: [requires_document_locking]
  */
 
 (function() {
@@ -142,10 +144,10 @@
     }
 
     checkFCV(primaryAdminDB, latestFCV);
-    // By default, the parameter is set to false.
-    const result = assert.commandWorked(
-        primaryAdminDB.runCommand({getParameter: 1, storeFindAndModifyImagesInSideCollection: 1}));
-    assert.eq(false, result.storeFindAndModifyImagesInSideCollection, result);
+    // By default, the parameter is set to false. Set it explicitly in case this test is running
+    // on the build variant which enables this parameter.
+    assert.commandWorked(primaryAdminDB.runCommand(
+        {setParameter: 1, storeFindAndModifyImagesInSideCollection: false}));
     // findAndModify writes store images in the oplog while the parameter is turned off.
     runTest(true /* storeInOplog */);
 

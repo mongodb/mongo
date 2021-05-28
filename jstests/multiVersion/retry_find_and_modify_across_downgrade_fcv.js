@@ -2,6 +2,8 @@
  * Tests that when storeFindAndModifyImagesInSideCollection=true, retrying a findAndModify after an
  * FCV downgrade will return an error indicating that no write history was found for the
  * transaction.
+ *
+ * @tags: [requires_document_locking]
  */
 
 (function() {
