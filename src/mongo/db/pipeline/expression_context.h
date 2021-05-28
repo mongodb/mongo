@@ -58,6 +58,15 @@ namespace mongo {
 
 class AggregateCommandRequest;
 
+/**
+ * The structure ExpressionCounters encapsulates counters for match, aggregate, and other
+ * expression types as seen in the end-user queries.
+ */
+struct ExpressionCounters {
+    StringMap<uint64_t> aggExprCountersMap;
+    StringMap<uint64_t> matchExprCountersMap;
+};
+
 class ExpressionContext : public RefCountable {
 public:
     static constexpr size_t kMaxSubPipelineViewDepth = 20;
@@ -316,6 +325,22 @@ public:
         return JsExecution::get(opCtx, scopeObj, ns.db(), loadStoredProcedures, jsHeapLimitMB);
     }
 
+    /**
+     * Create optional internal expression counters and start counting.
+     */
+    void startExpressionCounters();
+
+    /**
+     * Increment the counter for the match expression with a given name.
+     */
+    void incrementMatchExprCounter(StringData name);
+
+    /**
+     * Merge expression counters from the current expression context into the global maps
+     * and stop counting.
+     */
+    void stopExpressionCounters();
+
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
     boost::optional<ExplainOptions::Verbosity> explain;
 
@@ -413,6 +438,9 @@ protected:
     StringMap<ResolvedNamespace> _resolvedNamespaces;
 
     int _interruptCounter = kInterruptCheckPeriod;
+
+private:
+    boost::optional<ExpressionCounters> _expressionCounters = boost::none;
 };
 
 }  // namespace mongo

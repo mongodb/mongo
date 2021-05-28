@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
@@ -221,6 +222,26 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     // intended to be used for executing a separate aggregation pipeline.
 
     return expCtx;
+}
+
+void ExpressionContext::startExpressionCounters() {
+    if (!_expressionCounters) {
+        _expressionCounters = boost::make_optional<ExpressionCounters>({});
+    }
+}
+
+void ExpressionContext::incrementMatchExprCounter(StringData name) {
+    if (_expressionCounters) {
+        ++_expressionCounters.get().matchExprCountersMap[name];
+    }
+}
+
+void ExpressionContext::stopExpressionCounters() {
+    if (_expressionCounters) {
+        operatorCountersMatchExpressions.mergeCounters(
+            _expressionCounters.get().matchExprCountersMap);
+    }
+    _expressionCounters = boost::none;
 }
 
 }  // namespace mongo

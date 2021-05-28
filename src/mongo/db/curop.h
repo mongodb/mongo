@@ -775,6 +775,16 @@ public:
         _tickSource = tickSource;
     }
 
+    /**
+     * Merge match counters from the current operation into the global map and stop counting.
+     */
+    void stopMatchExprCounter();
+
+    /**
+     * Increment the counter for the match expression with given name in the current operation.
+     */
+    void incrementMatchExprCounter(StringData name);
+
 private:
     class CurOpStack;
 
@@ -846,4 +856,5 @@ private:
 
     TickSource* _tickSource = nullptr;
 };
+
 }  // namespace mongo
