@@ -33,6 +33,7 @@
 
 namespace mongo {
 namespace projection_ast {
+class ASTNode;
 class MatchExpressionASTNode;
 class ProjectionPathASTNode;
 class ProjectionPositionalASTNode;
@@ -64,5 +65,35 @@ public:
 
 using ProjectionASTMutableVisitor = ProjectionASTVisitor<false>;
 using ProjectionASTConstVisitor = ProjectionASTVisitor<true>;
+
+template <bool IsConst = false>
+class ProjectionASTWalker {
+public:
+    using VisitorPtr = ProjectionASTVisitor<IsConst>*;
+    using ASTNodePtr = tree_walker::MaybeConstPtr<IsConst, ASTNode>;
+
+    ProjectionASTWalker(VisitorPtr preVisitor, VisitorPtr inVisitor, VisitorPtr postVisitor)
+        : _preVisitor{preVisitor}, _inVisitor{inVisitor}, _postVisitor{postVisitor} {}
+
+    void preVisit(ASTNodePtr node) {
+        node->acceptVisitor(_preVisitor);
+    }
+
+    void postVisit(ASTNodePtr node) {
+        node->acceptVisitor(_postVisitor);
+    }
+
+    void inVisit(long count, ASTNodePtr node) {
+        node->acceptVisitor(_inVisitor);
+    }
+
+private:
+    VisitorPtr _preVisitor;
+    VisitorPtr _inVisitor;
+    VisitorPtr _postVisitor;
+};
+
+using ProjectionASTMutableWalker = ProjectionASTWalker<false>;
+using ProjectionASTConstWalker = ProjectionASTWalker<true>;
 }  // namespace projection_ast
 }  // namespace mongo

@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <type_traits>
+
 namespace mongo::tree_walker {
 /**
  * A template type which resolves to 'const T*' if 'IsConst' argument is 'true', and to 'T*'
