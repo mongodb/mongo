@@ -78,7 +78,8 @@ ChunkRange extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata,
  * The executor is initialized on the first call to this function. Uses a shared_ptr
  * because a shared_ptr is required to work with ExecutorFutures.
  */
-std::shared_ptr<executor::ThreadPoolTaskExecutor> getMigrationUtilExecutor();
+std::shared_ptr<executor::ThreadPoolTaskExecutor> getMigrationUtilExecutor(
+    ServiceContext* serviceContext);
 
 /**
  * Creates a query object that can used to find overlapping ranges in the pending range deletions
