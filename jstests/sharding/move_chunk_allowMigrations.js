@@ -172,6 +172,29 @@ const testConfigsvrSetAllowMigrationsCommand = function() {
 
     // Check that the collection version has been bumped and the shard has refreshed.
     ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(3, 0));
+
+    // Check that _configsvrSetAllowMigrations validates the 'collectionUUID' parameter if passed
+    const collectionUUID = configDB.collections.findOne({_id: ns}).uuid;
+    const anotherUUID = UUID();
+
+    assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
+        _configsvrSetAllowMigrations: ns,
+        allowMigrations: false,
+        collectionUUID: anotherUUID,
+        writeConcern: {w: "majority"}
+    }),
+                                 ErrorCodes.InvalidUUID);
+    assert.eq(undefined, configDB.collections.findOne({_id: ns}).allowMigrations);
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(3, 0));
+
+    assert.commandWorked(st.configRS.getPrimary().adminCommand({
+        _configsvrSetAllowMigrations: ns,
+        allowMigrations: false,
+        collectionUUID: collectionUUID,
+        writeConcern: {w: "majority"}
+    }));
+    assert.eq(false, configDB.collections.findOne({_id: ns}).allowMigrations);
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(4, 0));
 };
 
 // Test cases that should disable the balancer.
