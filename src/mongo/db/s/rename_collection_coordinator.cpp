@@ -164,7 +164,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then(_executePhase(
-            Phase::kCheckPreconditionsAndFreezeMigrations,
+            Phase::kCheckPreconditions,
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
@@ -173,73 +173,89 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 const auto& fromNss = nss();
                 const auto& toNss = _doc.getTo();
 
-                // Make sure the source collection exists
-                const auto optSourceCollType = getShardedCollection(opCtx, nss());
-                const bool sourceIsSharded = (bool)optSourceCollType;
+                try {
+                    // Make sure the source collection exists
+                    const auto optSourceCollType = getShardedCollection(opCtx, nss());
+                    const bool sourceIsSharded = (bool)optSourceCollType;
+                    if (sourceIsSharded) {
+                        uassert(ErrorCodes::CommandFailed,
+                                str::stream() << "Source and destination collections must be on "
+                                                 "the same database because "
+                                              << fromNss << " is sharded.",
+                                fromNss.db() == toNss.db());
 
-                if (sourceIsSharded) {
-                    uassert(ErrorCodes::CommandFailed,
-                            str::stream() << "Source and destination collections must be on the "
-                                             "same database because "
-                                          << fromNss << " is sharded.",
-                            fromNss.db() == toNss.db());
-                    _doc.setOptShardedCollInfo(optSourceCollType);
-                    _doc.setSourceUUID(optSourceCollType->getUuid());
-                } else {
+                        _doc.setOptShardedCollInfo(optSourceCollType);
+                        _doc.setSourceUUID(optSourceCollType->getUuid());
+                    } else {
+                        {
+                            Lock::DBLock dbLock(opCtx, fromNss.db(), MODE_IS);
+                            Lock::CollectionLock collLock(opCtx, fromNss, MODE_IS);
+                            const auto sourceCollPtr =
+                                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
+                                                                                           fromNss);
+
+                            uassert(ErrorCodes::NamespaceNotFound,
+                                    str::stream() << "Collection " << fromNss << " doesn't exist.",
+                                    sourceCollPtr);
+
+                            _doc.setSourceUUID(sourceCollPtr->uuid());
+                        }
+
+                        if (fromNss.db() != toNss.db()) {
+                            sharding_ddl_util::checkDbPrimariesOnTheSameShard(
+                                opCtx, fromNss, toNss);
+                        }
+                    }
+
+                    // Make sure the target namespace is not a view
                     {
-                        Lock::DBLock dbLock(opCtx, fromNss.db(), MODE_IS);
-                        Lock::CollectionLock collLock(opCtx, fromNss, MODE_IS);
-                        const auto sourceCollPtr =
-                            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
-                                                                                       fromNss);
-
-                        uassert(ErrorCodes::NamespaceNotFound,
-                                str::stream() << "Collection " << fromNss << " doesn't exist.",
-                                sourceCollPtr);
-
-                        _doc.setSourceUUID(sourceCollPtr->uuid());
+                        Lock::DBLock dbLock(opCtx, toNss.db(), MODE_IS);
+                        const auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, toNss.db());
+                        if (db) {
+                            uassert(ErrorCodes::CommandNotSupportedOnView,
+                                    str::stream() << "Can't rename to target collection `" << toNss
+                                                  << "` because it is a view.",
+                                    !ViewCatalog::get(db)->lookup(opCtx, toNss.ns()));
+                        }
                     }
 
-                    if (fromNss.db() != toNss.db()) {
-                        sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
-                    }
+                    const auto targetIsSharded = (bool)getShardedCollection(opCtx, toNss);
+                    _doc.setTargetIsSharded(targetIsSharded);
+
+                    sharding_ddl_util::checkShardedRenamePreconditions(
+                        opCtx, toNss, _doc.getDropTarget());
+                } catch (const DBException&) {
+                    _completeOnError = true;
+                    throw;
                 }
-
-                // Make sure the target namespace is not a view
-                {
-                    Lock::DBLock dbLock(opCtx, toNss.db(), MODE_IS);
-                    const auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, toNss.db());
-                    if (db) {
-                        uassert(ErrorCodes::CommandNotSupportedOnView,
-                                str::stream() << "Can't rename to target collection `" << toNss
-                                              << "` because it is a view.",
-                                !ViewCatalog::get(db)->lookup(opCtx, toNss.ns()));
-                    }
-                }
-
-                const auto targetIsSharded = (bool)getShardedCollection(opCtx, toNss);
-                _doc.setTargetIsSharded(targetIsSharded);
-
-                sharding_ddl_util::checkShardedRenamePreconditions(
-                    opCtx, toNss, _doc.getDropTarget());
-
-                // Block migrations on involved sharded collections
-                if (sourceIsSharded) {
-                    sharding_ddl_util::stopMigrations(opCtx, nss());
-                }
-
-                if (targetIsSharded) {
-                    sharding_ddl_util::stopMigrations(opCtx, _doc.getTo());
-                }
-
-                ShardingLogging::get(opCtx)->logChange(
-                    opCtx,
-                    "renameCollection.start",
-                    nss().ns(),
-                    BSON("source" << fromNss.toString() << "destination" << toNss.toString()),
-                    ShardingCatalogClient::kMajorityWriteConcern);
             }))
-        .then(_executePhase(Phase::kBlockCRUDAndRename,
+        .then(_executePhase(Phase::kFreezeMigrations,
+                            [this, executor = executor, anchor = shared_from_this()] {
+                                auto opCtxHolder = cc().makeOperationContext();
+                                auto* opCtx = opCtxHolder.get();
+                                getForwardableOpMetadata().setOn(opCtx);
+
+                                const auto& fromNss = nss();
+                                const auto& toNss = _doc.getTo();
+
+                                ShardingLogging::get(opCtx)->logChange(
+                                    opCtx,
+                                    "renameCollection.start",
+                                    fromNss.ns(),
+                                    BSON("source" << fromNss.toString() << "destination"
+                                                  << toNss.toString()),
+                                    ShardingCatalogClient::kMajorityWriteConcern);
+
+                                // Block migrations on involved sharded collections
+                                if (_doc.getOptShardedCollInfo()) {
+                                    sharding_ddl_util::stopMigrations(opCtx, fromNss);
+                                }
+
+                                if (_doc.getTargetIsSharded()) {
+                                    sharding_ddl_util::stopMigrations(opCtx, toNss);
+                                }
+                            }))
+        .then(_executePhase(Phase::kBlockCrudAndRename,
                             [this, executor = executor, anchor = shared_from_this()] {
                                 auto opCtxHolder = cc().makeOperationContext();
                                 auto* opCtx = opCtxHolder.get();
@@ -334,7 +350,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     nss().ns(),
                     BSON("source" << nss().toString() << "destination" << _doc.getTo().toString()),
                     ShardingCatalogClient::kMajorityWriteConcern);
-
                 LOGV2(5460504, "Collection renamed", "namespace"_attr = nss());
             }))
         .onError([this, anchor = shared_from_this()](const Status& status) {

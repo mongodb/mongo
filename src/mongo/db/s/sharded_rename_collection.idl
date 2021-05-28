@@ -45,8 +45,9 @@ enums:
         type: string
         values:
             kUnset: "unset"
-            kCheckPreconditionsAndFreezeMigrations: "checkPreconditionsAndFreezeMigrations"
-            kBlockCRUDAndRename: "blockCRUDAndRename"
+            kCheckPreconditions: "checkPreconditions"
+            kFreezeMigrations: "freezeMigrations"
+            kBlockCrudAndRename: "blockCRUDAndRename"
             kRenameMetadata: "renameMetadata"
             kUnblockCRUD: "unblockCRUD"
             kSetResponse: "setResponse"
