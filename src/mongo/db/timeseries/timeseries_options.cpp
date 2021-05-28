@@ -27,26 +27,42 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_options.h"
+
+#include "mongo/db/catalog/collection_catalog.h"
 
 namespace mongo {
 
-class NamespaceString;
-class OperationContext;
-
-/**
- * Namespace for helper functions related to time-series collections.
- */
 namespace timeseries {
 
-/**
- * Returns a copy of the time-series options for namespace 'nss', if 'nss' refers to a time-series
- * collection. Otherwise returns boost::none.
- */
 boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
-                                                        const NamespaceString& nss);
+                                                        const NamespaceString& nss) {
+    auto bucketsNs = nss.makeTimeseriesBucketsNamespace();
+    auto bucketsColl =
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
+    if (!bucketsColl) {
+        return boost::none;
+    }
+    return bucketsColl->getTimeseriesOptions();
+}
+
+int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity) {
+    switch (granularity) {
+        case BucketGranularityEnum::Seconds:
+            // 3600 seconds in an hour
+            return 60 * 60;
+        case BucketGranularityEnum::Minutes:
+            // 1440 minutes in a day
+            return 60 * 60 * 24;
+        case BucketGranularityEnum::Hours:
+            // 720 hours in an average month. Note that this only affects internal bucketing and
+            // query optimizations, but users should not depend on or be aware of this estimation.
+            return 60 * 60 * 24 * 30;
+    }
+    MONGO_UNREACHABLE;
+}
 
 }  // namespace timeseries
 }  // namespace mongo

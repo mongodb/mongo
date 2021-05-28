@@ -27,26 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/timeseries/timeseries_lookup.h"
-
-#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 
 namespace mongo {
 
+class NamespaceString;
+class OperationContext;
+
+/**
+ * Namespace for helper functions related to time-series collections.
+ */
 namespace timeseries {
 
+/**
+ * Returns a copy of the time-series options for namespace 'nss', if 'nss' refers to a time-series
+ * collection. Otherwise returns boost::none.
+ */
 boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
-                                                        const NamespaceString& nss) {
-    auto bucketsNs = nss.makeTimeseriesBucketsNamespace();
-    auto bucketsColl =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
-    if (!bucketsColl) {
-        return boost::none;
-    }
-    return bucketsColl->getTimeseriesOptions();
-}
+                                                        const NamespaceString& nss);
+
+/**
+ * Returns the default bucket timespan associated with the given granularity.
+ */
+int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity);
 
 }  // namespace timeseries
 }  // namespace mongo

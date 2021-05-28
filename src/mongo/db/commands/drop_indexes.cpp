@@ -52,7 +52,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
-#include "mongo/db/timeseries/timeseries_lookup.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"

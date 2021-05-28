@@ -35,6 +35,7 @@ imports:
     - "mongo/db/auth/access_checks.idl"
     - "mongo/idl/basic_types.idl"
     - "mongo/db/catalog/collection_options.idl"
+    - "mongo/db/timeseries/timeseries.idl"
 
 structs:
     CollModIndex:
@@ -70,6 +71,14 @@ structs:
             hidden_new:
                 optional: true
                 type: safeBool
+
+    CollModTimeseries:
+        description: "A type representing the adjustable options on timeseries collections"
+        strict: true
+        fields:
+            granularity:
+                optional: true
+                type: BucketGranularity
 
 commands:
     collMod:
@@ -133,4 +142,8 @@ commands:
                 optional: true
                 type:
                     variant: [string, safeInt64]
+            timeseries:
+                description: "Adjusts parameters for timeseries collections"
+                optional: true
+                type: CollModTimeseries
         reply_type: CollModReply

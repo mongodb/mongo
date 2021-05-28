@@ -41,7 +41,7 @@
 #include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/timeseries/timeseries_lookup.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/shard_collection_gen.h"

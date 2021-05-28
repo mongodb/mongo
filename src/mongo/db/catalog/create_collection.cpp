@@ -52,6 +52,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
@@ -121,24 +122,6 @@ Status _createView(OperationContext* opCtx,
     });
 }
 
-namespace {
-int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity) {
-    switch (granularity) {
-        case BucketGranularityEnum::Seconds:
-            // 3600 seconds in an hour
-            return 60 * 60;
-        case BucketGranularityEnum::Minutes:
-            // 1440 minutes in a day
-            return 60 * 60 * 24;
-        case BucketGranularityEnum::Hours:
-            // 720 hours in an average month. Note that this only affects internal bucketing and
-            // query optimizations, but users should not depend on or be aware of this estimation.
-            return 60 * 60 * 24 * 30;
-    }
-    MONGO_UNREACHABLE;
-}
-}  // namespace
-
 Status _createTimeseries(OperationContext* opCtx,
                          const NamespaceString& ns,
                          const CollectionOptions& optionsArg) {
@@ -154,7 +137,7 @@ Status _createTimeseries(OperationContext* opCtx,
     // Users may not pass a 'bucketMaxSpanSeconds' other than the default. Instead they should rely
     // on the default behavior from the 'granularity'.
     auto granularity = options.timeseries->getGranularity();
-    auto maxSpanSeconds = getMaxSpanSecondsFromGranularity(granularity);
+    auto maxSpanSeconds = timeseries::getMaxSpanSecondsFromGranularity(granularity);
     uassert(5510500,
             fmt::format("Timeseries 'bucketMaxSpanSeconds' is not configurable to a value other "
                         "than the default of {} for the provided granularity",

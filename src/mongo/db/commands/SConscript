@@ -354,7 +354,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/storage/two_phase_index_build_knobs_idl",
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_index_schema_conversion_functions',
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_lookup',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/views/views_mongod',
         '$BUILD_DIR/mongo/executor/async_request_executor',
