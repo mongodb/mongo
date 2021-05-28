@@ -119,6 +119,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile
     );
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
+    expCtx->startExpressionCounters();
+
     return expCtx;
 }
 

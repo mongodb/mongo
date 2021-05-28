@@ -69,6 +69,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/dbref.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
@@ -173,6 +174,7 @@ StatusWithMatchExpression parseRegexElement(StringData name,
     if (e.type() != BSONType::RegEx)
         return {Status(ErrorCodes::BadValue, "not a regex")};
 
+    expCtx->incrementMatchExprCounter("$regex");
     return {std::make_unique<RegexMatchExpression>(
         name,
         e.regex(),
@@ -317,6 +319,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
             if (auto&& expr = parsedExpression.getValue())
                 root->add(std::move(expr));
 
+            expCtx->incrementMatchExprCounter(e.fieldNameStringData());
             continue;
         }
 
@@ -337,7 +340,6 @@ StatusWithMatchExpression parse(const BSONObj& obj,
             auto result = parseRegexElement(e.fieldNameStringData(), e, expCtx);
             if (!result.isOK())
                 return result;
-
             addExpressionToRoot(expCtx, root.get(), std::move(result.getValue()));
             continue;
         }
@@ -353,7 +355,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
                             allowedFeatures);
         if (!eq.isOK())
             return eq;
-
+        expCtx->incrementMatchExprCounter("$eq");
         addExpressionToRoot(expCtx, root.get(), std::move(eq.getValue()));
     }
 
@@ -415,7 +417,9 @@ StatusWithMatchExpression parseSampleRate(StringData name,
         // DeMorgan's law here you will be suprised that $sampleRate will accept NaN as a valid
         // argument.
         return {Status(ErrorCodes::BadValue, "numeric argument to $sampleRate must be in [0, 1]")};
-    } else if (x == kRandomMinValue) {
+    }
+
+    if (x == kRandomMinValue) {
         return std::make_unique<ExprMatchExpression>(
             ExpressionConstant::create(expCtx.get(), Value(false)),
             expCtx,
@@ -1194,6 +1198,7 @@ StatusWithMatchExpression parseGeo(StringData name,
             return status;
         }
         expCtx->sbeCompatible = false;
+        expCtx->incrementMatchExprCounter(section.firstElementFieldName());
         return {std::make_unique<GeoNearMatchExpression>(name, nq.release(), section)};
     }
 }
@@ -2009,6 +2014,7 @@ Status parseSub(StringData name,
         if (!s.isOK())
             return s.getStatus();
 
+        expCtx->incrementMatchExprCounter(deep.fieldNameStringData());
         if (s.getValue()) {
             addExpressionToRoot(expCtx, root, std::move(s.getValue()));
         }
@@ -2171,6 +2177,33 @@ retrievePathlessParser(StringData name) {
     }
     return func->second;
 }
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(MatchExpressionCounters,
+                                     ("PathlessOperatorMap", "MatchExpressionParser"))
+(InitializerContext* context) {
+    static const std::set<std::string> exceptionsSet{"within",   // deprecated
+                                                     "geoNear",  // aggregation stage
+                                                     "db",       // $-prefixed field names
+                                                     "id",
+                                                     "ref",
+                                                     "options"};
+
+    for (auto&& [name, keyword] : *queryOperatorMap) {
+        if (name[0] == '_' || exceptionsSet.count(name) > 0) {
+            continue;
+        }
+        operatorCountersMatchExpressions.addMatchExprCounter("$" + name);
+    }
+    for (auto&& [name, fn] : *pathlessOperatorMap) {
+        if (name[0] == '_' || exceptionsSet.count(name) > 0) {
+            continue;
+        }
+        operatorCountersMatchExpressions.addMatchExprCounter("$" + name);
+    }
+    operatorCountersMatchExpressions.addMatchExprCounter("$not");
+}
+
+
 }  // namespace
 
 boost::optional<PathAcceptingKeyword> MatchExpressionParser::parsePathAcceptingKeyword(
