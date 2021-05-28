@@ -328,22 +328,6 @@ var {DataConsistencyChecker} = (function() {
                             delete syncingInfo.idIndex.ns;
                         }
 
-                        // TODO: SERVER-54967 Remove workaround for comparing size
-                        let sizeDeleted = false;
-                        let sourceSize = sourceInfo.options.size;
-                        let syncingSize = syncingInfo.options.size;
-
-                        // Compare 'size' field in 'options' field outside of bsonBinaryEqual as it
-                        // could be saved as a NumberDecimal or NumberLong in versions 4.4 and
-                        // before.
-                        if (jsTest.options().useRandomBinVersionsWithinReplicaSet &&
-                            sourceInfo.options.size == syncingInfo.options.size &&
-                            sourceInfo.options.size !== syncingInfo.options.size) {
-                            delete sourceInfo.options.size;
-                            delete syncingInfo.options.size;
-                            sizeDeleted = true;
-                        }
-
                         if (!bsonBinaryEqual(syncingInfo, sourceInfo)) {
                             prettyPrint(
                                 `the two nodes have different attributes for the collection or view ${
@@ -353,13 +337,6 @@ var {DataConsistencyChecker} = (function() {
                                                     syncingCollInfos,
                                                     syncingInfo.name);
                             success = false;
-                        }
-
-                        // Deleted sizes must be added back to prevent comparison between nodes that
-                        // have not had their size removed.
-                        if (sizeDeleted) {
-                            sourceInfo.options.size = sourceSize;
-                            syncingInfo.options.size = syncingSize;
                         }
                     }
                 });
