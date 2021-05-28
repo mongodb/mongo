@@ -150,8 +150,46 @@ void removeChunksForDroppedCollection(OperationContext* opCtx,
             return BSON(ChunkType::ns(nssOrUUID.nss()->ns()));
         }
     }();
-    uassertStatusOK(catalogClient->removeConfigDocuments(
-        opCtx, ChunkType::ConfigNS, chunksQuery, ShardingCatalogClient::kMajorityWriteConcern));
+
+    bool usingNssHint = true;
+    while (true) {
+        auto getHint = [&]() {
+            return usingNssHint ? BSON(ChunkType::ns() << 1 << ChunkType::min() << 1)
+                                : BSON(ChunkType::collectionUUID() << 1 << ChunkType::min() << 1);
+        };
+
+        try {
+            uassertStatusOK(
+                // TODO SERVER-57221 don't use hint if not relevant anymore for delete performances
+                catalogClient->removeConfigDocuments(opCtx,
+                                                     ChunkType::ConfigNS,
+                                                     chunksQuery,
+                                                     ShardingCatalogClient::kMajorityWriteConcern,
+                                                     getHint()));
+
+            // Exit the loop just when all the chunks have been successfully removed.
+            break;
+        } catch (ExceptionFor<ErrorCodes::BadValue>& ex) {
+            // The initially chosen indexes on `config.chunks` could not exist, catching the
+            // exception to use the old/new one.
+            LOGV2_INFO(5730700,
+                       "Index not found, switching index used for deleting chunks",
+                       "oldIndex"_attr = getHint(),
+                       "err"_attr = ex);
+            usingNssHint = !usingNssHint;
+        } catch (ExceptionFor<ErrorCodes::QueryPlanKilled>& ex) {
+            // The indexes on `config.chunks` could change when yielding during upgrade/downgrade,
+            // catching the exception to use the old/new one.
+            LOGV2_INFO(5730701,
+                       "Index dropped, switching index for deleting chunks",
+                       "oldIndex"_attr = getHint(),
+                       "err"_attr = ex);
+            usingNssHint = !usingNssHint;
+        } catch (ExceptionFor<ErrorCodes::NetworkInterfaceExceededTimeLimit>&) {
+            // The catalog client request could timeout before removing all the chunks: loop again
+            // to delete the remaining documents.
+        }
+    }
 }
 
 void removeTagsForDroppedCollection(OperationContext* opCtx, const NamespaceString& nss) {

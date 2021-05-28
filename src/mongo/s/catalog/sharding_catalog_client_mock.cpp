@@ -159,7 +159,8 @@ StatusWith<bool> ShardingCatalogClientMock::updateConfigDocument(
 Status ShardingCatalogClientMock::removeConfigDocuments(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         const BSONObj& query,
-                                                        const WriteConcernOptions& writeConcern) {
+                                                        const WriteConcernOptions& writeConcern,
+                                                        boost::optional<BSONObj> hint) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

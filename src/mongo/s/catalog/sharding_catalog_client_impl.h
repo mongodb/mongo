@@ -151,7 +151,8 @@ public:
     Status removeConfigDocuments(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const BSONObj& query,
-                                 const WriteConcernOptions& writeConcern) override;
+                                 const WriteConcernOptions& writeConcern,
+                                 boost::optional<BSONObj> hint = boost::none) override;
 
     StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
         OperationContext* opCtx,

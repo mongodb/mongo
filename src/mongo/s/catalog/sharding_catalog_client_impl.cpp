@@ -1205,7 +1205,8 @@ StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
 Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         const BSONObj& query,
-                                                        const WriteConcernOptions& writeConcern) {
+                                                        const WriteConcernOptions& writeConcern,
+                                                        boost::optional<BSONObj> hint) {
     invariant(nss.db() == NamespaceString::kConfigDb);
 
     BatchedCommandRequest request([&] {
@@ -1213,6 +1214,9 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
         deleteOp.setDeletes({[&] {
             write_ops::DeleteOpEntry entry;
             entry.setQ(query);
+            if (hint) {
+                entry.setHint(*hint);
+            }
             entry.setMulti(true);
             return entry;
         }()});
