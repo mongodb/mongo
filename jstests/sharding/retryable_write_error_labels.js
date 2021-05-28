@@ -153,7 +153,9 @@ function testMongosError() {
     MongoRunner.stopMongos(st.s);
     try {
         const retryableInsertRes = retryableInsertThread.returnData();
-        checkErrorCode(retryableInsertRes, ErrorCodes.InterruptedAtShutdown, false /* isWCError */);
+        checkErrorCode(retryableInsertRes,
+                       [ErrorCodes.InterruptedAtShutdown, ErrorCodes.CallbackCanceled],
+                       false /* isWCError */);
         assertContainRetryableErrorLabel(retryableInsertRes);
     } catch (e) {
         if (!isNetworkError(e)) {
