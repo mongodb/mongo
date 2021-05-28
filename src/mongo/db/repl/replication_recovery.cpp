@@ -384,6 +384,8 @@ void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Time
         fassert(31436, "No recovery timestamp, cannot recover from the oplog");
     }
 
+    startPoint = _adjustStartPointIfNecessary(opCtx, startPoint.get());
+
     invariant(!endPoint.isNull());
 
     if (*startPoint == endPoint) {
@@ -511,7 +513,8 @@ void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCt
         // Allow "oldest" timestamp to move forward freely.
         _storageInterface->setStableTimestamp(opCtx->getServiceContext(), Timestamp::min());
     }
-    _applyToEndOfOplog(opCtx, stableTimestamp, topOfOplog.getTimestamp(), recoveryMode);
+    auto startPoint = _adjustStartPointIfNecessary(opCtx, stableTimestamp);
+    _applyToEndOfOplog(opCtx, startPoint, topOfOplog.getTimestamp(), recoveryMode);
     if (recoveryMode == RecoveryMode::kStartupFromStableTimestamp && startupRecoveryForRestore) {
         _storageInterface->setInitialDataTimestamp(opCtx->getServiceContext(),
                                                    topOfOplog.getTimestamp());
@@ -842,6 +845,49 @@ void ReplicationRecoveryImpl::_truncateOplogIfNeededAndThenClearOplogTruncateAft
     // oplog -- and so that we do not truncate future entries erroneously.
     _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
     JournalFlusher::get(opCtx)->waitForJournalFlush();
+}
+
+Timestamp ReplicationRecoveryImpl::_adjustStartPointIfNecessary(OperationContext* opCtx,
+                                                                Timestamp startPoint) {
+    // Set up read on oplog collection.
+    AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+    const auto& oplogCollection = oplogRead.getCollection();
+    if (!oplogCollection) {
+        LOGV2_FATAL_NOTRACE(
+            5466600,
+            "Cannot find oplog collection for recovery oplog application start point",
+            "oplogNss"_attr = NamespaceString::kRsOplogNamespace);
+    }
+
+    boost::optional<BSONObj> adjustmentOplogEntryBSON =
+        _storageInterface->findOplogEntryLessThanOrEqualToTimestamp(
+            opCtx, oplogCollection, startPoint);
+
+    if (!adjustmentOplogEntryBSON) {
+        LOGV2_FATAL_NOTRACE(
+            5466601,
+            "Could not find LTE oplog entry for oplog application start point for recovery",
+            "startPoint"_attr = startPoint);
+    }
+
+    auto adjustmentOpTime =
+        fassert(5466602, OpTime::parseFromOplogEntry(adjustmentOplogEntryBSON.get()));
+    auto adjustmentTimestamp = adjustmentOpTime.getTimestamp();
+
+    if (startPoint != adjustmentTimestamp) {
+        LOGV2(5466603,
+              "Start point for recovery oplog application not found in oplog. Adjusting start "
+              "point to earlier entry",
+              "oldStartPoint"_attr = startPoint,
+              "newStartPoint"_attr = adjustmentTimestamp);
+        invariant(adjustmentTimestamp < startPoint);
+        return adjustmentTimestamp;
+    }
+
+    LOGV2(5466604,
+          "Start point for recovery oplog application exists in oplog. No adjustment necessary",
+          "startPoint"_attr = startPoint);
+    return startPoint;
 }
 
 }  // namespace repl
