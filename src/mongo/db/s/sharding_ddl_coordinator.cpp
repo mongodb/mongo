@@ -178,12 +178,12 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 .until([this, token](Status status) {
                     // Retry until either:
                     //  - The coordinator succeed
-                    //  - The coordiantor failed with non-retryable error
-                    //  - The node is stepping/shutting down
+                    //  - The coordinator failed with non-retryable error determined by the
+                    //  coordinator, or an already known retryable error
                     //
                     //  If the token is not cancelled we retry because it could have been generated
                     //  by a remote node.
-                    if (!status.isOK() &&
+                    if (!status.isOK() && !_completeOnError &&
                         (status.isA<ErrorCategory::CursorInvalidatedError>() ||
                          status.isA<ErrorCategory::ShutdownError>() ||
                          status.isA<ErrorCategory::RetriableError>() ||
