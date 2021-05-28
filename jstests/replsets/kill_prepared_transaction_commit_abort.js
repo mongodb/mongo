@@ -30,7 +30,7 @@ const testDB = primary.getDB(dbName);
 
 // A latch that will act as a signal to shut down the killOp thread.
 let shutdownLatch = new CountDownLatch(1);
-assert.commandWorked(testDB.runCommand({create: collName}));
+assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 /**
  * A function that continuously kills any running 'commitTransaction' or 'abortTransaction' commands
