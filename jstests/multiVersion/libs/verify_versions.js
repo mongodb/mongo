@@ -6,7 +6,7 @@ var Mongo, assert;
 (function() {
     "use strict";
     Mongo.prototype.getBinVersion = function() {
-        var result = this.getDB("admin").runCommand({serverStatus: 1});
+        var result = assert.commandWorked(this.getDB("admin").runCommand({serverStatus: 1}));
         return result.version;
     };
 
