@@ -127,6 +127,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         // support it. Use default value for the ExpressionContext's 'sortKeyFormat' member
         // variable, which is the newest format.
     }
+    expCtx->startExpressionCounters();
+
     return expCtx;
 }
 

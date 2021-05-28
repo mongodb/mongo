@@ -685,7 +685,9 @@ Status runAggregate(OperationContext* opCtx,
             // Use default value for the ExpressionContext's 'sortKeyFormat' member variable.
         }
 
+        expCtx->startExpressionCounters();
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+        expCtx->stopExpressionCounters();
 
         // Check that the view's collation matches the collation of any views involved in the
         // pipeline.
