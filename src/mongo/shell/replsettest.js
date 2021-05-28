@@ -1213,8 +1213,9 @@ var ReplSetTest = function(opts) {
     }
 
     /**
-     * Wait until the config on the primary becomes committed. Callers specify the primary in case
-     * this must be called when two nodes are expected to be concurrently primary.
+     * Wait until the config on the primary becomes replicated. Callers specify the primary in case
+     * this must be called when two nodes are expected to be concurrently primary. This does not
+     * necessarily wait for the config to be committed.
      */
     this.waitForConfigReplication = function(primary, nodes) {
         const nodeHosts = nodes ? tojson(nodes.map((n) => n.host)) : "all nodes";

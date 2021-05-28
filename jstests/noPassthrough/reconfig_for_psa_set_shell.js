@@ -8,6 +8,8 @@
 (function() {
 'use strict';
 
+load("jstests/replsets/rslib.js");
+
 // Start up a PSA set with the secondary having 'votes: 0' and 'priority: 0'.
 const rst = new ReplSetTest({
     name: jsTestName(),
@@ -43,6 +45,9 @@ const runReconfigForPSASet = (memberIndex, config, shouldSucceed, endPriority = 
     if (shouldSucceed) {
         assert.eq(0, result, 'expected reconfigToPSASet to succeed, but it failed');
 
+        // Wait for the new config to be committed.
+        assert.soonNoExcept(() => isConfigCommitted(primary));
+
         const replSetGetConfig =
             assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
         assert.eq(1, replSetGetConfig.members[1].votes);
@@ -56,6 +61,7 @@ const runReconfigForPSASet = (memberIndex, config, shouldSucceed, endPriority = 
         assert.eq(
             0,
             runMongoProgram('mongo', '--port', primary.port, '--eval', reconfigToOriginalConfig));
+        assert.soonNoExcept(() => isConfigCommitted(primary));
     } else {
         assert.neq(0, result, 'expected reconfigToPSASet to fail, but it succeeded');
     }
