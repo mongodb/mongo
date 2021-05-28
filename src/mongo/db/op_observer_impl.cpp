@@ -610,6 +610,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         opTime = replLogUpdate(opCtx, args, storeImagesInSideCollection);
+        // Check if we're in a retryable write that should save the image to
+        // `config.image_collection`.
         if (storeImagesInSideCollection && opCtx->getTxnNumber() &&
             args.updateArgs.storeDocOption != CollectionUpdateArgs::StoreDocOption::None) {
             BSONObj imageDoc;

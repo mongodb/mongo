@@ -331,6 +331,10 @@ void createIndexForApplyOps(OperationContext* opCtx,
     }
 }
 
+/**
+ * @param dataImage can be BSONObj::isEmpty to signal the node is in initial sync and must
+ *                  invalidate relevant image collection data.
+ */
 void writeToImageCollection(OperationContext* opCtx,
                             const BSONObj& op,
                             const BSONObj& image,
@@ -342,9 +346,14 @@ void writeToImageCollection(OperationContext* opCtx,
         LogicalSessionId::parse(IDLParserErrorContext("ParseSessionIdWhenWritingToImageCollection"),
                                 op.getField(OplogEntryBase::kSessionIdFieldName).Obj());
     imageEntry.set_id(sessionId);
+    imageEntry.setTxnNumber(op.getField(OplogEntryBase::kTxnNumberFieldName).numberLong());
     imageEntry.setTs(op["ts"].timestamp());
     imageEntry.setImageKind(imageKind);
     imageEntry.setImage(image);
+    if (image.isEmpty()) {
+        imageEntry.setInvalidated(true);
+        imageEntry.setInvalidatedReason("initial sync"_sd);
+    }
 
     UpdateRequest request(NamespaceString::kConfigImagesNamespace);
     request.setQuery(
@@ -1695,10 +1704,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
             imageKind = repl::RetryImage_parse(
                 IDLParserErrorContext("applyUpdate"),
                 op.getField(OplogEntryBase::kNeedsRetryImageFieldName).String());
-            if (imageKind == repl::RetryImageEnum::kPreImage) {
-                request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
-            } else if (imageKind == repl::RetryImageEnum::kPostImage) {
-                request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_NEW);
+            if (mode != OplogApplication::Mode::kInitialSync) {
+                if (imageKind == repl::RetryImageEnum::kPreImage) {
+                    request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
+                } else if (imageKind == repl::RetryImageEnum::kPostImage) {
+                    request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_NEW);
+                }
             }
         }
 
@@ -1756,8 +1767,14 @@ Status applyOperation_inlock(OperationContext* opCtx,
             }
             if (op.hasField(OplogEntryBase::kNeedsRetryImageFieldName)) {
                 invariant(imageKind);
-                writeToImageCollection(
-                    opCtx, op, ur.requestedDocImage, *imageKind, &upsertConfigImage);
+                writeToImageCollection(opCtx,
+                                       op,
+                                       // If we did not request an image because we're in
+                                       // initial sync, the value passed in here is conveniently
+                                       // the empty BSONObj.
+                                       ur.requestedDocImage,
+                                       *imageKind,
+                                       &upsertConfigImage);
             }
             wuow.commit();
             return Status::OK();
@@ -1804,17 +1821,26 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     op.hasField(OplogEntryBase::kNeedsRetryImageFieldName);
                 DeleteRequest request(requestNss);
                 request.setQuery(deleteCriteria);
-                if (kNeedsRetryImage) {
+                if (mode != OplogApplication::Mode::kInitialSync && kNeedsRetryImage) {
+                    // When in initial sync, we'll pass an empty image into
+                    // `writeToImageCollection`.
                     request.setReturnDeleted(true);
                 }
 
                 DeleteResult result = deleteObject(opCtx, collection, request);
-                if (result.nDeleted == 1 && kNeedsRetryImage) {
-                    writeToImageCollection(opCtx,
-                                           op,
-                                           result.requestedPreImage.get(),
-                                           repl::RetryImageEnum::kPreImage,
-                                           &upsertConfigImage);
+                if (kNeedsRetryImage) {
+                    // Even if `result.nDeleted` is 0, we want to perform a write to the
+                    // imageCollection to advance the txnNumber/ts and invalidate the image. This
+                    // isn't strictly necessary for correctness -- the `config.transactions` table
+                    // is responsible for whether to retry. The motivation here is to simply reduce
+                    // the number of states related documents in the two collections can be in.
+                    BSONObj imageDoc;
+                    if (result.nDeleted > 0 && mode != OplogApplication::Mode::kInitialSync) {
+                        imageDoc = result.requestedPreImage.get();
+                    }
+
+                    writeToImageCollection(
+                        opCtx, op, imageDoc, repl::RetryImageEnum::kPreImage, &upsertConfigImage);
                 }
             } else
                 verify(opType[1] == 'b');  // "db" advertisement

@@ -153,7 +153,17 @@ checkLogForOplogApplicationMsg(secondary, 1);
 assert(!initialSyncTest.step());
 checkLogForOplogApplicationMsg(secondary, 9);
 assert(!initialSyncTest.step());
-checkLogForOplogApplicationMsg(secondary, 1);
+
+const config = db.adminCommand({getParameter: 1, storeFindAndModifyImagesInSideCollection: 1});
+jsTestLog(`Config: ${tojson(config)}`);
+const newConfigImageCollectionExists = config.storeFindAndModifyImagesInSideCollection;
+
+if (newConfigImageCollectionExists) {
+    // Stepping up creates the `config.image_collection` table which adds to the batch size.
+    checkLogForOplogApplicationMsg(secondary, 3);
+} else {
+    checkLogForOplogApplicationMsg(secondary, 1);
+}
 
 assert(initialSyncTest.step(), "Expected initial sync to have completed, but it did not");
 
@@ -165,10 +175,11 @@ assert.commandWorked(primary.getDB("otherDB").otherColl.insert({x: 1}, {writeCon
 
 // Confirm that node can be read from and that it has the inserts that were made while the node
 // was in initial sync.
-assert.eq(secondary.getDB("test").foo.find().count(), 6);
-assert.eq(secondary.getDB("test").bar.find().count(), 6);
-assert.eq(secondary.getDB("test").foo.find().itcount(), 6);
-assert.eq(secondary.getDB("test").bar.find().itcount(), 6);
+let count = newConfigImageCollectionExists ? 7 : 6;
+assert.eq(secondary.getDB("test").foo.find().count(), count);
+assert.eq(secondary.getDB("test").bar.find().count(), count);
+assert.eq(secondary.getDB("test").foo.find().itcount(), count);
+assert.eq(secondary.getDB("test").bar.find().itcount(), count);
 
 // Do data consistency checks at the end.
 initialSyncTest.stop();
