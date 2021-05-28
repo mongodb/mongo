@@ -135,6 +135,8 @@ all:
     test_file: jstests/sharding/read_pref_with_hedging_mode.js
   - ticket: SERVER-57173
     test_file: jstests/replsets/invalidate_images_when_minvalid.js
+  - ticket: SERVER-56468
+    test_file: jstests/core/neq_null_correctly_cache.js
 
 suites:
 

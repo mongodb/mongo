@@ -34,9 +34,10 @@
 namespace mongo {
 
 /**
- * Returns true if the query predicate involves a negation of a LTE or GTE comparison to 'null'.
+ * Returns true if the query predicate involves a negation of an EQ, LTE, or GTE comparison to
+ * 'null'.
  */
-bool isQueryNegatingGTEorLTENull(const mongo::MatchExpression* tree);
+bool isQueryNegatingEqualToNull(const mongo::MatchExpression* tree);
 
 
 namespace canonical_query_encoder {
