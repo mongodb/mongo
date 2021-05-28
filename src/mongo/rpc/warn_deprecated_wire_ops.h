@@ -51,4 +51,9 @@ namespace mongo {
  */
 void warnDeprecation(Client& client, StringData op);
 
+/**
+ * Callback that gets invoked when 'deprecatedWireOpsWarningPeriodInSeconds' setting is changed.
+ */
+Status onUpdateOfWireOpsWarningPeriod(const int&);
+
 }  // namespace mongo

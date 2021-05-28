@@ -159,28 +159,4 @@ string Query::toString() const {
     return obj.toString();
 }
 
-void assembleQueryRequest(const string& ns,
-                          BSONObj query,
-                          int nToReturn,
-                          int nToSkip,
-                          const BSONObj* fieldsToReturn,
-                          int queryOptions,
-                          Message& toSend) {
-    if (kDebugBuild) {
-        massert(10337, (string) "object not valid assembleRequest query", query.isValid());
-    }
-
-    // see query.h for the protocol we are using here.
-    BufBuilder b;
-    int opts = queryOptions;
-    b.appendNum(opts);
-    b.appendStr(ns);
-    b.appendNum(nToSkip);
-    b.appendNum(nToReturn);
-    query.appendSelfToBufBuilder(b);
-    if (fieldsToReturn)
-        fieldsToReturn->appendSelfToBufBuilder(b);
-    toSend.setData(dbQuery, b.buf(), b.len());
-}
-
 }  // namespace mongo

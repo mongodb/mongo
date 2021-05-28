@@ -109,7 +109,7 @@ Message DBClientCursor::_assembleInit() {
         // so we need to allow the shell to send invalid options so that we can
         // test that the server rejects them. Thus, to allow generating commands with
         // invalid options, we validate them here, and fall back to generating an OP_QUERY
-        // through assembleQueryRequest if the options are invalid.
+        // through makeQueryMessage() if the options are invalid.
         bool hasValidNToReturnForCommand = (nToReturn == 1 || nToReturn == -1);
         bool hasValidFlagsForCommand = !(opts & mongo::QueryOption_Exhaust);
         bool hasInvalidMaxTimeMs = query.hasField("$maxTimeMS");
@@ -175,9 +175,7 @@ Message DBClientCursor::_assembleInit() {
     }
 
     _useFindCommand = false;  // Make sure we handle the reply correctly.
-    Message toSend;
-    assembleQueryRequest(ns.ns(), query, nextBatchSize(), nToSkip, fieldsToReturn, opts, toSend);
-    return toSend;
+    return makeQueryMessage(ns.ns(), query, nextBatchSize(), nToSkip, fieldsToReturn, opts);
 }
 
 Message DBClientCursor::_assembleGetMore() {

@@ -203,6 +203,7 @@ env.CppIntegrationTest(
     target='rpc_integration_test',
     source=[
         'op_msg_integration_test.cpp',
+        'op_legacy_integration_test.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',

@@ -43,17 +43,52 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/static_immortal.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 
 using namespace fmt::literals;
 
-void warnDeprecation(Client& client, StringData op) {
-    static StaticImmortal<logv2::KeyedSeveritySuppressor<std::string>> bumpedSeverity{
-        Seconds{deprecatedWireOpsWarningPeriodInSeconds.load()},
-        logv2::LogSeverity::Warning(),
-        logv2::LogSeverity::Debug(2)};
+namespace {
 
+class SeveritySource {
+public:
+    logv2::LogSeverity get(const std::string& key) {
+        return (***(_supressor))(key);
+    }
+
+    void refresh() {
+        *(_supressor) = _makeSuppressor();
+    }
+
+private:
+    using Suppressor = logv2::KeyedSeveritySuppressor<std::string>;
+
+    static std::unique_ptr<Suppressor> _makeSuppressor() {
+        return std::make_unique<Suppressor>(Seconds{deprecatedWireOpsWarningPeriodInSeconds.load()},
+                                            logv2::LogSeverity::Warning(),
+                                            logv2::LogSeverity::Debug(2));
+    }
+
+    synchronized_value<std::unique_ptr<Suppressor>> _supressor{_makeSuppressor()};
+};
+
+SeveritySource& getSeveritySource() {
+    static StaticImmortal<SeveritySource> severitySource{};
+    return *severitySource;
+}
+
+}  // namespace
+
+Status onUpdateOfWireOpsWarningPeriod(const int& /*timeout*/) {
+    // refresh() will fetch the current setting for the suppressor's timeout, which by this time
+    // will have changed to the new value, so it's OK to ignore the provided new 'timeout' setting
+    // here (which allows us to localize suppressor creation in 'SeveritySource' class.)
+    getSeveritySource().refresh();
+    return Status::OK();
+}
+
+void warnDeprecation(Client& client, StringData op) {
     std::string clientKey;
     BSONObj clientInfo;
     if (auto clientMetadata = ClientMetadata::get(&client); clientMetadata) {
@@ -68,10 +103,9 @@ void warnDeprecation(Client& client, StringData op) {
     }
 
     LOGV2_DEBUG(5578800,
-                (*bumpedSeverity)(clientKey).toInt(),
+                getSeveritySource().get(clientKey).toInt(),
                 "Deprecated operation requested",
                 "op"_attr = op,
                 "clientInfo"_attr = clientInfo);
 }
-
 }  // namespace mongo

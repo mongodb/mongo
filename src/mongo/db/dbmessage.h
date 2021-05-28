@@ -384,6 +384,16 @@ public:
     }
 };
 
+/**
+ * Builds a legacy OP_QUERY message.
+ */
+Message makeQueryMessage(StringData ns,
+                         BSONObj query,
+                         int nToReturn,
+                         int nToSkip,
+                         const BSONObj* fieldsToReturn,
+                         int queryOptions);
+
 enum InsertOptions {
     /** With muli-insert keep processing inserts if one fails */
     InsertOption_ContinueOnError = 1 << 0

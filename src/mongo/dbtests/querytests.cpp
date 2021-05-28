@@ -1932,14 +1932,12 @@ public:
                                        << "capped" << true << "size" << 8192),
                                   info));
         _client.insert(ns(), BSON("ts" << Timestamp(1000, 0)));
-        Message message;
-        assembleQueryRequest(ns(),
-                             BSON("ts" << GTE << Timestamp(1000, 0)),
-                             0,
-                             0,
-                             nullptr,
-                             QueryOption_CursorTailable | QueryOption_Exhaust,
-                             message);
+        Message message = makeQueryMessage(ns(),
+                                           BSON("ts" << GTE << Timestamp(1000, 0)),
+                                           0,
+                                           0,
+                                           nullptr,
+                                           QueryOption_CursorTailable | QueryOption_Exhaust);
         DbMessage dbMessage(message);
         QueryMessage queryMessage(dbMessage);
         Message result;

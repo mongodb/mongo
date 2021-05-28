@@ -27,6 +27,8 @@
 
 global:
     cpp_namespace: mongo
+    cpp_includes:
+    - "mongo/rpc/warn_deprecated_wire_ops.h"
 
 server_parameters:
     deprecatedWireOpsWarningPeriodInSeconds:
@@ -36,8 +38,9 @@ server_parameters:
                       received.
                       Such requests include OP_QUERY, OP_GET_MORE, OP_KILL_CURSORS, OP_INSERT,
                       OP_UPDATE, OP_DELETE op codes and getLastError command."
-        set_at: [ startup ]
+        set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<int>
+        on_update: "onUpdateOfWireOpsWarningPeriod"
         cpp_varname: deprecatedWireOpsWarningPeriodInSeconds
         default: 3600
         validator:

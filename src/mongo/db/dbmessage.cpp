@@ -154,6 +154,23 @@ Message makeMessage(NetworkOp op, Func&& bodyBuilder) {
 }
 }  // namespace
 
+Message makeQueryMessage(StringData ns,
+                         BSONObj query,
+                         int nToReturn,
+                         int nToSkip,
+                         const BSONObj* fieldsToReturn,
+                         int queryOptions) {
+    return makeMessage(dbQuery, [&](BufBuilder& b) {
+        b.appendNum(queryOptions);
+        b.appendStr(ns);
+        b.appendNum(nToSkip);
+        b.appendNum(nToReturn);
+        query.appendSelfToBufBuilder(b);
+        if (fieldsToReturn)
+            fieldsToReturn->appendSelfToBufBuilder(b);
+    });
+}
+
 Message makeInsertMessage(StringData ns, const BSONObj* objs, size_t count, int flags) {
     return makeMessage(dbInsert, [&](BufBuilder& b) {
         int reservedFlags = 0;
