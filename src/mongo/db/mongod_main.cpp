@@ -1326,7 +1326,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // The migrationutil executor must be shut down before shutting down the CatalogCacheLoader.
     // Otherwise, it may try to schedule work on the CatalogCacheLoader and fail.
     LOGV2_OPTIONS(4784921, {LogComponent::kSharding}, "Shutting down the MigrationUtilExecutor");
-    auto migrationUtilExecutor = migrationutil::getMigrationUtilExecutor();
+    auto migrationUtilExecutor = migrationutil::getMigrationUtilExecutor(serviceContext);
     migrationUtilExecutor->shutdown();
     migrationUtilExecutor->join();
 

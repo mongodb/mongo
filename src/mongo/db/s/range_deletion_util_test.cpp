@@ -86,7 +86,7 @@ public:
         DBDirectClient client(operationContext());
         client.dropCollection(kNss.ns());
 
-        while (migrationutil::getMigrationUtilExecutor()->hasTasks()) {
+        while (migrationutil::getMigrationUtilExecutor(getServiceContext())->hasTasks()) {
             continue;
         }
 

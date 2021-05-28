@@ -110,6 +110,52 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kNoTimeout);
 
+
+class MigrationUtilExecutor {
+public:
+    MigrationUtilExecutor()
+        : _executor(std::make_shared<executor::ThreadPoolTaskExecutor>(
+              _makePool(), executor::makeNetworkInterface("MigrationUtil-TaskExecutor"))) {}
+
+    void shutDownAndJoin() {
+        _executor->shutdown();
+        _executor->join();
+    }
+
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> getExecutor() {
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (!_started) {
+            _executor->startup();
+            _started = true;
+        }
+        return _executor;
+    }
+
+private:
+    std::unique_ptr<ThreadPool> _makePool() {
+        ThreadPool::Options options;
+        options.poolName = "MoveChunk";
+        options.minThreads = 0;
+        options.maxThreads = 16;
+        return std::make_unique<ThreadPool>(std::move(options));
+    }
+
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
+
+    // TODO SERVER-57253: get rid of _mutex and _started fields
+    Mutex _mutex = MONGO_MAKE_LATCH("MigrationUtilExecutor::_mutex");
+    bool _started = false;
+};
+
+const auto migrationUtilExecutorDecoration =
+    ServiceContext::declareDecoration<MigrationUtilExecutor>();
+const ServiceContext::ConstructorActionRegisterer migrationUtilExecutorRegisterer{
+    "MigrationUtilExecutor",
+    [](ServiceContext* service) {
+        // TODO SERVER-57253: start migration util executor at decoration construction time
+    },
+    [](ServiceContext* service) { migrationUtilExecutorDecoration(service).shutDownAndJoin(); }};
+
 template <typename Cmd>
 void sendToRecipient(OperationContext* opCtx,
                      const ShardId& recipientId,
@@ -194,27 +240,9 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
 
 }  // namespace
 
-std::shared_ptr<executor::ThreadPoolTaskExecutor> getMigrationUtilExecutor() {
-    static Mutex mutex = MONGO_MAKE_LATCH("MigrationUtilExecutor::_mutex");
-    static std::shared_ptr<executor::ThreadPoolTaskExecutor> executor;
-
-    stdx::lock_guard<Latch> lg(mutex);
-    if (!executor) {
-        auto makePool = [] {
-            ThreadPool::Options options;
-            options.poolName = "MoveChunk";
-            options.minThreads = 0;
-            options.maxThreads = 16;
-            return std::make_unique<ThreadPool>(std::move(options));
-        };
-
-        executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
-            makePool(), executor::makeNetworkInterface("MigrationUtil-TaskExecutor"));
-
-        executor->startup();
-    }
-
-    return executor;
+std::shared_ptr<executor::ThreadPoolTaskExecutor> getMigrationUtilExecutor(
+    ServiceContext* serviceContext) {
+    return migrationUtilExecutorDecoration(serviceContext).getExecutor();
 }
 
 BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
@@ -346,7 +374,7 @@ ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
 ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                                              const RangeDeletionTask& deletionTask) {
     const auto serviceContext = opCtx->getServiceContext();
-    auto executor = getMigrationUtilExecutor();
+    auto executor = getMigrationUtilExecutor(serviceContext);
     return ExecutorFuture<void>(executor)
         .then([=] {
             ThreadClient tc(kRangeDeletionThreadName, serviceContext);
@@ -475,7 +503,7 @@ void submitPendingDeletions(OperationContext* opCtx) {
 void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
     LOGV2(22028, "Starting pending deletion submission thread.");
 
-    ExecutorFuture<void>(getMigrationUtilExecutor())
+    ExecutorFuture<void>(getMigrationUtilExecutor(serviceContext))
         .then([serviceContext] {
             ThreadClient tc("ResubmitRangeDeletions", serviceContext);
             {
@@ -888,7 +916,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                                         << doc.getMigrationSessionId().toString()
                                         << " on collection " << nss);
 
-                      ExecutorFuture<void>(getMigrationUtilExecutor())
+                      ExecutorFuture<void>(getMigrationUtilExecutor(opCtx->getServiceContext()))
                           .then([serviceContext = opCtx->getServiceContext(), nss, mbg] {
                               ThreadClient tc("TriggerMigrationRecovery", serviceContext);
                               {
