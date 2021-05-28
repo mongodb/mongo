@@ -124,6 +124,8 @@ restoreNode = rst.restart(restoreNode, {noReplSet: false, setParameter: startPar
 
 // This node should not come back up, because it has no stable timestamp to recover to.
 assert.soon(() => (rawMongoProgramOutput().search("UnrecoverableRollbackError") >= 0));
+// Hide the exit code from the infrastructure.
+waitProgram(restoreNode.pid);
 
 // Remove the nodes which are down.
 rst.remove(primary);
