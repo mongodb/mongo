@@ -339,7 +339,8 @@ public:
     virtual Status removeConfigDocuments(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          const BSONObj& query,
-                                         const WriteConcernOptions& writeConcern) = 0;
+                                         const WriteConcernOptions& writeConcern,
+                                         boost::optional<BSONObj> hint = boost::none) = 0;
 
 protected:
     ShardingCatalogClient() = default;

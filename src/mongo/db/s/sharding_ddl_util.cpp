@@ -100,8 +100,14 @@ void deleteChunks(OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUI
         return BSON(ChunkType::ns(optNss->ns()));
     }();
 
-    uassertStatusOK(catalogClient->removeConfigDocuments(
-        opCtx, ChunkType::ConfigNS, chunksQuery, ShardingCatalogClient::kMajorityWriteConcern));
+    // TODO SERVER-57221 don't use hint if not relevant anymore for delete performances
+    auto hint = BSON(ChunkType::collectionUUID() << 1 << ChunkType::min() << 1);
+    uassertStatusOK(
+        catalogClient->removeConfigDocuments(opCtx,
+                                             ChunkType::ConfigNS,
+                                             chunksQuery,
+                                             ShardingCatalogClient::kMajorityWriteConcern,
+                                             hint));
 }
 
 void deleteCollection(OperationContext* opCtx, const NamespaceString& nss) {

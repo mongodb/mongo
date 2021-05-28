@@ -107,6 +107,14 @@ public:
         chunkDocBuilder.append("shard", _shard1.getName());
         ASSERT_OK(insertToConfigCollection(
             operationContext(), ChunkType::ConfigNS, chunkDocBuilder.obj()));
+
+        // Initialize config.chunks secondary index
+        getConfigShard()
+            ->createIndexOnConfig(operationContext(),
+                                  ChunkType::ConfigNS,
+                                  BSON(ChunkType::ns() << 1 << ChunkType::min() << 1),
+                                  /*unique*/ true)
+            .transitional_ignore();
     }
 
     void expectStaleConfig(const ShardType& shard) {
