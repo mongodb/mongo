@@ -872,31 +872,6 @@ private:
     ProjectionTraversalVisitorContext* _context;
 };
 
-class ProjectionTraversalWalker final {
-public:
-    ProjectionTraversalWalker(projection_ast::ProjectionASTConstVisitor* preVisitor,
-                              projection_ast::ProjectionASTConstVisitor* inVisitor,
-                              projection_ast::ProjectionASTConstVisitor* postVisitor)
-        : _preVisitor{preVisitor}, _inVisitor{inVisitor}, _postVisitor{postVisitor} {}
-
-    void preVisit(const projection_ast::ASTNode* node) {
-        node->acceptVisitor(_preVisitor);
-    }
-
-    void postVisit(const projection_ast::ASTNode* node) {
-        node->acceptVisitor(_postVisitor);
-    }
-
-    void inVisit(long count, const projection_ast::ASTNode* node) {
-        node->acceptVisitor(_inVisitor);
-    }
-
-private:
-    projection_ast::ProjectionASTConstVisitor* _preVisitor;
-    projection_ast::ProjectionASTConstVisitor* _inVisitor;
-    projection_ast::ProjectionASTConstVisitor* _postVisitor;
-};
-
 /**
  * Generates expression that applies positional projection operator to the array stored in the
  * 'inputSlot' using optional index from 'maybeIndexSlot'.
@@ -1177,7 +1152,7 @@ std::pair<sbe::value::SlotId, EvalStage> generateProjection(
     ProjectionTraversalPreVisitor preVisitor{&context};
     ProjectionTraversalInVisitor inVisitor{&context};
     ProjectionTraversalPostVisitor postVisitor{&context};
-    ProjectionTraversalWalker walker{&preVisitor, &inVisitor, &postVisitor};
+    projection_ast::ProjectionASTConstWalker walker{&preVisitor, &inVisitor, &postVisitor};
     tree_walker::walk<true, projection_ast::ASTNode>(projection->root(), &walker);
     auto [resultSlot, resultStage] = context.done();
 
@@ -1192,7 +1167,8 @@ std::pair<sbe::value::SlotId, EvalStage> generateProjection(
         ProjectionTraversalPreVisitor slicePreVisitor{&sliceContext};
         ProjectionTraversalInVisitor sliceInVisitor{&sliceContext};
         SliceProjectionTraversalPostVisitor slicePostVisitor{&sliceContext};
-        ProjectionTraversalWalker sliceWalker{&slicePreVisitor, &sliceInVisitor, &slicePostVisitor};
+        projection_ast::ProjectionASTConstWalker sliceWalker{
+            &slicePreVisitor, &sliceInVisitor, &slicePostVisitor};
         tree_walker::walk<true, projection_ast::ASTNode>(projection->root(), &sliceWalker);
         std::tie(resultSlot, resultStage) = sliceContext.done();
     }

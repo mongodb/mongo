@@ -67,7 +67,7 @@
 namespace mongo::stage_builder {
 namespace {
 /**
- * Tree representation of an index key pattern.
+ * Tree representing index key pattern or a subset of it.
  *
  * For example, the key pattern {a.b: 1, x: 1, a.c: 1} would look like:
  *
@@ -77,7 +77,7 @@ namespace {
  *       / \
  *      b   c
  *
- * This tree is used for building SBE subtrees to re-hydrate index keys.
+ * This tree is used for building SBE subtrees to re-hydrate index keys and for covered projections.
  */
 struct IndexKeyPatternTreeNode {
     IndexKeyPatternTreeNode* emplace(StringData fieldComponent) {
@@ -89,12 +89,142 @@ struct IndexKeyPatternTreeNode {
         return newNodeRaw;
     }
 
+    /**
+     * Returns leaf node matching field path. If the field path provided resolves to a non-leaf
+     * node, null will be returned.
+     *
+     * For example, if tree was built for key pattern {a: 1, a.b: 1}, this method will return
+     * nullptr for field path "a". On the other hand, this method will return corresponding node for
+     * field path "a.b".
+     */
+    IndexKeyPatternTreeNode* findLeafNode(const FieldRef& fieldRef, size_t currentIndex = 0) {
+        if (currentIndex == fieldRef.numParts()) {
+            if (children.empty()) {
+                return this;
+            }
+            return nullptr;
+        }
+
+        auto currentPart = fieldRef.getPart(currentIndex);
+        if (auto it = children.find(currentPart); it != children.end()) {
+            return it->second->findLeafNode(fieldRef, currentIndex + 1);
+        } else {
+            return nullptr;
+        }
+    }
+
     StringMap<std::unique_ptr<IndexKeyPatternTreeNode>> children;
     std::vector<std::string> childrenOrder;
 
     // Which slot the index key for this component is stored in. May be boost::none for non-leaf
     // nodes.
     boost::optional<sbe::value::SlotId> indexKeySlot;
+};
+
+/**
+ * For covered projections, each of the projection field paths represent respective index key. To
+ * rehydrate index keys into the result object, we first need to convert projection AST into
+ * 'IndexKeyPatternTreeNode' structure. Context structure and visitors below are used for this
+ * purpose.
+ */
+struct IndexKeysBuilderContext {
+    // Contains resulting tree of index keys converted from projection AST.
+    IndexKeyPatternTreeNode root;
+
+    // Full field path of the currently visited projection node.
+    std::vector<StringData> currentFieldPath;
+
+    // Each projection node has a vector of field names. This stack contains indexes of the
+    // currently visited field names for each of the projection nodes.
+    std::vector<size_t> currentFieldIndex;
+};
+
+/**
+ * Covered projections are always inclusion-only, so we ban all other operators.
+ */
+class IndexKeysBuilder : public projection_ast::ProjectionASTConstVisitor {
+public:
+    using projection_ast::ProjectionASTConstVisitor::visit;
+
+    IndexKeysBuilder(IndexKeysBuilderContext* context) : _context{context} {}
+
+    void visit(const projection_ast::ProjectionPositionalASTNode* node) final {
+        tasserted(5474501, "Positional projection is not allowed in covered projection");
+    }
+
+    void visit(const projection_ast::ProjectionSliceASTNode* node) final {
+        tasserted(5474502, "$slice is not allowed in covered projection");
+    }
+
+    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {
+        tasserted(5474503, "$elemMatch is not allowed in covered projection");
+    }
+
+    void visit(const projection_ast::ExpressionASTNode* node) final {
+        tasserted(5474504, "Expressions are not allowed in covered projection");
+    }
+
+    void visit(const projection_ast::MatchExpressionASTNode* node) final {
+        tasserted(5474505,
+                  "$elemMatch and positional projection are not allowed in covered projection");
+    }
+
+    void visit(const projection_ast::BooleanConstantASTNode* node) override {}
+
+protected:
+    IndexKeysBuilderContext* _context;
+};
+
+class IndexKeysPreBuilder final : public IndexKeysBuilder {
+public:
+    using IndexKeysBuilder::IndexKeysBuilder;
+    using IndexKeysBuilder::visit;
+
+    void visit(const projection_ast::ProjectionPathASTNode* node) final {
+        _context->currentFieldIndex.push_back(0);
+        _context->currentFieldPath.emplace_back(node->fieldNames().front());
+    }
+};
+
+class IndexKeysInBuilder final : public IndexKeysBuilder {
+public:
+    using IndexKeysBuilder::IndexKeysBuilder;
+    using IndexKeysBuilder::visit;
+
+    void visit(const projection_ast::ProjectionPathASTNode* node) final {
+        auto& currentIndex = _context->currentFieldIndex.back();
+        currentIndex++;
+        _context->currentFieldPath.back() = node->fieldNames()[currentIndex];
+    }
+};
+
+class IndexKeysPostBuilder final : public IndexKeysBuilder {
+public:
+    using IndexKeysBuilder::IndexKeysBuilder;
+    using IndexKeysBuilder::visit;
+
+    void visit(const projection_ast::ProjectionPathASTNode* node) final {
+        _context->currentFieldIndex.pop_back();
+        _context->currentFieldPath.pop_back();
+    }
+
+    void visit(const projection_ast::BooleanConstantASTNode* constantNode) final {
+        if (!constantNode->value()) {
+            // Even though only inclusion is allowed in covered projection, there still can be
+            // {_id: 0} component. We do not need to generate any nodes for it.
+            return;
+        }
+
+        // Insert current field path into the index keys tree if it does not exist yet.
+        auto* node = &_context->root;
+        for (const auto& part : _context->currentFieldPath) {
+            if (auto it = node->children.find(part); it != node->children.end()) {
+                node = it->second.get();
+            } else {
+                node = node->emplace(part);
+            }
+        }
+    }
 };
 
 /**
@@ -268,18 +398,63 @@ std::string PlanStageData::debugString() const {
 }
 
 namespace {
-const QuerySolutionNode* getNodeByType(const QuerySolutionNode* root, StageType type) {
+void getAllNodesByTypeHelper(const QuerySolutionNode* root,
+                             StageType type,
+                             std::vector<const QuerySolutionNode*>& results) {
     if (root->getType() == type) {
-        return root;
+        results.push_back(root);
     }
 
     for (auto&& child : root->children) {
-        if (auto result = getNodeByType(child, type)) {
-            return result;
-        }
+        getAllNodesByTypeHelper(child, type, results);
+    }
+}
+
+std::vector<const QuerySolutionNode*> getAllNodesByType(const QuerySolutionNode* root,
+                                                        StageType type) {
+    std::vector<const QuerySolutionNode*> results;
+    getAllNodesByTypeHelper(root, type, results);
+    return results;
+}
+
+/**
+ * Returns pair consisting of:
+ *  - First node of the specified type found by pre-order traversal. If node was not found, this
+ *    pair element is nullptr.
+ *  - Total number of nodes with the specified type in tree.
+ */
+std::pair<const QuerySolutionNode*, size_t> getFirstNodeByType(const QuerySolutionNode* root,
+                                                               StageType type) {
+    const QuerySolutionNode* result = nullptr;
+    size_t count = 0;
+    if (root->getType() == type) {
+        result = root;
+        count++;
     }
 
-    return nullptr;
+    for (auto&& child : root->children) {
+        auto [subTreeResult, subTreeCount] = getFirstNodeByType(child, type);
+        if (!result) {
+            result = subTreeResult;
+        }
+        count += subTreeCount;
+    }
+
+    return {result, count};
+}
+
+/**
+ * Returns node of the specified type found in tree. If there is no such node, returns null. If
+ * there are more than one nodes of the specified type, throws an exception.
+ */
+const QuerySolutionNode* getLoneNodeByType(const QuerySolutionNode* root, StageType type) {
+    auto [result, count] = getFirstNodeByType(root, type);
+    const auto msgCount = count;
+    tassert(5474506,
+            str::stream() << "Found " << msgCount << " nodes of type " << type
+                          << ", expected one or zero",
+            count < 2);
+    return result;
 }
 
 sbe::LockAcquisitionCallback makeLockAcquisitionCallback(bool checkNodeCanServeReads) {
@@ -484,16 +659,21 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
     // SERVER-52803: In the future if we need to gather more information from the QuerySolutionNode
     // tree, rather than doing one-off scans for each piece of information, we should add a formal
     // analysis pass here.
-    if (auto node = getNodeByType(solution.root(), STAGE_COLLSCAN)) {
+    // NOTE: Currently, we assume that each query operates on at most one collection, so there can
+    // be only one STAGE_COLLSCAN node.
+    if (auto node = getLoneNodeByType(solution.root(), STAGE_COLLSCAN)) {
         auto csn = static_cast<const CollectionScanNode*>(node);
         _data.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
         _data.shouldTrackResumeToken = csn->requestResumeToken;
         _data.shouldUseTailableScan = csn->tailable;
     }
 
-    if (auto node = getNodeByType(solution.root(), STAGE_VIRTUAL_SCAN)) {
+    for (const auto& node : getAllNodesByType(solution.root(), STAGE_VIRTUAL_SCAN)) {
         auto vsn = static_cast<const VirtualScanNode*>(node);
-        _shouldProduceRecordIdSlot = vsn->hasRecordId;
+        if (!vsn->hasRecordId) {
+            _shouldProduceRecordIdSlot = false;
+            break;
+        }
     }
 }
 
@@ -1034,7 +1214,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     sbe::IndexKeysInclusionSet sortPatternKeyBitSet;
     if (isCoveredQuery) {
         // If query is covered, we need to request index key for each part of the sort pattern.
-        auto indexScan = static_cast<const IndexScanNode*>(getNodeByType(child, STAGE_IXSCAN));
+        auto indexScan = static_cast<const IndexScanNode*>(getLoneNodeByType(child, STAGE_IXSCAN));
         tassert(5601701, "Expected index scan below sort for covered query", indexScan);
         indexKeyPattern = indexScan->index.keyPattern;
 
@@ -1283,7 +1463,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // 'b' and 'a'),  we wish to insert them into 'inputKeys' in the order that they appear in
         // the sort pattern.
         StringMap<size_t> indexKeyPositionMap;
-        auto ixnNode = getNodeByType(child, STAGE_IXSCAN);
+        auto ixnNode = getLoneNodeByType(child, STAGE_IXSCAN);
         tassert(5184300,
                 str::stream() << "Can't build exec tree for node: " << child->toString(),
                 ixnNode);
@@ -1455,28 +1635,93 @@ SlotBasedStageBuilder::buildProjectionCovered(const QuerySolutionNode* root,
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
 SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
                                               const PlanStageReqs& reqs) {
-    using namespace std::literals;
     invariant(!reqs.getIndexKeyBitset());
 
-    auto pn = static_cast<const ProjectionNodeDefault*>(root);
+    auto childReqs = reqs.copy();
 
-    // The child must produce all of the slots required by the parent of this ProjectionNodeDefault.
-    // In addition to that, the child must always produce a 'resultSlot' because it's needed by the
-    // projection logic below.
-    auto childReqs = reqs.copy().set(kResult);
+    auto pn = static_cast<const ProjectionNodeDefault*>(root);
+    const auto& projection = pn->proj;
+    const auto [indexScanNode, indexScanCount] = getFirstNodeByType(root, STAGE_IXSCAN);
+    // TODO SERVER-57533: Support multiple index scan nodes located below OR and SORT_MERGE stages.
+    const auto isCoveredProjection =
+        !pn->fetched() && indexScanCount == 1 && projection.isInclusionOnly();
+
+    boost::optional<IndexKeyPatternTreeNode> patternRoot;
+    std::vector<IndexKeyPatternTreeNode*> patternNodesForSlots;
+    if (isCoveredProjection) {
+        // Convert projection fieldpaths into the tree of 'IndexKeyPatternTreeNode'.
+        IndexKeysBuilderContext context;
+        IndexKeysPreBuilder preVisitor{&context};
+        IndexKeysInBuilder inVisitor{&context};
+        IndexKeysPostBuilder postVisitor{&context};
+        projection_ast::ProjectionASTConstWalker walker{&preVisitor, &inVisitor, &postVisitor};
+        tree_walker::walk<true, projection_ast::ASTNode>(projection.root(), &walker);
+        patternRoot = std::move(context.root);
+
+        // Construct a bitset requesting slots from the underlying index scan. These slots
+        // correspond to index keys for projection fieldpaths.
+        auto& indexKeyPattern = static_cast<const IndexScanNode*>(indexScanNode)->index.keyPattern;
+        size_t i = 0;
+        sbe::IndexKeysInclusionSet patternBitSet;
+        for (const auto& element : indexKeyPattern) {
+            FieldRef fieldRef{element.fieldNameStringData()};
+            // Projection field paths are always leaf nodes. In other words, projection like
+            // {a: 1, 'a.b': 1} would produce a path collision error.
+            if (auto node = patternRoot->findLeafNode(fieldRef); node) {
+                patternBitSet.set(i);
+                patternNodesForSlots.push_back(node);
+            }
+
+            ++i;
+        }
+
+        childReqs.getIndexKeyBitset() = patternBitSet;
+
+        // We do not need index scan to restore the entire object. Instead, we will restore only
+        // necessary parts of it below.
+        childReqs.clear(kResult);
+    } else {
+        // The child must produce all of the slots required by the parent of this
+        // ProjectionNodeDefault. In addition to that, the child must always produce a 'resultSlot'
+        // because it's needed by the projection logic below.
+        childReqs.set(kResult);
+    }
+
     auto [inputStage, outputs] = build(pn->children[0], childReqs);
 
-    auto relevantSlots = sbe::makeSV();
-    outputs.forEachSlot(childReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
+    sbe::value::SlotId resultSlot;
+    std::unique_ptr<sbe::PlanStage> resultStage;
+    if (isCoveredProjection) {
+        auto indexKeySlots = *outputs.extractIndexKeySlots();
 
-    auto [slot, stage] = generateProjection(_state,
-                                            &pn->proj,
-                                            {std::move(inputStage), std::move(relevantSlots)},
-                                            outputs.get(kResult),
-                                            root->nodeId());
-    outputs.set(kResult, slot);
+        // Extract slots corresponding to each of the projection fieldpaths.
+        invariant(indexKeySlots.size() == patternNodesForSlots.size());
+        for (size_t i = 0; i < indexKeySlots.size(); i++) {
+            patternNodesForSlots[i]->indexKeySlot = indexKeySlots[i];
+        }
 
-    return {std::move(stage.stage), std::move(outputs)};
+        // Finally, build the expression to create object with requested projection fieldpaths.
+        resultSlot = _slotIdGenerator.generate();
+        auto resultExpr = buildNewObjExpr(&*patternRoot);
+        resultStage = sbe::makeProjectStage(
+            std::move(inputStage), root->nodeId(), resultSlot, std::move(resultExpr));
+    } else {
+        auto relevantSlots = sbe::makeSV();
+        outputs.forEachSlot(childReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
+
+        EvalStage stage;
+        std::tie(resultSlot, stage) =
+            generateProjection(_state,
+                               &projection,
+                               {std::move(inputStage), std::move(relevantSlots)},
+                               outputs.get(kResult),
+                               root->nodeId());
+
+        resultStage = std::move(stage.stage);
+    }
+
+    outputs.set(kResult, resultSlot);
+    return {std::move(resultStage), std::move(outputs)};
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildOr(
