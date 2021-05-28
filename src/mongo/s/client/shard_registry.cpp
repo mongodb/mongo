@@ -101,7 +101,9 @@ void ShardRegistry::shutdown() {
     if (_executor && !_isShutdown) {
         LOGV2_DEBUG(22723, 1, "Shutting down task executor for reloading shard registry");
         _executor->shutdown();
+        _opContexts.interrupt(ErrorCodes::ShutdownInProgress);
         _executor->join();
+        invariant(_opContexts.isEmpty());
         _isShutdown = true;
     }
 }
@@ -259,10 +261,11 @@ void ShardRegistry::_internalReload(const CallbackArgs& cbArgs) {
 
     ThreadClient tc("shard-registry-reload", getGlobalServiceContext());
 
-    auto opCtx = tc->makeOperationContext();
+    auto context = _opContexts.makeOperationContext(*tc.get());
+    auto* opCtx = context.opCtx();
 
     try {
-        reload(opCtx.get());
+        reload(opCtx);
     } catch (const DBException& e) {
         LOGV2(22727,
               "Error running periodic reload of shard registry caused by {error}; will retry after "

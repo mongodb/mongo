@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context_group.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/client/shard.h"
@@ -341,6 +342,9 @@ private:
 
     ReloadState _reloadState{ReloadState::Idle};
     bool _isUp{false};
+
+    // The collection of operation contexts used by the refresh thread.
+    OperationContextGroup _opContexts;
 
     // Executor for reloading.
     std::unique_ptr<executor::TaskExecutor> _executor{};
