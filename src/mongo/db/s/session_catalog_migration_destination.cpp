@@ -220,7 +220,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
             result.isPrePostImage = true;
 
             uassert(40632,
-                    str::stream() << "Can't handle 2 pre/post image oplog in a row. Prevoius oplog "
+                    str::stream() << "Can't handle 2 pre/post image oplog in a row. Previous oplog "
                                   << lastResult.oplogTime.getTimestamp().toString()
                                   << ", oplog ts: " << oplogEntry.getTimestamp().toString() << ": "
                                   << oplogBSON,
@@ -263,6 +263,32 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
     BSONObj object(result.isPrePostImage
                        ? oplogEntry.getObject()
                        : BSON(SessionCatalogMigrationDestination::kSessionMigrateOplogTag << 1));
+    boost::optional<repl::RetryImageEnum> needsRetryImage;
+    if (oplogEntry.getNeedsRetryImage()) {
+        if (!lastResult.isPrePostImage) {
+            // The source was unable to find the matching image entry for this oplog entry. In
+            // this case, we do not have a pre- or post- image oplog link so we should set the
+            // 'needsRetryImage' field to avoid validation errors on retries of this operation.
+            needsRetryImage = oplogEntry.getNeedsRetryImage().get();
+        } else {
+            // Downconvert the oplog entry by removing the `needsRetryImage` field and appending a
+            // pre- or post- image opTime link.
+            BSONObj newBson =
+                oplogEntry.toBSON().removeField(repl::OplogEntryBase::kNeedsRetryImageFieldName);
+            BSONObjBuilder appendImageOpTimeBuilder(std::move(newBson));
+            switch (*oplogEntry.getNeedsRetryImage()) {
+                case repl::RetryImageEnum::kPreImage:
+                    appendImageOpTimeBuilder.append(repl::OplogEntryBase::kPreImageOpTimeFieldName,
+                                                    lastResult.oplogTime.toBSON());
+                    break;
+                case repl::RetryImageEnum::kPostImage:
+                    appendImageOpTimeBuilder.append(repl::OplogEntryBase::kPostImageOpTimeFieldName,
+                                                    lastResult.oplogTime.toBSON());
+                    break;
+            }
+            oplogEntry = parseOplog(appendImageOpTimeBuilder.obj().getOwned());
+        }
+    }
     auto oplogLink = extractPrePostImageTs(lastResult, oplogEntry);
     oplogLink.prevOpTime = txnParticipant.getLastWriteOpTime();
 
@@ -292,7 +318,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
                                            stmtId,
                                            oplogLink,
                                            OplogSlot(),
-                                           {});
+                                           needsRetryImage);
 
             const auto& oplogOpTime = result.oplogTime;
             uassert(40633,

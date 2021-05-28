@@ -36,6 +36,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/session.h"
@@ -53,8 +54,51 @@ namespace {
 
 PseudoRandom hashGenerator(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64());
 
+boost::optional<repl::OplogEntry> forgeNoopEntryFromImageCollection(
+    OperationContext* opCtx, const repl::OplogEntry& retryableFindAndModifyOplogEntry) {
+    invariant(retryableFindAndModifyOplogEntry.getNeedsRetryImage());
+
+    DBDirectClient client(opCtx);
+    BSONObj imageObj =
+        client.findOne(NamespaceString::kConfigImagesNamespace.ns(),
+                       BSON("_id" << retryableFindAndModifyOplogEntry.getSessionId()->toBSON()),
+                       nullptr);
+    if (imageObj.isEmpty()) {
+        return boost::none;
+    }
+
+    auto imageEntry = repl::ImageEntry::parse(IDLParserErrorContext("image entry"), imageObj);
+    if (imageEntry.getTxnNumber() != retryableFindAndModifyOplogEntry.getTxnNumber()) {
+        // In our snapshot, fetch the current transaction number for a session. If that transaction
+        // number doesn't match what's found on the image lookup, it implies that the image is not
+        // the correct version for this oplog entry. We will not forge a noop from it.
+        return boost::none;
+    }
+
+    BSONObjBuilder b;
+    // The opTime, namespace, and wall fields are expected to get overwritten by the
+    // destination.
+    b.append("ts", Timestamp::min());
+    b.append("t", -1LL);
+    b.appendDate("wall", Date_t::now());
+    b.append("ns", retryableFindAndModifyOplogEntry.getNss().ns());
+    b.append("op", OpType_serializer(repl::OpTypeEnum::kNoop));
+    b.append("v", repl::OplogEntry::kOplogVersion);
+    // The 'h' field is used for pv0 which is now deprecated.
+    b.append("h", 0LL);
+    b.append("o", imageEntry.getImage());
+    b.append(repl::OplogEntryBase::kSessionIdFieldName, imageEntry.get_id().toBSON());
+    b.append(repl::OplogEntryBase::kTxnNumberFieldName, imageEntry.getTxnNumber());
+    b.append(repl::OplogEntryBase::kStatementIdFieldName,
+             *retryableFindAndModifyOplogEntry.getStatementId());
+    return uassertStatusOK(repl::OplogEntry::parse(b.obj()));
+}
+
 boost::optional<repl::OplogEntry> fetchPrePostImageOplog(OperationContext* opCtx,
                                                          const repl::OplogEntry& oplog) {
+    if (oplog.getNeedsRetryImage()) {
+        return forgeNoopEntryFromImageCollection(opCtx, oplog);
+    }
     auto opTimeToFetch = oplog.getPreImageOpTime();
 
     if (!opTimeToFetch) {
@@ -214,6 +258,9 @@ SessionCatalogMigrationSource::OplogResult SessionCatalogMigrationSource::getLas
 
     {
         stdx::lock_guard<Latch> _lk(_newOplogMutex);
+        if (_lastFetchedNewWriteOplogImage) {
+            return OplogResult(_lastFetchedNewWriteOplogImage.get(), false);
+        }
         return OplogResult(_lastFetchedNewWriteOplog, true);
     }
 }
@@ -335,6 +382,16 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
     {
         stdx::lock_guard<Latch> lk(_newOplogMutex);
 
+        if (_lastFetchedNewWriteOplogImage) {
+            // When `_lastFetchedNewWriteOplogImage` is set, it means we found an oplog entry with
+            // `needsRetryImage`. At this step, we've already returned the image document, but we
+            // have yet to return the original oplog entry stored in `_lastFetchedNewWriteOplog`. We
+            // will unset this value and return such that the next call to `getLastFetchedOplog`
+            // will return `_lastFetchedNewWriteOplog`.
+            _lastFetchedNewWriteOplogImage.reset();
+            return true;
+        }
+
         if (_newWriteOpTimeList.empty()) {
             _lastFetchedNewWriteOplog.reset();
             return false;
@@ -355,7 +412,6 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
                           << nextOpTimeToFetch.toBSON(),
             !newWriteOplogDoc.isEmpty());
 
-
     auto newWriteOplogEntry = uassertStatusOK(repl::OplogEntry::parse(newWriteOplogDoc));
 
     // If this oplog entry corresponds to transaction prepare/commit, replace it with a sentinel
@@ -367,10 +423,19 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
                                    opCtx->getServiceContext()->getFastClockSource()->now());
     }
 
+    boost::optional<repl::OplogEntry> forgedNoopImage;
+    if (newWriteOplogEntry.getNeedsRetryImage()) {
+        forgedNoopImage = forgeNoopEntryFromImageCollection(opCtx, newWriteOplogEntry);
+    }
+
     {
         stdx::lock_guard<Latch> lk(_newOplogMutex);
         _lastFetchedNewWriteOplog = newWriteOplogEntry;
         _newWriteOpTimeList.pop_front();
+
+        if (forgedNoopImage) {
+            _lastFetchedNewWriteOplogImage = forgedNoopImage;
+        }
     }
 
     return true;

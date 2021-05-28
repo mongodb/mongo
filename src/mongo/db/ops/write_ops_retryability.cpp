@@ -53,7 +53,7 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
                                        const repl::OplogEntry& oplogWithCorrectLinks) {
     auto opType = oplogEntry.getOpType();
     auto ts = oplogEntry.getTimestamp();
-    const bool needsRetryImage = oplogEntry.getNeedsRetryImage().is_initialized();
+    const bool needsRetryImage = oplogWithCorrectLinks.getNeedsRetryImage().is_initialized();
 
     if (opType == repl::OpTypeEnum::kDelete) {
         uassert(
