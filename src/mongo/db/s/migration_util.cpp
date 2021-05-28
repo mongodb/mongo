@@ -57,6 +57,7 @@
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -592,6 +593,8 @@ void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, con
             // are set to unused values so that they don't conflict.
             RangeDeletionTask task(
                 UUID::gen(), nss, uuid, ShardId("fromFCVUpgrade"), range, CleanWhenEnum::kDelayed);
+            const auto currentTime = VectorClock::get(opCtx)->getTime();
+            task.setTimestamp(currentTime.clusterTime().asTimestamp());
             deletions.emplace_back(task);
         });
 

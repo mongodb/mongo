@@ -36,6 +36,7 @@
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/fail_point.h"
@@ -121,6 +122,8 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
                                         _waitForDelete ? CleanWhenEnum::kNow
                                                        : CleanWhenEnum::kDelayed);
     donorDeletionTask.setPending(true);
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    donorDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
     migrationutil::persistRangeDeletionTaskLocally(
         opCtx, donorDeletionTask, WriteConcerns::kMajorityWriteConcern);
 }
@@ -224,6 +227,8 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
                                    _migrationInfo.getDonorShardId(),
                                    _migrationInfo.getRange(),
                                    _waitForDelete ? CleanWhenEnum::kNow : CleanWhenEnum::kDelayed);
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    deletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
     return migrationutil::submitRangeDeletionTask(opCtx, deletionTask).semi();
 }
 

@@ -68,6 +68,7 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
@@ -1005,6 +1006,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                                                 range,
                                                 CleanWhenEnum::kNow);
         recipientDeletionTask.setPending(true);
+        const auto currentTime = VectorClock::get(outerOpCtx)->getTime();
+        recipientDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
 
         // It is illegal to wait for write concern with a session checked out, so persist the range
         // deletion task with an immediately satsifiable write concern and then wait for majority

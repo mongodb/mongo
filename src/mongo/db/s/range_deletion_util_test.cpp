@@ -42,6 +42,7 @@
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/fail_point.h"
 
@@ -156,6 +157,8 @@ RangeDeletionTask insertRangeDeletionTask(OperationContext* opCtx, UUID uuid, Ch
     auto migrationId = UUID::gen();
     RangeDeletionTask t(migrationId, kNss, uuid, ShardId("donor"), range, CleanWhenEnum::kDelayed);
     t.setPending(true);
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    t.setTimestamp(currentTime.clusterTime().asTimestamp());
     store.add(opCtx, t);
 
     // Document should be in the store.
