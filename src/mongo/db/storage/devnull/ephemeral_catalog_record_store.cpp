@@ -450,19 +450,10 @@ StatusWith<RecordData> EphemeralForTestRecordStore::updateWithDamages(
     opCtx->recoveryUnit()->registerChange(
         std::make_unique<RemoveChange>(opCtx, _data, loc, *oldRecord));
 
-    mutablebson::DamageVector damages_sorted(damages.size());
-    std::partial_sort_copy(damages.begin(),
-                           damages.end(),
-                           damages_sorted.begin(),
-                           damages_sorted.end(),
-                           [](const auto& damage1, const auto& damage2) {
-                               return damage1.targetOffset < damage2.targetOffset;
-                           });
-
     char* root = newRecord.data.get();
     char* old = oldRecord->data.get();
-    mutablebson::DamageVector::const_iterator where = damages_sorted.begin();
-    const mutablebson::DamageVector::const_iterator end = damages_sorted.end();
+    mutablebson::DamageVector::const_iterator where = damages.begin();
+    const mutablebson::DamageVector::const_iterator end = damages.end();
     // Since the 'targetOffset' is referring to the location in the new record, we need to subtract
     // the accumulated change of size by the damages to get the offset in the old record.
     int diffSize = 0;
