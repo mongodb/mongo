@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/mongo_uri.h"
+#include "mongo/client/replica_set_monitor_stats.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/transport/transport_layer.h"
@@ -54,7 +55,8 @@ public:
     virtual Future<BSONObj> sayHello(HostAndPort host,
                                      const std::string& setName,
                                      const MongoURI& setUri,
-                                     Milliseconds timeout) noexcept = 0;
+                                     Milliseconds timeout,
+                                     ReplicaSetMonitorStats* stats) noexcept = 0;
     virtual ~ReplicaSetMonitorTransport();
 };
 using ReplicaSetMonitorTransportPtr = std::unique_ptr<ReplicaSetMonitorTransport>;
@@ -68,7 +70,8 @@ public:
     Future<BSONObj> sayHello(HostAndPort host,
                              const std::string& setName,
                              const MongoURI& setUri,
-                             Milliseconds timeout) noexcept override;
+                             Milliseconds timeout,
+                             ReplicaSetMonitorStats* stats) noexcept override;
 };
 
 /**
@@ -83,7 +86,8 @@ public:
     Future<BSONObj> sayHello(HostAndPort host,
                              const std::string& setName,
                              const MongoURI& setUri,
-                             Milliseconds timeout) noexcept override;
+                             Milliseconds timeout,
+                             ReplicaSetMonitorStats* stats) noexcept override;
 
 private:
     void _haltIfIncompatibleServer(Status status);

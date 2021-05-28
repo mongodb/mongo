@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/client/replica_set_monitor_stats.h"
 #include "mongo/client/replica_set_monitor_transport.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/mutex.h"
@@ -120,6 +121,9 @@ private:
 
     // set to true when shutdown has been called.
     bool _isShutdown{false};
+
+    // Internally synchronized.
+    ReplicaSetMonitorManagerStats _stats;
 };
 
 }  // namespace mongo
