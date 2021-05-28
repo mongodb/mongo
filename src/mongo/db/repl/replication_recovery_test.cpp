@@ -785,11 +785,12 @@ TEST_F(ReplicationRecoveryTest,
 
 DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
                    AppliedThroughBehindOplogFasserts,
-                   "Fatal assertion.*40292") {
+                   "Fatal assertion.*5466601") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
     getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(1, 1), 1));
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(1, 1));
     _setUpOplog(opCtx, getStorageInterface(), {3, 4, 5});
 
     recovery.recoverFromOplog(opCtx, boost::none);
@@ -807,13 +808,12 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
     recovery.recoverFromOplog(opCtx, boost::none);
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
-                   AppliedThroughNotInOplogCausesFassert,
-                   "Fatal assertion.*40292") {
+TEST_F(ReplicationRecoveryTest, AppliedThroughNotInOplog) {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
     getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(3, 3), 1));
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(3, 3));
     _setUpOplog(opCtx, getStorageInterface(), {1, 2, 4, 5});
 
     recovery.recoverFromOplog(opCtx, boost::none);
@@ -1595,6 +1595,16 @@ DEATH_TEST_REGEX_F(
     getConsistencyMarkers()->setMinValid(opCtx, OpTime(Timestamp(20, 20), 1));
 
     recovery.recoverFromOplogAsStandalone(opCtx);
+}
+
+TEST_F(ReplicationRecoveryTest, RecoverStartFromClosestLTEEntryIfRecoveryTsNotInOplog) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    auto recoveryTs = Timestamp(4, 4);
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(recoveryTs);
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 5, 6, 7});
+    recovery.recoverFromOplog(opCtx, recoveryTs);
 }
 
 }  // namespace
