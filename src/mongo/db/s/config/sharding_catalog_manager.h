@@ -335,6 +335,7 @@ public:
      */
     void setAllowMigrationsAndBumpOneChunk(OperationContext* opCtx,
                                            const NamespaceString& nss,
+                                           const boost::optional<UUID>& collectionUUID,
                                            bool allowMigrations);
 
     //

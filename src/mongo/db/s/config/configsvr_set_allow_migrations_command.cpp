@@ -64,9 +64,10 @@ public:
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
             const auto allowMigrations = request().getAllowMigrations();
+            const auto& collectionUUID = request().getCollectionUUID();
 
             ShardingCatalogManager::get(opCtx)->setAllowMigrationsAndBumpOneChunk(
-                opCtx, nss, allowMigrations);
+                opCtx, nss, collectionUUID, allowMigrations);
         }
 
     private:

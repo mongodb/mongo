@@ -48,3 +48,7 @@ commands:
               type: bool
               description: "The new allowMigrations flag state to be set."
               optional: false
+          collectionUUID:
+              type: uuid
+              description: "The uuid of the collection."
+              optional: true # Optional for backwards compatibility
