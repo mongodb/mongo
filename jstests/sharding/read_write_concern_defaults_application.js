@@ -142,7 +142,8 @@ let testCases = {
     abortReshardCollection: {skip: "does not accept read or write concern"},
     abortTransaction: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({create: coll, writeConcern: {w: 'majority'}}));
             // Ensure that the dbVersion is known.
             assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
             assert.eq(1,
@@ -218,7 +219,8 @@ let testCases = {
     commitReshardCollection: {skip: "does not accept read or write concern"},
     commitTransaction: {
         setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
+            assert.commandWorked(
+                conn.getDB(db).runCommand({create: coll, writeConcern: {w: 'majority'}}));
             // Ensure that the dbVersion is known.
             assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
             assert.eq(1,

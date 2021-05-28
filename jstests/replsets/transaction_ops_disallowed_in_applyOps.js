@@ -35,7 +35,7 @@ const primarySessionDb = primarySession.getDatabase(dbName);
 const primarySessionColl = primarySessionDb[collName];
 
 // Create a collection.
-assert.commandWorked(primarySessionColl.insert({}));
+assert.commandWorked(primarySessionColl.insert({}, {writeConcern: {w: "majority"}}));
 
 //
 // Run transactions of different varieties and record the oplog entries they generate, so that we

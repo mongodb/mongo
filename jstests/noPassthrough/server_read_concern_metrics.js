@@ -142,7 +142,7 @@ const collName = "server_read_concern_metrics";
 const testDB = primary.getDB(dbName);
 const testColl = testDB[collName];
 testDB.runCommand({drop: collName});
-assert.commandWorked(testDB.createCollection(collName));
+assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "majority"}}));
 assert.commandWorked(testColl.insert({_id: 0}, {writeConcern: {w: 'majority'}}));
 
 const isDefaultRCLocalFlagEnabled = isDefaultReadConcernLocalFlagEnabled(primary);
