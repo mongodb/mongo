@@ -43,13 +43,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
-#include "mongo/db/pipeline/document_source_graph_lookup.h"
-#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_replace_root.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
@@ -342,120 +338,26 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
             .toBson(),
         expCtx));
 
-    // Denormalize oplog chaining. This will shove meta-information (particularly timestamps and
-    // `destinedRecipient`) into the current aggregation output (still a raw oplog entry). This
-    // meta-information is used for performing $lookups against the timestamp field and filtering
-    // out earlier commands where the necessary `destinedRecipient` data wasn't yet available.
-    stages.emplace_back(DocumentSourceGraphLookUp::create(
-        expCtx,
-        NamespaceString("local.system.resharding.slimOplogForGraphLookup"),  // from
-        "history",                                                           // as
-        "prevOpTime.ts",                                                     // connectFromField
-        "ts",                                                                // connectToField
-        ExpressionFieldPath::parse(expCtx.get(),
-                                   "$ts",
-                                   expCtx->variablesParseState),  // startWith
-        boost::none,                                              // additionalFilter
-        boost::optional<FieldPath>("depthForResharding"),         // depthField
-        boost::none,                                              // maxDepth
-        boost::none));                                            // unwindSrc
+    // Emits transaction entries chronologically, and adds _id to all events in the stream.
+    stages.emplace_back(DocumentSourceReshardingIterateTransaction::create(expCtx));
 
-    // Only keep oplog entries for the relevant `destinedRecipient`.
+    // Filter out applyOps entries which do not contain any relevant operations.
     stages.emplace_back(DocumentSourceMatch::create(
         Doc{{"$or",
-             Arr{V{Doc{{"history", Doc{{"$size", 1}}},
-                       {"$or",
-                        Arr{V{Doc{{"history.0.op", Doc{{"$ne", "c"_sd}}}}},
-                            V{Doc{{"history.0.op", "c"_sd}, {"history.0.o.applyOps", DNE}}}}}}},
-                 V{Doc{{"history",
+             Arr{V{Doc{{"op", Doc{{"$ne", "c"_sd}}}}},
+                 V{Doc{{"op", "c"_sd}, {"o.applyOps", DNE}}},
+                 V{Doc{{"op", "c"_sd},
+                       {"o.applyOps",
                         Doc{{"$elemMatch",
-                             Doc{{"op", "c"_sd},
-                                 {"o.applyOps",
-                                  Doc{{"$elemMatch",
-                                       Doc{{"ui", collUUID},
-                                           {"destinedRecipient",
-                                            recipientShard.toString()}}}}}}}}}}}}}}
+                             Doc{{"destinedRecipient", recipientShard.toString()},
+                                 {"ui", collUUID}}}}}}}}}}
             .toBson(),
-        expCtx));
-
-    // There's no guarantee to the order of entries accumulated in $graphLookup. The $reduce
-    // expression sorts the `history` array in ascending `depthForResharding` order. The
-    // $reverseArray expression will give an array in ascending timestamp order.
-    stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
-                    history: {$reverseArray: {$reduce: {\
-                        input: '$history',\
-                        initialValue: {$range: [0, {$size: '$history'}]},\
-                        in: {$concatArrays: [\
-                            {$slice: ['$$value', '$$this.depthForResharding']},\
-                            ['$$this'],\
-                            {$slice: [\
-                                '$$value',\
-                                {$subtract: [\
-                                    {$add: ['$$this.depthForResharding', 1]},\
-                                    {$size: '$history'}]}]}]}}}}}"),
-                                                        expCtx));
-
-    // If the last entry in the history is an `abortTransaction`, leave the `abortTransaction` oplog
-    // entry in place, but remove all prior `applyOps` entries. The `abortTransaction` entry is
-    // required to update the `config.transactions` table. Removing the `applyOps` entries ensures
-    // we don't make any data writes that would have to be undone.
-    stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
-                        'history': {$let: {\
-                            vars: {lastEntry: {$arrayElemAt: ['$history', -1]}},\
-                            in: {$cond: {\
-                                if: {$and: [\
-                                    {$eq: ['$$lastEntry.op', 'c']},\
-                                    {$ne: [{$type: '$$lastEntry.o.abortTransaction'}, 'missing']}\
-                                ]},\
-                                then: ['$$lastEntry'],\
-                                else: '$history'}}}}}"),
-                                                        expCtx));
-
-    // Unwind the history array. The output at this point is a new stream of oplog entries, each
-    // with exactly one history element. If there are no multi-oplog transactions (e.g: large
-    // transactions, prepared transactions), the documents will be in timestamp order. In the
-    // presence of large or prepared transactions, the data writes that were part of prior oplog
-    // entries will be adjacent to each other, terminating with a `commitTransaction` oplog entry.
-    stages.emplace_back(DocumentSourceUnwind::create(expCtx, "history", false, boost::none));
-
-    // Group the relevant timestamps into an `_id` field. The `_id.clusterTime` value is the
-    // timestamp of the last entry in a multi-oplog entry transaction. The `_id.ts` value is the
-    // timestamp of the oplog entry that operation appeared in. For typical CRUD operations, these
-    // are the same. In multi-oplog entry transactions, `_id.clusterTime` may be later than
-    // `_id.ts`.
-    stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
-        fromjson("{$replaceRoot: {newRoot: {$mergeObjects: [\
-                     '$history',\
-                     {_id: {clusterTime: '$ts', ts: '$history.ts'}}]}}}")
-            .firstElement(),
         expCtx));
 
     // Now that the chained oplog entries are adjacent with an annotated `ReshardingDonorOplogId`,
     // the pipeline can prune anything earlier than the resume time.
     stages.emplace_back(DocumentSourceMatch::create(
         Doc{{"_id", Doc{{"$gt", startAfter.toBSON()}}}}.toBson(), expCtx));
-
-    // Using the `ts` field, attach the full oplog document. Note that even for simple oplog
-    // entries, the oplog contents were thrown away making this step necessary for all documents.
-    stages.emplace_back(DocumentSourceLookUp::createFromBson(Doc{{"$lookup",
-                                                                  Doc{{"from", "oplog.rs"_sd},
-                                                                      {"localField", "ts"_sd},
-                                                                      {"foreignField", "ts"_sd},
-                                                                      {"as", "fullEntry"_sd}}}}
-                                                                 .toBson()
-                                                                 .firstElement(),
-                                                             expCtx));
-
-    // The outer fields of the pipeline document only contain meta-information about the
-    // operation. The prior `$lookup` places the actual operations into a `fullEntry` array of size
-    // one (timestamps are unique, thus always exactly one value).
-    stages.emplace_back(DocumentSourceUnwind::create(expCtx, "fullEntry", false, boost::none));
-
-    // Keep only the oplog entry from the `$lookup` merged with the `_id`.
-    stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
-        fromjson("{$replaceRoot: {newRoot: {$mergeObjects: ['$fullEntry', {_id: '$_id'}]}}}")
-            .firstElement(),
-        expCtx));
 
     // Filter out anything inside of an `applyOps` specifically destined for another shard. This
     // ensures zone restrictions are obeyed. Data will never be sent to a shard that it isn't meant
