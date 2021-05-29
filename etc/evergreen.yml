@@ -6306,6 +6306,10 @@ tasks:
   - name: replica_sets_jscore_passthrough
   commands:
     - func: "fetch artifacts"
+    - func: "f_expansions_write"
+    - func: "kill processes"
+    - func: "cleanup environment"
+    - func: "set up venv"
     - func: "fetch packages"
     - func: "apply compile expansions"
     - func: "set up remote credentials"
@@ -6331,6 +6335,10 @@ tasks:
   stepback: false
   commands:
     - func: "fetch artifacts"
+    - func: "f_expansions_write"
+    - func: "kill processes"
+    - func: "cleanup environment"
+    - func: "set up venv"
     - func: "fetch packages"
     - func: "fetch dist tarball"
     # Fetch the shell
