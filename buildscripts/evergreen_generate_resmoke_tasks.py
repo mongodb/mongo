@@ -19,6 +19,7 @@ from evergreen.api import EvergreenApi, RetryingEvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 from buildscripts.task_generation.gen_task_validation import GenTaskValidationService
+from buildscripts.util.taskname import remove_gen_suffix
 
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -30,8 +31,7 @@ from buildscripts.task_generation.gen_task_service import GenTaskOptions, Resmok
 from buildscripts.task_generation.suite_split_strategies import SplitStrategy, FallbackStrategy, \
     greedy_division, round_robin_fallback
 from buildscripts.task_generation.resmoke_proxy import ResmokeProxyConfig
-from buildscripts.task_generation.suite_split import SuiteSplitConfig, \
-    SuiteSplitParameters
+from buildscripts.task_generation.suite_split import SuiteSplitConfig, SuiteSplitParameters
 from buildscripts.util.cmdutils import enable_logging
 from buildscripts.util.fileops import read_yaml_file
 # pylint: enable=wrong-import-position
@@ -163,13 +163,6 @@ class EvgExpansions(BaseModel):
             resmoke_args=self.resmoke_args, resmoke_jobs_max=self.resmoke_jobs_max, config_location=
             f"{self.build_variant}/{self.revision}/generate_tasks/{self.task}_gen-{self.build_id}.tgz"
         )
-
-
-def remove_gen_suffix(task_name):
-    """Remove '_gen' suffix from task_name."""
-    if task_name.endswith(GEN_SUFFIX):
-        return task_name[:-4]
-    return task_name
 
 
 class EvgGenResmokeTaskOrchestrator:

@@ -1409,6 +1409,7 @@ functions:
         permissions: public-read
         content_type: application/gzip
         display_name: Generated Task Config - Execution ${execution}
+        optional: true
 
     - command: timeout.update
       params:

@@ -26,8 +26,7 @@ from buildscripts.task_generation.gen_config import GenerationConfiguration
 from buildscripts.task_generation.generated_config import GeneratedConfiguration
 from buildscripts.task_generation.multiversion_util import MultiversionUtilService
 from buildscripts.task_generation.resmoke_proxy import ResmokeProxyConfig
-from buildscripts.task_generation.suite_split import SuiteSplitConfig, SuiteSplitParameters, \
-    remove_gen_suffix
+from buildscripts.task_generation.suite_split import SuiteSplitConfig, SuiteSplitParameters
 from buildscripts.task_generation.suite_split_strategies import SplitStrategy, FallbackStrategy, \
     greedy_division, round_robin_fallback
 from buildscripts.task_generation.task_types.fuzzer_tasks import FuzzerGenTaskParams
@@ -40,6 +39,7 @@ import buildscripts.evergreen_gen_fuzzer_tests as gen_fuzzer
 import buildscripts.ciconfig.tags as _tags
 
 # pylint: disable=len-as-condition
+from buildscripts.util.taskname import remove_gen_suffix
 
 LOGGER = structlog.getLogger(__name__)
 
@@ -58,7 +58,6 @@ RANDOM_REPLSETS_TAG = "random_multiversion_ds"
 BACKPORT_REQUIRED_TAG = "backport_required_multiversion"
 EXCLUDE_TAGS = f"{REQUIRES_FCV_TAG},multiversion_incompatible,{BACKPORT_REQUIRED_TAG}"
 EXCLUDE_TAGS_FILE = "multiversion_exclude_tags.yml"
-GEN_SUFFIX = "_gen"
 GEN_PARENT_TASK = "generator_tasks"
 ASAN_SIGNATURE = "detect_leaks=1"
 
@@ -100,7 +99,7 @@ class EvgExpansions(BaseModel):
     @property
     def task(self) -> str:
         """Get the name of the task."""
-        return self.task_name
+        return remove_gen_suffix(self.task_name)
 
     @classmethod
     def from_yaml_file(cls, path: str) -> "EvgExpansions":
@@ -160,12 +159,10 @@ class EvgExpansions(BaseModel):
 
     def get_split_params(self) -> SuiteSplitParameters:
         """Get the parameters specified to split suites."""
-        task = remove_gen_suffix(self.task)
-
         return SuiteSplitParameters(
-            task_name=self.task,
-            suite_name=self.suite or task,
-            filename=self.suite or task,
+            task_name=self.task_name,
+            suite_name=self.suite or self.task,
+            filename=self.suite or self.task,
             test_file_filter=None,
             build_variant=self.build_variant,
             is_asan=self.is_asan_build(),
@@ -196,13 +193,12 @@ class EvgExpansions(BaseModel):
         :return: Parameters to use for generating multiversion tasks.
         """
         version_config_list = get_version_configs(is_sharded)
-        task = remove_gen_suffix(self.task)
         return MultiversionGenTaskParams(
             mixed_version_configs=version_config_list,
             is_sharded=is_sharded,
             resmoke_args=self.resmoke_args,
-            parent_task_name=task,
-            origin_suite=self.suite or task,
+            parent_task_name=self.task,
+            origin_suite=self.suite or self.task,
             use_large_distro=self.use_large_distro,
             large_distro_name=self.large_distro_name,
             config_location=self.config_location(),
@@ -315,7 +311,7 @@ class MultiVersionGenerateOrchestrator:
 
         builder = EvgConfigBuilder()  # pylint: disable=no-value-for-parameter
         builder.add_multiversion_suite(split_params, gen_params)
-        builder.add_display_task(GEN_PARENT_TASK, {f"{split_params.task_name}{GEN_SUFFIX}"},
+        builder.add_display_task(GEN_PARENT_TASK, {f"{split_params.task_name}"},
                                  evg_expansions.build_variant)
         return builder.build(f"{evg_expansions.task}.json")
 
