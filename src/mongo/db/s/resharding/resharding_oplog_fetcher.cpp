@@ -205,6 +205,10 @@ bool ReshardingOplogFetcher::iterate(Client* client, CancelableOperationContextF
         LOGV2_ERROR(
             5192103, "Fatal resharding error while fetching.", "error"_attr = exceptionToStatus());
         throw;
+    } catch (const ExceptionFor<ErrorCodes::IncompleteTransactionHistory>&) {
+        LOGV2_ERROR(
+            5354400, "Fatal resharding error while fetching.", "error"_attr = exceptionToStatus());
+        throw;
     } catch (const DBException&) {
         LOGV2_WARNING(
             5127200, "Error while fetching, retrying.", "error"_attr = exceptionToStatus());

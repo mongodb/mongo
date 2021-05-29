@@ -157,6 +157,7 @@ env.Library(
     source=[
         'resharding_util.cpp',
         'resharding/coordinator_document.idl',
+        'resharding/document_source_resharding_iterate_transaction.cpp',
         'resharding/donor_document.idl',
         'resharding/donor_oplog_id.idl',
         'resharding/recipient_document.idl',

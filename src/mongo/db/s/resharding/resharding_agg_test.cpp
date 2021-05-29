@@ -35,12 +35,74 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/transaction_history_iterator.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
 using namespace fmt::literals;
+
+// A mock TransactionHistoryIterator to support DSReshardingIterateTransaction.
+class MockTransactionHistoryIterator : public TransactionHistoryIteratorBase {
+public:
+    MockTransactionHistoryIterator(std::deque<DocumentSource::GetNextResult> oplogContents,
+                                   repl::OpTime startTime)
+        : _oplogContents(std::move(oplogContents)),
+          _oplogIt(_oplogContents.rbegin()),
+          _nextOpTime(std::move(startTime)) {}
+
+    virtual ~MockTransactionHistoryIterator() = default;
+
+    bool hasNext() const {
+        return !_nextOpTime.isNull();
+    }
+
+    repl::OplogEntry next(OperationContext* opCtx) {
+        BSONObj oplogBSON = findOneOplogEntry(_nextOpTime);
+
+        auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
+        const auto& oplogPrevTsOption = oplogEntry.getPrevWriteOpTimeInTransaction();
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Missing prevOpTime field: " << oplogBSON,
+                oplogPrevTsOption);
+
+        _nextOpTime = oplogPrevTsOption.value();
+
+        return oplogEntry;
+    }
+
+    repl::OpTime nextOpTime(OperationContext* opCtx) {
+        BSONObj oplogBSON = findOneOplogEntry(_nextOpTime);
+
+        auto prevOpTime = oplogBSON[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName];
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Missing prevOpTime field: " << oplogBSON,
+                !prevOpTime.eoo() && prevOpTime.isABSONObj());
+
+        auto returnOpTime = _nextOpTime;
+        _nextOpTime = repl::OpTime::parse(prevOpTime.Obj());
+        return returnOpTime;
+    }
+
+private:
+    BSONObj findOneOplogEntry(repl::OpTime needle) {
+        for (; _oplogIt != _oplogContents.rend(); _oplogIt++) {
+            auto oplogBSON = _oplogIt->getDocument().toBson();
+            auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
+            if (oplogEntry.getOpTime() == needle) {
+                return oplogBSON;
+            }
+        }
+        // We should never reach here unless the txn chain has fallen off the oplog.
+        uasserted(ErrorCodes::IncompleteTransactionHistory,
+                  str::stream() << "oplog with opTime " << needle.toBSON() << " cannot be found");
+    }
+
+    std::deque<DocumentSource::GetNextResult> _oplogContents;
+    std::deque<DocumentSource::GetNextResult>::reverse_iterator _oplogIt;
+    repl::OpTime _nextOpTime;
+};
 
 /**
  * Mock interface to allow specifiying mock results for the lookup pipeline.
@@ -58,6 +120,12 @@ public:
         pipeline->addInitialSource(
             DocumentSourceMock::createForTest(_mockResults, pipeline->getContext()));
         return pipeline;
+    }
+
+    std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
+        repl::OpTime time) const {
+        return std::unique_ptr<TransactionHistoryIteratorBase>(
+            new MockTransactionHistoryIterator(_mockResults, time));
     }
 
 private:
@@ -695,7 +763,6 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxn) {
         "    't' : { '$numberLong' : '1' } } }");
 
     const Timestamp clusterTime = commitEntry["ts"].timestamp();
-    const Timestamp commitTime = commitEntry["o"].Obj()["commitTimestamp"].timestamp();
 
     const bool debug = false;
     if (debug) {
@@ -747,20 +814,11 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxn) {
     ASSERT_EQ(clusterTime, oplogEntry.get_id()->getDocument()["clusterTime"].getTimestamp())
         << bsonDoc;
     ASSERT_EQ(2, oplogEntry.getObject()["applyOps"].Obj().nFields()) << bsonDoc;
+    ASSERT(validateOplogId(clusterTime, Document::fromBsonWithMetaData(prepareEntry), oplogEntry));
 
-    // The second document should be `o.commitTransaction: 1`.
-    doc = pipeline->getNext();
-    ASSERT(doc);
-    bsonDoc = doc->toBson();
-    if (debug) {
-        std::cout << "Commit doc:" << std::endl
-                  << bsonDoc.jsonString(ExtendedRelaxedV2_0_0, true, false) << std::endl;
-    }
-    oplogEntry = uassertStatusOK(repl::OplogEntry::parse(bsonDoc));
-    ASSERT_TRUE(oplogEntry.isPreparedCommit()) << bsonDoc;
-    ASSERT_EQ(clusterTime, oplogEntry.get_id()->getDocument()["clusterTime"].getTimestamp())
-        << bsonDoc;
-    ASSERT_EQ(commitTime, oplogEntry.getObject()["commitTimestamp"].timestamp()) << bsonDoc;
+    // We should not see the `commitTransaction` entry, since DSReshardingIterateTransaction
+    // swallows it.
+    ASSERT(!pipeline->getNext());
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelineAtomicApplyOps) {
@@ -801,21 +859,8 @@ TEST_F(ReshardingAggTest, VerifyPipelineAtomicApplyOps) {
 
     auto pipeline = createPipeline({Document(oplogBSON)});
 
-    // This test currently fails since the createOplogFetchingPipelineForResharding() function is
-    // looking for prevOpTime and destinedRecipient in each operation being applied.
-    auto doc = pipeline->getNext();
-    // TODO(SERVER-53542): Uncomment the following code once this ticket is addressed.
-    // ASSERT(doc);
-
-    // auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
-
-    // ASSERT(oplogEntry.isCommand());
-    // ASSERT(repl::OplogEntry::CommandType::kApplyOps == oplogEntry.getCommandType());
-    // ASSERT_EQ(oplogBSON["ts"].timestamp(), oplogEntry.getTimestamp());
-    // ASSERT(validateOplogId(oplogBSON["ts"].timestamp(), Document(oplogBSON), oplogEntry));
-
-    // doc = pipeline->getNext();
-    ASSERT(!doc);
+    // We don't need to support atomic applyOps in the resharding pipeline; we filter them out.
+    ASSERT(!pipeline->getNext());
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelineSmallTxn) {
@@ -941,23 +986,14 @@ TEST_F(ReshardingAggTest, VerifyPipelineSmallPreparedTxn) {
     ASSERT_EQ(pipelineSource[0].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
     ASSERT(validateOplogId(clusterTime, pipelineSource[0].getDocument(), oplogEntry));
 
-    doc = pipeline->getNext();
-    ASSERT(doc);
-
-    oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
-    ASSERT(oplogEntry.isCommand());
-    ASSERT(repl::OplogEntry::CommandType::kCommitTransaction == oplogEntry.getCommandType());
-    ASSERT_EQ(pipelineSource[1].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
-    ASSERT(validateOplogId(clusterTime, pipelineSource[1].getDocument(), oplogEntry));
-
-    doc = pipeline->getNext();
-    ASSERT(!doc);
+    // We should not observe the 'commitTransaction' entry, since DSReshardingIterateTransaction
+    // swallows it.
+    ASSERT(!pipeline->getNext());
 }
 
 // This test verifies that we don't return oplog entries that are not destined for the specified
 // recipient shard. The test has an oplog that only has entries that stay on the source shard
 // causing the pipeline to exclude the entire transaction.
-// https://github.com/mongodb/mongo/blob/0615cd112f6cbe12ad6aab52319903a954158da5/src/mongo/db/s/resharding_util.cpp#L376-L379
 TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxnNoReshardedDocs) {
     std::deque<DocumentSource::GetNextResult> pipelineSource = {Document(fromjson(R"({
             "lsid": {
@@ -1013,8 +1049,9 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxnNoReshardedDocs) {
 
     auto pipeline = createPipeline(pipelineSource);
 
-    auto doc = pipeline->getNext();
-    ASSERT(!doc);
+    // We don't see any results since there are no events for the requested destinedRecipient in the
+    // 'applyOps' and we swallow the 'commitTransaction' event internally.
+    ASSERT(!pipeline->getNext());
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxnAbort) {
@@ -1074,8 +1111,7 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxnAbort) {
     ASSERT_EQ(pipelineSource[1].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
     ASSERT(validateOplogId(clusterTime, pipelineSource[1].getDocument(), oplogEntry));
 
-    doc = pipeline->getNext();
-    ASSERT(!doc);
+    ASSERT(!pipeline->getNext());
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxn) {
@@ -1126,8 +1162,22 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxn) {
           "applyOps": [ {
               "op": "i",
               "ns": "test.foo",
+              "ui": { "$binary": "rSg0RzXCTkmM+WGwkZz2GQ==", "$type": "04" },
+              "o": { "_id": -18, "x": -2, "y": -3 },
+              "destinedRecipient": "shard1"
+            },
+            {
+              "op": "i",
+              "ns": "test.foo",
               "ui": { "$binary": "iSa6jmEaQsK7Gjt4GfYQ7Q==", "$type": "04" },
               "o": { "_id": 18, "x": 2, "y": 3 },
+              "destinedRecipient": "shard1"
+            },
+            {
+              "op": "i",
+              "ns": "test.foo",
+              "ui": { "$binary": "iSa6jmEaQsK7Gjt4GfYQ7Q==", "$type": "04" },
+              "o": { "_id": -18, "x": -2, "y": -3 },
               "destinedRecipient": "shard0"
             }
           ],
@@ -1189,23 +1239,14 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxn) {
     ASSERT(repl::OplogEntry::CommandType::kApplyOps == oplogEntry.getCommandType());
     ASSERT(oplogEntry.shouldPrepare());
     ASSERT_FALSE(oplogEntry.isPartialTransaction());
-    ASSERT_EQ(0, oplogEntry.getObject()["applyOps"].Obj().nFields());
+    // We only get back 1 out of 3 entries in the second 'applyOps' because only one of them matches
+    // both the correct UUID and the expected destinedRecipient.
+    ASSERT_EQ(1, oplogEntry.getObject()["applyOps"].Obj().nFields());
     ASSERT_EQ(pipelineSource[1].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
     ASSERT(validateOplogId(clusterTime, pipelineSource[1].getDocument(), oplogEntry));
 
-    doc = pipeline->getNext();
-    ASSERT(doc);
-
-    oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
-    ASSERT(oplogEntry.isCommand());
-    ASSERT(repl::OplogEntry::CommandType::kCommitTransaction == oplogEntry.getCommandType());
-    ASSERT_FALSE(oplogEntry.shouldPrepare());
-    ASSERT_FALSE(oplogEntry.isPartialTransaction());
-    ASSERT_EQ(pipelineSource[2].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
-    ASSERT(validateOplogId(clusterTime, pipelineSource[2].getDocument(), oplogEntry));
-
-    doc = pipeline->getNext();
-    ASSERT(!doc);
+    // We do not expect any further results because we swallow the 'commitTransaction' internally.
+    ASSERT(!pipeline->getNext());
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxnAbort) {
