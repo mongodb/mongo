@@ -66,11 +66,11 @@ class OpTime;
  */
 class SyncTail {
 public:
-    using MultiSyncApplyFunc =
-        stdx::function<Status(OperationContext* opCtx,
-                              MultiApplier::OperationPtrs* ops,
-                              SyncTail* st,
-                              WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
+    using MultiSyncApplyFunc = stdx::function<Status(OperationContext* opCtx,
+                                                     MultiApplier::OperationPtrs* ops,
+                                                     SyncTail* st,
+                                                     WorkerMultikeyPathInfo* workerMultikeyPathInfo,
+                                                     const bool isDataConsistent)>;
 
     /**
      * Maximum number of operations in each batch that can be applied using multiApply().
@@ -103,7 +103,8 @@ public:
      */
     static Status syncApply(OperationContext* opCtx,
                             const BSONObj& o,
-                            OplogApplication::Mode oplogApplicationMode);
+                            OplogApplication::Mode oplogApplicationMode,
+                            const bool isDataConsistent);
 
     /**
      *
@@ -315,12 +316,14 @@ private:
 Status multiSyncApply(OperationContext* opCtx,
                       MultiApplier::OperationPtrs* ops,
                       SyncTail* st,
-                      WorkerMultikeyPathInfo* workerMultikeyPathInfo);
+                      WorkerMultikeyPathInfo* workerMultikeyPathInfo,
+                      const bool isDataConsistent);
 
 Status multiInitialSyncApply(OperationContext* opCtx,
                              MultiApplier::OperationPtrs* ops,
                              SyncTail* st,
-                             WorkerMultikeyPathInfo* workerMultikeyPathInfo);
+                             WorkerMultikeyPathInfo* workerMultikeyPathInfo,
+                             const bool isDataConsistent);
 
 }  // namespace repl
 }  // namespace mongo

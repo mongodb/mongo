@@ -176,8 +176,10 @@ void SyncTailTest::_testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
     };
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_EQ(SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kSecondary),
-              expectedError);
+    ASSERT_EQ(
+        SyncTail::syncApply(
+            _opCtx.get(), op, OplogApplication::Mode::kSecondary, true /* isDataConsistent */),
+        expectedError);
     ASSERT_EQ(applyOpCalled, expectedApplyOpCalled);
 }
 
@@ -203,7 +205,8 @@ Status SyncTailTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
         opsPtrs.push_back(&op);
     }
     WorkerMultikeyPathInfo pathInfo;
-    return multiSyncApply(_opCtx.get(), &opsPtrs, &syncTail, &pathInfo);
+    return multiSyncApply(
+        _opCtx.get(), &opsPtrs, &syncTail, &pathInfo, true /* isDataConsistent */);
 }
 
 Status SyncTailTest::runOpInitialSync(const OplogEntry& op) {
@@ -221,7 +224,8 @@ Status SyncTailTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
         opsPtrs.push_back(&op);
     }
     WorkerMultikeyPathInfo pathInfo;
-    return multiInitialSyncApply(_opCtx.get(), &opsPtrs, &syncTail, &pathInfo);
+    return multiInitialSyncApply(
+        _opCtx.get(), &opsPtrs, &syncTail, &pathInfo, true /* isDataConsistent */);
 }
 
 

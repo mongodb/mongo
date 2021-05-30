@@ -229,6 +229,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                              const BSONObj& op,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
+                             const bool isDataConsistent,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats = {});
 
 /**

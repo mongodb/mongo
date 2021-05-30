@@ -178,8 +178,9 @@ Status _applyOps(OperationContext* opCtx,
 
             OldClientContext ctx(opCtx, nss.ns());
 
+            const bool isDataConsistent = true;
             status = repl::applyOperation_inlock(
-                opCtx, ctx.db(), opObj, alwaysUpsert, oplogApplicationMode);
+                opCtx, ctx.db(), opObj, alwaysUpsert, oplogApplicationMode, isDataConsistent);
             if (!status.isOK())
                 return status;
 
@@ -234,8 +235,13 @@ Status _applyOps(OperationContext* opCtx,
                             // ops doesn't stop the applyOps from trying to process the rest of the
                             // ops.  This is to leave the door open to parallelizing CRUD op
                             // application in the future.
-                            return repl::applyOperation_inlock(
-                                opCtx, ctx.db(), opObj, alwaysUpsert, oplogApplicationMode);
+                            const bool dataIsConsistent = true;
+                            return repl::applyOperation_inlock(opCtx,
+                                                               ctx.db(),
+                                                               opObj,
+                                                               alwaysUpsert,
+                                                               oplogApplicationMode,
+                                                               dataIsConsistent);
                         }
 
                         auto fieldO = opObj["o"];

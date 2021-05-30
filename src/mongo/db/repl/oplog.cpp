@@ -242,6 +242,16 @@ bool shouldBuildInForeground(OperationContext* opCtx,
 }
 
 
+StringData getInvalidatingReason(const OplogApplication::Mode mode, const bool isDataConsistent) {
+    if (mode == OplogApplication::Mode::kInitialSync) {
+        return "initial sync"_sd;
+    } else if (!isDataConsistent) {
+        return "minvalid suggests inconsistent snapshot"_sd;
+    }
+
+    return ""_sd;
+}
+
 }  // namespace
 
 void setOplogCollectionName(ServiceContext* service) {
@@ -317,6 +327,7 @@ void writeToImageCollection(OperationContext* opCtx,
                             const BSONObj& op,
                             const BSONObj& image,
                             repl::RetryImageEnum imageKind,
+                            const StringData& invalidatedReason,
                             bool* upsertConfigImage) {
     AutoGetCollection autoColl(opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
     repl::ImageEntry imageEntry;
@@ -330,7 +341,7 @@ void writeToImageCollection(OperationContext* opCtx,
     imageEntry.setImage(image);
     if (image.isEmpty()) {
         imageEntry.setInvalidated(true);
-        imageEntry.setInvalidatedReason("initial sync"_sd);
+        imageEntry.setInvalidatedReason(invalidatedReason);
     }
 
     UpdateRequest request(NamespaceString::kConfigImagesNamespace);
@@ -1120,6 +1131,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                              const BSONObj& op,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
+                             const bool isDataConsistent,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
     LOG(3) << "applying op: " << redact(op)
            << ", oplog application mode: " << OplogApplication::modeToString(mode);
@@ -1489,7 +1501,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             imageKind = repl::RetryImage_parse(
                 IDLParserErrorContext("applyUpdate"),
                 op.getField(OplogEntryBase::kNeedsRetryImageFieldName).String());
-            if (mode != OplogApplication::Mode::kInitialSync) {
+            if (mode != OplogApplication::Mode::kInitialSync && isDataConsistent) {
                 if (imageKind == repl::RetryImageEnum::kPreImage) {
                     request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
                 } else if (imageKind == repl::RetryImageEnum::kPostImage) {
@@ -1555,8 +1567,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
             }
             if (op.hasField(OplogEntryBase::kNeedsRetryImageFieldName)) {
                 invariant(imageKind);
-                writeToImageCollection(
-                    opCtx, op, ur.requestedDocImage, *imageKind, &upsertConfigImage);
+                writeToImageCollection(opCtx,
+                                       op,
+                                       ur.requestedDocImage,
+                                       *imageKind,
+                                       getInvalidatingReason(mode, isDataConsistent),
+                                       &upsertConfigImage);
             }
             wuow.commit();
             return Status::OK();
@@ -1602,7 +1618,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 DeleteRequest request(requestNss);
                 request.setQuery(deleteCriteria);
                 if (mode != OplogApplication::Mode::kInitialSync &&
-                    op.hasField(OplogEntryBase::kNeedsRetryImageFieldName)) {
+                    op.hasField(OplogEntryBase::kNeedsRetryImageFieldName) && isDataConsistent) {
                     request.setReturnDeleted(true);
                 }
                 boost::optional<BSONObj> preImage = deleteObject(opCtx, collection, request);
@@ -1613,6 +1629,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                            op,
                                            preImage.value_or(BSONObj()),
                                            repl::RetryImageEnum::kPreImage,
+                                           getInvalidatingReason(mode, isDataConsistent),
                                            &upsertConfigImage);
                 }
             } else

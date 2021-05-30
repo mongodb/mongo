@@ -115,7 +115,8 @@ protected:
     static Status noopApplyOperationFn(OperationContext*,
                                        MultiApplier::OperationPtrs*,
                                        SyncTail* st,
-                                       WorkerMultikeyPathInfo*) {
+                                       WorkerMultikeyPathInfo*,
+                                       const bool isDataConsistent) {
         return Status::OK();
     }
 

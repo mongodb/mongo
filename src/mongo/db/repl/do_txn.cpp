@@ -171,8 +171,13 @@ Status _doTxn(OperationContext* opCtx,
         // Setting alwaysUpsert to true makes sense only during oplog replay, and doTxn commands
         // should not be executed during oplog replay.
         const bool alwaysUpsert = false;
-        status = repl::applyOperation_inlock(
-            opCtx, db, opObj, alwaysUpsert, repl::OplogApplication::Mode::kApplyOpsCmd);
+        const bool dataIsConsistent = true;
+        status = repl::applyOperation_inlock(opCtx,
+                                             db,
+                                             opObj,
+                                             alwaysUpsert,
+                                             repl::OplogApplication::Mode::kApplyOpsCmd,
+                                             dataIsConsistent);
         if (!status.isOK())
             return status;
 

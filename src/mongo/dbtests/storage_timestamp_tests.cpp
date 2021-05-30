@@ -100,7 +100,7 @@ public:
 private:
     OperationContext* _opCtx;
 };
-}
+}  // namespace
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
@@ -2325,14 +2325,16 @@ public:
         auto applyOperationFn = [&](OperationContext* opCtx,
                                     std::vector<const repl::OplogEntry*>* operationsToApply,
                                     repl::SyncTail* st,
-                                    std::vector<MultikeyPathInfo>* pathInfo) -> Status {
+                                    std::vector<MultikeyPathInfo>* pathInfo,
+                                    const bool isDataConsistent) -> Status {
             if (!_opCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode,
                                                         MODE_X)) {
                 return {ErrorCodes::BadValue, "Batch applied was not holding PBWM lock in MODE_X"};
             }
 
             // Insert the document. A reader without a PBWM lock should not see it yet.
-            auto status = repl::multiSyncApply(opCtx, operationsToApply, st, pathInfo);
+            auto status = repl::multiSyncApply(
+                opCtx, operationsToApply, st, pathInfo, true /* isDataConsistent */);
             if (!status.isOK()) {
                 return status;
             }

@@ -225,9 +225,12 @@ auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
 TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
     NamespaceString nss("test.t");
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
-    ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), op.toBSON(), OplogApplication::Mode::kSecondary).ignore(),
-        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(),
+                                      op.toBSON(),
+                                      OplogApplication::Mode::kSecondary,
+                                      true /* isDataConsistent */)
+                      .ignore(),
+                  ExceptionFor<ErrorCodes::NamespaceNotFound>);
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentDatabaseMissing) {
@@ -241,9 +244,12 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLookupByUUIDFails) {
     createDatabase(_opCtx.get(), nss.db());
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kInsert, otherNss, UUID::gen());
-    ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), op.toBSON(), OplogApplication::Mode::kSecondary).ignore(),
-        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(),
+                                      op.toBSON(),
+                                      OplogApplication::Mode::kSecondary,
+                                      true /* isDataConsistent */)
+                      .ignore(),
+                  ExceptionFor<ErrorCodes::NamespaceNotFound>);
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLookupByUUIDFails) {
@@ -261,9 +267,12 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {
     // which in the case of this test just ignores such errors. This tests mostly that we don't
     // implicitly create the collection and lock the database in MODE_X.
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
-    ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), op.toBSON(), OplogApplication::Mode::kSecondary).ignore(),
-        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(),
+                                      op.toBSON(),
+                                      OplogApplication::Mode::kSecondary,
+                                      true /* isDataConsistent */)
+                      .ignore(),
+                  ExceptionFor<ErrorCodes::NamespaceNotFound>);
     ASSERT_FALSE(collectionExists(_opCtx.get(), nss));
 }
 
@@ -337,7 +346,8 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
     };
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync));
+    ASSERT_OK(SyncTail::syncApply(
+        _opCtx.get(), op, OplogApplication::Mode::kInitialSync, true /* isDataConsistent */));
     ASSERT_TRUE(applyCmdCalled);
 }
 
@@ -351,7 +361,9 @@ TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
                                     << "t"));
     // This test relies on the namespace type check in applyCommand_inlock().
     ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync).ignore(),
+        SyncTail::syncApply(
+            _opCtx.get(), op, OplogApplication::Mode::kInitialSync, true /* isDataConsistent */)
+            .ignore(),
         ExceptionFor<ErrorCodes::InvalidNamespace>);
 }
 
@@ -375,7 +387,8 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
     auto applyOperationFn = [&operationsApplied](OperationContext* opCtx,
                                                  MultiApplier::OperationPtrs* operationsToApply,
                                                  SyncTail* st,
-                                                 WorkerMultikeyPathInfo*) -> Status {
+                                                 WorkerMultikeyPathInfo*,
+                                                 const bool isDataConsistent) -> Status {
         for (auto&& opPtr : *operationsToApply) {
             operationsApplied.push_back(*opPtr);
         }
@@ -431,7 +444,8 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
         [&mutex, &operationsApplied](OperationContext* opCtx,
                                      MultiApplier::OperationPtrs* operationsForWriterThreadToApply,
                                      SyncTail* st,
-                                     WorkerMultikeyPathInfo*) -> Status {
+                                     WorkerMultikeyPathInfo*,
+                                     const bool isDataConsistent) -> Status {
         stdx::lock_guard<stdx::mutex> lock(mutex);
         operationsApplied.emplace_back();
         for (auto&& opPtr : *operationsForWriterThreadToApply) {
@@ -493,7 +507,8 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
     MultiApplier::OperationPtrs ops = {&op};
     WorkerMultikeyPathInfo pathInfo;
     SyncTail syncTail(nullptr, nullptr, nullptr, {}, nullptr);
-    ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT_OK(
+        multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo, true /* isDataConsistent */));
     // Collection should be created after SyncTail::syncApply() processes operation.
     ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
 }
@@ -504,7 +519,7 @@ void testWorkerMultikeyPaths(OperationContext* opCtx,
     SyncTail syncTail(nullptr, nullptr, nullptr, {}, nullptr);
     WorkerMultikeyPathInfo pathInfo;
     MultiApplier::OperationPtrs ops = {&op};
-    ASSERT_OK(multiSyncApply(opCtx, &ops, &syncTail, &pathInfo));
+    ASSERT_OK(multiSyncApply(opCtx, &ops, &syncTail, &pathInfo, true /* isDataConsistent */));
     ASSERT_EQ(pathInfo.size(), numPaths);
 }
 
@@ -560,7 +575,8 @@ TEST_F(SyncTailTest, MultiSyncApplyAddsMultipleWorkerMultikeyPathInfo) {
         SyncTail syncTail(nullptr, nullptr, nullptr, {}, nullptr);
         WorkerMultikeyPathInfo pathInfo;
         MultiApplier::OperationPtrs ops = {&opA, &opB};
-        ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+        ASSERT_OK(
+            multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo, true /* isDataConsistent */));
         ASSERT_EQ(pathInfo.size(), 2UL);
     }
 }
@@ -601,8 +617,9 @@ TEST_F(SyncTailTest, MultiSyncApplyFailsWhenCollectionCreationTriesToMakeUUID) {
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
     SyncTail syncTail(nullptr, nullptr, nullptr, {}, nullptr);
     MultiApplier::OperationPtrs ops = {&op};
-    ASSERT_EQUALS(ErrorCodes::InvalidOptions,
-                  multiSyncApply(_opCtx.get(), &ops, &syncTail, nullptr));
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidOptions,
+        multiSyncApply(_opCtx.get(), &ops, &syncTail, nullptr, true /* isDataConsistent */));
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplyFailsWhenCollectionCreationTriesToMakeUUID) {
@@ -613,8 +630,9 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyFailsWhenCollectionCreationTriesToMake
 
     SyncTail syncTail(nullptr, nullptr, nullptr, {}, nullptr);
     MultiApplier::OperationPtrs ops = {&op};
-    ASSERT_EQUALS(ErrorCodes::InvalidOptions,
-                  multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, nullptr));
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidOptions,
+        multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, nullptr, true /* isDataConsistent */));
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperations) {
@@ -980,7 +998,8 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyDisablesDocumentValidationWhileApplyin
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     MultiApplier::OperationPtrs ops = {&op};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT_OK(multiInitialSyncApply(
+        _opCtx.get(), &ops, &syncTail, &pathInfo, true /* isDataConsistent */));
     ASSERT(syncTail.called);
 }
 
@@ -1000,7 +1019,8 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyIgnoresUpdateOperationIfDocumentIsMiss
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     MultiApplier::OperationPtrs ops = {&op};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT_OK(multiInitialSyncApply(
+        _opCtx.get(), &ops, &syncTail, &pathInfo, true /* isDataConsistent */));
 
     // Since the missing document is not found on the sync source, the collection referenced by
     // the failed operation should not be automatically created.
@@ -1024,7 +1044,8 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsDocumentOnNamespaceNotFound) {
     auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT_OK(multiInitialSyncApply(
+        _opCtx.get(), &ops, &syncTail, &pathInfo, true /* isDataConsistent */));
     ASSERT_EQUALS(syncTail.numFetched, 0U);
 
     OplogInterfaceLocal collectionReader(_opCtx.get(), nss.ns());
@@ -1049,7 +1070,8 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsIndexCreationOnNamespaceNotFound)
     auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT_OK(multiInitialSyncApply(
+        _opCtx.get(), &ops, &syncTail, &pathInfo, true /* isDataConsistent */));
     ASSERT_EQUALS(syncTail.numFetched, 0U);
 
     OplogInterfaceLocal collectionReader(_opCtx.get(), nss.ns());
@@ -1072,7 +1094,8 @@ TEST_F(SyncTailTest,
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), updatedDocument);
     MultiApplier::OperationPtrs ops = {&op};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT_OK(multiInitialSyncApply(
+        _opCtx.get(), &ops, &syncTail, &pathInfo, true /* isDataConsistent */));
     ASSERT_EQUALS(syncTail.numFetched, 1U);
 
     // The collection referenced by "ns" in the failed operation is automatically created to hold
@@ -1528,8 +1551,10 @@ TEST_F(SyncTailTest, LogSlowOpApplicationWhenSuccessful) {
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
     startCapturingLogMessages();
-    ASSERT_OK(
-        SyncTail::syncApply(_opCtx.get(), entry.toBSON(), OplogApplication::Mode::kSecondary));
+    ASSERT_OK(SyncTail::syncApply(_opCtx.get(),
+                                  entry.toBSON(),
+                                  OplogApplication::Mode::kSecondary,
+                                  true /* isDataConsistent */));
 
     // Use a builder for easier escaping. We expect the operation to be logged.
     StringBuilder expected;
@@ -1550,10 +1575,12 @@ TEST_F(SyncTailTest, DoNotLogSlowOpApplicationWhenFailed) {
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
     startCapturingLogMessages();
-    ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), entry.toBSON(), OplogApplication::Mode::kSecondary)
-            .transitional_ignore(),
-        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(),
+                                      entry.toBSON(),
+                                      OplogApplication::Mode::kSecondary,
+                                      true /* isDataConsistent */)
+                      .transitional_ignore(),
+                  ExceptionFor<ErrorCodes::NamespaceNotFound>);
 
     // Use a builder for easier escaping. We expect the operation to *not* be logged
     // even thought it was slow, since we couldn't apply it successfully.
@@ -1576,8 +1603,10 @@ TEST_F(SyncTailTest, DoNotLogNonSlowOpApplicationWhenSuccessful) {
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
     startCapturingLogMessages();
-    ASSERT_OK(
-        SyncTail::syncApply(_opCtx.get(), entry.toBSON(), OplogApplication::Mode::kSecondary));
+    ASSERT_OK(SyncTail::syncApply(_opCtx.get(),
+                                  entry.toBSON(),
+                                  OplogApplication::Mode::kSecondary,
+                                  true /* isDataConsistent */));
 
     // Use a builder for easier escaping. We expect the operation to *not* be logged,
     // since it wasn't slow to apply.

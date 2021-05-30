@@ -372,7 +372,8 @@ std::unique_ptr<ThreadPool> SyncTail::makeWriterPool(int threadCount) {
 // static
 Status SyncTail::syncApply(OperationContext* opCtx,
                            const BSONObj& op,
-                           OplogApplication::Mode oplogApplicationMode) {
+                           OplogApplication::Mode oplogApplicationMode,
+                           const bool isDataConsistent) {
     // Count each log op application as a separate operation, for reporting purposes
     CurOp individualOp(opCtx);
 
@@ -395,8 +396,13 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         // wants to. We should ignore these errors intelligently while in RECOVERING and STARTUP
         // mode (similar to initial sync) instead so we do not accidentally ignore real errors.
         bool shouldAlwaysUpsert = (oplogApplicationMode != OplogApplication::Mode::kInitialSync);
-        Status status = applyOperation_inlock(
-            opCtx, db, op, shouldAlwaysUpsert, oplogApplicationMode, incrementOpsAppliedStats);
+        Status status = applyOperation_inlock(opCtx,
+                                              db,
+                                              op,
+                                              shouldAlwaysUpsert,
+                                              oplogApplicationMode,
+                                              isDataConsistent,
+                                              incrementOpsAppliedStats);
         if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
             throw WriteConflictException();
         }
@@ -553,7 +559,8 @@ void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
               const SyncTail::MultiSyncApplyFunc& func,
               SyncTail* st,
               std::vector<Status>* statusVector,
-              std::vector<WorkerMultikeyPathInfo>* workerMultikeyPathInfo) {
+              std::vector<WorkerMultikeyPathInfo>* workerMultikeyPathInfo,
+              const bool isDataConsistent) {
     invariant(writerVectors.size() == statusVector->size());
     for (size_t i = 0; i < writerVectors.size(); i++) {
         if (!writerVectors[i].empty()) {
@@ -562,10 +569,11 @@ void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
                 st,
                 &writer = writerVectors.at(i),
                 &status = statusVector->at(i),
-                &workerMultikeyPathInfo = workerMultikeyPathInfo->at(i)
+                &workerMultikeyPathInfo = workerMultikeyPathInfo->at(i),
+                isDataConsistent
             ] {
                 auto opCtx = cc().makeOperationContext();
-                status = func(opCtx.get(), &writer, st, &workerMultikeyPathInfo);
+                status = func(opCtx.get(), &writer, st, &workerMultikeyPathInfo, isDataConsistent);
             }));
         }
     }
@@ -1392,7 +1400,8 @@ bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
 Status multiSyncApply(OperationContext* opCtx,
                       MultiApplier::OperationPtrs* ops,
                       SyncTail* st,
-                      WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
+                      WorkerMultikeyPathInfo* workerMultikeyPathInfo,
+                      const bool isDataConsistent) {
     invariant(st);
 
     UnreplicatedWritesBlock uwb(opCtx);
@@ -1421,7 +1430,7 @@ Status multiSyncApply(OperationContext* opCtx,
 
             // If we are successful in grouping and applying inserts, advance the current iterator
             // past the end of the inserted group of entries.
-            auto groupResult = insertGroup.groupAndApplyInserts(it);
+            auto groupResult = insertGroup.groupAndApplyInserts(it, isDataConsistent);
             if (groupResult.isOK()) {
                 it = groupResult.getValue();
                 continue;
@@ -1429,7 +1438,8 @@ Status multiSyncApply(OperationContext* opCtx,
 
             // If we didn't create a group, try to apply the op individually.
             try {
-                const Status status = SyncTail::syncApply(opCtx, entry.raw, oplogApplicationMode);
+                const Status status =
+                    SyncTail::syncApply(opCtx, entry.raw, oplogApplicationMode, isDataConsistent);
 
                 if (!status.isOK()) {
                     severe() << "Error applying operation (" << redact(entry.toBSON())
@@ -1464,7 +1474,8 @@ Status multiSyncApply(OperationContext* opCtx,
 Status multiInitialSyncApply(OperationContext* opCtx,
                              MultiApplier::OperationPtrs* ops,
                              SyncTail* st,
-                             WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
+                             WorkerMultikeyPathInfo* workerMultikeyPathInfo,
+                             const bool isDataConsistent) {
     invariant(st);
 
     UnreplicatedWritesBlock uwb(opCtx);
@@ -1481,8 +1492,8 @@ Status multiInitialSyncApply(OperationContext* opCtx,
         for (auto it = ops->begin(); it != ops->end(); ++it) {
             auto& entry = **it;
             try {
-                const Status s =
-                    SyncTail::syncApply(opCtx, entry.raw, OplogApplication::Mode::kInitialSync);
+                const Status s = SyncTail::syncApply(
+                    opCtx, entry.raw, OplogApplication::Mode::kInitialSync, isDataConsistent);
                 if (!s.isOK()) {
                     // In initial sync, update operations can cause documents to be missed during
                     // collection cloning. As a result, it is possible that a document that we
@@ -1600,6 +1611,10 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         // Wait for writes to finish before applying ops.
         _writerPool->waitForIdle();
 
+        // Read `minValid` prior to it possibly being written to.
+        const bool isDataConsistent =
+            _consistencyMarkers->getMinValid(opCtx) < ops.front().getOpTime();
+
         // Reset consistency markers in case the node fails while applying ops.
         if (!_options.skipWritesToOplog) {
             _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
@@ -1608,7 +1623,13 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
 
         {
             std::vector<Status> statusVector(_writerPool->getStats().numThreads, Status::OK());
-            applyOps(writerVectors, _writerPool, _applyFunc, this, &statusVector, &multikeyVector);
+            applyOps(writerVectors,
+                     _writerPool,
+                     _applyFunc,
+                     this,
+                     &statusVector,
+                     &multikeyVector,
+                     isDataConsistent);
             _writerPool->waitForIdle();
 
             // If any of the statuses is not ok, return error.

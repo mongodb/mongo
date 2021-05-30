@@ -75,7 +75,8 @@ public:
      * If the grouped insert is applied successfully, returns the iterator to the last standalone
      * insert operation included in the applied grouped insert.
      */
-    StatusWith<ConstIterator> groupAndApplyInserts(ConstIterator oplogEntriesIterator);
+    StatusWith<ConstIterator> groupAndApplyInserts(ConstIterator oplogEntriesIterator,
+                                                   const bool isDataConsistent);
 
 private:
     // _doNotGroupBeforePoint is used to prevent retrying bad group inserts by marking the final op
