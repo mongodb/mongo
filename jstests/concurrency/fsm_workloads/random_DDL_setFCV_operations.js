@@ -8,8 +8,6 @@
  *   requires_sharding,
  *   # TODO (SERVER-56879) Support add/remove shards in new DDL paths
  *   does_not_support_add_remove_shards,
- *   # TODO (SERVER-57017) Enable on stepdown suites
- *   does_not_support_stepdowns,
  *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
  *   featureFlagShardingFullDDLSupport,
