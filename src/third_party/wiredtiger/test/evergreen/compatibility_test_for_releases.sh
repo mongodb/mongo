@@ -81,6 +81,8 @@ run_format()
         args+="rows=1000000 "
         args+="salvage=0 "                      # Faster runs
         args+="timer=4 "
+        args+="transaction.isolation=snapshot "
+        args+="transaction.timestamps=1 "
         args+="verify=0 "                       # Faster runs
 
         for am in $2; do
