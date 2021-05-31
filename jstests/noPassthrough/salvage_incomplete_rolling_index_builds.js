@@ -45,6 +45,12 @@ let primary = replTest.getPrimary();
 let primaryDB = primary.getDB(dbName);
 let coll = primaryDB.getCollection(collName);
 
+if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    jsTestLog('Two phase index builds not supported, skipping test.');
+    replTest.stopSet();
+    return;
+}
+
 const numDocs = 100;
 insertDocs(coll, 0, numDocs);
 assert.eq(numDocs, coll.count(), "unexpected number of documents after bulk insert.");
