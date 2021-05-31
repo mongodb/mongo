@@ -56,6 +56,8 @@
 namespace mongo {
 namespace {
 
+using unittest::assertGet;
+
 // Max duration to wait to satisfy test invariant before joining with main test thread.
 const Seconds kJoinTimeout(30);
 const Milliseconds kPingInterval(2);
@@ -95,11 +97,14 @@ protected:
     std::unique_ptr<DistLockManager> makeDistLockManager() override {
         auto distLockCatalogMock = std::make_unique<DistLockCatalogMock>();
         _distLockCatalogMock = distLockCatalogMock.get();
-        return std::make_unique<ReplSetDistLockManager>(getServiceContext(),
-                                                        _processID,
-                                                        std::move(distLockCatalogMock),
-                                                        kPingInterval,
-                                                        kLockExpiration);
+        auto distLockManager =
+            std::make_unique<ReplSetDistLockManager>(getServiceContext(),
+                                                     _processID,
+                                                     std::move(distLockCatalogMock),
+                                                     kPingInterval,
+                                                     kLockExpiration);
+        distLockManager->markRecovered_forTest();
+        return distLockManager;
     }
 
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
@@ -1583,9 +1588,33 @@ TEST_F(DistLockManagerReplSetTest, LockAcquisitionRetriesOnInterruptionNeverSucc
     ASSERT_NOT_OK(status);
 }
 
-class RSDistLockMgrWithMockTickSource : public DistLockManagerReplSetTest {
+TEST_F(DistLockManagerReplSetTest, RecoverySuccess) {
+    getMockCatalog()->expectUnlockAll(
+        [&](StringData processID, boost::optional<long long> term) {});
+
+    getMockCatalog()->expectGrabLock(
+        [&](StringData, const OID&, StringData, StringData, Date_t, StringData) {},
+        [&] {
+            LocksType doc;
+            doc.setName("RecoveryLock");
+            doc.setState(LocksType::LOCKED);
+            doc.setProcess(getProcessID());
+            doc.setWho("me");
+            doc.setWhy("because");
+            doc.setLockID(OID::gen());
+            return doc;
+        }());
+
+    auto replSetDistLockManager =
+        checked_cast<ReplSetDistLockManager*>(DistLockManager::get(operationContext()));
+    replSetDistLockManager->onStepUp(1LL);
+    ASSERT_OK(replSetDistLockManager->lockDirect(
+        operationContext(), "RecoveryLock", "because", DistLockManager::kDefaultLockTimeout));
+}
+
+class DistLockManagerReplSetTestWithMockTickSource : public DistLockManagerReplSetTest {
 protected:
-    RSDistLockMgrWithMockTickSource() {
+    DistLockManagerReplSetTestWithMockTickSource() {
         getServiceContext()->setTickSource(std::make_unique<TickSourceMock<>>());
     }
 
@@ -1604,7 +1633,7 @@ protected:
  * 3. Unlock (on destructor of ScopedDistLock).
  * 4. Check lock id used in lock and unlock are the same.
  */
-TEST_F(RSDistLockMgrWithMockTickSource, LockSuccessAfterRetry) {
+TEST_F(DistLockManagerReplSetTestWithMockTickSource, LockSuccessAfterRetry) {
     std::string lockName("test");
     std::string me("me");
     boost::optional<OID> lastTS;
@@ -1740,7 +1769,7 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockSuccessAfterRetry) {
  * 3. Grab lock errors out on the fourth try.
  * 4. Make sure that unlock is called to cleanup the last lock attempted that error out.
  */
-TEST_F(RSDistLockMgrWithMockTickSource, LockFailsAfterRetry) {
+TEST_F(DistLockManagerReplSetTestWithMockTickSource, LockFailsAfterRetry) {
     std::string lockName("test");
     std::string me("me");
     boost::optional<OID> lastTS;
@@ -1874,7 +1903,7 @@ TEST_F(DistLockManagerReplSetTest, LockBusyNoRetry) {
  * 4. Checks result is error.
  * 5. Implicitly check that unlock is not called (default setting of mock catalog).
  */
-TEST_F(RSDistLockMgrWithMockTickSource, LockRetryTimeout) {
+TEST_F(DistLockManagerReplSetTestWithMockTickSource, LockRetryTimeout) {
     std::string lockName("test");
     std::string me("me");
     boost::optional<OID> lastTS;
@@ -1930,7 +1959,7 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockRetryTimeout) {
  * 5. 2nd attempt to grab lock still fails for the same reason.
  * 6. But since the ping has not been updated, dist lock manager should overtake lock.
  */
-TEST_F(RSDistLockMgrWithMockTickSource, CanOvertakeIfNoPingDocument) {
+TEST_F(DistLockManagerReplSetTestWithMockTickSource, CanOvertakeIfNoPingDocument) {
     getMockCatalog()->expectGrabLock(
         [](StringData, const OID&, StringData, StringData, Date_t, StringData) {
             // Don't care

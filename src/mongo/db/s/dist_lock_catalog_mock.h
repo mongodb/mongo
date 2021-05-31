@@ -89,6 +89,8 @@ public:
     using GetLockByTSFunc = std::function<void(const OID& ts)>;
     using GetLockByNameFunc = std::function<void(StringData name)>;
     using GetServerInfoFunc = std::function<void()>;
+    using UnlockAllFunc =
+        std::function<void(StringData processID, boost::optional<long long> term)>;
 
     virtual StatusWith<LockpingsType> getPing(OperationContext* opCtx,
                                               StringData processID) override;
@@ -98,6 +100,7 @@ public:
     virtual StatusWith<LocksType> grabLock(OperationContext* opCtx,
                                            StringData lockID,
                                            const OID& lockSessionID,
+                                           long long term,
                                            StringData who,
                                            StringData processId,
                                            Date_t time,
@@ -107,6 +110,7 @@ public:
     virtual StatusWith<LocksType> overtakeLock(OperationContext* opCtx,
                                                StringData lockID,
                                                const OID& lockSessionID,
+                                               long long term,
                                                const OID& currentHolderTS,
                                                StringData who,
                                                StringData processId,
@@ -117,12 +121,11 @@ public:
                           const OID& lockSessionID,
                           StringData name) override;
 
-    virtual Status unlockAll(OperationContext* opCtx, const std::string& processID) override;
+    virtual Status unlockAll(OperationContext* opCtx,
+                             const std::string& processID,
+                             boost::optional<long long> term) override;
 
     virtual StatusWith<ServerInfo> getServerInfo(OperationContext* opCtx) override;
-
-    virtual StatusWith<LocksType> getLockByTS(OperationContext* opCtx,
-                                              const OID& lockSessionID) override;
 
     virtual StatusWith<LocksType> getLockByName(OperationContext* opCtx, StringData name) override;
 
@@ -157,12 +160,6 @@ public:
 
     /**
      * Sets the checker method to use and its return value the every time
-     * getLockByTS is called.
-     */
-    void expectGetLockByTS(GetLockByTSFunc checkerFunc, StatusWith<LocksType> returnThis);
-
-    /**
-     * Sets the checker method to use and its return value the every time
      * getLockByName is called.
      */
     void expectGetLockByName(GetLockByNameFunc checkerFunc, StatusWith<LocksType> returnThis);
@@ -185,6 +182,8 @@ public:
      */
     void expectGetServerInfo(GetServerInfoFunc checkerFunc,
                              StatusWith<DistLockCatalog::ServerInfo> returnThis);
+
+    void expectUnlockAll(UnlockAllFunc checkerFunc);
 
 private:
     // Protects all the member variables.
@@ -216,6 +215,8 @@ private:
 
     GetServerInfoFunc _getServerInfoChecker;
     StatusWith<DistLockCatalog::ServerInfo> _getServerInfoReturnValue;
+
+    UnlockAllFunc _unlockAllChecker;
 };
 
 }  // namespace mongo

@@ -33,6 +33,7 @@
 
 #include "mongo/db/s/dist_lock_manager_replset.h"
 
+#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/type_lockpings.h"
 #include "mongo/db/s/type_locks.h"
 #include "mongo/logv2/log.h"
@@ -58,12 +59,32 @@ const Milliseconds kLockRetryInterval(500);
 MONGO_FAIL_POINT_DEFINE(setDistLockTimeout);
 MONGO_FAIL_POINT_DEFINE(disableReplSetDistLockManager);
 
+class DistLockManagerService : public ReplicaSetAwareServiceShardSvr<DistLockManagerService> {
+public:
+    static DistLockManagerService* get(ServiceContext* opCtx);
+    static DistLockManagerService* get(OperationContext* opCtx);
+
+    void onStartup(OperationContext* opCtx) override {}
+    void onShutdown() override {}
+    void onStepUpBegin(OperationContext* opCtx, long long term) override {
+        auto distLockManager = DistLockManager::get(opCtx);
+        if (!distLockManager)  // Sharding not initialised yet
+            return;
+        checked_cast<ReplSetDistLockManager*>(distLockManager)->onStepUp(term);
+    }
+    void onStepUpComplete(OperationContext* opCtx, long long term) override {}
+    void onStepDown() override {}
+    void onBecomeArbiter() override {}
+};
+
+const auto serviceDecorator = ServiceContext::declareDecoration<DistLockManagerService>();
+
 /**
  * With this logic, the LockID handle for the config server is always fixed and different from that
  * of the shards, but all shards have the same LockID handle. This means that locks taken from
  * different shards OR different nodes from the same shard are always compatible.
  *
- * This is OK and is only needed as a step for upgrade from 4.4 to 4.9+ in order to ensure that the
+ * This is OK and is only needed as a step for upgrade from 4.4 to 5.0 in order to ensure that the
  * new DDL operations, which are driven by the DB primaries, lock out the legacy DDL operations,
  * which are driven by a 4.4 config server.
  */
@@ -78,6 +99,17 @@ OID shardNameToOID(StringData name) {
 
     return OID::from(oidData.c_str());
 }
+
+DistLockManagerService* DistLockManagerService::get(ServiceContext* service) {
+    return &serviceDecorator(service);
+}
+
+DistLockManagerService* DistLockManagerService::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
+
+const ReplicaSetAwareServiceRegistry::Registerer<DistLockManagerService>
+    distLockManagerServiceServiceRegisterer("DistLockManagerService");
 
 }  // namespace
 
@@ -94,7 +126,8 @@ ReplSetDistLockManager::ReplSetDistLockManager(ServiceContext* service,
       _processID(processID.toString()),
       _catalog(std::move(catalog)),
       _pingInterval(pingInterval),
-      _lockExpiration(lockExpiration) {}
+      _lockExpiration(lockExpiration),
+      _recoveryState(_processID == ShardId::kConfigServerId ? kRecovered : kMustRecover) {}
 
 ReplSetDistLockManager::~ReplSetDistLockManager() = default;
 
@@ -178,10 +211,16 @@ void ReplSetDistLockManager::doTask() {
             elapsedSincelastPing.reset();
         }
 
-        // Process the unlock queue
         {
             auto opCtxHolder = tc->makeOperationContext();
             auto* opCtx = opCtxHolder.get();
+
+            try {
+                _waitForRecovery(opCtx);
+            } catch (const DBException& ex) {
+                LOGV2_WARNING(
+                    570180, "Error recovering dist lock manager", "error"_attr = redact(ex));
+            }
 
             std::deque<UnlockRequest> toUnlockBatch;
             {
@@ -201,15 +240,13 @@ void ReplSetDistLockManager::doTask() {
 
                 if (!unlockStatus.isOK()) {
                     LOGV2_WARNING(22670,
-                                  "Error unlocking distributed lock {lockName} with sessionID "
-                                  "{lockSessionId} caused by {error}",
                                   "Error unlocking distributed lock",
-                                  "lockSessionId"_attr = toUnlock.lockId,
                                   "lockName"_attr = toUnlock.name,
-                                  "error"_attr = unlockStatus);
+                                  "lockSessionId"_attr = toUnlock.lockId,
+                                  "error"_attr = redact(unlockStatus));
                     // Queue another attempt, unless the problem was no longer being primary.
                     if (unlockStatus != ErrorCodes::NotWritablePrimary) {
-                        (void)queueUnlock(toUnlock.lockId, toUnlock.name);
+                        (void)_queueUnlock(toUnlock.lockId, toUnlock.name);
                     }
                 } else {
                     LOGV2(22650,
@@ -350,6 +387,9 @@ Status ReplSetDistLockManager::lockDirect(OperationContext* opCtx,
                                           StringData name,
                                           StringData whyMessage,
                                           Milliseconds waitFor) {
+    // Exclude recovery from the accounting for the duration of the dist lock acquisition
+    long long term = _waitForRecovery(opCtx);
+
     Timer timer(_serviceContext->getTickSource());
     Timer msgTimer(_serviceContext->getTickSource());
 
@@ -375,8 +415,8 @@ Status ReplSetDistLockManager::lockDirect(OperationContext* opCtx,
         LOGV2_DEBUG(22654,
                     1,
                     "Trying to acquire new distributed lock for {lockName} ( "
-                    "lockSessionID: {lockSessionId}, "
                     "process : {processId}, "
+                    "lockSessionID: {lockSessionId}, "
                     "lock timeout : {lockExpirationTimeout}, "
                     "ping interval : {pingInterval}, "
                     "reason: {reason} )",
@@ -388,13 +428,16 @@ Status ReplSetDistLockManager::lockDirect(OperationContext* opCtx,
                     "pingInterval"_attr = _pingInterval,
                     "reason"_attr = whyMessage);
 
-        auto lockResult = _catalog->grabLock(
-            opCtx, name, _lockSessionID, who, _processID, Date_t::now(), whyMessage.toString());
-
-        auto status = lockResult.getStatus();
-        if (status.isOK()) {
-            // Lock is acquired since findAndModify was able to successfully modify
-            // the lock document.
+        auto lockResult = _catalog->grabLock(opCtx,
+                                             name,
+                                             _lockSessionID,
+                                             term,
+                                             who,
+                                             _processID,
+                                             Date_t::now(),
+                                             whyMessage.toString(),
+                                             DistLockCatalog::kMajorityWriteConcern);
+        if (lockResult.isOK()) {
             LOGV2(22655,
                   "Acquired distributed lock {lockName} with session ID {lockSessionId} for "
                   "{reason}",
@@ -406,6 +449,7 @@ Status ReplSetDistLockManager::lockDirect(OperationContext* opCtx,
         }
 
         // If a network error occurred, unlock the lock synchronously and try again
+        auto status = lockResult.getStatus();
         if (configShard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent) &&
             networkErrorRetries < kMaxNumLockAcquireRetries) {
             LOGV2_DEBUG(22656,
@@ -439,7 +483,7 @@ Status ReplSetDistLockManager::lockDirect(OperationContext* opCtx,
         if (status != ErrorCodes::LockStateChangeFailed) {
             // An error occurred but the write might have actually been applied on the
             // other side. Schedule an unlock to clean it up just in case.
-            (void)queueUnlock(_lockSessionID, name.toString());
+            (void)_queueUnlock(_lockSessionID, name.toString());
             return status;
         }
 
@@ -465,6 +509,7 @@ Status ReplSetDistLockManager::lockDirect(OperationContext* opCtx,
                 auto overtakeResult = _catalog->overtakeLock(opCtx,
                                                              name,
                                                              _lockSessionID,
+                                                             term,
                                                              currentLock.getLockID(),
                                                              who,
                                                              _processID,
@@ -488,7 +533,7 @@ Status ReplSetDistLockManager::lockDirect(OperationContext* opCtx,
                 if (overtakeStatus != ErrorCodes::LockStateChangeFailed) {
                     // An error occurred but the write might have actually been applied on the
                     // other side. Schedule an unlock to clean it up just in case.
-                    (void)queueUnlock(_lockSessionID, name.toString());
+                    (void)_queueUnlock(_lockSessionID, name.toString());
                     return overtakeStatus;
                 }
             }
@@ -552,6 +597,7 @@ Status ReplSetDistLockManager::tryLockDirectWithLocalWriteConcern(OperationConte
     auto lockStatus = _catalog->grabLock(opCtx,
                                          name,
                                          _lockSessionID,
+                                         0LL,  // Zero term for ConfigServer acquisitions
                                          who,
                                          _processID,
                                          Date_t::now(),
@@ -582,13 +628,13 @@ Status ReplSetDistLockManager::tryLockDirectWithLocalWriteConcern(OperationConte
 }
 
 void ReplSetDistLockManager::unlock(Interruptible* intr, StringData name) {
-    auto unlockFuture = queueUnlock(_lockSessionID, name.toString());
+    auto unlockFuture = _queueUnlock(_lockSessionID, name.toString());
     if (intr)
         unlockFuture.getNoThrow(intr).ignore();
 }
 
 void ReplSetDistLockManager::unlockAll(OperationContext* opCtx) {
-    Status status = _catalog->unlockAll(opCtx, getProcessID());
+    Status status = _catalog->unlockAll(opCtx, getProcessID(), boost::none);
     if (!status.isOK()) {
         LOGV2_WARNING(
             22672,
@@ -599,12 +645,71 @@ void ReplSetDistLockManager::unlockAll(OperationContext* opCtx) {
     }
 }
 
-SharedSemiFuture<void> ReplSetDistLockManager::queueUnlock(const OID& lockSessionID,
-                                                           const std::string& name) {
+void ReplSetDistLockManager::onStepUp(long long term) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    _recoveryState = kMustRecover;
+    _recoveryTerm = term;
+    _waitForRecoveryCV.notify_all();
+}
+
+void ReplSetDistLockManager::markRecovered_forTest() {
+    stdx::unique_lock<Latch> lk(_mutex);
+    _recoveryState = kRecovered;
+    _recoveryTerm = 0;
+    _waitForRecoveryCV.notify_all();
+}
+
+SharedSemiFuture<void> ReplSetDistLockManager::_queueUnlock(const OID& lockSessionID,
+                                                            const std::string& name) {
     stdx::unique_lock<Latch> lk(_mutex);
     auto& req = _unlockList.emplace_back(lockSessionID, name);
     _shutDownCV.notify_all();
     return req.unlockCompleted.getFuture();
+}
+
+long long ReplSetDistLockManager::_waitForRecovery(OperationContext* opCtx) {
+    while (true) {
+        stdx::unique_lock lk(_mutex);
+        if (_recoveryState == kRecovered)
+            return _recoveryTerm;
+
+        const auto term = _recoveryTerm;
+
+        if (_recoveryState == kMustWaitForRecovery) {
+            opCtx->waitForConditionOrInterrupt(_waitForRecoveryCV, lk, [&] {
+                return !(_recoveryTerm == term && _recoveryState == kMustWaitForRecovery);
+            });
+            continue;
+        }
+
+        // This is the thread which will perform the recovery, while all others will block on it
+        invariant(_recoveryState == kMustRecover);
+        _recoveryState = kMustWaitForRecovery;
+        lk.unlock();
+
+        LOGV2(570181, "Recovering dist lock manager", "term"_attr = term);
+
+        auto anotherThreadMustRecoverGuard = makeGuard([&] {
+            lk.lock();
+            if (term == _recoveryTerm) {
+                _recoveryState = kMustRecover;
+                _waitForRecoveryCV.notify_all();
+            }
+        });
+
+        uassertStatusOKWithContext(
+            _catalog->unlockAll(opCtx, getProcessID(), term),
+            str::stream() << "While recovering the dist lock manager for term " << term);
+
+        anotherThreadMustRecoverGuard.dismiss();
+
+        lk.lock();
+        if (term == _recoveryTerm) {
+            _recoveryState = kRecovered;
+            _waitForRecoveryCV.notify_all();
+        }
+        continue;
+    }
 }
 
 ReplSetDistLockManager::DistLockPingInfo::DistLockPingInfo() = default;

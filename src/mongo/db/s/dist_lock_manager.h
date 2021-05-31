@@ -173,6 +173,8 @@ public:
      * Specialized locking method, which only succeeds if the specified lock name is not held by
      * anyone. Uses local write concern and does not attempt to overtake the lock or check whether
      * the lock lease has expired.
+     *
+     * This method is only used by the Balancer, which re-acquires dist locks while in drain mode.
      */
     virtual Status tryLockDirectWithLocalWriteConcern(OperationContext* opCtx,
                                                       StringData name,
@@ -193,8 +195,6 @@ public:
     virtual void unlockAll(OperationContext* opCtx) = 0;
 
 protected:
-    friend class MigrationManager;
-
     DistLockManager(OID lockSessionID);
 
     const OID _lockSessionID;

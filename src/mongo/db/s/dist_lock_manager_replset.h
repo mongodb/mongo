@@ -74,11 +74,19 @@ public:
 
     void unlockAll(OperationContext* opCtx) override;
 
+    /**
+     * Indicates to the dist lock manager that a step-up has occurred with the specified term. This
+     * in turn requests that the dist lock manager performs a recovery, freeing all locks it might
+     * have previously held, before it attempts to acquire any new ones.
+     */
+    void onStepUp(long long term);
+    void markRecovered_forTest();
+
 private:
     /**
      * Queue a lock to be unlocked asynchronously with retry until it doesn't error.
      */
-    SharedSemiFuture<void> queueUnlock(const OID& lockSessionID, const std::string& name);
+    SharedSemiFuture<void> _queueUnlock(const OID& lockSessionID, const std::string& name);
 
     /**
      * Periodically pings and checks if there are locks queued that needs unlocking.
@@ -97,6 +105,8 @@ private:
     StatusWith<bool> isLockExpired(OperationContext* opCtx,
                                    const LocksType lockDoc,
                                    const Milliseconds& lockExpiration);
+
+    long long _waitForRecovery(OperationContext* opCtx);
 
     /**
      * Data structure for storing information about distributed lock pings.
@@ -169,6 +179,16 @@ private:
 
     // Map of lockName to last ping information.
     stdx::unordered_map<std::string, DistLockPingInfo> _pingHistory;  // (M)
+
+    // Tracks the state of post step-up recovery.
+    enum Recovery {
+        kMustRecover,
+        kMustWaitForRecovery,
+        kRecovered,
+    };
+    Recovery _recoveryState;
+    long long _recoveryTerm{-1};
+    stdx::condition_variable _waitForRecoveryCV;
 };
 
 }  // namespace mongo

@@ -118,7 +118,12 @@ DistLockCatalogMock::DistLockCatalogMock()
       _getPingChecker(noGetPingSet),
       _getPingReturnValue(kLockpingsTypeBadRetValue),
       _getServerInfoChecker(noGetServerInfoSet),
-      _getServerInfoReturnValue(kServerInfoBadRetValue) {}
+      _getServerInfoReturnValue(kServerInfoBadRetValue),
+      _unlockAllChecker([](StringData processID, boost::optional<long long> term) {
+          uasserted(ErrorCodes::IllegalOperation,
+                    str::stream() << "unlockAll not expected to be called; processID: "
+                                  << processID);
+      }) {}
 
 DistLockCatalogMock::~DistLockCatalogMock() {}
 
@@ -154,6 +159,7 @@ Status DistLockCatalogMock::ping(OperationContext* opCtx, StringData processID, 
 StatusWith<LocksType> DistLockCatalogMock::grabLock(OperationContext* opCtx,
                                                     StringData lockID,
                                                     const OID& lockSessionID,
+                                                    long long term,
                                                     StringData who,
                                                     StringData processId,
                                                     Date_t time,
@@ -175,6 +181,7 @@ StatusWith<LocksType> DistLockCatalogMock::grabLock(OperationContext* opCtx,
 StatusWith<LocksType> DistLockCatalogMock::overtakeLock(OperationContext* opCtx,
                                                         StringData lockID,
                                                         const OID& lockSessionID,
+                                                        long long term,
                                                         const OID& currentHolderTS,
                                                         StringData who,
                                                         StringData processId,
@@ -222,21 +229,6 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogMock::getServerInfo(
     }
 
     checkerFunc();
-    return ret;
-}
-
-StatusWith<LocksType> DistLockCatalogMock::getLockByTS(OperationContext* opCtx,
-                                                       const OID& lockSessionID) {
-    auto ret = kLocksTypeBadRetValue;
-    GetLockByTSFunc checkerFunc = noGetLockByTSSet;
-
-    {
-        stdx::lock_guard<Latch> lk(_mutex);
-        ret = _getLockByTSReturnValue;
-        checkerFunc = _getLockByTSChecker;
-    }
-
-    checkerFunc(lockSessionID);
     return ret;
 }
 
@@ -300,13 +292,6 @@ void DistLockCatalogMock::expectStopPing(StopPingFunc checkerFunc, Status return
     _stopPingReturnValue = returnThis;
 }
 
-void DistLockCatalogMock::expectGetLockByTS(GetLockByTSFunc checkerFunc,
-                                            StatusWith<LocksType> returnThis) {
-    stdx::lock_guard<Latch> lk(_mutex);
-    _getLockByTSChecker = checkerFunc;
-    _getLockByTSReturnValue = returnThis;
-}
-
 void DistLockCatalogMock::expectGetLockByName(GetLockByNameFunc checkerFunc,
                                               StatusWith<LocksType> returnThis) {
     stdx::lock_guard<Latch> lk(_mutex);
@@ -335,9 +320,20 @@ void DistLockCatalogMock::expectGetServerInfo(GetServerInfoFunc checkerFunc,
     _getServerInfoReturnValue = returnThis;
 }
 
-Status DistLockCatalogMock::unlockAll(OperationContext* opCtx, const std::string& processID) {
-    return Status(ErrorCodes::IllegalOperation,
-                  str::stream() << "unlockAll not expected to be called; processID: " << processID);
+void DistLockCatalogMock::expectUnlockAll(UnlockAllFunc checkerFunc) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _unlockAllChecker = checkerFunc;
+}
+
+Status DistLockCatalogMock::unlockAll(OperationContext* opCtx,
+                                      const std::string& processID,
+                                      boost::optional<long long> term) {
+    try {
+        _unlockAllChecker(processID, term);
+        return Status::OK();
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 }
 
 }  // namespace mongo

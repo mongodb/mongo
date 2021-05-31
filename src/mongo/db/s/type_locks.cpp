@@ -49,6 +49,7 @@ const BSONField<OID> LocksType::lockID("ts");
 const BSONField<std::string> LocksType::who("who");
 const BSONField<std::string> LocksType::why("why");
 const BSONField<Date_t> LocksType::when("when");
+const BSONField<long long> LocksType::term("term");
 
 StatusWith<LocksType> LocksType::fromBSON(const BSONObj& source) {
     LocksType lock;

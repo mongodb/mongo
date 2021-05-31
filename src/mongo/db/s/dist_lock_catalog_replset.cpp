@@ -229,6 +229,7 @@ Status DistLockCatalogImpl::ping(OperationContext* opCtx, StringData processID, 
 StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* opCtx,
                                                     StringData lockID,
                                                     const OID& lockSessionID,
+                                                    long long term,
                                                     StringData who,
                                                     StringData processId,
                                                     Date_t time,
@@ -237,7 +238,7 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* opCtx,
     BSONObj newLockDetails(BSON(LocksType::lockID(lockSessionID)
                                 << LocksType::state(LocksType::LOCKED) << LocksType::who() << who
                                 << LocksType::process() << processId << LocksType::when(time)
-                                << LocksType::why() << why));
+                                << LocksType::term(term) << LocksType::why() << why));
 
     auto request = makeFindAndModifyRequest(
         _locksNS,
@@ -281,6 +282,7 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* opCtx,
 StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* opCtx,
                                                         StringData lockID,
                                                         const OID& lockSessionID,
+                                                        long long term,
                                                         const OID& currentHolderTS,
                                                         StringData who,
                                                         StringData processId,
@@ -294,7 +296,7 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* opCtx,
     BSONObj newLockDetails(BSON(LocksType::lockID(lockSessionID)
                                 << LocksType::state(LocksType::LOCKED) << LocksType::who() << who
                                 << LocksType::process() << processId << LocksType::when(time)
-                                << LocksType::why() << why));
+                                << LocksType::term(term) << LocksType::why() << why));
 
     auto request = makeFindAndModifyRequest(
         _locksNS,
@@ -358,12 +360,17 @@ Status DistLockCatalogImpl::unlock(OperationContext* opCtx,
     return findAndModifyStatus.getStatus();
 }
 
-Status DistLockCatalogImpl::unlockAll(OperationContext* opCtx, const std::string& processID) {
+Status DistLockCatalogImpl::unlockAll(OperationContext* opCtx,
+                                      const std::string& processID,
+                                      boost::optional<long long> term) {
     BatchedCommandRequest request([&] {
         write_ops::UpdateCommandRequest updateOp(_locksNS);
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
-            entry.setQ(BSON(LocksType::process(processID)));
+            auto query = BSON(LocksType::process(processID));
+            if (term)
+                query.addFields(BSON(LocksType::term() << BSON("$lte" << *term)));
+            entry.setQ(query);
             entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
                 BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED)))));
             entry.setUpsert(false);
@@ -442,32 +449,6 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(
     }
 
     return DistLockCatalog::ServerInfo(localTimeElem.date(), electionIdStatus.getValue());
-}
-
-StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(OperationContext* opCtx,
-                                                       const OID& lockSessionID) {
-    auto findResult =
-        findOnConfig(opCtx, kReadPref, _locksNS, BSON(LocksType::lockID(lockSessionID)), {}, 1);
-    if (!findResult.isOK()) {
-        return findResult.getStatus();
-    }
-
-    const auto& findResultSet = findResult.getValue();
-
-    if (findResultSet.empty()) {
-        return {ErrorCodes::LockNotFound,
-                str::stream() << "lock with ts " << lockSessionID << " not found"};
-    }
-
-    BSONObj doc = findResultSet.front();
-    auto locksTypeResult = LocksType::fromBSON(doc);
-    if (!locksTypeResult.isOK()) {
-        return {ErrorCodes::FailedToParse,
-                str::stream() << "failed to parse: " << doc << " : "
-                              << locksTypeResult.getStatus().toString()};
-    }
-
-    return locksTypeResult.getValue();
 }
 
 StatusWith<LocksType> DistLockCatalogImpl::getLockByName(OperationContext* opCtx, StringData name) {
