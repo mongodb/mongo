@@ -108,7 +108,7 @@ assert.eq(1, coll.find().itcount());
 coll.remove({});
 printjson(request = {
     insert: coll.getName(),
-    documents: [{a: 1}, {$invalid: 'doc'}],
+    documents: [{a: 1}, {_id: /a/}],
     writeConcern: {w: 'invalid'}
 });
 printjson(result = coll.runCommand(request));
@@ -124,7 +124,7 @@ assert.eq(1, coll.find().itcount());
 coll.remove({});
 printjson(request = {
     insert: coll.getName(),
-    documents: [{a: 1}, {$invalid: 'doc'}],
+    documents: [{a: 1}, {_id: /a/}],
     writeConcern: {w: 'invalid'},
     ordered: false
 });
