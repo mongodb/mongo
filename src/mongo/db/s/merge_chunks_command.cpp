@@ -40,7 +40,6 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
@@ -81,11 +80,19 @@ void mergeChunks(OperationContext* opCtx,
                  const BSONObj& minKey,
                  const BSONObj& maxKey,
                  const OID& epoch) {
-    auto const shardingState = ShardingState::get(opCtx);
+    const std::string whyMessage = str::stream() << "merging chunks in " << nss.ns() << " from "
+                                                 << redact(minKey) << " to " << redact(maxKey);
+    auto scopedDistLock = uassertStatusOKWithContext(
+        Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
+            opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout),
+        str::stream() << "could not acquire collection lock for " << nss.ns()
+                      << " to merge chunks in ["
+                      << redact(minKey)
+                      << ", "
+                      << redact(maxKey)
+                      << ")");
 
-    auto scopedSplitOrMergeChunk(
-        uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(
-            nss, ChunkRange(minKey, maxKey))));
+    auto const shardingState = ShardingState::get(opCtx);
 
     // We now have the collection distributed lock, refresh metadata to latest version and sanity
     // check
@@ -148,7 +155,7 @@ void mergeChunks(OperationContext* opCtx,
             !chunksToMerge.empty());
 
     //
-    // Validate the range starts and ends at chunk boundaries and has no holes, error if not valid
+    // Validate the range starts and ends at chunks and has no holes, error if not valid
     //
 
     BSONObj firstDocMin = chunksToMerge.front().getMin();

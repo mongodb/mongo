@@ -35,8 +35,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/s/request_types/move_chunk_request.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
@@ -44,7 +44,8 @@ namespace mongo {
 class OperationContext;
 class ScopedDonateChunk;
 class ScopedReceiveChunk;
-class ScopedSplitMergeChunk;
+template <typename T>
+class StatusWith;
 
 /**
  * Thread-safe object that keeps track of the active migrations running on a node and limits them
@@ -61,9 +62,9 @@ public:
     static ActiveMigrationsRegistry& get(OperationContext* opCtx);
 
     /**
-     * If there are no migrations or split/merges running on this shard, registers an active
-     * migration with the specified arguments. Returns a ScopedDonateChunk, which must be signaled
-     * by the caller before it goes out of scope.
+     * If there are no migrations running on this shard, registers an active migration with the
+     * specified arguments. Returns a ScopedDonateChunk, which must be signaled by the
+     * caller before it goes out of scope.
      *
      * If there is an active migration already running on this shard and it has the exact same
      * arguments, returns a ScopedDonateChunk. The ScopedDonateChunk can be used to join the
@@ -74,24 +75,15 @@ public:
     StatusWith<ScopedDonateChunk> registerDonateChunk(const MoveChunkRequest& args);
 
     /**
-     * If there are no migrations or split/merges running on this shard, registers an active receive
-     * operation with the specified session id and returns a ScopedReceiveChunk. The
-     * ScopedReceiveChunk will unregister the migration when the ScopedReceiveChunk goes out of
-     * scope.
+     * If there are no migrations running on this shard, registers an active receive operation with
+     * the specified session id and returns a ScopedReceiveChunk. The ScopedReceiveChunk will
+     * unregister the migration when the ScopedReceiveChunk goes out of scope.
      *
      * Otherwise returns a ConflictingOperationInProgress error.
      */
     StatusWith<ScopedReceiveChunk> registerReceiveChunk(const NamespaceString& nss,
                                                         const ChunkRange& chunkRange,
                                                         const ShardId& fromShardId);
-
-    /**
-     * If there are no migrations running on this shard, registers an active split or merge
-     * operation for the specified namespace and returns a scoped object which will in turn disallow
-     * other migrations or splits/merges for the same namespace (but not for other namespaces).
-     */
-    StatusWith<ScopedSplitMergeChunk> registerSplitOrMergeChunk(const NamespaceString& nss,
-                                                                const ChunkRange& chunkRange);
 
     /**
      * If a migration has been previously registered through a call to registerDonateChunk, returns
@@ -110,7 +102,6 @@ public:
 private:
     friend class ScopedDonateChunk;
     friend class ScopedReceiveChunk;
-    friend class ScopedSplitMergeChunk;
 
     // Describes the state of a currently active moveChunk operation
     struct ActiveMoveChunkState {
@@ -149,24 +140,6 @@ private:
         ShardId fromShardId;
     };
 
-    // Describes the state of a currently active split or merge operation
-    struct ActiveSplitMergeChunkState {
-        ActiveSplitMergeChunkState(NamespaceString inNss, ChunkRange inRange)
-            : nss(std::move(inNss)), range(std::move(inRange)) {}
-
-        /**
-         * Constructs an error status to return in the case of conflicting operations.
-         */
-        Status constructErrorStatus() const;
-
-        // Namespace for which a chunk is being split or merged
-        NamespaceString nss;
-
-        // If split, bounds of the chunk being split; if merge, the end bounds of the range being
-        // merged
-        ChunkRange range;
-    };
-
     /**
      * Unregisters a previously registered namespace with an ongoing migration. Must only be called
      * if a previous call to registerDonateChunk has succeeded.
@@ -179,12 +152,6 @@ private:
      */
     void _clearReceiveChunk();
 
-    /**
-     * Unregisters a previously registered split/merge chunk operation. Must only be called if a
-     * previous call to registerSplitOrMergeChunk has succeeded.
-     */
-    void _clearSplitMergeChunk(const NamespaceString& nss);
-
     // Protects the state below
     stdx::mutex _mutex;
 
@@ -193,10 +160,6 @@ private:
 
     // If there is an active chunk receive operation, this field contains the original session id
     boost::optional<ActiveReceiveChunkState> _activeReceiveChunkState;
-
-    // If there is an active split or merge chunk operation for a particular namespace, this map
-    // will contain an entry
-    stdx::unordered_map<NamespaceString, ActiveSplitMergeChunkState> _activeSplitMergeChunkStates;
 };
 
 /**
@@ -270,25 +233,6 @@ public:
 private:
     // Registry from which to unregister the migration. Not owned.
     ActiveMigrationsRegistry* _registry;
-};
-
-/**
- * Object of this class is returned from the registerSplitOrMergeChunk call of the active migrations
- * registry.
- */
-class ScopedSplitMergeChunk {
-public:
-    ScopedSplitMergeChunk(ActiveMigrationsRegistry* registry, const NamespaceString& nss);
-    ~ScopedSplitMergeChunk();
-
-    ScopedSplitMergeChunk(ScopedSplitMergeChunk&&);
-    ScopedSplitMergeChunk& operator=(ScopedSplitMergeChunk&&);
-
-private:
-    // Registry from which to unregister the split/merge. Not owned.
-    ActiveMigrationsRegistry* _registry;
-
-    NamespaceString _nss;
 };
 
 }  // namespace mongo
