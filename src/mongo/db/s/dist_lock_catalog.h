@@ -83,8 +83,10 @@ public:
     virtual Status ping(OperationContext* opCtx, StringData processID, Date_t ping) = 0;
 
     /**
-     * Attempts to update the owner of a lock identified by lockID to lockSessionID.
-     * Will only be successful if lock is not held.
+     * If 'lockID' is currently free, acquires it with lockSessionID as the owner.
+     *
+     * The term corresponds to the current replication term of the locking processID (which is the
+     * id of the shard taking the lock).
      *
      * The other parameters are for diagnostic purposes:
      * - who: unique string for the caller trying to grab the lock.
@@ -98,19 +100,22 @@ public:
      *
      * Common status errors include socket and duplicate key errors.
      */
-    virtual StatusWith<LocksType> grabLock(
-        OperationContext* opCtx,
-        StringData lockID,
-        const OID& lockSessionID,
-        StringData who,
-        StringData processId,
-        Date_t time,
-        StringData why,
-        const WriteConcernOptions& writeConcern = kMajorityWriteConcern) = 0;
+    virtual StatusWith<LocksType> grabLock(OperationContext* opCtx,
+                                           StringData lockID,
+                                           const OID& lockSessionID,
+                                           long long term,
+                                           StringData who,
+                                           StringData processId,
+                                           Date_t time,
+                                           StringData why,
+                                           const WriteConcernOptions& writeConcern) = 0;
 
     /**
-     * Attempts to forcefully transfer the ownership of a lock from currentHolderTS
-     * to lockSessionID.
+     * If 'lockID' currently free or the current owner is currentHolderTS, acquires it with
+     * lockSessionID as the new owner.
+     *
+     * The term corresponds to the current replication term of the locking processID (which is the
+     * id of the shard taking the lock).
      *
      * The other parameters are for diagnostic purposes:
      * - who: unique string for the caller trying to grab the lock.
@@ -126,6 +131,7 @@ public:
     virtual StatusWith<LocksType> overtakeLock(OperationContext* opCtx,
                                                StringData lockID,
                                                const OID& lockSessionID,
+                                               long long term,
                                                const OID& currentHolderTS,
                                                StringData who,
                                                StringData processId,
@@ -144,21 +150,15 @@ public:
      * indication as to how many locks were actually unlocked.  So long as the update command runs
      * successfully, returns OK, otherwise returns an error status.
      */
-    virtual Status unlockAll(OperationContext* opCtx, const std::string& processID) = 0;
+    virtual Status unlockAll(OperationContext* opCtx,
+                             const std::string& processID,
+                             boost::optional<long long> term) = 0;
 
     /**
      * Get some information from the config server primary.
      * Common status errors include socket errors.
      */
     virtual StatusWith<ServerInfo> getServerInfo(OperationContext* opCtx) = 0;
-
-    /**
-     * Returns the lock document.
-     * Returns LockNotFound if lock document doesn't exist.
-     * Common status errors include socket errors.
-     */
-    virtual StatusWith<LocksType> getLockByTS(OperationContext* opCtx,
-                                              const OID& lockSessionID) = 0;
 
     /**
      * Returns the lock document.

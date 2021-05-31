@@ -63,6 +63,7 @@ public:
     static const BSONField<std::string> who;
     static const BSONField<std::string> why;
     static const BSONField<Date_t> when;
+    static const BSONField<long long> term;
 
     /**
      * Constructs a new LocksType object from BSON.

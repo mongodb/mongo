@@ -53,6 +53,7 @@ public:
     StatusWith<LocksType> grabLock(OperationContext* opCtx,
                                    StringData lockID,
                                    const OID& lockSessionID,
+                                   long long term,
                                    StringData who,
                                    StringData processId,
                                    Date_t time,
@@ -62,6 +63,7 @@ public:
     StatusWith<LocksType> overtakeLock(OperationContext* opCtx,
                                        StringData lockID,
                                        const OID& lockSessionID,
+                                       long long term,
                                        const OID& currentHolderTS,
                                        StringData who,
                                        StringData processId,
@@ -70,11 +72,11 @@ public:
 
     Status unlock(OperationContext* opCtx, const OID& lockSessionID, StringData name) override;
 
-    Status unlockAll(OperationContext* opCtx, const std::string& processID) override;
+    Status unlockAll(OperationContext* opCtx,
+                     const std::string& processID,
+                     boost::optional<long long> term) override;
 
     StatusWith<ServerInfo> getServerInfo(OperationContext* opCtx) override;
-
-    StatusWith<LocksType> getLockByTS(OperationContext* opCtx, const OID& lockSessionID) override;
 
     StatusWith<LocksType> getLockByName(OperationContext* opCtx, StringData name) override;
 

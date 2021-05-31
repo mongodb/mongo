@@ -259,6 +259,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockNoOp) {
                                 .grabLock(opCtx,
                                           "test",
                                           myID,
+                                          0LL,
                                           "me",
                                           "mongos",
                                           now,
@@ -283,6 +284,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockNoOp) {
                         who: "me",
                         process: "mongos",
                         when: { $date: "2015-05-22T19:17:18.098Z" },
+                        term: 0,
                         why: "because"
                     }
                 },
@@ -313,6 +315,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockWithNewDoc) {
         auto resultStatus = _distLockCatalog.grabLock(opCtx,
                                                       "test",
                                                       myID,
+                                                      0LL,
                                                       "me",
                                                       "mongos",
                                                       now,
@@ -343,6 +346,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockWithNewDoc) {
                         who: "me",
                         process: "mongos",
                         when: { $date: "2015-05-22T19:17:18.098Z" },
+                        term: 0,
                         why: "because"
                     }
                 },
@@ -379,11 +383,17 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockWithNewDoc) {
 TEST_F(DistLockCatalogReplSetTest, GrabLockWithBadLockDoc) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
         Date_t now(dateFromISOString("2015-05-22T19:17:18.098Z").getValue());
-        auto resultStatus =
-            _distLockCatalog
-                .grabLock(
-                    opCtx, "test", OID(), "", "", now, "", DistLockCatalog::kMajorityWriteConcern)
-                .getStatus();
+        auto resultStatus = _distLockCatalog
+                                .grabLock(opCtx,
+                                          "test",
+                                          OID(),
+                                          0LL,
+                                          "",
+                                          "",
+                                          now,
+                                          "",
+                                          DistLockCatalog::kMajorityWriteConcern)
+                                .getStatus();
         ASSERT_EQUALS(ErrorCodes::FailedToParse, resultStatus.code());
     });
 
@@ -419,6 +429,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockTargetError) {
                       .grabLock(operationContext(),
                                 "",
                                 OID::gen(),
+                                0LL,
                                 "",
                                 "",
                                 Date_t::now(),
@@ -435,6 +446,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockRunCmdError) {
                       .grabLock(operationContext(),
                                 "",
                                 OID::gen(),
+                                0LL,
                                 "",
                                 "",
                                 Date_t::now(),
@@ -451,6 +463,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockCommandError) {
                           .grabLock(opCtx,
                                     "",
                                     OID::gen(),
+                                    0LL,
                                     "",
                                     "",
                                     Date_t::now(),
@@ -478,6 +491,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockDupKeyError) {
                           .grabLock(opCtx,
                                     "",
                                     OID::gen(),
+                                    0LL,
                                     "",
                                     "",
                                     Date_t::now(),
@@ -502,6 +516,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockWriteError) {
                           .grabLock(opCtx,
                                     "",
                                     OID::gen(),
+                                    0LL,
                                     "",
                                     "",
                                     Date_t::now(),
@@ -529,6 +544,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockWriteConcernError) {
                           .grabLock(operationContext(),
                                     "",
                                     OID::gen(),
+                                    0LL,
                                     "",
                                     "",
                                     Date_t::now(),
@@ -559,6 +575,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockWriteConcernErrorBadType) {
                           .grabLock(operationContext(),
                                     "",
                                     OID::gen(),
+                                    0LL,
                                     "",
                                     "",
                                     Date_t::now(),
@@ -587,6 +604,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockResponseMissingValueField) {
                           .grabLock(operationContext(),
                                     "",
                                     OID::gen(),
+                                    0LL,
                                     "",
                                     "",
                                     Date_t::now(),
@@ -610,6 +628,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockUnsupportedWriteConcernResponse) {
                           .grabLock(operationContext(),
                                     "",
                                     OID::gen(),
+                                    0LL,
                                     "",
                                     "",
                                     Date_t::now(),
@@ -639,6 +658,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockUnsupportedResponseFormat) {
                           .grabLock(operationContext(),
                                     "",
                                     OID::gen(),
+                                    0LL,
                                     "",
                                     "",
                                     Date_t::now(),
@@ -660,11 +680,17 @@ TEST_F(DistLockCatalogReplSetTest, OvertakeLockNoOp) {
         OID myID("555f80be366c194b13fb0372");
         OID currentOwner("555f99712c99a78c5b083358");
         Date_t now(dateFromISOString("2015-05-22T19:17:18.098Z").getValue());
-        auto resultStatus =
-            _distLockCatalog
-                .overtakeLock(
-                    operationContext(), "test", myID, currentOwner, "me", "mongos", now, "because")
-                .getStatus();
+        auto resultStatus = _distLockCatalog
+                                .overtakeLock(operationContext(),
+                                              "test",
+                                              myID,
+                                              0LL,
+                                              currentOwner,
+                                              "me",
+                                              "mongos",
+                                              now,
+                                              "because")
+                                .getStatus();
 
         ASSERT_EQUALS(ErrorCodes::LockStateChangeFailed, resultStatus.code());
     });
@@ -688,6 +714,7 @@ TEST_F(DistLockCatalogReplSetTest, OvertakeLockNoOp) {
                         who: "me",
                         process: "mongos",
                         when: { $date: "2015-05-22T19:17:18.098Z" },
+                        term: 0,
                         why: "because"
                     }
                 },
@@ -716,7 +743,7 @@ TEST_F(DistLockCatalogReplSetTest, OvertakeLockWithNewDoc) {
         OID currentOwner("555f99712c99a78c5b083358");
         Date_t now(dateFromISOString("2015-05-22T19:17:18.098Z").getValue());
         auto resultStatus = _distLockCatalog.overtakeLock(
-            operationContext(), "test", myID, currentOwner, "me", "mongos", now, "because");
+            operationContext(), "test", myID, 0LL, currentOwner, "me", "mongos", now, "because");
         ASSERT_OK(resultStatus.getStatus());
 
         const auto& lockDoc = resultStatus.getValue();
@@ -747,6 +774,7 @@ TEST_F(DistLockCatalogReplSetTest, OvertakeLockWithNewDoc) {
                         who: "me",
                         process: "mongos",
                         when: { $date: "2015-05-22T19:17:18.098Z" },
+                        term: 0,
                         why: "because"
                     }
                 },
@@ -783,7 +811,8 @@ TEST_F(DistLockCatalogReplSetTest, OvertakeLockWithBadLockDoc) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
         Date_t now(dateFromISOString("2015-05-22T19:17:18.098Z").getValue());
         auto resultStatus =
-            _distLockCatalog.overtakeLock(operationContext(), "test", OID(), OID(), "", "", now, "")
+            _distLockCatalog
+                .overtakeLock(operationContext(), "test", OID(), 0LL, OID(), "", "", now, "")
                 .getStatus();
         ASSERT_EQUALS(ErrorCodes::FailedToParse, resultStatus.code());
     });
@@ -815,18 +844,20 @@ TEST_F(DistLockCatalogReplSetTest, OvertakeLockWithBadLockDoc) {
 
 TEST_F(DistLockCatalogReplSetTest, OvertakeLockTargetError) {
     configTargeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
-    auto status = _distLockCatalog
-                      .overtakeLock(operationContext(), "", OID(), OID(), "", "", Date_t::now(), "")
-                      .getStatus();
+    auto status =
+        _distLockCatalog
+            .overtakeLock(operationContext(), "", OID(), 0LL, OID(), "", "", Date_t::now(), "")
+            .getStatus();
     ASSERT_NOT_OK(status);
 }
 
 TEST_F(DistLockCatalogReplSetTest, OvertakeLockRunCmdError) {
     shutdownExecutorPool();
 
-    auto status = _distLockCatalog
-                      .overtakeLock(operationContext(), "", OID(), OID(), "", "", Date_t::now(), "")
-                      .getStatus();
+    auto status =
+        _distLockCatalog
+            .overtakeLock(operationContext(), "", OID(), 0LL, OID(), "", "", Date_t::now(), "")
+            .getStatus();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
@@ -835,7 +866,7 @@ TEST_F(DistLockCatalogReplSetTest, OvertakeLockCommandError) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
         auto status =
             _distLockCatalog
-                .overtakeLock(operationContext(), "", OID(), OID(), "", "", Date_t::now(), "")
+                .overtakeLock(operationContext(), "", OID(), 0LL, OID(), "", "", Date_t::now(), "")
                 .getStatus();
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
         ASSERT_FALSE(status.reason().empty());
@@ -856,7 +887,7 @@ TEST_F(DistLockCatalogReplSetTest, OvertakeLockWriteError) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
         auto status =
             _distLockCatalog
-                .overtakeLock(operationContext(), "", OID(), OID(), "", "", Date_t::now(), "")
+                .overtakeLock(operationContext(), "", OID(), 0LL, OID(), "", "", Date_t::now(), "")
                 .getStatus();
         ASSERT_EQUALS(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
@@ -877,7 +908,7 @@ TEST_F(DistLockCatalogReplSetTest, OvertakeLockWriteConcernError) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
         auto status =
             _distLockCatalog
-                .overtakeLock(operationContext(), "", OID(), OID(), "", "", Date_t::now(), "")
+                .overtakeLock(operationContext(), "", OID(), 0LL, OID(), "", "", Date_t::now(), "")
                 .getStatus();
         ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, status.code());
         ASSERT_FALSE(status.reason().empty());
@@ -901,7 +932,7 @@ TEST_F(DistLockCatalogReplSetTest, OvertakeLockUnsupportedWriteConcernResponse) 
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
         auto status =
             _distLockCatalog
-                .overtakeLock(operationContext(), "", OID(), OID(), "", "", Date_t::now(), "")
+                .overtakeLock(operationContext(), "", OID(), 0LL, OID(), "", "", Date_t::now(), "")
                 .getStatus();
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
@@ -926,7 +957,7 @@ TEST_F(DistLockCatalogReplSetTest, OvertakeLockUnsupportedResponseFormat) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
         ASSERT_NOT_OK(
             _distLockCatalog
-                .overtakeLock(operationContext(), "", OID(), OID(), "", "", Date_t::now(), "")
+                .overtakeLock(operationContext(), "", OID(), 0LL, OID(), "", "", Date_t::now(), "")
                 .getStatus());
     });
 
@@ -1191,7 +1222,7 @@ TEST_F(DistLockCatalogReplSetTest, UnlockUnsupportedResponseFormat) {
 
 TEST_F(DistLockCatalogReplSetTest, BasicUnlockAll) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
-        auto status = _distLockCatalog.unlockAll(operationContext(), "processID");
+        auto status = _distLockCatalog.unlockAll(operationContext(), "processID", boost::none);
         ASSERT_OK(status);
     });
 
@@ -1225,7 +1256,7 @@ TEST_F(DistLockCatalogReplSetTest, BasicUnlockAll) {
 
 TEST_F(DistLockCatalogReplSetTest, UnlockAllWriteFailed) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
-        auto status = _distLockCatalog.unlockAll(operationContext(), "processID");
+        auto status = _distLockCatalog.unlockAll(operationContext(), "processID", boost::none);
         ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
     });
 
@@ -1239,7 +1270,7 @@ TEST_F(DistLockCatalogReplSetTest, UnlockAllWriteFailed) {
 
 TEST_F(DistLockCatalogReplSetTest, UnlockAllNetworkError) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
-        auto status = _distLockCatalog.unlockAll(operationContext(), "processID");
+        auto status = _distLockCatalog.unlockAll(operationContext(), "processID", boost::none);
         ASSERT_EQUALS(ErrorCodes::NetworkTimeout, status);
     });
 
@@ -1656,91 +1687,6 @@ TEST_F(DistLockCatalogReplSetTest, GetPingUnsupportedFormat) {
 
         std::vector<BSONObj> result;
         result.push_back(pingDoc);
-
-        return result;
-    });
-
-    future.default_timed_get();
-}
-
-TEST_F(DistLockCatalogReplSetTest, BasicGetLockByTS) {
-    auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
-        OID ts("555f99712c99a78c5b083358");
-        auto resultStatus = _distLockCatalog.getLockByTS(operationContext(), ts);
-        ASSERT_OK(resultStatus.getStatus());
-
-        const auto& lockDoc = resultStatus.getValue();
-        ASSERT_EQUALS("test", lockDoc.getName());
-        ASSERT_EQUALS(ts, lockDoc.getLockID());
-    });
-
-    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<std::vector<BSONObj>> {
-        ASSERT_EQUALS(dummyHost, request.target);
-        ASSERT_EQUALS("config", request.dbname);
-
-        const auto& findCmd = request.cmdObj;
-        ASSERT_EQUALS("locks", findCmd["find"].str());
-        ASSERT_BSONOBJ_EQ(BSON("ts" << OID("555f99712c99a78c5b083358")), findCmd["filter"].Obj());
-        ASSERT_EQUALS(1, findCmd["limit"].numberLong());
-        checkReadConcern(findCmd);
-
-        BSONObj lockDoc(fromjson(R"({
-            _id: "test",
-            state: 2,
-            ts: ObjectId("555f99712c99a78c5b083358")
-        })"));
-
-        std::vector<BSONObj> result;
-        result.push_back(lockDoc);
-        return result;
-    });
-
-    future.default_timed_get();
-}
-
-TEST_F(DistLockCatalogReplSetTest, GetLockByTSTargetError) {
-    configTargeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
-    auto status = _distLockCatalog.getLockByTS(operationContext(), OID()).getStatus();
-    ASSERT_EQUALS(ErrorCodes::InternalError, status.code());
-}
-
-TEST_F(DistLockCatalogReplSetTest, GetLockByTSRunCmdError) {
-    shutdownExecutorPool();
-    auto status = _distLockCatalog.getLockByTS(operationContext(), OID()).getStatus();
-    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
-    ASSERT_FALSE(status.reason().empty());
-}
-
-TEST_F(DistLockCatalogReplSetTest, GetLockByTSNotFound) {
-    auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
-        auto status = _distLockCatalog.getLockByTS(operationContext(), OID()).getStatus();
-        ASSERT_EQUALS(ErrorCodes::LockNotFound, status.code());
-        ASSERT_FALSE(status.reason().empty());
-    });
-
-    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<std::vector<BSONObj>> {
-        return std::vector<BSONObj>();
-    });
-
-    future.default_timed_get();
-}
-
-TEST_F(DistLockCatalogReplSetTest, GetLockByTSUnsupportedFormat) {
-    auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
-        auto status = _distLockCatalog.getLockByTS(operationContext(), OID()).getStatus();
-        ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
-        ASSERT_FALSE(status.reason().empty());
-    });
-
-    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<std::vector<BSONObj>> {
-        // return invalid non-numeric type for state.
-        BSONObj lockDoc(fromjson(R"({
-            _id: "test",
-            state: "bad"
-        })"));
-
-        std::vector<BSONObj> result;
-        result.push_back(lockDoc);
 
         return result;
     });

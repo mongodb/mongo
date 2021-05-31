@@ -166,13 +166,10 @@ StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
         auto swResponse = _runCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
         auto status = CommandResponse::getEffectiveStatus(swResponse);
         if (retry < kOnErrorNumRetries && isRetriableError(status.code(), retryPolicy)) {
-            LOGV2_DEBUG(22720,
-                        2,
-                        "Command {command} failed with retryable error and will be retried. Caused "
-                        "by {error}",
-                        "Command failed with retryable error and will be retried",
-                        "command"_attr = redact(cmdObj),
-                        "error"_attr = redact(status));
+            LOGV2(22720,
+                  "Command failed with a retryable error and will be retried",
+                  "command"_attr = redact(cmdObj),
+                  "error"_attr = redact(status));
             continue;
         }
 
