@@ -188,6 +188,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                          status.isA<ErrorCategory::ShutdownError>() ||
                          status.isA<ErrorCategory::RetriableError>() ||
                          status.isA<ErrorCategory::CancellationError>() ||
+                         status.isA<ErrorCategory::ExceededTimeLimitError>() ||
                          status == ErrorCodes::Interrupted) &&
                         !token.isCanceled()) {
                         LOGV2_DEBUG(5656000,
