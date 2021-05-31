@@ -5,8 +5,6 @@
  *
  * @tags: [
  *   requires_sharding,
- *   # TODO (SERVER-57017) Enable on stepdown suites
- *   does_not_support_stepdowns,
  *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
  *  ]
