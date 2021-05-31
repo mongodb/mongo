@@ -183,11 +183,16 @@ function testCollDetails(args) {
     }
     assert.commandWorked(admin.runCommand(cmdObj));
 
+    var originalValues = {};
     if (args.hasOwnProperty("unique")) {
+        originalValues["unique"] =
+            mongos.getDB("config").collections.findOne({_id: collName}).unique;
         assert.commandWorked(mongos.getDB("config").collections.update(
             {_id: collName}, {$set: {"unique": args.unique}}));
     }
     if (args.hasOwnProperty("noBalance")) {
+        originalValues["noBalance"] =
+            mongos.getDB("config").collections.findOne({_id: collName}).noBalance;
         assert.commandWorked(mongos.getDB("config").collections.update(
             {_id: collName}, {$set: {"noBalance": args.noBalance}}));
     }
@@ -209,6 +214,10 @@ function testCollDetails(args) {
     if (args.hasOwnProperty("unique") && typeof (args.unique) != "boolean") {
         // non-bool: actual value must be shown
         assertPresentInOutput(output, tojson(args.unique), "unique shard key indicator (non bool)");
+
+        // Restore original value.
+        assert.commandWorked(mongos.getDB("config").collections.update(
+            {_id: collName}, {$set: {"unique": originalValues.unique}}));
     }
 
     assertPresentInOutput(
@@ -216,6 +225,10 @@ function testCollDetails(args) {
     if (args.hasOwnProperty("noBalance") && typeof (args.noBalance) != "boolean") {
         // non-bool: actual value must be shown
         assertPresentInOutput(output, tojson(args.noBalance), "noBalance indicator (non bool)");
+
+        // Restore original value.
+        assert.commandWorked(mongos.getDB("config").collections.update(
+            {_id: collName}, {$set: {"noBalance": originalValues.noBalance}}));
     }
 
     try {
