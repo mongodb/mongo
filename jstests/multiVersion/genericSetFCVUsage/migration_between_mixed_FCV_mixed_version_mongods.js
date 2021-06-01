@@ -29,7 +29,6 @@ function runTest(downgradeVersion) {
         shards: [{binVersion: "latest"}, {binVersion: downgradeVersion}],
         mongos: 1,
         other: {
-            shardAsReplicaSet: true,
             mongosOptions: {binVersion: downgradeVersion},
             configOptions: {binVersion: "latest"},
         }
