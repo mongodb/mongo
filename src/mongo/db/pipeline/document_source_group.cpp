@@ -399,7 +399,7 @@ DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>&
       _doingMerge(false),
       _memoryTracker{expCtx->allowDiskUse && !expCtx->inMongos,
                      maxMemoryUsageBytes ? *maxMemoryUsageBytes
-                                         : internalDocumentSourceGroupMaxMemoryBytes.load()},
+                                         : (size_t)internalDocumentSourceGroupMaxMemoryBytes.load()},
       _initialized(false),
       _groups(expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
       _spilled(false) {
