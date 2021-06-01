@@ -566,6 +566,40 @@ class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
         return None
 
 
+class WtUpdateToBsonPrinter(object):
+    """Pretty printer for WT_UPDATE. Interpreting the `data` field as bson."""
+
+    def __init__(self, val):
+        """Initializer."""
+        self.val = val
+        self.size = self.val['size']
+        self.ptr = self.val['data']
+
+    @staticmethod
+    def display_hint():
+        """DisplayHint."""
+        return 'map'
+
+    # pylint: disable=R0201
+    def to_string(self):
+        """ToString."""
+        elems = []
+        for idx in range(len(self.val.type.fields())):
+            fld = self.val.type.fields()[idx]
+            val = self.val[fld.name]
+            elems.append(str((fld.name, str(val))))
+        return "WT_UPDATE: \n  %s" % ('\n  '.join(elems))
+
+    def children(self):
+        """children."""
+        memory = gdb.selected_inferior().read_memory(self.ptr, self.size).tobytes()
+        bsonobj = next(bson.decode_iter(memory))  # pylint: disable=stop-iteration-return
+
+        for key, value in list(bsonobj.items()):
+            yield 'key', key
+            yield 'value', bson.json_util.dumps(value)
+
+
 def build_pretty_printer():
     """Build a pretty printer."""
     pp = MongoPrettyPrinterCollection()
@@ -582,6 +616,7 @@ def build_pretty_printer():
     pp.add('__wt_cursor', '__wt_cursor', False, WtCursorPrinter)
     pp.add('__wt_session_impl', '__wt_session_impl', False, WtSessionImplPrinter)
     pp.add('__wt_txn', '__wt_txn', False, WtTxnPrinter)
+    pp.add('__wt_update', '__wt_update', False, WtUpdateToBsonPrinter)
     return pp
 
 

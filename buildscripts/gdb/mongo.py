@@ -24,6 +24,13 @@ except Exception as e:
     print("Failed to load the libstdc++ pretty printers: " + str(e))
 # pylint: enable=invalid-name,wildcard-import
 
+try:
+    import bson
+except ImportError as err:
+    print("Warning: Could not load bson library for Python '" + str(sys.version) + "'.")
+    print("Check with the pip command if pymongo 3.x is installed.")
+    bson = None
+
 if sys.version_info[0] < 3:
     raise gdb.GdbError(
         "MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2")
@@ -746,6 +753,36 @@ class MongoDBJavaScriptStack(gdb.Command):
 
 # Register command
 MongoDBJavaScriptStack()
+
+
+class MongoDBPPrintBsonAtPointer(gdb.Command):
+    """Interprets a pointer into raw memory as the start of a bson object. Pretty print the results."""
+
+    def __init__(self):
+        """Init."""
+        RegisterMongoCommand.register(self, "mongodb-pprint-bson", gdb.COMMAND_STATUS)
+
+    def invoke(self, args, _from_tty):  # pylint: disable=no-self-use
+        """Invoke."""
+        args = args.split(' ')
+        if len(args) == 0 or (len(args) == 1 and len(args[0]) == 0):
+            print("Usage: mongodb-pprint-bson <ptr> <optional length>")
+            return
+
+        ptr = eval(args[0])  # pylint: disable=eval-used
+        size = 20 * 1024
+        if len(args) >= 2:
+            size = int(args[1])
+        print("Pretty printing bson object at %s (%d bytes)" % (ptr, size))
+
+        memory = gdb.selected_inferior().read_memory(ptr, size).tobytes()
+        bsonobj = next(bson.decode_iter(memory))
+
+        from pprint import pprint
+        pprint(bsonobj)
+
+
+MongoDBPPrintBsonAtPointer()
 
 
 class MongoDBHelp(gdb.Command):
