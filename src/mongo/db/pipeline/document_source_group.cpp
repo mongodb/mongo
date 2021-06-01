@@ -381,9 +381,8 @@ intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
     const boost::intrusive_ptr<Expression>& groupByExpression,
     std::vector<AccumulationStatement> accumulationStatements,
     boost::optional<size_t> maxMemoryUsageBytes) {
-    size_t memoryBytes = maxMemoryUsageBytes ? *maxMemoryUsageBytes
-                                             : internalDocumentSourceGroupMaxMemoryBytes.load();
-    intrusive_ptr<DocumentSourceGroup> groupStage(new DocumentSourceGroup(expCtx, memoryBytes));
+    intrusive_ptr<DocumentSourceGroup> groupStage(
+        new DocumentSourceGroup(expCtx, maxMemoryUsageBytes));
     groupStage->setIdExpression(groupByExpression);
     for (auto&& statement : accumulationStatements) {
         groupStage->addAccumulator(statement);
@@ -398,8 +397,9 @@ DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>&
     : DocumentSource(kStageName, expCtx),
       _doingMerge(false),
       _memoryTracker{expCtx->allowDiskUse && !expCtx->inMongos,
-                     maxMemoryUsageBytes ? *maxMemoryUsageBytes
-                                         : internalDocumentSourceGroupMaxMemoryBytes.load()},
+                     maxMemoryUsageBytes
+                         ? *maxMemoryUsageBytes
+                         : static_cast<size_t>(internalDocumentSourceGroupMaxMemoryBytes.load())},
       _initialized(false),
       _groups(expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
       _spilled(false) {
