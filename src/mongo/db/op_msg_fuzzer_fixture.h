@@ -55,6 +55,8 @@ public:
     int testOneInput(const char* Data, size_t Size);
 
 private:
+    void _setAuthorizationManager();
+
     const LogicalTime kInMemoryLogicalTime = LogicalTime(Timestamp(3, 1));
 
     // This member is responsible for both creating and deleting the base directory. Think of it as
