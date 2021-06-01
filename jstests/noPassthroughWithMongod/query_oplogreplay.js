@@ -105,7 +105,7 @@ assert(!cursor.hasNext());
 let res = t.find({ts: {$eq: makeTS(10)}}).explain("executionStats");
 assert.commandWorked(res);
 // We expect to be able to seek directly to the entry with a 'ts' of 10.
-assert.lte(res.executionStats.totalDocsExamined, 2, tojson(res));
+assert.lte(res.executionStats.totalDocsExamined, isSBEEnabled ? 3 : 2, tojson(res));
 let collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(makeTS(10), longToTs(collScanStage.maxRecord), tojson(res));
@@ -113,7 +113,7 @@ assert.eq(makeTS(10), longToTs(collScanStage.maxRecord), tojson(res));
 // An AND with an $lt predicate stops scanning after passing the max timestamp.
 res = t.find({$and: [{ts: {$gte: makeTS(1)}}, {ts: {$lt: makeTS(10)}}]}).explain("executionStats");
 assert.commandWorked(res);
-assert.lte(res.executionStats.totalDocsExamined, 11, tojson(res));
+assert.lte(res.executionStats.totalDocsExamined, isSBEEnabled ? 12 : 11, tojson(res));
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(makeTS(10), longToTs(collScanStage.maxRecord), tojson(res));
@@ -147,7 +147,7 @@ res = t.find({
        }).explain("executionStats");
 assert.commandWorked(res);
 // We expect to be able to seek directly to the entry with a 'ts' of 5.
-assert.lte(res.executionStats.totalDocsExamined, 2, tojson(res));
+assert.lte(res.executionStats.totalDocsExamined, isSBEEnabled ? 3 : 2, tojson(res));
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(makeTS(5), longToTs(collScanStage.maxRecord), tojson(res));
@@ -157,7 +157,7 @@ assert.eq(makeTS(5), longToTs(collScanStage.minRecord), tojson(res));
 res = t.find({ts: {$eq: makeTS(200)}}).explain("executionStats");
 assert.commandWorked(res);
 // We expect to be able to seek directly to the end of the oplog.
-assert.lte(res.executionStats.totalDocsExamined, 1, tojson(res));
+assert.lte(res.executionStats.totalDocsExamined, isSBEEnabled ? 2 : 1, tojson(res));
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(makeTS(200), longToTs(collScanStage.maxRecord), tojson(res));
@@ -169,7 +169,7 @@ res = t.find({
        }).explain("executionStats");
 assert.commandWorked(res);
 // We expect to be able to seek directly to the start of the 'ts' range.
-assert.lte(res.executionStats.totalDocsExamined, 6, tojson(res));
+assert.lte(res.executionStats.totalDocsExamined, isSBEEnabled ? 7 : 6, tojson(res));
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 assert.eq(makeTS(8), longToTs(collScanStage.maxRecord), tojson(res));
@@ -202,18 +202,16 @@ while (res.hasNext()) {
 }
 res = res.explain("executionStats");
 assert.commandWorked(res);
-// In SBE we perform an extra seek to position the cursor and apply the filter, so we will report
-// an extra document examined.
-assert.lte(res.executionStats.totalDocsExamined, isSBEEnabled ? 12 : 11, res);
+assert.lte(res.executionStats.totalDocsExamined, isSBEEnabled ? 13 : 11, res);
 
 // Oplog replay optimization should work with limit.
 res = t.find({$and: [{ts: {$gte: makeTS(4)}}, {ts: {$lte: makeTS(8)}}]})
           .limit(2)
           .explain("executionStats");
 assert.commandWorked(res);
-assert.eq(2, res.executionStats.totalDocsExamined);
-collScanStage =
-    getPlanStage(res.executionStats.executionStages, isSBEEnabled ? "seek" : "COLLSCAN");
+assert.eq(isSBEEnabled ? 3 : 2, res.executionStats.totalDocsExamined);
+collScanStage = isSBEEnabled ? getPlanStages(res.executionStats.executionStages, "seek")[1]
+                             : getPlanStage(res.executionStats.executionStages, "COLLSCAN");
 assert.eq(2, collScanStage.nReturned, res);
 
 // A query over both 'ts' and '_id' should only pay attention to the 'ts' field for finding
