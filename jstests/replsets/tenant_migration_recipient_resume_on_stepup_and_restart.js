@@ -190,6 +190,8 @@ function testRecipientForgetMigrationInterrupt(interruptFunc) {
     testRecipientSyncDataInterrupt((recipientRst) => {
         recipientRst.stopSet(null /* signal */, true /*forRestart */);
         recipientRst.startSet({restart: true});
+        recipientRst.awaitSecondaryNodes();
+        recipientRst.getPrimary();
     }, true);
 })();
 
@@ -209,6 +211,8 @@ function testRecipientForgetMigrationInterrupt(interruptFunc) {
     testRecipientForgetMigrationInterrupt((recipientRst) => {
         recipientRst.stopSet(null /* signal */, true /*forRestart */);
         recipientRst.startSet({restart: true});
+        recipientRst.awaitSecondaryNodes();
+        recipientRst.getPrimary();
     });
 })();
 })();
