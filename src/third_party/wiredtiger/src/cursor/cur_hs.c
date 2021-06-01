@@ -883,6 +883,12 @@ retry:
         goto retry;
     WT_ERR(ret);
 
+    /*
+     * Mark the insert as successful. Even if one of the calls below fails, some callers will still
+     * need to know whether the actual insert went through or not.
+     */
+    hs_cursor->insert_success = true;
+
 #ifdef HAVE_DIAGNOSTIC
     /* Do a search again and call next to check the key order. */
     WT_WITH_PAGE_INDEX(session, ret = __wt_hs_row_search(cbt, &file_cursor->key, true));
@@ -1097,4 +1103,35 @@ err:
         *cursorp = NULL;
     }
     return (ret);
+}
+
+/*
+ * __wt_curhs_clear_insert_success --
+ *     Clear the insertion flag for the history store cursor. We should call this prior to using the
+ *     WT_CURSOR->insert method.
+ */
+void
+__wt_curhs_clear_insert_success(WT_CURSOR *cursor)
+{
+    WT_CURSOR_HS *hs_cursor;
+
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+    hs_cursor->insert_success = false;
+}
+
+/*
+ * __wt_curhs_check_insert_success --
+ *     Check whether the insertion flag for the history store cursor is set or not. This signals
+ *     whether or not the last WT_CURSOR->insert call successfully inserted the history store
+ *     record. This is distinctly different from the return value of WT_CURSOR->insert since the
+ *     return value could be non-zero due to cursor operations AFTER the actual history store
+ *     insertion.
+ */
+bool
+__wt_curhs_check_insert_success(WT_CURSOR *cursor)
+{
+    WT_CURSOR_HS *hs_cursor;
+
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+    return (hs_cursor->insert_success);
 }
