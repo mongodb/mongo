@@ -59,6 +59,21 @@ namespace {
 constexpr auto kTempDirStem = "op_msg_fuzzer_fixture"_sd;
 }
 
+// This must be called before creating any new threads that may access `AuthorizationManager` to
+// avoid a data-race.
+void OpMsgFuzzerFixture::_setAuthorizationManager() {
+    auto localExternalState = std::make_unique<AuthzManagerExternalStateMock>();
+    _externalState = localExternalState.get();
+
+    auto localAuthzManager =
+        std::make_unique<AuthorizationManagerImpl>(_serviceContext, std::move(localExternalState));
+    _authzManager = localAuthzManager.get();
+    _externalState->setAuthorizationManager(_authzManager);
+    _authzManager->setAuthEnabled(true);
+
+    AuthorizationManager::set(_serviceContext, std::move(localAuthzManager));
+}
+
 OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
     : _dir(kTempDirStem.toString()) {
     if (!skipGlobalInitializers) {
@@ -70,6 +85,7 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
     _session = _transportLayer.createSession();
 
     _serviceContext = getGlobalServiceContext();
+    _setAuthorizationManager();
     _serviceContext->setServiceEntryPoint(
         std::make_unique<ServiceEntryPointMongod>(_serviceContext));
 
@@ -101,17 +117,6 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
     IndexAccessMethodFactory::set(_serviceContext,
                                   std::make_unique<IndexAccessMethodFactoryImpl>());
     Collection::Factory::set(_serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
-
-    auto localExternalState = std::make_unique<AuthzManagerExternalStateMock>();
-    _externalState = localExternalState.get();
-
-    auto localAuthzManager =
-        std::make_unique<AuthorizationManagerImpl>(_serviceContext, std::move(localExternalState));
-    _authzManager = localAuthzManager.get();
-    _externalState->setAuthorizationManager(_authzManager);
-    _authzManager->setAuthEnabled(true);
-
-    AuthorizationManager::set(_serviceContext, std::move(localAuthzManager));
 
     // Setup the repl coordinator in standalone mode so we don't need an oplog etc.
     repl::ReplicationCoordinator::set(
