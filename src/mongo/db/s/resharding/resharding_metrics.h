@@ -73,7 +73,6 @@ public:
     void setRecipientState(RecipientStateEnum) noexcept;
     void setCoordinatorState(CoordinatorStateEnum) noexcept;
 
-    // Set by donors.
     void setDocumentsToCopy(int64_t documents, int64_t bytes) noexcept;
     // Allows updating metrics on "documents to copy" so long as the recipient is in cloning state.
     void onDocumentsCopied(int64_t documents, int64_t bytes) noexcept;
@@ -85,8 +84,8 @@ public:
     void startApplyingOplogEntries(Date_t start);
     void endApplyingOplogEntries(Date_t end);
 
-    void startInCriticalSection(Date_t start);
-    void endInCriticalSection(Date_t end);
+    void enterCriticalSection(Date_t start);
+    void leaveCriticalSection(Date_t end);
 
     // Allows updating "oplog entries to apply" metrics when the recipient is in applying state.
     void onOplogEntriesFetched(int64_t entries) noexcept;

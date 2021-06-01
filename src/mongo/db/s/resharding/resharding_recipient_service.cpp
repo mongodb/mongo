@@ -310,6 +310,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                                    _metadata.getSourceNss(),
                                    _critSecReason,
                                    ShardingCatalogClient::kLocalWriteConcern);
+
+                           _metrics()->leaveCriticalSection(getCurrentTime());
                        }
                    })
                    .then([this, executor] {
@@ -639,6 +641,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                         _metadata.getSourceNss(),
                         _critSecReason,
                         ShardingCatalogClient::kLocalWriteConcern);
+
+                _metrics()->enterCriticalSection(getCurrentTime());
             }
 
             _transitionToStrictConsistency();

@@ -69,6 +69,11 @@ namespace {
 
 const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
+Date_t getCurrentTime() {
+    const auto svcCtx = cc().getServiceContext();
+    return svcCtx->getFastClockSource()->now();
+}
+
 Timestamp generateMinFetchTimestamp(OperationContext* opCtx, const NamespaceString& sourceNss) {
     // Do a no-op write and use the OpTime as the minFetchTimestamp
     writeConflictRetry(
@@ -332,16 +337,19 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                            _metadata.getSourceNss(),
                            _critSecReason,
                            ShardingCatalogClient::kLocalWriteConcern);
+
+                   _metrics()->leaveCriticalSection(getCurrentTime());
                }
 
                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-               return _updateCoordinator(opCtx.get(), executor).then([this] {
-                   {
-                       auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-                       removeDonorDocFailpoint.pauseWhileSet(opCtx.get());
-                   }
-                   _removeDonorDocument();
-               });
+               return _updateCoordinator(opCtx.get(), executor)
+                   .then([this, aborted, stepdownToken] {
+                       {
+                           auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                           removeDonorDocFailpoint.pauseWhileSet(opCtx.get());
+                       }
+                       _removeDonorDocument(stepdownToken, aborted);
+                   });
            })
         .onTransientError([](const Status& status) {
             LOGV2(5633600,
@@ -353,7 +361,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
         .on(**executor, stepdownToken);
 }
 
-Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(Status status) {
+Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(
+    Status status, const CancellationToken& stepdownToken) {
     if (!status.isOK()) {
         stdx::lock_guard<Latch> lk(_mutex);
 
@@ -361,6 +370,10 @@ Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(Status st
         ensureFulfilledPromise(lk, _critSecWasPromoted, status);
 
         ensureFulfilledPromise(lk, _completionPromise, status);
+    }
+
+    if (stepdownToken.isCanceled()) {
+        _metrics()->onStepDown(ReshardingMetrics::Role::kDonor);
     }
 
     return status;
@@ -373,7 +386,11 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
     _markKilledExecutor->startup();
     _cancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
 
-    return _runUntilBlockingWritesOrErrored(executor, abortToken)
+    return ExecutorFuture(**executor)
+        .then([this] { _startMetrics(); })
+        .then([this, executor, abortToken] {
+            return _runUntilBlockingWritesOrErrored(executor, abortToken);
+        })
         .then([this, executor, abortToken] {
             return _notifyCoordinatorAndAwaitDecision(executor, abortToken);
         })
@@ -396,7 +413,6 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
         })
         .onError([this, stepdownToken](Status status) {
             if (stepdownToken.isCanceled()) {
-                // The operation will continue on a new DonorStateMachine.
                 return status;
             }
 
@@ -411,11 +427,11 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
         // safely finish executing.
         .onCompletion([anchor = shared_from_this()](Status status) { return status; })
         .thenRunOn(_donorService->getInstanceCleanupExecutor())
-        .onCompletion([this, anchor = shared_from_this()](Status status) {
+        .onCompletion([this, anchor = shared_from_this(), stepdownToken](Status status) {
             // On stepdown or shutdown, the _scopedExecutor may have already been shut down.
             // Everything in this function runs on the instance's cleanup executor, and will
             // execute regardless of any work on _scopedExecutor ever running.
-            return _runMandatoryCleanup(status);
+            return _runMandatoryCleanup(status, stepdownToken);
         })
         .semi();
 }
@@ -430,7 +446,7 @@ boost::optional<BSONObj> ReshardingDonorService::DonorStateMachine::reportForCur
                                                _metadata.getSourceNss(),
                                                _metadata.getReshardingKey().toBSON(),
                                                false);
-    return ReshardingMetrics::get(cc().getServiceContext())->reportForCurrentOp(options);
+    return _metrics()->reportForCurrentOp(options);
 }
 
 void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
@@ -578,6 +594,8 @@ void ReshardingDonorService::DonorStateMachine::
                 _metadata.getSourceNss(),
                 _critSecReason,
                 ShardingCatalogClient::kLocalWriteConcern);
+
+        _metrics()->enterCriticalSection(getCurrentTime());
     }
 
     {
@@ -708,6 +726,7 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(DonorShardConte
     auto newState = newDonorCtx.getState();
 
     _updateDonorDocument(std::move(newDonorCtx));
+    _metrics()->setDonorState(newState);
 
     LOGV2_INFO(5279505,
                "Transitioned resharding donor state",
@@ -850,7 +869,8 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
     _donorCtx = newDonorCtx;
 }
 
-void ReshardingDonorService::DonorStateMachine::_removeDonorDocument() {
+void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
+    const CancellationToken& stepdownToken, bool aborted) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
     const auto& nss = NamespaceString::kDonorReshardingOperationsNamespace;
@@ -863,8 +883,16 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument() {
 
         WriteUnitOfWork wuow(opCtx.get());
 
-        opCtx->recoveryUnit()->onCommit([this](boost::optional<Timestamp> unusedCommitTime) {
+        opCtx->recoveryUnit()->onCommit([this, stepdownToken, aborted](boost::optional<Timestamp>) {
             stdx::lock_guard<Latch> lk(_mutex);
+
+            if (!stepdownToken.isCanceled()) {
+                _metrics()->onCompletion(ReshardingMetrics::Role::kDonor,
+                                         aborted ? ReshardingOperationStatusEnum::kFailure
+                                                 : ReshardingOperationStatusEnum::kSuccess,
+                                         getCurrentTime());
+            }
+
             _completionPromise.emplaceValue();
         });
 
@@ -877,6 +905,18 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument() {
 
         wuow.commit();
     });
+}
+
+ReshardingMetrics* ReshardingDonorService::DonorStateMachine::_metrics() const {
+    return ReshardingMetrics::get(cc().getServiceContext());
+}
+
+void ReshardingDonorService::DonorStateMachine::_startMetrics() {
+    if (_donorCtx.getState() > DonorStateEnum::kPreparingToDonate) {
+        _metrics()->onStepUp(ReshardingMetrics::Role::kDonor);
+    } else {
+        _metrics()->onStart(ReshardingMetrics::Role::kDonor, getCurrentTime());
+    }
 }
 
 CancellationToken ReshardingDonorService::DonorStateMachine::_initAbortSource(
