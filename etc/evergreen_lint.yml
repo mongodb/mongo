@@ -1,0 +1,18 @@
+# These paths are relative to the directory containing this configuration file
+files:
+    - evergreen.yml
+help_url: https://wiki.corp.mongodb.com/pages/viewpage.action?pageId=133273894
+
+rules:
+    # this is a list of all rules available, their parameters, and their
+    # default values. Comment out a rule to disable it
+    - rule: "limit-keyval-inc"
+      # the maximum number of keyval.inc commands to allow in your YAML
+      limit: 4
+    - rule: "shell-exec-explicit-shell"
+    - rule: "no-working-dir-on-shell"
+    - rule: "no-shell-exec"
+    - rule: "no-multiline-expansions-update"
+    - rule: "invalid-build-parameter"
+    - rule: "required-expansions-write"
+      regex: .*\/evergreen\/.*\.sh
