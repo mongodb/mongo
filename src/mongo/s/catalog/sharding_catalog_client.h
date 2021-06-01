@@ -165,7 +165,10 @@ public:
      * @param optime an out parameter that will contain the opTime of the config server.
      *      Can be null. Note that chunks can be fetched in multiple batches and each batch
      *      can have a unique opTime. This opTime will be the one from the last batch.
+     * @param epoch epoch associated to the collection, needed to build the chunks.
+     * @param timestamp timestamp associated to the collection, needed to build the chunks.
      * @param readConcern The readConcern to use while querying for chunks.
+
      *
      * Returns a vector of ChunkTypes, or a !OK status if an error occurs.
      */
@@ -175,6 +178,8 @@ public:
         const BSONObj& sort,
         boost::optional<int> limit,
         repl::OpTime* opTime,
+        const OID& epoch,
+        const boost::optional<Timestamp>& timestamp,
         repl::ReadConcernLevel readConcern,
         const boost::optional<BSONObj>& hint = boost::none) = 0;
 

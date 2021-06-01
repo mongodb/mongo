@@ -233,7 +233,9 @@ public:
      * ErrorCodes::NoSuchKey if the '_id' field is missing while 'fromConfigBSON' does.
      */
     static StatusWith<ChunkType> parseFromConfigBSONCommand(const BSONObj& source);
-    static StatusWith<ChunkType> fromConfigBSON(const BSONObj& source);
+    static StatusWith<ChunkType> fromConfigBSON(const BSONObj& source,
+                                                const OID& epoch,
+                                                const boost::optional<Timestamp>& timestamp);
 
     /**
      * Returns the BSON representation of the entry for the config server's config.chunks

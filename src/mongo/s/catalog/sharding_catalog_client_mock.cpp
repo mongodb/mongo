@@ -82,6 +82,8 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientMock::getChunks(
     const BSONObj& sort,
     boost::optional<int> limit,
     repl::OpTime* opTime,
+    const OID& epoch,
+    const boost::optional<Timestamp>& timestamp,
     repl::ReadConcernLevel readConcern,
     const boost::optional<BSONObj>& hint) {
     return {ErrorCodes::InternalError, "Method not implemented"};

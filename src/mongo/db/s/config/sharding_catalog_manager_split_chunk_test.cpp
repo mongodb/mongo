@@ -55,11 +55,14 @@ protected:
 };
 
 TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
     ChunkType chunk;
     chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
-    auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
+    auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
     chunk.setVersion(origVersion);
     chunk.setShard(ShardId(_shardName));
 
@@ -78,7 +81,7 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     auto versions = assertGet(ShardingCatalogManager::get(operationContext())
                                   ->commitChunkSplit(operationContext(),
                                                      kNamespace,
-                                                     origVersion.epoch(),
+                                                     collEpoch,
                                                      ChunkRange(chunkMin, chunkMax),
                                                      splitPoints,
                                                      "shard0000"));
@@ -89,15 +92,13 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     ASSERT_EQ(collVersion, shardVersion);
 
     // Check for increment on mergedChunk's minor version
-    auto expectedShardVersion = ChunkVersion(origVersion.majorVersion(),
-                                             origVersion.minorVersion() + 2,
-                                             origVersion.epoch(),
-                                             origVersion.getTimestamp());
+    auto expectedShardVersion = ChunkVersion(
+        origVersion.majorVersion(), origVersion.minorVersion() + 2, collEpoch, collTimestamp);
     ASSERT_EQ(expectedShardVersion, shardVersion);
     ASSERT_EQ(shardVersion, collVersion);
 
     // First chunkDoc should have range [chunkMin, chunkSplitPoint]
-    auto chunkDocStatus = getChunkDoc(operationContext(), chunkMin);
+    auto chunkDocStatus = getChunkDoc(operationContext(), chunkMin, collEpoch, collTimestamp);
     ASSERT_OK(chunkDocStatus.getStatus());
 
     auto chunkDoc = chunkDocStatus.getValue();
@@ -111,7 +112,8 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     ASSERT_EQ(2UL, chunkDoc.getHistory().size());
 
     // Second chunkDoc should have range [chunkSplitPoint, chunkMax]
-    auto otherChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint);
+    auto otherChunkDocStatus =
+        getChunkDoc(operationContext(), chunkSplitPoint, collEpoch, collTimestamp);
     ASSERT_OK(otherChunkDocStatus.getStatus());
 
     auto otherChunkDoc = otherChunkDocStatus.getValue();
@@ -129,11 +131,14 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
 }
 
 TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
     ChunkType chunk;
     chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
-    auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
+    auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
     chunk.setVersion(origVersion);
     chunk.setShard(ShardId(_shardName));
 
@@ -153,13 +158,13 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->commitChunkSplit(operationContext(),
                                      kNamespace,
-                                     origVersion.epoch(),
+                                     collEpoch,
                                      ChunkRange(chunkMin, chunkMax),
                                      splitPoints,
                                      "shard0000"));
 
     // First chunkDoc should have range [chunkMin, chunkSplitPoint]
-    auto chunkDocStatus = getChunkDoc(operationContext(), chunkMin);
+    auto chunkDocStatus = getChunkDoc(operationContext(), chunkMin, collEpoch, collTimestamp);
     ASSERT_OK(chunkDocStatus.getStatus());
 
     auto chunkDoc = chunkDocStatus.getValue();
@@ -173,7 +178,8 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     ASSERT_EQ(2UL, chunkDoc.getHistory().size());
 
     // Second chunkDoc should have range [chunkSplitPoint, chunkSplitPoint2]
-    auto midChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint);
+    auto midChunkDocStatus =
+        getChunkDoc(operationContext(), chunkSplitPoint, collEpoch, collTimestamp);
     ASSERT_OK(midChunkDocStatus.getStatus());
 
     auto midChunkDoc = midChunkDocStatus.getValue();
@@ -187,7 +193,8 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     ASSERT_EQ(2UL, midChunkDoc.getHistory().size());
 
     // Third chunkDoc should have range [chunkSplitPoint2, chunkMax]
-    auto lastChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint2);
+    auto lastChunkDocStatus =
+        getChunkDoc(operationContext(), chunkSplitPoint2, collEpoch, collTimestamp);
     ASSERT_OK(lastChunkDocStatus.getStatus());
 
     auto lastChunkDoc = lastChunkDocStatus.getValue();
@@ -206,15 +213,17 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
 }
 
 TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
     ChunkType chunk, chunk2;
     chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
     chunk2.setName(OID::gen());
     chunk2.setNS(kNamespace);
-    auto collEpoch = OID::gen();
 
     // set up first chunk
-    auto origVersion = ChunkVersion(1, 2, collEpoch, boost::none /* timestamp */);
+    auto origVersion = ChunkVersion(1, 2, collEpoch, collTimestamp);
     chunk.setVersion(origVersion);
     chunk.setShard(ShardId(_shardName));
 
@@ -228,7 +237,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     splitPoints.push_back(chunkSplitPoint);
 
     // set up second chunk (chunk2)
-    auto competingVersion = ChunkVersion(2, 1, collEpoch, boost::none /* timestamp */);
+    auto competingVersion = ChunkVersion(2, 1, collEpoch, collTimestamp);
     chunk2.setVersion(competingVersion);
     chunk2.setShard(ShardId(_shardName));
     chunk2.setMin(BSON("a" << 10));
@@ -245,7 +254,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
                                      "shard0000"));
 
     // First chunkDoc should have range [chunkMin, chunkSplitPoint]
-    auto chunkDocStatus = getChunkDoc(operationContext(), chunkMin);
+    auto chunkDocStatus = getChunkDoc(operationContext(), chunkMin, collEpoch, collTimestamp);
     ASSERT_OK(chunkDocStatus.getStatus());
 
     auto chunkDoc = chunkDocStatus.getValue();
@@ -256,7 +265,8 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     ASSERT_EQ(competingVersion.minorVersion() + 1, chunkDoc.getVersion().minorVersion());
 
     // Second chunkDoc should have range [chunkSplitPoint, chunkMax]
-    auto otherChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint);
+    auto otherChunkDocStatus =
+        getChunkDoc(operationContext(), chunkSplitPoint, collEpoch, collTimestamp);
     ASSERT_OK(otherChunkDocStatus.getStatus());
 
     auto otherChunkDoc = otherChunkDocStatus.getValue();

@@ -138,7 +138,7 @@ BSONArray buildMergeChunksTransactionPrecond(const std::vector<ChunkType>& chunk
                                              const ChunkVersion& collVersion) {
     BSONArrayBuilder preCond;
 
-    for (auto chunk : chunksToMerge) {
+    for (const auto& chunk : chunksToMerge) {
         BSONObj query = BSON(ChunkType::min(chunk.getMin()) << ChunkType::max(chunk.getMax()));
         if (collVersion.getTimestamp()) {
             query = query.addFields(BSON(ChunkType::collectionUUID << chunk.getCollectionUUID()));
@@ -162,6 +162,8 @@ BSONArray buildMergeChunksTransactionPrecond(const std::vector<ChunkType>& chunk
  */
 StatusWith<ChunkType> getCurrentChunk(OperationContext* opCtx,
                                       const NamespaceStringOrUUID& nsOrUUID,
+                                      const OID& epoch,
+                                      const boost::optional<Timestamp>& timestamp,
                                       const ChunkType& requestedChunk) {
     uassert(4683300,
             "Config server rejecting commitChunkMigration request that does not have a "
@@ -199,7 +201,8 @@ StatusWith<ChunkType> getCurrentChunk(OperationContext* opCtx,
                               << "). Cannot execute the migration commit with invalid chunks."};
     }
 
-    return uassertStatusOK(ChunkType::fromConfigBSON(findResponseWith.getValue().docs.front()));
+    return uassertStatusOK(
+        ChunkType::fromConfigBSON(findResponseWith.getValue().docs.front(), epoch, timestamp));
 }
 
 BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
@@ -256,6 +259,8 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
  */
 boost::optional<ChunkType> getControlChunkForMigrate(OperationContext* opCtx,
                                                      const NamespaceStringOrUUID& nsOrUUID,
+                                                     const OID& epoch,
+                                                     const boost::optional<Timestamp>& timestamp,
                                                      const ChunkType& migratedChunk,
                                                      const ShardId& fromShard) {
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -282,7 +287,7 @@ boost::optional<ChunkType> getControlChunkForMigrate(OperationContext* opCtx,
         return boost::none;
     }
 
-    return uassertStatusOK(ChunkType::fromConfigBSON(response.docs.front()));
+    return uassertStatusOK(ChunkType::fromConfigBSON(response.docs.front(), epoch, timestamp));
 }
 
 // Helper function to find collection version and shard version.
@@ -571,7 +576,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
 
     // Find the chunk history.
     const auto collNsOrUUID = getNsOrUUIDForChunkTargeting(coll);
-    const auto origChunk = _findChunkOnConfig(opCtx, collNsOrUUID, range.getMin());
+    const auto origChunk = _findChunkOnConfig(
+        opCtx, collNsOrUUID, collVersion.epoch(), collVersion.getTimestamp(), range.getMin());
     if (!origChunk.isOK()) {
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         return origChunk.getStatus();
@@ -794,8 +800,11 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
 
     // Check if the chunk(s) have already been merged. If so, return success.
     const auto collNsOrUUID = getNsOrUUIDForChunkTargeting(coll);
-    auto minChunkOnDisk =
-        uassertStatusOK(_findChunkOnConfig(opCtx, collNsOrUUID, chunkBoundaries.front()));
+    auto minChunkOnDisk = uassertStatusOK(_findChunkOnConfig(opCtx,
+                                                             collNsOrUUID,
+                                                             collVersion.epoch(),
+                                                             collVersion.getTimestamp(),
+                                                             chunkBoundaries.front()));
     if (minChunkOnDisk.getMax().woCompare(chunkBoundaries.back()) == 0) {
         auto replyWithVersions = getShardAndCollectionVersion(opCtx, coll, ShardId(shardName));
         // Makes sure that the last thing we read in getCurrentChunk and
@@ -812,8 +821,11 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
     // Do not use the first chunk boundary as a max bound while building chunks
     for (size_t i = 1; i < chunkBoundaries.size(); ++i) {
         // Read the original chunk from disk to lookup that chunk's '_id' field.
-        auto currentChunk =
-            uassertStatusOK(_findChunkOnConfig(opCtx, collNsOrUUID, chunkBoundaries[i - 1]));
+        auto currentChunk = uassertStatusOK(_findChunkOnConfig(opCtx,
+                                                               collNsOrUUID,
+                                                               collVersion.epoch(),
+                                                               collVersion.getTimestamp(),
+                                                               chunkBoundaries[i - 1]));
 
         // Ensure the chunk boundaries are strictly increasing
         if (chunkBoundaries[i].woCompare(currentChunk.getMin()) <= 0) {
@@ -938,8 +950,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
 
     // Check if the chunk(s) have already been merged. If so, return success.
     if (shardChunksInRangeResponse.docs.size() == 1) {
-        auto chunk =
-            uassertStatusOK(ChunkType::fromConfigBSON(shardChunksInRangeResponse.docs.back()));
+        auto chunk = uassertStatusOK(ChunkType::fromConfigBSON(
+            shardChunksInRangeResponse.docs.back(), coll.getEpoch(), coll.getTimestamp()));
         uassert(
             ErrorCodes::IllegalOperation,
             str::stream() << "could not merge chunks, shard " << shardId
@@ -959,7 +971,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
     //    and ensure that the retrieved list of chunks covers the whole range.
     std::vector<ChunkType> chunksToMerge;
     for (const auto& chunkDoc : shardChunksInRangeResponse.docs) {
-        auto chunk = uassertStatusOK(ChunkType::fromConfigBSON(chunkDoc));
+        auto chunk = uassertStatusOK(
+            ChunkType::fromConfigBSON(chunkDoc, coll.getEpoch(), coll.getTimestamp()));
         if (chunksToMerge.empty()) {
             uassert(ErrorCodes::IllegalOperation,
                     str::stream()
@@ -1104,8 +1117,9 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
                           << ", but found no chunks",
             !findResponse.docs.empty());
 
-    const auto chunk = uassertStatusOK(ChunkType::fromConfigBSON(findResponse.docs[0]));
-    const auto currentCollectionVersion = chunk.getVersion();
+    const auto chunk = uassertStatusOK(
+        ChunkType::fromConfigBSON(findResponse.docs[0], coll.getEpoch(), coll.getTimestamp()));
+    const auto& currentCollectionVersion = chunk.getVersion();
 
     if (MONGO_unlikely(migrationCommitVersionError.shouldFail())) {
         uasserted(ErrorCodes::StaleEpoch,
@@ -1130,7 +1144,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
 
     // Check if chunk still exists and which shard owns it
     const auto collNsOrUUID = getNsOrUUIDForChunkTargeting(coll);
-    auto swCurrentChunk = getCurrentChunk(opCtx, collNsOrUUID, migratedChunk);
+    auto swCurrentChunk =
+        getCurrentChunk(opCtx, collNsOrUUID, coll.getEpoch(), coll.getTimestamp(), migratedChunk);
 
     if (!swCurrentChunk.isOK()) {
         return swCurrentChunk.getStatus();
@@ -1165,11 +1180,12 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
                     << currentChunk.toConfigBSON() << " on the shard " << fromShard.toString()};
     }
 
-    auto controlChunk = getControlChunkForMigrate(opCtx, collNsOrUUID, migratedChunk, fromShard);
+    auto controlChunk = getControlChunkForMigrate(
+        opCtx, collNsOrUUID, coll.getEpoch(), coll.getTimestamp(), migratedChunk, fromShard);
 
     // Find the chunk history.
-    const auto origChunk =
-        uassertStatusOK(_findChunkOnConfig(opCtx, collNsOrUUID, migratedChunk.getMin()));
+    const auto origChunk = uassertStatusOK(_findChunkOnConfig(
+        opCtx, collNsOrUUID, coll.getEpoch(), coll.getTimestamp(), migratedChunk.getMin()));
 
     // Generate the new versions of migratedChunk and controlChunk. Migrating chunk's minor version
     // will be 0.
@@ -1224,8 +1240,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     boost::optional<ChunkType> newControlChunk = boost::none;
     if (controlChunk) {
         // Find the chunk history.
-        auto origControlChunk =
-            uassertStatusOK(_findChunkOnConfig(opCtx, collNsOrUUID, controlChunk->getMin()));
+        auto origControlChunk = uassertStatusOK(_findChunkOnConfig(
+            opCtx, collNsOrUUID, coll.getEpoch(), coll.getTimestamp(), controlChunk->getMin()));
 
         newControlChunk = std::move(origControlChunk);
         newControlChunk->setVersion(ChunkVersion(currentCollectionVersion.majorVersion() + 1,
@@ -1257,7 +1273,11 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
 }
 
 StatusWith<ChunkType> ShardingCatalogManager::_findChunkOnConfig(
-    OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID, const BSONObj& key) {
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    const OID& epoch,
+    const boost::optional<Timestamp>& timestamp,
+    const BSONObj& key) {
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
     const auto query = [&]() {
@@ -1288,7 +1308,7 @@ StatusWith<ChunkType> ShardingCatalogManager::_findChunkOnConfig(
                               << " and min key " << key.toString() << ", but found no chunks"};
     }
 
-    return ChunkType::fromConfigBSON(origChunks.front());
+    return ChunkType::fromConfigBSON(origChunks.front(), epoch, timestamp);
 }
 
 void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
@@ -1346,7 +1366,8 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
                           << " from ns: " << nss.ns(),
             !targetChunkVector.empty());
 
-    const auto targetChunk = uassertStatusOK(ChunkType::fromConfigBSON(targetChunkVector.front()));
+    const auto targetChunk = uassertStatusOK(
+        ChunkType::fromConfigBSON(targetChunkVector.front(), coll.getEpoch(), coll.getTimestamp()));
 
     if (!targetChunk.getJumbo()) {
         return;
@@ -1375,8 +1396,8 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
                           << ", but found no chunks",
             !chunksVector.empty());
 
-    const auto highestVersionChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.front()));
+    const auto highestVersionChunk = uassertStatusOK(
+        ChunkType::fromConfigBSON(chunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
     const auto currentCollectionVersion = highestVersionChunk.getVersion();
 
     // It is possible for a migration to end up running partly without the protection of the
@@ -1472,8 +1493,8 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
         return;
     }
 
-    const auto currentChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(matchingChunksVector.front()));
+    const auto currentChunk = uassertStatusOK(ChunkType::fromConfigBSON(
+        matchingChunksVector.front(), version.epoch(), version.getTimestamp()));
 
     if (version.isOlderThan(currentChunk.getVersion())) {
         LOGV2(23885,
@@ -1512,8 +1533,8 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
               "epoch"_attr = version.epoch());
         return;
     }
-    const auto highestChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(highestChunksVector.front()));
+    const auto highestChunk = uassertStatusOK(ChunkType::fromConfigBSON(
+        highestChunksVector.front(), version.epoch(), version.getTimestamp()));
 
     // Generate a new version for the chunk by incrementing the collectionVersion's major version.
     auto newChunk = currentChunk;
