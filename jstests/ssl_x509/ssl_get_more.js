@@ -1,14 +1,10 @@
 (function() {
 "use strict";
 
-const x509_options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: "jstests/libs/server.pem",
-    sslCAFile: "jstests/libs/ca.pem",
-    sslClusterFile: "jstests/libs/cluster_cert.pem",
-    sslAllowInvalidHostnames: "",
-    clusterAuthMode: "x509"
-};
+load('jstests/ssl/libs/ssl_helpers.js');
+
+const x509_options =
+    Object.extend(requireSSL, {sslClusterFile: CLUSTER_CERT, clusterAuthMode: "x509"});
 
 const st = new ShardingTest({
     shards: 1,
@@ -17,8 +13,7 @@ const st = new ShardingTest({
         configOptions: x509_options,
         mongosOptions: x509_options,
         rsOptions: x509_options,
-        shardOptions: x509_options,
-        shardAsReplicaSet: false
+        shardOptions: x509_options
     }
 });
 
@@ -61,9 +56,6 @@ if (st.configRS) {
 // Index consistency check during shutdown needs a privileged user to auth as.
 const x509User = 'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
 st.s.getDB('$external').createUser({user: x509User, roles: [{role: '__system', db: 'admin'}]});
-
-// Orphan checks needs a privileged user to auth as.
-st.shard0.getDB('$external').createUser({user: x509User, roles: [{role: '__system', db: 'admin'}]});
 
 st.stop();
 }());
