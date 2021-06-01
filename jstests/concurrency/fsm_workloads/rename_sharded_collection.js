@@ -11,6 +11,7 @@
  * concurrency
  *
  * @tags: [
+ *   requires_fcv_50,
  *   requires_sharding,
  *   requires_fcv_50,
  *   # TODO (SERVER-56879): Support add/remove shards in new DDL paths

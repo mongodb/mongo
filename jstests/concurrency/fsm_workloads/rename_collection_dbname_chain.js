@@ -6,6 +6,11 @@
  * Creates a collection and then repeatedly executes the renameCollection
  * command against it, specifying a different database name in the namespace.
  * The previous "to" namespace is used as the next "from" namespace.
+ *
+ * @tags: [
+ *     # Rename between DBs with different shard primary is not supported
+ *     assumes_unsharded_collection,
+ * ]
  */
 
 var $config = (function() {

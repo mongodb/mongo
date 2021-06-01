@@ -1,6 +1,5 @@
 // @tags: [
-//   # renameCollection is not supported on sharded collections
-//   assumes_unsharded_collection,
+//   requires_fcv_50,
 //   assumes_superuser_permissions,
 //   requires_non_retryable_commands,
 // ]
