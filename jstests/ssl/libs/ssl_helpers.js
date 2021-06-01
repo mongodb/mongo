@@ -11,6 +11,7 @@ var SERVER_CERT = "jstests/libs/server.pem";
 var CA_CERT = "jstests/libs/ca.pem";
 var CLIENT_CERT = "jstests/libs/client.pem";
 var DH_PARAM = "jstests/libs/8k-prime.dhparam";
+var CLUSTER_CERT = "jstests/libs/cluster_cert.pem";
 
 // Note: "sslAllowInvalidCertificates" is enabled to avoid
 // hostname conflicts with our testing certificates
