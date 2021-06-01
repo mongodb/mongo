@@ -8,3 +8,4 @@ structlog ~= 19.2.0
 typing
 yamllint == 1.15.0
 yapf == 0.26.0
+git+ssh://git@github.com/10gen/evergreen-config-linter.git@v0.1.0#egg=evergreen_lint
