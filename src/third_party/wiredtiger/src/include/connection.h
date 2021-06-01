@@ -543,6 +543,7 @@ struct __wt_connection_impl {
 #define WT_CONN_DEBUG_CURSOR_COPY 0x04u
 #define WT_CONN_DEBUG_REALLOC_EXACT 0x08u
 #define WT_CONN_DEBUG_SLOW_CKPT 0x10u
+#define WT_CONN_DEBUG_UPDATE_RESTORE_EVICT 0x20u
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint64_t debug_flags;
 

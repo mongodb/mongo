@@ -636,6 +636,11 @@ __evict_update_work(WT_SESSION_IMPL *session)
     } else
         LF_SET(WT_CACHE_EVICT_NOKEEP);
 
+    if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_UPDATE_RESTORE_EVICT)) {
+        LF_SET(WT_CACHE_EVICT_SCRUB);
+        LF_CLR(WT_CACHE_EVICT_NOKEEP);
+    }
+
     /*
      * With an in-memory cache, we only do dirty eviction in order to scrub pages.
      */
