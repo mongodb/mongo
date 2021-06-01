@@ -78,6 +78,7 @@ MONGO_COMPILER_NORETURN void logAndQuickExit_inlock() {
 }
 
 void setShutdownFlag() {
+    log() << "Shutdown started";
     shutdownFlag.fetchAndAdd(1);
 }
 

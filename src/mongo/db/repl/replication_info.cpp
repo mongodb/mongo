@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kFTDC
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
 
 #include "mongo/platform/basic.h"
 
@@ -59,7 +59,9 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 
 namespace mongo {
@@ -74,6 +76,7 @@ namespace repl {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(impersonateFullyUpgradedFutureVersion);
+MONGO_FAIL_POINT_DEFINE(blockOrFailHelloCommand);
 
 constexpr auto kHelloString = "hello"_sd;
 constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
@@ -218,6 +221,46 @@ public:
     }
 } oplogInfoServerStatus;
 
+// Fail point for Hello command. Returns sleep timeout if needed. Supported arguments:
+//   internalClient:  enabled only for internal clients
+//   notInternalClient: enabled only for non-internal clients
+//   delay: specifies the sleep duration in milliseconds
+//   uassert: pass this integer argument to uassert and throw
+boost::optional<Milliseconds> handleHelloFailPoint(const BSONObj& args, const BSONObj& cmdObj) {
+    if (args.hasElement("internalClient") && !cmdObj.hasElement("internalClient")) {
+        log() << "Fail point Hello is disabled for external client";
+        return boost::none;  // Filtered out not internal client.
+    }
+    if (args.hasElement("notInternalClient") && cmdObj.hasElement("internalClient")) {
+        log() << "Fail point Hello is disabled for internal client";
+        return boost::none;  // Filtered out internal client.
+    }
+    if (args.hasElement("delay")) {
+        auto millisToSleep = args["delay"].numberInt();
+        log() << "Fail point delays Hello response by " << millisToSleep << " ms";
+        return Milliseconds(millisToSleep);
+    }
+    if (args.hasElement("uassert")) {
+        log() << "Fail point fails Hello response";
+        uasserted(args["uassert"].numberInt(), "Fail point");
+    }
+    return boost::none;
+}
+
+// Sleep implementation outside the fail point handler itself to avoid the problem that
+// processing a fail point will block its state.
+void sleepForDurationOrUntilShutdown(Milliseconds sleep) {
+    while (sleep > Milliseconds(0) && !globalInShutdownDeprecated()) {
+        auto nextSleep = std::min(sleep, Milliseconds(1000));
+        try {
+            sleepmillis(nextSleep.count());
+            sleep -= nextSleep;
+        } catch (...) {
+            break;
+        }
+    }
+}
+
 class CmdHello : public BasicCommand {
 public:
     CmdHello() : CmdHello(kHelloString, {}) {}
@@ -263,6 +306,14 @@ public:
 
         if (!seenIsMaster) {
             clientMetadataIsMasterState.setSeenIsMaster();
+        }
+
+        boost::optional<Milliseconds> sleepTimeout;
+        MONGO_FAIL_POINT_BLOCK(blockOrFailHelloCommand, customArgs) {
+            sleepTimeout = handleHelloFailPoint(customArgs.getData(), cmdObj);
+        }
+        if (MONGO_unlikely(sleepTimeout)) {
+            sleepForDurationOrUntilShutdown(*sleepTimeout);
         }
 
         BSONElement element = cmdObj[kMetadataDocumentName];

@@ -69,9 +69,8 @@ using std::vector;
 // Failpoint for disabling AsyncConfigChangeHook calls on updated RS nodes.
 MONGO_FAIL_POINT_DEFINE(failAsyncConfigChangeHook);
 
-// Failpoint for changing the default refresh period
+// Failpoint for changing the default refresh period.
 MONGO_FAIL_POINT_DEFINE(modifyReplicaSetMonitorDefaultRefreshPeriod);
-
 // Failpoint for changing the default socket timeout for Hello command.
 MONGO_FAIL_POINT_DEFINE(modifyReplicaSetMonitorHelloTimeout);
 
@@ -90,8 +89,6 @@ typedef SetState::Nodes Nodes;
 using executor::TaskExecutor;
 using CallbackArgs = TaskExecutor::CallbackArgs;
 using CallbackHandle = TaskExecutor::CallbackHandle;
-
-const double socketTimeoutSecs = 5;
 
 // Intentionally chosen to compare worse than all known latencies.
 const int64_t unknownLatency = numeric_limits<int64_t>::max();
@@ -293,7 +290,13 @@ void ReplicaSetMonitor::_scheduleRefresh(Date_t when) {
 void ReplicaSetMonitor::_doScheduledRefresh(const CallbackHandle& currentHandle) {
     startOrContinueRefresh().refreshAll();
 
-    // And now we set up the next one
+    // And now we set up the next one.
+    const auto defaultRefreshPeriod = getRefreshPeriod();
+    if (_state->refreshPeriod != defaultRefreshPeriod) {
+        _state->refreshPeriod =
+            defaultRefreshPeriod;  // Path executed in tests with fail injection.
+        log() << "Changed refresh period for " << _state->name;
+    }
     _scheduleRefresh(_executor->now() + _state->refreshPeriod);
 }
 

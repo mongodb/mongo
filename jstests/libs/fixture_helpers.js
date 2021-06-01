@@ -19,7 +19,7 @@ var FixtureHelpers = (function() {
      * Returns an array of connections to each data-bearing replica set in the fixture (not
      * including the config servers).
      */
-    function _getAllReplicas(db) {
+    function getAllReplicas(db) {
         let replicas = [];
         if (isMongos(db)) {
             const shardObjs = db.getSiblingDB("config").shards.find().sort({_id: 1});
@@ -36,7 +36,7 @@ var FixtureHelpers = (function() {
      * Asserts if the fixture is a standalone or if the shards are standalones.
      */
     function awaitReplication(db) {
-        _getAllReplicas(db).forEach((replSet) => replSet.awaitReplication());
+        getAllReplicas(db).forEach((replSet) => replSet.awaitReplication());
     }
 
     /**
@@ -47,7 +47,7 @@ var FixtureHelpers = (function() {
      * Asserts if the fixture is a standalone or if the shards are standalones.
      */
     function awaitLastOpCommitted(db) {
-        _getAllReplicas(db).forEach((replSet) => replSet.awaitLastOpCommitted());
+        getAllReplicas(db).forEach((replSet) => replSet.awaitLastOpCommitted());
     }
 
     /**
@@ -87,7 +87,7 @@ var FixtureHelpers = (function() {
      * replica set. Asserts if the fixture is a standalone or if the shards are standalones.
      */
     function runCommandOnEachPrimary({db, cmdObj}) {
-        return _getAllReplicas(db).map(
+        return getAllReplicas(db).map(
             (replSet) =>
                 assert.commandWorked(replSet.getPrimary().getDB(db.getName()).runCommand(cmdObj)));
     }
@@ -113,6 +113,22 @@ var FixtureHelpers = (function() {
     }
 
     /**
+     * Returns a collection of connections to each primary in a cluster.
+     */
+    function getPrimaries(db) {
+        return getAllReplicas(db).map((replSet) => replSet.getPrimary());
+    }
+
+    /**
+     * Returns a collection of connections to secondaries in a cluster.
+     */
+    function getSecondaries(db) {
+        return getAllReplicas(db).reduce((array, replSet) => {
+            return array.concat(replSet.getSecondaries());
+        }, []);
+    }
+
+    /**
      * Returns true if we have a replica set.
      */
     function isReplSet(db) {
@@ -128,6 +144,9 @@ var FixtureHelpers = (function() {
         awaitReplication: awaitReplication,
         awaitLastOpCommitted: awaitLastOpCommitted,
         runCommandOnEachPrimary: runCommandOnEachPrimary,
+        getAllReplicas: getAllReplicas,
+        getPrimaries: getPrimaries,
+        getSecondaries: getSecondaries,
         getPrimaryForNodeHostingDatabase: getPrimaryForNodeHostingDatabase,
         isReplSet: isReplSet,
     };

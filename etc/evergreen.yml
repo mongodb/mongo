@@ -4775,6 +4775,16 @@ tasks:
       fallback_num_sub_suites: 4
 
 - <<: *task_template
+  name: sharding_hello_failures
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_hello_failures --storageEngine=wiredTiger
+
+- <<: *task_template
   name: parallel
   depends_on:
   - name: jsCore
@@ -7366,6 +7376,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
+  - name: sharding_hello_failures
   - name: slow1_gen
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
@@ -7469,6 +7480,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_hello_failures
   - name: ssl_gen
   - name: sslSpecial_gen
   - name: tool
@@ -8394,6 +8406,7 @@ buildvariants:
   - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
+  - name: sharding_hello_failures
     distros:
     - rhel62-large
   - name: read_concern_majority_passthrough_gen
@@ -9022,6 +9035,7 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
+  - name: sharding_hello_failures
   - name: snmp
   - name: ssl_gen
   - name: sslSpecial_gen
