@@ -159,8 +159,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
     if (!transport) {
         transport = makeRsmTransport();
     }
-    auto newMonitor =
-        std::make_shared<ReplicaSetMonitor>(setName, servers, std::move(transport), &_stats);
+    auto newMonitor = std::make_shared<ReplicaSetMonitor>(setName, servers, std::move(transport));
     _monitors[setName] = newMonitor;
     newMonitor->init();
     return newMonitor;
@@ -181,7 +180,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
 
     log() << "Starting new replica set monitor for " << uri.toString();
 
-    auto newMonitor = std::make_shared<ReplicaSetMonitor>(uri, std::move(transport), &_stats);
+    auto newMonitor = std::make_shared<ReplicaSetMonitor>(uri, std::move(transport));
     _monitors[setName] = newMonitor;
     newMonitor->init();
     return newMonitor;
@@ -254,20 +253,16 @@ void ReplicaSetMonitorManager::report(BSONObjBuilder* builder, bool forFTDC) {
     // calling ShardRegistry::updateConfigServerConnectionString.
     auto setNames = getAllSetNames();
 
-    {
-        BSONObjBuilder setStats(
-            builder->subobjStart(forFTDC ? "replicaSetPingTimesMillis" : "replicaSets"));
+    BSONObjBuilder setStats(
+        builder->subobjStart(forFTDC ? "replicaSetPingTimesMillis" : "replicaSets"));
 
-        for (const auto& setName : setNames) {
-            auto monitor = getMonitor(setName);
-            if (!monitor) {
-                continue;
-            }
-            monitor->appendInfo(setStats, forFTDC);
+    for (const auto& setName : setNames) {
+        auto monitor = getMonitor(setName);
+        if (!monitor) {
+            continue;
         }
+        monitor->appendInfo(setStats, forFTDC);
     }
-
-    _stats.report(builder, forFTDC);
 }
 
 TaskExecutor* ReplicaSetMonitorManager::getExecutor() {

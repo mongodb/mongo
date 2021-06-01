@@ -44,12 +44,10 @@ const int kLogLevel = 2;
 ReplicaSetMonitorTransport::~ReplicaSetMonitorTransport() {}
 
 
-Future<BSONObj> ReplicaSetMonitorDbClientTransport::sayHello(
-    HostAndPort host,
-    const std::string& setName,
-    const MongoURI& setUri,
-    Milliseconds timeout,
-    ReplicaSetMonitorStats* stats) noexcept {
+Future<BSONObj> ReplicaSetMonitorDbClientTransport::sayHello(HostAndPort host,
+                                                             const std::string& setName,
+                                                             const MongoURI& setUri,
+                                                             Milliseconds timeout) noexcept {
     MongoURI targetURI;
     const auto& hostStr = host.toString();
     Timer timer;
@@ -64,7 +62,6 @@ Future<BSONObj> ReplicaSetMonitorDbClientTransport::sayHello(
 
         LOG(kLogLevel) << "ReplicaSetMonitor " << setName << " sending hello request to "
                        << hostStr;
-        const auto statsCollector = stats->collectHelloStats();
         ScopedDbConnection conn(targetURI, durationCount<Seconds>(timeout));
         bool ignoredOutParam = false;
         BSONObj reply;
@@ -87,12 +84,10 @@ ReplicaSetMonitorExecutorTransport::ReplicaSetMonitorExecutorTransport(
     executor::TaskExecutor* executor)
     : _executor(executor) {}
 
-Future<BSONObj> ReplicaSetMonitorExecutorTransport::sayHello(
-    HostAndPort host,
-    const std::string& setName,
-    const MongoURI& setUri,
-    Milliseconds timeout,
-    ReplicaSetMonitorStats* stats) noexcept {
+Future<BSONObj> ReplicaSetMonitorExecutorTransport::sayHello(HostAndPort host,
+                                                             const std::string& setName,
+                                                             const MongoURI& setUri,
+                                                             Milliseconds timeout) noexcept {
     try {
         auto pf = makePromiseFuture<BSONObj>();
         BSONObjBuilder bob;
@@ -110,8 +105,7 @@ Future<BSONObj> ReplicaSetMonitorExecutorTransport::sayHello(
         auto swCbHandle = _executor->scheduleRemoteCommand(std::move(request), [
             this,
             setName,
-            requestState = std::make_shared<HelloRequest>(host, std::move(pf.promise)),
-            statsCollector = stats->collectHelloStats()
+            requestState = std::make_shared<HelloRequest>(host, std::move(pf.promise))
         ](const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
             LOG(kLogLevel) << "Replica set monitor " << setName << " received reply from "
                            << requestState->host.toString() << ": "

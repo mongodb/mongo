@@ -99,7 +99,7 @@ const int64_t unknownLatency = numeric_limits<int64_t>::max();
 // After this period of time, RSM logging becomes more verbose.
 static constexpr int kRsmVerbosityThresholdTimeoutSec = 20;
 // When 'is master' reply latency is over 2 sec, it will be logged.
-static constexpr Milliseconds kSlowIsMasterThreshold{500};
+static constexpr int kSlowIsMasterThresholdMicros = 2L * 1000 * 1000;
 
 static Seconds kHelloTimeout = Seconds{10};
 
@@ -130,11 +130,6 @@ bool compareLatencies(const Node* lhs, const Node* rhs) {
 
 bool hostsEqual(const Node& lhs, const HostAndPort& rhs) {
     return lhs.host == rhs;
-}
-
-ReplicaSetMonitorManagerStats* testOnlyManagerStats() {
-    static ReplicaSetMonitorManagerStats* stats = new ReplicaSetMonitorManagerStats();
-    return stats;
 }
 
 // Allows comparing two Nodes, or a HostAndPort and a Node.
@@ -230,29 +225,20 @@ Milliseconds ReplicaSetMonitor::getHelloTimeout() {
 
 ReplicaSetMonitor::ReplicaSetMonitor(StringData name,
                                      const std::set<HostAndPort>& seeds,
-                                     ReplicaSetMonitorTransportPtr transport,
-                                     ReplicaSetMonitorManagerStats* managerStats)
+                                     ReplicaSetMonitorTransportPtr transport)
     : _state(std::make_shared<SetState>(name, seeds)),
       _executor(globalRSMonitorManager.getExecutor()),
-      _rsmTransport(std::move(transport)),
-      _stats(managerStats) {}
+      _rsmTransport(std::move(transport)) {}
 
 ReplicaSetMonitor::ReplicaSetMonitor(const MongoURI& uri,
-                                     std::unique_ptr<ReplicaSetMonitorTransport> transport,
-                                     ReplicaSetMonitorManagerStats* managerStats)
+                                     std::unique_ptr<ReplicaSetMonitorTransport> transport)
     : _state(std::make_shared<SetState>(uri)),
       _executor(globalRSMonitorManager.getExecutor()),
-      _rsmTransport(std::move(transport)),
-      _stats(managerStats) {}
+      _rsmTransport(std::move(transport)) {}
 
 void ReplicaSetMonitor::init() {
     _scheduleRefresh(_executor->now());
 }
-
-// Test only constructor.
-ReplicaSetMonitor::ReplicaSetMonitor(const SetStatePtr& initialState,
-                                     ReplicaSetMonitorManagerStats* managerStats)
-    : _state(initialState), _stats(managerStats ? managerStats : testOnlyManagerStats()) {}
 
 ReplicaSetMonitor::~ReplicaSetMonitor() {
     // need this lock because otherwise can get race with _scheduleRefresh()
@@ -326,8 +312,7 @@ StatusWith<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(const ReadPreference
             return {std::move(out)};
     }
 
-    const Timer startTimer;
-    const auto statsCollector = _stats.collectGetHostAndRefreshStats();
+    const auto startTimeMs = Date_t::now();
 
     while (true) {
         // We might not have found any matching hosts due to the scan, which just completed may have
@@ -344,7 +329,7 @@ StatusWith<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(const ReadPreference
             return {ErrorCodes::ShutdownInProgress, str::stream() << "Server is shutting down"};
         }
 
-        const Milliseconds remaining = maxWait - Milliseconds(startTimer.millis());
+        const Milliseconds remaining = maxWait - (Date_t::now() - startTimeMs);
 
         if (remaining < kFindHostMaxBackOffTime || areRefreshRetriesDisabledForTest.load()) {
             break;
@@ -367,7 +352,7 @@ HostAndPort ReplicaSetMonitor::getMasterOrUassert() {
 Refresher ReplicaSetMonitor::startOrContinueRefresh() {
     stdx::lock_guard<stdx::mutex> lk(_state->mutex);
 
-    Refresher out(_state, _executor, _rsmTransport.get(), &_stats);
+    Refresher out(_state, _executor, _rsmTransport.get());
     DEV _state->checkInvariants();
     return out;
 }
@@ -536,13 +521,8 @@ void ReplicaSetMonitor::markAsRemoved() {
 
 Refresher::Refresher(const SetStatePtr& setState,
                      executor::TaskExecutor* executor,
-                     ReplicaSetMonitorTransport* transport,
-                     ReplicaSetMonitorStats* stats)
-    : _set(setState),
-      _scan(setState->currentScan),
-      _executor(executor),
-      _rsmTransport(transport),
-      _stats(stats) {
+                     ReplicaSetMonitorTransport* transport)
+    : _set(setState), _scan(setState->currentScan), _executor(executor), _rsmTransport(transport) {
     if (_scan)
         return;  // participate in in-progress scan
 
@@ -926,7 +906,7 @@ HostAndPort Refresher::_refreshUntilMatches(const ReadPreferenceSetting* criteri
                 {
                     Timer timer;
                     auto helloFuture = _rsmTransport->sayHello(
-                        ns.host, _set->name, _set->setUri, getHelloTimeout(), _stats);
+                        ns.host, _set->name, _set->setUri, getHelloTimeout());
                     helloReplyStatus = helloFuture.getNoThrow();
                     pingMicros = timer.micros();
                 }
@@ -1085,9 +1065,9 @@ void Node::update(const IsMasterReply& reply, bool verbose) {
             // update latency with smoothed moving average (1/4th the delta)
             latencyMicros += (reply.latencyMicros - latencyMicros) / 4;
         }
-        if (Milliseconds(reply.latencyMicros / 1000) > kSlowIsMasterThreshold) {
-            log() << "Slow ReplicaSet Monitor reply for " << reply.setName << " from " << host
-                  << ": " << reply.raw << " (" << (reply.latencyMicros / 1000) << " ms)";
+        if (reply.latencyMicros > kSlowIsMasterThresholdMicros) {  // > 2 seconds.
+            log() << "ReplicaSet Monitor received reply with latency above 2 seconds: "
+                  << reply.raw;
         }
     }
 

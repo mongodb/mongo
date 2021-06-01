@@ -186,8 +186,7 @@ clientDriverEnv.Library(
         'global_conn_pool.cpp',
         'replica_set_monitor.cpp',
         'replica_set_monitor_manager.cpp',
-        'replica_set_monitor_stats.cpp',
-        'replica_set_monitor_transport.cpp',
+	'replica_set_monitor_transport.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/write_concern_options',
