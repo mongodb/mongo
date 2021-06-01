@@ -547,6 +547,7 @@ private:
         BucketAccess() = delete;
         BucketAccess(BucketCatalog* catalog,
                      BucketKey& key,
+                     const TimeseriesOptions& options,
                      ExecutionStats* stats,
                      const Date_t& time);
         BucketAccess(BucketCatalog* catalog, Bucket* bucket);
@@ -567,9 +568,6 @@ private:
          * this BucketAccess instance, with the bucket locked.
          */
         void rollover(const std::function<bool(BucketAccess*)>& isBucketFull);
-
-        // Adjust the time associated with the bucket (id) if it hasn't been committed yet.
-        void setTime();
 
         // Retrieve the time associated with the bucket (id)
         Date_t getTime() const;
@@ -615,6 +613,7 @@ private:
 
         BucketCatalog* _catalog;
         BucketKey* _key = nullptr;
+        const TimeseriesOptions* _options = nullptr;
         ExecutionStats* _stats = nullptr;
         const Date_t* _time = nullptr;
 
@@ -676,13 +675,14 @@ private:
     // Allocate a new bucket (and ID) and add it to the catalog
     Bucket* _allocateBucket(const BucketKey& key,
                             const Date_t& time,
+                            const TimeseriesOptions& options,
                             ExecutionStats* stats,
                             bool openedDuetoMetadata);
 
     std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns);
     const std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns) const;
 
-    void _setIdTimestamp(Bucket* bucket, const Date_t& time);
+    void _setIdTimestamp(Bucket* bucket, const Date_t& time, const TimeseriesOptions& options);
 
     /**
      * Changes the bucket state, taking into account the current state, the specified target state,

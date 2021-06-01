@@ -28,6 +28,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/util/fail_point',
         'timeseries_idl',
+        'timeseries_options',
     ],
 )
 

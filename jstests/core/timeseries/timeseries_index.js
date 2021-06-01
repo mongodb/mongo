@@ -26,6 +26,11 @@ TimeseriesTest.run((insert) => {
 
     const doc = {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: {tag1: 'a', tag2: 'b'}};
 
+    const roundDown = (date) => {
+        // Round down to nearest minute.
+        return new Date(date - (date % 60000));
+    };
+
     /**
      * Tests time-series
      *   - createIndex
@@ -66,7 +71,7 @@ TimeseriesTest.run((insert) => {
 
         const bucketDoc = bucketDocs[0];
         assert.eq(doc._id, bucketDoc.control.min._id, bucketDoc);
-        assert.eq(doc[timeFieldName], bucketDoc.control.min[timeFieldName], bucketDoc);
+        assert.eq(roundDown(doc[timeFieldName]), bucketDoc.control.min[timeFieldName], bucketDoc);
         assert.docEq(doc[metaFieldName], bucketDoc.meta, bucketDoc);
 
         // Check that listIndexes against the time-series collection returns the index just created.

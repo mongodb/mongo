@@ -36,7 +36,12 @@ TimeseriesTest.run((insert) => {
      */
     function updateControlDoc(controlDoc, key, newVal) {
         if (!controlDoc.min.hasOwnProperty(key)) {
-            controlDoc.min[key] = newVal;
+            if (key === timeFieldName) {
+                // Time field must be rounded down to nearest minute.
+                controlDoc.min[key] = new Date(newVal - (newVal % 60000));
+            } else {
+                controlDoc.min[key] = newVal;
+            }
         } else if (bsonWoCompare(newVal, controlDoc.min[key]) < 0) {
             controlDoc.min[key] = newVal;
         }
