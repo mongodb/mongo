@@ -311,12 +311,12 @@ void ReshardingMetrics::endApplyingOplogEntries(Date_t end) {
     _currentOp->applyingOplogEntries.forceEnd(end);
 }
 
-void ReshardingMetrics::startInCriticalSection(Date_t start) {
+void ReshardingMetrics::enterCriticalSection(Date_t start) {
     stdx::lock_guard<Latch> lk(_mutex);
     _currentOp->inCriticalSection.start(start);
 }
 
-void ReshardingMetrics::endInCriticalSection(Date_t end) {
+void ReshardingMetrics::leaveCriticalSection(Date_t end) {
     stdx::lock_guard<Latch> lk(_mutex);
     _currentOp->inCriticalSection.forceEnd(end);
 }
