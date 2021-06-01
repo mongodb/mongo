@@ -60,7 +60,7 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
     def before_test(self, test, test_report):
         """Before test."""
         self.logger.info("Resuming the tenant migration thread.")
-        self._tenant_migration_thread.resume()
+        self._tenant_migration_thread.resume(test.logger)
 
     def after_test(self, test, test_report):
         """After test."""
@@ -316,7 +316,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         self.__lifecycle.stop()
         self._is_stopped_evt.set()
         # Unpause to allow the thread to finish.
-        self.resume()
+        self.resume(self.logger)
         self.join()
 
     def pause(self):
@@ -335,8 +335,9 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 " ContinuousTenantMigration, but wasn't".format(
                     self._tenant_migration_fixture.pids()))
 
-    def resume(self):
+    def resume(self, logger):
         """Resume the thread before test."""
+        self.logger = logger
         self.__lifecycle.mark_test_started()
 
     def _wait(self, timeout):
