@@ -79,7 +79,7 @@ const positiveTestQueries = [
     [{$or: [{f1: 42}, {f1: NaN}, {f1: 99}]}, {f1: {$in: [42, NaN, 99]}}],
     [{$or: [{f1: /^x/}, {f1: "ab"}]}, {f1: {$in: [/^x/, "ab"]}}],
     [{$or: [{f1: /^x/}, {f1: "^a"}]}, {f1: {$in: [/^x/, "^a"]}}],
-    [{$or: [{f1: 42}, {f1: null}, {f1: 99}]}, {$or: [{f1: {$in: [42, 99]}}, {f1: null}]}],
+    [{$or: [{f1: 42}, {f1: null}, {f1: 99}]}, {f1: {$in: [42, 99, null]}}],
     [{$or: [{f1: 1}, {f2: 9}, {f1: 99}]}, {$or: [{f2: 9}, {f1: {$in: [1, 99]}}]}],
     [{$or: [{f1: {$regex: /^x/}}, {f1: {$regex: /ab/}}]}, {f1: {$in: [/^x/, /ab/]}}],
     [
@@ -96,15 +96,15 @@ const positiveTestQueries = [
     ],
     [{$or: [{f2: [32, 52]}, {f2: [42, [13, 11]]}]}, {f2: {$in: [[32, 52], [42, [13, 11]]]}}],
     [{$or: [{f2: 52}, {f2: 13}]}, {f2: {$in: [52, 13]}}],
-    [{$or: [{f2: [11]}, {f2: [23]}]}, {f2: {$in: [[11], [23]]}}]
+    [{$or: [{f2: [11]}, {f2: [23]}]}, {f2: {$in: [[11], [23]]}}],
+    {$or: [{f1: 42}, {f1: null}]},
 ];
 
 // These $or queries should not be rewritten into $in because of different semantics.
 const negativeTestQueries = [
     {$or: [{f2: 9}, {f1: 1}, {f1: 99}]},
-    {$or: [{f1: 42}, {f1: null}]},
     {$or: [{f1: {$eq: /^x/}}, {f1: {$eq: /ab/}}]},
-    {$or: [{f1: {$lt: 2}}, {f1: {$gt: 3}}]}
+    {$or: [{f1: {$lt: 2}}, {f1: {$gt: 3}}]},
 ];
 
 for (const query of negativeTestQueries) {

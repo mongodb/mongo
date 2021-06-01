@@ -403,7 +403,9 @@ bool InMatchExpression::contains(const BSONElement& e) const {
 }
 
 bool InMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
-    if (_hasNull && e.eoo()) {
+    // When an $in has a null, it adopts the same semantics as {$eq:null}. Namely, in addition to
+    // matching literal null values, the $in should match missing and undefined.
+    if (_hasNull && (e.eoo() || e.type() == BSONType::Undefined)) {
         return true;
     }
     if (contains(e)) {

@@ -158,6 +158,12 @@ all:
     test_file: jstests/sharding/txn_writes_during_movechunk.js
   - ticket: SERVER-57476
     test_file: jstests/replsets/assert_on_prepare_conflict_with_hole.js
+  - ticket: SERVER-21929
+    test_file: jstests/core/null_query_semantics.js
+  - ticket: SERVER-21929
+    test_file: jstests/core/or_to_in.js
+  - ticket: SERVER-21929
+    test_file: jstests/aggregation/sources/lookup/lookup_null_semantics.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

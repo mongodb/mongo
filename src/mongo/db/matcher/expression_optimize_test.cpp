@@ -460,8 +460,7 @@ TEST(ExpressionOptimizeTest, OrRewrittenToIn) {
         {"{$or: [{f1: 42}, {f1: NaN}, {f1: 99}]}", "{ f1: { $in: [ NaN, 42, 99 ] } }"},
         {"{$or: [{f1: /^x/}, {f1:'ab'}]}", "{ f1: { $in: [ \"ab\", /^x/ ] } }"},
         {"{$or: [{f1: /^x/}, {f1:'^a'}]}", "{ f1: { $in: [ \"^a\", /^x/ ] } }"},
-        {"{$or: [{f1: 42}, {f1: null}, {f1: 99}]}",
-         "{ $or: [ { f1: { $in: [ 42, 99 ] } }, { f1: { $eq: null } } ] }"},
+        {"{$or: [{f1: 42}, {f1: null}, {f1: 99}]}", "{ f1: { $in: [ null, 42, 99 ] } }"},
         {"{$or: [{f1: 1}, {f2: 9}, {f1: 99}]}",
          "{ $or: [ { f1: { $in: [ 1, 99 ] } }, { f2: { $eq: 9 } } ] }"},
         {"{$and: [{$or: [{f1: 7}, {f1: 3}, {f1: 5}]}, {$or: [{f1: 1}, {f1: 2}, {f1: 3}]}]}",
@@ -471,6 +470,7 @@ TEST(ExpressionOptimizeTest, OrRewrittenToIn) {
         {"{$or: [{$and: [{f1: 7}, {f2: 7}, {f1: 5}]}, {$or: [{f1: 1}, {f1: 2}, {f1: 3}]}]}",
          "{ $or: [ { $and: [ { f1: { $eq: 7 } }, { f2: { $eq: 7 } }, { f1: { $eq: 5 } } ] },"
          " { f1: { $in: [ 1, 2, 3 ] } } ] }"},
+        {"{$or: [{$and: [ { f1: null } ] } ] }", "{ f1: { $eq: null } }"},
     };
 
     auto optimizeExpr = [](std::string exprStr) {
@@ -492,6 +492,7 @@ TEST(ExpressionOptimizeTest, OrRewrittenToIn) {
     ASSERT_BSONOBJ_EQ(optimizeExpr(queries[7].first), fromjson(queries[7].second));
     ASSERT_BSONOBJ_EQ(optimizeExpr(queries[8].first), fromjson(queries[8].second));
     ASSERT_BSONOBJ_EQ(optimizeExpr(queries[9].first), fromjson(queries[9].second));
+    ASSERT_BSONOBJ_EQ(optimizeExpr(queries[10].first), fromjson(queries[10].second));
 }
 
 }  // namespace

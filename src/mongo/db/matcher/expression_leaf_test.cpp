@@ -134,11 +134,14 @@ TEST(EqOp, MatchesReferencedArrayValue) {
 TEST(EqOp, MatchesNull) {
     BSONObj operand = BSON("a" << BSONNULL);
     EqualityMatchExpression eq("a", operand["a"]);
-    ASSERT(eq.matchesBSON(BSONObj(), nullptr));
-    ASSERT(eq.matchesBSON(BSON("a" << BSONNULL), nullptr));
-    ASSERT(!eq.matchesBSON(BSON("a" << 4), nullptr));
-    // A non-existent field is treated same way as an empty bson object
-    ASSERT(eq.matchesBSON(BSON("b" << 4), nullptr));
+    ASSERT_TRUE(eq.matchesBSON(BSONObj(), nullptr));
+    ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSONNULL), nullptr));
+    ASSERT_FALSE(eq.matchesBSON(BSON("a" << 4), nullptr));
+
+    // {$eq:null} has special semantics which say that both missing and undefined match, in addition
+    // to literal nulls.
+    ASSERT_TRUE(eq.matchesBSON(BSON("b" << 4), nullptr));
+    ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSONUndefined), nullptr));
 }
 
 // This test documents how the matcher currently works,
@@ -1192,11 +1195,14 @@ TEST(InMatchExpression, MatchesNull) {
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
-    ASSERT(in.matchesBSON(BSONObj(), nullptr));
-    ASSERT(in.matchesBSON(BSON("a" << BSONNULL), nullptr));
-    ASSERT(!in.matchesBSON(BSON("a" << 4), nullptr));
-    // A non-existent field is treated same way as an empty bson object
-    ASSERT(in.matchesBSON(BSON("b" << 4), nullptr));
+    ASSERT_TRUE(in.matchesBSON(BSONObj(), nullptr));
+    ASSERT_TRUE(in.matchesBSON(BSON("a" << BSONNULL), nullptr));
+    ASSERT_FALSE(in.matchesBSON(BSON("a" << 4), nullptr));
+
+    // When null appears inside an $in, it has the same special semantics as an {$eq:null}
+    // predicate. In particular, we expect it to match both missing and undefined.
+    ASSERT_TRUE(in.matchesBSON(BSON("b" << 4), nullptr));
+    ASSERT_TRUE(in.matchesBSON(BSON("a" << BSONUndefined), nullptr));
 }
 
 TEST(InMatchExpression, MatchesUndefined) {
