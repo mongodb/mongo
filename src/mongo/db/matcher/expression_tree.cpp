@@ -162,9 +162,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
             boost::optional<std::string> childPath;
             const CollatorInterface* eqCollator = nullptr;
 
-            auto isNullOrRegEx = [](const BSONElement& elm) {
-                return (elm.isNull() || elm.type() == BSONType::RegEx);
-            };
+            auto isRegEx = [](const BSONElement& elm) { return elm.type() == BSONType::RegEx; };
 
             // Check if all children are equality conditions or regular expressions with the
             // same path argument, and same collation.
@@ -175,22 +173,19 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                     continue;
                 }
 
-                // Disjunctions of equalities use $eq comparison, which has different semantics
-                // from $in equality comparison in two cases:
-                // (1) ('null' $eq 'undefined' = true), while ('null' $in 'undefined' = false),
-                //     that is, when comparing a 'null' argument to an 'undefined' value, the
-                //     result is different for $eq vs $in.
-                // (2) the regex under the equality is matched literally as a string constant,
-                //     while a regex inside $in is matched as a regular expression.
-                //     $lookup processing explicitly depends on this different semantics.
-                // Both these cases should not be rewritten into $in because of the different
-                // comparison semantics.
+                // Disjunctions of equalities use $eq comparison, which has different semantics from
+                // $in for regular expressions. The regex under the equality is matched literally as
+                // a string constant, while a regex inside $in is matched as a regular expression.
+                // Furthermore, $lookup processing explicitly depends on these different semantics.
+                //
+                // We should not attempt to rewrite an $eq:<regex> into $in because of these
+                // different comparison semantics.
                 const CollatorInterface* curCollator = nullptr;
                 if (childExpression->matchType() == MatchExpression::EQ) {
                     auto eqExpression =
                         static_cast<EqualityMatchExpression*>(childExpression.get());
                     curCollator = eqExpression->getCollator();
-                    if (isNullOrRegEx(eqExpression->getData())) {
+                    if (isRegEx(eqExpression->getData())) {
                         ++countNonEquivExpr;
                         continue;
                     }
@@ -211,14 +206,14 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                 }
             }
             tassert(3401201,
-                    "All expressions must be classified as either eq-equiv or non-eq-equiv.",
+                    "All expressions must be classified as either eq-equiv or non-eq-equiv",
                     countEquivEqPaths + countNonEquivExpr == children.size());
 
             // The condition above checks that there are at least two equalities that can be
-            // rewritten to an $in, and the we have classified all $or conditions into two disjunct
+            // rewritten to an $in, and the we have classified all $or conditions into two disjoint
             // groups.
             if (countEquivEqPaths > 1) {
-                tassert(3401202, "There must be a common path.", childPath);
+                tassert(3401202, "There must be a common path", childPath);
                 auto inExpression = std::make_unique<InMatchExpression>(StringData(*childPath));
                 auto nonEquivOrExpr =
                     (countNonEquivExpr > 0) ? std::make_unique<OrMatchExpression>() : nullptr;
@@ -230,7 +225,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                     } else if (childExpression->matchType() == MatchExpression::EQ) {
                         std::unique_ptr<EqualityMatchExpression> eqExpressionPtr{
                             static_cast<EqualityMatchExpression*>(childExpression.release())};
-                        if (isNullOrRegEx(eqExpressionPtr->getData()) ||
+                        if (isRegEx(eqExpressionPtr->getData()) ||
                             eqExpressionPtr->getCollator() != eqCollator) {
                             nonEquivOrExpr->add(std::move(eqExpressionPtr));
                         } else {
@@ -244,7 +239,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                         regexExpressionPtr->setPath({});
                         auto status = inExpression->addRegex(std::move(regexExpressionPtr));
                         tassert(3401203,  // TODO SERVER-53380 convert to tassertStatusOK.
-                                "Conversion from OR to IN should always succeed.",
+                                "Conversion from OR to IN should always succeed",
                                 status == Status::OK());
                     } else {
                         nonEquivOrExpr->add(std::move(childExpression));
@@ -266,7 +261,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
 
                 auto status = inExpression->setEqualities(std::move(inEqualities));
                 tassert(3401206,  // TODO SERVER-53380 convert to tassertStatusOK.
-                        "Conversion from OR to IN should always succeed.",
+                        "Conversion from OR to IN should always succeed",
                         status == Status::OK());
 
                 inExpression->setBackingBSON(std::move(backingArr));
