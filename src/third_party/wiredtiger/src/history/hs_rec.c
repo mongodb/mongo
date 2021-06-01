@@ -609,6 +609,9 @@ __wt_hs_insert_updates(
                 WT_ASSERT(session, __txn_visible_id(session, upd->txnid));
 #endif
 
+            /* Clear out the insert success flag prior to our insert attempt. */
+            __wt_curhs_clear_insert_success(hs_cursor);
+
             /*
              * Calculate reverse modify and clear the history store records with timestamps when
              * inserting the first update. Always write on-disk data store updates to the history
@@ -628,20 +631,31 @@ __wt_hs_insert_updates(
               __wt_calc_modify(session, prev_full_value, full_value, prev_full_value->size / 10,
                 entries, &nentries) == 0) {
                 WT_ERR(__wt_modify_pack(hs_cursor, entries, nentries, &modify_value));
-                WT_ERR(__hs_insert_record(
-                  session, hs_cursor, btree, key, WT_UPDATE_MODIFY, modify_value, &tw));
+                ret = __hs_insert_record(
+                  session, hs_cursor, btree, key, WT_UPDATE_MODIFY, modify_value, &tw);
                 __wt_scr_free(session, &modify_value);
                 ++modify_cnt;
             } else {
                 modify_cnt = 0;
-                WT_ERR(__hs_insert_record(
-                  session, hs_cursor, btree, key, WT_UPDATE_STANDARD, full_value, &tw));
+                ret = __hs_insert_record(
+                  session, hs_cursor, btree, key, WT_UPDATE_STANDARD, full_value, &tw);
             }
 
-            /* Flag the update as now in the history store. */
-            F_SET(upd, WT_UPDATE_HS);
-            if (tombstone != NULL)
-                F_SET(tombstone, WT_UPDATE_HS);
+            /*
+             * Flag the update as now in the history store.
+             *
+             * Ensure that we don't use `WT_ERR` for the insertions above. Insertion can return
+             * non-zero even when the update made it into the history store. In those cases we need
+             * to write the flag to mark the update as having been written to the history store
+             * before jumping to the error handling.
+             */
+            if (__wt_curhs_check_insert_success(hs_cursor)) {
+                F_SET(upd, WT_UPDATE_HS);
+                if (tombstone != NULL)
+                    F_SET(tombstone, WT_UPDATE_HS);
+            }
+            WT_ERR(ret);
+
             hs_inserted = true;
             ++insert_cnt;
             if (squashed) {
