@@ -35,6 +35,7 @@ const allCommands = {
     _configsvrCleanupReshardCollection: {skip: isPrimaryOnly},
     _configsvrClearJumboFlag: {skip: isPrimaryOnly},
     _configsvrCommitChunkMerge: {skip: isPrimaryOnly},
+    _configsvrCommitChunksMerge: {skip: isPrimaryOnly},
     _configsvrCommitChunkMigration: {skip: isPrimaryOnly},
     _configsvrCommitChunkSplit: {skip: isPrimaryOnly},
     _configsvrCommitMovePrimary: {skip: isPrimaryOnly},

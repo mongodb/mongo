@@ -112,14 +112,6 @@ assert.commandFailed(admin.runCommand({
 assert.commandFailed(admin.runCommand(
     {mergeChunks: ns, bounds: [{x: NumberLong(-1500000000000000000)}, {x: MaxKey}]}));
 
-// Make sure merging single chunks is invalid.
-assert.commandFailed(admin.runCommand({mergeChunks: ns, bounds: [{x: MinKey}, chunkToSplit.min]}));
-assert.commandFailed(admin.runCommand({
-    mergeChunks: ns,
-    bounds: [{x: NumberLong(-4500000000000000000)}, {x: NumberLong(-4000000000000000000)}]
-}));
-assert.commandFailed(admin.runCommand({mergeChunks: ns, bounds: [{x: 110}, {x: MaxKey}]}));
-
 // Make sure merging over holes is invalid.
 assert.commandFailed(admin.runCommand(
     {mergeChunks: ns, bounds: [{x: MinKey}, {x: NumberLong(-3500000000000000000)}]}));
@@ -140,6 +132,27 @@ assert.commandFailed(admin.runCommand(
 assert.eq(4, staleCollection.find().itcount());
 
 jsTest.log("Trying merges that should succeed...");
+
+// Merging single chunks should be treated as a no-op
+// (or fail because 'the range specifies one single chunk' in multiversion test environments)
+try {
+    assert.commandWorked(
+        admin.runCommand({mergeChunks: ns, bounds: [{x: MinKey}, chunkToSplit.min]}));
+} catch (e) {
+    if (!e.message.match(/could not merge chunks, collection .* already contains chunk for/)) {
+        throw e;
+    }
+}
+try {
+    assert.commandWorked(admin.runCommand({
+        mergeChunks: ns,
+        bounds: [{x: NumberLong(-4500000000000000000)}, {x: NumberLong(-4000000000000000000)}]
+    }));
+} catch (e) {
+    if (!e.message.match(/could not merge chunks, collection .* already contains chunk for/)) {
+        throw e;
+    }
+}
 
 // Make sure merge including the MinKey works.
 assert.commandWorked(admin.runCommand(

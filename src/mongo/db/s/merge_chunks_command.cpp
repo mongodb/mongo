@@ -49,6 +49,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/merge_chunk_request_type.h"
+#include "mongo/s/request_types/merge_chunks_request_type.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -74,12 +75,38 @@ bool checkMetadataForSuccess(OperationContext* opCtx,
         chunk.getMax().woCompare(chunkRange.getMax()) == 0;
 }
 
-Shard::CommandResponse commitMergeOnConfigServer(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 const BSONObj& minKey,
-                                                 const BSONObj& maxKey,
-                                                 const OID& epoch,
-                                                 const CollectionMetadata& metadata) {
+Shard::CommandResponse commitUsingChunkRange(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const ChunkRange& chunkRange,
+                                             const CollectionMetadata& metadata) {
+    auto const shardingState = ShardingState::get(opCtx);
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    auto collUUID = metadata.getUUID();
+    invariant(collUUID);
+    MergeChunksRequest request{nss,
+                               shardingState->shardId(),
+                               *collUUID,
+                               chunkRange,
+                               currentTime.clusterTime().asTimestamp()};
+
+    auto configCmdObj =
+        request.toConfigCommandBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+    auto cmdResponse =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            configCmdObj,
+            Shard::RetryPolicy::kIdempotent));
+
+    return cmdResponse;
+}
+
+Shard::CommandResponse commitUsingChunksList(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const BSONObj& minKey,
+                                             const BSONObj& maxKey,
+                                             const CollectionMetadata& metadata) {
     auto const shardingState = ShardingState::get(opCtx);
 
     //
@@ -166,7 +193,7 @@ Shard::CommandResponse commitMergeOnConfigServer(OperationContext* opCtx,
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     MergeChunkRequest request{nss,
                               shardingState->shardId().toString(),
-                              epoch,
+                              metadata.getShardVersion().epoch(),
                               chunkBoundaries,
                               currentTime.clusterTime().asTimestamp()};
 
@@ -181,6 +208,16 @@ Shard::CommandResponse commitMergeOnConfigServer(OperationContext* opCtx,
             Shard::RetryPolicy::kIdempotent));
 
     return cmdResponse;
+}
+
+Shard::CommandResponse commitMergeOnConfigServer(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 const ChunkRange& chunkRange,
+                                                 const CollectionMetadata& metadata) {
+    auto commandResponse = commitUsingChunkRange(opCtx, nss, chunkRange, metadata);
+    return commandResponse.commandStatus == ErrorCodes::CommandNotFound
+        ? commitUsingChunksList(opCtx, nss, chunkRange.getMin(), chunkRange.getMax(), metadata)
+        : commandResponse;
 }
 
 void mergeChunks(OperationContext* opCtx,
@@ -223,15 +260,16 @@ void mergeChunks(OperationContext* opCtx,
                           << ", current epoch: " << epoch << ")",
             expectedEpoch == epoch);
 
+    ChunkRange chunkRange(minKey, maxKey);
+
     uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "could not merge chunks, the range "
-                          << redact(ChunkRange(minKey, maxKey).toString()) << " is not valid"
+            str::stream() << "could not merge chunks, the range " << redact(chunkRange.toString())
+                          << " is not valid"
                           << " for collection " << nss.ns() << " with key pattern "
                           << metadataBeforeMerge->getKeyPattern().toString(),
             metadataBeforeMerge->isValidKey(minKey) && metadataBeforeMerge->isValidKey(maxKey));
 
-    auto cmdResponse =
-        commitMergeOnConfigServer(opCtx, nss, minKey, maxKey, epoch, metadataBeforeMerge.get());
+    auto cmdResponse = commitMergeOnConfigServer(opCtx, nss, chunkRange, metadataBeforeMerge.get());
 
     boost::optional<ChunkVersion> shardVersionReceived = [&]() -> boost::optional<ChunkVersion> {
         // old versions might not have the shardVersion field
@@ -254,7 +292,7 @@ void mergeChunks(OperationContext* opCtx,
     auto writeConcernStatus = std::move(cmdResponse.writeConcernStatus);
 
     if ((!commandStatus.isOK() || !writeConcernStatus.isOK()) &&
-        checkMetadataForSuccess(opCtx, nss, epoch, ChunkRange(minKey, maxKey))) {
+        checkMetadataForSuccess(opCtx, nss, epoch, chunkRange)) {
         LOGV2_DEBUG(21983,
                     1,
                     "mergeChunk interval [{minKey},{maxKey}) has already been committed",

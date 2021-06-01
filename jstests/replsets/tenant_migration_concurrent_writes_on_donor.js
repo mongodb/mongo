@@ -453,6 +453,7 @@ const testCases = {
     _configsvrBalancerStop: {skip: isNotRunOnUserDatabase},
     _configsvrClearJumboFlag: {skip: isNotRunOnUserDatabase},
     _configsvrCommitChunkMerge: {skip: isNotRunOnUserDatabase},
+    _configsvrCommitChunksMerge: {skip: isNotRunOnUserDatabase},
     _configsvrCommitChunkMigration: {skip: isNotRunOnUserDatabase},
     _configsvrCommitChunkSplit: {skip: isNotRunOnUserDatabase},
     _configsvrCommitMovePrimary: {skip: isNotRunOnUserDatabase},
