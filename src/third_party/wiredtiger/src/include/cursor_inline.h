@@ -95,11 +95,11 @@ __cursor_checkvalue(WT_CURSOR *cursor)
 }
 
 /*
- * __cursor_localkey --
+ * __wt_cursor_localkey --
  *     If the key points into the tree, get a local copy.
  */
 static inline int
-__cursor_localkey(WT_CURSOR *cursor)
+__wt_cursor_localkey(WT_CURSOR *cursor)
 {
     if (F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
         if (!WT_DATA_IN_ITEM(&cursor->key))
@@ -136,7 +136,7 @@ __cursor_localvalue(WT_CURSOR *cursor)
 static inline int
 __cursor_needkey(WT_CURSOR *cursor)
 {
-    WT_RET(__cursor_localkey(cursor));
+    WT_RET(__wt_cursor_localkey(cursor));
     return (__cursor_checkkey(cursor));
 }
 
@@ -443,59 +443,6 @@ __wt_cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
     if (!F_ISSET(cbt, WT_CBT_NO_TXN))
         __wt_txn_cursor_op(session);
     return (0);
-}
-
-/*
- * __wt_cursor_page_pinned --
- *     Return if we have a page pinned.
- */
-static inline bool
-__wt_cursor_page_pinned(WT_CURSOR_BTREE *cbt, bool search_operation)
-{
-    WT_CURSOR *cursor;
-    WT_SESSION_IMPL *session;
-
-    cursor = &cbt->iface;
-    session = CUR2S(cbt);
-
-    /*
-     * Check the page active flag, asserting the page reference with any external key.
-     */
-    if (!F_ISSET(cbt, WT_CBT_ACTIVE)) {
-        WT_ASSERT(session, cbt->ref == NULL && !F_ISSET(cursor, WT_CURSTD_KEY_INT));
-        return (false);
-    }
-
-    /*
-     * Check if the key references an item on a page. When returning from search, the page is pinned
-     * and the key is internal. After the application sets a key, the key becomes external. For the
-     * search and search-near operations, we assume locality and check any pinned page first on each
-     * new search operation. For operations other than search and search-near, check if we have an
-     * internal key. If the page is pinned and we're pointing into the page, we don't need to search
-     * at all, we can proceed with the operation. However, if the key has been set, that is, it's an
-     * external key, we're going to have to do a full search.
-     */
-    if (!search_operation && !F_ISSET(cursor, WT_CURSTD_KEY_INT))
-        return (false);
-
-    /*
-     * XXX No fast-path searches at read-committed isolation. Underlying transactional functions
-     * called by the fast and slow path search code handle transaction IDs differently, resulting in
-     * different search results at read-committed isolation. This makes no difference for the update
-     * functions, but in the case of a search, we will see different results based on the cursor's
-     * initial location. See WT-5134 for the details.
-     */
-    if (search_operation && session->txn->isolation == WT_ISO_READ_COMMITTED)
-        return (false);
-
-    /*
-     * Fail if the page is flagged for forced eviction (so we periodically release pages grown too
-     * large).
-     */
-    if (cbt->ref->page->read_gen == WT_READGEN_OLDEST)
-        return (false);
-
-    return (true);
 }
 
 /*
