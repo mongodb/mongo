@@ -149,7 +149,7 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
 
     if (_activeMoveChunkState) {
         LOGV2(5004701,
-              "registerReceiveChink ",
+              "registerReceiveChunk ",
               "currentKeys"_attr = ChunkRange(_activeMoveChunkState->args.getMinKey(),
                                               _activeMoveChunkState->args.getMaxKey())
                                        .toString(),
