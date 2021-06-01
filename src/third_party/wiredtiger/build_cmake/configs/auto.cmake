@@ -284,6 +284,9 @@ config_compile(
 
 include(TestBigEndian)
 test_big_endian(is_big_endian)
+if(NOT is_big_endian)
+    set(is_big_endian FALSE)
+endif()
 config_bool(
     WORDS_BIGENDIAN
     "If the target system is big endian"
