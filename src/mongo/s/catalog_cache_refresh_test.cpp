@@ -315,7 +315,10 @@ TEST_F(CatalogCacheRefreshTest, ChunksBSONCorrupted) {
                       {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                       ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
                       {"0"});
-        return std::vector<BSONObj>{coll.toBSON().addFields(
+        return std::vector<BSONObj>{/* collection */
+                                    coll.toBSON(),
+                                    /* chunks */
+                                    coll.toBSON().addFields(
                                         BSON("chunks" << chunk1.toConfigBSON())),
                                     BSON("BadValue"
                                          << "This value should not be in a chunk config document")};

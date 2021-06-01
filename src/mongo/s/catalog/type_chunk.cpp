@@ -343,7 +343,9 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& sourc
     return chunk;
 }
 
-StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source) {
+StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source,
+                                                const OID& epoch,
+                                                const boost::optional<Timestamp>& timestamp) {
     StatusWith<ChunkType> chunkStatus = parseFromConfigBSONCommand(source);
     if (!chunkStatus.isOK()) {
         return chunkStatus.getStatus();

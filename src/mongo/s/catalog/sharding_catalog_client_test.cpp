@@ -351,14 +351,15 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsWithInvalidShard) {
 TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    OID oid = OID::gen();
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
 
     ChunkType chunkA;
     chunkA.setName(OID::gen());
     chunkA.setNS(kNamespace);
     chunkA.setMin(BSON("a" << 1));
     chunkA.setMax(BSON("a" << 100));
-    chunkA.setVersion({1, 2, oid, boost::none /* timestamp */});
+    chunkA.setVersion({1, 2, collEpoch, collTimestamp});
     chunkA.setShard(ShardId("shard0000"));
 
     ChunkType chunkB;
@@ -366,10 +367,10 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     chunkB.setNS(kNamespace);
     chunkB.setMin(BSON("a" << 100));
     chunkB.setMax(BSON("a" << 200));
-    chunkB.setVersion({3, 4, oid, boost::none /* timestamp */});
+    chunkB.setVersion({3, 4, collEpoch, collTimestamp});
     chunkB.setShard(ShardId("shard0001"));
 
-    ChunkVersion queryChunkVersion({1, 2, oid, boost::none /* timestamp */});
+    ChunkVersion queryChunkVersion({1, 2, collEpoch, collTimestamp});
 
     const BSONObj chunksQuery(
         BSON(ChunkType::ns("TestDB.TestColl")
@@ -378,7 +379,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
 
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
-    auto future = launchAsync([this, &chunksQuery, newOpTime] {
+    auto future = launchAsync([this, &chunksQuery, newOpTime, &collEpoch, &collTimestamp] {
         OpTime opTime;
 
         const auto chunks =
@@ -387,6 +388,8 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
                                                  BSON(ChunkType::lastmod() << -1),
                                                  1,
                                                  &opTime,
+                                                 collEpoch,
+                                                 collTimestamp,
                                                  repl::ReadConcernLevel::kMajorityReadConcern));
         ASSERT_EQ(2U, chunks.size());
         ASSERT_EQ(newOpTime, opTime);
@@ -433,20 +436,25 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
 TEST_F(ShardingCatalogClientTest, GetChunksForNSNoSortNoLimit) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    ChunkVersion queryChunkVersion({1, 2, OID::gen(), boost::none /* timestamp */});
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
+    ChunkVersion queryChunkVersion({1, 2, collEpoch, collTimestamp});
 
     const BSONObj chunksQuery(
         BSON(ChunkType::ns("TestDB.TestColl")
              << ChunkType::lastmod()
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
-    auto future = launchAsync([this, &chunksQuery] {
+    auto future = launchAsync([this, &chunksQuery, &collEpoch, &collTimestamp] {
         const auto chunks =
             assertGet(catalogClient()->getChunks(operationContext(),
                                                  chunksQuery,
                                                  BSONObj(),
                                                  boost::none,
                                                  nullptr,
+                                                 collEpoch,
+                                                 collTimestamp,
                                                  repl::ReadConcernLevel::kMajorityReadConcern));
         ASSERT_EQ(0U, chunks.size());
 
@@ -484,13 +492,15 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
              << ChunkType::lastmod()
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
-    auto future = launchAsync([this, &chunksQuery] {
+    auto future = launchAsync([this, &chunksQuery, &queryChunkVersion] {
         const auto swChunks =
             catalogClient()->getChunks(operationContext(),
                                        chunksQuery,
                                        BSONObj(),
                                        boost::none,
                                        nullptr,
+                                       queryChunkVersion.epoch(),
+                                       queryChunkVersion.getTimestamp(),
                                        repl::ReadConcernLevel::kMajorityReadConcern);
 
         ASSERT_EQUALS(ErrorCodes::NoSuchKey, swChunks.getStatus());

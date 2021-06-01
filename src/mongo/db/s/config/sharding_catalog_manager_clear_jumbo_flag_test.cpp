@@ -100,21 +100,29 @@ private:
 };
 
 TEST_F(ClearJumboFlagTest, ClearJumboShouldBumpVersion) {
-    ShardingCatalogManager::get(operationContext())
-        ->clearJumboFlag(operationContext(), ns(), epoch(), jumboChunk());
+    const auto collEpoch = epoch();
+    const auto collTimestamp = boost::none;
 
-    auto chunkDoc = uassertStatusOK(getChunkDoc(operationContext(), jumboChunk().getMin()));
+    ShardingCatalogManager::get(operationContext())
+        ->clearJumboFlag(operationContext(), ns(), collEpoch, jumboChunk());
+
+    auto chunkDoc = uassertStatusOK(
+        getChunkDoc(operationContext(), jumboChunk().getMin(), collEpoch, collTimestamp));
     ASSERT_FALSE(chunkDoc.getJumbo());
-    ASSERT_EQ(ChunkVersion(15, 0, epoch(), boost::none /* timestamp */), chunkDoc.getVersion());
+    ASSERT_EQ(ChunkVersion(15, 0, collEpoch, collTimestamp), chunkDoc.getVersion());
 }
 
 TEST_F(ClearJumboFlagTest, ClearJumboShouldNotBumpVersionIfChunkNotJumbo) {
-    ShardingCatalogManager::get(operationContext())
-        ->clearJumboFlag(operationContext(), ns(), epoch(), nonJumboChunk());
+    const auto collEpoch = epoch();
+    const auto collTimestamp = boost::none;
 
-    auto chunkDoc = uassertStatusOK(getChunkDoc(operationContext(), nonJumboChunk().getMin()));
+    ShardingCatalogManager::get(operationContext())
+        ->clearJumboFlag(operationContext(), ns(), collEpoch, nonJumboChunk());
+
+    auto chunkDoc = uassertStatusOK(
+        getChunkDoc(operationContext(), nonJumboChunk().getMin(), collEpoch, collTimestamp));
     ASSERT_FALSE(chunkDoc.getJumbo());
-    ASSERT_EQ(ChunkVersion(14, 7, epoch(), boost::none /* timestamp */), chunkDoc.getVersion());
+    ASSERT_EQ(ChunkVersion(14, 7, collEpoch, collTimestamp), chunkDoc.getVersion());
 }
 
 TEST_F(ClearJumboFlagTest, AssertsOnEpochMismatch) {

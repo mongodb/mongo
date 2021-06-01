@@ -118,10 +118,13 @@ protected:
      */
     void assertOnlyOneChunkVersionBumped(OperationContext* opCtx,
                                          std::vector<ChunkType> originalChunkTypes,
-                                         const ChunkVersion& targetChunkVersion) {
+                                         const ChunkVersion& targetChunkVersion,
+                                         const OID& collEpoch,
+                                         const boost::optional<Timestamp>& collTimestamp) {
         auto aChunkVersionWasBumped = false;
         for (auto originalChunkType : originalChunkTypes) {
-            auto swChunkTypeAfter = getChunkDoc(opCtx, originalChunkType.getMin());
+            auto swChunkTypeAfter =
+                getChunkDoc(opCtx, originalChunkType.getMin(), collEpoch, collTimestamp);
             auto wasBumped = chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
                 originalChunkType, swChunkTypeAfter, targetChunkVersion);
             if (aChunkVersionWasBumped) {
@@ -137,19 +140,19 @@ protected:
 
 TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
        BumpChunkVersionOneChunkPerShard) {
-    const auto epoch = OID::gen();
-    const auto shard0Chunk0 =
-        generateChunkType(kNss,
-                          ChunkVersion(10, 1, epoch, boost::none /* timestamp */),
-                          kShard0.getName(),
-                          BSON("a" << 1),
-                          BSON("a" << 10));
-    const auto shard1Chunk0 =
-        generateChunkType(kNss,
-                          ChunkVersion(11, 2, epoch, boost::none /* timestamp */),
-                          kShard1.getName(),
-                          BSON("a" << 11),
-                          BSON("a" << 20));
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
+    const auto shard0Chunk0 = generateChunkType(kNss,
+                                                ChunkVersion(10, 1, collEpoch, collTimestamp),
+                                                kShard0.getName(),
+                                                BSON("a" << 1),
+                                                BSON("a" << 10));
+    const auto shard1Chunk0 = generateChunkType(kNss,
+                                                ChunkVersion(11, 2, collEpoch, collTimestamp),
+                                                kShard1.getName(),
+                                                BSON("a" << 11),
+                                                BSON("a" << 20));
 
     const auto collectionVersion = shard1Chunk0.getVersion();
     ChunkVersion targetChunkVersion(collectionVersion.majorVersion() + 1,
@@ -165,33 +168,36 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
         opCtx, kNss, [&](OperationContext*, TxnNumber) {});
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard0Chunk0, getChunkDoc(operationContext(), shard0Chunk0.getMin()), targetChunkVersion));
+        shard0Chunk0,
+        getChunkDoc(operationContext(), shard0Chunk0.getMin(), collEpoch, collTimestamp),
+        targetChunkVersion));
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard1Chunk0, getChunkDoc(operationContext(), shard1Chunk0.getMin()), targetChunkVersion));
+        shard1Chunk0,
+        getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
+        targetChunkVersion));
 }
 
 TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
        BumpChunkVersionTwoChunksOnOneShard) {
-    const auto epoch = OID::gen();
-    const auto shard0Chunk0 =
-        generateChunkType(kNss,
-                          ChunkVersion(10, 1, epoch, boost::none /* timestamp */),
-                          kShard0.getName(),
-                          BSON("a" << 1),
-                          BSON("a" << 10));
-    const auto shard0Chunk1 =
-        generateChunkType(kNss,
-                          ChunkVersion(11, 2, epoch, boost::none /* timestamp */),
-                          kShard0.getName(),
-                          BSON("a" << 11),
-                          BSON("a" << 20));
-    const auto shard1Chunk0 =
-        generateChunkType(kNss,
-                          ChunkVersion(8, 1, epoch, boost::none /* timestamp */),
-                          kShard1.getName(),
-                          BSON("a" << 21),
-                          BSON("a" << 100));
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
+    const auto shard0Chunk0 = generateChunkType(kNss,
+                                                ChunkVersion(10, 1, collEpoch, collTimestamp),
+                                                kShard0.getName(),
+                                                BSON("a" << 1),
+                                                BSON("a" << 10));
+    const auto shard0Chunk1 = generateChunkType(kNss,
+                                                ChunkVersion(11, 2, collEpoch, collTimestamp),
+                                                kShard0.getName(),
+                                                BSON("a" << 11),
+                                                BSON("a" << 20));
+    const auto shard1Chunk0 = generateChunkType(kNss,
+                                                ChunkVersion(8, 1, collEpoch, collTimestamp),
+                                                kShard1.getName(),
+                                                BSON("a" << 21),
+                                                BSON("a" << 100));
 
     const auto collectionVersion = shard0Chunk1.getVersion();
     ChunkVersion targetChunkVersion(collectionVersion.majorVersion() + 1,
@@ -205,40 +211,43 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
     ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
         opCtx, kNss, [&](OperationContext*, TxnNumber) {});
 
-    assertOnlyOneChunkVersionBumped(
-        operationContext(), {shard0Chunk0, shard0Chunk1}, targetChunkVersion);
+    assertOnlyOneChunkVersionBumped(operationContext(),
+                                    {shard0Chunk0, shard0Chunk1},
+                                    targetChunkVersion,
+                                    collEpoch,
+                                    collTimestamp);
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard1Chunk0, getChunkDoc(operationContext(), shard1Chunk0.getMin()), targetChunkVersion));
+        shard1Chunk0,
+        getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
+        targetChunkVersion));
 }
 
 TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
        BumpChunkVersionTwoChunksOnTwoShards) {
-    const auto epoch = OID::gen();
-    const auto shard0Chunk0 =
-        generateChunkType(kNss,
-                          ChunkVersion(10, 1, epoch, boost::none /* timestamp */),
-                          kShard0.getName(),
-                          BSON("a" << 1),
-                          BSON("a" << 10));
-    const auto shard0Chunk1 =
-        generateChunkType(kNss,
-                          ChunkVersion(11, 2, epoch, boost::none /* timestamp */),
-                          kShard0.getName(),
-                          BSON("a" << 11),
-                          BSON("a" << 20));
-    const auto shard1Chunk0 =
-        generateChunkType(kNss,
-                          ChunkVersion(8, 1, epoch, boost::none /* timestamp */),
-                          kShard1.getName(),
-                          BSON("a" << 21),
-                          BSON("a" << 100));
-    const auto shard1Chunk1 =
-        generateChunkType(kNss,
-                          ChunkVersion(12, 1, epoch, boost::none /* timestamp */),
-                          kShard1.getName(),
-                          BSON("a" << 101),
-                          BSON("a" << 200));
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
+    const auto shard0Chunk0 = generateChunkType(kNss,
+                                                ChunkVersion(10, 1, collEpoch, collTimestamp),
+                                                kShard0.getName(),
+                                                BSON("a" << 1),
+                                                BSON("a" << 10));
+    const auto shard0Chunk1 = generateChunkType(kNss,
+                                                ChunkVersion(11, 2, collEpoch, collTimestamp),
+                                                kShard0.getName(),
+                                                BSON("a" << 11),
+                                                BSON("a" << 20));
+    const auto shard1Chunk0 = generateChunkType(kNss,
+                                                ChunkVersion(8, 1, collEpoch, collTimestamp),
+                                                kShard1.getName(),
+                                                BSON("a" << 21),
+                                                BSON("a" << 100));
+    const auto shard1Chunk1 = generateChunkType(kNss,
+                                                ChunkVersion(12, 1, collEpoch, collTimestamp),
+                                                kShard1.getName(),
+                                                BSON("a" << 101),
+                                                BSON("a" << 200));
 
     const auto collectionVersion = shard1Chunk1.getVersion();
     ChunkVersion targetChunkVersion(collectionVersion.majorVersion() + 1,
@@ -252,28 +261,34 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
     ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
         opCtx, kNss, [&](OperationContext*, TxnNumber) {});
 
-    assertOnlyOneChunkVersionBumped(
-        operationContext(), {shard0Chunk0, shard0Chunk1}, targetChunkVersion);
+    assertOnlyOneChunkVersionBumped(operationContext(),
+                                    {shard0Chunk0, shard0Chunk1},
+                                    targetChunkVersion,
+                                    collEpoch,
+                                    collTimestamp);
 
-    assertOnlyOneChunkVersionBumped(
-        operationContext(), {shard1Chunk0, shard1Chunk1}, targetChunkVersion);
+    assertOnlyOneChunkVersionBumped(operationContext(),
+                                    {shard1Chunk0, shard1Chunk1},
+                                    targetChunkVersion,
+                                    collEpoch,
+                                    collTimestamp);
 }
 
 TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
        SucceedsInThePresenceOfTransientTransactionErrors) {
-    const auto epoch = OID::gen();
-    const auto shard0Chunk0 =
-        generateChunkType(kNss,
-                          ChunkVersion(10, 1, epoch, boost::none /* timestamp */),
-                          kShard0.getName(),
-                          BSON("a" << 1),
-                          BSON("a" << 10));
-    const auto shard1Chunk0 =
-        generateChunkType(kNss,
-                          ChunkVersion(11, 2, epoch, boost::none /* timestamp */),
-                          kShard1.getName(),
-                          BSON("a" << 11),
-                          BSON("a" << 20));
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
+    const auto shard0Chunk0 = generateChunkType(kNss,
+                                                ChunkVersion(10, 1, collEpoch, collTimestamp),
+                                                kShard0.getName(),
+                                                BSON("a" << 1),
+                                                BSON("a" << 10));
+    const auto shard1Chunk0 = generateChunkType(kNss,
+                                                ChunkVersion(11, 2, collEpoch, collTimestamp),
+                                                kShard1.getName(),
+                                                BSON("a" << 11),
+                                                BSON("a" << 20));
     const auto initialCollectionVersion = shard1Chunk0.getVersion();
 
     setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard1Chunk0});
@@ -294,10 +309,14 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
                                            initialCollectionVersion.getTimestamp()};
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard0Chunk0, getChunkDoc(operationContext(), shard0Chunk0.getMin()), targetChunkVersion));
+        shard0Chunk0,
+        getChunkDoc(operationContext(), shard0Chunk0.getMin(), collEpoch, collTimestamp),
+        targetChunkVersion));
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard1Chunk0, getChunkDoc(operationContext(), shard1Chunk0.getMin()), targetChunkVersion));
+        shard1Chunk0,
+        getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
+        targetChunkVersion));
 
     ASSERT_EQ(numCalls, 5) << "transaction succeeded after unexpected number of attempts";
 
@@ -323,29 +342,33 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
                                       initialCollectionVersion.getTimestamp()};
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard0Chunk0, getChunkDoc(operationContext(), shard0Chunk0.getMin()), targetChunkVersion));
+        shard0Chunk0,
+        getChunkDoc(operationContext(), shard0Chunk0.getMin(), collEpoch, collTimestamp),
+        targetChunkVersion));
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard1Chunk0, getChunkDoc(operationContext(), shard1Chunk0.getMin()), targetChunkVersion));
+        shard1Chunk0,
+        getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
+        targetChunkVersion));
 
     ASSERT_EQ(numCalls, 5) << "transaction succeeded after unexpected number of attempts";
 }
 
 TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
        StopsRetryingOnPermanentServerErrors) {
-    const auto epoch = OID::gen();
-    const auto shard0Chunk0 =
-        generateChunkType(kNss,
-                          ChunkVersion(10, 1, epoch, boost::none /* timestamp */),
-                          kShard0.getName(),
-                          BSON("a" << 1),
-                          BSON("a" << 10));
-    const auto shard1Chunk0 =
-        generateChunkType(kNss,
-                          ChunkVersion(11, 2, epoch, boost::none /* timestamp */),
-                          kShard1.getName(),
-                          BSON("a" << 11),
-                          BSON("a" << 20));
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
+    const auto shard0Chunk0 = generateChunkType(kNss,
+                                                ChunkVersion(10, 1, collEpoch, collTimestamp),
+                                                kShard0.getName(),
+                                                BSON("a" << 1),
+                                                BSON("a" << 10));
+    const auto shard1Chunk0 = generateChunkType(kNss,
+                                                ChunkVersion(11, 2, collEpoch, collTimestamp),
+                                                kShard1.getName(),
+                                                BSON("a" << 11),
+                                                BSON("a" << 20));
 
     setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard1Chunk0});
 
@@ -364,12 +387,12 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
         shard0Chunk0,
-        getChunkDoc(operationContext(), shard0Chunk0.getMin()),
+        getChunkDoc(operationContext(), shard0Chunk0.getMin(), collEpoch, collTimestamp),
         shard0Chunk0.getVersion()));
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
         shard1Chunk0,
-        getChunkDoc(operationContext(), shard1Chunk0.getMin()),
+        getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
         shard1Chunk0.getVersion()));
 
     ASSERT_EQ(numCalls, 1) << "transaction failed after unexpected number of attempts";
@@ -389,12 +412,12 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
         shard0Chunk0,
-        getChunkDoc(operationContext(), shard0Chunk0.getMin()),
+        getChunkDoc(operationContext(), shard0Chunk0.getMin(), collEpoch, collTimestamp),
         shard0Chunk0.getVersion()));
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
         shard1Chunk0,
-        getChunkDoc(operationContext(), shard1Chunk0.getMin()),
+        getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
         shard1Chunk0.getVersion()));
 
     ASSERT_EQ(numCalls, 1) << "transaction failed after unexpected number of attempts";
@@ -419,12 +442,12 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
         shard0Chunk0,
-        getChunkDoc(operationContext(), shard0Chunk0.getMin()),
+        getChunkDoc(operationContext(), shard0Chunk0.getMin(), collEpoch, collTimestamp),
         shard0Chunk0.getVersion()));
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
         shard1Chunk0,
-        getChunkDoc(operationContext(), shard1Chunk0.getMin()),
+        getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
         shard1Chunk0.getVersion()));
 
     ASSERT_EQ(numCalls, 1) << "transaction failed after unexpected number of attempts";

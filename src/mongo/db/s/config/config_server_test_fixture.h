@@ -108,7 +108,10 @@ protected:
     /**
      * Retrieves the chunk document from the config server.
      */
-    StatusWith<ChunkType> getChunkDoc(OperationContext* opCtx, const BSONObj& minKey);
+    StatusWith<ChunkType> getChunkDoc(OperationContext* opCtx,
+                                      const BSONObj& minKey,
+                                      const OID& collEpoch,
+                                      const boost::optional<Timestamp>& collTimestamp);
 
     /**
      * Inserts a document for the database into the config.databases collection.

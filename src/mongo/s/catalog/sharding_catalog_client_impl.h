@@ -91,6 +91,8 @@ public:
         const BSONObj& sort,
         boost::optional<int> limit,
         repl::OpTime* opTime,
+        const OID& epoch,
+        const boost::optional<Timestamp>& timestamp,
         repl::ReadConcernLevel readConcern,
         const boost::optional<BSONObj>& hint = boost::none) override;
 

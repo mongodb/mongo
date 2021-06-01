@@ -106,16 +106,21 @@ TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoChunksFoundFoundReturnsSuccess) 
 }
 
 TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoChunkWithMatchingEpochFoundReturnsSuccess) {
+    const auto collEpoch1 = OID::gen();
+    const auto collTimestamp1 = boost::none;
+
     const auto requestedChunkType =
         generateChunkType(kNss,
-                          ChunkVersion(10, 2, OID::gen(), boost::none /* timestamp */),
+                          ChunkVersion(10, 2, collEpoch1, collTimestamp1),
                           ShardId(_shardName),
                           BSON("a" << 1),
                           BSON("a" << 10));
-
-    ChunkType existingChunkType = requestedChunkType;
     // Epoch is different.
-    existingChunkType.setVersion(ChunkVersion(10, 2, OID::gen(), boost::none /* timestamp */));
+
+    const auto collEpoch2 = OID::gen();
+    const auto collTimestamp2 = boost::none;
+    ChunkType existingChunkType = requestedChunkType;
+    existingChunkType.setVersion(ChunkVersion(10, 2, collEpoch2, collTimestamp2));
     setupCollection(kNss, kKeyPattern, {existingChunkType});
 
     ShardingCatalogManager::get(operationContext())
@@ -124,17 +129,20 @@ TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoChunkWithMatchingEpochFoundRetur
                                           requestedChunkType.getMax(),
                                           requestedChunkType.getVersion());
 
-    assertChunkHasNotChanged(existingChunkType,
-                             getChunkDoc(operationContext(), existingChunkType.getMin()));
+    assertChunkHasNotChanged(
+        existingChunkType,
+        getChunkDoc(operationContext(), existingChunkType.getMin(), collEpoch2, collTimestamp2));
 }
 
 TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoChunkWithMatchingMinKeyFoundReturnsSuccess) {
-    const auto requestedChunkType =
-        generateChunkType(kNss,
-                          ChunkVersion(10, 2, OID::gen(), boost::none /* timestamp */),
-                          ShardId(_shardName),
-                          BSON("a" << 1),
-                          BSON("a" << 10));
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
+    const auto requestedChunkType = generateChunkType(kNss,
+                                                      ChunkVersion(10, 2, collEpoch, collTimestamp),
+                                                      ShardId(_shardName),
+                                                      BSON("a" << 1),
+                                                      BSON("a" << 10));
 
     ChunkType existingChunkType = requestedChunkType;
     // Min key is different.
@@ -147,17 +155,20 @@ TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoChunkWithMatchingMinKeyFoundRetu
                                           requestedChunkType.getMax(),
                                           requestedChunkType.getVersion());
 
-    assertChunkHasNotChanged(existingChunkType,
-                             getChunkDoc(operationContext(), existingChunkType.getMin()));
+    assertChunkHasNotChanged(
+        existingChunkType,
+        getChunkDoc(operationContext(), existingChunkType.getMin(), collEpoch, collTimestamp));
 }
 
 TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoChunkWithMatchingMaxKeyFoundReturnsSuccess) {
-    const auto requestedChunkType =
-        generateChunkType(kNss,
-                          ChunkVersion(10, 2, OID::gen(), boost::none /* timestamp */),
-                          ShardId(_shardName),
-                          BSON("a" << 1),
-                          BSON("a" << 10));
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
+    const auto requestedChunkType = generateChunkType(kNss,
+                                                      ChunkVersion(10, 2, collEpoch, collTimestamp),
+                                                      ShardId(_shardName),
+                                                      BSON("a" << 1),
+                                                      BSON("a" << 10));
 
     ChunkType existingChunkType = requestedChunkType;
     // Max key is different.
@@ -170,27 +181,28 @@ TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoChunkWithMatchingMaxKeyFoundRetu
                                           requestedChunkType.getMax(),
                                           requestedChunkType.getVersion());
 
-    assertChunkHasNotChanged(existingChunkType,
-                             getChunkDoc(operationContext(), existingChunkType.getMin()));
+    assertChunkHasNotChanged(
+        existingChunkType,
+        getChunkDoc(operationContext(), existingChunkType.getMin(), collEpoch, collTimestamp));
 }
 
 TEST_F(EnsureChunkVersionIsGreaterThanTest,
        IfChunkMatchingRequestedChunkFoundBumpsChunkVersionAndReturnsSuccess) {
-    const auto epoch = OID::gen();
-    const auto requestedChunkType =
-        generateChunkType(kNss,
-                          ChunkVersion(10, 2, epoch, boost::none /* timestamp */),
-                          ShardId(_shardName),
-                          BSON("a" << 1),
-                          BSON("a" << 10));
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
+    const auto requestedChunkType = generateChunkType(kNss,
+                                                      ChunkVersion(10, 2, collEpoch, collTimestamp),
+                                                      ShardId(_shardName),
+                                                      BSON("a" << 1),
+                                                      BSON("a" << 10));
 
     const auto existingChunkType = requestedChunkType;
-    const auto highestChunkType =
-        generateChunkType(kNss,
-                          ChunkVersion(20, 3, epoch, boost::none /* timestamp */),
-                          ShardId("shard0001"),
-                          BSON("a" << 11),
-                          BSON("a" << 20));
+    const auto highestChunkType = generateChunkType(kNss,
+                                                    ChunkVersion(20, 3, collEpoch, collTimestamp),
+                                                    ShardId("shard0001"),
+                                                    BSON("a" << 11),
+                                                    BSON("a" << 20));
     setupCollection(kNss, kKeyPattern, {existingChunkType, highestChunkType});
 
     ShardingCatalogManager::get(operationContext())
@@ -199,27 +211,27 @@ TEST_F(EnsureChunkVersionIsGreaterThanTest,
                                           requestedChunkType.getMax(),
                                           requestedChunkType.getVersion());
 
-    assertChunkVersionWasBumpedTo(existingChunkType,
-                                  getChunkDoc(operationContext(), existingChunkType.getMin()),
-                                  ChunkVersion(highestChunkType.getVersion().majorVersion() + 1,
-                                               0,
-                                               epoch,
-                                               boost::none /* timestamp */));
+    assertChunkVersionWasBumpedTo(
+        existingChunkType,
+        getChunkDoc(operationContext(), existingChunkType.getMin(), collEpoch, collTimestamp),
+        ChunkVersion(
+            highestChunkType.getVersion().majorVersion() + 1, 0, collEpoch, collTimestamp));
 }
 
 TEST_F(
     EnsureChunkVersionIsGreaterThanTest,
     IfChunkMatchingRequestedChunkFoundAndHasHigherChunkVersionReturnsSuccessWithoutBumpingChunkVersion) {
-    const auto epoch = OID::gen();
-    const auto requestedChunkType =
-        generateChunkType(kNss,
-                          ChunkVersion(10, 2, epoch, boost::none /* timestamp */),
-                          ShardId(_shardName),
-                          BSON("a" << 1),
-                          BSON("a" << 10));
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
+    const auto requestedChunkType = generateChunkType(kNss,
+                                                      ChunkVersion(10, 2, collEpoch, collTimestamp),
+                                                      ShardId(_shardName),
+                                                      BSON("a" << 1),
+                                                      BSON("a" << 10));
 
     ChunkType existingChunkType = requestedChunkType;
-    existingChunkType.setVersion(ChunkVersion(11, 1, epoch, boost::none /* timestamp */));
+    existingChunkType.setVersion(ChunkVersion(11, 1, collEpoch, collTimestamp));
     setupCollection(kNss, kKeyPattern, {existingChunkType});
 
     ShardingCatalogManager::get(operationContext())
@@ -228,8 +240,9 @@ TEST_F(
                                           requestedChunkType.getMax(),
                                           requestedChunkType.getVersion());
 
-    assertChunkHasNotChanged(existingChunkType,
-                             getChunkDoc(operationContext(), existingChunkType.getMin()));
+    assertChunkHasNotChanged(
+        existingChunkType,
+        getChunkDoc(operationContext(), existingChunkType.getMin(), collEpoch, collTimestamp));
 }
 
 }  // namespace

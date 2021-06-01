@@ -345,14 +345,17 @@ void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
     }
 }
 
-StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opCtx,
-                                                           const BSONObj& minKey) {
+StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(
+    OperationContext* opCtx,
+    const BSONObj& minKey,
+    const OID& collEpoch,
+    const boost::optional<Timestamp>& collTimestamp) {
     auto doc =
         findOneOnConfigCollection(opCtx, ChunkType::ConfigNS, BSON(ChunkType::min() << minKey));
     if (!doc.isOK())
         return doc.getStatus();
 
-    return ChunkType::fromConfigBSON(doc.getValue());
+    return ChunkType::fromConfigBSON(doc.getValue(), collEpoch, collTimestamp);
 }
 
 void ConfigServerTestFixture::setupDatabase(const std::string& dbName,

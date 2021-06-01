@@ -50,6 +50,9 @@ const NamespaceString kNamespace("TestDB.TestColl");
 const KeyPattern kKeyPattern(BSON("x" << 1));
 
 TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");
@@ -62,7 +65,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
 
     ChunkType migratedChunk, controlChunk;
     {
-        ChunkVersion origVersion(12, 7, OID::gen(), boost::none /* timestamp */);
+        ChunkVersion origVersion(12, 7, collEpoch, collTimestamp);
 
         migratedChunk.setName(OID::gen());
         migratedChunk.setNS(kNamespace);
@@ -109,14 +112,16 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
     ASSERT_TRUE(mver.isOlderOrEqualThan(cver));
 
     // Verify the chunks ended up in the right shards.
-    auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), migratedChunk.getMin()));
+    auto chunkDoc0 = uassertStatusOK(
+        getChunkDoc(operationContext(), migratedChunk.getMin(), collEpoch, collTimestamp));
     ASSERT_EQ("shard1", chunkDoc0.getShard().toString());
 
     // The migrated chunk's history should be updated.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
     ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
 
-    auto chunkDoc1 = uassertStatusOK(getChunkDoc(operationContext(), controlChunk.getMin()));
+    auto chunkDoc1 = uassertStatusOK(
+        getChunkDoc(operationContext(), controlChunk.getMin(), collEpoch, collTimestamp));
     ASSERT_EQ("shard0", chunkDoc1.getShard().toString());
 
     // The control chunk's history and jumbo status should be unchanged.
@@ -129,6 +134,8 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
 }
 
 TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -141,8 +148,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
     setupShards({shard0, shard1});
 
     int origMajorVersion = 15;
-    auto const origVersion =
-        ChunkVersion(origMajorVersion, 4, OID::gen(), boost::none /* timestamp */);
+    auto const origVersion = ChunkVersion(origMajorVersion, 4, collEpoch, collTimestamp);
 
     ChunkType chunk0;
     chunk0.setName(OID::gen());
@@ -179,7 +185,8 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
     ASSERT_EQ(ChunkVersion(0, 0, origVersion.epoch(), origVersion.getTimestamp()), mver.getValue());
 
     // Verify the chunk ended up in the right shard.
-    auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), chunkMin));
+    auto chunkDoc0 =
+        uassertStatusOK(getChunkDoc(operationContext(), chunkMin, collEpoch, collTimestamp));
     ASSERT_EQ("shard1", chunkDoc0.getShard().toString());
     // The history should be updated.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
@@ -187,6 +194,8 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
 }
 
 TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -199,8 +208,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     setupShards({shard0, shard1});
 
     int origMajorVersion = 15;
-    auto const origVersion =
-        ChunkVersion(origMajorVersion, 4, OID::gen(), boost::none /* timestamp */);
+    auto const origVersion = ChunkVersion(origMajorVersion, 4, collEpoch, collTimestamp);
 
     ChunkType chunk0;
     chunk0.setName(OID::gen());
@@ -238,7 +246,8 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     ASSERT_EQ(ChunkVersion(0, 0, origVersion.epoch(), origVersion.getTimestamp()), mver.getValue());
 
     // Verify the chunk ended up in the right shard.
-    auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), chunkMin));
+    auto chunkDoc0 =
+        uassertStatusOK(getChunkDoc(operationContext(), chunkMin, collEpoch, collTimestamp));
     ASSERT_EQ("shard1", chunkDoc0.getShard().toString());
 
     // The new history entry should be added, but the old one preserved.
@@ -455,6 +464,9 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
 }
 
 TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks) {
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");
@@ -466,8 +478,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     setupShards({shard0, shard1});
 
     int origMajorVersion = 12;
-    auto const origVersion =
-        ChunkVersion(origMajorVersion, 7, OID::gen(), boost::none /* timestamp */);
+    auto const origVersion = ChunkVersion(origMajorVersion, 7, collEpoch, collTimestamp);
 
     ChunkType chunk0;
     chunk0.setName(OID::gen());
@@ -516,14 +527,16 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     ASSERT_EQ(ChunkVersion(0, 0, origVersion.epoch(), origVersion.getTimestamp()), mver.getValue());
 
     // Verify the chunks ended up in the right shards.
-    auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), chunkMin));
+    auto chunkDoc0 =
+        uassertStatusOK(getChunkDoc(operationContext(), chunkMin, collEpoch, collTimestamp));
     ASSERT_EQ(shard1.getName(), chunkDoc0.getShard().toString());
 
     // The migrated chunk's history should be updated.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
     ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
 
-    auto chunkDoc1 = uassertStatusOK(getChunkDoc(operationContext(), chunkMax));
+    auto chunkDoc1 =
+        uassertStatusOK(getChunkDoc(operationContext(), chunkMax, collEpoch, collTimestamp));
     ASSERT_EQ(shard1.getName(), chunkDoc1.getShard().toString());
     ASSERT_EQ(chunk1.getVersion(), chunkDoc1.getVersion());
 

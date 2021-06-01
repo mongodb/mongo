@@ -48,7 +48,9 @@ const ShardId kToShard("shard0001");
 const bool kWaitForDelete{true};
 
 TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
-    const ChunkVersion version(1, 2, OID::gen(), boost::none /* timestamp */);
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = boost::none;
+    const ChunkVersion version(1, 2, collEpoch, collTimestamp);
 
     BSONObjBuilder chunkBuilder;
     chunkBuilder.append(ChunkType::name(), OID::gen());
@@ -58,7 +60,8 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
     version.appendLegacyWithField(&chunkBuilder, ChunkType::lastmod());
     chunkBuilder.append(ChunkType::shard(), kFromShard.toString());
 
-    ChunkType chunkType = assertGet(ChunkType::fromConfigBSON(chunkBuilder.obj()));
+    ChunkType chunkType =
+        assertGet(ChunkType::fromConfigBSON(chunkBuilder.obj(), collEpoch, collTimestamp));
     ASSERT_OK(chunkType.validate());
 
     MigrateInfo migrateInfo(kToShard,
