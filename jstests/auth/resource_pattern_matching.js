@@ -28,16 +28,14 @@ function setup_dbs_and_cols(db) {
     var test_db_a = db.getSiblingDB("a");
     var test_db_b = db.getSiblingDB("b");
 
-    test_db_a.dropDatabase();
-    test_db_b.dropDatabase();
+    assert.commandWorked(test_db_a.dropDatabase({w: 'majority'}));
+    assert.commandWorked(test_db_b.dropDatabase({w: 'majority'}));
 
-    test_db_a.createCollection("a");
-    test_db_a.createCollection("b");
+    assert.commandWorked(test_db_a.createCollection("a", {writeConcern: {w: 'majority'}}));
+    assert.commandWorked(test_db_a.createCollection("b", {writeConcern: {w: 'majority'}}));
 
-    test_db_b.createCollection("a");
-    test_db_b.createCollection("b");
-
-    db.getLastError('majority');
+    assert.commandWorked(test_db_b.createCollection("a", {writeConcern: {w: 'majority'}}));
+    assert.commandWorked(test_db_b.createCollection("b", {writeConcern: {w: 'majority'}}));
 }
 
 function grant_privileges(granter, privileges) {

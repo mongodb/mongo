@@ -214,7 +214,8 @@ assert.commandWorked(rstest.getPrimary().getDB("admin").runCommand({
     ]
 }));
 
-assert.commandWorked(rstest.getPrimary().getDB("admin").getLastErrorObj(2));
+rstest.awaitReplication();
+
 rstest.nodes.forEach(function(node) {
     var role = node.getDB("db1").getRole("t1");
     assert.eq(1, role.roles.length, tojson(node));

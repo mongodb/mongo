@@ -53,18 +53,14 @@ assert.commandWorked(admin.runCommand({split: fooNS, middle: {a: 10}}));
 assert.commandWorked(admin.runCommand({shardCollection: barNS, key: {a: 1}}));
 assert.commandWorked(admin.runCommand({split: barNS, middle: {a: 10}}));
 
-fooColl.insert({a: 0});
-assert.eq(null, fooColl.getDB().getLastError());
-fooColl.insert({a: 10});
-assert.eq(null, fooColl.getDB().getLastError());
+assert.commandWorked(fooColl.insert({a: 0}));
+assert.commandWorked(fooColl.insert({a: 10}));
 assert.eq(0, fooRecipientColl.count());
 assert.eq(2, fooDonorColl.count());
 assert.eq(2, fooColl.count());
 
-barColl.insert({a: 0});
-assert.eq(null, barColl.getDB().getLastError());
-barColl.insert({a: 10});
-assert.eq(null, barColl.getDB().getLastError());
+assert.commandWorked(barColl.insert({a: 0}));
+assert.commandWorked(barColl.insert({a: 10}));
 assert.eq(0, barRecipientColl.count());
 assert.eq(2, barDonorColl.count());
 assert.eq(2, barColl.count());

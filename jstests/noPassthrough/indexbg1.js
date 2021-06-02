@@ -123,10 +123,7 @@ assert.eq(1, t.count({i: -50}));
 assert.eq(1, t.count({i: size + 2}));
 assert.eq(0, t.count({i: 40}));
 print("about to drop index");
-t.dropIndex({i: 1});
-var gle = db.getLastError();
-printjson(gle);
-assert(!gle);
+assert.commandWorked(t.dropIndex({i: 1}));
 
 MongoRunner.stopMongod(conn);
 })();

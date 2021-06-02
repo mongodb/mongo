@@ -395,7 +395,6 @@ for (var test = 0; test < numTests; test++) {
     delete env.earth;
 
     assert.commandWorked(t.createIndex(indexDoc, env));
-    assert.isnull(db.getLastError());
 
     var padding = "x";
     for (var i = 0; i < paddingSize; i++)

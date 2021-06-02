@@ -171,16 +171,14 @@ startParallelOps = function(mongo, proc, args, context) {
 
     var testDataColl = mongo.getCollection("config.parallelTest");
 
-    testDataColl.insert({
+    assert.commandWorked(testDataColl.insert({
         _id: procName,
         bootstrapper: tojson(bootstrapper),
         operation: tojson(proc),
         args: tojson(args),
         procContext: tojson(procContext),
         contexts: tojson(contexts)
-    });
-
-    assert.eq(null, testDataColl.getDB().getLastError());
+    }));
 
     var bootstrapStartup = "{ var procName = '" + procName + "'; " +
         "var stored = db.getMongo().getCollection( '" + testDataColl + "' )" +

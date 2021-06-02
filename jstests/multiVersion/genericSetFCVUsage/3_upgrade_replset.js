@@ -34,8 +34,7 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
 
         while (!isFinished()) {
             try {
-                coll.insert({_id: count, hello: "world"});
-                assert.eq(null, coll.getDB().getLastError());
+                assert.commandWorked(coll.insert({_id: count, hello: "world"}));
                 assert.neq(null, coll.findOne({_id: count}));
             } catch (e) {
                 printjson(e);

@@ -167,7 +167,6 @@ if (typeof _threadInject != "undefined") {
             // These tests use the getLastError command, which is unsafe to use in this environment,
             // since a previous test's cursors could be garbage collected in the middle of the next
             // test, which would reset the last error associated with the shell's client.
-            "dropdb_race.js",
             "bulk_legacy_enforce_gle.js",
 
             // These tests use getLog to examine the logs. Tests which do so shouldn't be run in

@@ -52,8 +52,7 @@ createCollectionWithData = function(db, collectionName, dataGenerator) {
         // matters here since we can use indexes
         nextDoc._id = numInserted;
         print("collection.insert(" + JSON.stringify(nextDoc) + ");");
-        var insertResult = collection.insert(nextDoc);
-        assert(db.getLastError() == null);
+        assert.commandWorked(collection.insert(nextDoc));
         numInserted++;
     }
 

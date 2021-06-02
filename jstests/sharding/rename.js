@@ -10,15 +10,13 @@ var s = new ShardingTest({shards: 2, mongos: 1, rs: {oplogSize: 10}});
 var db = s.getDB("test");
 
 assert.commandWorked(db.foo.insert({_id: 1}));
-db.foo.renameCollection('bar');
-assert.isnull(db.getLastError(), '1.0');
+assert.commandWorked(db.foo.renameCollection('bar'));
 assert.eq(db.bar.findOne(), {_id: 1}, '1.1');
 assert.eq(db.bar.count(), 1, '1.2');
 assert.eq(db.foo.count(), 0, '1.3');
 
 assert.commandWorked(db.foo.insert({_id: 2}));
-db.foo.renameCollection('bar', true);
-assert.isnull(db.getLastError(), '2.0');
+assert.commandWorked(db.foo.renameCollection('bar', true));
 assert.eq(db.bar.findOne(), {_id: 2}, '2.1');
 assert.eq(db.bar.count(), 1, '2.2');
 assert.eq(db.foo.count(), 0, '2.3');

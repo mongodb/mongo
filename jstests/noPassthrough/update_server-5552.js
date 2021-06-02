@@ -19,16 +19,15 @@ assert.commandWorked(bulk.execute());
 const join = startParallelShell(
     "while( db.foo.findOne( { _id : 0 } ).x == 1 ); db.foo.createIndex( { x : 1 } );");
 
-t.update({
+assert.commandWorked(t.update({
     $where: function() {
         sleep(1);
         return true;
     }
 },
-         {$set: {x: 5}},
-         false,
-         true);
-db.getLastError();
+                              {$set: {x: 5}},
+                              false,
+                              true));
 
 join();
 

@@ -307,9 +307,11 @@ let testConnReadPreference = function(conn, isMongos, rsNodes, {readPref, expect
     cmdTest(
         {dbStats: 1}, allowedOnSecondary.kAlways, true, formatProfileQuery(kDbName, {dbStats: 1}));
 
-    assert.commandWorked(shardedColl.createIndex({loc: '2d'}));
-
-    assert.commandWorked(testDB.runCommand({getLastError: 1, w: nodeCount}));
+    assert.commandWorked(testDB.runCommand({
+        createIndexes: shardedColl.getName(),
+        indexes: [{key: {loc: '2d'}, name: '2d'}],
+        writeConcern: {w: nodeCount}
+    }));
 
     // Test on sharded
     cmdTest({aggregate: kShardedCollName, pipeline: [{$project: {x: 1}}], cursor: {}},
