@@ -752,6 +752,9 @@ void ServiceStateMachineTest::tearDown() {
     // Normal shutdown is a noop outside of ASAN.
     invariant(_sep->shutdownAndWait(Seconds{10}));
 
+    _threadPool->shutdown();
+    _threadPool->join();
+
     if (_originalThreadingModel) {
         ServiceExecutor::setInitialThreadingModel(*_originalThreadingModel);
     }
