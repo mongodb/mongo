@@ -1862,7 +1862,6 @@ void WiredTigerKVEngine::checkpoint() {
             }
         }
     } catch (const WriteConflictException&) {
-        // TODO SERVER-50824: Check if this can be removed now that WT-3483 is done.
         LOGV2_WARNING(22346, "Checkpoint encountered a write conflict exception.");
     } catch (const AssertionException& exc) {
         invariant(ErrorCodes::isShutdownError(exc.code()), exc.what());
