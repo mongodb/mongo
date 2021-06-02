@@ -162,7 +162,8 @@ private:
      * The work inside this function must be run regardless of any work on _scopedExecutor ever
      * running.
      */
-    ExecutorFuture<void> _runMandatoryCleanup(Status status);
+    ExecutorFuture<void> _runMandatoryCleanup(Status status,
+                                              const CancellationToken& stepdownToken);
 
     // The following functions correspond to the actions to take at a particular recipient state.
     ExecutorFuture<void> _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
@@ -229,6 +230,8 @@ private:
         const CancellationToken& abortToken);
 
     ReshardingMetrics* _metrics() const;
+
+    void _startMetrics();
 
     // Initializes the _abortSource and generates a token from it to return back the caller.
     //

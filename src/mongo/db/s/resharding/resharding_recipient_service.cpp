@@ -337,7 +337,14 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMandatoryCleanup(
-    Status status) {
+    Status status, const CancellationToken& stepdownToken) {
+    if (stepdownToken.isCanceled()) {
+        // Interrupt occured, ensure the metrics get shut down.
+        // TODO SERVER-56500: Don't use ReshardingOperationStatusEnum::kCanceled here if it
+        // is not meant for failover cases.
+        _metrics()->onStepDown(ReshardingMetrics::Role::kRecipient);
+    }
+
     return _dataReplicationQuiesced.thenRunOn(_recipientService->getInstanceCleanupExecutor())
         .onCompletion([this, self = shared_from_this(), outerStatus = status](
                           Status dataReplicationHaltStatus) {
@@ -358,8 +365,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     _cancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
 
     return ExecutorFuture<void>(**executor)
-        .then(
-            [this] { _metrics()->onStart(ReshardingMetrics::Role::kRecipient, getCurrentTime()); })
+        .then([this] { _startMetrics(); })
         .then([this, executor, abortToken] {
             return _runUntilStrictConsistencyOrErrored(executor, abortToken);
         })
@@ -400,23 +406,10 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
         // necessary to use shared_from_this() to extend the lifetime so the all earlier code can
         // safely finish executing.
         .onCompletion([this, self = shared_from_this(), stepdownToken](Status status) {
-            if (stepdownToken.isCanceled()) {
-                // Interrupt occured, ensure the metrics get shut down.
-                // TODO SERVER-56500: Don't use ReshardingOperationStatusEnum::kCanceled here if it
-                // is not meant for failover cases.
-                _metrics()->onCompletion(ReshardingMetrics::Role::kRecipient,
-                                         ReshardingOperationStatusEnum::kCanceled,
-                                         getCurrentTime());
-            }
-
-            return status;
-        })
-        .thenRunOn(_recipientService->getInstanceCleanupExecutor())
-        .onCompletion([this, self = shared_from_this()](Status status) {
             // On stepdown or shutdown, the _scopedExecutor may have already been shut down.
             // Everything in this function runs on the instance's cleanup executor, and will
             // execute regardless of any work on _scopedExecutor ever running.
-            return _runMandatoryCleanup(status);
+            return _runMandatoryCleanup(status, stepdownToken);
         })
         .semi();
 }
@@ -952,6 +945,14 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
 
 ReshardingMetrics* ReshardingRecipientService::RecipientStateMachine::_metrics() const {
     return ReshardingMetrics::get(cc().getServiceContext());
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_startMetrics() {
+    if (_recipientCtx.getState() > RecipientStateEnum::kAwaitingFetchTimestamp) {
+        _metrics()->onStepUp(ReshardingMetrics::Role::kRecipient);
+    } else {
+        _metrics()->onStart(ReshardingMetrics::Role::kRecipient, getCurrentTime());
+    }
 }
 
 CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortSource(
