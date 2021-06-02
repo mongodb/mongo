@@ -510,8 +510,12 @@ void ConnectionPool::dropConnections(const HostAndPort& hostAndPort) {
 void ConnectionPool::dropConnections(transport::Session::TagMask tags) {
     stdx::lock_guard lk(_mutex);
 
-    for (const auto& pair : _pools) {
-        auto& pool = pair.second;
+    // SpecificPool::triggerShutdown can cause iterator invalidation (e.g. `pool` removing itself
+    // from `_pools`), so we increment `it` early after grabbing a reference to the `pool` it points
+    // to.
+    for (auto it = _pools.begin(); it != _pools.end();) {
+        auto& pool = it->second;
+        ++it;
 
         if (pool->matchesTags(tags))
             continue;
