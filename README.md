@@ -14,22 +14,27 @@ Welcome to MongoDB!
 
 ## Running
   For command line options invoke:
-    $ ./mongod --help
+  ```bash
+  $ ./mongod --help
+  ```
 
   To run a single server database:
+  ```bash
     $ sudo mkdir -p /data/db
     $ ./mongod
     $
     $ # The mongo javascript shell connects to localhost and test database by default:
     $ ./mongo
     > help
+  ```
 
 ## Installing Compass
-  You can install compass using the install_compass script packaged with MongoDB:
+  You can install compass using the `install_compass` script packaged with MongoDB:
+  ```bash
     $ ./install_compass
+  ```
 
-  This will download the appropriate MongoDB Compass package for your platform
-  and install it.
+  This will download the appropriate MongoDB Compass package for your platform and install it.
 
 ## Drivers
   Client drivers for most programming languages are available at
