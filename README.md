@@ -1,29 +1,22 @@
-MongoDB README
-
+# ![Logo](https://webassets.mongodb.com/_com_assets/cms/leaf-2g1s5txorx.svg) MongoDB README 
 Welcome to MongoDB!
 
-COMPONENTS
+## Components
+  - `mongod` - The database server.
+  - `mongos` - Sharding router.
+  - `mongo`  - The database shell (uses interactive javascript).
 
-  mongod - The database server.
-  mongos - Sharding router.
-  mongo  - The database shell (uses interactive javascript).
+## Utilities
+  `install_compass` - Installs MongoDB Compass for your platform.
 
-UTILITIES
+## Building
+  See [Building MongoDB](docs/building.md)
 
-  install_compass   - Installs MongoDB Compass for your platform.
-
-BUILDING
-
-  See docs/building.md.
-
-RUNNING
-
+## Running
   For command line options invoke:
-
     $ ./mongod --help
 
   To run a single server database:
-
     $ sudo mkdir -p /data/db
     $ ./mongod
     $
@@ -31,54 +24,39 @@ RUNNING
     $ ./mongo
     > help
 
-INSTALLING COMPASS
-
+## Installing Compass
   You can install compass using the install_compass script packaged with MongoDB:
-
     $ ./install_compass
 
   This will download the appropriate MongoDB Compass package for your platform
   and install it.
 
-DRIVERS
-
+## Drivers
   Client drivers for most programming languages are available at
   https://docs.mongodb.com/manual/applications/drivers/. Use the shell
   ("mongo") for administrative tasks.
 
-BUG REPORTS
-
+## Bug Reports
   See https://github.com/mongodb/mongo/wiki/Submit-Bug-Reports.
 
-PACKAGING
-
+## Packaging
   Packages are created dynamically by the package.py script located in the
   buildscripts directory. This will generate RPM and Debian packages.
 
-DOCUMENTATION
-
+## Documentation
   https://docs.mongodb.com/manual/
 
-CLOUD HOSTED MONGODB
-
+## Cloud Hosted MongoDB
   https://www.mongodb.com/cloud/atlas
 
-FORUMS
+## Forums for technical questions
+  - https://community.mongodb.com - using MongoDB
+  - https://community.mongodb.com/c/server-dev - building and developing MongoDB
 
-  https://community.mongodb.com
-
-    A forum for technical questions about using MongoDB.
-
-  https://community.mongodb.com/c/server-dev
-
-    A forum for technical questions about building and developing MongoDB.
-
-LEARN MONGODB
-
+## Learn MongoDB
   https://university.mongodb.com/
 
-LICENSE
-
+## LICENSE
   MongoDB is free and the source is available. Versions released prior to
   October 16, 2018 are published under the AGPL. All versions released after
   October 16, 2018, including patch fixes for prior versions, are published
