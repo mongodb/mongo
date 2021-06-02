@@ -42,6 +42,7 @@
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/util/assert_util.h"
@@ -95,11 +96,20 @@ private:
     const NamespaceString _ns{"test.test"};
     const std::vector<ShardId> _recipientShards = {{"shardOne"}, {"shardTwo"}};
 
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> _futureExecutor;
+
     std::unique_ptr<CancellationSource> _cancellationSource;
     std::shared_ptr<CoordinatorCommitMonitor> _commitMonitor;
 
     boost::optional<Callback> _runOnMockingNextResponse;
 };
+
+auto makeExecutor() {
+    executor::ThreadPoolMock::Options options;
+    options.onCreateThread = [] { Client::initThread("executor", nullptr); };
+    auto net = std::make_unique<executor::NetworkInterfaceMock>();
+    return executor::makeSharedThreadPoolTestExecutor(std::move(net), std::move(options));
+}
 
 void CoordinatorCommitMonitorTest::setUp() {
     ConfigServerTestFixture::setUp();
@@ -125,22 +135,24 @@ void CoordinatorCommitMonitorTest::setUp() {
     // The coordinator monitor uses `AsyncRequestsSender` to schedule remote commands, which
     // provides a blocking interface for fetching responses. The mocked networking, however,
     // requires yielding the executor thread after scheduling a remote command. To avoid deadlocks,
-    // we only use `executor()` to schedule remote commands, and use the arbitrary executor to run
+    // we only use `executor()` to schedule remote commands, and use the future executor to run
     // the future-continuation and its blocking calls.
-    auto networkExecutor = executor();
-    auto futureExecutor = executorPool()->getArbitraryExecutor();
-
-    futureExecutor->schedule([](Status) { Client::initThread("executor", nullptr); });
+    _futureExecutor = makeExecutor();
+    _futureExecutor->startup();
 
     _cancellationSource = std::make_unique<CancellationSource>();
     _commitMonitor = std::make_shared<CoordinatorCommitMonitor>(
-        _ns, _recipientShards, futureExecutor, _cancellationSource->token(), Milliseconds(0));
-    _commitMonitor->setNetworkExecutorForTest(networkExecutor);
+        _ns, _recipientShards, _futureExecutor, _cancellationSource->token(), Milliseconds(0));
+    _commitMonitor->setNetworkExecutorForTest(executor());
 }
 
 void CoordinatorCommitMonitorTest::tearDown() {
     _commitMonitor.reset();
     _cancellationSource.reset();
+
+    _futureExecutor->shutdown();
+    _futureExecutor->join();
+
     ConfigServerTestFixture::tearDown();
 }
 
