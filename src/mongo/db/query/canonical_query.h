@@ -146,7 +146,12 @@ public:
      *
      * TODO: Move this to query_validator.cpp
      */
-    static Status isValid(MatchExpression* root, const QueryRequest& parsed);
+    static Status isValid(const MatchExpression* root, const QueryRequest& parsed);
+
+    /**
+     * Perform additional validation checks on the normalized 'root'.
+     */
+    static Status isValidNormalized(const MatchExpression* root);
 
     /**
      * Traverses expression tree post-order.

@@ -1,5 +1,5 @@
 // Test the $text query operator.
-// @tags: [requires_non_retryable_writes]
+// @tags: [requires_fcv_42, requires_non_retryable_writes]
 (function() {
     "use strict";
 
@@ -79,8 +79,20 @@
     assert.eq(2, coll.find({b: 1}).itcount(), 'incorrect number of documents updated');
 
     // $text cannot be contained within a $nor.
-    assert.commandFailedWithCode(assert.throws(function() {
-        coll.find({$nor: [{$text: {$search: 'a'}}]}).itcount();
-    }),
-                                 ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        assert.throws(() => coll.find({$nor: [{$text: {$search: 'a'}}]}).itcount()),
+        ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        assert.throws(() => coll.find({$nor: [{a: 1}, {$text: {$search: 'a'}}]}).itcount()),
+        ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        assert.throws(
+            () => coll.find({
+                          $and: [
+                              {a: 2},
+                              {$nor: [{$or: [{c: {$not: {$ne: 10}}}, {$text: {$search: 'a'}}]}]}
+                          ]
+                      })
+                      .itcount()),
+        ErrorCodes.BadValue);
 }());

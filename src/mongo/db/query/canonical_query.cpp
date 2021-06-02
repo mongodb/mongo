@@ -224,12 +224,18 @@ Status CanonicalQuery::init(OperationContext* opCtx,
 
     _canHaveNoopMatchNodes = canHaveNoopMatchNodes;
 
-    // Normalize, sort and validate tree.
-    _root = MatchExpression::optimize(std::move(root));
-    sortTree(_root.get());
-    Status validStatus = isValid(_root.get(), *_qr);
+    // Validate, normalize, and sort tree.
+    auto validStatus = isValid(root.get(), *_qr);
     if (!validStatus.isOK()) {
         return validStatus;
+    }
+    _root = MatchExpression::optimize(std::move(root));
+    sortTree(_root.get());
+    // The tree must always be valid after normalization.
+    dassert(isValid(_root.get(), *_qr).isOK());
+    auto status = isValidNormalized(_root.get());
+    if (!status.isOK()) {
+        return status;
     }
 
     // Validate the projection if there is one.
@@ -314,7 +320,7 @@ size_t CanonicalQuery::countNodes(const MatchExpression* root, MatchExpression::
 /**
  * Does 'root' have a subtree of type 'subtreeType' with a node of type 'childType' inside?
  */
-bool hasNodeInSubtree(MatchExpression* root,
+bool hasNodeInSubtree(const MatchExpression* root,
                       MatchExpression::MatchType childType,
                       MatchExpression::MatchType subtreeType) {
     if (subtreeType == root->matchType()) {
@@ -329,9 +335,7 @@ bool hasNodeInSubtree(MatchExpression* root,
 }
 
 // static
-Status CanonicalQuery::isValid(MatchExpression* root, const QueryRequest& parsed) {
-    // Analysis below should be done after squashing the tree to make it clearer.
-
+Status CanonicalQuery::isValid(const MatchExpression* root, const QueryRequest& parsed) {
     // There can only be one TEXT.  If there is a TEXT, it cannot appear inside a NOR.
     //
     // Note that the query grammar (as enforced by the MatchExpression parser) forbids TEXT
@@ -351,20 +355,7 @@ Status CanonicalQuery::isValid(MatchExpression* root, const QueryRequest& parsed
     if (numGeoNear > 1) {
         return Status(ErrorCodes::BadValue, "Too many geoNear expressions");
     } else if (1 == numGeoNear) {
-        bool topLevel = false;
-        if (MatchExpression::GEO_NEAR == root->matchType()) {
-            topLevel = true;
-        } else if (MatchExpression::AND == root->matchType()) {
-            for (size_t i = 0; i < root->numChildren(); ++i) {
-                if (MatchExpression::GEO_NEAR == root->getChild(i)->matchType()) {
-                    topLevel = true;
-                    break;
-                }
-            }
-        }
-        if (!topLevel) {
-            return Status(ErrorCodes::BadValue, "geoNear must be top-level expr");
-        }
+        // Do nothing, we will perform extra checks in CanonicalQuery::isValidNormalized.
     }
 
     // NEAR cannot have a $natural sort or $natural hint.
@@ -420,6 +411,31 @@ Status CanonicalQuery::isValid(MatchExpression* root, const QueryRequest& parsed
                 return Status(ErrorCodes::BadValue,
                               "$natural hint must be in the same direction as $natural sort order");
             }
+        }
+    }
+
+    return Status::OK();
+}
+
+Status CanonicalQuery::isValidNormalized(const MatchExpression* root) {
+    auto numGeoNear = countNodes(root, MatchExpression::GEO_NEAR);
+    if (numGeoNear > 0) {
+        invariant(numGeoNear == 1);
+
+        auto topLevel = false;
+        if (MatchExpression::GEO_NEAR == root->matchType()) {
+            topLevel = true;
+        } else if (MatchExpression::AND == root->matchType()) {
+            for (size_t i = 0; i < root->numChildren(); ++i) {
+                if (MatchExpression::GEO_NEAR == root->getChild(i)->matchType()) {
+                    topLevel = true;
+                    break;
+                }
+            }
+        }
+
+        if (!topLevel) {
+            return Status(ErrorCodes::BadValue, "geoNear must be top-level expr");
         }
     }
 

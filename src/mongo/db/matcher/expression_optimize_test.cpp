@@ -74,7 +74,11 @@ Status isValid(const std::string& queryStr, const QueryRequest& qrRaw) {
     BSONObj queryObj = fromjson(queryStr);
     std::unique_ptr<MatchExpression> me(parseMatchExpression(queryObj));
     me = MatchExpression::optimize(std::move(me));
-    return CanonicalQuery::isValid(me.get(), qrRaw);
+    auto status = CanonicalQuery::isValid(me.get(), qrRaw);
+    if (!status.isOK()) {
+        return status;
+    }
+    return CanonicalQuery::isValidNormalized(me.get());
 }
 
 TEST(ExpressionOptimizeTest, IsValidText) {
