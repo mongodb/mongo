@@ -78,10 +78,12 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
 
     {
         stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
-        const bool isMultikey = _catalogIsMultikey(opCtx, collection, &_indexMultikeyPathsForRead);
+        const bool isMultikey = _catalogIsMultikey(opCtx, collection, &_indexMultikeyPathsForWrite);
         _isMultikeyForRead.store(isMultikey);
         _isMultikeyForWrite.store(isMultikey);
-        _indexTracksMultikeyPathsInCatalog = !_indexMultikeyPathsForRead.empty();
+        _indexMultikeyPathsForRead = _indexMultikeyPathsForWrite;
+        _numUncommittedCatalogMultikeyUpdates = 0;
+        _indexTracksMultikeyPathsInCatalog = !_indexMultikeyPathsForWrite.empty();
     }
 
     auto nss = DurableCatalog::get(opCtx)->getEntry(_catalogId).nss;
@@ -184,12 +186,12 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
 
     if (_indexTracksMultikeyPathsInCatalog) {
         stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
-        invariant(multikeyPaths.size() == _indexMultikeyPathsForRead.size());
+        invariant(multikeyPaths.size() == _indexMultikeyPathsForWrite.size());
 
         bool newPathIsMultikey = false;
         for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-            if (!std::includes(_indexMultikeyPathsForRead[i].begin(),
-                               _indexMultikeyPathsForRead[i].end(),
+            if (!std::includes(_indexMultikeyPathsForWrite[i].begin(),
+                               _indexMultikeyPathsForWrite[i].end(),
                                multikeyPaths[i].begin(),
                                multikeyPaths[i].end())) {
                 // If 'multikeyPaths' contains a new path component that causes this index to be
@@ -274,10 +276,12 @@ void IndexCatalogEntryImpl::forceSetMultikey(OperationContext* const opCtx,
     {
         stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
         const bool isMultikeyInCatalog =
-            _catalogIsMultikey(opCtx, coll, &_indexMultikeyPathsForRead);
+            _catalogIsMultikey(opCtx, coll, &_indexMultikeyPathsForWrite);
         _isMultikeyForRead.store(isMultikeyInCatalog);
         _isMultikeyForWrite.store(isMultikeyInCatalog);
-        _indexTracksMultikeyPathsInCatalog = !_indexMultikeyPathsForRead.empty();
+        _indexMultikeyPathsForRead = _indexMultikeyPathsForWrite;
+        _numUncommittedCatalogMultikeyUpdates = 0;
+        _indexTracksMultikeyPathsInCatalog = !_indexMultikeyPathsForWrite.empty();
     }
 
     // Since multikey metadata has changed, invalidate the query cache.
@@ -394,9 +398,13 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
     _isMultikeyForRead.store(true);
     if (_indexTracksMultikeyPathsInCatalog) {
         stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
+        if (_numUncommittedCatalogMultikeyUpdates == 0) {
+            _indexMultikeyPathsForRead = _indexMultikeyPathsForWrite;
+        }
         for (size_t i = 0; i < multikeyPaths.size(); ++i) {
             _indexMultikeyPathsForRead[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
         }
+        _numUncommittedCatalogMultikeyUpdates++;
     }
     if (indexMetadataHasChanged) {
         LOGV2_DEBUG(4718705,
@@ -412,6 +420,21 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
         // transaction successfully commits. Only after this point may a writer optimize out
         // flipping multikey.
         _isMultikeyForWrite.store(true);
+        if (_indexTracksMultikeyPathsInCatalog) {
+            stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
+            _indexMultikeyPathsForWrite = _indexMultikeyPathsForRead;
+            _numUncommittedCatalogMultikeyUpdates--;
+            invariant(_numUncommittedCatalogMultikeyUpdates >= 0,
+                      str::stream() << _ident << descriptor()->indexName());
+        }
+    });
+    opCtx->recoveryUnit()->onRollback([this] {
+        if (_indexTracksMultikeyPathsInCatalog) {
+            stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
+            _numUncommittedCatalogMultikeyUpdates--;
+            invariant(_numUncommittedCatalogMultikeyUpdates >= 0,
+                      str::stream() << _ident << ":" << descriptor()->indexName());
+        }
     });
 }
 
