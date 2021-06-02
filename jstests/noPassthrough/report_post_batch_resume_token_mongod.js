@@ -19,10 +19,17 @@ const db = rst.getPrimary().getDB(jsTestName());
 const collName = "report_post_batch_resume_token";
 const testCollection = assertDropAndRecreateCollection(db, collName);
 const otherCollection = assertDropAndRecreateCollection(db, "unrelated_" + collName);
-const adminDB = db.getSiblingDB("admin");
+const oplogColl = db.getSiblingDB("local").oplog.rs;
 
 let docId = 0;  // Tracks _id of documents inserted to ensure that we do not duplicate.
 const batchSize = 2;
+
+// Helper function to perform generic comparisons and dump the oplog on failure.
+function assertCompare(cmpFn, left, right, cmpOp, cmpVal) {
+    assert[cmpOp](cmpFn(left, right),
+                  cmpVal,
+                  {left: left, right: right, oplogEntries: oplogColl.find().toArray()});
+}
 
 // Start watching the test collection in order to capture a resume token.
 let csCursor = testCollection.watch();
@@ -74,13 +81,13 @@ assert.eq(csCursor.objsLeftInBatch(), 2);
 // The clusterTime should be the same on each, but the resume token keeps advancing.
 const txnEvent1 = csCursor.next(), txnEvent2 = csCursor.next();
 const txnClusterTime = txnEvent1.clusterTime;
-assert.eq(txnEvent2.clusterTime, txnClusterTime);
-assert.gt(bsonWoCompare(txnEvent1._id, initialAggPBRT), 0);
-assert.gt(bsonWoCompare(txnEvent2._id, txnEvent1._id), 0);
+assertCompare(timestampCmp, txnEvent2.clusterTime, txnClusterTime, "eq", 0);
+assertCompare(bsonWoCompare, txnEvent1._id, initialAggPBRT, "gt", 0);
+assertCompare(bsonWoCompare, txnEvent2._id, txnEvent1._id, "gt", 0);
 
 // The PBRT of the first transaction batch is equal to the last document's resumeToken.
 let getMorePBRT = csCursor.getResumeToken();
-assert.eq(bsonWoCompare(getMorePBRT, txnEvent2._id), 0);
+assertCompare(bsonWoCompare, getMorePBRT, txnEvent2._id, "eq", 0);
 
 // Save this PBRT so that we can test resuming from it later on.
 const resumePBRT = getMorePBRT;
@@ -93,15 +100,15 @@ assert.eq(csCursor.objsLeftInBatch(), 1);
 // The clusterTime of this event is the same as the two events from the previous batch, but its
 // resume token is greater than the previous PBRT.
 const txnEvent3 = csCursor.next();
-assert.eq(txnEvent3.clusterTime, txnClusterTime);
-assert.gt(bsonWoCompare(txnEvent3._id, previousGetMorePBRT), 0);
+assertCompare(timestampCmp, txnEvent3.clusterTime, txnClusterTime, "eq", 0);
+assertCompare(bsonWoCompare, txnEvent3._id, previousGetMorePBRT, "gt", 0);
 
 // Because we wrote to the unrelated collection, the final event in the transaction does not
 // appear in the batch. But in this case it also does not allow our PBRT to advance beyond the
 // last event in the batch, because the unrelated event is within the same transaction and
 // therefore has the same clusterTime.
 getMorePBRT = csCursor.getResumeToken();
-assert.eq(bsonWoCompare(getMorePBRT, txnEvent3._id), 0);
+assertCompare(bsonWoCompare, getMorePBRT, txnEvent3._id, "eq", 0);
 
 // Confirm that resuming from the PBRT of the first batch gives us the third transaction write.
 csCursor = testCollection.watch([], {resumeAfter: resumePBRT});
