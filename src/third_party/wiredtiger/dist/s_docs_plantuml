@@ -13,7 +13,7 @@ PLANTUML_URL="https://downloads.sourceforge.net/project/plantuml/plantuml.jar?r=
 
 # We require java which may not be installed.
 type java > /dev/null 2>&1 || {
-	echo 'skipped: java not found'
+	echo "$0 skipped: java not found"
 	exit 0
 }
 

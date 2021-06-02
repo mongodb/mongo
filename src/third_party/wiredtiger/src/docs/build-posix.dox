@@ -1,4 +1,4 @@
-/*! @page build-posix Building and installing WiredTiger on POSIX
+/*! @page build-posix Building and installing WiredTiger on POSIX (Linux, *BSD, OS X):
 
 To read instructions on using the legacy autoconf build system, see  @subpage build-autoconf.
 
