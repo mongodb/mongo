@@ -30,7 +30,21 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExp
         }
     }
 
-    var coll = db.indexofcp;
+    const coll = db.indexofcp;
+    coll.drop();
+    assert.commandWorked(coll.insert({item: 'foobar foobar', emptyStr: ''}));
+
+    // Test the edge case of searching for an empty string inside an empty string, where the start
+    // index is past the end index. These cases are designed to reproduce SERVER-56819.
+    assert.eq(-1,
+              coll.aggregate({$project: {byteLocation: {$indexOfCP: ['', '$emptyStr', 3]}}})
+                  .toArray()[0]
+                  .byteLocation);
+    assert.eq(-1,
+              coll.aggregate({$project: {byteLocation: {$indexOfCP: ['', '$emptyStr', 3, 1]}}})
+                  .toArray()[0]
+                  .byteLocation);
+
     coll.drop();
 
     // Insert a dummy document so something flows through the pipeline.
