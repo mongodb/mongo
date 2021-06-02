@@ -35,7 +35,7 @@ function checkSBEEnabled(theDB) {
                 const getParam =
                     conn.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1});
                 checkResult = getParam.hasOwnProperty("internalQueryForceClassicEngine") &&
-                    !getParam.internalQueryForceClassicEngine.value;
+                    !getParam.internalQueryForceClassicEngine;
                 return true;
             } catch (e) {
                 continue;
