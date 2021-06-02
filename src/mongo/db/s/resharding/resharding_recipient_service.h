@@ -146,7 +146,7 @@ public:
                                     const ReshardingRecipientDocument& recipientDoc);
 
     // Initiates the cancellation of the resharding operation.
-    void abort();
+    void abort(bool isUserCancelled);
 
 private:
     /**

@@ -455,7 +455,7 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
         auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
         notifyToStartCloning(opCtx.get(), *recipient, doc);
-        recipient->abort();
+        recipient->abort(false);
 
         doneTransitionGuard->wait(RecipientStateEnum::kDone);
         stepDown();
@@ -471,7 +471,7 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
         recipient = *maybeRecipient;
 
         doneTransitionGuard.reset();
-        recipient->abort();
+        recipient->abort(false);
 
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
         checkStateDocumentRemoved(opCtx.get());

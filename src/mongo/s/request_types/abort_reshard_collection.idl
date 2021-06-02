@@ -60,3 +60,8 @@ commands:
     namespace: type
     api_version: ""
     type: uuid
+    fields:
+      userCanceled:
+        type: bool
+        optional: false
+        description: "Determines whether the resharding opertion was user aborted."

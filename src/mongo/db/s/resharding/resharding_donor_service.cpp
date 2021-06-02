@@ -422,7 +422,7 @@ boost::optional<BSONObj> ReshardingDonorService::DonorStateMachine::reportForCur
 void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
     OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
     if (reshardingFields.getState() == CoordinatorStateEnum::kAborting) {
-        abort();
+        abort(reshardingFields.getUserCanceled().get());
         return;
     }
 
@@ -883,7 +883,7 @@ CancellationToken ReshardingDonorService::DonorStateMachine::_initAbortSource(
     return _abortSource->token();
 }
 
-void ReshardingDonorService::DonorStateMachine::abort() {
+void ReshardingDonorService::DonorStateMachine::abort(bool isUserCancelled) {
     auto abortSource = [&]() -> boost::optional<CancellationSource> {
         stdx::lock_guard<Latch> lk(_mutex);
 

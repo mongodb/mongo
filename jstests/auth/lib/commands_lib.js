@@ -226,7 +226,7 @@ var authCommandsLib = {
         },
         {
           testname: "_shardsvrAbortReshardCollection",
-          command: {_shardsvrAbortReshardCollection: UUID()},
+          command: {_shardsvrAbortReshardCollection: UUID(), userCanceled: true},
           skipSharded: true,
           testcases: [
               {

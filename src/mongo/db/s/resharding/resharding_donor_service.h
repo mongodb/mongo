@@ -101,7 +101,7 @@ public:
                                     const ReshardingDonorDocument& donorDoc);
 
     // Initiates the cancellation of the resharding operation.
-    void abort();
+    void abort(bool isUserCancelled);
 
 private:
     /**

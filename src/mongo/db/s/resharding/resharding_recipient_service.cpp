@@ -425,7 +425,7 @@ boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::repo
 void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChanges(
     OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
     if (reshardingFields.getState() == CoordinatorStateEnum::kAborting) {
-        abort();
+        abort(reshardingFields.getUserCanceled().get());
         return;
     }
 
@@ -951,7 +951,7 @@ CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortS
     return _abortSource->token();
 }
 
-void ReshardingRecipientService::RecipientStateMachine::abort() {
+void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancelled) {
     auto abortSource = [&]() -> boost::optional<CancellationSource> {
         stdx::lock_guard<Latch> lk(_mutex);
 

@@ -1254,7 +1254,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_onAbortCoordinatorAnd
     _updateCoordinatorDocStateAndCatalogEntries(
         CoordinatorStateEnum::kAborting, _coordinatorDoc, boost::none, boost::none, status);
 
-    _tellAllParticipantsToAbort(executor);
+    _tellAllParticipantsToAbort(executor, status == ErrorCodes::ReshardCollectionAborted);
 
     // Wait for all participants to acknowledge the operation reached an unrecoverable
     // error.
@@ -1638,7 +1638,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsTo
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsToAbort(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, bool isUserAborted) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
     auto donorShardIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
@@ -1647,7 +1647,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsTo
     std::set<ShardId> participantShardIds{donorShardIds.begin(), donorShardIds.end()};
     participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
 
-    ShardsvrAbortReshardCollection abortCmd(_coordinatorDoc.getReshardingUUID());
+    ShardsvrAbortReshardCollection abortCmd(_coordinatorDoc.getReshardingUUID(), isUserAborted);
     abortCmd.setDbName("admin");
 
     sharding_util::sendCommandToShards(opCtx.get(),
