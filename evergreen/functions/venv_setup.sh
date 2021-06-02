@@ -39,6 +39,11 @@ toolchain_txt="$pip_dir/toolchain-requirements.txt"
 
 activate_venv
 echo "Upgrading pip to 21.0.1"
-python -m pip install "pip==21.0.1"
-python -m pip install -r "$toolchain_txt" -q
+python -m pip --disable-pip-version-check install "pip==21.0.1" || exit 1
+python -m pip --disable-pip-version-check install -r "$toolchain_txt" -q --log install.log
+if [ $? != 0 ]; then
+  echo "Pip install error"
+  cat install.log
+  exit 1
+fi
 python -m pip freeze >pip-requirements.txt
