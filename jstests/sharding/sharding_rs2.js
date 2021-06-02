@@ -225,8 +225,12 @@ assert.eq(100, ts.count(), "E4");
 assert.eq(100, ts.find().itcount(), "E5");
 printjson(ts.find().batchSize(5).explain());
 
-// fsyncLock the secondaries
+// fsyncLock the secondaries and enable command logging on all the mongods.
+assert.commandWorked(
+    rs.getPrimary().adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}));
 rs.getSecondaries().forEach(function(secondary) {
+    assert.commandWorked(
+        secondary.adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}));
     assert.commandWorked(secondary.getDB("test").fsyncLock());
 });
 
