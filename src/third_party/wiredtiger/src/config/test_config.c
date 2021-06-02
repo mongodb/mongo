@@ -2,6 +2,11 @@
 
 #include "wt_internal.h"
 
+static const WT_CONFIG_CHECK confchk_checkpoint_manager_subconfigs[] = {
+  {"enabled", "boolean", NULL, NULL, NULL, 0},
+  {"interval", "string", NULL, "choices=[\"s\",\"m\",\"h\"]", NULL, 0},
+  {"op_count", "int", NULL, "min=1,max=10000", NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
+
 static const WT_CONFIG_CHECK confchk_stat_cache_size_subconfigs[] = {
   {"enabled", "boolean", NULL, NULL, NULL, 0}, {"limit", "int", NULL, "min=0", NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
@@ -60,6 +65,7 @@ static const WT_CONFIG_CHECK confchk_workload_tracking_subconfigs[] = {
 
 static const WT_CONFIG_CHECK confchk_example_test[] = {
   {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
+  {"checkpoint_manager", "category", NULL, NULL, confchk_checkpoint_manager_subconfigs, 3},
   {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
   {"enable_logging", "boolean", NULL, NULL, NULL, 0},
   {"runtime_monitor", "category", NULL, NULL, confchk_runtime_monitor_subconfigs, 4},
@@ -70,6 +76,7 @@ static const WT_CONFIG_CHECK confchk_example_test[] = {
 
 static const WT_CONFIG_CHECK confchk_poc_test[] = {
   {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
+  {"checkpoint_manager", "category", NULL, NULL, confchk_checkpoint_manager_subconfigs, 3},
   {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
   {"enable_logging", "boolean", NULL, NULL, NULL, 0},
   {"runtime_monitor", "category", NULL, NULL, confchk_runtime_monitor_subconfigs, 4},
@@ -80,7 +87,8 @@ static const WT_CONFIG_CHECK confchk_poc_test[] = {
 
 static const WT_CONFIG_ENTRY config_entries[] = {
   {"example_test",
-    "cache_size_mb=0,duration_seconds=0,enable_logging=false,"
+    "cache_size_mb=0,checkpoint_manager=(enabled=true,interval=s,"
+    "op_count=1),duration_seconds=0,enable_logging=false,"
     "runtime_monitor=(enabled=true,interval=s,op_count=1,"
     "stat_cache_size=(enabled=false,limit=0)),"
     "timestamp_manager=(enabled=true,interval=s,oldest_lag=1,"
@@ -91,9 +99,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     "min=0),read_threads=0,update_config=(interval=s,key_size=5,"
     "op_count=1,value_size=5),update_threads=0,value_size=5),"
     "workload_tracking=(enabled=true,interval=s,op_count=1)",
-    confchk_example_test, 7},
+    confchk_example_test, 8},
   {"poc_test",
-    "cache_size_mb=0,duration_seconds=0,enable_logging=false,"
+    "cache_size_mb=0,checkpoint_manager=(enabled=true,interval=s,"
+    "op_count=1),duration_seconds=0,enable_logging=false,"
     "runtime_monitor=(enabled=true,interval=s,op_count=1,"
     "stat_cache_size=(enabled=false,limit=0)),"
     "timestamp_manager=(enabled=true,interval=s,oldest_lag=1,"
@@ -104,7 +113,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     "min=0),read_threads=0,update_config=(interval=s,key_size=5,"
     "op_count=1,value_size=5),update_threads=0,value_size=5),"
     "workload_tracking=(enabled=true,interval=s,op_count=1)",
-    confchk_poc_test, 7},
+    confchk_poc_test, 8},
   {NULL, NULL, NULL, 0}};
 
 /*

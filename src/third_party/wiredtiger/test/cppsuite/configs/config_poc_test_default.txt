@@ -3,6 +3,11 @@
 # Used as a basic test for the framework.
 duration_seconds=10,
 cache_size_mb=1000,
+checkpoint_manager=
+(
+    op_count=30,
+    interval=m,
+),
 runtime_monitor=
 (
     stat_cache_size=

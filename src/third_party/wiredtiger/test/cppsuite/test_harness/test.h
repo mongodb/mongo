@@ -41,6 +41,7 @@ extern "C" {
 #include "util/api_const.h"
 #include "core/component.h"
 #include "core/configuration.h"
+#include "checkpoint_manager.h"
 #include "connection_manager.h"
 #include "runtime_monitor.h"
 #include "timestamp_manager.h"
@@ -57,6 +58,7 @@ class test : public database_operation {
     test(const std::string &config, const std::string &name)
     {
         _config = new configuration(name, config);
+        _checkpoint_manager = new checkpoint_manager(_config->get_subconfig(CHECKPOINT_MANAGER));
         _runtime_monitor = new runtime_monitor(_config->get_subconfig(RUNTIME_MONITOR));
         _timestamp_manager = new timestamp_manager(_config->get_subconfig(TIMESTAMP_MANAGER));
         _workload_tracking = new workload_tracking(_config->get_subconfig(WORKLOAD_TRACKING),
@@ -69,19 +71,21 @@ class test : public database_operation {
          * Ordering is not important here, any dependencies between components should be resolved
          * internally by the components.
          */
-        _components = {
-          _workload_tracking, _workload_generator, _timestamp_manager, _runtime_monitor};
+        _components = {_workload_tracking, _workload_generator, _timestamp_manager,
+          _runtime_monitor, _checkpoint_manager};
     }
 
     ~test()
     {
         delete _config;
+        delete _checkpoint_manager;
         delete _runtime_monitor;
         delete _timestamp_manager;
         delete _thread_manager;
         delete _workload_generator;
         delete _workload_tracking;
         _config = nullptr;
+        _checkpoint_manager = nullptr;
         _runtime_monitor = nullptr;
         _timestamp_manager = nullptr;
         _thread_manager = nullptr;
@@ -181,6 +185,7 @@ class test : public database_operation {
     std::string _name;
     std::vector<component *> _components;
     configuration *_config;
+    checkpoint_manager *_checkpoint_manager = nullptr;
     runtime_monitor *_runtime_monitor = nullptr;
     thread_manager *_thread_manager = nullptr;
     timestamp_manager *_timestamp_manager = nullptr;
