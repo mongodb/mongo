@@ -225,14 +225,19 @@ Status CanonicalQuery::init(OperationContext* opCtx,
 
     _canHaveNoopMatchNodes = canHaveNoopMatchNodes;
 
-    // Normalize, sort and validate tree.
-    _root = MatchExpression::optimize(std::move(root));
-    sortTree(_root.get());
-    auto validStatus = isValid(_root.get(), *_qr);
+    // Validate, normalize, and sort tree.
+    auto validStatus = isValid(root.get(), *_qr);
     if (!validStatus.isOK()) {
         return validStatus.getStatus();
     }
     auto unavailableMetadata = validStatus.getValue();
+    _root = MatchExpression::optimize(std::move(root));
+    sortTree(_root.get());
+    // The tree must always be valid after normalization.
+    dassert(isValid(_root.get(), *_qr).isOK());
+    if (auto status = isValidNormalized(_root.get()); !status.isOK()) {
+        return status;
+    }
 
     // Validate the projection if there is one.
     if (!_qr->getProj().isEmpty()) {
@@ -360,7 +365,7 @@ size_t CanonicalQuery::countNodes(const MatchExpression* root, MatchExpression::
 /**
  * Does 'root' have a subtree of type 'subtreeType' with a node of type 'childType' inside?
  */
-bool hasNodeInSubtree(MatchExpression* root,
+bool hasNodeInSubtree(const MatchExpression* root,
                       MatchExpression::MatchType childType,
                       MatchExpression::MatchType subtreeType) {
     if (subtreeType == root->matchType()) {
@@ -374,7 +379,7 @@ bool hasNodeInSubtree(MatchExpression* root,
     return false;
 }
 
-StatusWith<QueryMetadataBitSet> CanonicalQuery::isValid(MatchExpression* root,
+StatusWith<QueryMetadataBitSet> CanonicalQuery::isValid(const MatchExpression* root,
                                                         const QueryRequest& request) {
     QueryMetadataBitSet unavailableMetadata{};
 
@@ -400,20 +405,7 @@ StatusWith<QueryMetadataBitSet> CanonicalQuery::isValid(MatchExpression* root,
     if (numGeoNear > 1) {
         return Status(ErrorCodes::BadValue, "Too many geoNear expressions");
     } else if (1 == numGeoNear) {
-        bool topLevel = false;
-        if (MatchExpression::GEO_NEAR == root->matchType()) {
-            topLevel = true;
-        } else if (MatchExpression::AND == root->matchType()) {
-            for (size_t i = 0; i < root->numChildren(); ++i) {
-                if (MatchExpression::GEO_NEAR == root->getChild(i)->matchType()) {
-                    topLevel = true;
-                    break;
-                }
-            }
-        }
-        if (!topLevel) {
-            return Status(ErrorCodes::BadValue, "geoNear must be top-level expr");
-        }
+        // Do nothing, we will perform extra checks in CanonicalQuery::isValidNormalized.
     } else {
         // Geo distance and geo point metadata are unavailable.
         unavailableMetadata |= DepsTracker::kAllGeoNearData;
@@ -487,6 +479,30 @@ StatusWith<QueryMetadataBitSet> CanonicalQuery::isValid(MatchExpression* root,
     }
 
     return unavailableMetadata;
+}
+
+Status CanonicalQuery::isValidNormalized(const MatchExpression* root) {
+    if (auto numGeoNear = countNodes(root, MatchExpression::GEO_NEAR); numGeoNear > 0) {
+        invariant(numGeoNear == 1);
+
+        auto topLevel = false;
+        if (MatchExpression::GEO_NEAR == root->matchType()) {
+            topLevel = true;
+        } else if (MatchExpression::AND == root->matchType()) {
+            for (size_t i = 0; i < root->numChildren(); ++i) {
+                if (MatchExpression::GEO_NEAR == root->getChild(i)->matchType()) {
+                    topLevel = true;
+                    break;
+                }
+            }
+        }
+
+        if (!topLevel) {
+            return Status(ErrorCodes::BadValue, "geoNear must be top-level expr");
+        }
+    }
+
+    return Status::OK();
 }
 
 std::string CanonicalQuery::toString() const {
