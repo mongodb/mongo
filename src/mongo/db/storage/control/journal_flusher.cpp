@@ -48,6 +48,7 @@ namespace {
 
 const auto getJournalFlusher = ServiceContext::declareDecoration<std::unique_ptr<JournalFlusher>>();
 
+MONGO_FAIL_POINT_DEFINE(pauseJournalFlusherBeforeFlush);
 MONGO_FAIL_POINT_DEFINE(pauseJournalFlusherThread);
 
 }  // namespace
@@ -94,6 +95,7 @@ void JournalFlusher::run() {
     // from Flow Control.
     _uniqueCtx->get()->setShouldParticipateInFlowControl(false);
     while (true) {
+        pauseJournalFlusherBeforeFlush.pauseWhileSet();
         try {
             ON_BLOCK_EXIT([&] {
                 // We do not want to miss an interrupt for the next round. Therefore, the opCtx
