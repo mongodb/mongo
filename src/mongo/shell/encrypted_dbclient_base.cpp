@@ -629,7 +629,8 @@ std::shared_ptr<SymmetricKey> EncryptedDBClientBase::getDataKey(const UUID& uuid
 
 std::shared_ptr<SymmetricKey> EncryptedDBClientBase::getDataKeyFromDisk(const UUID& uuid) {
     NamespaceString fullNameNS = getCollectionNS();
-    BSONObj dataKeyObj = _conn->findOne(fullNameNS.ns(), QUERY("_id" << uuid));
+    BSONObj dataKeyObj = _conn->findOne(
+        fullNameNS.ns(), QUERY("_id" << uuid), nullptr, 0, repl::ReadConcernArgs::kImplicitDefault);
     if (dataKeyObj.isEmpty()) {
         uasserted(ErrorCodes::BadValue, "Invalid keyID.");
     }
