@@ -48,19 +48,20 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self.use_replica_set_connection_string = use_replica_set_connection_string
         self.default_read_concern = default_read_concern
         self.default_write_concern = default_write_concern
-        self.mixed_bin_versions = self.fixturelib.default_if_none(mixed_bin_versions,
-                                                                  self.config.MIXED_BIN_VERSIONS)
-        self.mixed_bin_versions_config = self.mixed_bin_versions
+        self.mixed_bin_versions = mixed_bin_versions
         self.shard_logging_prefix = shard_logging_prefix
         self.replicaset_logging_prefix = replicaset_logging_prefix
+        self.num_nodes = num_nodes
+        # Used by the enhanced multiversion system to signify multiversion mode.
+        # None implies no multiversion run.
+        self.fcv = None
 
         # Use the values given from the command line if they exist for linear_chain and num_nodes.
         linear_chain_option = self.fixturelib.default_if_none(self.config.LINEAR_CHAIN,
                                                               linear_chain)
         self.linear_chain = linear_chain_option if linear_chain_option else linear_chain
-        num_replset_nodes = self.config.NUM_REPLSET_NODES
-        self.num_nodes = num_replset_nodes if num_replset_nodes else num_nodes
 
+        # Legacy multiversion line
         if self.mixed_bin_versions is not None:
             mongod_executable = self.fixturelib.default_if_none(
                 self.mongod_executable, self.config.MONGOD_EXECUTABLE,
@@ -110,43 +111,29 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             self._dbpath_prefix = os.path.join(self._dbpath_prefix, self.config.FIXTURE_SUBDIR)
 
         self.nodes = []
-        self.replset_name = None
+        self.replset_name = self.mongod_options.setdefault("replSet", "rs")
         self.initial_sync_node = None
         self.initial_sync_node_idx = -1
 
     def setup(self):  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
         """Set up the replica set."""
-        self.replset_name = self.mongod_options.get("replSet", "rs")
-        if not self.nodes:
-            for i in range(self.num_nodes):
-                node = self._new_mongod(i, self.replset_name)
-                self.nodes.append(node)
 
+        # Version-agnostic options for mongod/s can be set here.
+        # Version-specific options should be set in get_version_specific_options_for_mongod()
+        # to avoid options for old versions being applied to new Replicaset fixtures.
         for i in range(self.num_nodes):
-            steady_state_constraint_param = "oplogApplicationEnforcesSteadyStateConstraints"
-            # TODO (SERVER-52985): Set steady state constraint parameters on last-lts nodes.
-            if (steady_state_constraint_param not in self.nodes[i].mongod_options["set_parameters"]
-                    and self.mixed_bin_versions is not None
-                    and self.mixed_bin_versions[i] == "new"):
-                self.nodes[i].mongod_options["set_parameters"][steady_state_constraint_param] = True
-            if self.linear_chain and i > 0:
-                self.nodes[i].mongod_options["set_parameters"][
-                    "failpoint.forceSyncSourceCandidate"] = self.fixturelib.make_historic({
-                        "mode": "alwaysOn",
-                        "data": {"hostAndPort": self.nodes[i - 1].get_internal_connection_string()}
-                    })
             self.nodes[i].setup()
 
-        if self.start_initial_sync_node:
-            if not self.initial_sync_node:
-                self.initial_sync_node_idx = len(self.nodes)
-                self.initial_sync_node = self._new_mongod(self.initial_sync_node_idx,
-                                                          self.replset_name)
+        if self.initial_sync_node:
             self.initial_sync_node.setup()
             self.initial_sync_node.await_ready()
 
+        # Legacy multiversion line
+        # TODO (SERVER-57255): Don't delete steady state constraint options when backporting to 5.0.
         if self.mixed_bin_versions:
             for i in range(self.num_nodes):
+                print("node[i] version: " + self.nodes[i].mongod_executable +
+                      "mixed_bin_version[i]: " + self.mixed_bin_versions[i])
                 if self.nodes[i].mongod_executable != self.mixed_bin_versions[i]:
                     msg = (f"Executable of node{i}: {self.nodes[i].mongod_executable} does not "
                            f"match the executable assigned by mixedBinVersions: "
@@ -213,23 +200,13 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self._initiate_repl_set(client, repl_config)
         self._await_primary()
 
-        if self.mixed_bin_versions is not None:
-            if self.mixed_bin_versions[0] == "new":
-                fcv_response = client.admin.command(
-                    {"getParameter": 1, "featureCompatibilityVersion": 1})
-                fcv = fcv_response["featureCompatibilityVersion"]["version"]
-                if fcv != ReplicaSetFixture._LATEST_FCV:
-                    msg = (("Server returned FCV{} when we expected FCV{}.").format(
-                        fcv, ReplicaSetFixture._LATEST_FCV))
-                    raise self.fixturelib.ServerFailure(msg)
-
+        if self.fcv is not None:
             # Initiating a replica set with a single node will use "latest" FCV. This will
             # cause IncompatibleServerVersion errors if additional "last-lts" binary version
             # nodes are subsequently added to the set, since such nodes cannot set their FCV to
             # "latest". Therefore, we make sure the primary is "last-lts" FCV before adding in
             # nodes of different binary versions to the replica set.
-            client.admin.command(
-                {"setFeatureCompatibilityVersion": ReplicaSetFixture._LAST_LTS_FCV})
+            client.admin.command({"setFeatureCompatibilityVersion": self.fcv})
 
         if self.nodes[1:]:
             # Wait to connect to each of the secondaries before running the replSetReconfig
@@ -581,21 +558,32 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         """Return initial sync node from the replica set."""
         return self.initial_sync_node
 
-    def _new_mongod(self, index, replset_name):
-        """Return a standalone.MongoDFixture configured to be used as replica-set member."""
-        mongod_executable = (self.mongod_executable
-                             if self.mixed_bin_versions is None else self.mixed_bin_versions[index])
-        mongod_logger = self._get_logger_for_mongod(index)
+    def set_fcv(self, fcv):
+        """Set the fcv used by this fixtures."""
+        self.fcv = fcv
+
+    def install_mongod(self, mongod):
+        """Install a mongod node. Called by a builder."""
+        self.nodes.append(mongod)
+
+    def get_options_for_mongod(self, index):
+        """Return options that may be passed to a mongod."""
         mongod_options = self.mongod_options.copy()
-        mongod_options["replSet"] = replset_name
+
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "node{}".format(index))
-        mongod_options["set_parameters"] = mongod_options.get("set_parameters", {}).copy()
+        mongod_options["set_parameters"] = mongod_options.get("set_parameters",
+                                                              self.fixturelib.make_historic(
+                                                                  {})).copy()
 
-        return interface.make_fixture(
-            "MongoDFixture", mongod_logger, self.job_num, mongod_executable=mongod_executable,
-            mongod_options=mongod_options, preserve_dbpath=self.preserve_dbpath)
+        if self.linear_chain and index > 0:
+            self.mongod_options["set_parameters"][
+                "failpoint.forceSyncSourceCandidate"] = self.fixturelib.make_historic({
+                    "mode": "alwaysOn",
+                    "data": {"hostAndPort": self.nodes[index - 1].get_internal_connection_string()}
+                })
+        return mongod_options
 
-    def _get_logger_for_mongod(self, index):
+    def get_logger_for_mongod(self, index):
         """Return a new logging.Logger instance.
 
         The instance is used as the primary, secondary, or initial sync member of a replica-set.
@@ -624,9 +612,6 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""
-        if self.replset_name is None:
-            raise ValueError("Must call setup() before calling get_internal_connection_string()")
-
         conn_strs = [node.get_internal_connection_string() for node in self.nodes]
         if self.initial_sync_node:
             conn_strs.append(self.initial_sync_node.get_internal_connection_string())
@@ -643,9 +628,6 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
-        if self.replset_name is None:
-            raise ValueError("Must call setup() before calling get_driver_connection_url()")
-
         if self.use_replica_set_connection_string:
             # We use a replica set connection string when all nodes are electable because we
             # anticipate the client will want to gracefully handle any failovers.
@@ -657,6 +639,10 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             # We return a direct connection to the expected pimary when only the first node is
             # electable because we want the client to error out if a stepdown occurs.
             return self.nodes[0].get_driver_connection_url()
+
+    def write_historic(self, obj):
+        """Convert the obj to a record to track history."""
+        self.fixturelib.make_historic(obj)
 
 
 def get_last_optime(client, fixturelib):

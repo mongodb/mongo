@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Generate fuzzer tests to run in evergreen in parallel."""
 import argparse
-from collections import namedtuple
 from typing import Set, Optional, List, NamedTuple
 
 from shrub.v2 import ShrubProject, FunctionCall, Task, TaskDependency, BuildVariant, ExistingTask

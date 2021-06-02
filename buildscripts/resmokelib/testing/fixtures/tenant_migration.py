@@ -49,9 +49,28 @@ class TenantMigrationFixture(interface.Fixture):  # pylint: disable=too-many-ins
 
         self.replica_sets = []
 
+        if not self.replica_sets:
+            for i in range(self.num_replica_sets):
+                rs_name = f"rs{i}"
+                mongod_options = self.common_mongod_options.copy()
+                mongod_options.update(self.per_mongod_options[i])
+                mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, rs_name)
+                mongod_options["replSet"] = rs_name
+
+                self.replica_sets.append(
+                    self.fixturelib.make_fixture(
+                        "ReplicaSetFixture", self.logger, self.job_num,
+                        mongod_options=mongod_options, preserve_dbpath=self.preserve_dbpath,
+                        num_nodes=self.num_nodes_per_replica_set, auth_options=self.auth_options,
+                        replset_config_options=self.replset_config_options,
+                        mixed_bin_versions=self.mixed_bin_versions,
+                        replicaset_logging_prefix=rs_name,
+                        use_replica_set_connection_string=self.use_replica_set_connection_string,
+                        all_nodes_electable=self.all_nodes_electable))
+
         # The ReplicaSetFixture for the replica set that starts out owning the data (i.e. the
         # replica set that driver should connect to when running commands).
-        self.replica_set_with_tenant = None
+        self.replica_set_with_tenant = self.replica_sets[0]
 
     def pids(self):
         """:return: pids owned by this fixture if any."""
@@ -64,28 +83,6 @@ class TenantMigrationFixture(interface.Fixture):  # pylint: disable=too-many-ins
 
     def setup(self):
         """Set up the replica sets."""
-        if not self.replica_sets:
-            for i in range(self.num_replica_sets):
-                rs_name = f"rs{i}"
-                mongod_options = self.common_mongod_options.copy()
-                mongod_options.update(self.per_mongod_options[i])
-                mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, rs_name)
-                mongod_options["replSet"] = rs_name
-
-                self.replica_sets.append(
-                    interface.make_fixture(
-                        "ReplicaSetFixture", self.logger, self.job_num,
-                        mongod_options=mongod_options, preserve_dbpath=self.preserve_dbpath,
-                        num_nodes=self.num_nodes_per_replica_set, auth_options=self.auth_options,
-                        replset_config_options=self.replset_config_options,
-                        mixed_bin_versions=self.mixed_bin_versions,
-                        replicaset_logging_prefix=rs_name,
-                        use_replica_set_connection_string=self.use_replica_set_connection_string,
-                        all_nodes_electable=self.all_nodes_electable))
-
-            self.replica_set_with_tenant = self.replica_sets[0]
-
-        # Start up each of the replica sets
         for replica_set in self.replica_sets:
             replica_set.setup()
             self._create_tenant_migration_donor_and_recipient_roles(replica_set)
