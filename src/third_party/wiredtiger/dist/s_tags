@@ -14,7 +14,7 @@ test -f s_tags || {
 
 # We require ctags which may not be installed.
 type ctags > /dev/null 2>&1 || {
-	echo 'skipped: ctags not found'
+	echo "$0 skipped: ctags not found"
 	exit 0
 }
 

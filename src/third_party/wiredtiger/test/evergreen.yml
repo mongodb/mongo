@@ -148,13 +148,13 @@ functions:
           #   Please note the "branch" variable used here is a normal shell variable to store the name of
           #   a WiredTiger Github branch, while the "branch_name" used above is an Evergreen built-in variable
           #   to store the name of the branch being tested by the Evergreen project.
-          for branch in develop mongodb-4.4 mongodb-4.2 mongodb-4.0 mongodb-3.6 ; do
+          for branch in develop mongodb-5.0 mongodb-4.4 mongodb-4.2 mongodb-4.0 ; do
             echo "[Debug] Checking out branch $branch ..."
             git checkout $branch && git pull --ff-only && git reset --hard origin/$branch && git clean -fdqx
             sh reconf
 
             # Java API is removed in newer branches via WT-6675.
-            if [ "$branch" = "mongodb-4.2" -o "$branch" = "mongodb-4.0" -o "$branch" = "mongodb-3.6" ]; then
+            if [ "$branch" = "mongodb-4.2" -o "$branch" = "mongodb-4.0" ]; then
               ../configure CFLAGS="-DMIGHT_NOT_RUN -Wno-error" --enable-java --enable-python --enable-strict
               (cd lang/python && make ../../../lang/python/wiredtiger_wrap.c)
               (cd lang/java && make ../../../lang/java/wiredtiger_wrap.c)
@@ -162,11 +162,6 @@ functions:
               ../configure CFLAGS="-DMIGHT_NOT_RUN -Wno-error" --enable-python --enable-strict
               (cd lang/python && make ../../../lang/python/wiredtiger_wrap.c)
             fi
-
-            # Make sure the code fragment is in the documentation build.
-            make all-am
-            make -C test/utility
-            make -C examples/c
 
             (cd ../dist && sh s_docs)
             (cd .. && rm -rf docs-$branch && mv docs docs-$branch)
@@ -2762,7 +2757,7 @@ buildvariants:
 - name: little-endian
   display_name: "~ Little-endian (x86)"
   run_on:
-  - ubuntu1804-test
+  - ubuntu2004-test
   batchtime: 10080 # 7 days
   expansions:
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
