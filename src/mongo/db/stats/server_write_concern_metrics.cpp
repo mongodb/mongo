@@ -106,13 +106,8 @@ BSONObj ServerWriteConcernMetrics::toBSON() const {
     return builder.obj();
 }
 
-void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::recordWriteConcern(
+void ServerWriteConcernMetrics::WriteConcernCounters::recordWriteConcern(
     const WriteConcernOptions& writeConcernOptions, size_t numOps) {
-    if (writeConcernOptions.usedDefaultW) {
-        noWCount += numOps;
-        return;
-    }
-
     if (!writeConcernOptions.wMode.empty()) {
         if (writeConcernOptions.wMode == WriteConcernOptions::kMajority) {
             wMajorityCount += numOps;
@@ -126,8 +121,28 @@ void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::recordWrite
     wNumCounts[writeConcernOptions.wNumNodes] += numOps;
 }
 
-void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::toBSON(
-    BSONObjBuilder* builder) const {
+void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::recordWriteConcern(
+    const WriteConcernOptions& writeConcernOptions, size_t numOps) {
+    if (writeConcernOptions.usedDefaultW) {
+        if (writeConcernOptions.getProvenance().isCustomDefault()) {
+            cWWC.recordWriteConcern(writeConcernOptions, numOps);
+        } else {
+            // Provenance is either:
+            //  - "implicitDefault" : implicit default WC (w:1 or w:"majority") is used.
+            //  - "clientSupplied"  : set without "w" value, so implicit default WC (w:1) is used.
+            //  - "internalWriteDefault" : if internal command sets empty WC ({writeConcern: {}}),
+            //    then default constructed WC (w:1) is used.
+            implicitDefaultWC.recordWriteConcern(writeConcernOptions, numOps);
+        }
+
+        notExplicitWCount += numOps;
+        return;
+    }
+
+    explicitWC.recordWriteConcern(writeConcernOptions, numOps);
+}
+
+void ServerWriteConcernMetrics::WriteConcernCounters::toBSON(BSONObjBuilder* builder) const {
     builder->append("wmajority", static_cast<long long>(wMajorityCount));
 
     BSONObjBuilder wNumBuilder(builder->subobjStart("wnum"));
@@ -136,13 +151,31 @@ void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::toBSON(
     }
     wNumBuilder.done();
 
-    BSONObjBuilder wTagBuilder(builder->subobjStart("wtag"));
-    for (auto const& pair : wTagCounts) {
-        wTagBuilder.append(pair.first, static_cast<long long>(pair.second));
+    if (exportWTag) {
+        BSONObjBuilder wTagBuilder(builder->subobjStart("wtag"));
+        for (auto const& pair : wTagCounts) {
+            wTagBuilder.append(pair.first, static_cast<long long>(pair.second));
+        }
+        wTagBuilder.done();
     }
-    wTagBuilder.done();
+}
 
-    builder->append("none", static_cast<long long>(noWCount));
+void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::toBSON(
+    BSONObjBuilder* builder) const {
+    explicitWC.toBSON(builder);
+
+    builder->append("none", static_cast<long long>(notExplicitWCount));
+    BSONObjBuilder noneBuilder(builder->subobjStart("noneInfo"));
+
+    BSONObjBuilder cWWCBuilder(noneBuilder.subobjStart("CWWC"));
+    cWWC.toBSON(&cWWCBuilder);
+    cWWCBuilder.done();
+
+    BSONObjBuilder implicitBuilder(noneBuilder.subobjStart("implicitDefault"));
+    implicitDefaultWC.toBSON(&implicitBuilder);
+    implicitBuilder.done();
+
+    noneBuilder.done();
 }
 
 namespace {

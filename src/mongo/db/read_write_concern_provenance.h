@@ -123,6 +123,13 @@ public:
     }
 
     /**
+     * Returns true if the RWC was a custom default.
+     */
+    const bool isCustomDefault() const {
+        return hasSource() && *getSource() == Source::customDefault;
+    }
+
+    /**
      * Sets the source of this provenance.  In order to prevent accidental clobbering of provenance
      * with incorrect values, a source cannot change during the provenance's lifetime, except for
      * the initial transition from kUnset to some other Source value.
