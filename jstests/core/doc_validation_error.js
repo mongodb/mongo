@@ -74,6 +74,7 @@ const testCases = [
                 operatorName: "properties",
                 propertiesNotSatisfied: [{
                     propertyName: "children",
+                    description: "must be an array of string and max is 2",
                     details: [{
                         operatorName: "bsonType",
                         specifiedAs: {bsonType: ["array"]},
@@ -183,6 +184,7 @@ const testCases = [
                     propertiesNotSatisfied: [
                         {
                             propertyName: "major",
+                            description: "can only be one of the enum values and is required",
                             details: [{
                                 operatorName: "enum",
                                 specifiedAs: {
@@ -198,6 +200,7 @@ const testCases = [
                                 operatorName: "properties",
                                 propertiesNotSatisfied: [{
                                     propertyName: "street",
+                                    description: "must be a string if the field exists",
                                     details: [{
                                         operatorName: "bsonType",
                                         specifiedAs: {bsonType: "string"},
@@ -287,6 +290,7 @@ const testCases = [
                     operatorName: "properties",
                     propertiesNotSatisfied: [{
                         propertyName: "status",
+                        description: "can only be one of the enum values",
                         details: [{
                             operatorName: "enum",
                             specifiedAs: {enum: ["Unknown", "Incomplete"]},
@@ -319,11 +323,14 @@ const testCases = [
         },
         expectedError: {
             operatorName: "$jsonSchema",
+            title: "JSON schema for component.json files",
             schemaRulesNotSatisfied: [{
                 operatorName: "properties",
                 propertiesNotSatisfied: [
                     {
                         propertyName: "private",
+                        description:
+                            "A boolean specifying whether the component is private, defaulting to    false.",
                         details: [{
                             operatorName: "type",
                             specifiedAs: {type: "boolean"},
@@ -334,6 +341,8 @@ const testCases = [
                     },
                     {
                         propertyName: "name",
+                        description:
+                            "A public component MUST have a 'name'. This is what will be passed to    require().",
                         details: [{
                             operatorName: "pattern",
                             specifiedAs: {pattern: "^[0-9a-z-_]+$"},
@@ -343,6 +352,8 @@ const testCases = [
                     },
                     {
                         propertyName: "version",
+                        description:
+                            "The public component MUST include a version, allowing other scripts to depend on specific releases of the component.",
                         details: [{
                             operatorName: "type",
                             specifiedAs: {type: "string"},
@@ -353,6 +364,8 @@ const testCases = [
                     },
                     {
                         propertyName: "scripts",
+                        description:
+                            "The    scripts    field explicitly specifies the scripts for this component. For public components, these must be regular JavaScript files. For private components, these should be regular Javascript files.",
                         details: [{
                             operatorName: "items",
                             reason: "At least one item did not match the sub-schema",
@@ -368,6 +381,7 @@ const testCases = [
                     },
                     {
                         propertyName: "dependencies",
+                        description: "Runtime dependencies.",
                         details: [{
                             operatorName: "type",
                             specifiedAs: {type: "object"},
@@ -392,6 +406,9 @@ const testCases = [
         },
         expectedError: {
             operatorName: "$jsonSchema",
+            title: "LLVM compilation database",
+            description:
+                "Describes a format for specifying how to replay single compilations independently of the build system",
             schemaRulesNotSatisfied: [{
                 operatorName: "properties",
                 propertiesNotSatisfied: [{

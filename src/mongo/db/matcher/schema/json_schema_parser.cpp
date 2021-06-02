@@ -564,7 +564,8 @@ StatusWithMatchExpression parseProperties(const boost::intrusive_ptr<ExpressionC
         nestedSchemaMatch.getValue()->setErrorAnnotation(doc_validation_error::createAnnotation(
             expCtx,
             "_property",
-            BSON("propertyName" << property.fieldNameStringData().toString())));
+            BSON("propertyName" << property.fieldNameStringData().toString()),
+            property.Obj()));
         if (requiredProperties.find(property.fieldNameStringData()) != requiredProperties.end()) {
             // The field name for which we created the nested schema is a required property. This
             // property must exist and therefore must match 'nestedSchemaMatch'.
@@ -927,9 +928,17 @@ StatusWithMatchExpression parseDependencies(const boost::intrusive_ptr<Expressio
     }
 
     auto andExpr = std::make_unique<AndMatchExpression>(doc_validation_error::createAnnotation(
-        expCtx, dependencies.fieldNameStringData().toString(), BSONObj()));
+        expCtx, dependencies.fieldNameStringData().toString(), BSONObj(), dependencies.Obj()));
     for (auto&& dependency : dependencies.embeddedObject()) {
         if (dependency.type() != BSONType::Object && dependency.type() != BSONType::Array) {
+            // Allow JSON Schema annotations under "dependency" keyword.
+            const auto isSchemaAnnotation =
+                dependency.fieldNameStringData() == JSONSchemaParser::kSchemaTitleKeyword ||
+                dependency.fieldNameStringData() == JSONSchemaParser::kSchemaDescriptionKeyword;
+            if (dependency.type() == BSONType::String && isSchemaAnnotation) {
+                continue;
+            }
+
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "property '" << dependency.fieldNameStringData()
                                   << "' in $jsonSchema keyword '"
@@ -1748,7 +1757,7 @@ StatusWithMatchExpression _parse(const boost::intrusive_ptr<ExpressionContext>& 
     // to '$jsonSchema', the caller is responsible for providing this information by overwriting
     // this annotation.
     auto andExpr = std::make_unique<AndMatchExpression>(
-        doc_validation_error::createAnnotation(expCtx, "_subschema", BSONObj()));
+        doc_validation_error::createAnnotation(expCtx, "_subschema", BSONObj(), schema));
 
     auto translationStatus =
         translateScalarKeywords(expCtx, keywordMap, path, typeExpr.get(), andExpr.get());
@@ -1874,8 +1883,8 @@ StatusWithMatchExpression JSONSchemaParser::parse(
         if (translation.isOK()) {
             if (auto topLevelAnnotation = translation.getValue()->getErrorAnnotation()) {
                 auto oldAnnotation = topLevelAnnotation->annotation;
-                translation.getValue()->setErrorAnnotation(
-                    doc_validation_error::createAnnotation(expCtx, "$jsonSchema", oldAnnotation));
+                translation.getValue()->setErrorAnnotation(doc_validation_error::createAnnotation(
+                    expCtx, "$jsonSchema", oldAnnotation, schema));
             }
         }
         expCtx->sbeCompatible = false;

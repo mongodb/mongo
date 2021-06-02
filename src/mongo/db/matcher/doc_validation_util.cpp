@@ -33,9 +33,11 @@ namespace mongo::doc_validation_error {
 std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const std::string& tag,
-    BSONObj annotation) {
+    BSONObj annotation,
+    const BSONObj& jsonSchemaElement) {
     if (expCtx->isParsingCollectionValidator) {
-        return std::make_unique<MatchExpression::ErrorAnnotation>(tag, std::move(annotation));
+        return std::make_unique<MatchExpression::ErrorAnnotation>(
+            tag, std::move(annotation), jsonSchemaElement);
     } else {
         return nullptr;
     }

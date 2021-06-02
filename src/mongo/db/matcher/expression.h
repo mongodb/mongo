@@ -229,17 +229,41 @@ public:
         };
 
         /**
+         * JSON Schema annotations - 'title' and 'description' attributes.
+         */
+        struct SchemaAnnotations {
+            /**
+             * Constructs JSON schema annotations with annotation fields not set.
+             */
+            SchemaAnnotations() {}
+
+            /**
+             * Constructs JSON schema annotations from JSON Schema element 'jsonSchemaElement'.
+             */
+            SchemaAnnotations(const BSONObj& jsonSchemaElement);
+
+            void appendElements(BSONObjBuilder& builder) const;
+
+            boost::optional<std::string> title;
+            boost::optional<std::string> description;
+        };
+
+        /**
          * Constructs an annotation for a MatchExpression which does not contribute to error output.
          */
-        ErrorAnnotation(Mode mode) : tag(""), annotation(BSONObj()), mode(mode) {
+        ErrorAnnotation(Mode mode)
+            : tag(""), annotation(BSONObj()), mode(mode), schemaAnnotations(SchemaAnnotations()) {
             invariant(mode != Mode::kGenerateError);
         }
 
         /**
          * Constructs a complete annotation for a MatchExpression which contributes to error output.
          */
-        ErrorAnnotation(std::string tag, BSONObj annotation)
-            : tag(std::move(tag)), annotation(annotation.getOwned()), mode(Mode::kGenerateError) {}
+        ErrorAnnotation(std::string tag, BSONObj annotation, BSONObj schemaAnnotationsObj)
+            : tag(std::move(tag)),
+              annotation(annotation.getOwned()),
+              mode(Mode::kGenerateError),
+              schemaAnnotations(SchemaAnnotations(schemaAnnotationsObj)) {}
 
         std::unique_ptr<ErrorAnnotation> clone() const {
             return std::make_unique<ErrorAnnotation>(*this);
@@ -252,6 +276,7 @@ public:
         // Tracks the original expression as specified by the user.
         const BSONObj annotation;
         const Mode mode;
+        const SchemaAnnotations schemaAnnotations;
     };
 
     /**

@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/matcher/schema/json_schema_parser.h"
 
 namespace mongo {
 
@@ -162,5 +163,29 @@ void MatchExpression::addDependencies(DepsTracker* deps) const {
     }
 
     _doAddDependencies(deps);
+}
+
+MatchExpression::ErrorAnnotation::SchemaAnnotations::SchemaAnnotations(
+    const BSONObj& jsonSchemaElement) {
+    auto title = jsonSchemaElement[JSONSchemaParser::kSchemaTitleKeyword];
+    if (title.type() == BSONType::String) {
+        this->title = {title.String()};
+    }
+
+    auto description = jsonSchemaElement[JSONSchemaParser::kSchemaDescriptionKeyword];
+    if (description.type() == BSONType::String) {
+        this->description = {description.String()};
+    }
+}
+
+void MatchExpression::ErrorAnnotation::SchemaAnnotations::appendElements(
+    BSONObjBuilder& builder) const {
+    if (title) {
+        builder << JSONSchemaParser::kSchemaTitleKeyword << title.get();
+    }
+
+    if (description) {
+        builder << JSONSchemaParser::kSchemaDescriptionKeyword << description.get();
+    }
 }
 }  // namespace mongo
