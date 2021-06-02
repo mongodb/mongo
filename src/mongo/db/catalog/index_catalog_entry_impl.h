@@ -248,7 +248,8 @@ private:
     // this point, future writers do not need to update the catalog.
     AtomicWord<bool> _isMultikeyForWrite;
 
-    // Controls concurrent access to '_indexMultikeyPathsForRead'.
+    // Controls concurrent access to '_indexMultikeyPathsForRead', '_indexMultikeyPathsForWrite',
+    // and '_numUncommittedCatalogMultikeyUpdates'.
     // We acquire this mutex rather than the RESOURCE_METADATA lock as a performance optimization
     // so that it is cheaper to detect whether there is actually any path-level multikey
     // information to update or not.
@@ -261,7 +262,17 @@ private:
     // in the index key pattern. Each element in the vector is an ordered set of positions (starting
     // at 0) into the corresponding indexed field that represent what prefixes of the indexed field
     // causes the index to be multikey.
-    MultikeyPaths _indexMultikeyPathsForRead;  // May include paths not committed to catalog.
+    MultikeyPaths _indexMultikeyPathsForRead;   // May include paths not committed to catalog.
+    MultikeyPaths _indexMultikeyPathsForWrite;  // Paths in catalog updated by a transaction commit.
+
+    // If this counter is greater than zero, we have state in '_indexMultikeyPathsForRead' that have
+    // not been successfully updated in the durable catalog. This counter corresponds to the number
+    // of calls _catalogSetMultikey() with open storage transactions.
+    // It is possible for the read paths to contain path info that are not present in the durable
+    // catalog, but all the durable paths must be present in the in-memory state (read paths). This
+    // may lead to less than optimal query plans, but should not result in incorrect plans due to
+    // insufficient multikey coverage.
+    int _numUncommittedCatalogMultikeyUpdates = 0;
 
     // KVPrefix used to differentiate between index entries in different logical indexes sharing the
     // same underlying sorted data interface.
