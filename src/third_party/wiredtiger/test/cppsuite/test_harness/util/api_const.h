@@ -33,6 +33,7 @@
 namespace test_harness {
 
 /* Component names. */
+static const char *CHECKPOINT_MANAGER = "checkpoint_manager";
 static const char *RUNTIME_MONITOR = "runtime_monitor";
 static const char *TIMESTAMP_MANAGER = "timestamp_manager";
 static const char *WORKLOAD_GENERATOR = "workload_generator";

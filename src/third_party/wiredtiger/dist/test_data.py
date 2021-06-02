@@ -115,6 +115,11 @@ transaction_config = [
 ]
 
 #
+# Configuration for the checkpoint_manager component.
+#
+checkpoint_manager = component_config
+
+#
 # Configuration that applies to the runtime monitor component, this should be a list of statistics
 # that need to be checked by the component.
 #
@@ -161,6 +166,9 @@ workload_generator = component_config + transaction_config + record_config + pop
 
 test_config = [
 # Component configurations.
+    Config('checkpoint_manager', '', r'''
+        Configuration options for the checkpoint manager''',
+        type='category', subconfig=checkpoint_manager),
     Config('runtime_monitor', '', r'''
         Configuration options for the runtime_monitor''',
         type='category', subconfig=runtime_monitor),
