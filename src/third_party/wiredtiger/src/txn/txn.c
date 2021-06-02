@@ -1159,9 +1159,15 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
             continue;
         }
 
-        /* Ignore the already resolved updates. */
-        if (upd->prepare_state == WT_PREPARE_RESOLVED)
+        /*
+         * Performing an update on the same key where the truncate operation is performed can lead
+         * to updates that are already resolved in the updated list. Ignore the already resolved
+         * updates.
+         */
+        if (upd->prepare_state == WT_PREPARE_RESOLVED) {
+            WT_ASSERT(session, upd->type == WT_UPDATE_TOMBSTONE);
             continue;
+        }
 
         /*
          * Newer updates are inserted at head of update chain, and transaction operations are added
