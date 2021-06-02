@@ -251,7 +251,7 @@ function(config_bool config_name description)
             endif()
         endif()
         # Config doesn't meet dependency requirements, set its default state and flag it as disabled.
-        set(${config_name} ${CONFIG_BOOL_DEFAULT} CACHE STRING "${description}" FORCE)
+        set(${config_name} OFF CACHE STRING "${description}" FORCE)
         set(${config_name}_DISABLED ON CACHE INTERNAL "" FORCE)
     endif()
 endfunction()

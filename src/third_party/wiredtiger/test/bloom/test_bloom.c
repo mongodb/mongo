@@ -28,6 +28,8 @@
 
 #include "test_util.h"
 
+#define HOME_SIZE 512
+
 static struct {
     WT_CONNECTION *wt_conn; /* WT_CONNECTION handle */
     WT_SESSION *wt_session; /* WT_SESSION handle */
@@ -104,8 +106,14 @@ setup(void)
     WT_CONNECTION *conn;
     WT_SESSION *session;
     char config[512];
+    static char home[HOME_SIZE]; /* Base home directory */
 
-    testutil_check(system("rm -f WiredTiger* *.bf"));
+    testutil_work_dir_from_path(home, HOME_SIZE, "WT_TEST");
+
+    /* Clean the test directory if it already exists. */
+    testutil_clean_work_dir(home);
+    /* Create the home test directory for the test. */
+    testutil_make_work_dir(home);
 
     /*
      * This test doesn't test public Wired Tiger functionality, it still needs connection and
@@ -120,7 +128,7 @@ setup(void)
       "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,%s", progname, g.c_cache,
       g.config_open == NULL ? "" : g.config_open));
 
-    testutil_check(wiredtiger_open(NULL, NULL, config, &conn));
+    testutil_check(wiredtiger_open(home, NULL, config, &conn));
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 

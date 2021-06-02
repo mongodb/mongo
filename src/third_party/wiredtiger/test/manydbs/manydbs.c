@@ -164,7 +164,8 @@ main(int argc, char *argv[])
     testutil_make_work_dir(home);
     __wt_random_init(&rnd);
     for (i = 0; i < dbs; ++i) {
-        testutil_check(__wt_snprintf(hometmp, HOME_SIZE, "%s/%s.%d", home, HOME_BASE, i));
+        testutil_check(
+          __wt_snprintf(hometmp, HOME_SIZE, "%s%c%s.%d", home, DIR_DELIM, HOME_BASE, i));
         testutil_make_work_dir(hometmp);
         /*
          * Open each database. Rotate different configurations among them. Open a session and

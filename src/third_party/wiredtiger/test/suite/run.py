@@ -61,6 +61,8 @@ elif os.path.basename(curdir) == '.libs' and \
     wt_builddir = os.path.join(curdir, os.pardir)
 elif os.path.isfile(os.path.join(curdir, 'wt')):
     wt_builddir = curdir
+elif os.path.isfile(os.path.join(curdir, 'wt.exe')):
+    wt_builddir = curdir
 elif os.path.isfile(os.path.join(wt_disttop, 'wt')):
     wt_builddir = wt_disttop
 elif os.path.isfile(os.path.join(wt_disttop, 'build_posix', 'wt')):
