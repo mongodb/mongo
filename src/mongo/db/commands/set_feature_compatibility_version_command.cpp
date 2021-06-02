@@ -353,8 +353,9 @@ public:
         // writeConcern.
         ON_BLOCK_EXIT([&] {
             // Propagate the user's wTimeout if one was given.
-            auto timeout =
-                opCtx->getWriteConcern().usedDefault ? INT_MAX : opCtx->getWriteConcern().wTimeout;
+            auto timeout = opCtx->getWriteConcern().isImplicitDefaultWriteConcern()
+                ? INT_MAX
+                : opCtx->getWriteConcern().wTimeout;
             WriteConcernResult res;
             auto waitForWCStatus = waitForWriteConcern(
                 opCtx,

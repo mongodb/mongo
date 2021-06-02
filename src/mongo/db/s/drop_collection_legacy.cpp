@@ -56,7 +56,7 @@ void sendDropCollectionToAllShards(OperationContext* opCtx,
         BSONObjBuilder builder;
         builder.append("drop", nss.coll());
 
-        if (!opCtx->getWriteConcern().usedDefault) {
+        if (!opCtx->getWriteConcern().usedDefaultConstructedWC) {
             builder.append(WriteConcernOptions::kWriteConcernField,
                            opCtx->getWriteConcern().toBSON());
         }

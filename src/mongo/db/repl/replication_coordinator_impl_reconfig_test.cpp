@@ -1957,8 +1957,8 @@ TEST_F(ReplCoordReconfigTest, ArbiterNodesShouldNeverHaveNewlyAddedField) {
     RWConcernDefault newDefaults;
     WriteConcernOptions wc;
     wc.wMode = "majority";
-    wc.usedDefault = false;
-    wc.usedDefaultW = false;
+    wc.usedDefaultConstructedWC = false;
+    wc.notExplicitWValue = false;
     newDefaults.setDefaultWriteConcern(wc);
     lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 

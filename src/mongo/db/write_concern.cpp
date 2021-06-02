@@ -93,7 +93,10 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
 
     WriteConcernOptions writeConcern = wcResult.getValue();
 
-    bool clientSuppliedWriteConcern = !writeConcern.usedDefault;
+    // This is the WC extracted from the command object, so the CWWC or implicit default hasn't been
+    // applied yet, which is why "usedDefaultConstructedWC" flag can be used an indicator of whether
+    // the client supplied a WC or not.
+    bool clientSuppliedWriteConcern = !writeConcern.usedDefaultConstructedWC;
     bool customDefaultWasApplied = false;
 
     // If no write concern is specified in the command, then use the cluster-wide default WC (if
@@ -138,7 +141,8 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
         if (writeConcern.wNumNodes == 0 && writeConcern.wMode.empty()) {
             writeConcern.wNumNodes = 1;
         }
-        writeConcern.usedDefaultW = true;
+
+        writeConcern.notExplicitWValue = true;
     }
 
     // It's fine for clients to provide any provenance value to mongod. But if they haven't, then an
@@ -156,7 +160,8 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
         }
     }
 
-    if (writeConcern.usedDefault && serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+    if (!clientSuppliedWriteConcern &&
+        serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
         !opCtx->getClient()->isInDirectClient() &&
         (opCtx->getClient()->session() &&
          (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient))) {

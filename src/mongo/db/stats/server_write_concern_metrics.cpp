@@ -123,7 +123,7 @@ void ServerWriteConcernMetrics::WriteConcernCounters::recordWriteConcern(
 
 void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::recordWriteConcern(
     const WriteConcernOptions& writeConcernOptions, size_t numOps) {
-    if (writeConcernOptions.usedDefaultW) {
+    if (writeConcernOptions.notExplicitWValue) {
         if (writeConcernOptions.getProvenance().isCustomDefault()) {
             cWWC.recordWriteConcern(writeConcernOptions, numOps);
         } else {

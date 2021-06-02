@@ -124,7 +124,8 @@ void TransactionMetricsObserver::onCommit(OperationContext* opCtx,
     serverTransactionsMetrics->updateLastTransaction(
         operationCount,
         oplogOperationBytes,
-        opCtx->getWriteConcern().usedDefault ? BSONObj() : opCtx->getWriteConcern().toBSON());
+        opCtx->getWriteConcern().usedDefaultConstructedWC ? BSONObj()
+                                                          : opCtx->getWriteConcern().toBSON());
 
     auto duration =
         durationCount<Microseconds>(_singleTransactionStats.getDuration(tickSource, curTick));

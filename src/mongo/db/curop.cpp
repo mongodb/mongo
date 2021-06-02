@@ -965,7 +965,7 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
         }
     }
 
-    if (writeConcern && !writeConcern->usedDefault) {
+    if (writeConcern && !writeConcern->usedDefaultConstructedWC) {
         s << " writeConcern:" << writeConcern->toBSON();
     }
 
@@ -1148,7 +1148,7 @@ void OpDebug::report(OperationContext* opCtx,
         }
     }
 
-    if (writeConcern && !writeConcern->usedDefault) {
+    if (writeConcern && !writeConcern->usedDefaultConstructedWC) {
         pAttrs->add("writeConcern", writeConcern->toBSON());
     }
 
@@ -1285,7 +1285,7 @@ void OpDebug::append(OperationContext* opCtx,
         }
     }
 
-    if (writeConcern && !writeConcern->usedDefault) {
+    if (writeConcern && !writeConcern->usedDefaultConstructedWC) {
         b.append("writeConcern", writeConcern->toBSON());
     }
 
@@ -1547,7 +1547,7 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     });
 
     addIfNeeded("writeConcern", [](auto field, auto args, auto& b) {
-        if (args.op.writeConcern && !args.op.writeConcern->usedDefault) {
+        if (args.op.writeConcern && !args.op.writeConcern->usedDefaultConstructedWC) {
             b.append(field, args.op.writeConcern->toBSON());
         }
     });

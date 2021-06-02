@@ -1240,7 +1240,7 @@ StatusWith<ChunkManager> getExecutionNsRoutingInfo(OperationContext* opCtx,
 Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx) {
     // The idempotent retry policy will retry even for writeConcern failures, so only set it if the
     // pipeline does not support writeConcern.
-    if (!opCtx->getWriteConcern().usedDefault) {
+    if (!opCtx->getWriteConcern().usedDefaultConstructedWC) {
         return Shard::RetryPolicy::kNotIdempotent;
     }
     return Shard::RetryPolicy::kIdempotent;

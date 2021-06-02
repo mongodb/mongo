@@ -1329,7 +1329,7 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
     //
     // TODO (SERVER-41165): Snapshot read concern should wait on the read timestamp instead.
     auto wc = opCtx->getWriteConcern();
-    auto needsNoopWrite = txnOps.empty() && !opCtx->getWriteConcern().usedDefault;
+    auto needsNoopWrite = txnOps.empty() && !opCtx->getWriteConcern().usedDefaultConstructedWC;
 
     const size_t operationCount = p().transactionOperations.size();
     const size_t oplogOperationBytes = p().transactionOperationBytes;
