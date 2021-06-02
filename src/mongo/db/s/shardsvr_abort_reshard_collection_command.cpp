@@ -76,7 +76,7 @@ public:
                 LOGV2(5663800,
                       "Aborting resharding recipient participant",
                       "reshardingUUID"_attr = uuid());
-                (*machine)->abort();
+                (*machine)->abort(isUserCanceled());
             }
 
             if (auto machine = resharding::tryGetReshardingStateMachine<
@@ -88,7 +88,7 @@ public:
                 LOGV2(5663801,
                       "Aborting resharding donor participant",
                       "reshardingUUID"_attr = uuid());
-                (*machine)->abort();
+                (*machine)->abort(isUserCanceled());
             }
 
             for (auto doneFuture : futuresToWait) {
@@ -122,6 +122,10 @@ public:
         }
 
     private:
+        bool isUserCanceled() const {
+            return request().getUserCanceled();
+        }
+
         UUID uuid() const {
             return request().getCommandParameter();
         }

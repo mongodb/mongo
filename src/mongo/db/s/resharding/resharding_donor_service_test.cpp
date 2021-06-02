@@ -486,7 +486,7 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterAbort) {
         // The call to notifyToStartBlockingWrites() is skipped here because the donor is being
         // notified that the resharding operation is aborting before the donor would have
         // transitioned to kBlockingWrites.
-        donor->abort();
+        donor->abort(false);
 
         // Step down before the transition to kDone can complete.
         doneTransitionGuard->wait(DonorStateEnum::kDone);
@@ -504,7 +504,7 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterAbort) {
         donor = *maybeDonor;
         doneTransitionGuard.reset();
 
-        donor->abort();
+        donor->abort(false);
         ASSERT_OK(donor->getCompletionFuture().getNoThrow());
         checkStateDocumentRemoved(opCtx.get());
 
@@ -543,7 +543,7 @@ TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
             ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
         }
 
-        donor->abort();
+        donor->abort(false);
         ASSERT_OK(donor->getCompletionFuture().getNoThrow());
         checkStateDocumentRemoved(opCtx.get());
 
