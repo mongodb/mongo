@@ -401,11 +401,13 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
         const bool shouldBalance = isAutoBalanceEnabled(opCtx.get(), nss, balancerConfig);
 
         LOGV2(21908,
-              "autosplitted {namespace} chunk: {chunk} with {splitPoints} split points "
-              "(maxChunkSizeBytes: {maxChunkSizeBytes}). {extraInfo}",
+              "autosplitted {namespace} chunk: [{minKey},{maxKey}) with {splitPoints} split points "
+              "(maxChunkSizeBytes: {maxChunkSizeBytes}, lastmod: {lastmod}). {extraInfo}",
               "autosplitted chunk",
               "namespace"_attr = nss,
-              "chunk"_attr = redact(chunk.toString()),
+              "minKey"_attr = redact(chunk.getMin()),
+              "maxKey"_attr = redact(chunk.getMax()),
+              "lastmod"_attr = redact(chunk.getLastmod().toBSON()),
               "splitPoints"_attr = splitPoints.size(),
               "maxChunkSizeBytes"_attr = maxChunkSizeBytes,
               "extraInfo"_attr =

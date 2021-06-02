@@ -130,8 +130,8 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
               "Requested split points lookup for chunk {namespace} {minKey} -->> {maxKey}",
               "Requested split points lookup for chunk",
               "namespace"_attr = nss.toString(),
-              "minKey"_attr = redact(minKey),
-              "maxKey"_attr = redact(maxKey));
+              "minKey"_attr = redact(prettyKey(keyPattern, minKey)),
+              "maxKey"_attr = redact(prettyKey(keyPattern, maxKey)));
 
         // We'll use the average object size and number of object to find approximately how many
         // keys each chunk should have. We'll split at half the maxChunkSizeBytes or
@@ -205,8 +205,8 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                 "{maxKey} contains only the key {key}",
                 "Possible low cardinality key detected in range. Range contains only a single key.",
                 "namespace"_attr = nss.toString(),
-                "minKey"_attr = redact(minKey),
-                "maxKey"_attr = redact(maxKey),
+                "minKey"_attr = redact(prettyKey(idx->keyPattern(), minKey)),
+                "maxKey"_attr = redact(prettyKey(idx->keyPattern(), maxKey)),
                 "key"_attr = redact(prettyKey(idx->keyPattern(), currKey)));
             std::vector<BSONObj> emptyVector;
             return emptyVector;
@@ -248,8 +248,8 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                                   "Max BSON response size reached for split vector before the end "
                                   "of chunk",
                                   "namespace"_attr = nss.toString(),
-                                  "minKey"_attr = redact(minKey),
-                                  "maxKey"_attr = redact(maxKey));
+                                  "minKey"_attr = redact(prettyKey(idx->keyPattern(), minKey)),
+                                  "maxKey"_attr = redact(prettyKey(idx->keyPattern(), maxKey)));
                             break;
                         }
 
@@ -273,8 +273,8 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                           "Max number of requested split points reached before the end of chunk",
                           "numSplitPoints"_attr = numChunks,
                           "namespace"_attr = nss.toString(),
-                          "minKey"_attr = redact(minKey),
-                          "maxKey"_attr = redact(maxKey));
+                          "minKey"_attr = redact(prettyKey(idx->keyPattern(), minKey)),
+                          "maxKey"_attr = redact(prettyKey(idx->keyPattern(), maxKey)));
                     break;
                 }
 
