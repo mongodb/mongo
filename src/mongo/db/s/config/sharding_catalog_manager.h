@@ -247,6 +247,23 @@ public:
                                          const boost::optional<Timestamp>& validAfter);
 
     /**
+     * Updates metadata in the config.chunks collection so the chunks within the specified key range
+     * are seen merged into a single larger chunk.
+     * If 'validAfter' is not set, this means the commit request came from an older server version,
+     * which is not history-aware.
+     *
+     * Returns a BSON object with the newly produced chunk versions after the migration:
+     *   - shardVersion - The new shard version of the source shard
+     *   - collectionVersion - The new collection version after the commit
+     */
+    StatusWith<BSONObj> commitChunksMerge(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const UUID& requestCollectionUUID,
+                                          const ChunkRange& chunkRange,
+                                          const ShardId& shardId,
+                                          const boost::optional<Timestamp>& validAfter);
+
+    /**
      * Updates metadata in config.chunks collection to show the given chunk in its new shard.
      * If 'validAfter' is not set, this means the commit request came from an older server version,
      * which is not history-aware.

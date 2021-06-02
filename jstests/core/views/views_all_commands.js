@@ -85,6 +85,7 @@ let viewsCommandTests = {
     _configsvrCleanupReshardCollection: {skip: isAnInternalCommand},
     _configsvrClearJumboFlag: {skip: isAnInternalCommand},
     _configsvrCommitChunkMerge: {skip: isAnInternalCommand},
+    _configsvrCommitChunksMerge: {skip: isAnInternalCommand},
     _configsvrCommitChunkMigration: {skip: isAnInternalCommand},
     _configsvrCommitChunkSplit: {skip: isAnInternalCommand},
     _configsvrCommitMovePrimary: {skip: isAnInternalCommand},

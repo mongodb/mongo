@@ -32,6 +32,7 @@ var kCommandsSupportingWriteConcern = new Set([
     "_configsvrAddShard",
     "_configsvrAddShardToZone",
     "_configsvrCommitChunkMerge",
+    "_configsvrCommitChunksMerge",
     "_configsvrCommitChunkMigration",
     "_configsvrCommitChunkSplit",
     "_configsvrCreateDatabase",
