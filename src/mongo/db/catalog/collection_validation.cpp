@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/validate_adaptor.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
@@ -439,6 +440,21 @@ Status validate(OperationContext* opCtx,
     // This is deliberately outside of the try-catch block, so that any errors thrown in the
     // constructor fail the cmd, as opposed to returning OK with valid:false.
     ValidateState validateState(opCtx, nss, mode, repairMode, turnOnExtraLoggingForTest);
+
+    // The FCV document may not be initialized yet in repair mode.
+    if (repairMode == RepairMode::kNone) {
+        auto fcv = serverGlobalParams.featureCompatibility.getVersion();
+        auto isFcvAtLeast50 = fcv >= ServerGlobalParams::FeatureCompatibility::Version::kVersion50;
+
+        // Capped collections perform un-timestamped writes to delete expired documents in FCV 4.4.
+        // As a result, background validation will fail when reading documents that have just been
+        // deleted.
+        uassert(ErrorCodes::CommandNotSupported,
+                str::stream() << "Cannot run background validation on capped collection '" << nss
+                              << "' unless FCV is >= 5.0. Use foreground validation instead",
+                isFcvAtLeast50 || mode != ValidateMode::kBackground ||
+                    !validateState.getCollection()->isCapped());
+    }
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     // Check whether we are allowed to read from this node after acquiring our locks. If we are
