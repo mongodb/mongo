@@ -256,6 +256,7 @@ Status ServiceExecutorFixed::shutdown(Milliseconds timeout) {
         }
     }
 
+    join();
     LOGV2_DEBUG(4910504,
                 kDiagnosticLogLevel,
                 "Shutdown fixed thread-pool service executor",
