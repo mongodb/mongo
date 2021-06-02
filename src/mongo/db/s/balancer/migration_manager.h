@@ -183,12 +183,13 @@ private:
      * successful (or not done), schedules the migration request and returns a notification which
      * can be used to obtain the outcome of the operation.
      */
-    std::shared_ptr<Notification<executor::RemoteCommandResponse>> _schedule(
-        OperationContext* opCtx,
-        const MigrateInfo& migrateInfo,
-        uint64_t maxChunkSizeBytes,
-        const MigrationSecondaryThrottleOptions& secondaryThrottle,
-        bool waitForDelete);
+    std::pair<std::shared_ptr<Notification<executor::RemoteCommandResponse>>,
+              boost::optional<HostAndPort>>
+    _schedule(OperationContext* opCtx,
+              const MigrateInfo& migrateInfo,
+              uint64_t maxChunkSizeBytes,
+              const MigrationSecondaryThrottleOptions& secondaryThrottle,
+              bool waitForDelete);
 
     /**
      * Acquires the collection distributed lock for the specified namespace and if it succeeds,
@@ -246,7 +247,8 @@ private:
      */
     Status _processRemoteCommandResponse(
         const executor::RemoteCommandResponse& remoteCommandResponse,
-        ScopedMigrationRequest* scopedMigrationRequest);
+        ScopedMigrationRequest* scopedMigrationRequest,
+        const boost::optional<HostAndPort>& remoteHost);
 
     // The service context under which this migration manager runs.
     ServiceContext* const _serviceContext;

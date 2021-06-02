@@ -124,7 +124,12 @@ MigrationStatuses MigrationManager::executeMigrationsForAutoBalance(
 
     {
         std::map<MigrationIdentifier, ScopedMigrationRequest> scopedMigrationRequests;
-        vector<std::pair<shared_ptr<Notification<RemoteCommandResponse>>, MigrateInfo>> responses;
+        struct Response {
+            std::pair<shared_ptr<Notification<RemoteCommandResponse>>, boost::optional<HostAndPort>>
+                response;
+            MigrateInfo migrateInfo;
+        };
+        vector<Response> responses;
 
         for (const auto& migrateInfo : migrateInfos) {
             // Write a document to the config.migrations collection, in case this migration must be
@@ -139,22 +144,23 @@ MigrationStatuses MigrationManager::executeMigrationsForAutoBalance(
             scopedMigrationRequests.emplace(migrateInfo.getName(),
                                             std::move(statusWithScopedMigrationRequest.getValue()));
 
-            responses.emplace_back(
+            responses.emplace_back(Response{
                 _schedule(opCtx, migrateInfo, maxChunkSizeBytes, secondaryThrottle, waitForDelete),
-                migrateInfo);
+                migrateInfo});
         }
 
         // Wait for all the scheduled migrations to complete.
         for (auto& response : responses) {
-            auto notification = std::move(response.first);
-            auto migrateInfo = std::move(response.second);
+            auto notification = std::move(response.response.first);
+            auto remoteHost = std::move(response.response.second);
+            auto migrateInfo = std::move(response.migrateInfo);
 
             const auto& remoteCommandResponse = notification->get();
 
             auto it = scopedMigrationRequests.find(migrateInfo.getName());
             invariant(it != scopedMigrationRequests.end());
             Status commandStatus =
-                _processRemoteCommandResponse(remoteCommandResponse, &it->second);
+                _processRemoteCommandResponse(remoteCommandResponse, &it->second, remoteHost);
             migrationStatuses.emplace(migrateInfo.getName(), std::move(commandStatus));
         }
     }
@@ -180,8 +186,10 @@ Status MigrationManager::executeManualMigration(
         return statusWithScopedMigrationRequest.getStatus();
     }
 
-    RemoteCommandResponse remoteCommandResponse =
-        _schedule(opCtx, migrateInfo, maxChunkSizeBytes, secondaryThrottle, waitForDelete)->get();
+    auto remoteCommandResponsePair =
+        _schedule(opCtx, migrateInfo, maxChunkSizeBytes, secondaryThrottle, waitForDelete);
+    RemoteCommandResponse remoteCommandResponse = remoteCommandResponsePair.first->get();
+    const boost::optional<HostAndPort>& remoteHost = remoteCommandResponsePair.second;
 
     auto routingInfoStatus =
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
@@ -196,7 +204,7 @@ Status MigrationManager::executeManualMigration(
         routingInfo.cm()->findIntersectingChunkWithSimpleCollation(migrateInfo.minKey);
 
     Status commandStatus = _processRemoteCommandResponse(
-        remoteCommandResponse, &statusWithScopedMigrationRequest.getValue());
+        remoteCommandResponse, &statusWithScopedMigrationRequest.getValue(), remoteHost);
 
     // Migration calls can be interrupted after the metadata is committed but before the command
     // finishes the waitForDelete stage. Any failovers, therefore, must always cause the moveChunk
@@ -353,8 +361,9 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
 
             scheduledMigrations++;
 
-            responses.emplace_back(_schedule(
-                opCtx, migrationInfo, maxChunkSizeBytes, secondaryThrottle, waitForDelete));
+            responses.emplace_back(
+                _schedule(opCtx, migrationInfo, maxChunkSizeBytes, secondaryThrottle, waitForDelete)
+                    .first);
         }
 
         // If no migrations were scheduled for this namespace, free the dist lock
@@ -413,37 +422,41 @@ void MigrationManager::drainActiveMigrations() {
     _state = State::kStopped;
 }
 
-shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
-    OperationContext* opCtx,
-    const MigrateInfo& migrateInfo,
-    uint64_t maxChunkSizeBytes,
-    const MigrationSecondaryThrottleOptions& secondaryThrottle,
-    bool waitForDelete) {
+std::pair<shared_ptr<Notification<RemoteCommandResponse>>, boost::optional<HostAndPort>>
+MigrationManager::_schedule(OperationContext* opCtx,
+                            const MigrateInfo& migrateInfo,
+                            uint64_t maxChunkSizeBytes,
+                            const MigrationSecondaryThrottleOptions& secondaryThrottle,
+                            bool waitForDelete) {
     const NamespaceString& nss = migrateInfo.nss;
 
     // Ensure we are not stopped in order to avoid doing the extra work
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_state != State::kEnabled && _state != State::kRecovering) {
-            return std::make_shared<Notification<RemoteCommandResponse>>(
-                Status(ErrorCodes::BalancerInterrupted,
-                       "Migration cannot be executed because the balancer is not running"));
+            return std::make_pair(
+                std::make_shared<Notification<RemoteCommandResponse>>(
+                    Status(ErrorCodes::BalancerInterrupted,
+                           "Migration cannot be executed because the balancer is not running")),
+                boost::none);
         }
     }
 
     const auto fromShardStatus =
         Grid::get(opCtx)->shardRegistry()->getShard(opCtx, migrateInfo.from);
     if (!fromShardStatus.isOK()) {
-        return std::make_shared<Notification<RemoteCommandResponse>>(
-            std::move(fromShardStatus.getStatus()));
+        return std::make_pair(std::make_shared<Notification<RemoteCommandResponse>>(
+                                  std::move(fromShardStatus.getStatus())),
+                              boost::none);
     }
 
     const auto fromShard = fromShardStatus.getValue();
     auto fromHostStatus = fromShard->getTargeter()->findHost(
         opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
     if (!fromHostStatus.isOK()) {
-        return std::make_shared<Notification<RemoteCommandResponse>>(
-            std::move(fromHostStatus.getStatus()));
+        return std::make_pair(std::make_shared<Notification<RemoteCommandResponse>>(
+                                  std::move(fromHostStatus.getStatus())),
+                              boost::none);
     }
 
     BSONObjBuilder builder;
@@ -462,14 +475,16 @@ shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     if (_state != State::kEnabled && _state != State::kRecovering) {
-        return std::make_shared<Notification<RemoteCommandResponse>>(
-            Status(ErrorCodes::BalancerInterrupted,
-                   "Migration cannot be executed because the balancer is not running"));
+        return std::make_pair(
+            std::make_shared<Notification<RemoteCommandResponse>>(
+                Status(ErrorCodes::BalancerInterrupted,
+                       "Migration cannot be executed because the balancer is not running")),
+            boost::none);
     }
 
     Migration migration(nss, builder.obj());
 
-    auto retVal = migration.completionNotification;
+    auto retVal = std::make_pair(migration.completionNotification, fromHostStatus.getValue());
 
     _schedule(lock, opCtx, fromHostStatus.getValue(), std::move(migration));
 
@@ -606,10 +621,13 @@ void MigrationManager::_abandonActiveMigrationsAndEnableManager(OperationContext
 
 Status MigrationManager::_processRemoteCommandResponse(
     const RemoteCommandResponse& remoteCommandResponse,
-    ScopedMigrationRequest* scopedMigrationRequest) {
+    ScopedMigrationRequest* scopedMigrationRequest,
+    const boost::optional<HostAndPort>& remoteHost) {
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     Status commandStatus(ErrorCodes::InternalError, "Uninitialized value.");
+    auto remoteHostLog =
+        remoteHost ? std::string(" from ") + remoteHost->toString() : std::string();
 
     // Check for local errors sending the remote command caused by stepdown.
     if (isErrorDueToConfigStepdown(remoteCommandResponse.status,
@@ -618,7 +636,8 @@ Status MigrationManager::_processRemoteCommandResponse(
         return {ErrorCodes::BalancerInterrupted,
                 stream() << "Migration interrupted because the balancer is stopping."
                          << " Command status: "
-                         << remoteCommandResponse.status.toString()};
+                         << remoteCommandResponse.status.toString()
+                         << remoteHostLog};
     }
 
     if (!remoteCommandResponse.isOK()) {
@@ -631,7 +650,8 @@ Status MigrationManager::_processRemoteCommandResponse(
     if (!Shard::shouldErrorBePropagated(commandStatus.code())) {
         commandStatus = {ErrorCodes::OperationFailed,
                          stream() << "moveChunk command failed on source shard."
-                                  << causedBy(commandStatus)};
+                                  << causedBy(commandStatus)
+                                  << remoteHostLog};
     }
 
     // Any failure to remove the migration document should be because the config server is
@@ -645,9 +665,13 @@ Status MigrationManager::_processRemoteCommandResponse(
             stream() << "Migration interrupted because the balancer is stopping"
                      << " and failed to remove the config.migrations document."
                      << " Command status: "
-                     << (commandStatus.isOK() ? status.toString() : commandStatus.toString())};
+                     << (commandStatus.isOK() ? status.toString() : commandStatus.toString())
+                     << remoteHostLog};
     }
 
+    if (!commandStatus.isOK()) {
+        warning() << commandStatus;
+    }
     return commandStatus;
 }
 
