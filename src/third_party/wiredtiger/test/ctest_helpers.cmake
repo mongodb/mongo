@@ -104,6 +104,15 @@ function(create_test_executable target)
         target_link_libraries(${target} ${CREATE_TEST_LIBS})
     endif()
 
+    # If compiling for windows, additionally link in the shim library.
+    if(WT_WIN)
+        target_include_directories(
+            ${target}
+            PUBLIC ${CMAKE_SOURCE_DIR}/test/windows
+        )
+        target_link_libraries(${target} windows_shim)
+    endif()
+
     # Install any additional files, scripts, etc in the output test binary
     # directory. Useful if we need to setup an additional wrappers needed to run the test
     # executable.
@@ -133,3 +142,123 @@ function(create_test_executable target)
         add_dependencies(${target} copy_dir_${target}_${dir_basename})
     endforeach()
 endfunction()
+
+function(define_test_variants target)
+    cmake_parse_arguments(
+        PARSE_ARGV
+        1
+        "DEFINE_TEST"
+        ""
+        ""
+        "VARIANTS;LABELS"
+    )
+    if (NOT "${DEFINE_TEST_UNPARSED_ARGUMENTS}" STREQUAL "")
+        message(FATAL_ERROR "Unknown arguments to define_test_variants: ${DEFINE_TEST_VARIANTS_UNPARSED_ARGUMENTS}")
+    endif()
+    if ("${DEFINE_TEST_VARIANTS}" STREQUAL "")
+        message(FATAL_ERROR "Need at least one variant for define_test_variants")
+    endif()
+
+    set(defined_tests)
+    foreach(variant ${DEFINE_TEST_VARIANTS})
+        list(LENGTH variant variant_length)
+        if (NOT variant_length EQUAL 2)
+            message(
+                FATAL_ERROR
+                "Invalid variant format: ${variant} - Expected format 'variant_name;variant args'"
+            )
+        endif()
+        list(GET variant 0 curr_variant_name)
+        list(GET variant 1 curr_variant_args)
+        set(variant_args)
+        if(WT_WIN)
+            separate_arguments(variant_args WINDOWS_COMMAND ${curr_variant_args})
+        else()
+            separate_arguments(variant_args UNIX_COMMAND ${curr_variant_args})
+        endif()
+        # Create a variant directory to run the test in.
+        add_custom_target(${curr_variant_name}_test_dir
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/${curr_variant_name})
+        # Ensure the variant target is created prior to building the test.
+        add_dependencies(${target} ${curr_variant_name}_test_dir)
+        add_test(
+            NAME ${curr_variant_name}
+            COMMAND $<TARGET_FILE:${target}> ${variant_args}
+            # Run each variant in its own subdirectory, allowing us to execute variants in
+            # parallel.
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${curr_variant_name}
+        )
+        list(APPEND defined_tests ${curr_variant_name})
+    endforeach()
+    if(DEFINE_TEST_LABELS)
+        set_tests_properties(${defined_tests} PROPERTIES LABELS "${DEFINE_TEST_LABELS}")
+    endif()
+endfunction()
+
+macro(define_c_test)
+    cmake_parse_arguments(
+        "C_TEST"
+        "SMOKE"
+        "TARGET;DIR_NAME;DEPENDS"
+        "SOURCES;FLAGS;ARGUMENTS"
+        ${ARGN}
+    )
+    if (NOT "${C_TEST_UNPARSED_ARGUMENTS}" STREQUAL "")
+        message(FATAL_ERROR "Unknown arguments to define_c_test: ${C_TEST_UNPARSED_ARGUMENTS}")
+    endif()
+    if ("${C_TEST_TARGET}" STREQUAL "")
+        message(FATAL_ERROR "No target name given to define_c_test")
+    endif()
+    if ("${C_TEST_SOURCES}" STREQUAL "")
+        message(FATAL_ERROR "No sources given to define_c_test")
+    endif()
+    if ("${C_TEST_DIR_NAME}" STREQUAL "")
+        message(FATAL_ERROR "No directory given to define_c_test")
+    endif()
+
+    # Check that the csuite dependencies are enabled before compiling and creating the test.
+    eval_dependency("${C_TEST_DEPENDS}" enabled)
+    if(enabled)
+        set(additional_executable_args)
+        if(NOT "${C_TEST_FLAGS}" STREQUAL "")
+            list(APPEND additional_executable_args FLAGS ${C_TEST_FLAGS})
+        endif()
+        if (C_TEST_SMOKE)
+            # csuite test comes with a smoke execution wrapper.
+            create_test_executable(${C_TEST_TARGET}
+                SOURCES ${C_TEST_SOURCES}
+                ADDITIONAL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/${C_TEST_DIR_NAME}/smoke.sh
+                BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}
+                ${additional_executable_args}
+            )
+            add_test(NAME ${C_TEST_TARGET}
+                COMMAND ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}/smoke.sh ${C_TEST_ARGUMENTS} $<TARGET_FILE:${C_TEST_TARGET}>
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}
+            )
+        else()
+            create_test_executable(${C_TEST_TARGET}
+                SOURCES ${C_TEST_SOURCES}
+                BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}
+                ${additional_executable_args}
+            )
+            # Take a CMake-based path and convert it to a platform-specfic path (/ for Unix, \ for Windows).
+            set(wt_test_home_dir ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}/WT_HOME_${C_TEST_TARGET})
+            file(TO_NATIVE_PATH "${wt_test_home_dir}" wt_test_home_dir)
+            # Ensure each DB home directory is run under the tests working directory.
+            set(command_args -h ${wt_test_home_dir})
+            list(APPEND command_args ${C_TEST_ARGUMENTS})
+            set(exec_wrapper)
+            if(WT_WIN)
+                # This is a workaround to run our csuite tests under Windows using CTest. When executing a test,
+                # CTests by-passes the shell and directly executes the test as a child process. In doing so CTest executes the binary with forward-slash paths.
+                # Which while technically valid breaks assumptions in our testing utilities. Wrap the execution in powershell to avoid this.
+                set(exec_wrapper "powershell.exe")
+            endif()
+            add_test(NAME ${C_TEST_TARGET}
+                COMMAND ${exec_wrapper} $<TARGET_FILE:${C_TEST_TARGET}> ${command_args}
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}
+            )
+        endif()
+        list(APPEND c_tests ${C_TEST_TARGET})
+    endif()
+endmacro(define_c_test)

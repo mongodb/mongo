@@ -70,7 +70,6 @@ config_bool(
     ENABLE_PYTHON
     "Configure the python API"
     DEFAULT OFF
-    DEPENDS "NOT ENABLE_STATIC"
 )
 
 config_bool(
@@ -83,6 +82,13 @@ config_bool(
     HAVE_NO_CRC32_HARDWARE
     "Disable any crc32 hardware support"
     DEFAULT OFF
+)
+
+config_bool(
+    DYNAMIC_CRT
+    "Link with the MSVCRT DLL version"
+    DEFAULT OFF
+    DEPENDS "WT_WIN"
 )
 
 config_choice(
@@ -145,10 +151,16 @@ config_bool(
     DEPENDS_ERROR ON "Failed to find tcmalloc library"
 )
 
+set(default_optimize_level)
+if("${WT_OS}" STREQUAL "windows")
+    set(default_optimize_level "/O2")
+else()
+    set(default_optimize_level "-O3")
+endif()
 config_string(
     CC_OPTIMIZE_LEVEL
     "CC optimization level"
-    DEFAULT "-O3"
+    DEFAULT "${default_optimize_level}"
 )
 
 config_string(
@@ -180,7 +192,25 @@ config_string(
 if(HAVE_DIAGNOSTIC AND (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug"))
     # Avoid setting diagnostic flags if we are building with Debug mode.
     # CMakes Debug config sets compilation with debug symbols by default.
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
+    if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+        # Produce full symbolic debugging information.
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /Z7")
+        # Ensure a PDB file can be generated for debugging symbols.
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEBUG")
+    else()
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
+    endif()
+endif()
+
+if(WT_WIN)
+    # Check if we a using the dynamic or static run-time library.
+    if(DYNAMIC_CRT)
+        # Use the multithread-specific and DLL-specific version of the run-time library (MSVCRT.lib).
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MD")
+    else()
+        # Use the multithread, static version of the run-time library.
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MT")
+    endif()
 endif()
 
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
