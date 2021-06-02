@@ -248,7 +248,8 @@ private:
     // this point, future writers do not need to update the catalog.
     mutable AtomicWord<bool> _isMultikeyForWrite;
 
-    // Controls concurrent access to '_indexMultikeyPathsForRead'.
+    // Controls concurrent access to '_indexMultikeyPathsForRead', '_indexMultikeyPathsForWrite',
+    // and '_numUncommittedCatalogMultikeyUpdates'.
     // We acquire this mutex rather than the RESOURCE_METADATA lock as a performance optimization
     // so that it is cheaper to detect whether there is actually any path-level multikey
     // information to update or not.
@@ -263,6 +264,17 @@ private:
     // causes the index to be multikey.
     mutable MultikeyPaths
         _indexMultikeyPathsForRead;  // May include paths not committed to catalog.
+    mutable MultikeyPaths
+        _indexMultikeyPathsForWrite;  // Paths in catalog updated by a transaction commit.
+
+    // If this counter is greater than zero, we have state in '_indexMultikeyPathsForRead' that have
+    // not been successfully updated in the durable catalog. This counter corresponds to the number
+    // of calls _catalogSetMultikey() with open storage transactions.
+    // It is possible for the read paths to contain path info that are not present in the durable
+    // catalog, but all the durable paths must be present in the in-memory state (read paths). This
+    // may lead to less than optimal query plans, but should not result in incorrect plans due to
+    // insufficient multikey coverage.
+    mutable int _numUncommittedCatalogMultikeyUpdates = 0;
 
     // The earliest snapshot that is allowed to read this index.
     boost::optional<Timestamp> _minVisibleSnapshot;
