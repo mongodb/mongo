@@ -106,7 +106,7 @@ auto makeThreadPool(const std::string& poolName) {
     return stdx::make_unique<ThreadPool>(threadPoolOptions);
 }
 
-void ReplicaSetMonitorManager::_setupTaskExecutorInLock(const std::string& name) {
+void ReplicaSetMonitorManager::_setupTaskExecutorAndStatsInLock(const std::string& name) {
     auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
 
     // do not restart taskExecutor if is in shutdown
@@ -131,6 +131,10 @@ void ReplicaSetMonitorManager::_setupTaskExecutorInLock(const std::string& name)
                << redact(name);
         _taskExecutor->startup();
     }
+
+    if (!_stats) {
+        _stats = std::make_shared<ReplicaSetMonitorManagerStats>();
+    }
 }
 
 namespace {
@@ -144,7 +148,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
     invariant(connStr.type() == ConnectionString::SET);
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _setupTaskExecutorInLock(connStr.toString());
+    _setupTaskExecutorAndStatsInLock(connStr.toString());
     auto setName = connStr.getSetName();
     auto monitor = _monitors[setName].lock();
     if (monitor) {
@@ -159,7 +163,9 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
     if (!transport) {
         transport = makeRsmTransport();
     }
-    auto newMonitor = std::make_shared<ReplicaSetMonitor>(setName, servers, std::move(transport));
+    invariant(_stats);
+    auto newMonitor =
+        std::make_shared<ReplicaSetMonitor>(setName, servers, std::move(transport), _stats);
     _monitors[setName] = newMonitor;
     newMonitor->init();
     return newMonitor;
@@ -170,7 +176,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
     invariant(uri.type() == ConnectionString::SET);
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _setupTaskExecutorInLock(uri.toString());
+    _setupTaskExecutorAndStatsInLock(uri.toString());
     const auto& setName = uri.getSetName();
     auto monitor = _monitors[setName].lock();
     if (monitor) {
@@ -180,7 +186,8 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
 
     log() << "Starting new replica set monitor for " << uri.toString();
 
-    auto newMonitor = std::make_shared<ReplicaSetMonitor>(uri, std::move(transport));
+    invariant(_stats);
+    auto newMonitor = std::make_shared<ReplicaSetMonitor>(uri, std::move(transport), _stats);
     _monitors[setName] = newMonitor;
     newMonitor->init();
     return newMonitor;
@@ -253,15 +260,21 @@ void ReplicaSetMonitorManager::report(BSONObjBuilder* builder, bool forFTDC) {
     // calling ShardRegistry::updateConfigServerConnectionString.
     auto setNames = getAllSetNames();
 
-    BSONObjBuilder setStats(
-        builder->subobjStart(forFTDC ? "replicaSetPingTimesMillis" : "replicaSets"));
+    {
+        BSONObjBuilder setStats(
+            builder->subobjStart(forFTDC ? "replicaSetPingTimesMillis" : "replicaSets"));
 
-    for (const auto& setName : setNames) {
-        auto monitor = getMonitor(setName);
-        if (!monitor) {
-            continue;
+        for (const auto& setName : setNames) {
+            auto monitor = getMonitor(setName);
+            if (!monitor) {
+                continue;
+            }
+            monitor->appendInfo(setStats, forFTDC);
         }
-        monitor->appendInfo(setStats, forFTDC);
+    }
+
+    if (_stats) {
+        _stats->report(builder, forFTDC);
     }
 }
 

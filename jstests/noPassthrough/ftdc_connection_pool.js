@@ -24,6 +24,12 @@ load('jstests/libs/ftdc.js');
     assert(stats.hasOwnProperty('totalAvailable'));
     assert(stats.hasOwnProperty('totalCreated'));
     assert(stats.hasOwnProperty('totalRefreshing'));
+    assert("getHostAndRefresh" in stats["replicaSetMonitor"]);
+    const getHostStats = stats["replicaSetMonitor"]["getHostAndRefresh"];
+    assert(getHostStats.hasOwnProperty('currentlyActive'));
+    assert("hello" in stats["replicaSetMonitor"]);
+    const helloStats = stats["replicaSetMonitor"]["hello"];
+    assert(helloStats.hasOwnProperty('currentlyActive'));
 
     // The connPoolStats command reply has "hosts", but FTDC's stats do not.
     assert(!stats.hasOwnProperty('hosts'));

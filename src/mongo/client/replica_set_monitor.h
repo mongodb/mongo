@@ -32,13 +32,13 @@
 
 #include <atomic>
 #include <memory>
-#include <memory>
 #include <set>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/client/replica_set_monitor_stats.h"
 #include "mongo/client/replica_set_monitor_transport.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
@@ -74,9 +74,12 @@ public:
      */
     ReplicaSetMonitor(StringData name,
                       const std::set<HostAndPort>& seeds,
-                      ReplicaSetMonitorTransportPtr transport);
+                      ReplicaSetMonitorTransportPtr transport,
+                      std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats);
 
-    ReplicaSetMonitor(const MongoURI& uri, ReplicaSetMonitorTransportPtr transport);
+    ReplicaSetMonitor(const MongoURI& uri,
+                      ReplicaSetMonitorTransportPtr transport,
+                      std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats);
 
     /**
      * Schedules the initial refresh task into task executor.
@@ -275,8 +278,11 @@ public:
 
     /**
      * Allows tests to set initial conditions and introspect the current state.
+     * This constructor is used only in tests.
      */
-    explicit ReplicaSetMonitor(const SetStatePtr& initialState) : _state(initialState) {}
+    explicit ReplicaSetMonitor(const SetStatePtr& initialState,
+                               std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats =
+                                   std::make_shared<ReplicaSetMonitorManagerStats>());
     ~ReplicaSetMonitor();
 
     /**
@@ -313,6 +319,8 @@ private:
     executor::TaskExecutor* _executor;
     AtomicBool _isRemovedFromManager{false};
     ReplicaSetMonitorTransportPtr _rsmTransport;
+
+    std::shared_ptr<ReplicaSetMonitorStats> _stats;
 };
 
 
@@ -357,7 +365,8 @@ public:
      */
     explicit Refresher(const SetStatePtr& setState,
                        executor::TaskExecutor* executor,
-                       ReplicaSetMonitorTransport* transport);
+                       ReplicaSetMonitorTransport* transport,
+                       ReplicaSetMonitorStats* stats);
 
     struct NextStep {
         enum StepKind {
@@ -436,6 +445,7 @@ private:
 
     executor::TaskExecutor* _executor;
     ReplicaSetMonitorTransport* _rsmTransport;
+    ReplicaSetMonitorStats* const _stats;
 };
 
 }  // namespace mongo
