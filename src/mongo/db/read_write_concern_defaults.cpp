@@ -115,7 +115,7 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk(
         checkSuitabilityAsDefault(*rc);
         rwc.setDefaultReadConcern(rc);
     }
-    if (wc && !wc->usedDefault) {
+    if (wc && !wc->usedDefaultConstructedWC) {
         checkSuitabilityAsDefault(*wc);
         rwc.setDefaultWriteConcern(wc);
     }
@@ -134,13 +134,13 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk(
     }
     // If the setDefaultRWConcern command tries to unset the global default write concern when it
     // has already been set, throw an error.
-    // wc->usedDefault indicates that the defaultWriteConcern given in the setDefaultRWConcern
-    // command was empty (i.e. {defaultWriteConcern: {}})
+    // wc->usedDefaultConstructedWC indicates that the defaultWriteConcern given in the
+    // setDefaultRWConcern command was empty (i.e. {defaultWriteConcern: {}})
     // If current->getDefaultWriteConcern exists, that means the global default write concern has
     // already been set.
     if (repl::feature_flags::gDefaultWCMajority.isEnabled(
             serverGlobalParams.featureCompatibility) &&
-        wc && wc->usedDefault && current) {
+        wc && wc->usedDefaultConstructedWC && current) {
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "The global default write concern cannot be unset once it is set.",
                 !current->getDefaultWriteConcern());
@@ -261,8 +261,8 @@ ReadWriteConcernDefaults::RWConcernDefaultAndTime ReadWriteConcernDefaults::getD
     // This prevents overriding the default write concern and its source on mongos if it has
     // already been set through the config server.
     if (isDefaultWCMajorityFeatureFlagEnabled && !cached.getDefaultWriteConcernSource()) {
-        const bool isCWWCSet =
-            cached.getDefaultWriteConcern() && !cached.getDefaultWriteConcern().get().usedDefault;
+        const bool isCWWCSet = cached.getDefaultWriteConcern() &&
+            !cached.getDefaultWriteConcern().get().usedDefaultConstructedWC;
         if (isCWWCSet) {
             cached.setDefaultWriteConcernSource(DefaultWriteConcernSourceEnum::kGlobal);
         } else {

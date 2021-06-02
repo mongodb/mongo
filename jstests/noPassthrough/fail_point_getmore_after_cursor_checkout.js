@@ -39,14 +39,7 @@ for (let readMode of ["commands", "legacy"]) {
 
         // Issue a getMore and confirm that the failpoint throws the expected exception.
         const getMoreRes = assert.throws(() => testCursor.hasNext() && testCursor.next());
-        if (readMode == "legacy") {
-            // The default WC is majority and the "legacy" version could fail with error code 31124
-            // (OP_GET_MORE does not support cursors with a write concern other than the default
-            // (old default {w:1}).)
-            assert.commandFailedWithCode(getMoreRes, [ErrorCodes.ShutdownInProgress, 31124]);
-        } else {
-            assert.commandFailedWithCode(getMoreRes, [ErrorCodes.ShutdownInProgress]);
-        }
+        assert.commandFailedWithCode(getMoreRes, ErrorCodes.ShutdownInProgress);
 
         // Disable the failpoint.
         assert.commandWorked(testDB.adminCommand(

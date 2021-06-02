@@ -120,20 +120,20 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
             if (!jEl.isNumber() && jEl.type() != Bool) {
                 return Status(ErrorCodes::FailedToParse, "j must be numeric or a boolean value");
             }
-            writeConcern.usedDefault = false;
+            writeConcern.usedDefaultConstructedWC = false;
         } else if (fieldName == kFSyncFieldName) {
             fsyncEl = e;
             if (!fsyncEl.isNumber() && fsyncEl.type() != Bool) {
                 return Status(ErrorCodes::FailedToParse,
                               "fsync must be numeric or a boolean value");
             }
-            writeConcern.usedDefault = false;
+            writeConcern.usedDefaultConstructedWC = false;
         } else if (fieldName == kWFieldName) {
             wEl = e;
-            writeConcern.usedDefault = false;
+            writeConcern.usedDefaultConstructedWC = false;
         } else if (fieldName == kWTimeoutFieldName) {
             wTimeout = e.safeNumberLong();
-            writeConcern.usedDefault = false;
+            writeConcern.usedDefaultConstructedWC = false;
         } else if (fieldName == kWElectionIdFieldName) {
             // Ignore.
         } else if (fieldName == kWOpTimeFieldName) {
@@ -176,11 +176,11 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
                                         << repl::ReplSetConfig::kMaxMembers);
         }
         writeConcern.wNumNodes = static_cast<decltype(writeConcern.wNumNodes)>(wNumNodes);
-        writeConcern.usedDefaultW = false;
+        writeConcern.notExplicitWValue = false;
     } else if (wEl.type() == String) {
         writeConcern.wNumNodes = 0;
         writeConcern.wMode = wEl.valuestrsafe();
-        writeConcern.usedDefaultW = false;
+        writeConcern.notExplicitWValue = false;
     } else if (wEl.eoo() || wEl.type() == jstNULL || wEl.type() == Undefined) {
         writeConcern.wNumNodes = 1;
     } else {
@@ -231,7 +231,7 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
             return sw.getStatus();
         }
         auto writeConcernOptions = sw.getValue();
-        writeConcernOptions.usedDefault = false;
+        writeConcernOptions.usedDefaultConstructedWC = false;
         return writeConcernOptions;
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -242,8 +242,8 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::convertFromIdl(
     const WriteConcernIdl& writeConcernIdl) {
     WriteConcernOptions writeConcern;
     auto parsedW = writeConcernIdl.getWriteConcernW();
-    if (!parsedW.usedDefault()) {
-        writeConcern.usedDefaultW = false;
+    if (!parsedW.usedDefaultConstructedW1()) {
+        writeConcern.notExplicitWValue = false;
         auto wVal = parsedW.getValue();
         if (auto wNum = stdx::get_if<std::int64_t>(&wVal)) {
             if (*wNum < 0 ||

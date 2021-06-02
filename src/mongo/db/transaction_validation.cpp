@@ -74,7 +74,7 @@ bool isTransactionCommand(StringData cmdName) {
 void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, StringData cmdName) {
     uassert(ErrorCodes::InvalidOptions,
             "writeConcern is not allowed within a multi-statement transaction",
-            wcResult.usedDefault || isTransactionCommand(cmdName));
+            wcResult.usedDefaultConstructedWC || isTransactionCommand(cmdName));
 }
 
 bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLevel) {

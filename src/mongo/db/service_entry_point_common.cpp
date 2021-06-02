@@ -1302,7 +1302,8 @@ Future<void> RunCommandAndWaitForWriteConcern::_runCommandWithFailPoint() {
 Future<void> RunCommandAndWaitForWriteConcern::_handleError(Status status) {
     auto opCtx = _execContext->getOpCtx();
     // Do no-op write before returning NoSuchTransaction if command has writeConcern.
-    if (status.code() == ErrorCodes::NoSuchTransaction && !opCtx->getWriteConcern().usedDefault) {
+    if (status.code() == ErrorCodes::NoSuchTransaction &&
+        !opCtx->getWriteConcern().usedDefaultConstructedWC) {
         TransactionParticipant::performNoopWrite(opCtx, "NoSuchTransaction error");
     }
     _waitForWriteConcern(*_ecd->getExtraFieldsBuilder());

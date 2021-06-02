@@ -280,8 +280,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNotSetThenSetWithImp
         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern));
     WriteConcernOptions wc;
     wc.wNumNodes = 4;
-    wc.usedDefault = false;
-    wc.usedDefaultW = false;
+    wc.usedDefaultConstructedWC = false;
+    wc.notExplicitWValue = false;
     newDefaults.setDefaultWriteConcern(wc);
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
@@ -342,8 +342,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNotSetThenSetWithImp
         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern));
     WriteConcernOptions wc;
     wc.wNumNodes = 4;
-    wc.usedDefault = false;
-    wc.usedDefaultW = false;
+    wc.usedDefaultConstructedWC = false;
+    wc.notExplicitWValue = false;
     newDefaults.setDefaultWriteConcern(wc);
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
@@ -377,8 +377,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCW1)
         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern));
     WriteConcernOptions wc;
     wc.wNumNodes = 4;
-    wc.usedDefault = false;
-    wc.usedDefaultW = false;
+    wc.usedDefaultConstructedWC = false;
+    wc.notExplicitWValue = false;
     newDefaults.setDefaultWriteConcern(wc);
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
@@ -417,8 +417,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCMaj
         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern));
     WriteConcernOptions wc;
     wc.wNumNodes = 4;
-    wc.usedDefault = false;
-    wc.usedDefaultW = false;
+    wc.usedDefaultConstructedWC = false;
+    wc.notExplicitWValue = false;
     newDefaults.setDefaultWriteConcern(wc);
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
@@ -467,7 +467,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWriteConcernSourceImplicitWit
         ASSERT(!defaults.getDefaultReadConcernSource());
     }
 
-    // The default write concern source should be set to implicit if wc.usedDefault is true
+    // The default write concern source should be set to implicit if wc.usedDefaultConstructedWC is
+    // true
     ASSERT_EQ(0, defaults.getDefaultWriteConcern()->wNumNodes);
     ASSERT_EQ(WriteConcernOptions::kMajority, defaults.getDefaultWriteConcern().get().wMode);
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
@@ -632,8 +633,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithoutInvalidateDoesNotCallL
         repl::ReadConcernArgs(repl::ReadConcernLevel::kAvailableReadConcern));
     WriteConcernOptions wc;
     wc.wNumNodes = 4;
-    wc.usedDefault = false;
-    wc.usedDefaultW = false;
+    wc.usedDefaultConstructedWC = false;
+    wc.notExplicitWValue = false;
     newDefaults2.setDefaultWriteConcern(wc);
     newDefaults2.setUpdateOpTime(Timestamp(3, 4));
     newDefaults2.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(5678));
@@ -697,8 +698,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
         repl::ReadConcernArgs(repl::ReadConcernLevel::kAvailableReadConcern));
     WriteConcernOptions wc;
     wc.wNumNodes = 4;
-    wc.usedDefault = false;
-    wc.usedDefaultW = false;
+    wc.usedDefaultConstructedWC = false;
+    wc.notExplicitWValue = false;
     newDefaults2.setDefaultWriteConcern(wc);
     newDefaults2.setUpdateOpTime(Timestamp(3, 4));
     newDefaults2.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(5678));

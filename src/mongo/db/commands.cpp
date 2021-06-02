@@ -468,7 +468,7 @@ BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj,
                                         WriteConcernOptions::SyncMode::UNSET,
                                         wc["wtimeout"].Number());
         }
-    } else if (!defaultWC.usedDefault) {
+    } else if (!defaultWC.usedDefaultConstructedWC) {
         auto minimumAcceptableWTimeout = newWC.wTimeout;
         newWC = defaultWC;
         newWC.wMode = "majority";

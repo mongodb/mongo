@@ -66,14 +66,14 @@ public:
 
     // It is assumed that a default-constructed WriteConcernOptions will be populated with the
     // default options. If it is subsequently populated with non-default options, it is the caller's
-    // responsibility to set the usedDefault and usedDefaultW flag correctly.
+    // responsibility to set the usedDefaultConstructedWC and notExplicitWValue flag correctly.
     WriteConcernOptions()
         : syncMode(SyncMode::UNSET),
           wNumNodes(1),
           wMode(""),
           wTimeout(0),
-          usedDefault(true),
-          usedDefaultW(true) {}
+          usedDefaultConstructedWC(true),
+          notExplicitWValue(true) {}
 
     WriteConcernOptions(int numNodes, SyncMode sync, int timeout);
 
@@ -121,6 +121,15 @@ public:
         return !operator==(other);
     }
 
+    /**
+     * Return true if the default write concern is being used.
+     *      - Default constructed WC (w:1) is being used.
+     *      - Implicit default majority WC is being used.
+     */
+    bool isImplicitDefaultWriteConcern() const {
+        return usedDefaultConstructedWC || _provenance.isImplicitDefault();
+    }
+
     SyncMode syncMode;
 
     // The w parameter for this write concern. The wMode represents the string format and
@@ -134,11 +143,30 @@ public:
     // wTimeout.
     Date_t wDeadline = Date_t::max();
 
-    // True if the default write concern was used.
-    bool usedDefault = false;
+    // True if the default constructed WC ({w:1}) was used.
+    //      - Implicit default WC when value of w is {w:1}.
+    //      - Internal commands set empty WC ({writeConcern: {}}), then default constructed WC (w:1)
+    //        is used.
+    // False otherwise:
+    //      - Implicit default WC when value of w is {w:"majority"}.
+    //      - Cluster-wide WC.
+    //          - with (w) value set, for example ({writeConcern: {w:1}}).
+    //          - without (w) value set, for example ({writeConcern: {j: true}}).
+    //      - Client-supplied WC.
+    //          - with (w) value set, for example ({writeConcern: {w:1}}).
+    //          - without (w) value set, for example ({writeConcern: {j: true}}).
+    bool usedDefaultConstructedWC = false;
 
-    // True if the default 'w' value of w:1 was used.
-    bool usedDefaultW = false;
+    // Used only for tracking opWriteConcernCounters metric.
+    // True if the (w) value of the write concern used is not set explicitly by client:
+    //      - Default constructed WC ({w:1})
+    //      - Implicit default majority WC.
+    //      - Cluster-wide WC.
+    //          - with (w) value set, for example ({writeConcern: {w:1}}).
+    //          - without (w) value set, for example ({writeConcern: {j: true}}).
+    //      - Client-supplied WC without (w) value set, for example ({writeConcern: {j: true}}).
+    //      - Internal commands set empty WC ({writeConcern: {}}).
+    bool notExplicitWValue = false;
 
     CheckCondition checkCondition = CheckCondition::OpTime;
 

@@ -208,10 +208,10 @@ public:
         builder->appendNumber(fieldName, static_cast<long long>(*intVal));
     }
 
-    WriteConcernW() : _w{1}, _usedDefault{true} {};
+    WriteConcernW() : _w{1}, _usedDefaultConstructedW1{true} {};
 
-    bool usedDefault() const {
-        return _usedDefault;
+    bool usedDefaultConstructedW1() const {
+        return _usedDefaultConstructedW1;
     }
 
     stdx::variant<std::string, std::int64_t> getValue() const {
@@ -219,9 +219,9 @@ public:
     }
 
 private:
-    WriteConcernW(std::int64_t w) : _w{w}, _usedDefault{false} {};
-    WriteConcernW(std::string&& w) : _w(std::move(w)), _usedDefault{false} {};
+    WriteConcernW(std::int64_t w) : _w{w}, _usedDefaultConstructedW1{false} {};
+    WriteConcernW(std::string&& w) : _w(std::move(w)), _usedDefaultConstructedW1{false} {};
     stdx::variant<std::string, std::int64_t> _w;
-    bool _usedDefault;
+    bool _usedDefaultConstructedW1;
 };
 }  // namespace mongo

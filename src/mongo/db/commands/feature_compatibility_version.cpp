@@ -228,8 +228,9 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
             updateSpec.appendBool("upsert", true);
         }
     }
-    auto timeout = opCtx->getWriteConcern().usedDefault ? WriteConcernOptions::kNoTimeout
-                                                        : opCtx->getWriteConcern().wTimeout;
+    auto timeout = opCtx->getWriteConcern().isImplicitDefaultWriteConcern()
+        ? WriteConcernOptions::kNoTimeout
+        : opCtx->getWriteConcern().wTimeout;
     auto newWC = WriteConcernOptions(
         WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, timeout);
     updateCmd.append(WriteConcernOptions::kWriteConcernField, newWC.toBSON());
