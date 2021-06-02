@@ -892,9 +892,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
                                                      << "mergeChunk cannot merge chunks.");
     }
 
-    // 2. Retrieve the list of chunks belonging to the requested shard + key range;
-    //    The query over config.collections is guaranteed to succeed,
-    //    since it has been already issued & checked by getCollectionVersion()
+    // 2. Retrieve the list of chunks belonging to the requested shard + key range.
     auto findCollResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -903,6 +901,12 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
                                             BSON(CollectionType::kNssFieldName << nss.ns()),
                                             {},
                                             1));
+
+    if (findCollResponse.docs.empty()) {
+        return {ErrorCodes::Error(5678601),
+                str::stream() << "Collection '" << nss.ns() << "' no longer either exists"};
+    }
+
     const CollectionType coll(findCollResponse.docs[0]);
     if (coll.getUuid() != requestCollectionUUID) {
         return {
