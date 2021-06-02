@@ -68,6 +68,7 @@ run_format()
         flags="-1q $(bflag $1)"
 
         args=""
+        args+="runs.type=row "                  # Temporarily disable column store tests
         args+="cache=80 "                       # Medium cache so there's eviction
         args+="checkpoints=1 "                  # Force periodic writes
         args+="compression=snappy "             # We only built with snappy, force the choice
@@ -80,6 +81,8 @@ run_format()
         args+="rows=1000000 "
         args+="salvage=0 "                      # Faster runs
         args+="timer=4 "
+        args+="transaction.isolation=snapshot "
+        args+="transaction.timestamps=1 "
         args+="verify=0 "                       # Faster runs
 
         for am in $2; do

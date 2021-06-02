@@ -279,9 +279,8 @@ file_config = format_meta + file_runtime_config + tiered_config + [
     Config('block_allocation', 'best', r'''
         configure block allocation. Permitted values are \c "best" or \c "first";
         the \c "best" configuration uses a best-fit algorithm,
-        the \c "first" configuration uses a first-available algorithm during block allocation,
-        the \c "log-structure" configuration allocates a new file for each checkpoint''',
-        choices=['best', 'first', 'log-structured',]),
+        the \c "first" configuration uses a first-available algorithm during block allocation''',
+        choices=['best', 'first',]),
     Config('allocation_size', '4KB', r'''
         the file unit allocation size, in bytes, must a power-of-two;
         smaller values decrease the file space required by overflow
@@ -596,6 +595,9 @@ connection_runtime_config = [
             This setting introduces a log format change that may break older
             versions of WiredTiger. These operations are informational and
             skipped in recovery.''',
+            type='boolean'),
+        Config('update_restore_evict', 'false', r'''
+            if true, control all dirty page evictions through forcing update restore eviction.''',
             type='boolean'),
         ]),
     Config('error_prefix', '', r'''

@@ -452,7 +452,7 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *
         if (WT_PREFIX_MATCH(uri, "table:"))
             WT_RET(__wt_curtable_open(session, uri, owner, cfg, cursorp));
         if (WT_PREFIX_MATCH(uri, "tiered:"))
-            WT_RET(__wt_curtiered_open(session, uri, owner, cfg, cursorp));
+            WT_RET(__wt_curfile_open(session, uri, owner, cfg, cursorp));
         break;
     case 'c':
         if (WT_PREFIX_MATCH(uri, "colgroup:")) {

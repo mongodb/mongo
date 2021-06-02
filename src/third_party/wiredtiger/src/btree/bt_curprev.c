@@ -607,7 +607,7 @@ __wt_btcur_prev_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
 
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
-    WT_ERR(__cursor_func_init(cbt, false));
+    WT_ERR(__wt_cursor_func_init(cbt, false));
 
     /*
      * If we aren't already iterating in the right direction, there's some setup to do.

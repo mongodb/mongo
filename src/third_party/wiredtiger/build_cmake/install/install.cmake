@@ -35,32 +35,3 @@ if(WT_POSIX)
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
     )
 endif()
-
-# Install our wiredtiger compressor extensions (provided we have enabled/built them).
-if(HAVE_BUILTIN_EXTENSION_LZ4 OR ENABLE_LZ4)
-    install(TARGETS wiredtiger_lz4
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    )
-endif()
-
-if(HAVE_BUILTIN_EXTENSION_SNAPPY OR ENABLE_SNAPPY)
-    install(TARGETS wiredtiger_snappy
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    )
-endif()
-
-if(HAVE_BUILTIN_EXTENSION_ZLIB OR ENABLE_ZLIB)
-    install(TARGETS wiredtiger_zlib
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    )
-endif()
-
-if(HAVE_BUILTIN_EXTENSION_ZSTD OR ENABLE_ZSTD)
-    install(TARGETS wiredtiger_zstd
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    )
-endif()

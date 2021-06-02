@@ -95,11 +95,11 @@ __cursor_checkvalue(WT_CURSOR *cursor)
 }
 
 /*
- * __cursor_localkey --
+ * __wt_cursor_localkey --
  *     If the key points into the tree, get a local copy.
  */
 static inline int
-__cursor_localkey(WT_CURSOR *cursor)
+__wt_cursor_localkey(WT_CURSOR *cursor)
 {
     if (F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
         if (!WT_DATA_IN_ITEM(&cursor->key))
@@ -136,7 +136,7 @@ __cursor_localvalue(WT_CURSOR *cursor)
 static inline int
 __cursor_needkey(WT_CURSOR *cursor)
 {
-    WT_RET(__cursor_localkey(cursor));
+    WT_RET(__wt_cursor_localkey(cursor));
     return (__cursor_checkkey(cursor));
 }
 
@@ -352,10 +352,14 @@ __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
 
     dhandle = session->dhandle;
 
-    /* If we close a handle with a time of death set, clear it. */
+    /*
+     * If we close a handle with a time of death set, clear it. The ordering is important: after
+     * decrementing the use count, there's a chance that the data handle can be freed.
+     */
     WT_ASSERT(session, dhandle->session_inuse > 0);
-    if (__wt_atomic_subi32(&dhandle->session_inuse, 1) == 0 && dhandle->timeofdeath != 0)
+    if (dhandle->timeofdeath != 0 && dhandle->session_inuse == 1)
         dhandle->timeofdeath = 0;
+    (void)__wt_atomic_subi32(&dhandle->session_inuse, 1);
 }
 
 /*
@@ -404,11 +408,11 @@ __cursor_kv_return(WT_CURSOR_BTREE *cbt, WT_UPDATE_VALUE *upd_value)
 }
 
 /*
- * __cursor_func_init --
+ * __wt_cursor_func_init --
  *     Cursor call setup.
  */
 static inline int
-__cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
+__wt_cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
 {
     WT_SESSION_IMPL *session;
 

@@ -603,9 +603,8 @@ __log_file_server(void *arg)
                  */
                 if (conn->hot_backup_start == 0 && conn->log_cursors == 0) {
                     WT_WITH_HOTBACKUP_READ_LOCK(session,
-                      WT_ERR_ERROR_OK(
-                        __wt_ftruncate(session, close_fh, close_end_lsn.l.offset), ENOTSUP, false),
-                      NULL);
+                      ret = __wt_ftruncate(session, close_fh, close_end_lsn.l.offset), NULL);
+                    WT_ERR_ERROR_OK(ret, ENOTSUP, false);
                 }
                 WT_SET_LSN(&close_end_lsn, close_end_lsn.l.file + 1, 0);
                 __wt_spin_lock(session, &log->log_sync_lock);

@@ -64,14 +64,15 @@ __checkpoint_name_check(WT_SESSION_IMPL *session, const char *uri)
             WT_ERR(cursor->get_key(cursor, &uri));
             if (!WT_PREFIX_MATCH(uri, "colgroup:") && !WT_PREFIX_MATCH(uri, "file:") &&
               !WT_PREFIX_MATCH(uri, "index:") && !WT_PREFIX_MATCH(uri, WT_SYSTEM_PREFIX) &&
-              !WT_PREFIX_MATCH(uri, "table:")) {
+              !WT_PREFIX_MATCH(uri, "table:") && !WT_PREFIX_MATCH(uri, "tiered:")) {
                 fail = uri;
                 break;
             }
         }
         WT_ERR_NOTFOUND_OK(ret, false);
     } else if (!WT_PREFIX_MATCH(uri, "colgroup:") && !WT_PREFIX_MATCH(uri, "file:") &&
-      !WT_PREFIX_MATCH(uri, "index:") && !WT_PREFIX_MATCH(uri, "table:"))
+      !WT_PREFIX_MATCH(uri, "index:") && !WT_PREFIX_MATCH(uri, "table:") &&
+      !WT_PREFIX_MATCH(uri, "tiered:"))
         fail = uri;
 
     if (fail != NULL)
@@ -254,8 +255,7 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
     }
 
     /* Should not be called with anything other than a live btree handle. */
-    WT_ASSERT(session,
-      session->dhandle->type == WT_DHANDLE_TYPE_BTREE && session->dhandle->checkpoint == NULL);
+    WT_ASSERT(session, WT_DHANDLE_BTREE(session->dhandle) && session->dhandle->checkpoint == NULL);
 
     btree = S2BT(session);
 

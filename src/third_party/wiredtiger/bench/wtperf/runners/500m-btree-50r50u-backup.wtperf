@@ -24,4 +24,4 @@ sample_interval=10
 sample_rate=1
 threads=((count=10,reads=1),(count=10,updates=1))
 warmup=120
-backup_interval=300
+backup_interval=1800

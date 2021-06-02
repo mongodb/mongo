@@ -301,6 +301,10 @@ run_check_subtest(
         subtest_args[narg++] = (char *)"subtest";
     subtest_args[narg++] = (char *)"-h";
     subtest_args[narg++] = opts->home;
+    if (opts->build_dir != NULL) {
+        subtest_args[narg++] = (char *)"-b";
+        subtest_args[narg++] = opts->build_dir;
+    }
     subtest_args[narg++] = (char *)"-v"; /* subtest is always verbose */
     subtest_args[narg++] = (char *)"-p";
     subtest_args[narg++] = (char *)"-o";
@@ -498,9 +502,10 @@ subtest_main(int argc, char *argv[], bool close_test)
     testutil_check(__wt_snprintf(filename, sizeof(filename), "%s/%s", opts->home, STDOUT_FILE));
     testutil_assert(freopen(filename, "a", stdout) != NULL);
 
+#ifndef WT_FAIL_FS_LIB
 #define WT_FAIL_FS_LIB "ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so"
-
-    testutil_build_dir(buf, 1024);
+#endif
+    testutil_build_dir(opts, buf, 1024);
     testutil_check(__wt_snprintf(config, sizeof(config),
       "create,cache_size=250M,log=(enabled),transaction_sync=(enabled,method=none),extensions=(%s/"
       "%s=(early_load,config={environment=true,verbose=true}))",

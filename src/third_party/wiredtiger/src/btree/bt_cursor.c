@@ -532,7 +532,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
      * (unlike other cursor functions), because we don't anticipate applications searching for a key
      * they currently have pinned.)
      */
-    WT_ERR(__cursor_localkey(cursor));
+    WT_ERR(__wt_cursor_localkey(cursor));
     __cursor_novalue(cursor);
     __cursor_state_save(cursor, &state);
 
@@ -555,7 +555,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
         }
     }
     if (!valid) {
-        WT_ERR(__cursor_func_init(cbt, true));
+        WT_ERR(__wt_cursor_func_init(cbt, true));
 
         if (btree->type == BTREE_ROW) {
             WT_ERR(__cursor_row_search(cbt, false, NULL, NULL));
@@ -628,7 +628,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
      * (unlike other cursor functions), because we don't anticipate applications searching for a key
      * they currently have pinned.)
      */
-    WT_ERR(__cursor_localkey(cursor));
+    WT_ERR(__wt_cursor_localkey(cursor));
     __cursor_novalue(cursor);
     __cursor_state_save(cursor, &state);
 
@@ -661,7 +661,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
             WT_ERR(__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid));
     }
     if (!valid) {
-        WT_ERR(__cursor_func_init(cbt, true));
+        WT_ERR(__wt_cursor_func_init(cbt, true));
 
         /*
          * Set the "insert" flag for row-store search; we may intend to position the cursor at the
@@ -823,7 +823,7 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
          * or value. (Restart could still use the pinned page, but that's an unlikely path.) Re-save
          * the cursor state: we may retry but eventually fail.
          */
-        WT_TRET(__cursor_localkey(cursor));
+        WT_TRET(__wt_cursor_localkey(cursor));
         WT_TRET(__cursor_localvalue(cursor));
         __cursor_state_save(cursor, &state);
         goto err;
@@ -833,12 +833,12 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
      * The pinned page goes away if we do a search, get a local copy of any pinned key or value.
      * Re-save the cursor state: we may retry but eventually fail.
      */
-    WT_ERR(__cursor_localkey(cursor));
+    WT_ERR(__wt_cursor_localkey(cursor));
     WT_ERR(__cursor_localvalue(cursor));
     __cursor_state_save(cursor, &state);
 
 retry:
-    WT_ERR(__cursor_func_init(cbt, true));
+    WT_ERR(__wt_cursor_func_init(cbt, true));
 
     if (btree->type == BTREE_ROW) {
         WT_ERR(__cursor_row_search(cbt, true, NULL, NULL));
@@ -965,11 +965,11 @@ __wt_btcur_insert_check(WT_CURSOR_BTREE *cbt)
      * any pinned value. Unlike most of the btree cursor routines, we don't have to save/restore the
      * cursor key state, none of the work done here changes the cursor state.
      */
-    WT_ERR(__cursor_localkey(cursor));
+    WT_ERR(__wt_cursor_localkey(cursor));
     __cursor_novalue(cursor);
 
 retry:
-    WT_ERR(__cursor_func_init(cbt, true));
+    WT_ERR(__wt_cursor_func_init(cbt, true));
     WT_ERR(__cursor_row_search(cbt, true, NULL, NULL));
 
     /* Just check for conflicts. */
@@ -1058,11 +1058,11 @@ retry:
      * Any pinned page goes away if we do a search, including as a result of a restart. Get a local
      * copy of any pinned key and re-save the cursor state: we may retry but eventually fail.
      */
-    WT_ERR(__cursor_localkey(cursor));
+    WT_ERR(__wt_cursor_localkey(cursor));
     __cursor_state_save(cursor, &state);
     searched = true;
 
-    WT_ERR(__cursor_func_init(cbt, true));
+    WT_ERR(__wt_cursor_func_init(cbt, true));
 
     if (btree->type == BTREE_ROW) {
         WT_ERR_NOTFOUND_OK(__cursor_row_search(cbt, false, NULL, NULL), true);
@@ -1230,7 +1230,7 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
          * or value. (Restart could still use the pinned page, but that's an unlikely path.) Re-save
          * the cursor state: we may retry but eventually fail.
          */
-        WT_TRET(__cursor_localkey(cursor));
+        WT_TRET(__wt_cursor_localkey(cursor));
         WT_TRET(__cursor_localvalue(cursor));
         __cursor_state_save(cursor, &state);
         goto err;
@@ -1240,12 +1240,12 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
      * The pinned page goes away if we do a search, get a local copy of any pinned key or value.
      * Re-save the cursor state: we may retry but eventually fail.
      */
-    WT_ERR(__cursor_localkey(cursor));
+    WT_ERR(__wt_cursor_localkey(cursor));
     WT_ERR(__cursor_localvalue(cursor));
     __cursor_state_save(cursor, &state);
 
 retry:
-    WT_ERR(__cursor_func_init(cbt, true));
+    WT_ERR(__wt_cursor_func_init(cbt, true));
     WT_ERR(btree->type == BTREE_ROW ? __cursor_row_search(cbt, true, NULL, NULL) :
                                       __cursor_col_search(cbt, NULL, NULL));
 

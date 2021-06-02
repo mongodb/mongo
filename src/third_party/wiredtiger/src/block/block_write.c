@@ -189,14 +189,14 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint8_
   size_t *addr_sizep, bool data_checksum, bool checkpoint_io)
 {
     wt_off_t offset;
-    uint32_t checksum, logid, size;
+    uint32_t checksum, objectid, size;
     uint8_t *endp;
 
-    WT_RET(__wt_block_write_off(
-      session, block, buf, &logid, &offset, &size, &checksum, data_checksum, checkpoint_io, false));
+    WT_RET(__wt_block_write_off(session, block, buf, &objectid, &offset, &size, &checksum,
+      data_checksum, checkpoint_io, false));
 
     endp = addr;
-    WT_RET(__wt_block_addr_to_buffer(block, &endp, logid, offset, size, checksum));
+    WT_RET(__wt_block_addr_to_buffer(block, &endp, objectid, offset, size, checksum));
     *addr_sizep = WT_PTRDIFF(endp, addr);
 
     return (0);
@@ -207,7 +207,7 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint8_
  *     Write a buffer into a block, returning the block's offset, size and checksum.
  */
 static int
-__block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint32_t *logidp,
+__block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint32_t *objectidp,
   wt_off_t *offsetp, uint32_t *sizep, uint32_t *checksump, bool data_checksum, bool checkpoint_io,
   bool caller_locked)
 {
@@ -216,7 +216,7 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint3
     WT_FH *fh;
     wt_off_t offset;
     size_t align_size;
-    uint32_t checksum, logid;
+    uint32_t checksum, objectid;
     uint8_t *file_sizep;
     bool local_locked;
 
@@ -225,7 +225,7 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint3
     *checksump = 0; /* -Werror=maybe-uninitialized */
 
     fh = block->fh;
-    logid = block->logid;
+    objectid = block->objectid;
 
     /* Buffers should be aligned for writing. */
     if (!F_ISSET(buf, WT_ITEM_ALIGNED)) {
@@ -327,7 +327,7 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint3
     if ((ret = __wt_write(session, fh, offset, align_size, buf->mem)) != 0) {
         if (!caller_locked)
             __wt_spin_lock(session, &block->live_lock);
-        WT_TRET(__wt_block_off_free(session, block, logid, offset, (wt_off_t)align_size));
+        WT_TRET(__wt_block_off_free(session, block, objectid, offset, (wt_off_t)align_size));
         if (!caller_locked)
             __wt_spin_unlock(session, &block->live_lock);
         WT_RET(ret);
@@ -361,7 +361,7 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint3
     __wt_verbose(session, WT_VERB_WRITE, "off %" PRIuMAX ", size %" PRIuMAX ", checksum %#" PRIx32,
       (uintmax_t)offset, (uintmax_t)align_size, checksum);
 
-    *logidp = logid;
+    *objectidp = objectid;
     *offsetp = offset;
     *sizep = WT_STORE_SIZE(align_size);
     *checksump = checksum;
@@ -374,7 +374,7 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint3
  *     Write a buffer into a block, returning the block's offset, size and checksum.
  */
 int
-__wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint32_t *logidp,
+__wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint32_t *objectidp,
   wt_off_t *offsetp, uint32_t *sizep, uint32_t *checksump, bool data_checksum, bool checkpoint_io,
   bool caller_locked)
 {
@@ -386,8 +386,8 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
      * never see anything other than their original content.
      */
     __wt_page_header_byteswap(buf->mem);
-    ret = __block_write_off(session, block, buf, logidp, offsetp, sizep, checksump, data_checksum,
-      checkpoint_io, caller_locked);
+    ret = __block_write_off(session, block, buf, objectidp, offsetp, sizep, checksump,
+      data_checksum, checkpoint_io, caller_locked);
     __wt_page_header_byteswap(buf->mem);
     return (ret);
 }

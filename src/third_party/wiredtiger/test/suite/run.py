@@ -52,8 +52,11 @@ wt_3rdpartydir = os.path.join(wt_disttop, 'test', '3rdparty')
 # could pick the wrong one. We also need to account for the fact that there
 # may be an executable 'wt' file the build directory and a subordinate .libs
 # directory.
+env_builddir = os.getenv('WT_BUILDDIR')
 curdir = os.getcwd()
-if os.path.basename(curdir) == '.libs' and \
+if env_builddir and os.path.isfile(os.path.join(env_builddir, 'wt')):
+    wt_builddir = env_builddir
+elif os.path.basename(curdir) == '.libs' and \
    os.path.isfile(os.path.join(curdir, os.pardir, 'wt')):
     wt_builddir = os.path.join(curdir, os.pardir)
 elif os.path.isfile(os.path.join(curdir, 'wt')):
@@ -133,6 +136,7 @@ Options:\n\
   -R      | --randomseed         run with random seeds for generates random numbers\n\
   -S      | --seed               run with two seeds that generates random numbers, \n\
                                  format "seed1.seed2", seed1 or seed2 can\'t be zero\n\
+  -z      | --zstd               run the zstd tests\n\
 \n\
 Tests:\n\
   may be a file name in test/suite: (e.g. test_base01.py)\n\
@@ -307,7 +311,7 @@ def error(exitval, prefix, msg):
 
 if __name__ == '__main__':
     # Turn numbers and ranges into test module names
-    preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = ignoreStdout = False
+    preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = zstdtest = ignoreStdout = False
     removeAtStart = True
     asan = False
     parallel = 0
@@ -379,6 +383,9 @@ if __name__ == '__main__':
                 continue
             if option == '-long' or option == 'l':
                 longtest = True
+                continue
+            if option == '-zstd' or option == 'z':
+                zstdtest = True
                 continue
             if option == '-noremove':
                 removeAtStart = False
@@ -537,7 +544,7 @@ if __name__ == '__main__':
     # All global variables should be set before any test classes are loaded.
     # That way, verbose printing can be done at the class definition level.
     wttest.WiredTigerTestCase.globalSetup(preserve, removeAtStart, timestamp, gdbSub, lldbSub,
-                                          verbose, wt_builddir, dirarg, longtest,
+                                          verbose, wt_builddir, dirarg, longtest, zstdtest,
                                           ignoreStdout, seedw, seedz, hookmgr)
 
     # Without any tests listed as arguments, do discovery

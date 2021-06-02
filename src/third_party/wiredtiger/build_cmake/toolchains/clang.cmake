@@ -6,7 +6,7 @@
 # See the file LICENSE for redistribution information.
 #
 
-cmake_minimum_required(VERSION 3.11.0)
+cmake_minimum_required(VERSION 3.10.0)
 
 set(CMAKE_C_COMPILER "clang")
 set(CMAKE_C_COMPILER_ID "Clang")

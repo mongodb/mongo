@@ -777,6 +777,8 @@ struct __wt_connection_stats {
     int64_t rec_time_window_durable_stop_ts;
     int64_t rec_time_window_stop_ts;
     int64_t rec_time_window_stop_txn;
+    int64_t tiered_work_units_dequeued;
+    int64_t tiered_work_units_created;
     int64_t tiered_retention;
     int64_t tiered_object_size;
     int64_t txn_read_race_prepare_update;
@@ -996,6 +998,8 @@ struct __wt_dsrc_stats {
     int64_t rec_time_window_durable_stop_ts;
     int64_t rec_time_window_stop_ts;
     int64_t rec_time_window_stop_txn;
+    int64_t tiered_work_units_dequeued;
+    int64_t tiered_work_units_created;
     int64_t tiered_retention;
     int64_t tiered_object_size;
     int64_t txn_read_race_prepare_update;

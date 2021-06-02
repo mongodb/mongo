@@ -380,7 +380,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
     {
         dhandle = dhandle_cache->dhandle;
         empty_btree = false;
-        if (dhandle->type == WT_DHANDLE_TYPE_BTREE)
+        if (WT_DHANDLE_BTREE(dhandle))
             WT_WITH_DHANDLE(
               session, dhandle, empty_btree = (__wt_btree_bytes_evictable(session) == 0));
 

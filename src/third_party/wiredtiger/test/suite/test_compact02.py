@@ -110,6 +110,12 @@ class test_compact02(wttest.WiredTigerTestCase):
 
     # Create a table, add keys with both big and small values.
     def test_compact02(self):
+        # FIXME-WT-7187
+        # This test is temporarily disabled for OS/X, it fails, but not consistently.
+        import platform
+        if platform.system() == 'Darwin':
+            self.skipTest('Compaction tests skipped, as they fail on OS/X')
+
         self.ConnectionOpen(self.cacheSize)
 
         mb = 1024 * 1024

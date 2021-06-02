@@ -129,6 +129,9 @@
 /* Spinlock type from mutex.h. */
 #cmakedefine SPINLOCK_TYPE @SPINLOCK_TYPE_CONFIG_VAR@
 
+/* Define to 1 if the target system is big endian */
+#cmakedefine WORDS_BIGENDIAN 1
+
 /* Version number of package */
 #define VERSION "@VERSION_MAJOR@.@VERSION_MINOR@.@VERSION_PATCH@"
 

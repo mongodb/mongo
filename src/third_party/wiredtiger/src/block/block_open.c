@@ -99,10 +99,10 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
     __wt_free(session, block->name);
 
-    if (block->log_structured && block->lfh != NULL) {
-        for (i = 0; i < block->max_logid; i++)
-            WT_TRET(__wt_close(session, &block->lfh[i]));
-        __wt_free(session, block->lfh);
+    if (block->has_objects && block->ofh != NULL) {
+        for (i = 0; i < block->max_objectid; i++)
+            WT_TRET(__wt_close(session, &block->ofh[i]));
+        __wt_free(session, block->ofh);
     }
 
     if (block->fh != NULL)
@@ -182,7 +182,6 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, const char *cfg[
 
     WT_ERR(__wt_config_gets(session, cfg, "block_allocation", &cval));
     block->allocfirst = WT_STRING_MATCH("first", cval.str, cval.len);
-    block->log_structured = WT_STRING_MATCH("log-structured", cval.str, cval.len);
 
     /* Configuration: optional OS buffer cache maximum size. */
     WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));
