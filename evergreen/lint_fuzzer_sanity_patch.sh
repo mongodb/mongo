@@ -14,7 +14,7 @@ indir="$(pwd)/jstestfuzzinput"
 outdir="$(pwd)/jstestfuzzoutput"
 
 # Grep all the js files from modified_and_created_patch_files.txt and put them into $indir.
-(grep -v "\.tpl\.js$" modified_and_created_patch_files.txt | grep "\.js$" | xargs -I {} cp {} $indir || true)
+(grep -v "\.tpl\.js$" modified_and_created_patch_files.txt | grep ".*jstests/.*\.js$" | xargs -I {} cp {} $indir || true)
 
 # Count the number of files in $indir.
 if [[ "$(ls -A $indir)" ]]; then
