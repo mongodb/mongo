@@ -94,6 +94,15 @@ void renameOrDropTarget(OperationContext* opCtx,
         }
     }
 
+    {
+        // Clear CollectionShardingRuntime entry for the toNss collection.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        Lock::DBLock dbLock(opCtx, toNss.db(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, toNss, MODE_IX);
+        auto* csr = CollectionShardingRuntime::get(opCtx, toNss);
+        csr->clearFilteringMetadata(opCtx);
+    }
+
     try {
         validateAndRunRenameCollection(opCtx, fromNss, toNss, options);
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
