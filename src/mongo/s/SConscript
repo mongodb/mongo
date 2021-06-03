@@ -469,7 +469,6 @@ env.Library(
         'mongos_server_parameters',
         'mongos_topology_coordinator',
         'query/cluster_cursor_cleanup_job',
-        'sessions_collection_sharded',
         'sharding_egress_metadata_hook_for_mongos',
         'sharding_initialization',
         'sharding_router_api',

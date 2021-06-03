@@ -2051,7 +2051,6 @@ env.Library(
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
-        '$BUILD_DIR/mongo/s/sessions_collection_sharded',
         '$BUILD_DIR/mongo/scripting/scripting_server',
         '$BUILD_DIR/mongo/transport/message_compressor_options_server',
         '$BUILD_DIR/mongo/transport/service_entry_point',
