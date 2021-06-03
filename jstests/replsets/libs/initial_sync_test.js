@@ -27,7 +27,9 @@ load('jstests/replsets/rslib.js');
  * @param {Object} [replSet] the ReplSetTest instance to adopt
  * @param {int} [timeout] how long to wait for initial sync to start
  */
-function InitialSyncTest(name = "InitialSyncTest", replSet, timeout) {
+function InitialSyncTest(
+    name = "InitialSyncTest", replSet, timeout, replBatchLimitBytes = 100 * 1024 * 1024) {
+    this.replBatchLimitBytes = replBatchLimitBytes;
     const State = {
         kBeforeInitialSync: "kBeforeInitialSync",
         kDuringInitialSync: "kDuringInitialSync",
@@ -64,7 +66,8 @@ function InitialSyncTest(name = "InitialSyncTest", replSet, timeout) {
         let nodeOptions = {};
         if (TestData.logComponentVerbosity) {
             nodeOptions["setParameter"] = {
-                "logComponentVerbosity": tojsononeline(TestData.logComponentVerbosity)
+                "logComponentVerbosity": tojsononeline(TestData.logComponentVerbosity),
+                "replBatchLimitBytes": replBatchLimitBytes,
             };
         }
 
@@ -148,6 +151,7 @@ function InitialSyncTest(name = "InitialSyncTest", replSet, timeout) {
             startClean: true,
             setParameter: {
                 'failpoint.initialSyncFuzzerSynchronizationPoint1': tojson({mode: 'alwaysOn'}),
+                'replBatchLimitBytes': replBatchLimitBytes,
             },
         };
 
@@ -268,6 +272,13 @@ function InitialSyncTest(name = "InitialSyncTest", replSet, timeout) {
 
     this.getSecondary = function() {
         return secondary;
+    };
+
+    this.fail = function() {
+        assert.commandWorked(secondary.adminCommand(
+            {"configureFailPoint": 'initialSyncFuzzerSynchronizationPoint1', "mode": 'off'}));
+        assert.commandWorked(secondary.adminCommand(
+            {"configureFailPoint": 'initialSyncFuzzerSynchronizationPoint2', "mode": 'off'}));
     };
 
     /**
