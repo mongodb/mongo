@@ -235,8 +235,10 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
     DonorShardContext donorCtx;
     donorCtx.setState(DonorStateEnum::kPreparingToDonate);
 
-    auto donorDoc = ReshardingDonorDocument{
-        std::move(donorCtx), reshardingFields.getDonorFields()->getRecipientShardIds()};
+    auto donorDoc =
+        ReshardingDonorDocument{std::move(donorCtx),
+                                reshardingFields.getDonorFields()->getRecipientShardIds(),
+                                ReshardingDonorMetrics()};
 
     auto sourceUUID = getCollectionUUIDFromChunkManger(nss, *metadata.getChunkManager());
     auto commonMetadata =

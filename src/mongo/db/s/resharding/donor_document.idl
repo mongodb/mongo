@@ -36,6 +36,21 @@ imports:
     - "mongo/s/resharding/common_types.idl"
 
 structs:
+    ReshardingDonorMetrics:
+        description: "Contains metrics about the resharding operation on a donor."
+        strict: false
+        fields:
+            operationRuntime:
+                    type: ReshardingMetricsTimeInterval
+                    description: >-
+                        The time interval of the entire resharding operation on this donor.
+                    optional: true
+            criticalSection:
+                type: ReshardingMetricsTimeInterval
+                description: >-
+                    The time interval of the resharding critical section on this donor.
+                optional: true
+
     ReshardingDonorDocument:
         description: "Represents a resharding operation on the donor shard."
         inline_chained_structs: true
@@ -53,3 +68,6 @@ structs:
             recipientShards:
                 type: array<shard_id>
                 description: "The list of recipient shards that are replicating from this donor."
+            metrics:
+                type: ReshardingDonorMetrics
+                description: "Metrics related to this donor."

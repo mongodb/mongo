@@ -136,7 +136,8 @@ public:
         ReshardingDonorDocument doc(std::move(donorCtx),
                                     {ShardId{"recipient1"},
                                      isAlsoRecipient ? donorShardId : ShardId{"recipient2"},
-                                     ShardId{"recipient3"}});
+                                     ShardId{"recipient3"}},
+                                    ReshardingDonorMetrics());
 
         NamespaceString sourceNss("sourcedb.sourcecollection");
         auto sourceUUID = UUID::gen();

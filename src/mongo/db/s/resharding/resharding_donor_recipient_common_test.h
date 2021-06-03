@@ -138,7 +138,8 @@ protected:
         donorCtx.setState(DonorStateEnum::kPreparingToDonate);
 
         ReshardingDonorDocument doc(std::move(donorCtx),
-                                    {kThisShard.getShardId(), kOtherShard.getShardId()});
+                                    {kThisShard.getShardId(), kOtherShard.getShardId()},
+                                    ReshardingDonorMetrics());
 
         NamespaceString sourceNss = kOriginalNss;
         auto sourceUUID = UUID::gen();
