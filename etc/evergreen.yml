@@ -4650,7 +4650,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      dependsOn: jsCore
       resmoke_args: --storageEngine=wiredTiger
 
 - name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
@@ -4658,7 +4657,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      dependsOn: jsCore
       suite: sharded_causally_consistent_jscore_txns_passthrough
       resmoke_args: --storageEngine=wiredTiger --excludeWithAnyTags=uses_snapshot_read_concern
 
@@ -4667,7 +4665,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      dependsOn: jsCore
       resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
@@ -4955,7 +4952,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 5
 
@@ -5071,7 +5067,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      depends_on: jsCore
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 10
@@ -5081,7 +5076,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      depends_on: jsCore
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 10
