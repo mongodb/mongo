@@ -294,7 +294,7 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(ExpressionContext* expCtx,
                                                       const IndexDescriptor* twoDIndex) {
     // Scan bounds on 2D indexes are only over the 2D field - other bounds aren't applicable.
     // This is handled in query planning.
-    IndexScanParams scanParams(expCtx->opCtx, twoDIndex);
+    IndexScanParams scanParams(expCtx->opCtx, _collection, twoDIndex);
     scanParams.bounds = _nearParams->baseBounds;
 
     // The "2d" field is always the first in the index
@@ -612,7 +612,7 @@ std::unique_ptr<NearStage::CoveredInterval> GeoNear2DStage::nextInterval(
 
     // Scan bounds on 2D indexes are only over the 2D field - other bounds aren't applicable.
     // This is handled in query planning.
-    IndexScanParams scanParams(opCtx, indexDescriptor());
+    IndexScanParams scanParams(opCtx, collection, indexDescriptor());
 
     // This does force us to do our own deduping of results.
     scanParams.bounds = _nearParams.baseBounds;
@@ -798,7 +798,7 @@ GeoNear2DSphereStage::DensityEstimator::DensityEstimator(const CollectionPtr& co
 void GeoNear2DSphereStage::DensityEstimator::buildIndexScan(ExpressionContext* expCtx,
                                                             WorkingSet* workingSet,
                                                             const IndexDescriptor* s2Index) {
-    IndexScanParams scanParams(expCtx->opCtx, s2Index);
+    IndexScanParams scanParams(expCtx->opCtx, _collection, s2Index);
     scanParams.bounds = _nearParams->baseBounds;
 
     // Because the planner doesn't yet set up 2D index bounds, do it ourselves here
@@ -967,7 +967,7 @@ std::unique_ptr<NearStage::CoveredInterval> GeoNear2DSphereStage::nextInterval(
     // Setup the covering region and stages for this interval
     //
 
-    IndexScanParams scanParams(opCtx, indexDescriptor());
+    IndexScanParams scanParams(opCtx, collection, indexDescriptor());
 
     // This does force us to do our own deduping of results.
     scanParams.bounds = _nearParams.baseBounds;

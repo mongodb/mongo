@@ -132,7 +132,8 @@ public:
 
     IndexScanParams makeIndexScanParams(OperationContext* opCtx,
                                         const IndexDescriptor* descriptor) {
-        IndexScanParams params(opCtx, descriptor);
+        AutoGetCollectionForReadCommand collection(&_opCtx, NamespaceString(ns()));
+        IndexScanParams params(opCtx, *collection, descriptor);
         params.bounds.isSimpleRange = true;
         params.bounds.endKey = BSONObj();
         params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
@@ -164,7 +165,7 @@ public:
 
     void run() {
         // foo <= 20
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1)));
+        auto params = makeIndexScanParams(&_opCtx, this->getIndex(BSON("foo" << 1)));
         params.bounds.startKey = BSON("" << 20);
         params.direction = -1;
 

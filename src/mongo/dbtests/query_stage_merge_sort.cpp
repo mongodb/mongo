@@ -79,8 +79,9 @@ public:
     }
 
     IndexScanParams makeIndexScanParams(OperationContext* opCtx,
+                                        const CollectionPtr& collection,
                                         const IndexDescriptor* descriptor) {
-        IndexScanParams params(opCtx, descriptor);
+        IndexScanParams params(opCtx, collection, descriptor);
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = objWithMinKey(1);
         params.bounds.endKey = objWithMaxKey(1);
@@ -176,11 +177,11 @@ public:
         auto ms = std::make_unique<MergeSortStage>(_expCtx.get(), msparams, ws.get());
 
         // a:1
-        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         // b:1
-        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         unique_ptr<FetchStage> fetchStage =
@@ -247,11 +248,11 @@ public:
         auto ms = std::make_unique<MergeSortStage>(_expCtx.get(), msparams, ws.get());
 
         // a:1
-        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         // b:1
-        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
@@ -317,11 +318,11 @@ public:
         auto ms = std::make_unique<MergeSortStage>(_expCtx.get(), msparams, ws.get());
 
         // a:1
-        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         // b:1
-        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
@@ -389,13 +390,13 @@ public:
         auto ms = std::make_unique<MergeSortStage>(_expCtx.get(), msparams, ws.get());
 
         // a:1
-        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
         params.bounds.startKey = objWithMaxKey(1);
         params.bounds.endKey = objWithMinKey(1);
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         // b:1
-        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         params.bounds.startKey = objWithMaxKey(1);
         params.bounds.endKey = objWithMinKey(1);
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
@@ -463,11 +464,11 @@ public:
         auto ms = std::make_unique<MergeSortStage>(_expCtx.get(), msparams, ws.get());
 
         // a:1
-        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         // b:51 (EOF)
-        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         params.bounds.startKey = BSON("" << 51 << "" << MinKey);
         params.bounds.endKey = BSON("" << 51 << "" << MaxKey);
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
@@ -526,7 +527,7 @@ public:
 
             BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
             addIndex(indexSpec);
-            auto params = makeIndexScanParams(&_opCtx, getIndex(indexSpec, coll));
+            auto params = makeIndexScanParams(&_opCtx, coll, getIndex(indexSpec, coll));
             ms->addChild(
                 std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
         }
@@ -587,7 +588,7 @@ public:
 
             BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
             addIndex(indexSpec);
-            auto params = makeIndexScanParams(&_opCtx, getIndex(indexSpec, coll));
+            auto params = makeIndexScanParams(&_opCtx, coll, getIndex(indexSpec, coll));
             ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
         }
 
@@ -710,7 +711,7 @@ public:
 
         // First child scans [5, 10].
         {
-            auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("a" << 1), coll));
+            auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("a" << 1), coll));
             params.bounds.startKey = BSON("" << 5);
             params.bounds.endKey = BSON("" << 10);
             auto fetchStage = std::make_unique<FetchStage>(
@@ -724,7 +725,7 @@ public:
 
         // Second child scans [4, 10].
         {
-            auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("a" << 1), coll));
+            auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("a" << 1), coll));
             params.bounds.startKey = BSON("" << 4);
             params.bounds.endKey = BSON("" << 10);
             auto fetchStage = std::make_unique<FetchStage>(
@@ -817,11 +818,11 @@ public:
         auto ms = std::make_unique<MergeSortStage>(_expCtx.get(), msparams, ws.get());
 
         // a:1
-        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         // b:1
-        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
 
         auto fetchStage =
@@ -891,7 +892,7 @@ public:
         auto ms = std::make_unique<MergeSortStage>(_expCtx.get(), msparams, ws.get());
 
         // a:1
-        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
         auto idxScan = std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr);
 
         // Wrap 'idxScan' with a FETCH stage so a document is fetched and MERGE_SORT is forced to
@@ -901,7 +902,7 @@ public:
             make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, coll));
 
         // b:1
-        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         idxScan = std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr);
         ms->addChild(
             make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, coll));

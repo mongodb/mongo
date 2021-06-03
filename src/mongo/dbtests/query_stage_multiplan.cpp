@@ -148,7 +148,7 @@ unique_ptr<PlanStage> getIxScanPlan(ExpressionContext* expCtx,
         expCtx->opCtx, BSON("foo" << 1), false, &indexes);
     ASSERT_EQ(indexes.size(), 1U);
 
-    IndexScanParams ixparams(expCtx->opCtx, indexes[0]);
+    IndexScanParams ixparams(expCtx->opCtx, coll, indexes[0]);
     ixparams.bounds.isSimpleRange = true;
     ixparams.bounds.startKey = BSON("" << desiredFooValue);
     ixparams.bounds.endKey = BSON("" << desiredFooValue);

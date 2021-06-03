@@ -83,8 +83,9 @@ public:
     }
 
     IndexScanParams makeIndexScanParams(OperationContext* opCtx,
+                                        const CollectionPtr& collection,
                                         const IndexDescriptor* descriptor) {
-        IndexScanParams params(opCtx, descriptor);
+        IndexScanParams params(opCtx, collection, descriptor);
         params.bounds.isSimpleRange = true;
         params.bounds.endKey = BSONObj();
         params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
@@ -196,13 +197,13 @@ public:
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
 
         // Foo <= 20.
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Bar >= 10.
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 10);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
@@ -283,13 +284,13 @@ public:
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
 
         // Foo <= 20 (descending).
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Bar <= 19 (descending).
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 19);
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -363,13 +364,13 @@ public:
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
 
         // Foo <= 20
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Bar >= 10
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 10);
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -412,13 +413,14 @@ public:
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws, 20 * big.size());
 
         // Foo <= 20
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1 << "big" << 1), coll));
+        auto params =
+            makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1 << "big" << 1), coll));
         params.bounds.startKey = BSON("" << 20 << "" << big);
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Bar >= 10
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 10);
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -460,13 +462,13 @@ public:
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws, 5 * big.size());
 
         // Foo <= 20
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Bar >= 10
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1 << "big" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1 << "big" << 1), coll));
         params.bounds.startKey = BSON("" << 10 << "" << big);
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -502,18 +504,18 @@ public:
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
 
         // Foo <= 20
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Bar >= 10
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 10);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // 5 <= baz <= 15
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("baz" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("baz" << 1), coll));
         params.bounds.startKey = BSON("" << 5);
         params.bounds.endKey = BSON("" << 15);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -560,18 +562,18 @@ public:
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws, 10 * big.size());
 
         // Foo <= 20
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Bar >= 10
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1 << "big" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1 << "big" << 1), coll));
         params.bounds.startKey = BSON("" << 10 << "" << big);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // 5 <= baz <= 15
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("baz" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("baz" << 1), coll));
         params.bounds.startKey = BSON("" << 5);
         params.bounds.endKey = BSON("" << 15);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -607,13 +609,13 @@ public:
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
 
         // Foo <= 20
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Bar == 5.  Index scan should be eof.
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 5);
         params.bounds.endKey = BSON("" << 5);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -664,12 +666,12 @@ public:
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
 
         // Foo >= 100
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 100);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Bar <= 100
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 100);
         // This is subtle and confusing.  We couldn't extract any keys from the elements with
         // 'foo' in them so we would normally index them with the "nothing found" key.  We don't
@@ -711,7 +713,7 @@ public:
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
 
         // Foo <= 20
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
         params.direction = -1;
         auto firstScan = std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr);
@@ -723,7 +725,7 @@ public:
         ah->addChild(std::move(fetch));
 
         // Bar >= 10
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 10);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
@@ -764,13 +766,13 @@ public:
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
 
         // Foo <= 20
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Bar >= 10
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 10);
         auto secondScan = std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr);
 
@@ -936,13 +938,13 @@ public:
         auto ah = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
 
         // Scan over foo == 1.
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Scan over bar == 1.
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -1053,19 +1055,19 @@ public:
         auto ah = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
 
         // Scan over foo == 1
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // bar == 1
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // baz == 1
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("baz" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("baz" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -1098,13 +1100,13 @@ public:
         auto ah = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
 
         // Foo == 7.  Should be EOF.
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 7);
         params.bounds.endKey = BSON("" << 7);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Bar == 20, not EOF.
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
         params.bounds.endKey = BSON("" << 20);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -1141,13 +1143,13 @@ public:
         auto ah = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
 
         // foo == 7.
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 7);
         params.bounds.endKey = BSON("" << 7);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // bar == 20.
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
         params.bounds.endKey = BSON("" << 20);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -1180,13 +1182,13 @@ public:
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
 
         // Scan over foo == 1
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Intersect with 7 <= bar < 10000
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 7);
         params.bounds.endKey = BSON("" << 10000);
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -1242,7 +1244,7 @@ public:
         unique_ptr<AndSortedStage> as = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
 
         // Scan over foo == 1
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
         auto firstScan = std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr);
@@ -1254,7 +1256,7 @@ public:
         as->addChild(std::move(fetch));
 
         // bar == 1
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
         as->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -1295,13 +1297,13 @@ public:
         unique_ptr<AndSortedStage> as = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
 
         // Scan over foo == 1
-        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
+        auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
         as->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // bar == 1
-        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
         auto secondScan = std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr);

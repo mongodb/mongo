@@ -208,7 +208,7 @@ public:
         auto descriptor = indexes[0];
 
         // We are not testing indexing here so use maximal bounds
-        IndexScanParams params(&_opCtx, descriptor);
+        IndexScanParams params(&_opCtx, _coll, descriptor);
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = BSON("" << 0);
         params.bounds.endKey = BSON("" << kDocuments + 1);

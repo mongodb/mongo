@@ -101,7 +101,7 @@ public:
         ASSERT_EQ(indexes.size(), 1U);
 
         // We are not testing indexing here so use maximal bounds
-        IndexScanParams params(&_opCtx, indexes[0]);
+        IndexScanParams params(&_opCtx, _collPtr, indexes[0]);
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = startKey;
         params.bounds.endKey = endKey;
@@ -123,7 +123,7 @@ public:
         catalog->findIndexesByKeyPattern(&_opCtx, BSON("x" << 1), false, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
-        IndexScanParams params(&_opCtx, indexes[0]);
+        IndexScanParams params(&_opCtx, _collPtr, indexes[0]);
         params.direction = direction;
 
         OrderedIntervalList oil("x");
