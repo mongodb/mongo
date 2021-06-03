@@ -210,7 +210,9 @@ public:
      */
     virtual long long getFreeStorageBytes(OperationContext* opCtx) const = 0;
 
-    virtual RecordId findSingle(OperationContext* opCtx, const BSONObj& key) const = 0;
+    virtual RecordId findSingle(OperationContext* opCtx,
+                                const CollectionPtr& collection,
+                                const BSONObj& key) const = 0;
 
     /**
      * Attempt compaction to regain disk space if the indexed record store supports
@@ -521,7 +523,9 @@ public:
 
     long long getFreeStorageBytes(OperationContext* opCtx) const final;
 
-    RecordId findSingle(OperationContext* opCtx, const BSONObj& key) const final;
+    RecordId findSingle(OperationContext* opCtx,
+                        const CollectionPtr& collection,
+                        const BSONObj& key) const final;
 
     Status compact(OperationContext* opCtx) final;
 

@@ -243,7 +243,7 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
     auto idToFetch = updateRequest.getQuery().firstElement();
     auto toUpdateIdDoc = idToFetch.wrap();
     dassert(idToFetch.fieldNameStringData() == "_id"_sd);
-    auto recordId = indexAccess->findSingle(opCtx, toUpdateIdDoc);
+    auto recordId = indexAccess->findSingle(opCtx, *collection, toUpdateIdDoc);
     auto startingSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
     const auto updateMod = updateRequest.getUpdateModification().getUpdateClassic();
 

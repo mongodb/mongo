@@ -149,10 +149,11 @@ bool Helpers::findById(OperationContext* opCtx,
     if (indexFound)
         *indexFound = 1;
 
-    RecordId loc = catalog->getEntry(desc)->accessMethod()->findSingle(opCtx, query["_id"].wrap());
-    if (loc.isNull())
+    auto recordId =
+        catalog->getEntry(desc)->accessMethod()->findSingle(opCtx, collection, query["_id"].wrap());
+    if (recordId.isNull())
         return false;
-    result = collection->docFor(opCtx, loc).value();
+    result = collection->docFor(opCtx, recordId).value();
     return true;
 }
 
@@ -163,7 +164,8 @@ RecordId Helpers::findById(OperationContext* opCtx,
     const IndexCatalog* catalog = collection->getIndexCatalog();
     const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
     uassert(13430, "no _id index", desc);
-    return catalog->getEntry(desc)->accessMethod()->findSingle(opCtx, idquery["_id"].wrap());
+    return catalog->getEntry(desc)->accessMethod()->findSingle(
+        opCtx, collection, idquery["_id"].wrap());
 }
 
 // Acquires necessary locks to read the collection with the given namespace. If this is an oplog

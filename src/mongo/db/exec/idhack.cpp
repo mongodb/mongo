@@ -86,7 +86,7 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
     WorkingSetID id = WorkingSet::INVALID_ID;
     try {
         // Look up the key by going directly to the index.
-        RecordId recordId = indexAccessMethod()->findSingle(opCtx(), _key);
+        auto recordId = indexAccessMethod()->findSingle(opCtx(), collection(), _key);
 
         // Key not found.
         if (recordId.isNull()) {

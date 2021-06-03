@@ -265,6 +265,7 @@ Status AbstractIndexAccessMethod::initializeAsEmpty(OperationContext* opCtx) {
 }
 
 RecordId AbstractIndexAccessMethod::findSingle(OperationContext* opCtx,
+                                               const CollectionPtr& collection,
                                                const BSONObj& requestedKey) const {
     // Generate the key for this index.
     KeyString::Value actualKey = [&]() {
