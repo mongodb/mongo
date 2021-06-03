@@ -162,7 +162,7 @@ structs:
                 description: "Number of documents on this donor shard in the collection being
                               resharded."
                 optional: true
-                
+
     DonorShardFetchTimestamp:
         description: "Used for tracking donor min fetch timestamp"
         strict: false
@@ -231,7 +231,7 @@ structs:
                 type: string
                 description: "The zone name."
             min:
-                type: object_owned 
+                type: object_owned
                 description: "The min key of the chunk range assigned to the zone."
             max:
                 type: object_owned
