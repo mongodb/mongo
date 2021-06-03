@@ -1464,7 +1464,7 @@ Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
 
     UpdateTicket updateTicket;
 
-    iam->prepareUpdate(opCtx, index, oldDoc, newDoc, recordId, options, &updateTicket);
+    iam->prepareUpdate(opCtx, coll, index, oldDoc, newDoc, recordId, options, &updateTicket);
 
     int64_t keysInserted = 0;
     int64_t keysDeleted = 0;
