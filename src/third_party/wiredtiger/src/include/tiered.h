@@ -111,6 +111,8 @@ struct __wt_tiered {
 
     WT_TIERED_TIERS tiers[WT_TIERED_MAX_TIERS]; /* Tiers array */
 
+    WT_BLOCK_FILE_OPENER opener;
+
     uint64_t current_id; /* Current object id number */
     uint64_t next_id;    /* Next object number */
 

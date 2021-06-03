@@ -212,6 +212,7 @@ src/support/timestamp.c
 src/support/update_vector.c
 src/tiered/tiered_config.c
 src/tiered/tiered_handle.c
+src/tiered/tiered_opener.c
 src/tiered/tiered_work.c
 src/txn/txn.c
 src/txn/txn_ckpt.c

@@ -57,6 +57,7 @@ __btree_clear(WT_SESSION_IMPL *session)
 int
 __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 {
+    WT_BLOCK_FILE_OPENER *opener;
     WT_BM *bm;
     WT_BTREE *btree;
     WT_CKPT ckpt;
@@ -110,15 +111,17 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
     /* Initialize and configure the WT_BTREE structure. */
     WT_ERR(__btree_conf(session, &ckpt));
 
-    /* Connect to the underlying block manager. */
-    filename = dhandle->name;
-    if (!WT_PREFIX_SKIP(filename, "file:"))
-        WT_ERR_MSG(session, EINVAL, "expected a 'file:' URI");
+    /*
+     * Get an opener abstraction that the block manager can use to open any of the files that
+     * represent a btree. In the case of a tiered Btree, that would allow opening different files
+     * according to an object id in a reference. For a non-tiered Btree, the opener will know to
+     * always open a single file (given by the filename).
+     */
+    WT_ERR(__wt_tiered_opener(session, dhandle, &opener, &filename));
 
-    WT_WITH_BUCKET_STORAGE(btree->bstorage, session,
-      ret = __wt_block_manager_open(session, filename, dhandle->cfg, forced_salvage,
-        F_ISSET(btree, WT_BTREE_READONLY), btree->allocsize, &btree->bm));
-    WT_ERR(ret);
+    /* Connect to the underlying block manager. */
+    WT_ERR(__wt_block_manager_open(session, filename, opener, dhandle->cfg, forced_salvage,
+      F_ISSET(btree, WT_BTREE_READONLY), btree->allocsize, &btree->bm));
 
     bm = btree->bm;
 
@@ -400,6 +403,12 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
         F_CLR(btree, WT_BTREE_NO_LOGGING);
     else
         F_SET(btree, WT_BTREE_NO_LOGGING);
+
+    WT_RET(__wt_config_gets(session, cfg, "tiered_object", &cval));
+    if (cval.val)
+        F_SET(btree, WT_BTREE_NO_CHECKPOINT);
+    else
+        F_CLR(btree, WT_BTREE_NO_CHECKPOINT);
 
     /* Checksums */
     WT_RET(__wt_config_gets(session, cfg, "checksum", &cval));
@@ -1002,4 +1011,27 @@ __wt_btree_immediately_durable(WT_SESSION_IMPL *session)
     return ((FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) ||
               (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))) &&
       !F_ISSET(btree, WT_BTREE_NO_LOGGING));
+}
+
+/*
+ * __wt_btree_switch_object --
+ *     Switch to a writeable object for a tiered btree.
+ */
+int
+__wt_btree_switch_object(WT_SESSION_IMPL *session, uint64_t object_id, uint32_t flags)
+{
+    WT_BM *bm;
+    WT_DECL_RET;
+
+    bm = S2BT(session)->bm;
+
+    /*
+     * When initially opening a tiered Btree, a tier switch is done internally without the btree
+     * being fully opened. That's okay, the btree will be told later about the current object
+     * number.
+     */
+    if (bm != NULL)
+        ret = bm->switch_object(bm, session, object_id, flags);
+
+    return (ret);
 }

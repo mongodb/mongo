@@ -185,7 +185,6 @@ struct __wt_bm {
     int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, bool *);
     int (*compact_start)(WT_BM *, WT_SESSION_IMPL *);
     int (*corrupt)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
-    int (*flush_tier)(WT_BM *, WT_SESSION_IMPL *, uint8_t **, size_t *);
     int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     bool (*is_mapped)(WT_BM *, WT_SESSION_IMPL *);
     int (*map_discard)(WT_BM *, WT_SESSION_IMPL *, void *, size_t);
@@ -197,6 +196,7 @@ struct __wt_bm {
     int (*salvage_valid)(WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t, bool);
     int (*size)(WT_BM *, WT_SESSION_IMPL *, wt_off_t *);
     int (*stat)(WT_BM *, WT_SESSION_IMPL *, WT_DSRC_STATS *stats);
+    int (*switch_object)(WT_BM *, WT_SESSION_IMPL *, uint64_t, uint32_t);
     int (*sync)(WT_BM *, WT_SESSION_IMPL *, bool);
     int (*verify_addr)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     int (*verify_end)(WT_BM *, WT_SESSION_IMPL *);
@@ -221,8 +221,9 @@ struct __wt_bm {
  *	Block manager handle, references a single file.
  */
 struct __wt_block {
-    const char *name;   /* Name */
-    uint64_t name_hash; /* Hash of name */
+    const char *name;             /* Name */
+    uint64_t name_hash;           /* Hash of name */
+    WT_BLOCK_FILE_OPENER *opener; /* how to open files/objects */
 
     /* A list of block manager handles, sharing a file descriptor. */
     uint32_t ref;                  /* References */
@@ -239,7 +240,6 @@ struct __wt_block {
     /* Configuration information, set when the file is opened. */
     uint32_t allocfirst; /* Allocation is first-fit */
     uint32_t allocsize;  /* Allocation size */
-    bool has_objects;    /* Address cookies contain object id */
     size_t os_cache;     /* System buffer cache flush max */
     size_t os_cache_max;
     size_t os_cache_dirty_max;
@@ -247,8 +247,11 @@ struct __wt_block {
     u_int block_header; /* Header length */
 
     /* Object file tracking. */
-    uint32_t file_flags, objectid, max_objectid;
-    WT_FH **ofh;
+    bool has_objects;      /* Address cookies contain object id */
+    uint32_t file_flags;   /* Flags for opening objects */
+    uint32_t objectid;     /* Current writeable object id */
+    uint32_t max_objectid; /* Size of object handle array */
+    WT_FH **ofh;           /* Object file handles */
     size_t ofh_alloc;
 
     /*
@@ -314,6 +317,20 @@ struct __wt_block_desc {
  * of the file for this information, but it would be worth investigation, regardless).
  */
 #define WT_BLOCK_DESC_SIZE 16
+
+/*
+ * WT_BLOCK_FILE_OPENER --
+ *	An open callback for the block manager.  This hides details about how to access the
+ * different objects that make up a tiered file.
+ */
+struct __wt_block_file_opener {
+    /* An id to be used with the open call to reference the current object. */
+#define WT_TIERED_CURRENT_ID 0xFFFFFFFFFFFFFFFFULL
+    int (*open)(
+      WT_BLOCK_FILE_OPENER *, WT_SESSION_IMPL *, uint64_t, WT_FS_OPEN_FILE_TYPE, u_int, WT_FH **);
+    uint64_t (*current_object_id)(WT_BLOCK_FILE_OPENER *);
+    void *cookie; /* Used in open call */
+};
 
 /*
  * __wt_block_desc_byteswap --

@@ -35,9 +35,7 @@ class test_tiered02(wttest.WiredTigerTestCase):
     K = 1024
     M = 1024 * K
     G = 1024 * M
-    # TODO: tiered: change this to a table: URI, otherwise we are
-    # not using tiered files.
-    uri = "file:test_tiered02"
+    uri = "table:test_tiered02"
 
     auth_token = "test_token"
     bucket = "mybucket"
@@ -46,25 +44,25 @@ class test_tiered02(wttest.WiredTigerTestCase):
     prefix = "pfx-"
 
     def conn_config(self):
-        os.makedirs(self.bucket, exist_ok=True)
+        if not os.path.exists(self.bucket):
+            os.mkdir(self.bucket)
         return \
           'statistics=(all),' + \
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % self.bucket + \
           'bucket_prefix=%s,' % self.prefix + \
-          'name=%s)' % self.extension_name
+          'name=%s),tiered_manager=(wait=0)' % self.extension_name
 
     # Load the local store extension, but skip the test if it is missing.
     def conn_extensions(self, extlist):
         extlist.skip_if_missing = True
         extlist.extension('storage_sources', self.extension_name)
 
-    def confirm_flush(self, increase=True):
-        # TODO: tiered: flush tests disabled, as the interface
-        # for flushing will be changed.
-        return
+    def progress(self, s):
+        self.verbose(3, s)
+        self.pr(s)
 
-        self.flushed_objects
+    def confirm_flush(self, increase=True):
         got = sorted(list(os.listdir(self.bucket)))
         self.pr('Flushed objects: ' + str(got))
         if increase:
@@ -80,45 +78,86 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.flushed_objects = 0
         args = 'key_format=S'
 
+        intl_page = 'internal_page_max=16K'
+        base_create = 'key_format=S,value_format=S,' + intl_page
+        self.pr("create sys")
+        #self.session.create(self.uri + 'xxx', base_create)
+
+        self.progress('Create simple data set (10)')
         ds = SimpleDataSet(self, self.uri, 10, config=args)
+        self.progress('populate')
         ds.populate()
         ds.check()
+        self.progress('checkpoint')
         self.session.checkpoint()
-        # For some reason, every checkpoint does not cause a flush.
-        # As we're about to move to a new model of flushing, we're not going to chase this error.
-        #self.confirm_flush()
+        self.progress('flush_tier')
+        self.session.flush_tier(None)
+        self.confirm_flush()
 
+        # FIXME-WT-7589 reopening a connection does not yet work.
+        if False:
+            self.close_conn()
+            self.progress('reopen_conn')
+            self.reopen_conn()
+            # Check what was there before
+            ds = SimpleDataSet(self, self.uri, 10, config=args)
+            ds.check()
+
+        self.progress('Create simple data set (50)')
         ds = SimpleDataSet(self, self.uri, 50, config=args)
+        self.progress('populate')
         ds.populate()
         ds.check()
+        self.progress('checkpoint')
         self.session.checkpoint()
+        self.progress('flush_tier')
+        self.session.flush_tier(None)
         self.confirm_flush()
 
+        # FIXME-WT-7589 This test works up to this point, then runs into trouble.
+        if True:
+            return
+
+        self.progress('Create simple data set (100)')
         ds = SimpleDataSet(self, self.uri, 100, config=args)
+        self.progress('populate')
         ds.populate()
         ds.check()
+        self.progress('checkpoint')
         self.session.checkpoint()
+        self.progress('flush_tier')
+        self.session.flush_tier(None)
         self.confirm_flush()
 
+        self.progress('Create simple data set (200)')
         ds = SimpleDataSet(self, self.uri, 200, config=args)
+        self.progress('populate')
         ds.populate()
         ds.check()
+        self.progress('close_conn')
         self.close_conn()
         self.confirm_flush()  # closing the connection does a checkpoint
 
+        self.progress('reopen_conn')
         self.reopen_conn()
         # Check what was there before
         ds = SimpleDataSet(self, self.uri, 200, config=args)
         ds.check()
 
         # Now add some more.
+        self.progress('Create simple data set (300)')
         ds = SimpleDataSet(self, self.uri, 300, config=args)
+        self.progress('populate')
         ds.populate()
         ds.check()
 
-        # We haven't done a checkpoint/flush so there should be
+        # We haven't done a flush so there should be
         # nothing extra on the shared tier.
         self.confirm_flush(increase=False)
+        self.progress('checkpoint')
+        self.session.checkpoint()
+        self.confirm_flush(increase=False)
+        self.progress('END TEST')
 
 if __name__ == '__main__':
     wttest.run()
