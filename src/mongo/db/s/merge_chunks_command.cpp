@@ -38,8 +38,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
@@ -225,14 +225,9 @@ void mergeChunks(OperationContext* opCtx,
                  const BSONObj& minKey,
                  const BSONObj& maxKey,
                  const OID& expectedEpoch) {
-    const std::string whyMessage = str::stream() << "merging chunks in " << nss.ns() << " from "
-                                                 << redact(minKey) << " to " << redact(maxKey);
-    auto scopedDistLock = uassertStatusOKWithContext(
-        DistLockManager::get(opCtx)->lock(
-            opCtx, nss.ns(), whyMessage, DistLockManager::kDefaultLockTimeout),
-        str::stream() << "could not acquire collection lock for " << nss.ns()
-                      << " to merge chunks in [" << redact(minKey) << ", " << redact(maxKey)
-                      << ")");
+    auto scopedSplitOrMergeChunk(
+        uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(
+            opCtx, nss, ChunkRange(minKey, maxKey))));
 
     const bool isVersioned = OperationShardingState::isOperationVersioned(opCtx);
     if (!isVersioned) {
