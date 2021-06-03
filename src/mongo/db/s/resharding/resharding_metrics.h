@@ -74,8 +74,11 @@ public:
     void setCoordinatorState(CoordinatorStateEnum) noexcept;
 
     void setDocumentsToCopy(int64_t documents, int64_t bytes) noexcept;
+    void setDocumentsToCopyForCurrentOp(int64_t documents, int64_t bytes) noexcept;
     // Allows updating metrics on "documents to copy" so long as the recipient is in cloning state.
     void onDocumentsCopied(int64_t documents, int64_t bytes) noexcept;
+    // Allows updating metrics on "documents to copy".
+    void onDocumentsCopiedForCurrentOp(int64_t documents, int64_t bytes) noexcept;
 
     // Starts/ends the timers recording the times spend in the named sections.
     void startCopyingDocuments(Date_t start);
@@ -89,11 +92,16 @@ public:
 
     // Allows updating "oplog entries to apply" metrics when the recipient is in applying state.
     void onOplogEntriesFetched(int64_t entries) noexcept;
+    // Allows restoring "oplog entries to apply" metrics.
+    void onOplogEntriesFetchedForCurrentOp(int64_t entries) noexcept;
     void onOplogEntriesApplied(int64_t entries) noexcept;
+    void onOplogEntriesAppliedForCurrentOp(int64_t entries) noexcept;
 
     // Allows tracking writes during a critical section when the donor's state is either of
     // "donating-oplog-entries" or "blocking-writes".
     void onWriteDuringCriticalSection(int64_t writes) noexcept;
+    // Allows restoring writes during a critical section.
+    void onWriteDuringCriticalSectionForCurrentOp(int64_t writes) noexcept;
 
     // Indicates that a role on this node is stepping down. If the role being stepped down is the
     // last active role on this process, the function tears down the currentOp variable. The

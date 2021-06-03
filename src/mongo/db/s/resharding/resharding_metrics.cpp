@@ -273,6 +273,12 @@ void ReshardingMetrics::setDocumentsToCopy(int64_t documents, int64_t bytes) noe
     invariant(_currentOp.has_value(), kNoOperationInProgress);
     invariant(_currentOp->recipientState == RecipientStateEnum::kCreatingCollection);
 
+    setDocumentsToCopyForCurrentOp(documents, bytes);
+}
+
+void ReshardingMetrics::setDocumentsToCopyForCurrentOp(int64_t documents, int64_t bytes) noexcept {
+    invariant(_currentOp.has_value(), kNoOperationInProgress);
+
     _currentOp->documentsToCopy = documents;
     _currentOp->bytesToCopy = bytes;
 }
@@ -285,10 +291,16 @@ void ReshardingMetrics::onDocumentsCopied(int64_t documents, int64_t bytes) noex
     invariant(checkState(*_currentOp->recipientState,
                          {RecipientStateEnum::kCloning, RecipientStateEnum::kError}));
 
-    _currentOp->documentsCopied += documents;
-    _currentOp->bytesCopied += bytes;
+    onDocumentsCopiedForCurrentOp(documents, bytes);
     _cumulativeOp.documentsCopied += documents;
     _cumulativeOp.bytesCopied += bytes;
+}
+
+void ReshardingMetrics::onDocumentsCopiedForCurrentOp(int64_t documents, int64_t bytes) noexcept {
+    invariant(_currentOp.has_value(), kNoOperationInProgress);
+
+    _currentOp->documentsCopied += documents;
+    _currentOp->bytesCopied += bytes;
 }
 
 void ReshardingMetrics::startCopyingDocuments(Date_t start) {
@@ -330,8 +342,14 @@ void ReshardingMetrics::onOplogEntriesFetched(int64_t entries) noexcept {
         *_currentOp->recipientState,
         {RecipientStateEnum::kCloning, RecipientStateEnum::kApplying, RecipientStateEnum::kError}));
 
-    _currentOp->oplogEntriesFetched += entries;
+    onOplogEntriesFetchedForCurrentOp(entries);
     _cumulativeOp.oplogEntriesFetched += entries;
+}
+
+void ReshardingMetrics::onOplogEntriesFetchedForCurrentOp(int64_t entries) noexcept {
+    invariant(_currentOp.has_value(), kNoOperationInProgress);
+
+    _currentOp->oplogEntriesFetched += entries;
 }
 
 void ReshardingMetrics::onOplogEntriesApplied(int64_t entries) noexcept {
@@ -342,8 +360,14 @@ void ReshardingMetrics::onOplogEntriesApplied(int64_t entries) noexcept {
     invariant(checkState(*_currentOp->recipientState,
                          {RecipientStateEnum::kApplying, RecipientStateEnum::kError}));
 
-    _currentOp->oplogEntriesApplied += entries;
+    onOplogEntriesAppliedForCurrentOp(entries);
     _cumulativeOp.oplogEntriesApplied += entries;
+}
+
+void ReshardingMetrics::onOplogEntriesAppliedForCurrentOp(int64_t entries) noexcept {
+    invariant(_currentOp.has_value(), kNoOperationInProgress);
+
+    _currentOp->oplogEntriesApplied += entries;
 }
 
 void ReshardingMetrics::onWriteDuringCriticalSection(int64_t writes) noexcept {
@@ -356,8 +380,14 @@ void ReshardingMetrics::onWriteDuringCriticalSection(int64_t writes) noexcept {
                           DonorStateEnum::kBlockingWrites,
                           DonorStateEnum::kError}));
 
-    _currentOp->writesDuringCriticalSection += writes;
+    onWriteDuringCriticalSectionForCurrentOp(writes);
     _cumulativeOp.writesDuringCriticalSection += writes;
+}
+
+void ReshardingMetrics::onWriteDuringCriticalSectionForCurrentOp(int64_t writes) noexcept {
+    invariant(_currentOp.has_value(), kNoOperationInProgress);
+
+    _currentOp->writesDuringCriticalSection += writes;
 }
 
 void ReshardingMetrics::OperationMetrics::TimeInterval::start(Date_t start) noexcept {
