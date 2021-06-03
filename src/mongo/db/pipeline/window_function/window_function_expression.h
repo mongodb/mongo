@@ -484,9 +484,6 @@ protected:
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << accumulatorName << " requires a non-expression sortBy",
                 !sortBy->begin()->expression);
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << accumulatorName << " requires an ascending sortBy",
-                sortBy->begin()->isAscending);
     }
 
     boost::optional<long long> convertTimeUnitToMillis(boost::optional<TimeUnit> outputUnit) const {

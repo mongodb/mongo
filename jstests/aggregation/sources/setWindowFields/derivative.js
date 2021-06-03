@@ -117,6 +117,23 @@ assert.docEq(result, [
     // time: 4 and time: 7.
     {time: 7, y: 118, dy: +3 / 3},
 ]);
+// Because the derivative is the same irrespective of sort order (as long as we reexpress the
+// bounds) we can compare this result with the result of the previous aggregation.
+const resultDesc =
+    coll.aggregate([
+            {
+                $setWindowFields: {
+                    sortBy: {time: -1},
+                    output: {
+                        dy: {$derivative: {input: "$y"}, window: {documents: [-1, +3]}},
+                    }
+                }
+            },
+            {$unset: "_id"},
+            {$sort: {time: 1}},
+        ])
+        .toArray();
+assert.docEq(result, resultDesc);
 
 // Example with range-based bounds.
 coll.drop();

@@ -70,6 +70,26 @@ assert.sameMembers(result, [
     {partitionID: 2, x: 4, y: 107, integral: 212},  // (105 + 107) * 2 / 2 = 212
     {partitionID: 2, x: 6, y: -100, integral: 7},   // (107 - 100) * 2 / 2 = 7
 ]);
+// Because the integral from a to b is the same as the inverse of the integral from b to a, we can
+// invert the input, sort order, and bounds so that the results are the same as the previous
+// integral.
+const resultDesc = coll.aggregate([
+                           {
+                               $setWindowFields: {
+                                   partitionBy: "$partitionID",
+                                   sortBy: {x: -1},
+                                   output: {
+                                       integral: {
+                                           $integral: {input: {$subtract: [0, "$y"]}},
+                                           window: {documents: [0, +1]}
+                                       },
+                                   }
+                               }
+                           },
+                           {$unset: "_id"},
+                       ])
+                       .toArray();
+assert.sameMembers(result, resultDesc);
 
 // 'outputUnit' only supports 'week' and smaller.
 coll.drop();
