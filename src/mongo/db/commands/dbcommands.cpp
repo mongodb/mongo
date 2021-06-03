@@ -409,23 +409,24 @@ public:
                 keyPattern = Helpers::inferKeyPattern(min);
             }
 
-            const IndexDescriptor* idx =
-                collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx,
-                                                                         keyPattern,
-                                                                         true);  // requireSingleKey
+            auto catalog = collection->getIndexCatalog();
+            auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(opCtx,
+                                                                  *collection,
+                                                                  keyPattern,
+                                                                  /*requireSingleKey=*/true);
 
-            if (idx == nullptr) {
+            if (shardKeyIdx == nullptr) {
                 errmsg = "couldn't find valid index containing key pattern";
                 return false;
             }
             // If both min and max non-empty, append MinKey's to make them fit chosen index
-            KeyPattern kp(idx->keyPattern());
+            KeyPattern kp(shardKeyIdx->keyPattern());
             min = Helpers::toKeyFormat(kp.extendRangeBound(min, false));
             max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
 
             exec = InternalPlanner::indexScan(opCtx,
                                               &collection.getCollection(),
-                                              idx,
+                                              shardKeyIdx,
                                               min,
                                               max,
                                               BoundInclusion::kIncludeStartKeyOnly,

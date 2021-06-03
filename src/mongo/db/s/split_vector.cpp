@@ -82,15 +82,16 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
 
         // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,
         // any multi-key index prefixed by shard key cannot be multikey over the shard key fields.
-        const IndexDescriptor* idx =
-            collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx, keyPattern, false);
+        auto catalog = collection->getIndexCatalog();
+        auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(
+            opCtx, *collection, keyPattern, /*requireSingleKey=*/false);
         uassert(ErrorCodes::IndexNotFound,
                 str::stream() << "couldn't find index over splitting key "
                               << keyPattern.clientReadable().toString(),
-                idx);
+                shardKeyIdx);
 
         // extend min to get (min, MinKey, MinKey, ....)
-        KeyPattern kp(idx->keyPattern());
+        KeyPattern kp(shardKeyIdx->keyPattern());
         BSONObj minKey = Helpers::toKeyFormat(kp.extendRangeBound(min, false));
         BSONObj maxKey;
         if (max.isEmpty()) {
@@ -164,7 +165,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
 
         auto exec = InternalPlanner::indexScan(opCtx,
                                                &collection.getCollection(),
-                                               idx,
+                                               shardKeyIdx,
                                                minKey,
                                                maxKey,
                                                BoundInclusion::kIncludeStartKeyOnly,
@@ -182,7 +183,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         {
             auto exec = InternalPlanner::indexScan(opCtx,
                                                    &collection.getCollection(),
-                                                   idx,
+                                                   shardKeyIdx,
                                                    maxKey,
                                                    minKey,
                                                    BoundInclusion::kIncludeEndKeyOnly,
@@ -205,9 +206,9 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                 "{maxKey} contains only the key {key}",
                 "Possible low cardinality key detected in range. Range contains only a single key.",
                 "namespace"_attr = nss.toString(),
-                "minKey"_attr = redact(prettyKey(idx->keyPattern(), minKey)),
-                "maxKey"_attr = redact(prettyKey(idx->keyPattern(), maxKey)),
-                "key"_attr = redact(prettyKey(idx->keyPattern(), currKey)));
+                "minKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), minKey)),
+                "maxKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), maxKey)),
+                "key"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), currKey)));
             std::vector<BSONObj> emptyVector;
             return emptyVector;
         }
@@ -217,7 +218,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         // chunk, we issue a warning and split on the following key.
         auto tooFrequentKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         splitKeys.push_back(dotted_path_support::extractElementsBasedOnTemplate(
-            prettyKey(idx->keyPattern(), currKey.getOwned()), keyPattern));
+            prettyKey(shardKeyIdx->keyPattern(), currKey.getOwned()), keyPattern));
 
         while (1) {
             while (PlanExecutor::ADVANCED == state) {
@@ -225,7 +226,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
 
                 if (currCount > keyCount && !force) {
                     currKey = dotted_path_support::extractElementsBasedOnTemplate(
-                        prettyKey(idx->keyPattern(), currKey.getOwned()), keyPattern);
+                        prettyKey(shardKeyIdx->keyPattern(), currKey.getOwned()), keyPattern);
 
                     // Do not use this split key if it is the same used in the previous split
                     // point.
@@ -248,8 +249,10 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                                   "Max BSON response size reached for split vector before the end "
                                   "of chunk",
                                   "namespace"_attr = nss.toString(),
-                                  "minKey"_attr = redact(prettyKey(idx->keyPattern(), minKey)),
-                                  "maxKey"_attr = redact(prettyKey(idx->keyPattern(), maxKey)));
+                                  "minKey"_attr =
+                                      redact(prettyKey(shardKeyIdx->keyPattern(), minKey)),
+                                  "maxKey"_attr =
+                                      redact(prettyKey(shardKeyIdx->keyPattern(), maxKey)));
                             break;
                         }
 
@@ -273,8 +276,8 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                           "Max number of requested split points reached before the end of chunk",
                           "numSplitPoints"_attr = numChunks,
                           "namespace"_attr = nss.toString(),
-                          "minKey"_attr = redact(prettyKey(idx->keyPattern(), minKey)),
-                          "maxKey"_attr = redact(prettyKey(idx->keyPattern(), maxKey)));
+                          "minKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), minKey)),
+                          "maxKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), maxKey)));
                     break;
                 }
 
@@ -299,7 +302,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
 
             exec = InternalPlanner::indexScan(opCtx,
                                               &collection.getCollection(),
-                                              idx,
+                                              shardKeyIdx,
                                               minKey,
                                               maxKey,
                                               BoundInclusion::kIncludeStartKeyOnly,
@@ -321,7 +324,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                           "{key}",
                           "Possible low cardinality key detected",
                           "namespace"_attr = nss.toString(),
-                          "key"_attr = redact(prettyKey(idx->keyPattern(), *it)));
+                          "key"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), *it)));
         }
 
         // Remove the sentinel at the beginning before returning

@@ -93,11 +93,10 @@ public:
             return false;
         }
 
-        const IndexDescriptor* idx =
-            collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx,
-                                                                     keyPattern,
-                                                                     true);  // requireSingleKey
-        if (idx == nullptr) {
+        auto catalog = collection->getIndexCatalog();
+        auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(
+            opCtx, *collection, keyPattern, /*requireSingleKey=*/true);
+        if (!shardKeyIdx) {
             errmsg = "couldn't find valid index for shard key";
             return false;
         }

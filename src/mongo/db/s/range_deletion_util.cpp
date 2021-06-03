@@ -132,8 +132,9 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     // The IndexChunk has a keyPattern that may apply to more than one index - we need to
     // select the index and get the full index keyPattern here.
     auto catalog = collection->getIndexCatalog();
-    const IndexDescriptor* idx = catalog->findShardKeyPrefixedIndex(opCtx, keyPattern, false);
-    if (!idx) {
+    auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(
+        opCtx, collection, keyPattern, /*requireSingleKey=*/false);
+    if (!shardKeyIdx) {
         LOGV2_ERROR_OPTIONS(23765,
                             {logv2::UserAssertAfterLog(ErrorCodes::InternalError)},
                             "Unable to find shard key index for {keyPattern} in {namespace}",
@@ -143,7 +144,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     }
 
     // Extend bounds to match the index we found
-    const KeyPattern indexKeyPattern(idx->keyPattern());
+    const KeyPattern indexKeyPattern(shardKeyIdx->keyPattern());
     const auto extend = [&](const auto& key) {
         return Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(key, false));
     };
@@ -159,7 +160,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                 "max"_attr = max,
                 "namespace"_attr = nss.ns());
 
-    const auto indexName = idx->indexName();
+    const auto indexName = shardKeyIdx->indexName();
     const IndexDescriptor* descriptor =
         collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
     if (!descriptor) {

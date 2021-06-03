@@ -232,9 +232,10 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
 
     // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,
     // any multi-key index prefixed by shard key cannot be multikey over the shard key fields.
-    const IndexDescriptor* idx =
-        collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx, keyPatternObj, false);
-    if (!idx) {
+    auto catalog = collection->getIndexCatalog();
+    auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(
+        opCtx, *collection, keyPatternObj, /*requireSingleKey=*/false);
+    if (!shardKeyIdx) {
         return boost::optional<ChunkRange>(boost::none);
     }
 
@@ -248,10 +249,10 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
 
     KeyPattern shardKeyPattern(keyPatternObj);
     if (shardKeyPattern.globalMax().woCompare(backChunk.getMax()) == 0 &&
-        checkIfSingleDoc(opCtx, collection.getCollection(), idx, &backChunk)) {
+        checkIfSingleDoc(opCtx, collection.getCollection(), shardKeyIdx, &backChunk)) {
         return boost::optional<ChunkRange>(ChunkRange(backChunk.getMin(), backChunk.getMax()));
     } else if (shardKeyPattern.globalMin().woCompare(frontChunk.getMin()) == 0 &&
-               checkIfSingleDoc(opCtx, collection.getCollection(), idx, &frontChunk)) {
+               checkIfSingleDoc(opCtx, collection.getCollection(), shardKeyIdx, &frontChunk)) {
         return boost::optional<ChunkRange>(ChunkRange(frontChunk.getMin(), frontChunk.getMax()));
     }
     return boost::optional<ChunkRange>(boost::none);

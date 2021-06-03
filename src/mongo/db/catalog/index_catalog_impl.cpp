@@ -1221,6 +1221,7 @@ void IndexCatalogImpl::findIndexesByKeyPattern(OperationContext* opCtx,
 }
 
 const IndexDescriptor* IndexCatalogImpl::findShardKeyPrefixedIndex(OperationContext* opCtx,
+                                                                   const CollectionPtr& collection,
                                                                    const BSONObj& shardKey,
                                                                    bool requireSingleKey) const {
     const IndexDescriptor* best = nullptr;

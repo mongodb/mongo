@@ -258,6 +258,7 @@ public:
      * If no such index exists, returns NULL.
      */
     virtual const IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* const opCtx,
+                                                             const CollectionPtr& collection,
                                                              const BSONObj& shardKey,
                                                              const bool requireSingleKey) const = 0;
 

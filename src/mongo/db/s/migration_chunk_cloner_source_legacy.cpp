@@ -798,10 +798,9 @@ MigrationChunkClonerSourceLegacy::_getIndexScanExecutor(
     InternalPlanner::IndexScanOptions scanOption) {
     // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore, any
     // multi-key index prefixed by shard key cannot be multikey over the shard key fields.
-    const IndexDescriptor* shardKeyIdx =
-        collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx,
-                                                                 _shardKeyPattern.toBSON(),
-                                                                 false);  // requireSingleKey
+    auto catalog = collection->getIndexCatalog();
+    auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(
+        opCtx, collection, _shardKeyPattern.toBSON(), /*requireSingleKey=*/false);
     if (!shardKeyIdx) {
         return {ErrorCodes::IndexNotFound,
                 str::stream() << "can't find index with prefix " << _shardKeyPattern.toBSON()

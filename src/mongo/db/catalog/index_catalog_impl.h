@@ -137,6 +137,7 @@ public:
      * If no such index exists, returns NULL.
      */
     const IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* opCtx,
+                                                     const CollectionPtr& collection,
                                                      const BSONObj& shardKey,
                                                      bool requireSingleKey) const override;
 
