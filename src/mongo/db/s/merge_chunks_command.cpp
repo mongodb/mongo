@@ -39,6 +39,7 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
@@ -224,14 +225,9 @@ void mergeChunks(OperationContext* opCtx,
                  const BSONObj& minKey,
                  const BSONObj& maxKey,
                  const OID& epoch) {
-    const std::string whyMessage = str::stream() << "merging chunks in " << nss.ns() << " from "
-                                                 << redact(minKey) << " to " << redact(maxKey);
-    auto scopedDistLock = uassertStatusOKWithContext(
-        Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
-            opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout),
-        str::stream() << "could not acquire collection lock for " << nss.ns()
-                      << " to merge chunks in [" << redact(minKey) << ", " << redact(maxKey)
-                      << ")");
+    auto scopedSplitOrMergeChunk(
+        uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(
+            opCtx, nss, ChunkRange(minKey, maxKey))));
 
     // We now have the collection distributed lock, refresh metadata to latest version and sanity
     // check

@@ -64,36 +64,36 @@ ActiveMigrationsRegistry& ActiveMigrationsRegistry::get(OperationContext* opCtx)
 void ActiveMigrationsRegistry::lock(OperationContext* opCtx, StringData reason) {
     stdx::unique_lock<Latch> lock(_mutex);
 
-    // This wait is to hold back additional lock requests while there is already one in
-    // progress.
-    opCtx->waitForConditionOrInterrupt(_lockCond, lock, [this] { return !_migrationsBlocked; });
+    // This wait is to hold back additional lock requests while there is already one in progress
+    opCtx->waitForConditionOrInterrupt(
+        _chunkOperationsStateChangedCV, lock, [this] { return !_migrationsBlocked; });
 
     // Setting flag before condvar returns to block new migrations from starting. (Favoring writers)
-    LOGV2(4675601, "Going to start blocking migrations", "reason"_attr = reason);
+    LOGV2(467560, "Going to start blocking migrations", "reason"_attr = reason);
     _migrationsBlocked = true;
 
-    // Wait for any ongoing migrations to complete.
-    opCtx->waitForConditionOrInterrupt(
-        _lockCond, lock, [this] { return !(_activeMoveChunkState || _activeReceiveChunkState); });
+    // Wait for any ongoing chunk modifications to complete
+    opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, lock, [this] {
+        return !(_activeMoveChunkState || _activeReceiveChunkState);
+    });
 }
 
 void ActiveMigrationsRegistry::unlock(StringData reason) {
     stdx::lock_guard<Latch> lock(_mutex);
 
-    LOGV2(4675602, "Going to stop blocking migrations", "reason"_attr = reason);
+    LOGV2(467561, "Going to stop blocking migrations", "reason"_attr = reason);
     _migrationsBlocked = false;
 
-    _lockCond.notify_all();
+    _chunkOperationsStateChangedCV.notify_all();
 }
 
 StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
     OperationContext* opCtx, const MoveChunkRequest& args) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<Latch> ul(_mutex);
 
-    if (_migrationsBlocked) {
-        LOGV2(4675603, "Register donate chunk waiting for migrations to be unblocked");
-        opCtx->waitForConditionOrInterrupt(_lockCond, lk, [this] { return !_migrationsBlocked; });
-    }
+    opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [&] {
+        return !_migrationsBlocked && !_activeSplitMergeChunkStates.count(args.getNss());
+    });
 
     if (_activeReceiveChunkState) {
         return _activeReceiveChunkState->constructErrorStatus();
@@ -117,12 +117,10 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
     const NamespaceString& nss,
     const ChunkRange& chunkRange,
     const ShardId& fromShardId) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<Latch> ul(_mutex);
 
-    if (_migrationsBlocked) {
-        LOGV2(4675604, "Register receive chunk waiting for migrations to be unblocked");
-        opCtx->waitForConditionOrInterrupt(_lockCond, lk, [this] { return !_migrationsBlocked; });
-    }
+    opCtx->waitForConditionOrInterrupt(
+        _chunkOperationsStateChangedCV, ul, [this] { return !_migrationsBlocked; });
 
     if (_activeReceiveChunkState) {
         return _activeReceiveChunkState->constructErrorStatus();
@@ -135,6 +133,22 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
     _activeReceiveChunkState.emplace(nss, chunkRange, fromShardId);
 
     return {ScopedReceiveChunk(this)};
+}
+
+StatusWith<ScopedSplitMergeChunk> ActiveMigrationsRegistry::registerSplitOrMergeChunk(
+    OperationContext* opCtx, const NamespaceString& nss, const ChunkRange& chunkRange) {
+    stdx::unique_lock<Latch> ul(_mutex);
+
+    opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [&] {
+        return !(_activeMoveChunkState && _activeMoveChunkState->args.getNss() == nss) &&
+            !_activeSplitMergeChunkStates.count(nss);
+    });
+
+    auto [it, inserted] =
+        _activeSplitMergeChunkStates.emplace(nss, ActiveSplitMergeChunkState(nss, chunkRange));
+    invariant(inserted);
+
+    return {ScopedSplitMergeChunk(this, nss)};
 }
 
 boost::optional<NamespaceString> ActiveMigrationsRegistry::getActiveDonateChunkNss() {
@@ -178,20 +192,31 @@ void ActiveMigrationsRegistry::_clearDonateChunk() {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_activeMoveChunkState);
     _activeMoveChunkState.reset();
-    _lockCond.notify_all();
+    _chunkOperationsStateChangedCV.notify_all();
 }
 
 void ActiveMigrationsRegistry::_clearReceiveChunk() {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_activeReceiveChunkState);
+    LOGV2(5004703,
+          "clearReceiveChunk ",
+          "currentKeys"_attr = ChunkRange(_activeReceiveChunkState->range.getMin(),
+                                          _activeReceiveChunkState->range.getMax())
+                                   .toString());
     _activeReceiveChunkState.reset();
-    _lockCond.notify_all();
+    _chunkOperationsStateChangedCV.notify_all();
+}
+
+void ActiveMigrationsRegistry::_clearSplitMergeChunk(const NamespaceString& nss) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    invariant(_activeSplitMergeChunkStates.erase(nss));
+    _chunkOperationsStateChangedCV.notify_all();
 }
 
 Status ActiveMigrationsRegistry::ActiveMoveChunkState::constructErrorStatus() const {
     return {ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Unable to start new migration because this shard is currently "
-                             "donating chunk "
+            str::stream() << "Unable to start new balancer operation because this shard is "
+                             "currently donating chunk "
                           << ChunkRange(args.getMinKey(), args.getMaxKey()).toString()
                           << " for namespace " << args.getNss().ns() << " to "
                           << args.getToShardId()};
@@ -199,8 +224,8 @@ Status ActiveMigrationsRegistry::ActiveMoveChunkState::constructErrorStatus() co
 
 Status ActiveMigrationsRegistry::ActiveReceiveChunkState::constructErrorStatus() const {
     return {ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Unable to start new migration because this shard is currently "
-                             "receiving chunk "
+            str::stream() << "Unable to start new balancer operation because this shard is "
+                             "currently receiving chunk "
                           << range.toString() << " for namespace " << nss.ns() << " from "
                           << fromShardId};
 }
@@ -261,6 +286,30 @@ ScopedReceiveChunk& ScopedReceiveChunk::operator=(ScopedReceiveChunk&& other) {
     if (&other != this) {
         _registry = other._registry;
         other._registry = nullptr;
+    }
+
+    return *this;
+}
+
+ScopedSplitMergeChunk::ScopedSplitMergeChunk(ActiveMigrationsRegistry* registry,
+                                             const NamespaceString& nss)
+    : _registry(registry), _nss(nss) {}
+
+ScopedSplitMergeChunk::~ScopedSplitMergeChunk() {
+    if (_registry) {
+        _registry->_clearSplitMergeChunk(_nss);
+    }
+}
+
+ScopedSplitMergeChunk::ScopedSplitMergeChunk(ScopedSplitMergeChunk&& other) {
+    *this = std::move(other);
+}
+
+ScopedSplitMergeChunk& ScopedSplitMergeChunk::operator=(ScopedSplitMergeChunk&& other) {
+    if (&other != this) {
+        _registry = other._registry;
+        other._registry = nullptr;
+        _nss = std::move(other._nss);
     }
 
     return *this;
