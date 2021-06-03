@@ -187,7 +187,7 @@ functions:
           #   Please note the "branch" variable used here is a normal shell variable to store the name of
           #   a WiredTiger Github branch, while the "branch_name" used above is an Evergreen built-in variable
           #   to store the name of the branch being tested by the Evergreen project.
-          for branch in mongodb-3.6 mongodb-4.0 mongodb-4.2 mongodb-4.4 develop ; do
+          for branch in mongodb-4.0 mongodb-4.2 mongodb-4.4 mongodb-5.0 develop ; do
             echo "[Debug] Copying over doc directory for branch $branch ..."
             rsync -avq ../docs-$branch/ $branch/
 
@@ -2630,7 +2630,7 @@ buildvariants:
   display_name: "~ Documentation update"
   batchtime: 1440 # 1 day
   run_on:
-  - ubuntu1804-test
+  - ubuntu2004-test
   tasks:
     - name: doc-update
   expansions:
@@ -2757,7 +2757,7 @@ buildvariants:
 - name: little-endian
   display_name: "~ Little-endian (x86)"
   run_on:
-  - ubuntu2004-test
+  - ubuntu1804-test
   batchtime: 10080 # 7 days
   expansions:
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
