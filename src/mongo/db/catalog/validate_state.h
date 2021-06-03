@@ -84,6 +84,14 @@ public:
         return isFullValidation() || _mode == ValidateMode::kForegroundFullIndexOnly;
     }
 
+    bool isCollectionSchemaViolated() const {
+        return _collectionSchemaViolated;
+    }
+
+    void setCollectionSchemaViolated() {
+        _collectionSchemaViolated = true;
+    }
+
     bool fixErrors() const {
         return _repairMode == RepairMode::kFixErrors;
     }
@@ -198,6 +206,7 @@ private:
     NamespaceString _nss;
     ValidateMode _mode;
     RepairMode _repairMode;
+    bool _collectionSchemaViolated = false;
 
     boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> _noPBWM;
     boost::optional<Lock::GlobalLock> _globalLock;

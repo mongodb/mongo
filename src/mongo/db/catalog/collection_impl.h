@@ -118,6 +118,8 @@ public:
         return _validator.validatorDoc.getOwned();
     }
 
+    Status checkValidation(OperationContext* opCtx, const BSONObj& document) const final;
+
     bool requiresIdIndex() const final;
 
     Snapshotted<BSONObj> docFor(OperationContext* opCtx, RecordId loc) const final {
@@ -458,11 +460,6 @@ public:
                          std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md) final;
 
 private:
-    /**
-     * Returns a non-ok Status if document does not pass this collection's validator.
-     */
-    Status checkValidation(OperationContext* opCtx, const BSONObj& document) const;
-
     Status _insertDocuments(OperationContext* opCtx,
                             std::vector<InsertStatement>::const_iterator begin,
                             std::vector<InsertStatement>::const_iterator end,
