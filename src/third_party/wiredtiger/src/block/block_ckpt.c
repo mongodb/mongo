@@ -746,13 +746,6 @@ live_update:
     ci->ckpt_discard = ci->discard;
     WT_ERR(__wt_block_extlist_init(session, &ci->discard, "live", "discard", false));
 
-    /*
-     * TODO: tiered: for now we are switching files on a checkpoint, we'll want to do it only on
-     * flush_tier.
-     */
-    if (block->has_objects)
-        WT_ERR(__wt_block_tiered_newfile(session, block));
-
 #ifdef HAVE_DIAGNOSTIC
     /*
      * The first checkpoint in the system should always have an empty discard list. If we've read

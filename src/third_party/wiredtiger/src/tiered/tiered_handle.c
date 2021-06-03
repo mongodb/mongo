@@ -97,6 +97,7 @@ __tiered_create_local(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     __wt_verbose(session, WT_VERB_TIERED, "TIER_CREATE_LOCAL: LOCAL: %s", name);
     cfg[0] = WT_CONFIG_BASE(session, object_meta);
     cfg[1] = tiered->obj_config;
+    cfg[2] = "tiered_object=true,readonly=true";
     __wt_verbose(session, WT_VERB_TIERED, "TIER_CREATE_LOCAL: obj_config: %s : %s", name, cfg[1]);
     WT_ASSERT(session, tiered->obj_config != NULL);
     WT_ERR(__wt_config_merge(session, cfg, NULL, (const char **)&config));
@@ -113,11 +114,15 @@ __tiered_create_local(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     this_tier->name = name;
     F_SET(this_tier, WT_TIERS_OP_READ | WT_TIERS_OP_WRITE);
 
-    if (0) {
+    WT_WITH_DHANDLE(
+      session, &tiered->iface, ret = __wt_btree_switch_object(session, tiered->current_id, 0));
+    WT_ERR(ret);
+
 err:
+    if (ret != 0)
         /* Only free name on error. */
         __wt_free(session, name);
-    }
+
     __wt_free(session, config);
     return (ret);
 }
@@ -270,7 +275,7 @@ __tiered_update_metadata(WT_SESSION_IMPL *session, WT_TIERED *tiered, const char
     newconfig = NULL;
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
-    WT_RET(__wt_buf_fmt(session, tmp, "last=%" PRIu64 ",tiers=(\"", tiered->current_id));
+    WT_RET(__wt_buf_fmt(session, tmp, "last=%" PRIu64 ",tiers=(", tiered->current_id));
     for (i = 0; i < WT_TIERED_MAX_TIERS; ++i) {
         if (tiered->tiers[i].name == NULL) {
             __wt_verbose(session, WT_VERB_TIERED, "TIER_UPDATE_META: names[%" PRIu32 "] NULL", i);
@@ -278,7 +283,7 @@ __tiered_update_metadata(WT_SESSION_IMPL *session, WT_TIERED *tiered, const char
         }
         __wt_verbose(session, WT_VERB_TIERED, "TIER_UPDATE_META: names[%" PRIu32 "]: %s", i,
           tiered->tiers[i].name);
-        WT_RET(__wt_buf_catfmt(session, tmp, "%s%s\"", i == 0 ? "" : ",", tiered->tiers[i].name));
+        WT_RET(__wt_buf_catfmt(session, tmp, "%s\"%s\"", i == 0 ? "" : ",", tiered->tiers[i].name));
     }
     WT_RET(__wt_buf_catfmt(session, tmp, ")"));
 
@@ -450,7 +455,7 @@ static int
 __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_CONFIG_ITEM cval, tierconf;
-    WT_DATA_HANDLE *dhandle;
+    WT_DATA_HANDLE *dhandle, *file_dhandle;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_TIERED *tiered;
@@ -459,13 +464,15 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
     uint32_t unused;
 #endif
     char *metaconf;
+    const char *newconfig;
     const char *obj_cfg[] = {WT_CONFIG_BASE(session, object_meta), NULL, NULL};
+    const char *new_tiered_cfg[] = {NULL, NULL, NULL, NULL};
     const char **tiered_cfg, *config;
 
     dhandle = session->dhandle;
     tiered = (WT_TIERED *)dhandle;
     tiered_cfg = dhandle->cfg;
-    config = NULL;
+    config = newconfig = NULL;
     metaconf = NULL;
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
@@ -512,15 +519,31 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
         __wt_verbose(
           session, WT_VERB_TIERED, "TIERED_OPEN: create %s config %s", dhandle->name, config);
         WT_ERR(__wt_tiered_switch(session, config));
+        file_dhandle = tiered->tiers[WT_TIERED_INDEX_LOCAL].tier;
+        WT_ASSERT(session, file_dhandle != dhandle && file_dhandle->type == WT_DHANDLE_TYPE_BTREE);
 
-        /* XXX brute force, need to figure out functions to use to do this properly. */
-        /* We need to update the dhandle config entry to reflect the new tiers metadata. */
-        WT_ERR(__wt_metadata_search(session, dhandle->name, &metaconf));
+        /*
+         * XXX brute force, need to figure out functions to use to do this properly.
+         *
+         * We are updating the tiered dhandle config entry to reflect the new tiers metadata. The
+         * tiered dhandle must look almost exactly like the local file dhandle. The difference is
+         * that the local file dhandle is marked as readonly and also tagged as a tiered object.
+         * We'll turn those off before putting it into tiered dhandle.
+         */
+        WT_ERR(__wt_metadata_search(session, file_dhandle->name, &metaconf));
         __wt_verbose(session, WT_VERB_TIERED, "TIERED_OPEN: after switch meta conf %s %s",
           dhandle->name, metaconf);
+        new_tiered_cfg[0] = metaconf;
+        new_tiered_cfg[1] = "tiered_object=false,readonly=false";
+        WT_ERR(__wt_config_merge(session, new_tiered_cfg, NULL, &newconfig));
         __wt_free(session, dhandle->cfg[1]);
-        dhandle->cfg[1] = metaconf;
+        dhandle->cfg[1] = newconfig;
+        WT_ERR(__wt_config_merge(session, dhandle->cfg, NULL, &newconfig));
+        WT_ERR(__wt_metadata_update(session, dhandle->name, newconfig));
     }
+    WT_ERR(__wt_btree_open(session, tiered_cfg));
+    WT_ERR(__wt_btree_switch_object(session, tiered->current_id, 0));
+
 #if 1
     if (0) {
         /* Temp code to keep s_all happy. */
