@@ -125,6 +125,30 @@ void validateDollarPrefixElement(mutablebson::ConstElement elem) {
 }
 }  // namespace
 
+Status storageValidIdField(const mongo::BSONElement& element) {
+    switch (element.type()) {
+        case BSONType::RegEx:
+        case BSONType::Array:
+        case BSONType::Undefined:
+            return Status(ErrorCodes::InvalidIdField,
+                          str::stream()
+                              << "The '_id' value cannot be of type " << typeName(element.type()));
+        case BSONType::Object: {
+            auto status = element.Obj().storageValidEmbedded();
+            if (!status.isOK() && status.code() == ErrorCodes::DollarPrefixedFieldName &&
+                feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV()) {
+                return Status(status.code(),
+                              str::stream() << "_id fields may not contain '$'-prefixed fields: "
+                                            << status.reason());
+            }
+            return status;
+        }
+        default:
+            break;
+    }
+    return Status::OK();
+}
+
 void storageValid(const mutablebson::Document& doc,
                   const bool allowTopLevelDollarPrefixes,
                   const bool shouldValidate,
@@ -132,16 +156,7 @@ void storageValid(const mutablebson::Document& doc,
     auto currElem = doc.root().leftChild();
     while (currElem.ok()) {
         if (currElem.getFieldName() == idFieldName && shouldValidate) {
-            switch (currElem.getType()) {
-                case BSONType::RegEx:
-                case BSONType::Array:
-                case BSONType::Undefined:
-                    uasserted(ErrorCodes::InvalidIdField,
-                              str::stream() << "The '_id' value cannot be of type "
-                                            << typeName(currElem.getType()));
-                default:
-                    break;
-            }
+            uassertStatusOK(storageValidIdField(currElem.getValue()));
         }
 
         // Validate this child element.

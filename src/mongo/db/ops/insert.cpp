@@ -38,6 +38,7 @@
 #include "mongo/db/query/dbref.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/update/storage_validation.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/util/fail_point.h"
@@ -134,33 +135,9 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
                 // also, disallow undefined and arrays
                 // Make sure _id isn't duplicated (SERVER-19361).
                 if (fieldName == "_id") {
-                    if (e.type() == RegEx) {
-                        return StatusWith<BSONObj>(ErrorCodes::BadValue,
-                                                   "can't use a regex for _id");
-                    }
-                    if (e.type() == Undefined) {
-                        return StatusWith<BSONObj>(ErrorCodes::BadValue,
-                                                   "can't use a undefined for _id");
-                    }
-                    if (e.type() == Array) {
-                        return StatusWith<BSONObj>(ErrorCodes::BadValue,
-                                                   "can't use an array for _id");
-                    }
-                    if (e.type() == Object) {
-                        BSONObj o = e.Obj();
-                        Status s = o.storageValidEmbedded();
-                        if (!s.isOK()) {
-                            if (feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV() &&
-                                s.code() == ErrorCodes::DollarPrefixedFieldName) {
-                                return StatusWith<BSONObj>(
-                                    s.code(),
-                                    str::stream()
-                                        << "_id fields may not contain '$'-prefixed fields: "
-                                        << s.reason());
-                            } else {
-                                return StatusWith<BSONObj>(s);
-                            }
-                        }
+                    auto status = storage_validation::storageValidIdField(e);
+                    if (!status.isOK()) {
+                        return StatusWith<BSONObj>(status);
                     }
                     if (hadId) {
                         return StatusWith<BSONObj>(
