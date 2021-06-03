@@ -46,6 +46,9 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/set_allow_migrations_gen.h"
+#include "mongo/s/write_ops/batch_write_exec.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
 
@@ -56,38 +59,31 @@ namespace {
 void updateTags(OperationContext* opCtx,
                 const NamespaceString& fromNss,
                 const NamespaceString& toNss) {
-    // TODO very inefficient function, refactor using a cluster write with bulk update
-    auto catalogClient = Grid::get(opCtx)->catalogClient();
-    auto tags = uassertStatusOK(catalogClient->getTagsForCollection(opCtx, fromNss));
+    const auto query = BSON(TagsType::ns(fromNss.ns()));
+    const auto update = BSON("$set" << BSON(TagsType::ns << toNss.ns()));
 
-    if (tags.empty()) {
-        return;
-    }
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(TagsType::ConfigNS);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(query);
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+            entry.setUpsert(false);
+            entry.setMulti(true);
+            return entry;
+        }()});
+        return updateOp;
+    }());
+    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
-    // Wait for majority just for last tag
-    auto lastTag = tags.back();
-    tags.pop_back();
-    for (auto& tag : tags) {
-        uassertStatusOK(catalogClient->updateConfigDocument(
-            opCtx,
-            TagsType::ConfigNS,
-            BSON(TagsType::ns(fromNss.ns()) << TagsType::min(tag.getMinKey())),
-            BSON("$set" << BSON(TagsType::ns << toNss.ns())),
-            false /* upsert */,
-            ShardingCatalogClient::kLocalWriteConcern));
-    }
-    uassertStatusOK(catalogClient->updateConfigDocument(
-        opCtx,
-        TagsType::ConfigNS,
-        BSON(TagsType::ns(fromNss.ns()) << TagsType::min(lastTag.getMinKey())),
-        BSON("$set" << BSON(TagsType::ns << toNss.ns())),
-        false /* upsert */,
-        ShardingCatalogClient::kMajorityWriteConcern));
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto response = configShard->runBatchWriteCommand(
+        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotent);
+
+    uassertStatusOK(response.toStatus());
 }
 
 void deleteChunks(OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) {
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
-
     // Remove config.chunks entries
     const auto chunksQuery = [&]() {
         auto optUUID = nssOrUUID.uuid();
@@ -102,12 +98,26 @@ void deleteChunks(OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUI
 
     // TODO SERVER-57221 don't use hint if not relevant anymore for delete performances
     auto hint = BSON(ChunkType::collectionUUID() << 1 << ChunkType::min() << 1);
-    uassertStatusOK(
-        catalogClient->removeConfigDocuments(opCtx,
-                                             ChunkType::ConfigNS,
-                                             chunksQuery,
-                                             ShardingCatalogClient::kMajorityWriteConcern,
-                                             hint));
+
+    BatchedCommandRequest request([&] {
+        write_ops::DeleteCommandRequest deleteOp(ChunkType::ConfigNS);
+        deleteOp.setDeletes({[&] {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ(chunksQuery);
+            entry.setHint(hint);
+            entry.setMulti(true);
+            return entry;
+        }()});
+        return deleteOp;
+    }());
+
+    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto response = configShard->runBatchWriteCommand(
+        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotent);
+
+    uassertStatusOK(response.toStatus());
 }
 
 void deleteCollection(OperationContext* opCtx, const NamespaceString& nss) {
@@ -149,14 +159,29 @@ void sendAuthenticatedCommandToShards(OperationContext* opCtx,
 }
 
 void removeTagsMetadataFromConfig(OperationContext* opCtx, const NamespaceString& nss) {
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
-
     // Remove config.tags entries
-    uassertStatusOK(
-        catalogClient->removeConfigDocuments(opCtx,
-                                             TagsType::ConfigNS,
-                                             BSON(TagsType::ns(nss.ns())),
-                                             ShardingCatalogClient::kMajorityWriteConcern));
+    const auto query = BSON(TagsType::ns(nss.ns()));
+    const auto hint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
+
+    BatchedCommandRequest request([&] {
+        write_ops::DeleteCommandRequest deleteOp(TagsType::ConfigNS);
+        deleteOp.setDeletes({[&] {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ(query);
+            entry.setMulti(true);
+            entry.setHint(hint);
+            return entry;
+        }()});
+        return deleteOp;
+    }());
+
+    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto response = configShard->runBatchWriteCommand(
+        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotent);
+
+    uassertStatusOK(response.toStatus());
 }
 
 void removeCollMetadataFromConfig(OperationContext* opCtx, const CollectionType& coll) {
