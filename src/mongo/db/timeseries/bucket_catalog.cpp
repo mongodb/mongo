@@ -521,10 +521,10 @@ void BucketCatalog::_abort(stdx::unique_lock<Mutex>& lk,
     if (auto& prepared = bucket->_preparedBatch) {
         if (prepared == batch) {
             prepared->_abort(status, true);
+            prepared.reset();
         } else {
             doRemove = false;
         }
-        prepared.reset();
     }
 
     lk.unlock();
