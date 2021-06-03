@@ -917,6 +917,9 @@ private:
                           static_cast<int64_t>(sizeof(uint8_t)));
         }
 
+        Node& operator=(const Node& rhs) = delete;
+        Node& operator=(Node&& rhs) = delete;
+
         virtual ~Node() {
             subtractNodeMemory();
         }
@@ -1329,13 +1332,16 @@ private:
         ~Head() {
             if (_nextVersion)
                 _nextVersion->_hasPreviousVersion = false;
-            _metrics.subtractMemory(sizeof(Head) - sizeof(Node256));
+            subtractNodeMemory();
         }
 
         Head(Head&& other)
             : Node256(std::move(other)), _count(other._count), _dataSize(other._dataSize) {
             addNodeMemory();
         }
+
+        Head& operator=(const Head& rhs) = delete;
+        Head& operator=(Head&& rhs) = delete;
 
         bool hasPreviousVersion() const {
             return _hasPreviousVersion;
@@ -1353,7 +1359,10 @@ private:
 
     private:
         void addNodeMemory() {
-            _metrics.totalMemory.fetchAndAdd(sizeof(Head) - sizeof(Node256));
+            _metrics.addMemory(sizeof(Head) - sizeof(Node256));
+        }
+        void subtractNodeMemory() {
+            _metrics.subtractMemory(sizeof(Head) - sizeof(Node256));
         }
 
         size_type _count = 0;
