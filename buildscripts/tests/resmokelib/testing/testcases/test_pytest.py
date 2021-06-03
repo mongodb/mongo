@@ -24,7 +24,7 @@ class TestPyTestCase(unittest.TestCase):
         self.assertEqual(pytest_case.test_name, filename)
         self.assertEqual(pytest_case.logger, logger)
         proc = pytest_case._make_process()
-        self.assertIn(sys.executable + " -m unittest", proc.as_command())
+        self.assertIn(" -m unittest", proc.as_command())
         self.assertIn(pytest_case.test_module_name, proc.as_command())
         self.assertEqual(proc.logger, logger)
 
@@ -35,7 +35,7 @@ class TestPyTestCase(unittest.TestCase):
         self.assertEqual(pytest_case.test_name, filename)
         self.assertEqual(pytest_case.logger, logger)
         proc = pytest_case._make_process()
-        self.assertIn(sys.executable + " -m unittest", proc.as_command())
+        self.assertIn(" -m unittest", proc.as_command())
         self.assertIn(pytest_case.test_module_name, proc.as_command())
         self.assertEqual(proc.logger, logger)
 
@@ -46,7 +46,7 @@ class TestPyTestCase(unittest.TestCase):
         self.assertEqual(pytest_case.test_name, filename)
         self.assertEqual(pytest_case.logger, logger)
         proc = pytest_case._make_process()
-        self.assertIn(sys.executable + " -m unittest", proc.as_command())
+        self.assertIn(" -m unittest", proc.as_command())
         self.assertIn(pytest_case.test_module_name, proc.as_command())
         self.assertEqual(proc.logger, logger)
 
@@ -67,3 +67,14 @@ class TestPyTestCase(unittest.TestCase):
         filename = "myfile.py"
         pytest_case = pytest.PyTestCase(logger, filename)
         self.assertEqual(pytest_case.test_module_name, "myfile")
+
+    def test__make_process_with_space(self):
+        logger = logging.getLogger("pytest")
+        filename = "this file name has space.py:q:"
+        pytest_case = pytest.PyTestCase(logger, filename)
+        self.assertEqual(pytest_case.test_name, filename)
+        self.assertEqual(pytest_case.logger, logger)
+        proc = pytest_case._make_process()
+        self.assertIn(" -m unittest", proc.as_command())
+        self.assertIn(pytest_case.test_module_name, proc.as_command())
+        self.assertEqual(proc.logger, logger)

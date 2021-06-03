@@ -12,6 +12,7 @@ import subprocess
 import sys
 import threading
 from datetime import datetime
+from shlex import quote
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import errors
@@ -257,8 +258,8 @@ class Process(object):
 
         sb = []  # String builder.
         for env_var in env_diff:
-            sb.append("%s=%s" % (env_var, env_diff[env_var]))
-        sb.extend(self.args)
+            sb.append(quote("%s=%s" % (env_var, env_diff[env_var])))
+        sb.extend(map(quote, self.args))
 
         return " ".join(sb)
 
