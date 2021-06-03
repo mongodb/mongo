@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/requires_index_stage.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
@@ -54,7 +55,9 @@ struct CountScanParams {
         invariant(descriptor);
     }
 
-    CountScanParams(OperationContext* opCtx, const IndexDescriptor* descriptor)
+    CountScanParams(OperationContext* opCtx,
+                    const CollectionPtr& collection,
+                    const IndexDescriptor* descriptor)
         : CountScanParams(descriptor,
                           descriptor->indexName(),
                           descriptor->keyPattern(),

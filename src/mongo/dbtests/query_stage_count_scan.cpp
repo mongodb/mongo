@@ -100,8 +100,9 @@ public:
     }
 
     CountScanParams makeCountScanParams(OperationContext* opCtx,
+                                        const CollectionPtr& collection,
                                         const IndexDescriptor* descriptor) {
-        return {opCtx, descriptor};
+        return {opCtx, collection, descriptor};
     }
 
     static NamespaceString ns() {
@@ -136,7 +137,8 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up the count stage
-        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
+        auto params =
+            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("a" << 1);
         params.startKeyInclusive = true;
         params.endKey = BSON("a" << 10);
@@ -167,7 +169,8 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up the count stage
-        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
+        auto params =
+            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 3);
         params.startKeyInclusive = true;
         params.endKey = BSON("" << 7);
@@ -198,7 +201,8 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up the count stage
-        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
+        auto params =
+            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 3);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 7);
@@ -225,7 +229,8 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count, and run
-        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
+        auto params =
+            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 3);
@@ -253,7 +258,8 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count, and run
-        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
+        auto params =
+            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 3);
@@ -282,7 +288,8 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count, and run
-        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
+        auto params =
+            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 3);
@@ -312,7 +319,8 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count stage
-        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
+        auto params =
+            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 6);
@@ -365,7 +373,8 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count stage
-        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
+        auto params =
+            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 6);
@@ -421,7 +430,8 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count stage
-        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
+        auto params =
+            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 6);
@@ -484,7 +494,8 @@ public:
         remove(BSON("a" << 1 << "b" << 4));
 
         // Ensure that count does not include unused keys
-        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
+        auto params =
+            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 1);
         params.startKeyInclusive = true;
         params.endKey = BSON("" << 1);
@@ -516,7 +527,8 @@ public:
         remove(BSON("a" << 1 << "b" << 9));
 
         // Run count and check
-        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
+        auto params =
+            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 0);
         params.startKeyInclusive = true;
         params.endKey = BSON("" << 2);
@@ -545,7 +557,8 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count stage
-        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
+        auto params =
+            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 1);
         params.startKeyInclusive = true;
         params.endKey = BSON("" << 1);
