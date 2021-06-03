@@ -262,7 +262,7 @@ variables:
   - name: external_auth_windows
     distros:
     - windows-64-2016
-  - name: .jscore .common !.compat !.sharding
+  - name: .jscore .common !.sharding
   - name: .jstestfuzz .common
   - name: .logical_session_cache
   - name: replica_sets_auth_gen
@@ -4529,15 +4529,6 @@ tasks:
       resmoke_args: --suites=core_ese_gcm --storageEngine=wiredTiger
 
 - <<: *task_template
-  name: jsCore_compatibility
-  tags: ["jscore", "common", "compat"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=core --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command,requires_timeseries
-
-- <<: *task_template
   name: jsCore_auth
   tags: ["jscore", "auth", "common"]
   commands:
@@ -4554,15 +4545,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core_minimum_batch_size --storageEngine=wiredTiger
-
-- <<: *task_template
-  name: jsCore_op_query
-  tags: ["jscore"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=core_op_query --storageEngine=wiredTiger
 
 - <<: *task_template
   name: jsCore_txns
@@ -4590,15 +4572,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharded_jscore_txns --storageEngine=wiredTiger
-
-- <<: *task_template
-  name: sharded_jscore_op_query_txns
-  tags: ["sharding", "jscore", "txns"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharded_jscore_op_query_txns --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharded_jscore_txns_without_snapshot
@@ -4956,30 +4929,13 @@ tasks:
       fallback_num_sub_suites: 5
 
 - <<: *task_template
-  name: sharding_jscore_op_query_passthrough
-  tags: ["sharding", "jscore"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharding_jscore_op_query_passthrough --storageEngine=wiredTiger
-
-- <<: *task_template
   name: sharding_update_v1_oplog_jscore_passthrough
   tags: ["sharding", "jscore"]
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=sharding_jscore_op_query_passthrough --storageEngine=wiredTiger
-
-- name: sharding_jscore_passthrough_wire_ops_gen
-  tags: ["sharding", "jscore"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: sharding_jscore_passthrough
-      resmoke_args: --storageEngine=wiredTiger --shellReadMode=legacy --shellWriteMode=compatibility --excludeWithAnyTags=requires_find_command,requires_timeseries
+      resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharded_multi_stmt_txn_jscore_passthrough
@@ -5086,16 +5042,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: parallel_compatibility
-  tags: ["misc_js"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=parallel --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -5603,15 +5549,6 @@ tasks:
     vars:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
-
-- name: sharding_op_query_gen
-  tags: ["sharding", "common", "op_query"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: sharding
-      use_large_distro: "true"
-      resmoke_args: --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
 
 - name: sharding_auth_gen
   tags: ["sharding", "auth"]
@@ -7478,7 +7415,7 @@ buildvariants:
   - name: .jepsen
     distros:
     - ubuntu1804-build
-  - name: .jscore .common !.compat !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -7684,7 +7621,7 @@ buildvariants:
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_aws
-  - name: .jscore .common !.compat !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -7820,7 +7757,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.aggregation
-  - name: .jscore .common !.compat
+  - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
   - name: .logical_session_cache .one_sec
@@ -7884,7 +7821,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.op_query !.csrs
+  - name: .sharding .common !.csrs
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
@@ -7929,7 +7866,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.aggregation
-  - name: .jscore .common !.compat
+  - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
   - name: .logical_session_cache .one_sec
@@ -7992,7 +7929,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.op_query !.csrs
+  - name: .sharding .common !.csrs
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
@@ -8035,7 +7972,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
-  - name: .jscore .common !.compat !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -8095,7 +8032,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.op_query !.csrs !.multiversion
+  - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -8334,7 +8271,7 @@ buildvariants:
     - name: external_auth_windows
       distros:
         - windows-64-2016
-    - name: .jscore .common !.compat !.sharding
+    - name: .jscore .common !.sharding
     - name: jsCore_auth
     - name: jsCore_ese
     - name: jsCore_txns_large_txns_format
@@ -8394,7 +8331,7 @@ buildvariants:
     - name: external_auth_windows
       distros:
         - windows-64-2016
-    - name: .jscore .common !.compat !.sharding
+    - name: .jscore .common !.sharding
     - name: jsCore_auth
     - name: jsCore_ese
     - name: jsCore_txns_large_txns_format
@@ -8469,7 +8406,7 @@ buildvariants:
     - windows-vsCurrent-large
   - name: concurrency_replication_causal_consistency_gen
   - name: initial_sync_fuzzer_gen
-  - name: .jscore .common !.decimal !.compat !.sharding
+  - name: .jscore .common !.decimal !.sharding
   - name: .jstestfuzz .common !.flow_control  # Flow control jstestfuzz take longer.
   - name: .read_write_concern .linearize !.durable_history
   - name: replica_sets_auth_gen
@@ -8535,7 +8472,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
-  - name: .sharding .common !.op_query !.csrs
+  - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
   - name: .updatefuzzer
@@ -8599,7 +8536,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
-  - name: .sharding .common !.op_query !.csrs
+  - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
   - name: .updatefuzzer
@@ -8744,7 +8681,7 @@ buildvariants:
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
-  - name: .jscore .common !.compat !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: mqlrun
@@ -8863,7 +8800,6 @@ buildvariants:
     - rhel80-medium
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
@@ -8992,7 +8928,6 @@ buildvariants:
     - rhel80-xlarge
   - name: .jscore .common !jsCore
   - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
@@ -9108,7 +9043,6 @@ buildvariants:
     - rhel80-medium
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
@@ -9204,7 +9138,7 @@ buildvariants:
   - name: .aggregation !.no_async !.secondary_reads !.sharded !.unwind !aggregation_disabled_optimization
   - name: .change_streams
   - name: .concurrency !.large !.ubsan !.debug_only
-  - name: .jscore !.sharding !.decimal !.compat !cst_jscore_passthrough
+  - name: .jscore !.sharding !.decimal !cst_jscore_passthrough
   - name: .jstestfuzz !.flow_control
   - name: .query_fuzzer
   - name: .read_write_concern
@@ -9237,15 +9171,11 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_jscore_passthrough
   - name: sharding_api_version_jscore_passthrough_gen
-  - name: sharding_jscore_passthrough_wire_ops_gen
-  - name: sharding_jscore_op_query_passthrough
   - name: sharding_update_v1_oplog_jscore_passthrough
   - name: sharding_last_lts_mongos_and_mixed_shards_gen
   - name: sharding_max_mirroring_gen
   - name: sharding_multiversion_gen
-  - name: sharding_op_query_gen
   - name: sharding_update_v1_oplog_gen
-  - name: jsCore_compatibility
   - name: ese
     distros:
     - rhel80-medium
@@ -9415,7 +9345,6 @@ buildvariants:
     - name: .jscore .common
     - name: jsCore_txns_large_txns_format
     - name: jsCore_minimum_batch_size
-    - name: jsCore_op_query
     - name: libunwind_tests
     - name: .logical_session_cache .one_sec
     - name: .multi_shard .common
@@ -9527,7 +9456,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
-  - name: .jscore .common !.compat !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -9608,7 +9537,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
-  - name: .jscore .common !.compat !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -9662,7 +9591,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
-  - name: .jscore .common !.compat !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -9738,7 +9667,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
-  - name: .jscore .common !.compat !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -9849,7 +9778,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.op_query !.csrs
+  - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -9899,7 +9828,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.op_query !.csrs
+  - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -9946,7 +9875,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.op_query !.csrs !.multiversion
+  - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -10009,7 +9938,6 @@ buildvariants:
     distros:
     - rhel81-power8-large
   - name: .jscore .common !.auth
-  - name: jsCore_op_query
   - name: .read_write_concern
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -10090,7 +10018,6 @@ buildvariants:
     distros:
     - rhel72-zseries-build
   - name: .jscore .common !.auth
-  - name: jsCore_op_query
   - name: .read_write_concern
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -10221,7 +10148,7 @@ buildvariants:
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
-  - name: .jscore .common !.compat !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
@@ -10279,7 +10206,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.op_query !.csrs
+  - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
   - name: .publish
@@ -10313,7 +10240,7 @@ buildvariants:
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
-  - name: .jscore .common !.decimal !.compat !.sharding
+  - name: .jscore .common !.decimal !.sharding
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
@@ -10365,7 +10292,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.op_query !.csrs !.multiversion
+  - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
   - name: .publish
@@ -10406,7 +10333,7 @@ buildvariants:
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
-  - name: .jscore .common !.decimal !.compat !.sharding
+  - name: .jscore .common !.decimal !.sharding
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
@@ -10462,7 +10389,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.op_query !.csrs
+  - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -10502,7 +10429,7 @@ buildvariants:
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
-  - name: .jscore .common !.decimal !.compat !.sharding
+  - name: .jscore .common !.decimal !.sharding
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
@@ -10558,7 +10485,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.op_query !.csrs
+  - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -10617,7 +10544,6 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: .jscore .common !.decimal
-  - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz !.initsync
   - name: .logical_session_cache
@@ -10678,7 +10604,6 @@ buildvariants:
   # - name: concurrency_simultaneous_replication
   - name: .integration !.audit
   - name: .jscore .common !.txns !.decimal
-  - name: jsCore_op_query
   # SERVER-50295: Investigate jstestfuzz time outs.
   # - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -10714,7 +10639,6 @@ buildvariants:
     distros:
     - rhel72-zseries-build
   - name: .jscore .common !.decimal
-  - name: jsCore_op_query
   - name: .read_write_concern !.durable_history
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -10771,7 +10695,6 @@ buildvariants:
   - name: .integration !.standalone !.audit
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache
@@ -10847,7 +10770,6 @@ buildvariants:
   - name: .integration !.standalone !.audit
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache
@@ -10919,7 +10841,6 @@ buildvariants:
   - name: .integration !.standalone !.audit
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache
@@ -11007,7 +10928,6 @@ buildvariants:
   - name: .integration !.audit
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache .one_sec
@@ -11078,7 +10998,6 @@ buildvariants:
   - name: .integration !.audit
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache .one_sec
@@ -11146,7 +11065,6 @@ buildvariants:
   - name: .integration !.audit
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache .one_sec
@@ -11588,7 +11506,6 @@ buildvariants:
 #  - name: initial_sync_fuzzer_gen
   - name: .jscore .common
 #  - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
 #  - name: jsonSchema
   - name: .jstestfuzz !.flow_control !.stepdowns !.causal
