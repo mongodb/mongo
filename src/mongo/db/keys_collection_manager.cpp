@@ -55,7 +55,7 @@ namespace {
 
 Milliseconds kDefaultRefreshWaitTime(30 * 1000);
 Milliseconds kRefreshIntervalIfErrored(200);
-Milliseconds kMaxRefreshWaitTimeIfErrored(10 * 60 * 1000);
+Milliseconds kMaxRefreshWaitTimeIfErrored(5 * 60 * 1000);
 // Never wait more than the number of milliseconds in 20 days to avoid sleeping for a number greater
 // than can fit in a signed 32 bit integer.
 // 20 days = 1000 * 60 * 60 * 24 * 20 = 1,728,000,000 vs signed integer max of 2,147,483,648.
@@ -241,9 +241,8 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
 
     ON_BLOCK_EXIT([this]() mutable { _hasSeenKeys.store(false); });
 
+    unsigned errorCount = 0;
     while (true) {
-        unsigned errorCount = 0;
-
         decltype(_refreshRequest) request;
         std::shared_ptr<RefreshFunc> doRefresh;
         {
