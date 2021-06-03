@@ -36,6 +36,12 @@ namespace mongo {
 namespace storage_validation {
 
 /**
+ * Returns a status to indicate whether or not 'element' is a valid _id field for storage in a
+ * collection.
+ */
+Status storageValidIdField(const mongo::BSONElement& element);
+
+/**
  * Validates that the MutableBSON document 'doc' is acceptable for storage in a collection. The
  * check is performed recursively on subdocuments. Uasserts if the validation fails or if the depth
  * exceeds the maximum allowable depth.

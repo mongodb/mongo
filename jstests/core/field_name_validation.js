@@ -109,6 +109,15 @@ assert.eq(1, coll.find({a: {b: 2}}).itcount());
 assert.commandWorked(coll.update({"a.b": 2}, {"a.b": 3}));
 assert.eq(0, coll.find({"a.b": 3}).itcount());
 
+// Upserting _id fields containing $-prefixed fields is not allowed.
+assert.writeErrorWithCode(coll.update({"a.b": 1}, {_id: {$invalid: 1}}, {upsert: true}),
+                          ErrorCodes.DollarPrefixedFieldName);
+assert.writeErrorWithCode(coll.update({"a.b": 1}, {$set: {_id: {$invalid: 1}}}, {upsert: true}),
+                          ErrorCodes.DollarPrefixedFieldName);
+assert.writeErrorWithCode(
+    coll.update({"a.b": 1}, {$setOnInsert: {_id: {$invalid: 1}}}, {upsert: true}),
+    ErrorCodes.DollarPrefixedFieldName);
+
 if (isDotsAndDollarsEnabled) {
     // Replacement-style updates can contain nested $-prefixed fields.
     assert.commandWorked(coll.update({"a.b": 1}, {a: {$c: 1}}));
