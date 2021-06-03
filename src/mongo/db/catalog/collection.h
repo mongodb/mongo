@@ -322,6 +322,11 @@ public:
 
     virtual const BSONObj getValidatorDoc() const = 0;
 
+    /**
+     * Returns a non-ok Status if the document does not pass this collection's schema validator.
+     */
+    virtual Status checkValidation(OperationContext* opCtx, const BSONObj& document) const = 0;
+
     virtual bool requiresIdIndex() const = 0;
 
     virtual Snapshotted<BSONObj> docFor(OperationContext* const opCtx, RecordId loc) const = 0;

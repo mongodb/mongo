@@ -537,6 +537,25 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
                 nInvalid++;
             }
+        } else {
+            // If the document is not corrupted, validate the document against this collection's
+            // schema validator. Don't treat invalid documents as errors since documents can bypass
+            // document validation when being inserted or updated.
+            status = _validateState->getCollection()->checkValidation(opCtx, record->data.toBson());
+            if (!status.isOK()) {
+                LOGV2_WARNING(5363500,
+                              "Document is not compliant with the collection's schema",
+                              logAttrs(_validateState->getCollection()->ns()),
+                              "recordId"_attr = record->id,
+                              "reason"_attr = status);
+
+                if (!_validateState->isCollectionSchemaViolated()) {
+                    _validateState->setCollectionSchemaViolated();
+                    results->warnings.push_back(
+                        "Detected one or more documents not compliant with the collection's "
+                        "schema. See logs.");
+                }
+            }
         }
 
         prevRecordId = record->id;

@@ -96,6 +96,10 @@ public:
         std::abort();
     }
 
+    Status checkValidation(OperationContext* opCtx, const BSONObj& document) const {
+        std::abort();
+    }
+
     bool requiresIdIndex() const {
         std::abort();
     }
