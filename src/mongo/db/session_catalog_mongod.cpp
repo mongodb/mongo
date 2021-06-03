@@ -275,7 +275,9 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     abortInProgressTransactions(opCtx);
 
     createTransactionTable(opCtx);
-    createRetryableFindAndModifyTable(opCtx);
+    if (repl::gStoreFindAndModifyImagesInSideCollection.load()) {
+        createRetryableFindAndModifyTable(opCtx);
+    }
 }
 
 boost::optional<UUID> MongoDSessionCatalog::getTransactionTableUUID(OperationContext* opCtx) {
