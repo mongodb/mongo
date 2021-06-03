@@ -190,6 +190,15 @@ bool shouldBuildInForeground(OperationContext* opCtx,
     return false;
 }
 
+StringData getInvalidatingReason(const OplogApplication::Mode mode, const bool isDataConsistent) {
+    if (mode == OplogApplication::Mode::kInitialSync) {
+        return "initial sync"_sd;
+    } else if (!isDataConsistent) {
+        return "minvalid suggests inconsistent snapshot"_sd;
+    }
+
+    return ""_sd;
+}
 
 }  // namespace
 
@@ -339,6 +348,7 @@ void writeToImageCollection(OperationContext* opCtx,
                             const BSONObj& op,
                             const BSONObj& image,
                             repl::RetryImageEnum imageKind,
+                            const StringData& invalidatedReason,
                             bool* upsertConfigImage) {
     AutoGetCollection autoColl(opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
     repl::ImageEntry imageEntry;
@@ -352,7 +362,7 @@ void writeToImageCollection(OperationContext* opCtx,
     imageEntry.setImage(image);
     if (image.isEmpty()) {
         imageEntry.setInvalidated(true);
-        imageEntry.setInvalidatedReason("initial sync"_sd);
+        imageEntry.setInvalidatedReason(invalidatedReason);
     }
 
     UpdateRequest request(NamespaceString::kConfigImagesNamespace);
@@ -1336,6 +1346,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                              const BSONObj& op,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
+                             const bool isDataConsistent,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
     LOG(3) << "applying op: " << redact(op)
            << ", oplog application mode: " << OplogApplication::modeToString(mode);
@@ -1704,7 +1715,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             imageKind = repl::RetryImage_parse(
                 IDLParserErrorContext("applyUpdate"),
                 op.getField(OplogEntryBase::kNeedsRetryImageFieldName).String());
-            if (mode != OplogApplication::Mode::kInitialSync) {
+            if (mode != OplogApplication::Mode::kInitialSync && isDataConsistent) {
                 if (imageKind == repl::RetryImageEnum::kPreImage) {
                     request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
                 } else if (imageKind == repl::RetryImageEnum::kPostImage) {
@@ -1774,6 +1785,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                        // the empty BSONObj.
                                        ur.requestedDocImage,
                                        *imageKind,
+                                       getInvalidatingReason(mode, isDataConsistent),
                                        &upsertConfigImage);
             }
             wuow.commit();
@@ -1821,7 +1833,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     op.hasField(OplogEntryBase::kNeedsRetryImageFieldName);
                 DeleteRequest request(requestNss);
                 request.setQuery(deleteCriteria);
-                if (mode != OplogApplication::Mode::kInitialSync && kNeedsRetryImage) {
+                if (mode != OplogApplication::Mode::kInitialSync && kNeedsRetryImage &&
+                    isDataConsistent) {
                     // When in initial sync, we'll pass an empty image into
                     // `writeToImageCollection`.
                     request.setReturnDeleted(true);
@@ -1839,8 +1852,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         imageDoc = result.requestedPreImage.get();
                     }
 
-                    writeToImageCollection(
-                        opCtx, op, imageDoc, repl::RetryImageEnum::kPreImage, &upsertConfigImage);
+                    writeToImageCollection(opCtx,
+                                           op,
+                                           imageDoc,
+                                           repl::RetryImageEnum::kPreImage,
+                                           getInvalidatingReason(mode, isDataConsistent),
+                                           &upsertConfigImage);
                 }
             } else
                 verify(opType[1] == 'b');  // "db" advertisement

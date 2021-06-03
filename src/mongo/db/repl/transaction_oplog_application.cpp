@@ -68,8 +68,13 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
     for (const auto& op : ops) {
         try {
             AutoGetCollection coll(opCtx, op.getNss(), MODE_IX);
-            auto status = repl::applyOperation_inlock(
-                opCtx, coll.getDb(), op.toBSON(), false /*alwaysUpsert*/, oplogApplicationMode);
+            const bool isDataConsistent = true;
+            auto status = repl::applyOperation_inlock(opCtx,
+                                                      coll.getDb(),
+                                                      op.toBSON(),
+                                                      false /*alwaysUpsert*/,
+                                                      oplogApplicationMode,
+                                                      isDataConsistent);
             if (!status.isOK()) {
                 return status;
             }

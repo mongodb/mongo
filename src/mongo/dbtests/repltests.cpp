@@ -249,8 +249,13 @@ protected:
                     mongo::unittest::log() << "op: " << *i << endl;
                 }
                 repl::UnreplicatedWritesBlock uwb(&_opCtx);
-                uassertStatusOK(applyOperation_inlock(
-                    &_opCtx, ctx.db(), *i, false, OplogApplication::Mode::kSecondary));
+                const bool isDataConsistent = true;
+                uassertStatusOK(applyOperation_inlock(&_opCtx,
+                                                      ctx.db(),
+                                                      *i,
+                                                      false,
+                                                      OplogApplication::Mode::kSecondary,
+                                                      isDataConsistent));
             }
         }
     }

@@ -66,11 +66,11 @@ class OpTime;
  */
 class SyncTail {
 public:
-    using MultiSyncApplyFunc =
-        stdx::function<Status(OperationContext* opCtx,
-                              MultiApplier::OperationPtrs* ops,
-                              SyncTail* st,
-                              WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
+    using MultiSyncApplyFunc = stdx::function<Status(OperationContext* opCtx,
+                                                     MultiApplier::OperationPtrs* ops,
+                                                     SyncTail* st,
+                                                     WorkerMultikeyPathInfo* workerMultikeyPathInfo,
+                                                     const bool isDataConsistent)>;
 
     /**
      * Applies the operation that is in param o.
@@ -80,6 +80,7 @@ public:
     static Status syncApply(OperationContext* opCtx,
                             const BSONObj& o,
                             OplogApplication::Mode oplogApplicationMode,
+                            const bool isDataConsistent,
                             boost::optional<Timestamp> stableTimestampForRecovery);
 
     /**
@@ -260,7 +261,8 @@ private:
      */
     void _applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
                    std::vector<Status>* statusVector,
-                   std::vector<WorkerMultikeyPathInfo>* workerMultikeyPathInfo);
+                   std::vector<WorkerMultikeyPathInfo>* workerMultikeyPathInfo,
+                   const bool isDataConsistent);
 
     OplogApplier::Observer* const _observer;
     ReplicationConsistencyMarkers* const _consistencyMarkers;
@@ -290,7 +292,8 @@ private:
 Status multiSyncApply(OperationContext* opCtx,
                       MultiApplier::OperationPtrs* ops,
                       SyncTail* st,
-                      WorkerMultikeyPathInfo* workerMultikeyPathInfo);
+                      WorkerMultikeyPathInfo* workerMultikeyPathInfo,
+                      const bool isDataConsistent);
 
 }  // namespace repl
 }  // namespace mongo

@@ -74,7 +74,8 @@ InsertGroup::InsertGroup(ApplierHelpers::OperationPtrs* ops,
                          InsertGroup::Mode mode)
     : _doNotGroupBeforePoint(ops->cbegin()), _end(ops->cend()), _opCtx(opCtx), _mode(mode) {}
 
-StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIterator it) {
+StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
+    ConstIterator it, const bool isDataConsistent) {
     const auto& entry = **it;
 
     // The following conditions must be met before attempting to group the oplog entries starting
@@ -187,7 +188,8 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
     auto groupedInsertObj = groupedInsertBuilder.done();
     try {
         // Apply the group of inserts.
-        uassertStatusOK(SyncTail::syncApply(_opCtx, groupedInsertObj, _mode, boost::none));
+        uassertStatusOK(
+            SyncTail::syncApply(_opCtx, groupedInsertObj, _mode, isDataConsistent, boost::none));
         // It succeeded, advance the oplogEntriesIterator to the end of the
         // group of inserts.
         return endOfGroupableOpsIterator - 1;

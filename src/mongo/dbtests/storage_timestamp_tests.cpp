@@ -778,8 +778,12 @@ public:
                           << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid().get();
 
         auto oplogEntry = oplogEntryBuilder.done();
-        ASSERT_OK(repl::SyncTail::syncApply(
-            _opCtx, oplogEntry, repl::OplogApplication::Mode::kSecondary, boost::none));
+        const bool isDataConsistent = true;
+        ASSERT_OK(repl::SyncTail::syncApply(_opCtx,
+                                            oplogEntry,
+                                            repl::OplogApplication::Mode::kSecondary,
+                                            isDataConsistent,
+                                            boost::none));
 
         for (std::uint32_t idx = 0; idx < docsToInsert; ++idx) {
             OneOffRead oor(_opCtx, firstInsertTime.addTicks(idx).asTimestamp());
@@ -2607,14 +2611,16 @@ public:
         auto applyOperationFn = [&](OperationContext* opCtx,
                                     std::vector<const repl::OplogEntry*>* operationsToApply,
                                     repl::SyncTail* st,
-                                    std::vector<MultikeyPathInfo>* pathInfo) -> Status {
+                                    std::vector<MultikeyPathInfo>* pathInfo,
+                                    const bool isDataConsistent) -> Status {
             if (!_opCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode,
                                                         MODE_X)) {
                 return {ErrorCodes::BadValue, "Batch applied was not holding PBWM lock in MODE_X"};
             }
 
             // Insert the document. A reader without a PBWM lock should not see it yet.
-            auto status = repl::multiSyncApply(opCtx, operationsToApply, st, pathInfo);
+            auto status =
+                repl::multiSyncApply(opCtx, operationsToApply, st, pathInfo, isDataConsistent);
             if (!status.isOK()) {
                 return status;
             }
