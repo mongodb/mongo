@@ -54,6 +54,7 @@ namespace resharding {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failQueryingRecipients);
+MONGO_FAIL_POINT_DEFINE(hangBeforeQueryingRecipients);
 
 BSONObj makeCommandObj(const NamespaceString& ns) {
     auto command = _shardsvrReshardingOperationTime(ns);
@@ -138,6 +139,8 @@ Milliseconds CoordinatorCommitMonitor::_queryMaxRemainingOperationTimeForRecipie
                             requests,
                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                             Shard::RetryPolicy::kIdempotent);
+
+    hangBeforeQueryingRecipients.pauseWhileSet();
 
     auto maxRemainingTime = Milliseconds(0);
     while (!ars.done()) {

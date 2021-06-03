@@ -173,9 +173,17 @@ TEST_F(CoordinatorCommitMonitorTest, UnblocksWhenRecipientsWithinCommitThreshold
 }
 
 TEST_F(CoordinatorCommitMonitorTest, UnblocksWhenCancellationTokenIsCancelled) {
-    auto future = getCommitMonitor()->waitUntilRecipientsAreWithinCommitThreshold();
-    runOnMockingNextResponse([this] { cancelMonitor(); });
-    respondWithNotReadyToCommit();
+    auto future = [&] {
+        FailPointEnableBlock fp("hangBeforeQueryingRecipients");
+        auto future = getCommitMonitor()->waitUntilRecipientsAreWithinCommitThreshold();
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        // Cancels the monitor before waiting for the recipients to respond to the query. Once the
+        // fail-point is disabled, the monitor should cancel pending network operations and make the
+        // future ready. Thus, we do not block to run commands on behalf of the mocked network here.
+        cancelMonitor();
+        return future;
+    }();
+
     future.get();
 }
 
