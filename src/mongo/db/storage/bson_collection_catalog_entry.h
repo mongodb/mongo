@@ -73,15 +73,17 @@ public:
         }
 
         IndexMetaData& operator=(IndexMetaData&& rhs) {
-            spec = std::move(rhs.spec);
-            ready = std::move(rhs.ready);
-            isBackgroundSecondaryBuild = std::move(rhs.isBackgroundSecondaryBuild);
-            buildUUID = std::move(rhs.buildUUID);
+            if (&rhs != this) {
+                spec = std::move(rhs.spec);
+                ready = std::move(rhs.ready);
+                isBackgroundSecondaryBuild = std::move(rhs.isBackgroundSecondaryBuild);
+                buildUUID = std::move(rhs.buildUUID);
 
-            // No need to hold mutex on move, there are no concurrent readers while we're moving the
-            // instance.
-            multikey = std::move(rhs.multikey);
-            multikeyPaths = std::move(rhs.multikeyPaths);
+                // No need to hold mutex on move, there are no concurrent readers while we're moving
+                // the instance.
+                multikey = std::move(rhs.multikey);
+                multikeyPaths = std::move(rhs.multikeyPaths);
+            }
             return *this;
         }
 
