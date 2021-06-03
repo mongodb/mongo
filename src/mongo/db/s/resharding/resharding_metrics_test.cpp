@@ -46,7 +46,7 @@ namespace {
 
 using namespace fmt::literals;
 
-constexpr auto kOpTimeRemaining = "remainingOperationTimeEstimated"_sd;
+constexpr auto kOpTimeRemaining = "remainingOperationTimeEstimatedSecs"_sd;
 
 class ReshardingMetricsTest : public ServiceContextTest {
 public:
@@ -240,7 +240,8 @@ TEST_F(ReshardingMetricsTest, TestElapsedTime) {
     startOperation(ReshardingMetrics::Role::kRecipient);
     const auto elapsedTime = 1;
     advanceTime(Seconds(elapsedTime));
-    checkMetrics("totalOperationTimeElapsed", elapsedTime, OpReportType::CurrentOpReportDonorRole);
+    checkMetrics(
+        "totalOperationTimeElapsedSecs", elapsedTime, OpReportType::CurrentOpReportDonorRole);
 }
 
 TEST_F(ReshardingMetricsTest, TestDonorAndRecipientMetrics) {
@@ -274,17 +275,17 @@ TEST_F(ReshardingMetricsTest, TestDonorAndRecipientMetrics) {
     completeOperation(ReshardingMetrics::Role::kDonor, ReshardingOperationStatusEnum::kSuccess);
     completeOperation(ReshardingMetrics::Role::kRecipient, ReshardingOperationStatusEnum::kSuccess);
 
-    checkMetrics(currentRecipientOpReport, "totalCopyTimeElapsed", elapsedTime);
+    checkMetrics(currentRecipientOpReport, "totalCopyTimeElapsedSecs", elapsedTime);
     checkMetrics(currentRecipientOpReport, "bytesCopied", kBytesToCopy * kCopyProgress / 100);
     checkMetrics(
         currentRecipientOpReport, "documentsCopied", kDocumentsToCopy * kCopyProgress / 100);
-    checkMetrics(currentDonorOpReport, "totalCriticalSectionTimeElapsed", elapsedTime * 2);
+    checkMetrics(currentDonorOpReport, "totalCriticalSectionTimeElapsedSecs", elapsedTime * 2);
     checkMetrics(
         currentDonorOpReport, "countWritesDuringCriticalSection", kWritesDuringCriticalSection);
 
-    // Expected remaining time = totalCopyTimeElapsed + 2 * estimated time to copy remaining
+    // Expected remaining time = totalCopyTimeElapsedSecs + 2 * estimated time to copy remaining
     checkMetrics(currentDonorOpReport,
-                 "remainingOperationTimeEstimated",
+                 "remainingOperationTimeEstimatedSecs",
                  elapsedTime + 2 * (100 - kCopyProgress) / kCopyProgress * elapsedTime);
 
     const auto cumulativeReportAfterCompletion = getReport(OpReportType::CumulativeReport);
@@ -402,7 +403,7 @@ TEST_F(ReshardingMetricsTest, CurrentOpMetricsAreNotRetainedAfterStepDown) {
 }
 
 TEST_F(ReshardingMetricsTest, EstimatedRemainingOperationTime) {
-    auto constexpr kTag = "remainingOperationTimeEstimated";
+    auto constexpr kTag = "remainingOperationTimeEstimatedSecs";
     const auto elapsedTime = 1;
 
     startOperation(ReshardingMetrics::Role::kRecipient);
@@ -458,10 +459,10 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForDonor) {
                              "key: {2},"
                              "unique: {3},"
                              "collation: {{ locale: \"simple\" }} }},"
-                             "totalOperationTimeElapsed: 5,"
-                             "remainingOperationTimeEstimated: -1,"
+                             "totalOperationTimeElapsedSecs: 5,"
+                             "remainingOperationTimeEstimatedSecs: -1,"
                              "countWritesDuringCriticalSection: 0,"
-                             "totalCriticalSectionTimeElapsed : 3,"
+                             "totalCriticalSectionTimeElapsedSecs : 3,"
                              "donorState: \"{4}\","
                              "opStatus: \"running\" }}",
                              options.id.toString(),
@@ -518,16 +519,16 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForRecipient) {
                              "key: {2},"
                              "unique: {3},"
                              "collation: {{ locale: \"simple\" }} }},"
-                             "totalOperationTimeElapsed: {4},"
-                             "remainingOperationTimeEstimated: {5},"
+                             "totalOperationTimeElapsedSecs: {4},"
+                             "remainingOperationTimeEstimatedSecs: {5},"
                              "approxDocumentsToCopy: {6},"
                              "documentsCopied: {7},"
                              "approxBytesToCopy: {8},"
                              "bytesCopied: {9},"
-                             "totalCopyTimeElapsed: {10},"
+                             "totalCopyTimeElapsedSecs: {10},"
                              "oplogEntriesFetched: 0,"
                              "oplogEntriesApplied: 0,"
-                             "totalApplyTimeElapsed: 0,"
+                             "totalApplyTimeElapsedSecs: 0,"
                              "recipientState: \"{11}\","
                              "opStatus: \"running\" }}",
                              options.id.toString(),
@@ -571,8 +572,8 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForCoordinator) {
                              "key: {2},"
                              "unique: {3},"
                              "collation: {{ locale: \"simple\" }} }},"
-                             "totalOperationTimeElapsed: {4},"
-                             "remainingOperationTimeEstimated: -1,"
+                             "totalOperationTimeElapsedSecs: {4},"
+                             "remainingOperationTimeEstimatedSecs: -1,"
                              "coordinatorState: \"{5}\","
                              "opStatus: \"running\" }}",
                              options.id.toString(),
