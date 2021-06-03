@@ -56,7 +56,9 @@ struct DistinctParams {
         invariant(indexDescriptor);
     }
 
-    DistinctParams(OperationContext* opCtx, const IndexDescriptor* descriptor)
+    DistinctParams(OperationContext* opCtx,
+                   const CollectionPtr& collection,
+                   const IndexDescriptor* descriptor)
         : DistinctParams(descriptor,
                          descriptor->indexName(),
                          descriptor->keyPattern(),
