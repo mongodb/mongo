@@ -384,10 +384,25 @@ void IndexBuildInterceptor::_yield(OperationContext* opCtx, const Yieldable* yie
 }
 
 bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {
+    return _checkAllWritesApplied(opCtx, false);
+}
+
+void IndexBuildInterceptor::invariantAllWritesApplied(OperationContext* opCtx) const {
+    _checkAllWritesApplied(opCtx, true);
+}
+
+bool IndexBuildInterceptor::_checkAllWritesApplied(OperationContext* opCtx, bool fatal) const {
     invariant(_sideWritesTable);
 
     // The table is empty only when all writes are applied.
-    if (_sideWritesTable->rs()->getCursor(opCtx)->next()) {
+    auto cursor = _sideWritesTable->rs()->getCursor(opCtx);
+    auto record = cursor->next();
+    if (fatal) {
+        invariant(
+            !record,
+            str::stream() << "Expected all side writes to be drained but found record with id "
+                          << record->id << " and data " << record->data.toBson());
+    } else if (record) {
         return false;
     }
 
