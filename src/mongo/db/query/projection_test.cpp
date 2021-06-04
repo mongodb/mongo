@@ -177,7 +177,7 @@ TEST(QueryProjectionTest, InvalidElemMatchGeoNearProjection) {
     assertInvalidFindProjection(
         "{}",
         "{a: {$elemMatch: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}}",
-        5626500);
+        ErrorCodes::BadValue);
 }
 
 TEST(QueryProjectionTest, InvalidElemMatchExprProjection) {
