@@ -70,6 +70,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                              WorkingSet* workingSet,
                              WorkingSetID id,
                              SeekableRecordCursor* cursor,
+                             const CollectionPtr& collection,
                              const NamespaceString& ns) {
     WorkingSetMember* member = workingSet->get(id);
 

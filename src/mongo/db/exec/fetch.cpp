@@ -100,10 +100,11 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
             verify(member->hasRecordId());
 
             try {
+                const auto& coll = collection();
                 if (!_cursor)
-                    _cursor = collection()->getCursor(opCtx());
+                    _cursor = coll->getCursor(opCtx());
 
-                if (!WorkingSetCommon::fetch(opCtx(), _ws, id, _cursor.get(), collection()->ns())) {
+                if (!WorkingSetCommon::fetch(opCtx(), _ws, id, _cursor.get(), coll, coll->ns())) {
                     _ws->free(id);
                     return NEED_TIME;
                 }

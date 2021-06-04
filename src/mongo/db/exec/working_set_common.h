@@ -34,6 +34,7 @@
 
 namespace mongo {
 
+class CollectionPtr;
 class OperationContext;
 class SeekableRecordCursor;
 
@@ -52,6 +53,7 @@ public:
                       WorkingSet* workingSet,
                       WorkingSetID id,
                       SeekableRecordCursor* cursor,
+                      const CollectionPtr& collection,
                       const NamespaceString& ns);
 };
 

@@ -256,7 +256,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
         // already.
         try {
             if (!WorkingSetCommon::fetch(
-                    opCtx(), _ws, wsid, _recordCursor.get(), collection()->ns())) {
+                    opCtx(), _ws, wsid, _recordCursor.get(), collection(), collection()->ns())) {
                 _ws->free(wsid);
                 textRecordData->score = -1;
                 return NEED_TIME;
