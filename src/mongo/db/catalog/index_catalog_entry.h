@@ -115,7 +115,8 @@ public:
      * returns a vector with size equal to the number of elements in the index key pattern where
      * each element in the vector is an empty set.
      */
-    virtual MultikeyPaths getMultikeyPaths(OperationContext* const opCtx) const = 0;
+    virtual MultikeyPaths getMultikeyPaths(OperationContext* const opCtx,
+                                           const CollectionPtr& collection) const = 0;
 
     /**
      * Sets this index to be multikey. Information regarding which newly detected path components

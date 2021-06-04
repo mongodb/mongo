@@ -99,6 +99,7 @@ bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
  * will be retrieved.
  */
 IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
+                                           const CollectionPtr& collection,
                                            const IndexCatalogEntry& ice,
                                            const CanonicalQuery* canonicalQuery = nullptr);
 

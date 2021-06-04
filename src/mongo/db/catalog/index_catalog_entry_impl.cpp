@@ -151,7 +151,8 @@ bool IndexCatalogEntryImpl::isMultikey() const {
     return _isMultikeyForRead.load();
 }
 
-MultikeyPaths IndexCatalogEntryImpl::getMultikeyPaths(OperationContext* opCtx) const {
+MultikeyPaths IndexCatalogEntryImpl::getMultikeyPaths(OperationContext* opCtx,
+                                                      const CollectionPtr& collection) const {
     stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
     return _indexMultikeyPathsForRead;
 }

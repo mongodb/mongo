@@ -149,7 +149,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         }
 
         if (index->isMultikey()) {
-            const MultikeyPaths& indexPaths = index->getMultikeyPaths(opCtx);
+            const MultikeyPaths& indexPaths = index->getMultikeyPaths(opCtx, coll);
             if (!MultikeyPathTracker::covers(indexPaths, *documentMultikeyPaths.get())) {
                 if (_validateState->fixErrors()) {
                     writeConflictRetry(opCtx, "increaseMultikeyPathCoverage", coll->ns().ns(), [&] {
@@ -372,7 +372,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
 
         // If this collection has documents that make this index multikey, then check whether those
         // multikey paths match the index's metadata.
-        auto indexPaths = index->getMultikeyPaths(opCtx);
+        auto indexPaths = index->getMultikeyPaths(opCtx, _validateState->getCollection());
         auto& documentPaths = indexInfo.docMultikeyPaths;
         if (indexInfo.multikeyDocs && documentPaths != indexPaths) {
             LOGV2(5367500,

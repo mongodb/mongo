@@ -61,7 +61,7 @@ struct IndexScanParams {
         : IndexScanParams(descriptor,
                           descriptor->indexName(),
                           descriptor->keyPattern(),
-                          descriptor->getEntry()->getMultikeyPaths(opCtx),
+                          descriptor->getEntry()->getMultikeyPaths(opCtx, collection),
                           descriptor->getEntry()->isMultikey()) {}
 
     const IndexDescriptor* indexDescriptor;

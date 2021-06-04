@@ -188,6 +188,7 @@ bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
 }
 
 IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
+                                           const CollectionPtr& collection,
                                            const IndexCatalogEntry& ice,
                                            const CanonicalQuery* canonicalQuery) {
     auto desc = ice.descriptor();
@@ -232,7 +233,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             desc->version(),
             isMultikey,
             // The fixed-size vector of multikey paths stored in the index catalog.
-            ice.getMultikeyPaths(opCtx),
+            ice.getMultikeyPaths(opCtx, collection),
             // The set of multikey paths from special metadata keys stored in the index itself.
             // Indexes that have these metadata keys do not store a fixed-size vector of multikey
             // metadata in the index catalog. Depending on the index type, an index uses one of
@@ -293,7 +294,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
         if (ice->descriptor()->hidden())
             continue;
         plannerParams->indices.push_back(
-            indexEntryFromIndexCatalogEntry(opCtx, *ice, canonicalQuery));
+            indexEntryFromIndexCatalogEntry(opCtx, collection, *ice, canonicalQuery));
     }
 
     // If query supports index filters, filter params.indices by indices in query settings.
@@ -939,7 +940,7 @@ protected:
         invariant(descriptor->getEntry());
         std::unique_ptr<QuerySolutionNode> root = [&]() {
             auto ixScan = std::make_unique<IndexScanNode>(
-                indexEntryFromIndexCatalogEntry(_opCtx, *descriptor->getEntry(), _cq));
+                indexEntryFromIndexCatalogEntry(_opCtx, _collection, *descriptor->getEntry(), _cq));
 
             const auto bsonKey =
                 IndexBoundsBuilder::objFromElement(_cq->getQueryObj()["_id"], _cq->getCollator());
@@ -2162,7 +2163,7 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
             if (!mayUnwindArrays &&
                 isAnyComponentOfPathMultikey(desc->keyPattern(),
                                              ice->isMultikey(),
-                                             ice->getMultikeyPaths(opCtx),
+                                             ice->getMultikeyPaths(opCtx, collection),
                                              parsedDistinct.getKey())) {
                 // If the caller requested "strict" distinct that does not "pre-unwind" arrays,
                 // then an index which is multikey on the distinct field may not be used. This is
@@ -2171,8 +2172,8 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
                 continue;
             }
 
-            plannerParams.indices.push_back(
-                indexEntryFromIndexCatalogEntry(opCtx, *ice, parsedDistinct.getQuery()));
+            plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(
+                opCtx, collection, *ice, parsedDistinct.getQuery()));
         } else if (desc->getIndexType() == IndexType::INDEX_WILDCARD && !query.isEmpty()) {
             // Check whether the $** projection captures the field over which we are distinct-ing.
             auto* proj = static_cast<const WildcardAccessMethod*>(ice->accessMethod())
@@ -2180,8 +2181,8 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
                              ->exec();
             if (projection_executor_utils::applyProjectionToOneField(proj,
                                                                      parsedDistinct.getKey())) {
-                plannerParams.indices.push_back(
-                    indexEntryFromIndexCatalogEntry(opCtx, *ice, parsedDistinct.getQuery()));
+                plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(
+                    opCtx, collection, *ice, parsedDistinct.getQuery()));
             }
 
             // It is not necessary to do any checks about 'mayUnwindArrays' in this case, because:

@@ -93,7 +93,7 @@ public:
         auto desc = indexes[0];
         const IndexCatalogEntry* ice = indexCatalog->getEntry(desc);
 
-        auto actualMultikeyPaths = ice->getMultikeyPaths(_opCtx.get());
+        auto actualMultikeyPaths = ice->getMultikeyPaths(_opCtx.get(), collection);
         ASSERT_FALSE(actualMultikeyPaths.empty());
         const bool match = (expectedMultikeyPaths == actualMultikeyPaths);
         if (!match) {

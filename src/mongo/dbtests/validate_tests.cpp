@@ -3410,7 +3410,7 @@ public:
         auto catalogEntry = indexCatalog->getEntry(descriptor);
         auto expectedPathsBefore = MultikeyPaths{};
         ASSERT(catalogEntry->isMultikey());
-        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx) == expectedPathsBefore);
+        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx, coll) == expectedPathsBefore);
 
         releaseDb();
         ensureValidateWorked();
@@ -3446,7 +3446,7 @@ public:
 
         auto expectedPathsAfter = MultikeyPaths{{0}, {}};
         ASSERT(catalogEntry->isMultikey());
-        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx) == expectedPathsAfter);
+        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx, coll) == expectedPathsAfter);
 
         // Confirm validate does not make changes when run a second time.
         {
@@ -3478,7 +3478,7 @@ public:
         }
 
         ASSERT(catalogEntry->isMultikey());
-        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx) == expectedPathsAfter);
+        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx, coll) == expectedPathsAfter);
     }
 };
 
