@@ -47,8 +47,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/set_allow_migrations_gen.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
 
@@ -60,7 +58,7 @@ void updateTags(OperationContext* opCtx,
                 const NamespaceString& fromNss,
                 const NamespaceString& toNss) {
     const auto query = BSON(TagsType::ns(fromNss.ns()));
-    const auto update = BSON("$set" << BSON(TagsType::ns << toNss.ns()));
+    const auto update = BSON("$set" << BSON(TagsType::ns(toNss.ns())));
 
     BatchedCommandRequest request([&] {
         write_ops::UpdateCommandRequest updateOp(TagsType::ConfigNS);
@@ -78,7 +76,7 @@ void updateTags(OperationContext* opCtx,
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto response = configShard->runBatchWriteCommand(
-        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotent);
+        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
 
     uassertStatusOK(response.toStatus());
 }
@@ -115,7 +113,7 @@ void deleteChunks(OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUI
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto response = configShard->runBatchWriteCommand(
-        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotent);
+        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
 
     uassertStatusOK(response.toStatus());
 }
@@ -179,7 +177,7 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx, const NamespaceString
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto response = configShard->runBatchWriteCommand(
-        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotent);
+        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
 
     uassertStatusOK(response.toStatus());
 }
