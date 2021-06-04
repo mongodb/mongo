@@ -2,6 +2,11 @@
  * Test oplog visibility enforcement of primaries and secondaries. This test uses a client to read
  * the oplog while there are concurrent writers. The client copies all the timestamps it sees and
  * verifies a later scan over the range returns the same values.
+ *
+ * @tags: [
+ *     # TODO(SERVER-57443): remove incompatible_with_eft.
+ *     incompatible_with_eft,
+ * ]
  */
 (function() {
 "use strict";
