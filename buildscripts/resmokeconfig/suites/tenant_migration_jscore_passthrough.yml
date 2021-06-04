@@ -88,8 +88,6 @@ selector:
   - jstests/core/views/invalid_system_views.js
   - jstests/core/views/views_all_commands.js
   - jstests/core/rename_collection_staytemp.js
-  # TODO (SERVER-52866): Synchronize getLastError with tenant migrations.
-  - jstests/core/bulk_legacy_enforce_gle.js
   # This test contains assertions for the hostname that operations run on.
   - jstests/core/currentop_cursors.js
   # Server parameters are stored in-memory only so are not transferred onto the recipient. These

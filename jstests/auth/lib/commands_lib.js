@@ -4137,14 +4137,6 @@ var authCommandsLib = {
           }]
         },
         {
-          testname: "getLastError",
-          command: {getLastError: 1},
-          testcases: [
-              {runOnDb: firstDbName, roles: roles_all, privileges: []},
-              {runOnDb: secondDbName, roles: roles_all, privileges: []}
-          ]
-        },
-        {
           testname: "getLog",
           command: {getLog: "*"},
           testcases: [
@@ -6305,7 +6297,6 @@ var authCommandsLib = {
         if (t.setup) {
             adminDb.auth("admin", "password");
             var state = t.setup(runOnDb, testcase);
-            runOnDb.getLastError();
             adminDb.logout();
             return state;
         }
@@ -6324,7 +6315,6 @@ var authCommandsLib = {
         if (t.teardown) {
             adminDb.auth("admin", "password");
             t.teardown(runOnDb, response);
-            runOnDb.getLastError();
             adminDb.logout();
         }
     },

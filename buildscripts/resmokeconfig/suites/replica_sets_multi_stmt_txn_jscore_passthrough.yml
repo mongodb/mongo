@@ -16,7 +16,6 @@ selector:
   - jstests/core/api_params_getmore.js
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
-  - jstests/core/bulk_legacy_enforce_gle.js
   - jstests/core/commands_with_uuid.js
   - jstests/core/dbcase.js
   - jstests/core/dbcase2.js
@@ -113,7 +112,6 @@ selector:
   # to test run without multi statement transactions).
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
-  - jstests/core/bulk_legacy_enforce_gle.js
   - jstests/core/doc_validation.js
   - jstests/core/doc_validation_options.js
   - jstests/core/field_name_validation.js

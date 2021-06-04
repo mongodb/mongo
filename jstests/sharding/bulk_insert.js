@@ -204,9 +204,6 @@ var inserts = (function() {
     ];
 })();
 
-var staleMongosWithLegacyWrites = new Mongo(staleMongos.name);
-staleMongosWithLegacyWrites.forceWriteMode('legacy');
-
 staleCollSh = staleMongos.getCollection(collSh + "");
 assert.eq(null, staleCollSh.findOne(), 'Collections should be empty');
 
@@ -215,8 +212,7 @@ assert.commandWorked(admin.runCommand(
 assert.commandWorked(admin.runCommand(
     {moveChunk: collSh + "", find: {ukey: 0}, to: st.shard0.shardName, _waitForDelete: true}));
 
-staleCollSh.insert(inserts);
-staleCollSh.getDB().getLastError();
+assert.commandWorked(staleCollSh.insert(inserts));
 
 st.stop();
 })();
