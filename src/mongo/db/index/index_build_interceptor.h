@@ -152,10 +152,16 @@ public:
     Status retrySkippedRecords(OperationContext* opCtx, const CollectionPtr& collection);
 
     /**
-     * Returns 'true' if there are no visible records remaining to be applied from the side writes
-     * table. Ensure that this returns 'true' when an index build is completed.
+     * Returns whether there are no visible records remaining to be applied from the side writes
+     * table.
      */
     bool areAllWritesApplied(OperationContext* opCtx) const;
+
+    /**
+     * Invariants that there are no visible records remaining to be applied from the side writes
+     * table.
+     */
+    void invariantAllWritesApplied(OperationContext* opCtx) const;
 
     /**
      * When an index builder wants to commit, use this to retrieve any recorded multikey paths
@@ -183,6 +189,8 @@ private:
                        TrackDuplicates trackDups,
                        int64_t* const keysInserted,
                        int64_t* const keysDeleted);
+
+    bool _checkAllWritesApplied(OperationContext* opCtx, bool fatal) const;
 
     /**
      * Yield lock manager locks and abandon the current storage engine snapshot.

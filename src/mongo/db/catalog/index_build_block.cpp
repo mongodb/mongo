@@ -218,7 +218,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
         }
 
         // An index build should never be completed with writes remaining in the interceptor.
-        invariant(_indexBuildInterceptor->areAllWritesApplied(opCtx));
+        _indexBuildInterceptor->invariantAllWritesApplied(opCtx);
     }
 
     auto indexCatalogEntry = getEntry(opCtx, collection);
