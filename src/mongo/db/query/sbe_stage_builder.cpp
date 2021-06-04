@@ -457,17 +457,6 @@ const QuerySolutionNode* getLoneNodeByType(const QuerySolutionNode* root, StageT
     return result;
 }
 
-sbe::LockAcquisitionCallback makeLockAcquisitionCallback(bool checkNodeCanServeReads) {
-    if (!checkNodeCanServeReads) {
-        return {};
-    }
-
-    return [](OperationContext* opCtx, const AutoGetCollectionForReadMaybeLockFree& coll) {
-        uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(
-            opCtx, coll.getNss(), true));
-    };
-}
-
 /**
  * Callback function that logs a message and uasserts if it detects a corrupt index key. An index
  * key is considered corrupt if it has no corresponding Record.
@@ -649,7 +638,6 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
       _yieldPolicy(yieldPolicy),
       _data(makeRuntimeEnvironment(_cq, _opCtx, &_slotIdGenerator)),
       _shardFiltererFactory(shardFiltererFactory),
-      _lockAcquisitionCallback(makeLockAcquisitionCallback(solution.shouldCheckCanServeReads())),
       _state(_opCtx,
              _data.env,
              _cq.getExpCtxRaw()->variables,
@@ -708,12 +696,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto csn = static_cast<const CollectionScanNode*>(root);
 
-    auto [stage, outputs] = generateCollScan(_state,
-                                             _collection,
-                                             csn,
-                                             _yieldPolicy,
-                                             reqs.getIsTailableCollScanResumeBranch(),
-                                             _lockAcquisitionCallback);
+    auto [stage, outputs] = generateCollScan(
+        _state, _collection, csn, _yieldPolicy, reqs.getIsTailableCollScanResumeBranch());
 
     if (reqs.has(kReturnKey)) {
         // Assign the 'returnKeySlot' to be the empty object.
@@ -825,14 +809,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         iamMap = nullptr;
     }
 
-    auto [stage, outputs] = generateIndexScan(_state,
-                                              _collection,
-                                              ixn,
-                                              indexKeyBitset,
-                                              _yieldPolicy,
-                                              _lockAcquisitionCallback,
-                                              iamMap,
-                                              reqs.has(kIndexKeyPattern));
+    auto [stage, outputs] = generateIndexScan(
+        _state, _collection, ixn, indexKeyBitset, _yieldPolicy, iamMap, reqs.has(kIndexKeyPattern));
 
     if (reqs.has(PlanStageSlots::kReturnKey)) {
         std::vector<std::unique_ptr<sbe::EExpression>> mkObjArgs;
@@ -888,7 +866,6 @@ SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inpu
 
     using namespace std::placeholders;
     sbe::ScanCallbacks callbacks(
-        _lockAcquisitionCallback,
         indexKeyCorruptionCheckCallback,
         std::bind(indexKeyConsistencyCheckCallback, _1, std::move(iamMap), _2, _3, _4, _5, _6));
     // Scan the collection in the range [seekKeySlot, Inf).

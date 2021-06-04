@@ -326,7 +326,7 @@ struct QuerySolutionNodeWithSortSet : public QuerySolutionNode {
  */
 class QuerySolution {
 public:
-    explicit QuerySolution(size_t plannerOptions) : plannerOptions(plannerOptions) {}
+    QuerySolution() = default;
 
     /**
      * Return true if this solution tree contains a node of the given 'type'.
@@ -361,18 +361,6 @@ public:
      * output (e.g. explain).
      */
     void setRoot(std::unique_ptr<QuerySolutionNode> root);
-
-    /**
-     * Returns true if the execution plan which is constructed from this QuerySolution should check
-     * that the node is eligible to serve reads prior to actually performing any reads.
-     */
-    bool shouldCheckCanServeReads() const {
-        return !(plannerOptions & QueryPlannerParams::OMIT_REPL_STATE_PERMITS_READS_CHECK);
-    }
-
-    // A bit vector of flags which clients to the QueryPlanner pass to control which plans are
-    // generated and their properties.
-    const size_t plannerOptions;
 
     // There are two known scenarios in which a query solution might potentially block:
     //

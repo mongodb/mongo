@@ -1061,7 +1061,7 @@ TEST(QuerySolutionTest, NodeIdsAssignedInPostOrderFashionStartingFromOne) {
     ASSERT_EQ(orNode->children[0]->nodeId(), 0u);
     ASSERT_EQ(orNode->children[1]->nodeId(), 0u);
 
-    auto querySolution = std::make_unique<QuerySolution>(QueryPlannerParams::Options::DEFAULT);
+    auto querySolution = std::make_unique<QuerySolution>();
     querySolution->setRoot(std::move(orNode));
     auto root = querySolution->root();
 

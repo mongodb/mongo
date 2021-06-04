@@ -381,10 +381,6 @@ private:
     // A factory to construct shard filters.
     ShardFiltererFactoryInterface* _shardFiltererFactory;
 
-    // A callback that should be installed on "scan" and "ixscan" nodes. It will get invoked when
-    // these data access stages acquire their AutoGet*.
-    const sbe::LockAcquisitionCallback _lockAcquisitionCallback;
-
     // Common parameters to SBE stage builder functions.
     StageBuilderState _state;
 };

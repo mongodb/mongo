@@ -568,7 +568,7 @@ public:
                         "namespace"_attr = _cq->ns(),
                         "canonicalQuery"_attr = redact(_cq->toStringShort()));
 
-            auto solution = std::make_unique<QuerySolution>(_plannerOptions);
+            auto solution = std::make_unique<QuerySolution>();
             solution->setRoot(std::make_unique<EofNode>());
 
             auto root = buildExecutableTree(*solution);
@@ -975,7 +975,7 @@ protected:
             }
         }
 
-        auto soln = std::make_unique<QuerySolution>(plannerParams->options);
+        auto soln = std::make_unique<QuerySolution>();
         soln->setRoot(std::move(root));
 
         auto execTree = buildExecutableTree(*soln);

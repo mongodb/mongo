@@ -57,7 +57,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     const IndexScanNode* ixn,
     const sbe::IndexKeysInclusionSet& indexKeyBitset,
     PlanYieldPolicy* yieldPolicy,
-    sbe::LockAcquisitionCallback lockAcquisitionCallback,
     StringMap<const IndexAccessMethod*>* iamMap,
     bool needsCorruptionCheck);
 
@@ -95,7 +94,6 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
     boost::optional<sbe::value::SlotId> keyPatternSlot,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     PlanYieldPolicy* yieldPolicy,
-    PlanNodeId nodeId,
-    sbe::LockAcquisitionCallback lockAcquisitionCallback);
+    PlanNodeId nodeId);
 
 }  // namespace mongo::stage_builder
