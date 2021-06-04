@@ -40,3 +40,8 @@ feature_flags:
       cpp_varname: gFeatureFlagDotsAndDollars
       default: true
       version: 5.0
+
+    featureFlagDensify:
+      description: "Feature flag for allowing a $densify stage in an aggregation pipeline"
+      cpp_varname: gFeatureFlagDensify
+      default: false
