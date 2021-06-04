@@ -2029,7 +2029,7 @@ RTF_SOURCE_CODE        = NO
 # classes and files.
 # The default value is: NO.
 
-GENERATE_MAN           = YES
+GENERATE_MAN           = NO
 
 # The MAN_OUTPUT tag is used to specify where the man pages will be put. If a
 # relative path is entered the value of OUTPUT_DIRECTORY will be put in front of
