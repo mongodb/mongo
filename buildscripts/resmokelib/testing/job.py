@@ -348,6 +348,11 @@ class FixtureTestCaseManager:
 
         Return True if the teardown was successful, False otherwise.
         """
+
+        # Refresh the fixture table before teardown to capture changes due to
+        # CleanEveryN and stepdown hooks.
+        self.report.logging_prefix = create_fixture_table(self.fixture)
+
         if abort:
             test_case = _fixture.FixtureAbortTestCase(self.test_queue_logger, self.fixture,
                                                       "job{}".format(self.job_num),
