@@ -56,12 +56,12 @@
     jsTestLog("6. Start updating documents on primary");
     for (i = N - 1; i >= N - 10000; --i) {
         // If the document is cloned as {a:1}, the {$set:{'a.b':1}} modifier will uassert.
-        mc.update({_id: i}, {$set: {'a.b': 1}});
-        mc.update({_id: i}, {$set: {a: 1}});
+        mc.update({_id: i}, {$set: {'a.b': 1}}, {writeConcern: {w: 1}});
+        mc.update({_id: i}, {$set: {a: 1}}, {writeConcern: {w: 1}});
     }
 
     for (i = N; i < N * 2; i++) {
-        mc.insert({_id: i, x: i});
+        mc.insert({_id: i, x: i}, {writeConcern: {w: 1}});
     }
 
     assert.eq(N * 2, mc.find().itcount());
