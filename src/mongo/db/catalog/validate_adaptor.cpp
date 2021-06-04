@@ -594,7 +594,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     }
 }
 
-void ValidateAdaptor::validateIndexKeyCount(const IndexCatalogEntry* index,
+void ValidateAdaptor::validateIndexKeyCount(OperationContext* opCtx,
+                                            const IndexCatalogEntry* index,
                                             IndexValidateResults& results) {
     // Fetch the total number of index entries we previously found traversing the index.
     const IndexDescriptor* desc = index->descriptor();

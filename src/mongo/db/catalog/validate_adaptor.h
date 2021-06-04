@@ -80,7 +80,9 @@ public:
      * Validates that the number of document keys matches the number of index keys previously
      * traversed in traverseIndex().
      */
-    void validateIndexKeyCount(const IndexCatalogEntry* index, IndexValidateResults& results);
+    void validateIndexKeyCount(OperationContext* opCtx,
+                               const IndexCatalogEntry* index,
+                               IndexValidateResults& results);
 
 private:
     IndexConsistency* _indexConsistency;
