@@ -55,6 +55,36 @@ def build_mock_split_params(test_filter=None):
     )
 
 
+def build_mock_sub_suite(index, test_list):
+    return under_test.SubSuite(
+        index=index,
+        suite_name="suite_name",
+        test_list=test_list,
+        tests_with_runtime_info=0,
+        max_test_runtime=0,
+        historic_runtime=0,
+        task_overhead=0,
+    )
+
+
+class TestGeneratedSuite(unittest.TestCase):
+    def test_get_test_list_should_run_tests_in_sub_tasks(self):
+        n_sub_suites = 3
+        n_tests_per_suite = 5
+        test_lists = [[f"test_{i * n_tests_per_suite + j}" for j in range(n_tests_per_suite)]
+                      for i in range(n_sub_suites)]
+        mock_sub_suites = [build_mock_sub_suite(i, test_lists[i]) for i in range(n_sub_suites)]
+        mock_suite = under_test.GeneratedSuite(sub_suites=mock_sub_suites,
+                                               build_variant="build_variant", task_name="task_name",
+                                               suite_name="suite_name", filename="filename")
+
+        all_tests = mock_suite.get_test_list()
+
+        for test_list in test_lists:
+            for test in test_list:
+                self.assertIn(test, all_tests)
+
+
 class TestSplitSuite(unittest.TestCase):
     def test_calculate_suites(self):
         mock_test_stats = [tst_stat_mock(f"test{i}.js", 60, 1) for i in range(100)]
