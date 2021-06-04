@@ -45,7 +45,8 @@ namespace mozjs {
 JSStringWrapper::JSStringWrapper(std::int32_t value) : _isSet(true) {
     auto formatted = fmt::format_int(value);
     _length = formatted.size();
-    strncpy(_buf, formatted.c_str(), sizeof(_buf));
+    strncpy(_buf, formatted.c_str(), sizeof(_buf) - 1);
+    _buf[sizeof(_buf) - 1] = '\0';
 }
 
 JSStringWrapper::JSStringWrapper(JSContext* cx, JSString* str) : _isSet(true) {
