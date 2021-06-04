@@ -931,7 +931,7 @@ retry:
 
 #ifdef HAVE_DIAGNOSTIC
     /* Do a search again and call next to check the key order. */
-    WT_WITH_PAGE_INDEX(session, ret = __curhs_search(cbt, true));
+    WT_WITH_PAGE_INDEX(session, ret = __curhs_search(cbt, false));
     WT_ASSERT(session, ret == 0);
     WT_ERR_NOTFOUND_OK(__curhs_file_cursor_next(session, file_cursor), false);
 #endif
