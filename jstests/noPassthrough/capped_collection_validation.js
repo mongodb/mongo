@@ -2,7 +2,12 @@
  * Capped collections perform un-timestamped writes to delete expired documents in FCV 4.4. As a
  * result, background validation will fail when reading documents that have just been deleted.
  *
- * @tags: [requires_capped, requires_replication]
+ * @tags: [
+ *     # ephemeralForTest does not support background validation.
+ *     incompatible_with_eft,
+ *     requires_capped,
+ *     requires_replication,
+ * ]
  */
 (function() {
 'use strict';
