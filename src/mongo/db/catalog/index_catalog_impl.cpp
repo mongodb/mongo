@@ -1238,7 +1238,7 @@ const IndexDescriptor* IndexCatalogImpl::findShardKeyPrefixedIndex(OperationCont
         if (!shardKey.isPrefixOf(desc->keyPattern(), SimpleBSONElementComparator::kInstance))
             continue;
 
-        if (!entry->isMultikey() && hasSimpleCollation)
+        if (!entry->isMultikey(opCtx, collection) && hasSimpleCollation)
             return desc;
 
         if (!requireSingleKey && hasSimpleCollation)

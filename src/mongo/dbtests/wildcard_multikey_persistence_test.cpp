@@ -100,7 +100,9 @@ protected:
 
         // Verify whether or not the index has been marked as multikey.
         ASSERT_EQ(expectIndexIsMultikey,
-                  getIndexDesc(collection.getCollection(), indexName)->getEntry()->isMultikey());
+                  getIndexDesc(collection.getCollection(), indexName)
+                      ->getEntry()
+                      ->isMultikey(opCtx(), *collection));
 
         // Obtain a cursor over the index, and confirm that the keys are present in order.
         auto indexCursor = getIndexCursor(collection.getCollection(), indexName);

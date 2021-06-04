@@ -119,7 +119,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
             {multikeyMetadataKeys->begin(), multikeyMetadataKeys->end()},
             *documentMultikeyPaths);
 
-        if (!index->isMultikey() && shouldBeMultikey) {
+        if (!index->isMultikey(opCtx, coll) && shouldBeMultikey) {
             if (_validateState->fixErrors()) {
                 writeConflictRetry(opCtx, "setIndexAsMultikey", coll->ns().ns(), [&] {
                     WriteUnitOfWork wuow(opCtx);
@@ -148,7 +148,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
             }
         }
 
-        if (index->isMultikey()) {
+        if (index->isMultikey(opCtx, coll)) {
             const MultikeyPaths& indexPaths = index->getMultikeyPaths(opCtx, coll);
             if (!MultikeyPathTracker::covers(indexPaths, *documentMultikeyPaths.get())) {
                 if (_validateState->fixErrors()) {
@@ -405,7 +405,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
         }
 
         // If this index does not need to be multikey, then unset the flag.
-        if (index->isMultikey() && !indexInfo.multikeyDocs) {
+        if (index->isMultikey(opCtx, _validateState->getCollection()) && !indexInfo.multikeyDocs) {
             invariant(!indexInfo.docMultikeyPaths.size());
 
             LOGV2(5367501,
@@ -623,7 +623,8 @@ void ValidateAdaptor::validateIndexKeyCount(OperationContext* opCtx,
     }
 
     // Hashed indexes may never be multikey.
-    if (desc->getAccessMethodName() == IndexNames::HASHED && index->isMultikey()) {
+    if (desc->getAccessMethodName() == IndexNames::HASHED &&
+        index->isMultikey(opCtx, _validateState->getCollection())) {
         results.errors.push_back(str::stream() << "Hashed index is incorrectly marked multikey: "
                                                << desc->indexName());
         results.valid = false;
@@ -633,7 +634,7 @@ void ValidateAdaptor::validateIndexKeyCount(OperationContext* opCtx,
     // collection. This check is only valid for indexes that are not multikey (indexed arrays
     // produce an index key per array entry) and not $** indexes which can produce index keys for
     // multiple paths within a single document.
-    if (results.valid && !index->isMultikey() &&
+    if (results.valid && !index->isMultikey(opCtx, _validateState->getCollection()) &&
         desc->getIndexType() != IndexType::INDEX_WILDCARD && numTotalKeys > _numRecords) {
         std::string err = str::stream()
             << "index " << desc->indexName() << " is not multi-key, but has more entries ("

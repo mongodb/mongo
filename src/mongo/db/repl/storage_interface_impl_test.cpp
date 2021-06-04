@@ -2660,7 +2660,7 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeySucceeds) {
     ASSERT_TRUE(autoColl.getCollection());
     auto indexCatalog = autoColl.getCollection()->getIndexCatalog();
     auto entry = indexCatalog->findIndexByName(opCtx, indexName)->getEntry();
-    ASSERT(entry->isMultikey());
+    ASSERT(entry->isMultikey(opCtx, autoColl.getCollection()));
     ASSERT(paths == entry->getMultikeyPaths(opCtx, autoColl.getCollection()));
 }
 

@@ -147,7 +147,8 @@ bool IndexCatalogEntryImpl::isFrozen() const {
     return _isFrozen;
 }
 
-bool IndexCatalogEntryImpl::isMultikey() const {
+bool IndexCatalogEntryImpl::isMultikey(OperationContext* const opCtx,
+                                       const CollectionPtr& collection) const {
     return _isMultikeyForRead.load();
 }
 

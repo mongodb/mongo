@@ -75,7 +75,7 @@ void BtreeAccessMethod::doGetKeys(OperationContext* opCtx,
                                   MultikeyPaths* multikeyPaths,
                                   boost::optional<RecordId> id) const {
     const auto skipMultikey = context == IndexAccessMethod::GetKeysContext::kValidatingKeys &&
-        !_descriptor->getEntry()->isMultikey();
+        !_descriptor->getEntry()->isMultikey(opCtx, collection);
     _keyGenerator->getKeys(pooledBufferBuilder, obj, skipMultikey, keys, multikeyPaths, id);
 }
 

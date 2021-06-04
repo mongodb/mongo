@@ -197,7 +197,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
     auto accessMethod = ice.accessMethod();
     invariant(accessMethod);
 
-    const bool isMultikey = ice.isMultikey();
+    const bool isMultikey = ice.isMultikey(opCtx, collection);
 
     const WildcardProjection* wildcardProjection = nullptr;
     std::set<FieldRef> multikeyPathSet;
@@ -2162,7 +2162,7 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
         if (desc->keyPattern().hasField(parsedDistinct.getKey())) {
             if (!mayUnwindArrays &&
                 isAnyComponentOfPathMultikey(desc->keyPattern(),
-                                             ice->isMultikey(),
+                                             ice->isMultikey(opCtx, collection),
                                              ice->getMultikeyPaths(opCtx, collection),
                                              parsedDistinct.getKey())) {
                 // If the caller requested "strict" distinct that does not "pre-unwind" arrays,
