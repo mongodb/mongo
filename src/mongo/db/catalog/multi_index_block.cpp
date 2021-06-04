@@ -631,7 +631,7 @@ Status MultiIndexBlock::_insert(OperationContext* opCtx,
         // When calling insert, BulkBuilderImpl's Sorter performs file I/O that may result in an
         // exception.
         try {
-            idxStatus = _indexes[i].bulk->insert(opCtx, doc, loc, _indexes[i].options);
+            idxStatus = _indexes[i].bulk->insert(opCtx, collection, doc, loc, _indexes[i].options);
         } catch (...) {
             return exceptionToStatus();
         }

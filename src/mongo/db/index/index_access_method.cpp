@@ -487,6 +487,7 @@ public:
                     StringData dbName);
 
     Status insert(OperationContext* opCtx,
+                  const CollectionPtr& collection,
                   const BSONObj& obj,
                   const RecordId& loc,
                   const InsertDeleteOptions& options) final;
@@ -560,6 +561,7 @@ AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEn
       _indexMultikeyPaths(createMultikeyPaths(stateInfo.getMultikeyPaths())) {}
 
 Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCtx,
+                                                          const CollectionPtr& collection,
                                                           const BSONObj& obj,
                                                           const RecordId& loc,
                                                           const InsertDeleteOptions& options) {

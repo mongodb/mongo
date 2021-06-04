@@ -243,6 +243,7 @@ public:
          * Insert into the BulkBuilder as-if inserting into an IndexAccessMethod.
          */
         virtual Status insert(OperationContext* opCtx,
+                              const CollectionPtr& collection,
                               const BSONObj& obj,
                               const RecordId& loc,
                               const InsertDeleteOptions& options) = 0;
