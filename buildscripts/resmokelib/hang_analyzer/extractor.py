@@ -53,7 +53,10 @@ def _extract_tar(root_logger):
         if os.path.exists(dest):
             root_logger.debug('Debug symbol %s already exists, not copying from %s.', dest, src)
             continue
-        shutil.copy(src, dest)
+        if os.path.isdir(src):
+            shutil.copytree(src, dest)
+        else:
+            shutil.copy(src, dest)
         root_logger.debug('Copied debug symbol %s.', dest)
     return sym_files
 

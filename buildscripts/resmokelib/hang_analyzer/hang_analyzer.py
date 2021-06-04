@@ -9,7 +9,6 @@ A prototype hang analyzer for Evergreen integration to help investigate test tim
 
 Supports Linux, MacOS X, and Windows.
 """
-import glob
 import logging
 import os
 import platform
@@ -75,8 +74,6 @@ class HangAnalyzer(Subcommand):
         processes = process_list.get_processes(self.process_ids, self.interesting_processes,
                                                self.options.process_match, self.root_logger)
 
-        max_dump_size_bytes = int(self.options.max_core_dumps_size) * 1024 * 1024
-
         # Suspending all processes, except python, to prevent them from getting unstuck when
         # the hang analyzer attaches to them.
         for pinfo in [pinfo for pinfo in processes if not pinfo.name.startswith("python")]:
@@ -92,15 +89,29 @@ class HangAnalyzer(Subcommand):
         trapped_exceptions = []
 
         dump_pids = {}
-        # Dump all processes, except python & java.
+        # Dump core files of all processes, except python & java.
+        if self.options.dump_core:
+            for pinfo in [
+                    pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)
+            ]:
+                if self._check_enough_free_space():
+                    try:
+                        dumpers.dbg.dump_info(pinfo, take_dump=True)
+                    except dumper.DumpError as err:
+                        self.root_logger.error(err.message)
+                        dump_pids = {**err.dump_pids, **dump_pids}
+                    except Exception as err:  # pylint: disable=broad-except
+                        self.root_logger.info("Error encountered when invoking debugger %s", err)
+                    trapped_exceptions.append(traceback.format_exc())
+                else:
+                    self.root_logger.info(
+                        "Not enough space for a core dump, skipping %s processes with PIDs %s",
+                        pinfo.name, str(pinfo.pidv))
+
+        # Dump info of all processes, except python & java.
         for pinfo in [pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)]:
             try:
-                dumpers.dbg.dump_info(
-                    pinfo, self.options.dump_core
-                    and _check_dump_quota(max_dump_size_bytes, dumpers.dbg.get_dump_ext()))
-            except dumper.DumpError as err:
-                self.root_logger.error(err.message)
-                dump_pids = {**err.dump_pids, **dump_pids}
+                dumpers.dbg.dump_info(pinfo, take_dump=False)
             except Exception as err:  # pylint: disable=broad-except
                 self.root_logger.info("Error encountered when invoking debugger %s", err)
                 trapped_exceptions.append(traceback.format_exc())
@@ -200,17 +211,10 @@ class HangAnalyzer(Subcommand):
             self.root_logger.warning(
                 "Cannot determine Unix Current Login, not supported on Windows")
 
-
-def _check_dump_quota(quota, ext):
-    """Check if sum of the files with ext is within the specified quota in megabytes."""
-
-    files = glob.glob("*." + ext)
-
-    size_sum = 0
-    for file_name in files:
-        size_sum += os.path.getsize(file_name)
-
-    return size_sum <= quota
+    def _check_enough_free_space(self):
+        usage_percent = psutil.disk_usage(".").percent
+        self.root_logger.info("Current disk usage percent: %s", usage_percent)
+        return usage_percent < self.options.max_disk_usage_percent
 
 
 class HangAnalyzerPlugin(PluginInterface):
@@ -243,9 +247,8 @@ class HangAnalyzerPlugin(PluginInterface):
             ' -g')
         parser.add_argument('-c', '--dump-core', dest='dump_core', action="store_true",
                             default=False, help='Dump core file for each analyzed process')
-        parser.add_argument('-s', '--max-core-dumps-size', dest='max_core_dumps_size',
-                            default=10000,
-                            help='Maximum total size of core dumps to keep in megabytes')
+        parser.add_argument('-s', '--max-disk-usage-percent', dest='max_disk_usage_percent',
+                            default=90, help='Maximum disk usage percent for a core dump')
         parser.add_argument(
             '-o', '--debugger-output', dest='debugger_output', action="append", choices=('file',
                                                                                          'stdout'),
