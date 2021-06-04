@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/expression_walker.h"
+
 namespace ExpressionTests {
 class Testable;
 }  // namespace ExpressionTests
@@ -181,140 +183,161 @@ class ExpressionFromAccumulator;
  * to visit all the nodes in the expression tree. ExpressionVisitor's purpose is not actually to
  * ensure that every node in the tree is visited, but rather to handle dynamic dispatch without
  * having to add virtual methods to the Expression interface itself.
+ *
+ * If the visitor doesn't intend to modify the tree, then the template argument 'IsConst' should be
+ * set to 'true'. In this case all 'visit()' methods will take a const pointer to a visiting node.
  */
+
+template <bool IsConst>
 class ExpressionVisitor {
 public:
     virtual ~ExpressionVisitor() = default;
-    virtual void visit(ExpressionConstant*) = 0;
-    virtual void visit(ExpressionAbs*) = 0;
-    virtual void visit(ExpressionAdd*) = 0;
-    virtual void visit(ExpressionAllElementsTrue*) = 0;
-    virtual void visit(ExpressionAnd*) = 0;
-    virtual void visit(ExpressionAnyElementTrue*) = 0;
-    virtual void visit(ExpressionTestApiVersion*) = 0;
-    virtual void visit(ExpressionArray*) = 0;
-    virtual void visit(ExpressionArrayElemAt*) = 0;
-    virtual void visit(ExpressionFirst*) = 0;
-    virtual void visit(ExpressionLast*) = 0;
-    virtual void visit(ExpressionObjectToArray*) = 0;
-    virtual void visit(ExpressionArrayToObject*) = 0;
-    virtual void visit(ExpressionBsonSize*) = 0;
-    virtual void visit(ExpressionCeil*) = 0;
-    virtual void visit(ExpressionCoerceToBool*) = 0;
-    virtual void visit(ExpressionCompare*) = 0;
-    virtual void visit(ExpressionConcat*) = 0;
-    virtual void visit(ExpressionConcatArrays*) = 0;
-    virtual void visit(ExpressionCond*) = 0;
-    virtual void visit(ExpressionDateFromString*) = 0;
-    virtual void visit(ExpressionDateFromParts*) = 0;
-    virtual void visit(ExpressionDateDiff*) = 0;
-    virtual void visit(ExpressionDateToParts*) = 0;
-    virtual void visit(ExpressionDateToString*) = 0;
-    virtual void visit(ExpressionDateTrunc*) = 0;
-    virtual void visit(ExpressionDivide*) = 0;
-    virtual void visit(ExpressionExp*) = 0;
-    virtual void visit(ExpressionFieldPath*) = 0;
-    virtual void visit(ExpressionFilter*) = 0;
-    virtual void visit(ExpressionFloor*) = 0;
-    virtual void visit(ExpressionIfNull*) = 0;
-    virtual void visit(ExpressionIn*) = 0;
-    virtual void visit(ExpressionIndexOfArray*) = 0;
-    virtual void visit(ExpressionIndexOfBytes*) = 0;
-    virtual void visit(ExpressionIndexOfCP*) = 0;
-    virtual void visit(ExpressionIsNumber*) = 0;
-    virtual void visit(ExpressionLet*) = 0;
-    virtual void visit(ExpressionLn*) = 0;
-    virtual void visit(ExpressionLog*) = 0;
-    virtual void visit(ExpressionLog10*) = 0;
-    virtual void visit(ExpressionMap*) = 0;
-    virtual void visit(ExpressionMeta*) = 0;
-    virtual void visit(ExpressionMod*) = 0;
-    virtual void visit(ExpressionMultiply*) = 0;
-    virtual void visit(ExpressionNot*) = 0;
-    virtual void visit(ExpressionObject*) = 0;
-    virtual void visit(ExpressionOr*) = 0;
-    virtual void visit(ExpressionPow*) = 0;
-    virtual void visit(ExpressionRange*) = 0;
-    virtual void visit(ExpressionReduce*) = 0;
-    virtual void visit(ExpressionReplaceOne*) = 0;
-    virtual void visit(ExpressionReplaceAll*) = 0;
-    virtual void visit(ExpressionSetDifference*) = 0;
-    virtual void visit(ExpressionSetEquals*) = 0;
-    virtual void visit(ExpressionSetIntersection*) = 0;
-    virtual void visit(ExpressionSetIsSubset*) = 0;
-    virtual void visit(ExpressionSetUnion*) = 0;
-    virtual void visit(ExpressionSize*) = 0;
-    virtual void visit(ExpressionReverseArray*) = 0;
-    virtual void visit(ExpressionSlice*) = 0;
-    virtual void visit(ExpressionIsArray*) = 0;
-    virtual void visit(ExpressionRandom*) = 0;
-    virtual void visit(ExpressionRound*) = 0;
-    virtual void visit(ExpressionSplit*) = 0;
-    virtual void visit(ExpressionSqrt*) = 0;
-    virtual void visit(ExpressionStrcasecmp*) = 0;
-    virtual void visit(ExpressionSubstrBytes*) = 0;
-    virtual void visit(ExpressionSubstrCP*) = 0;
-    virtual void visit(ExpressionStrLenBytes*) = 0;
-    virtual void visit(ExpressionBinarySize*) = 0;
-    virtual void visit(ExpressionStrLenCP*) = 0;
-    virtual void visit(ExpressionSubtract*) = 0;
-    virtual void visit(ExpressionSwitch*) = 0;
-    virtual void visit(ExpressionToLower*) = 0;
-    virtual void visit(ExpressionToUpper*) = 0;
-    virtual void visit(ExpressionTrim*) = 0;
-    virtual void visit(ExpressionTrunc*) = 0;
-    virtual void visit(ExpressionType*) = 0;
-    virtual void visit(ExpressionZip*) = 0;
-    virtual void visit(ExpressionConvert*) = 0;
-    virtual void visit(ExpressionRegexFind*) = 0;
-    virtual void visit(ExpressionRegexFindAll*) = 0;
-    virtual void visit(ExpressionRegexMatch*) = 0;
-    virtual void visit(ExpressionCosine*) = 0;
-    virtual void visit(ExpressionSine*) = 0;
-    virtual void visit(ExpressionTangent*) = 0;
-    virtual void visit(ExpressionArcCosine*) = 0;
-    virtual void visit(ExpressionArcSine*) = 0;
-    virtual void visit(ExpressionArcTangent*) = 0;
-    virtual void visit(ExpressionArcTangent2*) = 0;
-    virtual void visit(ExpressionHyperbolicArcTangent*) = 0;
-    virtual void visit(ExpressionHyperbolicArcCosine*) = 0;
-    virtual void visit(ExpressionHyperbolicArcSine*) = 0;
-    virtual void visit(ExpressionHyperbolicTangent*) = 0;
-    virtual void visit(ExpressionHyperbolicCosine*) = 0;
-    virtual void visit(ExpressionHyperbolicSine*) = 0;
-    virtual void visit(ExpressionDegreesToRadians*) = 0;
-    virtual void visit(ExpressionRadiansToDegrees*) = 0;
-    virtual void visit(ExpressionDayOfMonth*) = 0;
-    virtual void visit(ExpressionDayOfWeek*) = 0;
-    virtual void visit(ExpressionDayOfYear*) = 0;
-    virtual void visit(ExpressionHour*) = 0;
-    virtual void visit(ExpressionMillisecond*) = 0;
-    virtual void visit(ExpressionMinute*) = 0;
-    virtual void visit(ExpressionMonth*) = 0;
-    virtual void visit(ExpressionSecond*) = 0;
-    virtual void visit(ExpressionWeek*) = 0;
-    virtual void visit(ExpressionIsoWeekYear*) = 0;
-    virtual void visit(ExpressionIsoDayOfWeek*) = 0;
-    virtual void visit(ExpressionIsoWeek*) = 0;
-    virtual void visit(ExpressionYear*) = 0;
-    virtual void visit(ExpressionFromAccumulator<AccumulatorAvg>*) = 0;
-    virtual void visit(ExpressionFromAccumulator<AccumulatorMax>*) = 0;
-    virtual void visit(ExpressionFromAccumulator<AccumulatorMin>*) = 0;
-    virtual void visit(ExpressionFromAccumulator<AccumulatorStdDevPop>*) = 0;
-    virtual void visit(ExpressionFromAccumulator<AccumulatorStdDevSamp>*) = 0;
-    virtual void visit(ExpressionFromAccumulator<AccumulatorSum>*) = 0;
-    virtual void visit(ExpressionFromAccumulator<AccumulatorMergeObjects>*) = 0;
-    virtual void visit(ExpressionTests::Testable*) = 0;
-    virtual void visit(ExpressionInternalJsEmit*) = 0;
-    virtual void visit(ExpressionFunction*) = 0;
-    virtual void visit(ExpressionInternalFindSlice*) = 0;
-    virtual void visit(ExpressionInternalFindPositional*) = 0;
-    virtual void visit(ExpressionInternalFindElemMatch*) = 0;
-    virtual void visit(ExpressionToHashedIndexKey*) = 0;
-    virtual void visit(ExpressionDateAdd*) = 0;
-    virtual void visit(ExpressionDateSubtract*) = 0;
-    virtual void visit(ExpressionGetField*) = 0;
-    virtual void visit(ExpressionSetField*) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionConstant>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionAbs>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionAdd>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionAllElementsTrue>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionAnd>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionAnyElementTrue>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTestApiVersion>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionArray>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionArrayElemAt>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionFirst>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionLast>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionObjectToArray>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionArrayToObject>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionBsonSize>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionCeil>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionCoerceToBool>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionCompare>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionConcat>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionConcatArrays>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionCond>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDateFromString>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDateFromParts>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDateDiff>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDateToParts>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDateToString>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDateTrunc>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDivide>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionExp>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionFieldPath>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionFilter>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionFloor>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionIfNull>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionIn>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionIndexOfArray>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionIndexOfBytes>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionIndexOfCP>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionIsNumber>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionLet>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionLn>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionLog>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionLog10>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMap>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMeta>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMod>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMultiply>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionNot>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionObject>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionOr>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionPow>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRange>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionReduce>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionReplaceOne>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionReplaceAll>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSetDifference>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSetEquals>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSetIntersection>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSetIsSubset>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSetUnion>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSize>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionReverseArray>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSlice>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionIsArray>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRandom>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRound>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSplit>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSqrt>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionStrcasecmp>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSubstrBytes>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSubstrCP>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionStrLenBytes>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionBinarySize>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionStrLenCP>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSubtract>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSwitch>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionToLower>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionToUpper>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTrim>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTrunc>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionType>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionZip>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionConvert>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRegexFind>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRegexFindAll>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRegexMatch>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionCosine>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSine>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTangent>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionArcCosine>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionArcSine>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionArcTangent>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionArcTangent2>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionHyperbolicArcTangent>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionHyperbolicArcCosine>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionHyperbolicArcSine>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionHyperbolicTangent>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionHyperbolicCosine>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionHyperbolicSine>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDegreesToRadians>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRadiansToDegrees>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDayOfMonth>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDayOfWeek>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDayOfYear>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionHour>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMillisecond>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMinute>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMonth>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSecond>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionWeek>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionIsoWeekYear>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionIsoDayOfWeek>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionIsoWeek>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionYear>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionFromAccumulator<AccumulatorAvg>>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionFromAccumulator<AccumulatorMax>>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionFromAccumulator<AccumulatorMin>>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst,
+                                         ExpressionFromAccumulator<AccumulatorStdDevPop>>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst,
+                                         ExpressionFromAccumulator<AccumulatorStdDevSamp>>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionFromAccumulator<AccumulatorSum>>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst,
+                                         ExpressionFromAccumulator<AccumulatorMergeObjects>>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTests::Testable>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionInternalJsEmit>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionFunction>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionInternalFindSlice>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionInternalFindPositional>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionInternalFindElemMatch>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionToHashedIndexKey>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDateAdd>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDateSubtract>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionGetField>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSetField>) = 0;
 };
 
+using ExpressionMutableVisitor = ExpressionVisitor<false>;
+using ExpressionConstVisitor = ExpressionVisitor<true>;
 }  // namespace mongo

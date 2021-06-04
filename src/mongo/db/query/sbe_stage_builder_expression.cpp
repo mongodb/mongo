@@ -312,158 +312,158 @@ std::unique_ptr<sbe::EExpression> generateRegexNullResponse(StringData exprName)
     return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0);
 }
 
-class ExpressionPreVisitor final : public ExpressionVisitor {
+class ExpressionPreVisitor final : public ExpressionConstVisitor {
 public:
     ExpressionPreVisitor(ExpressionVisitorContext* context) : _context{context} {}
 
-    void visit(ExpressionConstant* expr) final {}
-    void visit(ExpressionAbs* expr) final {}
-    void visit(ExpressionAdd* expr) final {}
-    void visit(ExpressionAllElementsTrue* expr) final {}
-    void visit(ExpressionAnd* expr) final {
+    void visit(const ExpressionConstant* expr) final {}
+    void visit(const ExpressionAbs* expr) final {}
+    void visit(const ExpressionAdd* expr) final {}
+    void visit(const ExpressionAllElementsTrue* expr) final {}
+    void visit(const ExpressionAnd* expr) final {
         visitMultiBranchLogicExpression(expr, sbe::EPrimBinary::logicAnd);
     }
-    void visit(ExpressionAnyElementTrue* expr) final {}
-    void visit(ExpressionArray* expr) final {}
-    void visit(ExpressionArrayElemAt* expr) final {}
-    void visit(ExpressionFirst* expr) final {}
-    void visit(ExpressionLast* expr) final {}
-    void visit(ExpressionObjectToArray* expr) final {}
-    void visit(ExpressionArrayToObject* expr) final {}
-    void visit(ExpressionBsonSize* expr) final {}
-    void visit(ExpressionCeil* expr) final {}
-    void visit(ExpressionCoerceToBool* expr) final {}
-    void visit(ExpressionCompare* expr) final {}
-    void visit(ExpressionConcat* expr) final {}
-    void visit(ExpressionConcatArrays* expr) final {
+    void visit(const ExpressionAnyElementTrue* expr) final {}
+    void visit(const ExpressionArray* expr) final {}
+    void visit(const ExpressionArrayElemAt* expr) final {}
+    void visit(const ExpressionFirst* expr) final {}
+    void visit(const ExpressionLast* expr) final {}
+    void visit(const ExpressionObjectToArray* expr) final {}
+    void visit(const ExpressionArrayToObject* expr) final {}
+    void visit(const ExpressionBsonSize* expr) final {}
+    void visit(const ExpressionCeil* expr) final {}
+    void visit(const ExpressionCoerceToBool* expr) final {}
+    void visit(const ExpressionCompare* expr) final {}
+    void visit(const ExpressionConcat* expr) final {}
+    void visit(const ExpressionConcatArrays* expr) final {
         _context->evalStack.emplaceFrame(EvalStage{});
     }
-    void visit(ExpressionCond* expr) final {
+    void visit(const ExpressionCond* expr) final {
         _context->evalStack.emplaceFrame(EvalStage{});
     }
-    void visit(ExpressionDateDiff* expr) final {}
-    void visit(ExpressionDateFromString* expr) final {}
-    void visit(ExpressionDateFromParts* expr) final {}
-    void visit(ExpressionDateToParts* expr) final {}
-    void visit(ExpressionDateToString* expr) final {}
-    void visit(ExpressionDateTrunc* expr) final {}
-    void visit(ExpressionDivide* expr) final {}
-    void visit(ExpressionExp* expr) final {}
-    void visit(ExpressionFieldPath* expr) final {}
-    void visit(ExpressionFilter* expr) final {}
-    void visit(ExpressionFloor* expr) final {}
-    void visit(ExpressionIfNull* expr) final {
+    void visit(const ExpressionDateDiff* expr) final {}
+    void visit(const ExpressionDateFromString* expr) final {}
+    void visit(const ExpressionDateFromParts* expr) final {}
+    void visit(const ExpressionDateToParts* expr) final {}
+    void visit(const ExpressionDateToString* expr) final {}
+    void visit(const ExpressionDateTrunc* expr) final {}
+    void visit(const ExpressionDivide* expr) final {}
+    void visit(const ExpressionExp* expr) final {}
+    void visit(const ExpressionFieldPath* expr) final {}
+    void visit(const ExpressionFilter* expr) final {}
+    void visit(const ExpressionFloor* expr) final {}
+    void visit(const ExpressionIfNull* expr) final {
         _context->evalStack.emplaceFrame(EvalStage{});
     }
-    void visit(ExpressionIn* expr) final {}
-    void visit(ExpressionIndexOfArray* expr) final {}
-    void visit(ExpressionIndexOfBytes* expr) final {}
-    void visit(ExpressionIndexOfCP* expr) final {}
-    void visit(ExpressionIsNumber* expr) final {}
-    void visit(ExpressionLet* expr) final {
+    void visit(const ExpressionIn* expr) final {}
+    void visit(const ExpressionIndexOfArray* expr) final {}
+    void visit(const ExpressionIndexOfBytes* expr) final {}
+    void visit(const ExpressionIndexOfCP* expr) final {}
+    void visit(const ExpressionIsNumber* expr) final {}
+    void visit(const ExpressionLet* expr) final {
         _context->varsFrameStack.push(ExpressionVisitorContext::VarsFrame{
             std::begin(expr->getOrderedVariableIds()), std::end(expr->getOrderedVariableIds())});
     }
-    void visit(ExpressionLn* expr) final {}
-    void visit(ExpressionLog* expr) final {}
-    void visit(ExpressionLog10* expr) final {}
-    void visit(ExpressionMap* expr) final {}
-    void visit(ExpressionMeta* expr) final {}
-    void visit(ExpressionMod* expr) final {}
-    void visit(ExpressionMultiply* expr) final {}
-    void visit(ExpressionNot* expr) final {}
-    void visit(ExpressionObject* expr) final {}
-    void visit(ExpressionOr* expr) final {
+    void visit(const ExpressionLn* expr) final {}
+    void visit(const ExpressionLog* expr) final {}
+    void visit(const ExpressionLog10* expr) final {}
+    void visit(const ExpressionMap* expr) final {}
+    void visit(const ExpressionMeta* expr) final {}
+    void visit(const ExpressionMod* expr) final {}
+    void visit(const ExpressionMultiply* expr) final {}
+    void visit(const ExpressionNot* expr) final {}
+    void visit(const ExpressionObject* expr) final {}
+    void visit(const ExpressionOr* expr) final {
         visitMultiBranchLogicExpression(expr, sbe::EPrimBinary::logicOr);
     }
-    void visit(ExpressionPow* expr) final {}
-    void visit(ExpressionRange* expr) final {}
-    void visit(ExpressionReduce* expr) final {}
-    void visit(ExpressionReplaceOne* expr) final {}
-    void visit(ExpressionReplaceAll* expr) final {}
-    void visit(ExpressionSetDifference* expr) final {}
-    void visit(ExpressionSetEquals* expr) final {}
-    void visit(ExpressionSetIntersection* expr) final {}
-    void visit(ExpressionSetIsSubset* expr) final {}
-    void visit(ExpressionSetUnion* expr) final {}
-    void visit(ExpressionSize* expr) final {}
-    void visit(ExpressionReverseArray* expr) final {}
-    void visit(ExpressionSlice* expr) final {}
-    void visit(ExpressionIsArray* expr) final {}
-    void visit(ExpressionRound* expr) final {}
-    void visit(ExpressionSplit* expr) final {}
-    void visit(ExpressionSqrt* expr) final {}
-    void visit(ExpressionStrcasecmp* expr) final {}
-    void visit(ExpressionSubstrBytes* expr) final {}
-    void visit(ExpressionSubstrCP* expr) final {}
-    void visit(ExpressionStrLenBytes* expr) final {}
-    void visit(ExpressionBinarySize* expr) final {}
-    void visit(ExpressionStrLenCP* expr) final {}
-    void visit(ExpressionSubtract* expr) final {}
-    void visit(ExpressionSwitch* expr) final {
+    void visit(const ExpressionPow* expr) final {}
+    void visit(const ExpressionRange* expr) final {}
+    void visit(const ExpressionReduce* expr) final {}
+    void visit(const ExpressionReplaceOne* expr) final {}
+    void visit(const ExpressionReplaceAll* expr) final {}
+    void visit(const ExpressionSetDifference* expr) final {}
+    void visit(const ExpressionSetEquals* expr) final {}
+    void visit(const ExpressionSetIntersection* expr) final {}
+    void visit(const ExpressionSetIsSubset* expr) final {}
+    void visit(const ExpressionSetUnion* expr) final {}
+    void visit(const ExpressionSize* expr) final {}
+    void visit(const ExpressionReverseArray* expr) final {}
+    void visit(const ExpressionSlice* expr) final {}
+    void visit(const ExpressionIsArray* expr) final {}
+    void visit(const ExpressionRound* expr) final {}
+    void visit(const ExpressionSplit* expr) final {}
+    void visit(const ExpressionSqrt* expr) final {}
+    void visit(const ExpressionStrcasecmp* expr) final {}
+    void visit(const ExpressionSubstrBytes* expr) final {}
+    void visit(const ExpressionSubstrCP* expr) final {}
+    void visit(const ExpressionStrLenBytes* expr) final {}
+    void visit(const ExpressionBinarySize* expr) final {}
+    void visit(const ExpressionStrLenCP* expr) final {}
+    void visit(const ExpressionSubtract* expr) final {}
+    void visit(const ExpressionSwitch* expr) final {
         _context->evalStack.emplaceFrame(EvalStage{});
     }
-    void visit(ExpressionTestApiVersion* expr) final {}
-    void visit(ExpressionToLower* expr) final {}
-    void visit(ExpressionToUpper* expr) final {}
-    void visit(ExpressionTrim* expr) final {}
-    void visit(ExpressionTrunc* expr) final {}
-    void visit(ExpressionType* expr) final {}
-    void visit(ExpressionZip* expr) final {}
-    void visit(ExpressionConvert* expr) final {}
-    void visit(ExpressionRegexFind* expr) final {}
-    void visit(ExpressionRegexFindAll* expr) final {}
-    void visit(ExpressionRegexMatch* expr) final {}
-    void visit(ExpressionCosine* expr) final {}
-    void visit(ExpressionSine* expr) final {}
-    void visit(ExpressionTangent* expr) final {}
-    void visit(ExpressionArcCosine* expr) final {}
-    void visit(ExpressionArcSine* expr) final {}
-    void visit(ExpressionArcTangent* expr) final {}
-    void visit(ExpressionArcTangent2* expr) final {}
-    void visit(ExpressionHyperbolicArcTangent* expr) final {}
-    void visit(ExpressionHyperbolicArcCosine* expr) final {}
-    void visit(ExpressionHyperbolicArcSine* expr) final {}
-    void visit(ExpressionHyperbolicTangent* expr) final {}
-    void visit(ExpressionHyperbolicCosine* expr) final {}
-    void visit(ExpressionHyperbolicSine* expr) final {}
-    void visit(ExpressionDegreesToRadians* expr) final {}
-    void visit(ExpressionRadiansToDegrees* expr) final {}
-    void visit(ExpressionDayOfMonth* expr) final {}
-    void visit(ExpressionDayOfWeek* expr) final {}
-    void visit(ExpressionDayOfYear* expr) final {}
-    void visit(ExpressionHour* expr) final {}
-    void visit(ExpressionMillisecond* expr) final {}
-    void visit(ExpressionMinute* expr) final {}
-    void visit(ExpressionMonth* expr) final {}
-    void visit(ExpressionSecond* expr) final {}
-    void visit(ExpressionWeek* expr) final {}
-    void visit(ExpressionIsoWeekYear* expr) final {}
-    void visit(ExpressionIsoDayOfWeek* expr) final {}
-    void visit(ExpressionIsoWeek* expr) final {}
-    void visit(ExpressionYear* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorAvg>* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorMax>* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorMin>* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorSum>* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {}
-    void visit(ExpressionTests::Testable* expr) final {}
-    void visit(ExpressionInternalJsEmit* expr) final {}
-    void visit(ExpressionInternalFindSlice* expr) final {}
-    void visit(ExpressionInternalFindPositional* expr) final {}
-    void visit(ExpressionInternalFindElemMatch* expr) final {}
-    void visit(ExpressionFunction* expr) final {}
-    void visit(ExpressionRandom* expr) final {}
-    void visit(ExpressionToHashedIndexKey* expr) final {}
-    void visit(ExpressionDateAdd* expr) final {}
-    void visit(ExpressionDateSubtract* expr) final {}
-    void visit(ExpressionGetField* expr) final {}
-    void visit(ExpressionSetField* expr) final {}
+    void visit(const ExpressionTestApiVersion* expr) final {}
+    void visit(const ExpressionToLower* expr) final {}
+    void visit(const ExpressionToUpper* expr) final {}
+    void visit(const ExpressionTrim* expr) final {}
+    void visit(const ExpressionTrunc* expr) final {}
+    void visit(const ExpressionType* expr) final {}
+    void visit(const ExpressionZip* expr) final {}
+    void visit(const ExpressionConvert* expr) final {}
+    void visit(const ExpressionRegexFind* expr) final {}
+    void visit(const ExpressionRegexFindAll* expr) final {}
+    void visit(const ExpressionRegexMatch* expr) final {}
+    void visit(const ExpressionCosine* expr) final {}
+    void visit(const ExpressionSine* expr) final {}
+    void visit(const ExpressionTangent* expr) final {}
+    void visit(const ExpressionArcCosine* expr) final {}
+    void visit(const ExpressionArcSine* expr) final {}
+    void visit(const ExpressionArcTangent* expr) final {}
+    void visit(const ExpressionArcTangent2* expr) final {}
+    void visit(const ExpressionHyperbolicArcTangent* expr) final {}
+    void visit(const ExpressionHyperbolicArcCosine* expr) final {}
+    void visit(const ExpressionHyperbolicArcSine* expr) final {}
+    void visit(const ExpressionHyperbolicTangent* expr) final {}
+    void visit(const ExpressionHyperbolicCosine* expr) final {}
+    void visit(const ExpressionHyperbolicSine* expr) final {}
+    void visit(const ExpressionDegreesToRadians* expr) final {}
+    void visit(const ExpressionRadiansToDegrees* expr) final {}
+    void visit(const ExpressionDayOfMonth* expr) final {}
+    void visit(const ExpressionDayOfWeek* expr) final {}
+    void visit(const ExpressionDayOfYear* expr) final {}
+    void visit(const ExpressionHour* expr) final {}
+    void visit(const ExpressionMillisecond* expr) final {}
+    void visit(const ExpressionMinute* expr) final {}
+    void visit(const ExpressionMonth* expr) final {}
+    void visit(const ExpressionSecond* expr) final {}
+    void visit(const ExpressionWeek* expr) final {}
+    void visit(const ExpressionIsoWeekYear* expr) final {}
+    void visit(const ExpressionIsoDayOfWeek* expr) final {}
+    void visit(const ExpressionIsoWeek* expr) final {}
+    void visit(const ExpressionYear* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {}
+    void visit(const ExpressionTests::Testable* expr) final {}
+    void visit(const ExpressionInternalJsEmit* expr) final {}
+    void visit(const ExpressionInternalFindSlice* expr) final {}
+    void visit(const ExpressionInternalFindPositional* expr) final {}
+    void visit(const ExpressionInternalFindElemMatch* expr) final {}
+    void visit(const ExpressionFunction* expr) final {}
+    void visit(const ExpressionRandom* expr) final {}
+    void visit(const ExpressionToHashedIndexKey* expr) final {}
+    void visit(const ExpressionDateAdd* expr) final {}
+    void visit(const ExpressionDateSubtract* expr) final {}
+    void visit(const ExpressionGetField* expr) final {}
+    void visit(const ExpressionSetField* expr) final {}
 
 private:
-    void visitMultiBranchLogicExpression(Expression* expr, sbe::EPrimBinary::Op logicOp) {
+    void visitMultiBranchLogicExpression(const Expression* expr, sbe::EPrimBinary::Op logicOp) {
         invariant(logicOp == sbe::EPrimBinary::logicOr || logicOp == sbe::EPrimBinary::logicAnd);
 
         if (expr->getChildren().size() < 2) {
@@ -478,45 +478,45 @@ private:
     ExpressionVisitorContext* _context;
 };
 
-class ExpressionInVisitor final : public ExpressionVisitor {
+class ExpressionInVisitor final : public ExpressionConstVisitor {
 public:
     ExpressionInVisitor(ExpressionVisitorContext* context) : _context{context} {}
 
-    void visit(ExpressionConstant* expr) final {}
-    void visit(ExpressionAbs* expr) final {}
-    void visit(ExpressionAdd* expr) final {}
-    void visit(ExpressionAllElementsTrue* expr) final {}
-    void visit(ExpressionAnd* expr) final {
+    void visit(const ExpressionConstant* expr) final {}
+    void visit(const ExpressionAbs* expr) final {}
+    void visit(const ExpressionAdd* expr) final {}
+    void visit(const ExpressionAllElementsTrue* expr) final {}
+    void visit(const ExpressionAnd* expr) final {
         visitMultiBranchLogicExpression(expr, sbe::EPrimBinary::logicAnd);
     }
-    void visit(ExpressionAnyElementTrue* expr) final {}
-    void visit(ExpressionArray* expr) final {}
-    void visit(ExpressionArrayElemAt* expr) final {}
-    void visit(ExpressionFirst* expr) final {}
-    void visit(ExpressionLast* expr) final {}
-    void visit(ExpressionObjectToArray* expr) final {}
-    void visit(ExpressionArrayToObject* expr) final {}
-    void visit(ExpressionBsonSize* expr) final {}
-    void visit(ExpressionCeil* expr) final {}
-    void visit(ExpressionCoerceToBool* expr) final {}
-    void visit(ExpressionCompare* expr) final {}
-    void visit(ExpressionConcat* expr) final {}
-    void visit(ExpressionConcatArrays* expr) final {
+    void visit(const ExpressionAnyElementTrue* expr) final {}
+    void visit(const ExpressionArray* expr) final {}
+    void visit(const ExpressionArrayElemAt* expr) final {}
+    void visit(const ExpressionFirst* expr) final {}
+    void visit(const ExpressionLast* expr) final {}
+    void visit(const ExpressionObjectToArray* expr) final {}
+    void visit(const ExpressionArrayToObject* expr) final {}
+    void visit(const ExpressionBsonSize* expr) final {}
+    void visit(const ExpressionCeil* expr) final {}
+    void visit(const ExpressionCoerceToBool* expr) final {}
+    void visit(const ExpressionCompare* expr) final {}
+    void visit(const ExpressionConcat* expr) final {}
+    void visit(const ExpressionConcatArrays* expr) final {
         _context->evalStack.emplaceFrame(EvalStage{});
     }
-    void visit(ExpressionCond* expr) final {
+    void visit(const ExpressionCond* expr) final {
         _context->evalStack.emplaceFrame(EvalStage{});
     }
-    void visit(ExpressionDateDiff* expr) final {}
-    void visit(ExpressionDateFromString* expr) final {}
-    void visit(ExpressionDateFromParts* expr) final {}
-    void visit(ExpressionDateToParts* expr) final {}
-    void visit(ExpressionDateToString* expr) final {}
-    void visit(ExpressionDateTrunc*) final {}
-    void visit(ExpressionDivide* expr) final {}
-    void visit(ExpressionExp* expr) final {}
-    void visit(ExpressionFieldPath* expr) final {}
-    void visit(ExpressionFilter* expr) final {
+    void visit(const ExpressionDateDiff* expr) final {}
+    void visit(const ExpressionDateFromString* expr) final {}
+    void visit(const ExpressionDateFromParts* expr) final {}
+    void visit(const ExpressionDateToParts* expr) final {}
+    void visit(const ExpressionDateToString* expr) final {}
+    void visit(const ExpressionDateTrunc*) final {}
+    void visit(const ExpressionDivide* expr) final {}
+    void visit(const ExpressionExp* expr) final {}
+    void visit(const ExpressionFieldPath* expr) final {}
+    void visit(const ExpressionFilter* expr) final {
         // This visitor executes after visiting the expression that will evaluate to the array for
         // filtering and before visiting the filter condition expression.
         auto variableId = expr->getVariableId();
@@ -528,16 +528,16 @@ public:
         // Push new frame to provide clean context for sub-tree generated by filter predicate.
         _context->evalStack.emplaceFrame(EvalStage{});
     }
-    void visit(ExpressionFloor* expr) final {}
-    void visit(ExpressionIfNull* expr) final {
+    void visit(const ExpressionFloor* expr) final {}
+    void visit(const ExpressionIfNull* expr) final {
         _context->evalStack.emplaceFrame(EvalStage{});
     }
-    void visit(ExpressionIn* expr) final {}
-    void visit(ExpressionIndexOfArray* expr) final {}
-    void visit(ExpressionIndexOfBytes* expr) final {}
-    void visit(ExpressionIndexOfCP* expr) final {}
-    void visit(ExpressionIsNumber* expr) final {}
-    void visit(ExpressionLet* expr) final {
+    void visit(const ExpressionIn* expr) final {}
+    void visit(const ExpressionIndexOfArray* expr) final {}
+    void visit(const ExpressionIndexOfBytes* expr) final {}
+    void visit(const ExpressionIndexOfCP* expr) final {}
+    void visit(const ExpressionIsNumber* expr) final {}
+    void visit(const ExpressionLet* expr) final {
         // This visitor fires after each variable definition in a $let expression. The top of the
         // _context's expression stack will be an expression defining the variable initializer. We
         // use a separate frame stack ('varsFrameStack') to keep track of which variable we are
@@ -565,106 +565,106 @@ public:
         invariant(_context->environment.find(varToBind) == _context->environment.end());
         _context->environment.insert({varToBind, slotToBind});
     }
-    void visit(ExpressionLn* expr) final {}
-    void visit(ExpressionLog* expr) final {}
-    void visit(ExpressionLog10* expr) final {}
-    void visit(ExpressionMap* expr) final {}
-    void visit(ExpressionMeta* expr) final {}
-    void visit(ExpressionMod* expr) final {}
-    void visit(ExpressionMultiply* expr) final {}
-    void visit(ExpressionNot* expr) final {}
-    void visit(ExpressionObject* expr) final {}
-    void visit(ExpressionOr* expr) final {
+    void visit(const ExpressionLn* expr) final {}
+    void visit(const ExpressionLog* expr) final {}
+    void visit(const ExpressionLog10* expr) final {}
+    void visit(const ExpressionMap* expr) final {}
+    void visit(const ExpressionMeta* expr) final {}
+    void visit(const ExpressionMod* expr) final {}
+    void visit(const ExpressionMultiply* expr) final {}
+    void visit(const ExpressionNot* expr) final {}
+    void visit(const ExpressionObject* expr) final {}
+    void visit(const ExpressionOr* expr) final {
         visitMultiBranchLogicExpression(expr, sbe::EPrimBinary::logicOr);
     }
-    void visit(ExpressionPow* expr) final {}
-    void visit(ExpressionRange* expr) final {}
-    void visit(ExpressionReduce* expr) final {}
-    void visit(ExpressionReplaceOne* expr) final {}
-    void visit(ExpressionReplaceAll* expr) final {}
-    void visit(ExpressionSetDifference* expr) final {}
-    void visit(ExpressionSetEquals* expr) final {}
-    void visit(ExpressionSetIntersection* expr) final {}
-    void visit(ExpressionSetIsSubset* expr) final {}
-    void visit(ExpressionSetUnion* expr) final {}
-    void visit(ExpressionSize* expr) final {}
-    void visit(ExpressionReverseArray* expr) final {}
-    void visit(ExpressionSlice* expr) final {}
-    void visit(ExpressionIsArray* expr) final {}
-    void visit(ExpressionRound* expr) final {}
-    void visit(ExpressionSplit* expr) final {}
-    void visit(ExpressionSqrt* expr) final {}
-    void visit(ExpressionStrcasecmp* expr) final {}
-    void visit(ExpressionSubstrBytes* expr) final {}
-    void visit(ExpressionSubstrCP* expr) final {}
-    void visit(ExpressionStrLenBytes* expr) final {}
-    void visit(ExpressionBinarySize* expr) final {}
-    void visit(ExpressionStrLenCP* expr) final {}
-    void visit(ExpressionSubtract* expr) final {}
-    void visit(ExpressionSwitch* expr) final {
+    void visit(const ExpressionPow* expr) final {}
+    void visit(const ExpressionRange* expr) final {}
+    void visit(const ExpressionReduce* expr) final {}
+    void visit(const ExpressionReplaceOne* expr) final {}
+    void visit(const ExpressionReplaceAll* expr) final {}
+    void visit(const ExpressionSetDifference* expr) final {}
+    void visit(const ExpressionSetEquals* expr) final {}
+    void visit(const ExpressionSetIntersection* expr) final {}
+    void visit(const ExpressionSetIsSubset* expr) final {}
+    void visit(const ExpressionSetUnion* expr) final {}
+    void visit(const ExpressionSize* expr) final {}
+    void visit(const ExpressionReverseArray* expr) final {}
+    void visit(const ExpressionSlice* expr) final {}
+    void visit(const ExpressionIsArray* expr) final {}
+    void visit(const ExpressionRound* expr) final {}
+    void visit(const ExpressionSplit* expr) final {}
+    void visit(const ExpressionSqrt* expr) final {}
+    void visit(const ExpressionStrcasecmp* expr) final {}
+    void visit(const ExpressionSubstrBytes* expr) final {}
+    void visit(const ExpressionSubstrCP* expr) final {}
+    void visit(const ExpressionStrLenBytes* expr) final {}
+    void visit(const ExpressionBinarySize* expr) final {}
+    void visit(const ExpressionStrLenCP* expr) final {}
+    void visit(const ExpressionSubtract* expr) final {}
+    void visit(const ExpressionSwitch* expr) final {
         _context->evalStack.emplaceFrame(EvalStage{});
     }
-    void visit(ExpressionTestApiVersion* expr) final {}
-    void visit(ExpressionToLower* expr) final {}
-    void visit(ExpressionToUpper* expr) final {}
-    void visit(ExpressionTrim* expr) final {}
-    void visit(ExpressionTrunc* expr) final {}
-    void visit(ExpressionType* expr) final {}
-    void visit(ExpressionZip* expr) final {}
-    void visit(ExpressionConvert* expr) final {}
-    void visit(ExpressionRegexFind* expr) final {}
-    void visit(ExpressionRegexFindAll* expr) final {}
-    void visit(ExpressionRegexMatch* expr) final {}
-    void visit(ExpressionCosine* expr) final {}
-    void visit(ExpressionSine* expr) final {}
-    void visit(ExpressionTangent* expr) final {}
-    void visit(ExpressionArcCosine* expr) final {}
-    void visit(ExpressionArcSine* expr) final {}
-    void visit(ExpressionArcTangent* expr) final {}
-    void visit(ExpressionArcTangent2* expr) final {}
-    void visit(ExpressionHyperbolicArcTangent* expr) final {}
-    void visit(ExpressionHyperbolicArcCosine* expr) final {}
-    void visit(ExpressionHyperbolicArcSine* expr) final {}
-    void visit(ExpressionHyperbolicTangent* expr) final {}
-    void visit(ExpressionHyperbolicCosine* expr) final {}
-    void visit(ExpressionHyperbolicSine* expr) final {}
-    void visit(ExpressionDegreesToRadians* expr) final {}
-    void visit(ExpressionRadiansToDegrees* expr) final {}
-    void visit(ExpressionDayOfMonth* expr) final {}
-    void visit(ExpressionDayOfWeek* expr) final {}
-    void visit(ExpressionDayOfYear* expr) final {}
-    void visit(ExpressionHour* expr) final {}
-    void visit(ExpressionMillisecond* expr) final {}
-    void visit(ExpressionMinute* expr) final {}
-    void visit(ExpressionMonth* expr) final {}
-    void visit(ExpressionSecond* expr) final {}
-    void visit(ExpressionWeek* expr) final {}
-    void visit(ExpressionIsoWeekYear* expr) final {}
-    void visit(ExpressionIsoDayOfWeek* expr) final {}
-    void visit(ExpressionIsoWeek* expr) final {}
-    void visit(ExpressionYear* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorAvg>* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorMax>* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorMin>* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorSum>* expr) final {}
-    void visit(ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {}
-    void visit(ExpressionTests::Testable* expr) final {}
-    void visit(ExpressionInternalJsEmit* expr) final {}
-    void visit(ExpressionInternalFindSlice* expr) final {}
-    void visit(ExpressionInternalFindPositional* expr) final {}
-    void visit(ExpressionInternalFindElemMatch* expr) final {}
-    void visit(ExpressionFunction* expr) final {}
-    void visit(ExpressionRandom* expr) final {}
-    void visit(ExpressionToHashedIndexKey* expr) final {}
-    void visit(ExpressionDateAdd* expr) final {}
-    void visit(ExpressionDateSubtract* expr) final {}
-    void visit(ExpressionGetField* expr) final {}
-    void visit(ExpressionSetField* expr) final {}
+    void visit(const ExpressionTestApiVersion* expr) final {}
+    void visit(const ExpressionToLower* expr) final {}
+    void visit(const ExpressionToUpper* expr) final {}
+    void visit(const ExpressionTrim* expr) final {}
+    void visit(const ExpressionTrunc* expr) final {}
+    void visit(const ExpressionType* expr) final {}
+    void visit(const ExpressionZip* expr) final {}
+    void visit(const ExpressionConvert* expr) final {}
+    void visit(const ExpressionRegexFind* expr) final {}
+    void visit(const ExpressionRegexFindAll* expr) final {}
+    void visit(const ExpressionRegexMatch* expr) final {}
+    void visit(const ExpressionCosine* expr) final {}
+    void visit(const ExpressionSine* expr) final {}
+    void visit(const ExpressionTangent* expr) final {}
+    void visit(const ExpressionArcCosine* expr) final {}
+    void visit(const ExpressionArcSine* expr) final {}
+    void visit(const ExpressionArcTangent* expr) final {}
+    void visit(const ExpressionArcTangent2* expr) final {}
+    void visit(const ExpressionHyperbolicArcTangent* expr) final {}
+    void visit(const ExpressionHyperbolicArcCosine* expr) final {}
+    void visit(const ExpressionHyperbolicArcSine* expr) final {}
+    void visit(const ExpressionHyperbolicTangent* expr) final {}
+    void visit(const ExpressionHyperbolicCosine* expr) final {}
+    void visit(const ExpressionHyperbolicSine* expr) final {}
+    void visit(const ExpressionDegreesToRadians* expr) final {}
+    void visit(const ExpressionRadiansToDegrees* expr) final {}
+    void visit(const ExpressionDayOfMonth* expr) final {}
+    void visit(const ExpressionDayOfWeek* expr) final {}
+    void visit(const ExpressionDayOfYear* expr) final {}
+    void visit(const ExpressionHour* expr) final {}
+    void visit(const ExpressionMillisecond* expr) final {}
+    void visit(const ExpressionMinute* expr) final {}
+    void visit(const ExpressionMonth* expr) final {}
+    void visit(const ExpressionSecond* expr) final {}
+    void visit(const ExpressionWeek* expr) final {}
+    void visit(const ExpressionIsoWeekYear* expr) final {}
+    void visit(const ExpressionIsoDayOfWeek* expr) final {}
+    void visit(const ExpressionIsoWeek* expr) final {}
+    void visit(const ExpressionYear* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {}
+    void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {}
+    void visit(const ExpressionTests::Testable* expr) final {}
+    void visit(const ExpressionInternalJsEmit* expr) final {}
+    void visit(const ExpressionInternalFindSlice* expr) final {}
+    void visit(const ExpressionInternalFindPositional* expr) final {}
+    void visit(const ExpressionInternalFindElemMatch* expr) final {}
+    void visit(const ExpressionFunction* expr) final {}
+    void visit(const ExpressionRandom* expr) final {}
+    void visit(const ExpressionToHashedIndexKey* expr) final {}
+    void visit(const ExpressionDateAdd* expr) final {}
+    void visit(const ExpressionDateSubtract* expr) final {}
+    void visit(const ExpressionGetField* expr) final {}
+    void visit(const ExpressionSetField* expr) final {}
 
 private:
-    void visitMultiBranchLogicExpression(Expression* expr, sbe::EPrimBinary::Op logicOp) {
+    void visitMultiBranchLogicExpression(const Expression* expr, sbe::EPrimBinary::Op logicOp) {
         // The infix visitor should only visit expressions with more than one child.
         invariant(expr->getChildren().size() >= 2);
         invariant(logicOp == sbe::EPrimBinary::logicOr || logicOp == sbe::EPrimBinary::logicAnd);
@@ -694,7 +694,7 @@ struct DoubleBound {
     bool inclusive;
 };
 
-class ExpressionPostVisitor final : public ExpressionVisitor {
+class ExpressionPostVisitor final : public ExpressionConstVisitor {
 public:
     ExpressionPostVisitor(ExpressionVisitorContext* context) : _context{context} {}
 
@@ -704,12 +704,12 @@ public:
         Union,
     };
 
-    void visit(ExpressionConstant* expr) final {
+    void visit(const ExpressionConstant* expr) final {
         auto [tag, val] = makeValue(expr->getValue());
         _context->pushExpr(sbe::makeE<sbe::EConstant>(tag, val));
     }
 
-    void visit(ExpressionAbs* expr) final {
+    void visit(const ExpressionAbs* expr) final {
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
@@ -729,7 +729,7 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(absExpr)));
     }
 
-    void visit(ExpressionAdd* expr) final {
+    void visit(const ExpressionAdd* expr) final {
         size_t arity = expr->getChildren().size();
         _context->ensureArity(arity);
         auto frameId = _context->state.frameId();
@@ -835,19 +835,19 @@ public:
         }
     }
 
-    void visit(ExpressionAllElementsTrue* expr) final {
+    void visit(const ExpressionAllElementsTrue* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionAnd* expr) final {
+    void visit(const ExpressionAnd* expr) final {
         visitMultiBranchLogicExpression(expr, sbe::EPrimBinary::logicAnd);
     }
-    void visit(ExpressionAnyElementTrue* expr) final {
+    void visit(const ExpressionAnyElementTrue* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionArray* expr) final {
+    void visit(const ExpressionArray* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionArrayElemAt* expr) final {
+    void visit(const ExpressionArrayElemAt* expr) final {
         _context->ensureArity(2);
 
         auto index = _context->popExpr();
@@ -894,19 +894,19 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(arrayElemAtExpr)));
     }
-    void visit(ExpressionFirst* expr) final {
+    void visit(const ExpressionFirst* expr) final {
         buildArrayAccessByConstantIndex(_context, expr->getOpName(), 0);
     }
-    void visit(ExpressionLast* expr) final {
+    void visit(const ExpressionLast* expr) final {
         buildArrayAccessByConstantIndex(_context, expr->getOpName(), -1);
     }
-    void visit(ExpressionObjectToArray* expr) final {
+    void visit(const ExpressionObjectToArray* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionArrayToObject* expr) final {
+    void visit(const ExpressionArrayToObject* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionBsonSize* expr) final {
+    void visit(const ExpressionBsonSize* expr) final {
         // Build an expression which evaluates the size of a BSON document and validates the input
         // argument.
         // 1. If the argument is null or empty, return null.
@@ -928,7 +928,7 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(bsonSizeExpr)));
     }
-    void visit(ExpressionCeil* expr) final {
+    void visit(const ExpressionCeil* expr) final {
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
@@ -944,12 +944,12 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(ceilExpr)));
     }
-    void visit(ExpressionCoerceToBool* expr) final {
+    void visit(const ExpressionCoerceToBool* expr) final {
         // Since $coerceToBool is internal-only and there are not yet any input expressions that
         // generate an ExpressionCoerceToBool expression, we will leave it as unreachable for now.
         MONGO_UNREACHABLE;
     }
-    void visit(ExpressionCompare* expr) final {
+    void visit(const ExpressionCompare* expr) final {
         _context->ensureArity(2);
         std::vector<std::unique_ptr<sbe::EExpression>> operands(2);
         for (auto it = operands.rbegin(); it != operands.rend(); ++it) {
@@ -1015,7 +1015,7 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(operands), std::move(cmpWithFallback)));
     }
 
-    void visit(ExpressionConcat* expr) final {
+    void visit(const ExpressionConcat* expr) final {
         auto arity = expr->getChildren().size();
         _context->ensureArity(arity);
         auto frameId = _context->state.frameId();
@@ -1064,7 +1064,7 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(concatExpr)));
     }
 
-    void visit(ExpressionConcatArrays* expr) final {
+    void visit(const ExpressionConcatArrays* expr) final {
         // Pop eval frames pushed by pre and in visitors off the stack.
         std::vector<EvalExprStagePair> branches;
         auto numChildren = expr->getChildren().size();
@@ -1195,10 +1195,10 @@ public:
 
         _context->pushExpr(sbe::makeE<sbe::EVariable>(branchSlot), std::move(finalNljStage));
     }
-    void visit(ExpressionCond* expr) final {
+    void visit(const ExpressionCond* expr) final {
         visitConditionalExpression(expr);
     }
-    void visit(ExpressionDateDiff* expr) final {
+    void visit(const ExpressionDateDiff* expr) final {
         using namespace std::literals;
         auto frameId = _context->state.frameId();
         std::vector<std::unique_ptr<sbe::EExpression>> arguments;
@@ -1326,10 +1326,10 @@ public:
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
             frameId, std::move(bindings), std::move(dateDiffExpression)));
     }
-    void visit(ExpressionDateFromString* expr) final {
+    void visit(const ExpressionDateFromString* expr) final {
         unsupportedExpression("$dateFromString");
     }
-    void visit(ExpressionDateFromParts* expr) final {
+    void visit(const ExpressionDateFromParts* expr) final {
         // This expression can carry null children depending on the set of fields provided,
         // to compute a date from parts so we only need to pop if a child exists.
         auto children = expr->getChildren();
@@ -1630,7 +1630,7 @@ public:
             frameId, std::move(operands), std::move(computeDateOrNull)));
     }
 
-    void visit(ExpressionDateToParts* expr) final {
+    void visit(const ExpressionDateToParts* expr) final {
         auto frameId = _context->state.frameId();
         auto children = expr->getChildren();
         std::unique_ptr<sbe::EExpression> date, timezone, isoflag;
@@ -1720,13 +1720,13 @@ public:
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
             frameId, std::move(operands), std::move(totalDateToPartsFunc)));
     }
-    void visit(ExpressionDateToString* expr) final {
+    void visit(const ExpressionDateToString* expr) final {
         unsupportedExpression("$dateFromString");
     }
-    void visit(ExpressionDateTrunc*) final {
+    void visit(const ExpressionDateTrunc*) final {
         unsupportedExpression("$dateTrunc");
     }
-    void visit(ExpressionDivide* expr) final {
+    void visit(const ExpressionDivide* expr) final {
         _context->ensureArity(2);
 
         auto rhs = _context->popExpr();
@@ -1756,7 +1756,7 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(divideExpr)));
     }
-    void visit(ExpressionExp* expr) final {
+    void visit(const ExpressionExp* expr) final {
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
@@ -1772,7 +1772,7 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(expExpr)));
     }
-    void visit(ExpressionFieldPath* expr) final {
+    void visit(const ExpressionFieldPath* expr) final {
         sbe::value::SlotId slotId;
 
         if (!Variables::isUserDefinedVariable(expr->getVariableId())) {
@@ -1824,7 +1824,7 @@ public:
 
         _context->pushExpr(sbe::makeE<sbe::EVariable>(outputSlot), std::move(stage));
     }
-    void visit(ExpressionFilter* expr) final {
+    void visit(const ExpressionFilter* expr) final {
         // Extract filter predicate expression and sub-tree.
         auto [filterPredicate, filterStage] = _context->popFrame();
 
@@ -1933,7 +1933,7 @@ public:
 
         _context->pushExpr(std::move(result), std::move(traverseStage));
     }
-    void visit(ExpressionFloor* expr) final {
+    void visit(const ExpressionFloor* expr) final {
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
@@ -1949,7 +1949,7 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(floorExpr)));
     }
-    void visit(ExpressionIfNull* expr) final {
+    void visit(const ExpressionIfNull* expr) final {
         auto numChildren = expr->getChildren().size();
         invariant(numChildren >= 2);
 
@@ -1991,21 +1991,21 @@ public:
 
         _context->pushExpr(resultExpr.extractExpr(), std::move(loopJoinStage));
     }
-    void visit(ExpressionIn* expr) final {
+    void visit(const ExpressionIn* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionIndexOfArray* expr) final {
+    void visit(const ExpressionIndexOfArray* expr) final {
         unsupportedExpression(expr->getOpName());
     }
 
-    void visit(ExpressionIndexOfBytes* expr) final {
+    void visit(const ExpressionIndexOfBytes* expr) final {
         visitIndexOfFunction(expr, _context, "indexOfBytes");
     }
 
-    void visit(ExpressionIndexOfCP* expr) final {
+    void visit(const ExpressionIndexOfCP* expr) final {
         visitIndexOfFunction(expr, _context, "indexOfCP");
     }
-    void visit(ExpressionIsNumber* expr) final {
+    void visit(const ExpressionIsNumber* expr) final {
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
@@ -2019,7 +2019,7 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(exprIsNum)));
     }
-    void visit(ExpressionLet* expr) final {
+    void visit(const ExpressionLet* expr) final {
         // The evaluated result of the $let is the evaluated result of its "in" field, which is
         // already on top of the stack. The "infix" visitor has already popped the variable
         // initializers off the expression stack.
@@ -2045,7 +2045,7 @@ public:
         // Note that there is no need to remove SlotId bindings from the the _context's environment.
         // The AST parser already enforces scope rules.
     }
-    void visit(ExpressionLn* expr) final {
+    void visit(const ExpressionLn* expr) final {
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
@@ -2069,10 +2069,10 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(lnExpr)));
     }
-    void visit(ExpressionLog* expr) final {
+    void visit(const ExpressionLog* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionLog10* expr) final {
+    void visit(const ExpressionLog10* expr) final {
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
@@ -2096,13 +2096,13 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(log10Expr)));
     }
-    void visit(ExpressionMap* expr) final {
+    void visit(const ExpressionMap* expr) final {
         unsupportedExpression("$map");
     }
-    void visit(ExpressionMeta* expr) final {
+    void visit(const ExpressionMeta* expr) final {
         unsupportedExpression("$meta");
     }
-    void visit(ExpressionMod* expr) final {
+    void visit(const ExpressionMod* expr) final {
         auto frameId = _context->state.frameId();
         auto rhs = _context->popExpr();
         auto lhs = _context->popExpr();
@@ -2139,7 +2139,7 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(modExpr)));
     }
-    void visit(ExpressionMultiply* expr) final {
+    void visit(const ExpressionMultiply* expr) final {
         auto arity = expr->getChildren().size();
         _context->ensureArity(arity);
         auto frameId = _context->state.frameId();
@@ -2203,7 +2203,7 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(multiplyExpr)));
     }
-    void visit(ExpressionNot* expr) final {
+    void visit(const ExpressionNot* expr) final {
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
 
@@ -2212,22 +2212,22 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(notExpr)));
     }
-    void visit(ExpressionObject* expr) final {
+    void visit(const ExpressionObject* expr) final {
         unsupportedExpression("$object");
     }
-    void visit(ExpressionOr* expr) final {
+    void visit(const ExpressionOr* expr) final {
         visitMultiBranchLogicExpression(expr, sbe::EPrimBinary::logicOr);
     }
-    void visit(ExpressionPow* expr) final {
+    void visit(const ExpressionPow* expr) final {
         unsupportedExpression("$pow");
     }
-    void visit(ExpressionRange* expr) final {
+    void visit(const ExpressionRange* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionReduce* expr) final {
+    void visit(const ExpressionReduce* expr) final {
         unsupportedExpression("$reduce");
     }
-    void visit(ExpressionReplaceOne* expr) final {
+    void visit(const ExpressionReplaceOne* expr) final {
         auto frameId = _context->state.frameId();
 
         auto replacement = _context->popExpr();
@@ -2303,32 +2303,32 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(replaceOneExpr)));
     }
-    void visit(ExpressionReplaceAll* expr) final {
+    void visit(const ExpressionReplaceAll* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionSetDifference* expr) final {
+    void visit(const ExpressionSetDifference* expr) final {
         invariant(expr->getChildren().size() == 2);
 
         generateSetExpression(expr, SetOperation::Difference);
     }
-    void visit(ExpressionSetEquals* expr) final {
+    void visit(const ExpressionSetEquals* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionSetIntersection* expr) final {
+    void visit(const ExpressionSetIntersection* expr) final {
         generateSetExpression(expr, SetOperation::Intersection);
     }
 
-    void visit(ExpressionSetIsSubset* expr) final {
+    void visit(const ExpressionSetIsSubset* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionSetUnion* expr) final {
+    void visit(const ExpressionSetUnion* expr) final {
         generateSetExpression(expr, SetOperation::Union);
     }
 
-    void visit(ExpressionSize* expr) final {
+    void visit(const ExpressionSize* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionReverseArray* expr) final {
+    void visit(const ExpressionReverseArray* expr) final {
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef{frameId, 0};
@@ -2345,10 +2345,10 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(exprRevArr)));
     }
-    void visit(ExpressionSlice* expr) final {
+    void visit(const ExpressionSlice* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionIsArray* expr) final {
+    void visit(const ExpressionIsArray* expr) final {
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
@@ -2358,10 +2358,10 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(exprIsArr)));
     }
-    void visit(ExpressionRound* expr) final {
+    void visit(const ExpressionRound* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionSplit* expr) final {
+    void visit(const ExpressionSplit* expr) final {
         auto frameId = _context->state.frameId();
         std::vector<std::unique_ptr<sbe::EExpression>> args;
         std::vector<std::unique_ptr<sbe::EExpression>> binds;
@@ -2430,7 +2430,7 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(totalSplitFunc)));
     }
-    void visit(ExpressionSqrt* expr) final {
+    void visit(const ExpressionSqrt* expr) final {
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
@@ -2450,216 +2450,216 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(lnExpr)));
     }
-    void visit(ExpressionStrcasecmp* expr) final {
+    void visit(const ExpressionStrcasecmp* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionSubstrBytes* expr) final {
+    void visit(const ExpressionSubstrBytes* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionSubstrCP* expr) final {
+    void visit(const ExpressionSubstrCP* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionStrLenBytes* expr) final {
+    void visit(const ExpressionStrLenBytes* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionBinarySize* expr) final {
+    void visit(const ExpressionBinarySize* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionStrLenCP* expr) final {
+    void visit(const ExpressionStrLenCP* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionSubtract* expr) final {
+    void visit(const ExpressionSubtract* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionSwitch* expr) final {
+    void visit(const ExpressionSwitch* expr) final {
         visitConditionalExpression(expr);
     }
-    void visit(ExpressionTestApiVersion* expr) final {
+    void visit(const ExpressionTestApiVersion* expr) final {
         _context->pushExpr(
             makeConstant(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int32_t>(1)));
     }
-    void visit(ExpressionToLower* expr) final {
+    void visit(const ExpressionToLower* expr) final {
         generateStringCaseConversionExpression(_context, "toLower");
     }
-    void visit(ExpressionToUpper* expr) final {
+    void visit(const ExpressionToUpper* expr) final {
         generateStringCaseConversionExpression(_context, "toUpper");
     }
-    void visit(ExpressionTrim* expr) final {
+    void visit(const ExpressionTrim* expr) final {
         unsupportedExpression("$trim");
     }
-    void visit(ExpressionTrunc* expr) final {
+    void visit(const ExpressionTrunc* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionType* expr) final {
+    void visit(const ExpressionType* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionZip* expr) final {
+    void visit(const ExpressionZip* expr) final {
         unsupportedExpression("$zip");
     }
-    void visit(ExpressionConvert* expr) final {
+    void visit(const ExpressionConvert* expr) final {
         unsupportedExpression("$convert");
     }
-    void visit(ExpressionRegexFind* expr) final {
+    void visit(const ExpressionRegexFind* expr) final {
         generateRegexExpression(expr, "regexFind");
     }
-    void visit(ExpressionRegexFindAll* expr) final {
+    void visit(const ExpressionRegexFindAll* expr) final {
         generateRegexExpression(expr, "regexFindAll");
     }
-    void visit(ExpressionRegexMatch* expr) final {
+    void visit(const ExpressionRegexMatch* expr) final {
         generateRegexExpression(expr, "regexMatch");
     }
-    void visit(ExpressionCosine* expr) final {
+    void visit(const ExpressionCosine* expr) final {
         generateTrigonometricExpressionWithBounds(
             "cos", DoubleBound::minInfinity(), DoubleBound::plusInfinity());
     }
-    void visit(ExpressionSine* expr) final {
+    void visit(const ExpressionSine* expr) final {
         generateTrigonometricExpressionWithBounds(
             "sin", DoubleBound::minInfinity(), DoubleBound::plusInfinity());
     }
-    void visit(ExpressionTangent* expr) final {
+    void visit(const ExpressionTangent* expr) final {
         generateTrigonometricExpressionWithBounds(
             "tan", DoubleBound::minInfinity(), DoubleBound::plusInfinity());
     }
-    void visit(ExpressionArcCosine* expr) final {
+    void visit(const ExpressionArcCosine* expr) final {
         generateTrigonometricExpressionWithBounds(
             "acos", DoubleBound(-1.0, true), DoubleBound(1.0, true));
     }
-    void visit(ExpressionArcSine* expr) final {
+    void visit(const ExpressionArcSine* expr) final {
         generateTrigonometricExpressionWithBounds(
             "asin", DoubleBound(-1.0, true), DoubleBound(1.0, true));
     }
-    void visit(ExpressionArcTangent* expr) final {
+    void visit(const ExpressionArcTangent* expr) final {
         generateTrigonometricExpression("atan");
     }
-    void visit(ExpressionArcTangent2* expr) final {
+    void visit(const ExpressionArcTangent2* expr) final {
         generateTrigonometricExpressionBinary("atan2");
     }
-    void visit(ExpressionHyperbolicArcTangent* expr) final {
+    void visit(const ExpressionHyperbolicArcTangent* expr) final {
         generateTrigonometricExpressionWithBounds(
             "atanh", DoubleBound(-1.0, true), DoubleBound(1.0, true));
     }
-    void visit(ExpressionHyperbolicArcCosine* expr) final {
+    void visit(const ExpressionHyperbolicArcCosine* expr) final {
         generateTrigonometricExpressionWithBounds(
             "acosh", DoubleBound(1.0, true), DoubleBound::plusInfinity());
     }
-    void visit(ExpressionHyperbolicArcSine* expr) final {
+    void visit(const ExpressionHyperbolicArcSine* expr) final {
         generateTrigonometricExpression("asinh");
     }
-    void visit(ExpressionHyperbolicCosine* expr) final {
+    void visit(const ExpressionHyperbolicCosine* expr) final {
         generateTrigonometricExpression("cosh");
     }
-    void visit(ExpressionHyperbolicSine* expr) final {
+    void visit(const ExpressionHyperbolicSine* expr) final {
         generateTrigonometricExpression("sinh");
     }
-    void visit(ExpressionHyperbolicTangent* expr) final {
+    void visit(const ExpressionHyperbolicTangent* expr) final {
         generateTrigonometricExpression("tanh");
     }
-    void visit(ExpressionDegreesToRadians* expr) final {
+    void visit(const ExpressionDegreesToRadians* expr) final {
         generateTrigonometricExpression("degreesToRadians");
     }
-    void visit(ExpressionRadiansToDegrees* expr) final {
+    void visit(const ExpressionRadiansToDegrees* expr) final {
         generateTrigonometricExpression("radiansToDegrees");
     }
-    void visit(ExpressionDayOfMonth* expr) final {
+    void visit(const ExpressionDayOfMonth* expr) final {
         generateDayOfExpression("dayOfMonth", expr);
     }
-    void visit(ExpressionDayOfWeek* expr) final {
+    void visit(const ExpressionDayOfWeek* expr) final {
         generateDayOfExpression("dayOfWeek", expr);
     }
-    void visit(ExpressionDayOfYear* expr) final {
+    void visit(const ExpressionDayOfYear* expr) final {
         generateDayOfExpression("dayOfYear", expr);
     }
-    void visit(ExpressionHour* expr) final {
+    void visit(const ExpressionHour* expr) final {
         unsupportedExpression("$hour");
     }
-    void visit(ExpressionMillisecond* expr) final {
+    void visit(const ExpressionMillisecond* expr) final {
         unsupportedExpression("$millisecond");
     }
-    void visit(ExpressionMinute* expr) final {
+    void visit(const ExpressionMinute* expr) final {
         unsupportedExpression("$minute");
     }
-    void visit(ExpressionMonth* expr) final {
+    void visit(const ExpressionMonth* expr) final {
         unsupportedExpression("$month");
     }
-    void visit(ExpressionSecond* expr) final {
+    void visit(const ExpressionSecond* expr) final {
         unsupportedExpression("$second");
     }
-    void visit(ExpressionWeek* expr) final {
+    void visit(const ExpressionWeek* expr) final {
         unsupportedExpression("$week");
     }
-    void visit(ExpressionIsoWeekYear* expr) final {
+    void visit(const ExpressionIsoWeekYear* expr) final {
         unsupportedExpression("$isoWeekYear");
     }
-    void visit(ExpressionIsoDayOfWeek* expr) final {
+    void visit(const ExpressionIsoDayOfWeek* expr) final {
         unsupportedExpression("$isoDayOfWeek");
     }
-    void visit(ExpressionIsoWeek* expr) final {
+    void visit(const ExpressionIsoWeek* expr) final {
         unsupportedExpression("$isoWeek");
     }
-    void visit(ExpressionYear* expr) final {
+    void visit(const ExpressionYear* expr) final {
         unsupportedExpression("$year");
     }
-    void visit(ExpressionFromAccumulator<AccumulatorAvg>* expr) final {
+    void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionFromAccumulator<AccumulatorMax>* expr) final {
+    void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionFromAccumulator<AccumulatorMin>* expr) final {
+    void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionFromAccumulator<AccumulatorSum>* expr) final {
+    void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {
+    void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {
         unsupportedExpression(expr->getOpName());
     }
-    void visit(ExpressionTests::Testable* expr) final {
+    void visit(const ExpressionTests::Testable* expr) final {
         unsupportedExpression("$test");
     }
-    void visit(ExpressionInternalJsEmit* expr) final {
+    void visit(const ExpressionInternalJsEmit* expr) final {
         unsupportedExpression("$internalJsEmit");
     }
-    void visit(ExpressionInternalFindSlice* expr) final {
+    void visit(const ExpressionInternalFindSlice* expr) final {
         unsupportedExpression("$internalFindSlice");
     }
-    void visit(ExpressionInternalFindPositional* expr) final {
+    void visit(const ExpressionInternalFindPositional* expr) final {
         unsupportedExpression("$internalFindPositional");
     }
-    void visit(ExpressionInternalFindElemMatch* expr) final {
+    void visit(const ExpressionInternalFindElemMatch* expr) final {
         unsupportedExpression("$internalFindElemMatch");
     }
-    void visit(ExpressionFunction* expr) final {
+    void visit(const ExpressionFunction* expr) final {
         unsupportedExpression("$function");
     }
 
-    void visit(ExpressionRandom* expr) final {
+    void visit(const ExpressionRandom* expr) final {
         unsupportedExpression(expr->getOpName());
     }
 
-    void visit(ExpressionToHashedIndexKey* expr) final {
+    void visit(const ExpressionToHashedIndexKey* expr) final {
         unsupportedExpression("$toHashedIndexKey");
     }
 
-    void visit(ExpressionDateAdd* expr) final {
+    void visit(const ExpressionDateAdd* expr) final {
         generateDateArithmeticsExpression(expr, "dateAdd");
     }
 
-    void visit(ExpressionDateSubtract* expr) final {
+    void visit(const ExpressionDateSubtract* expr) final {
         generateDateArithmeticsExpression(expr, "dateSubtract");
     }
 
-    void visit(ExpressionGetField* expr) final {
+    void visit(const ExpressionGetField* expr) final {
         unsupportedExpression("$getField");
     }
 
-    void visit(ExpressionSetField* expr) final {
+    void visit(const ExpressionSetField* expr) final {
         unsupportedExpression("$setField");
     }
 
@@ -2670,7 +2670,7 @@ private:
      * together using binary and/or EExpressions so that the result has MQL's short-circuit
      * semantics.
      */
-    void visitMultiBranchLogicExpression(Expression* expr, sbe::EPrimBinary::Op logicOp) {
+    void visitMultiBranchLogicExpression(const Expression* expr, sbe::EPrimBinary::Op logicOp) {
         invariant(logicOp == sbe::EPrimBinary::logicAnd || logicOp == sbe::EPrimBinary::logicOr);
 
         size_t numChildren = expr->getChildren().size();
@@ -2726,7 +2726,7 @@ private:
      * Handle $switch and $cond, which have different syntax but are structurally identical in the
      * AST.
      */
-    void visitConditionalExpression(Expression* expr) {
+    void visitConditionalExpression(const Expression* expr) {
         // The default case is always the last child in the ExpressionSwitch. If it is unspecified
         // in the user's query, it is a nullptr. In ExpressionCond, the last child is the "else"
         // branch, and it is guaranteed not to be nullptr.
@@ -2788,7 +2788,7 @@ private:
         _context->pushExpr(resultExpr.extractExpr(), std::move(loopJoinStage));
     }
 
-    void generateDayOfExpression(StringData exprName, Expression* expr) {
+    void generateDayOfExpression(StringData exprName, const Expression* expr) {
         auto frameId = _context->state.frameId();
         std::vector<std::unique_ptr<sbe::EExpression>> args;
         std::vector<std::unique_ptr<sbe::EExpression>> binds;
@@ -2990,7 +2990,7 @@ private:
     /*
      * Generates an EExpression that returns an index for $indexOfBytes or $indexOfCP.
      */
-    void visitIndexOfFunction(Expression* expr,
+    void visitIndexOfFunction(const Expression* expr,
                               ExpressionVisitorContext* _context,
                               const std::string& indexOfFunction) {
         auto frameId = _context->state.frameId();
@@ -3105,7 +3105,7 @@ private:
     /**
      * Generic logic for building set expressions: setUnion, setIntersection, etc.
      */
-    void generateSetExpression(Expression* expr, SetOperation setOp) {
+    void generateSetExpression(const Expression* expr, SetOperation setOp) {
         using namespace std::literals;
 
         size_t arity = expr->getChildren().size();
@@ -3192,7 +3192,7 @@ private:
     /**
      * Shared expression building logic for regex expressions.
      */
-    void generateRegexExpression(ExpressionRegex* expr, StringData exprName) {
+    void generateRegexExpression(const ExpressionRegex* expr, StringData exprName) {
         size_t arity = expr->hasOptions() ? 3 : 2;
         _context->ensureArity(arity);
 
@@ -3384,7 +3384,7 @@ private:
     /**
      * Generic logic for building $dateAdd and $dateSubtract expressions.
      */
-    void generateDateArithmeticsExpression(ExpressionDateArithmetics* expr,
+    void generateDateArithmeticsExpression(const ExpressionDateArithmetics* expr,
                                            const std::string& dateExprName) {
         auto children = expr->getChildren();
         auto arity = children.size();
@@ -3503,27 +3503,27 @@ private:
 
 class ExpressionWalker final {
 public:
-    ExpressionWalker(ExpressionVisitor* preVisitor,
-                     ExpressionVisitor* inVisitor,
-                     ExpressionVisitor* postVisitor)
+    ExpressionWalker(ExpressionConstVisitor* preVisitor,
+                     ExpressionConstVisitor* inVisitor,
+                     ExpressionConstVisitor* postVisitor)
         : _preVisitor{preVisitor}, _inVisitor{inVisitor}, _postVisitor{postVisitor} {}
 
-    void preVisit(Expression* expr) {
+    void preVisit(const Expression* expr) {
         expr->acceptVisitor(_preVisitor);
     }
 
-    void inVisit(long long count, Expression* expr) {
+    void inVisit(long long count, const Expression* expr) {
         expr->acceptVisitor(_inVisitor);
     }
 
-    void postVisit(Expression* expr) {
+    void postVisit(const Expression* expr) {
         expr->acceptVisitor(_postVisitor);
     }
 
 private:
-    ExpressionVisitor* _preVisitor;
-    ExpressionVisitor* _inVisitor;
-    ExpressionVisitor* _postVisitor;
+    ExpressionConstVisitor* _preVisitor;
+    ExpressionConstVisitor* _inVisitor;
+    ExpressionConstVisitor* _postVisitor;
 };
 }  // namespace
 
@@ -3577,7 +3577,7 @@ std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, EvalStage> gen
     ExpressionInVisitor inVisitor{&context};
     ExpressionPostVisitor postVisitor{&context};
     ExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
-    expression_walker::walk(&walker, expr);
+    expression_walker::walk<const Expression>(expr, &walker);
 
     auto [slotId, resultExpr, resultStage] = context.done();
     return {slotId, std::move(resultExpr), std::move(resultStage)};

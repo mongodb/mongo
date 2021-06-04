@@ -271,7 +271,11 @@ public:
         return "$atan2";
     }
 
-    void acceptVisitor(ExpressionVisitor* visitor) final {
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
 };
@@ -308,7 +312,11 @@ public:
             return "$" #funcName;                                                                  \
         }                                                                                          \
                                                                                                    \
-        void acceptVisitor(ExpressionVisitor* visitor) final {                                     \
+        void acceptVisitor(ExpressionMutableVisitor* visitor) final {                              \
+            return visitor->visit(this);                                                           \
+        }                                                                                          \
+                                                                                                   \
+        void acceptVisitor(ExpressionConstVisitor* visitor) const final {                          \
             return visitor->visit(this);                                                           \
         }                                                                                          \
     };
@@ -374,7 +382,11 @@ CREATE_BOUNDED_TRIGONOMETRIC_CLASS(Tangent,
             return "$" #funcName;                                              \
         }                                                                      \
                                                                                \
-        void acceptVisitor(ExpressionVisitor* visitor) final {                 \
+        void acceptVisitor(ExpressionMutableVisitor* visitor) final {          \
+            return visitor->visit(this);                                       \
+        }                                                                      \
+                                                                               \
+        void acceptVisitor(ExpressionConstVisitor* visitor) const final {      \
             return visitor->visit(this);                                       \
         }                                                                      \
     };
@@ -421,7 +433,11 @@ public:
         return "$degreesToRadians";
     }
 
-    void acceptVisitor(ExpressionVisitor* visitor) final {
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
 };
@@ -443,7 +459,11 @@ public:
         return "$radiansToDegrees";
     }
 
-    void acceptVisitor(ExpressionVisitor* visitor) final {
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
 };

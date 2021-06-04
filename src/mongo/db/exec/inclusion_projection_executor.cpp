@@ -93,7 +93,7 @@ namespace {
 boost::intrusive_ptr<Expression> substituteInExpr(boost::intrusive_ptr<Expression> ex,
                                                   StringMap<std::string> renames) {
     SubstituteFieldPathWalker substituteWalker(renames);
-    auto substExpr = expression_walker::walk(&substituteWalker, ex.get());
+    auto substExpr = expression_walker::walk<Expression>(ex.get(), &substituteWalker);
     if (substExpr.get() != nullptr) {
         return substExpr.release();
     }
