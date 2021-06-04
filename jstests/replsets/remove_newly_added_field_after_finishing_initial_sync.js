@@ -87,6 +87,9 @@ let res = primaryDb.runCommand(
 assert.commandWorkedIgnoringWriteConcernErrors(res);
 checkWriteConcernTimedOut(res);
 
+// Wait for the new config to be replicated before disconnecting the secondary.
+rst.waitForConfigReplication(primary);
+
 // Only two nodes are needed for majority (0 and 1).
 rst.nodes[2].disconnect(rst.nodes);
 assert.commandWorked(primaryColl.insert({a: 3}, {writeConcern: {w: "majority"}}));
