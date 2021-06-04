@@ -3,7 +3,7 @@
  * do not get populated by nodes doing oplog application while in initial sync.
  *
  * This setParameter behavior does not yet exist on earlier versions.
- * @tags: [multiversion_incompatible]
+ * @tags: [multiversion_incompatible, requires_document_locking]
  */
 (function() {
 'use strict';
