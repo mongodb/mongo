@@ -53,5 +53,10 @@ boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
  */
 int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity);
 
+/**
+ * Returns the number of seconds used to round down the bucket ID and control.min timestamp.
+ */
+int getBucketRoundingSecondsFromGranularity(BucketGranularityEnum granularity);
+
 }  // namespace timeseries
 }  // namespace mongo

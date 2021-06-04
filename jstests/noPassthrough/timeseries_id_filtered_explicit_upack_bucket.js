@@ -47,7 +47,7 @@ const bucketIds = sysColl
                           {
                               $match: {
                                   _id: {
-                                      $gt: ObjectId("5fc4e5cd0000000000000000"),
+                                      $gt: ObjectId("5fc4e5c80000000000000000"),
                                       $lt: ObjectId("5fc4ea7e0000000000000000")
                                   },
                                   "control.max.end": {$lte: ISODate("2020-11-30T13:00:05Z")}

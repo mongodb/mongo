@@ -39,7 +39,7 @@ TimeseriesTest.run((insert) => {
     assert.eq(buckets.length, 1, 'Expected one bucket but found ' + tojson(buckets));
     const bucketId = buckets[0]._id;
     const minTime = buckets[0].control.min.time;
-    const maxTime = buckets[0].control.min.time;
+    const maxTime = buckets[0].control.max.time;
 
     assert.docEq(buckets, bucketsColl.find({_id: bucketId}).toArray());
     let explain = bucketsColl.find({_id: bucketId}).explain();

@@ -64,5 +64,20 @@ int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity) {
     MONGO_UNREACHABLE;
 }
 
+int getBucketRoundingSecondsFromGranularity(BucketGranularityEnum granularity) {
+    switch (granularity) {
+        case BucketGranularityEnum::Seconds:
+            // Round down to nearest minute.
+            return 60;
+        case BucketGranularityEnum::Minutes:
+            // Round down to nearest hour.
+            return 60 * 60;
+        case BucketGranularityEnum::Hours:
+            // Round down to hearest day.
+            return 60 * 60 * 24;
+    }
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace timeseries
 }  // namespace mongo

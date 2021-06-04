@@ -22,7 +22,7 @@ TimeseriesTest.run((insert) => {
     const timeFieldName = 'time';
     const times = [
         ISODate('2021-01-01T01:00:00Z'),
-        ISODate('2021-01-01T01:30:00Z'),
+        ISODate('2021-01-01T01:00:30Z'),
         ISODate('2021-01-01T02:00:00Z')
     ];
     let docs = [{_id: 0, [timeFieldName]: times[1]}, {_id: 1, [timeFieldName]: times[0]}];
