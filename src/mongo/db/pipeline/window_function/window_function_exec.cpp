@@ -56,9 +56,8 @@ boost::intrusive_ptr<Expression> translateInputExpression(
     if (auto integral = dynamic_cast<window_function::ExpressionIntegral*>(expr.get())) {
         auto expCtx = integral->expCtx();
         tassert(5558802,
-                "$integral requires a 1-field ascending sortBy",
-                sortBy && sortBy->size() == 1 && !sortBy->begin()->expression &&
-                    sortBy->begin()->isAscending);
+                "$integral requires a 1-field sortBy",
+                sortBy && sortBy->size() == 1 && !sortBy->begin()->expression);
         auto sortByExpr = ExpressionFieldPath::createPathFromString(
             expCtx, sortBy->begin()->fieldPath->fullPath(), expCtx->variablesParseState);
         return ExpressionArray::create(
@@ -97,9 +96,8 @@ std::unique_ptr<mongo::WindowFunctionExec> translateDerivative(
     const boost::optional<SortPattern>& sortBy,
     MemoryUsageTracker::PerFunctionMemoryTracker* memTracker) {
     tassert(5490703,
-            "$derivative requires a 1-field ascending sortBy",
-            sortBy && sortBy->size() == 1 && !sortBy->begin()->expression &&
-                sortBy->begin()->isAscending);
+            "$derivative requires a 1-field sortBy",
+            sortBy && sortBy->size() == 1 && !sortBy->begin()->expression);
     auto sortExpr =
         ExpressionFieldPath::createPathFromString(expr->expCtx(),
                                                   sortBy->begin()->fieldPath->fullPath(),
