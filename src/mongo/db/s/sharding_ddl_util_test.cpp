@@ -113,6 +113,24 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
 
     setupCollection(fromNss, KeyPattern(BSON("x" << 1)), chunks);
 
+    // Initialize TO collection chunks
+    std::vector<ChunkType> originalToChunks;
+    const auto toEpoch = OID::gen();
+    const auto toUUID = UUID::gen();
+    for (int i = 0; i < nChunks; i++) {
+        ChunkVersion chunkVersion(1, i, toEpoch, Timestamp(2));
+        ChunkType chunk;
+        chunk.setName(OID::gen());
+        chunk.setCollectionUUID(toUUID);
+        chunk.setVersion(chunkVersion);
+        chunk.setShard(shard0.getName());
+        chunk.setHistory({ChunkHistory(Timestamp(1, i), shard0.getName())});
+        chunk.setMin(BSON("a" << i));
+        chunk.setMax(BSON("a" << i + 1));
+        originalToChunks.push_back(chunk);
+    }
+    setupCollection(kToNss, KeyPattern(BSON("x" << 1)), originalToChunks);
+
     // Get FROM collection document and chunks
     auto fromDoc = client.findOne(CollectionType::ConfigNS.ns(), fromCollQuery);
     CollectionType fromCollection(fromDoc);
@@ -122,7 +140,6 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     client.findN(fromChunks, ChunkType::ConfigNS.ns(), fromChunksQuery, nChunks);
 
     auto fromCollType = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, fromNss);
-
     // Perform the metadata rename
     sharding_ddl_util::shardedRenameMetadata(opCtx, fromCollType, kToNss);
 
