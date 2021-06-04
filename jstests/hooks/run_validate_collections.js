@@ -56,11 +56,16 @@ if (requiredFCV) {
     originalFCV = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
 
     if (originalFCV.targetVersion) {
+        let cmd = {setFeatureCompatibilityVersion: originalFCV.targetVersion};
+        if (originalFCV.version === lastLTSFCV && originalFCV.targetVersion === lastContinuousFCV) {
+            // We are only able to call 'setFeatureCompatibilityVersion' to transition from last-lts
+            // to last-continuous with 'fromConfigServer: true'.
+            cmd.fromConfigServer = true;
+        }
         // If a previous FCV upgrade or downgrade was interrupted, then we run the
         // setFeatureCompatibilityVersion command to complete it before attempting to set the
         // feature compatibility version to 'requiredFCV'.
-        assert.commandWorked(
-            adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV.targetVersion}));
+        assert.commandWorked(adminDB.runCommand(cmd));
         checkFCV(adminDB, originalFCV.targetVersion);
     }
 
