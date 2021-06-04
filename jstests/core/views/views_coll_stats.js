@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   assumes_unsharded_collection,
+ *   requires_collstats,
  * ]
  */
 
