@@ -927,6 +927,17 @@ int mongo_main(int argc, char* argv[]) {
 
         bool lastLineSuccessful = true;
         if (shellGlobalParams.runShell) {
+            std::cout << "================\n"
+                         "Warning: the \"mongo\" shell has been superseded by \"mongosh\",\n"
+                         "which delivers improved usability and compatibility."
+                         "The \"mongo\" shell has been deprecated and will be removed in\n"
+                         "an upcoming release.\n"
+                         "We recommend you begin using \"mongosh\".\n"
+                         "For installation instructions, see\n"
+                         "https://docs.mongodb.com/mongodb-shell/install/\n"
+                         "================"
+                      << std::endl;
+
             mongo::shell_utils::MongoProgramScope s;
             // If they specify norc, assume it's not their first time
             bool hasMongoRC = shellGlobalParams.norc;
