@@ -37,7 +37,7 @@ namespace test_harness {
 class checkpoint_manager : public component {
     public:
     explicit checkpoint_manager(configuration *configuration)
-        : component(CHECKPOINT_MANAGER, configuration), _session(nullptr)
+        : component(CHECKPOINT_MANAGER, configuration)
     {
     }
     virtual ~checkpoint_manager() = default;
@@ -47,7 +47,7 @@ class checkpoint_manager : public component {
     checkpoint_manager &operator=(const checkpoint_manager &) = delete;
 
     void
-    load() override
+    load() override final
     {
         /* Load the general component things. */
         component::load();
@@ -58,14 +58,14 @@ class checkpoint_manager : public component {
     }
 
     void
-    do_work() override
+    do_work() override final
     {
         debug_print("Running checkpoint", DEBUG_INFO);
         testutil_check(_session->checkpoint(_session, nullptr));
     }
 
     private:
-    WT_SESSION *_session;
+    WT_SESSION *_session = nullptr;
 };
 
 } // namespace test_harness

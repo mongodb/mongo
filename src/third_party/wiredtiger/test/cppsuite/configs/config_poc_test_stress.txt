@@ -4,6 +4,12 @@
 duration_seconds=10,
 cache_size_mb=5000,
 enable_logging=true,
+checkpoint_manager=
+(
+    enabled=true,
+    interval=m,
+    op_count=20
+),
 runtime_monitor=
 (
     stat_cache_size=

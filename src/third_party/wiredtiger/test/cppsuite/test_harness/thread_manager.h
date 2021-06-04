@@ -31,9 +31,6 @@
 
 #include <thread>
 
-#include "workload/database_operation.h"
-#include "workload/thread_context.h"
-
 namespace test_harness {
 /* Class that handles threads, from their initialization to their deletion. */
 class thread_manager {
@@ -52,27 +49,13 @@ class thread_manager {
     }
 
     /*
-     * Generic function to create threads that take contexts, typically these will be static
-     * functions.
+     * Generic function to create threads that call member function of classes.
      */
-    template <typename Callable>
+    template <typename Callable, typename... Args>
     void
-    add_thread(thread_context *tc, database_operation *db_operation, Callable &&fct)
+    add_thread(Callable &&fct, Args &&... args)
     {
-        tc->set_running(true);
-        std::thread *t = new std::thread(fct, std::ref(*tc), std::ref(*db_operation));
-        _workers.push_back(t);
-    }
-
-    /*
-     * Generic function to create threads that do not take thread contexts but take a single
-     * argument, typically these threads are calling non static member function of classes.
-     */
-    template <typename Callable, typename Args>
-    void
-    add_thread(Callable &&fct, Args &&args)
-    {
-        std::thread *t = new std::thread(fct, args);
+        std::thread *t = new std::thread(fct, args...);
         _workers.push_back(t);
     }
 
@@ -83,8 +66,9 @@ class thread_manager {
     join()
     {
         for (const auto &it : _workers) {
-            if (it->joinable())
-                it->join();
+            while (!it->joinable()) {
+            }
+            it->join();
         }
     }
 
