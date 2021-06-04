@@ -166,6 +166,7 @@ public:
      * Should be called inside of a WriteUnitOfWork.
      */
     Status insertSingleDocumentForInitialSyncOrRecovery(OperationContext* opCtx,
+                                                        const CollectionPtr& collection,
                                                         const BSONObj& wholeDocument,
                                                         const RecordId& loc);
 
@@ -311,7 +312,10 @@ private:
                                      const BSONObj& doc,
                                      unsigned long long iteration) const;
 
-    Status _insert(OperationContext* opCtx, const BSONObj& wholeDocument, const RecordId& loc);
+    Status _insert(OperationContext* opCtx,
+                   const CollectionPtr& collection,
+                   const BSONObj& wholeDocument,
+                   const RecordId& loc);
 
     /**
      * Performs a collection scan on the given collection and inserts the relevant index keys into
