@@ -54,7 +54,7 @@ void ExpressionParams::parseTwoDParams(const BSONObj& infoObj, TwoDIndexingParam
         } else {
             int order = 1;
             if (e.isNumber()) {
-                order = static_cast<int>(e.Number());
+                order = e.safeNumberInt();
             }
             out->other.emplace_back(e.fieldName(), order);
         }
