@@ -47,7 +47,7 @@ class timestamp_manager : public component {
     timestamp_manager(configuration *config) : component("timestamp_manager", config) {}
 
     void
-    load()
+    load() override final
     {
         component::load();
 
@@ -58,7 +58,7 @@ class timestamp_manager : public component {
     }
 
     void
-    do_work()
+    do_work() override final
     {
         std::string config;
         /* latest_ts_s represents the time component of the latest timestamp provided. */

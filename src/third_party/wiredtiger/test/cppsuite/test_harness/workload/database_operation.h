@@ -122,19 +122,18 @@ class database_operation {
 
     /* Basic read operation that walks a cursors across all collections. */
     virtual void
-    read_operation(thread_context &context, WT_SESSION *session)
+    read_operation(thread_context *tc)
     {
         WT_CURSOR *cursor;
         std::vector<WT_CURSOR *> cursors;
 
-        testutil_assert(session != nullptr);
         /* Get a cursor for each collection in collection_names. */
-        for (const auto &it : context.get_collection_names()) {
-            testutil_check(session->open_cursor(session, it.c_str(), NULL, NULL, &cursor));
+        for (const auto &it : tc->database.get_collection_names()) {
+            testutil_check(tc->session->open_cursor(tc->session, it.c_str(), NULL, NULL, &cursor));
             cursors.push_back(cursor);
         }
 
-        while (!cursors.empty() && context.is_running()) {
+        while (!cursors.empty() && tc->running()) {
             /* Walk each cursor. */
             for (const auto &it : cursors) {
                 if (it->next(it) != 0)
@@ -147,30 +146,28 @@ class database_operation {
      * Basic update operation that updates all the keys to a random value in each collection.
      */
     virtual void
-    update_operation(thread_context &context, WT_SESSION *session)
+    update_operation(thread_context *tc)
     {
-        WT_DECL_RET;
         WT_CURSOR *cursor;
+        WT_DECL_RET;
         wt_timestamp_t ts;
         std::vector<WT_CURSOR *> cursors;
-        std::vector<std::string> collection_names = context.get_collection_names();
+        std::vector<std::string> collection_names = tc->database.get_collection_names();
         key_value_t key, generated_value;
         const char *key_tmp;
-        int64_t value_size = context.get_value_size();
-        uint64_t i;
+        uint64_t i = 0;
+        bool using_timestamps = tc->timestamp_manager->enabled();
 
-        testutil_assert(session != nullptr);
         /* Get a cursor for each collection in collection_names. */
         for (const auto &it : collection_names) {
-            testutil_check(session->open_cursor(session, it.c_str(), NULL, NULL, &cursor));
+            testutil_check(tc->session->open_cursor(tc->session, it.c_str(), NULL, NULL, &cursor));
             cursors.push_back(cursor);
         }
 
         /*
          * Update each collection while the test is running.
          */
-        i = 0;
-        while (context.is_running() && !collection_names.empty()) {
+        while (tc->running() && !collection_names.empty()) {
             if (i >= collection_names.size())
                 i = 0;
             ret = cursors[i]->next(cursors[i]);
@@ -190,35 +187,30 @@ class database_operation {
                  */
                 key = key_value_t(key_tmp);
                 generated_value =
-                  random_generator::random_generator::instance().generate_string(value_size);
-                ts = context.get_timestamp_manager()->get_next_ts();
+                  random_generator::random_generator::instance().generate_string(tc->value_size);
 
-                /* Start a transaction if possible. */
-                if (!context.is_in_transaction()) {
-                    context.begin_transaction(session, "");
-                    context.set_commit_timestamp(session, ts);
-                }
+                /* Start a transaction. */
+                if (!tc->transaction.active())
+                    tc->transaction.begin(tc->session, "");
 
-                update(context.get_tracking(), cursors[i], collection_names[i], key.c_str(),
+                ts = tc->timestamp_manager->get_next_ts();
+                if (using_timestamps)
+                    tc->transaction.set_commit_timestamp(
+                      tc->session, timestamp_manager::decimal_to_hex(ts));
+
+                update(tc->tracking, cursors[i], collection_names[i], key.c_str(),
                   generated_value.c_str(), ts);
 
-                /* Commit the current transaction if possible. */
-                context.increment_operation_count();
-                if (context.can_commit_transaction())
-                    context.commit_transaction(session, "");
+                /* Commit the current transaction. */
+                tc->transaction.op_count++;
+                if (tc->transaction.can_commit())
+                    tc->transaction.commit(tc->session, "");
             }
+            tc->sleep();
         }
-
-        /*
-         * The update operations will be later on inside a loop that will be managed through
-         * throttle management.
-         */
-        while (context.is_running())
-            context.sleep();
-
         /* Make sure the last operation is committed now the work is finished. */
-        if (context.is_in_transaction())
-            context.commit_transaction(session, "");
+        if (tc->transaction.active())
+            tc->transaction.commit(tc->session, "");
     }
 
     private:

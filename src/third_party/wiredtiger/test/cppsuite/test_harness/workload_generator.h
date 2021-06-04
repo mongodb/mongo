@@ -64,57 +64,46 @@ class workload_generator : public component {
 
     /* Do the work of the main part of the workload. */
     void
-    run()
+    run() override final
     {
-        configuration *transaction_config, *update_config, *insert_config;
-        int64_t min_operation_per_transaction, max_operation_per_transaction, read_threads,
-          update_threads, value_size;
+        configuration *read_config, *update_config, *insert_config;
 
         /* Populate the database. */
         _database_operation->populate(_database, _timestamp_manager, _config, _tracking);
         _db_populated = true;
 
         /* Retrieve useful parameters from the test configuration. */
-        transaction_config = _config->get_subconfig(OPS_PER_TRANSACTION);
         update_config = _config->get_subconfig(UPDATE_CONFIG);
         insert_config = _config->get_subconfig(INSERT_CONFIG);
-        read_threads = _config->get_int(READ_THREADS);
-        update_threads = _config->get_int(UPDATE_THREADS);
-
-        min_operation_per_transaction = transaction_config->get_int(MIN);
-        max_operation_per_transaction = transaction_config->get_int(MAX);
-        testutil_assert(max_operation_per_transaction >= min_operation_per_transaction);
-        value_size = _config->get_int(VALUE_SIZE);
-        testutil_assert(value_size >= 0);
+        read_config = _config->get_subconfig(READ_CONFIG);
 
         /* Generate threads to execute read operations on the collections. */
-        for (size_t i = 0; i < read_threads && _running; ++i) {
-            thread_context *tc = new thread_context(_timestamp_manager, _tracking, _database,
-              thread_operation::READ, max_operation_per_transaction, min_operation_per_transaction,
-              value_size, throttle());
+        for (size_t i = 0; i < read_config->get_int(THREAD_COUNT) && _running; ++i) {
+            thread_context *tc =
+              new thread_context(read_config, _timestamp_manager, _tracking, _database);
             _workers.push_back(tc);
-            _thread_manager.add_thread(tc, _database_operation, &execute_operation);
+            _thread_manager.add_thread(
+              &database_operation::read_operation, _database_operation, tc);
         }
 
         /* Generate threads to execute update operations on the collections. */
-        for (size_t i = 0; i < update_threads && _running; ++i) {
-            thread_context *tc = new thread_context(_timestamp_manager, _tracking, _database,
-              thread_operation::UPDATE, max_operation_per_transaction,
-              min_operation_per_transaction, value_size, throttle(update_config));
+        for (size_t i = 0; i < update_config->get_int(THREAD_COUNT) && _running; ++i) {
+            thread_context *tc =
+              new thread_context(update_config, _timestamp_manager, _tracking, _database);
             _workers.push_back(tc);
-            _thread_manager.add_thread(tc, _database_operation, &execute_operation);
+            _thread_manager.add_thread(
+              &database_operation::update_operation, _database_operation, tc);
         }
 
-        delete transaction_config;
+        delete read_config;
         delete update_config;
         delete insert_config;
     }
 
     void
-    finish()
+    finish() override final
     {
         component::finish();
-
         for (const auto &it : _workers)
             it->finish();
         _thread_manager.join();
@@ -131,34 +120,6 @@ class workload_generator : public component {
     db_populated() const
     {
         return (_db_populated);
-    }
-
-    /* Workload threaded operations. */
-    static void
-    execute_operation(thread_context &context, database_operation &db_operation)
-    {
-        WT_SESSION *session;
-
-        session = connection_manager::instance().create_session();
-
-        switch (context.get_thread_operation()) {
-        case thread_operation::READ:
-            db_operation.read_operation(context, session);
-            break;
-        case thread_operation::REMOVE:
-        case thread_operation::INSERT:
-            /* Sleep until it is implemented. */
-            while (context.is_running())
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-            break;
-        case thread_operation::UPDATE:
-            db_operation.update_operation(context, session);
-            break;
-        default:
-            testutil_die(DEBUG_ERROR, "system: thread_operation is unknown : %d",
-              static_cast<int>(context.get_thread_operation()));
-            break;
-        }
     }
 
     private:
