@@ -102,7 +102,9 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
         auto documentMultikeyPaths = executionCtx.multikeyPaths();
 
-        iam->getKeys(executionCtx.pooledBufferBuilder(),
+        iam->getKeys(opCtx,
+                     coll,
+                     executionCtx.pooledBufferBuilder(),
                      recordBson,
                      IndexAccessMethod::GetKeysMode::kEnforceConstraints,
                      IndexAccessMethod::GetKeysContext::kAddingKeys,

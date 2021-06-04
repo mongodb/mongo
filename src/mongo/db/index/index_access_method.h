@@ -347,7 +347,9 @@ public:
      */
     using OnSuppressedErrorFn =
         std::function<void(Status status, const BSONObj& obj, boost::optional<RecordId> loc)>;
-    virtual void getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+    virtual void getKeys(OperationContext* opCtx,
+                         const CollectionPtr& collection,
+                         SharedBufferFragmentBuilder& pooledBufferBuilder,
                          const BSONObj& obj,
                          GetKeysMode mode,
                          GetKeysContext context,
@@ -547,7 +549,9 @@ public:
                       const KeyHandlerFn& onDuplicateKeyInserted,
                       const RecordIdHandlerFn& onDuplicateRecord) final;
 
-    void getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+    void getKeys(OperationContext* opCtx,
+                 const CollectionPtr& collection,
+                 SharedBufferFragmentBuilder& pooledBufferBuilder,
                  const BSONObj& obj,
                  GetKeysMode mode,
                  GetKeysContext context,

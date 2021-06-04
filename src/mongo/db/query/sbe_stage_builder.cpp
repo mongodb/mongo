@@ -415,7 +415,9 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
 
-            iam->getKeys(executionCtx.pooledBufferBuilder(),
+            iam->getKeys(opCtx,
+                         collection,
+                         executionCtx.pooledBufferBuilder(),
                          nextRecord.data.toBson(),
                          IndexAccessMethod::GetKeysMode::kEnforceConstraints,
                          IndexAccessMethod::GetKeysContext::kValidatingKeys,

@@ -131,7 +131,9 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
     auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
     auto multikeyPaths = executionCtx.multikeyPaths();
 
-    getKeys(executionCtx.pooledBufferBuilder(),
+    getKeys(opCtx,
+            coll,
+            executionCtx.pooledBufferBuilder(),
             obj,
             options.getKeysMode,
             GetKeysContext::kAddingKeys,
@@ -276,7 +278,9 @@ RecordId AbstractIndexAccessMethod::findSingle(OperationContext* opCtx,
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
 
-            getKeys(executionCtx.pooledBufferBuilder(),
+            getKeys(opCtx,
+                    collection,
+                    executionCtx.pooledBufferBuilder(),
                     requestedKey,
                     GetKeysMode::kEnforceConstraints,
                     GetKeysContext::kAddingKeys,
@@ -396,7 +400,9 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
         // There's no need to compute the prefixes of the indexed fields that possibly caused the
         // index to be multikey when the old version of the document was written since the index
         // metadata isn't updated when keys are deleted.
-        getKeys(executionCtx.pooledBufferBuilder(),
+        getKeys(opCtx,
+                collection,
+                executionCtx.pooledBufferBuilder(),
                 from,
                 getKeysMode,
                 GetKeysContext::kRemovingKeys,
@@ -408,7 +414,9 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
     }
 
     if (!indexFilter || indexFilter->matchesBSON(to)) {
-        getKeys(executionCtx.pooledBufferBuilder(),
+        getKeys(opCtx,
+                collection,
+                executionCtx.pooledBufferBuilder(),
                 to,
                 options.getKeysMode,
                 GetKeysContext::kAddingKeys,
@@ -572,6 +580,8 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
 
     try {
         _indexCatalogEntry->accessMethod()->getKeys(
+            opCtx,
+            collection,
             executionCtx.pooledBufferBuilder(),
             obj,
             options.getKeysMode,
@@ -807,7 +817,9 @@ IndexAccessMethod::OnSuppressedErrorFn IndexAccessMethod::kNoopOnSuppressedError
             "obj"_attr = redact(obj));
     };
 
-void AbstractIndexAccessMethod::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+void AbstractIndexAccessMethod::getKeys(OperationContext* opCtx,
+                                        const CollectionPtr& collection,
+                                        SharedBufferFragmentBuilder& pooledBufferBuilder,
                                         const BSONObj& obj,
                                         GetKeysMode mode,
                                         GetKeysContext context,

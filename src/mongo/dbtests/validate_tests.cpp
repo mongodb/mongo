@@ -864,7 +864,9 @@ public:
             options.logIfError = true;
 
             KeyStringSet keys;
-            iam->getKeys(executionCtx.pooledBufferBuilder(),
+            iam->getKeys(&_opCtx,
+                         coll,
+                         executionCtx.pooledBufferBuilder(),
                          actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kAddingKeys,
@@ -1266,7 +1268,9 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(executionCtx.pooledBufferBuilder(),
+            iam->getKeys(&_opCtx,
+                         coll,
+                         executionCtx.pooledBufferBuilder(),
                          actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -1648,7 +1652,9 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(executionCtx.pooledBufferBuilder(),
+            iam->getKeys(&_opCtx,
+                         coll,
+                         executionCtx.pooledBufferBuilder(),
                          actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -1993,7 +1999,9 @@ public:
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(&_opCtx,
+                             coll,
+                             executionCtx.pooledBufferBuilder(),
                              dupObj,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraints,
                              IndexAccessMethod::GetKeysContext::kAddingKeys,
@@ -2049,7 +2057,9 @@ public:
                 const BSONObj actualKey = BSON("a" << 1);
 
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(&_opCtx,
+                             coll,
+                             executionCtx.pooledBufferBuilder(),
                              actualKey,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                              IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -2186,7 +2196,9 @@ public:
             {
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(&_opCtx,
+                             coll,
+                             executionCtx.pooledBufferBuilder(),
                              doc,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                              IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -2389,7 +2401,9 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(executionCtx.pooledBufferBuilder(),
+            iam->getKeys(&_opCtx,
+                         coll,
+                         executionCtx.pooledBufferBuilder(),
                          actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -2426,7 +2440,9 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(executionCtx.pooledBufferBuilder(),
+            iam->getKeys(&_opCtx,
+                         coll,
+                         executionCtx.pooledBufferBuilder(),
                          actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -2539,7 +2555,9 @@ public:
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(&_opCtx,
+                             coll,
+                             executionCtx.pooledBufferBuilder(),
                              dupObj,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraints,
                              IndexAccessMethod::GetKeysContext::kAddingKeys,
@@ -2591,7 +2609,9 @@ public:
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(&_opCtx,
+                             coll,
+                             executionCtx.pooledBufferBuilder(),
                              dupObj,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraints,
                              IndexAccessMethod::GetKeysContext::kAddingKeys,
@@ -2942,7 +2962,9 @@ public:
             {
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(&_opCtx,
+                             coll,
+                             executionCtx.pooledBufferBuilder(),
                              doc,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                              IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -2976,7 +2998,9 @@ public:
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
                 MultikeyPaths multikeyPaths;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(&_opCtx,
+                             coll,
+                             executionCtx.pooledBufferBuilder(),
                              mkDoc,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                              IndexAccessMethod::GetKeysContext::kAddingKeys,
@@ -3167,7 +3191,9 @@ public:
             {
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(&_opCtx,
+                             coll,
+                             executionCtx.pooledBufferBuilder(),
                              doc1,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                              IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -3202,7 +3228,9 @@ public:
             {
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(&_opCtx,
+                             coll,
+                             executionCtx.pooledBufferBuilder(),
                              doc2,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                              IndexAccessMethod::GetKeysContext::kAddingKeys,
