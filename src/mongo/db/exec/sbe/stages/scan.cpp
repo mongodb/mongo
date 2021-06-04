@@ -309,8 +309,12 @@ PlanState ScanStage::getNext() {
 
     // Return EOF if the index key is found to be inconsistent.
     if (_scanCallbacks.indexKeyConsistencyCheckCallBack &&
-        !_scanCallbacks.indexKeyConsistencyCheckCallBack(
-            _opCtx, _snapshotIdAccessor, _indexIdAccessor, _indexKeyAccessor, *nextRecord)) {
+        !_scanCallbacks.indexKeyConsistencyCheckCallBack(_opCtx,
+                                                         _snapshotIdAccessor,
+                                                         _indexIdAccessor,
+                                                         _indexKeyAccessor,
+                                                         _coll->getCollection(),
+                                                         *nextRecord)) {
         return trackPlanState(PlanState::IS_EOF);
     }
 
@@ -767,8 +771,12 @@ PlanState ParallelScanStage::getNext() {
 
         // Return EOF if the index key is found to be inconsistent.
         if (_scanCallbacks.indexKeyConsistencyCheckCallBack &&
-            !_scanCallbacks.indexKeyConsistencyCheckCallBack(
-                _opCtx, _snapshotIdAccessor, _indexIdAccessor, _indexKeyAccessor, *nextRecord)) {
+            !_scanCallbacks.indexKeyConsistencyCheckCallBack(_opCtx,
+                                                             _snapshotIdAccessor,
+                                                             _indexIdAccessor,
+                                                             _indexKeyAccessor,
+                                                             _coll->getCollection(),
+                                                             *nextRecord)) {
             return trackPlanState(PlanState::IS_EOF);
         }
     } while (!nextRecord);

@@ -51,6 +51,7 @@ using IndexKeyConsistencyCheckCallback = std::function<bool(OperationContext* op
                                                             value::SlotAccessor* snapshotIdAccessor,
                                                             value::SlotAccessor* indexIdAccessor,
                                                             value::SlotAccessor* indexKeyAccessor,
+                                                            const CollectionPtr& collection,
                                                             const Record& nextRecord)>;
 
 using IndexKeyCorruptionCheckCallback =
