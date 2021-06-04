@@ -62,7 +62,9 @@ HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState,
     uassert(16774, "no non-geo fields specified", _otherFields.size());
 }
 
-void HaystackAccessMethod::doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+void HaystackAccessMethod::doGetKeys(OperationContext* opCtx,
+                                     const CollectionPtr& collection,
+                                     SharedBufferFragmentBuilder& pooledBufferBuilder,
                                      const BSONObj& obj,
                                      GetKeysContext context,
                                      KeyStringSet* keys,

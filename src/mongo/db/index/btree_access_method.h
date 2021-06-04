@@ -48,7 +48,9 @@ public:
     BtreeAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 
 private:
-    void doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+    void doGetKeys(OperationContext* opCtx,
+                   const CollectionPtr& collection,
+                   SharedBufferFragmentBuilder& pooledBufferBuilder,
                    const BSONObj& obj,
                    GetKeysContext context,
                    KeyStringSet* keys,

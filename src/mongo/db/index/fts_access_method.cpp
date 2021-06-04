@@ -39,7 +39,9 @@ FTSAccessMethod::FTSAccessMethod(IndexCatalogEntry* btreeState,
     : AbstractIndexAccessMethod(btreeState, std::move(btree)),
       _ftsSpec(btreeState->descriptor()->infoObj()) {}
 
-void FTSAccessMethod::doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+void FTSAccessMethod::doGetKeys(OperationContext* opCtx,
+                                const CollectionPtr& collection,
+                                SharedBufferFragmentBuilder& pooledBufferBuilder,
                                 const BSONObj& obj,
                                 GetKeysContext context,
                                 KeyStringSet* keys,

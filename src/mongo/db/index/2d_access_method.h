@@ -58,7 +58,9 @@ private:
      * This function ignores the 'multikeyPaths' and 'multikeyMetadataKeys' pointers because 2d
      * indexes don't support tracking path-level multikey information.
      */
-    void doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+    void doGetKeys(OperationContext* opCtx,
+                   const CollectionPtr& collection,
+                   SharedBufferFragmentBuilder& pooledBufferBuilder,
                    const BSONObj& obj,
                    GetKeysContext context,
                    KeyStringSet* keys,

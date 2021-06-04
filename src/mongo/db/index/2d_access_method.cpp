@@ -50,7 +50,9 @@ TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState,
 }
 
 /** Finds the key objects to put in an index */
-void TwoDAccessMethod::doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+void TwoDAccessMethod::doGetKeys(OperationContext* opCtx,
+                                 const CollectionPtr& collection,
+                                 SharedBufferFragmentBuilder& pooledBufferBuilder,
                                  const BSONObj& obj,
                                  GetKeysContext context,
                                  KeyStringSet* keys,

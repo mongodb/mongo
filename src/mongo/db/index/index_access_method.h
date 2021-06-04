@@ -582,7 +582,9 @@ protected:
      * keys are not associated with the document itself, but instead represent multi-key path
      * information that must be stored in a reserved keyspace within the index.
      */
-    virtual void doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+    virtual void doGetKeys(OperationContext* opCtx,
+                           const CollectionPtr& collection,
+                           SharedBufferFragmentBuilder& pooledBufferBuilder,
                            const BSONObj& obj,
                            GetKeysContext context,
                            KeyStringSet* keys,

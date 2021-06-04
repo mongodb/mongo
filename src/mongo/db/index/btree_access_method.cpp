@@ -65,7 +65,9 @@ BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState,
                                             getSortedDataInterface()->getOrdering());
 }
 
-void BtreeAccessMethod::doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+void BtreeAccessMethod::doGetKeys(OperationContext* opCtx,
+                                  const CollectionPtr& collection,
+                                  SharedBufferFragmentBuilder& pooledBufferBuilder,
                                   const BSONObj& obj,
                                   GetKeysContext context,
                                   KeyStringSet* keys,

@@ -127,7 +127,9 @@ StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
     return specObj;
 }
 
-void S2AccessMethod::doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+void S2AccessMethod::doGetKeys(OperationContext* opCtx,
+                               const CollectionPtr& collection,
+                               SharedBufferFragmentBuilder& pooledBufferBuilder,
                                const BSONObj& obj,
                                GetKeysContext context,
                                KeyStringSet* keys,

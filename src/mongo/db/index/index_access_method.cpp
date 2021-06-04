@@ -836,7 +836,15 @@ void AbstractIndexAccessMethod::getKeys(OperationContext* opCtx,
                           id->toString()));
 
     try {
-        doGetKeys(pooledBufferBuilder, obj, context, keys, multikeyMetadataKeys, multikeyPaths, id);
+        doGetKeys(opCtx,
+                  collection,
+                  pooledBufferBuilder,
+                  obj,
+                  context,
+                  keys,
+                  multikeyMetadataKeys,
+                  multikeyPaths,
+                  id);
     } catch (const AssertionException& ex) {
         // Suppress all indexing errors when mode is kRelaxConstraints.
         if (mode == GetKeysMode::kEnforceConstraints) {

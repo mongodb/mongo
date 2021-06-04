@@ -61,7 +61,9 @@ bool WildcardAccessMethod::shouldMarkIndexAsMultikey(size_t numberOfKeys,
     return !multikeyMetadataKeys.empty();
 }
 
-void WildcardAccessMethod::doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+void WildcardAccessMethod::doGetKeys(OperationContext* opCtx,
+                                     const CollectionPtr& collection,
+                                     SharedBufferFragmentBuilder& pooledBufferBuilder,
                                      const BSONObj& obj,
                                      GetKeysContext context,
                                      KeyStringSet* keys,

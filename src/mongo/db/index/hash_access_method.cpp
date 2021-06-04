@@ -49,7 +49,9 @@ HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState,
     _collator = btreeState->getCollator();
 }
 
-void HashAccessMethod::doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+void HashAccessMethod::doGetKeys(OperationContext* opCtx,
+                                 const CollectionPtr& collection,
+                                 SharedBufferFragmentBuilder& pooledBufferBuilder,
                                  const BSONObj& obj,
                                  GetKeysContext context,
                                  KeyStringSet* keys,
