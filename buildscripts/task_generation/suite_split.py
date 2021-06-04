@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from copy import deepcopy
 from datetime import datetime
+from itertools import chain
 from typing import NamedTuple, Callable, Optional, List, Dict, Any
 
 import inject
@@ -188,6 +189,10 @@ class GeneratedSuite(NamedTuple):
         if self.include_build_variant_in_name:
             return f"{base_name}_{self.build_variant}"
         return base_name
+
+    def get_test_list(self) -> List[str]:
+        """Get the list of tests that will be run by this suite."""
+        return list(chain.from_iterable(sub_suite.test_list for sub_suite in self.sub_suites))
 
     def __len__(self) -> int:
         """Get the number of sub-suites."""
