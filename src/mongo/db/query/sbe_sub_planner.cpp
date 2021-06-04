@@ -58,14 +58,14 @@ CandidatePlans SubPlanner::plan(
         // branch of the OR query. In this case, fail with a 'QueryPlanKilled' error.
         _indexExistenceChecker.check();
 
+        // Ensure that no previous plans are registered to yield while we multi plan each branch.
+        _yieldPolicy->clearRegisteredPlans();
+
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots;
         for (auto&& solution : solutions) {
             roots.push_back(stage_builder::buildSlotBasedExecutableTree(
                 _opCtx, _collection, *cq, *solution, _yieldPolicy));
         }
-
-        // Ensure that no previous plans are registered to yield while we multi plan each branch.
-        _yieldPolicy->clearRegisteredPlans();
 
         // Clear any plans registered to yield once multiplanning is done for this branch. We don't
         // want to leave dangling pointers to the execution plans used in multi planning hanging
@@ -82,12 +82,13 @@ CandidatePlans SubPlanner::plan(
         return std::move(candidates[winnerIdx].solution);
     };
 
+    auto subplanSelectStat = QueryPlanner::choosePlanForSubqueries(
+        _cq, _queryParams, std::move(subplanningStatus.getValue()), multiplanCallback);
+
     // One of the indexes in '_queryParams' might have been dropped while planning the final branch
     // of the OR query. In this case, fail with a 'QueryPlanKilled' error.
     _indexExistenceChecker.check();
 
-    auto subplanSelectStat = QueryPlanner::choosePlanForSubqueries(
-        _cq, _queryParams, std::move(subplanningStatus.getValue()), multiplanCallback);
     if (!subplanSelectStat.isOK()) {
         // Query planning can continue if we failed to find a solution for one of the children.
         // Otherwise, it cannot, as it may no longer be safe to access the collection (an index

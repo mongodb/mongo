@@ -682,7 +682,7 @@ void Parser::walkScan(AstQuery& ast) {
                                  forward,
                                  _yieldPolicy,
                                  getCurrentPlanNodeId(),
-                                 ScanCallbacks({}));
+                                 ScanCallbacks{});
 }
 
 void Parser::walkParallelScan(AstQuery& ast) {
@@ -733,7 +733,7 @@ void Parser::walkParallelScan(AstQuery& ast) {
                                          lookupSlots(ast.nodes[projectsPos]->renames),
                                          _yieldPolicy,
                                          getCurrentPlanNodeId(),
-                                         ScanCallbacks({}));
+                                         ScanCallbacks{});
 }
 
 void Parser::walkSeek(AstQuery& ast) {
@@ -796,7 +796,7 @@ void Parser::walkSeek(AstQuery& ast) {
                                  forward,
                                  _yieldPolicy,
                                  getCurrentPlanNodeId(),
-                                 ScanCallbacks({}));
+                                 ScanCallbacks{});
 }
 
 void Parser::walkIndexScan(AstQuery& ast) {
@@ -856,8 +856,7 @@ void Parser::walkIndexScan(AstQuery& ast) {
                                       boost::none,
                                       boost::none,
                                       _yieldPolicy,
-                                      getCurrentPlanNodeId(),
-                                      LockAcquisitionCallback{});
+                                      getCurrentPlanNodeId());
 }
 
 void Parser::walkIndexSeek(AstQuery& ast) {
@@ -917,8 +916,7 @@ void Parser::walkIndexSeek(AstQuery& ast) {
                                       lookupSlot(ast.nodes[0]->identifier),
                                       lookupSlot(ast.nodes[1]->identifier),
                                       _yieldPolicy,
-                                      getCurrentPlanNodeId(),
-                                      LockAcquisitionCallback{});
+                                      getCurrentPlanNodeId());
 }
 
 void Parser::walkProject(AstQuery& ast) {

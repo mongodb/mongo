@@ -123,8 +123,7 @@ protected:
                                             boost::none,
                                             boost::none,
                                             nullptr,
-                                            planNodeId,
-                                            nullptr),
+                                            planNodeId),
             // IXSCAN with 'seekKeySlotLow' / 'seekKeySlotHigh' present.
             sbe::makeS<sbe::IndexScanStage>(fakeUuid,
                                             "_id",
@@ -137,8 +136,7 @@ protected:
                                             sbe::value::SlotId{1},
                                             sbe::value::SlotId{2},
                                             nullptr,
-                                            planNodeId,
-                                            nullptr),
+                                            planNodeId),
             // IXSCAN with 'recordIdSlot' missing and 'seekKeySlotLow' present.
             sbe::makeS<sbe::IndexScanStage>(fakeUuid,
                                             "_id",
@@ -151,8 +149,7 @@ protected:
                                             sbe::value::SlotId{2},
                                             boost::none,
                                             nullptr,
-                                            planNodeId,
-                                            nullptr),
+                                            planNodeId),
             // IXSCAN with all slots except seek keys present.
             sbe::makeS<sbe::IndexScanStage>(fakeUuid,
                                             "_id",
@@ -165,8 +162,7 @@ protected:
                                             boost::none,
                                             boost::none,
                                             nullptr,
-                                            planNodeId,
-                                            nullptr),
+                                            planNodeId),
             // IXSCAN with all slots present.
             sbe::makeS<sbe::IndexScanStage>(fakeUuid,
                                             "_id",
@@ -179,8 +175,7 @@ protected:
                                             sbe::value::SlotId{4},
                                             sbe::value::SlotId{5},
                                             nullptr,
-                                            planNodeId,
-                                            nullptr),
+                                            planNodeId),
             // SCAN with 'recordSlot' and 'recordIdSlot' slots only.
             sbe::makeS<sbe::ScanStage>(fakeUuid,
                                        sbe::value::SlotId{1},
@@ -196,7 +191,7 @@ protected:
                                        true /* forward */,
                                        nullptr,
                                        planNodeId,
-                                       sbe::ScanCallbacks({})),
+                                       sbe::ScanCallbacks{}),
             // SCAN with 'recordSlot', 'recordIdSlot' and 'seekKeySlot' slots.
             sbe::makeS<sbe::ScanStage>(fakeUuid,
                                        sbe::value::SlotId{1},
@@ -212,7 +207,7 @@ protected:
                                        true /* forward */,
                                        nullptr,
                                        planNodeId,
-                                       sbe::ScanCallbacks({})),
+                                       sbe::ScanCallbacks{}),
             // SCAN with all slots present.
             sbe::makeS<sbe::ScanStage>(
                 fakeUuid,
@@ -229,7 +224,7 @@ protected:
                 true /* forward */,
                 nullptr,
                 planNodeId,
-                sbe::ScanCallbacks({})),
+                sbe::ScanCallbacks{}),
             // PSCAN with both 'recordSlot' and 'recordIdSlot' slots present.
             sbe::makeS<sbe::ParallelScanStage>(fakeUuid,
                                                sbe::value::SlotId{1},
@@ -242,7 +237,7 @@ protected:
                                                sbe::makeSV(1, 2),
                                                nullptr,
                                                planNodeId,
-                                               sbe::ScanCallbacks({})),
+                                               sbe::ScanCallbacks{}),
             // PSCAN with 'recordSlot' missing.
             sbe::makeS<sbe::ParallelScanStage>(fakeUuid,
                                                sbe::value::SlotId{1},
@@ -255,7 +250,7 @@ protected:
                                                sbe::makeSV(1, 2),
                                                nullptr,
                                                planNodeId,
-                                               sbe::ScanCallbacks({})),
+                                               sbe::ScanCallbacks{}),
             // PSCAN with all slots.
             sbe::makeS<sbe::ParallelScanStage>(fakeUuid,
                                                sbe::value::SlotId{1},
@@ -268,7 +263,7 @@ protected:
                                                sbe::makeSV(1, 2),
                                                nullptr,
                                                planNodeId,
-                                               sbe::ScanCallbacks({})),
+                                               sbe::ScanCallbacks{}),
             // COSCAN
             sbe::makeS<sbe::CoScanStage>(planNodeId),
             // PROJECT

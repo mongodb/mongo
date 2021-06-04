@@ -49,8 +49,7 @@ IndexScanStage::IndexScanStage(CollectionUUID collUuid,
                                boost::optional<value::SlotId> seekKeySlotLow,
                                boost::optional<value::SlotId> seekKeySlotHigh,
                                PlanYieldPolicy* yieldPolicy,
-                               PlanNodeId nodeId,
-                               LockAcquisitionCallback lockAcquisitionCallback)
+                               PlanNodeId nodeId)
     : PlanStage(seekKeySlotLow ? "ixseek"_sd : "ixscan"_sd, yieldPolicy, nodeId),
       _collUuid(collUuid),
       _indexName(indexName),
@@ -61,8 +60,7 @@ IndexScanStage::IndexScanStage(CollectionUUID collUuid,
       _indexKeysToInclude(indexKeysToInclude),
       _vars(std::move(vars)),
       _seekKeySlotLow(seekKeySlotLow),
-      _seekKeySlotHigh(seekKeySlotHigh),
-      _lockAcquisitionCallback(std::move(lockAcquisitionCallback)) {
+      _seekKeySlotHigh(seekKeySlotHigh) {
     // The valid state is when both boundaries, or none is set, or only low key is set.
     invariant((_seekKeySlotLow && _seekKeySlotHigh) || (!_seekKeySlotLow && !_seekKeySlotHigh) ||
               (_seekKeySlotLow && !_seekKeySlotHigh));
@@ -82,8 +80,7 @@ std::unique_ptr<PlanStage> IndexScanStage::clone() const {
                                             _seekKeySlotLow,
                                             _seekKeySlotHigh,
                                             _yieldPolicy,
-                                            _commonStats.nodeId,
-                                            _lockAcquisitionCallback);
+                                            _commonStats.nodeId);
 }
 
 void IndexScanStage::prepare(CompileCtx& ctx) {
@@ -114,10 +111,10 @@ void IndexScanStage::prepare(CompileCtx& ctx) {
     }
     _seekKeyLowHolder = std::make_unique<value::OwnedValueAccessor>();
 
-    std::tie(_collName, _catalogEpoch) =
-        acquireCollection(_opCtx, _collUuid, _lockAcquisitionCallback, _coll);
+    tassert(5709602, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
+    std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid);
 
-    auto indexCatalog = _coll->getCollection()->getIndexCatalog();
+    auto indexCatalog = _coll->getIndexCatalog();
     auto indexDesc = indexCatalog->findIndexByName(_opCtx, _indexName);
     tassert(4938500,
             str::stream() << "could not find index named '" << _indexName << "' in collection '"
@@ -189,7 +186,7 @@ void IndexScanStage::doSaveState() {
 }
 
 void IndexScanStage::restoreCollectionAndIndex() {
-    restoreCollection(_opCtx, _collName, _collUuid, _catalogEpoch, _lockAcquisitionCallback, _coll);
+    _coll = restoreCollection(_opCtx, _collName, _collUuid, _catalogEpoch);
     auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
@@ -248,7 +245,7 @@ void IndexScanStage::open(bool reOpen) {
 
     if (_open) {
         tassert(5071006, "reopened IndexScanStage but reOpen=false", reOpen);
-        tassert(5071007, "IndexScanStage is open but _coll is not held", _coll);
+        tassert(5071007, "IndexScanStage is open but _coll is null", _coll);
         tassert(5071008, "IndexScanStage is open but don't have _cursor", _cursor);
     } else {
         tassert(5071009, "first open to IndexScanStage but reOpen=true", !reOpen);

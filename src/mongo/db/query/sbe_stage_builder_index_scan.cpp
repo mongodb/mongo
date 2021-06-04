@@ -292,8 +292,7 @@ generateOptimizedMultiIntervalIndexScan(
     boost::optional<sbe::value::SlotId> indexKeyPatternSlot,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     PlanYieldPolicy* yieldPolicy,
-    PlanNodeId planNodeId,
-    sbe::LockAcquisitionCallback lockAcquisitionCallback) {
+    PlanNodeId planNodeId) {
     using namespace std::literals;
 
     auto recordIdSlot = slotIdGenerator->generate();
@@ -376,8 +375,7 @@ generateOptimizedMultiIntervalIndexScan(
                                                  lowKeySlot,
                                                  highKeySlot,
                                                  yieldPolicy,
-                                                 planNodeId,
-                                                 std::move(lockAcquisitionCallback));
+                                                 planNodeId);
 
     // Add a project on top of the index scan to remember the snapshotId of the most recent index
     // key returned by the IndexScan above. Otherwise, the index key's snapshot id would be
@@ -451,8 +449,7 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
                                        boost::optional<sbe::value::SlotId> indexKeyPatternSlot,
                                        sbe::value::SlotIdGenerator* slotIdGenerator,
                                        PlanYieldPolicy* yieldPolicy,
-                                       PlanNodeId planNodeId,
-                                       sbe::LockAcquisitionCallback lockAcquisitionCallback) {
+                                       PlanNodeId planNodeId) {
     // The IndexScanStage in this branch will always produce a KeyString. As such, we use
     // 'indexKeySlot' if is defined and generate a new slot otherwise.
     sbe::value::SlotId resultSlot;
@@ -499,8 +496,7 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
                                                   lowKeySlot,
                                                   boost::none,
                                                   yieldPolicy,
-                                                  planNodeId,
-                                                  std::move(lockAcquisitionCallback));
+                                                  planNodeId);
 
     // Get the low key from the outer side and feed it to the inner side (ixscan).
     sbe::value::SlotVector outerSv = sbe::makeSV();
@@ -631,8 +627,7 @@ generateGenericMultiIntervalIndexScan(const CollectionPtr& collection,
                                       boost::optional<sbe::value::SlotId> indexKeyPatternSlot,
                                       sbe::value::SlotIdGenerator* slotIdGenerator,
                                       sbe::value::SpoolIdGenerator* spoolIdGenerator,
-                                      PlanYieldPolicy* yieldPolicy,
-                                      sbe::LockAcquisitionCallback lockAcquisitionCallback) {
+                                      PlanYieldPolicy* yieldPolicy) {
     using namespace std::literals;
 
     auto resultSlot = slotIdGenerator->generate();
@@ -752,8 +747,7 @@ generateGenericMultiIntervalIndexScan(const CollectionPtr& collection,
         savedKeyPattern,
         slotIdGenerator,
         yieldPolicy,
-        ixn->nodeId(),
-        std::move(lockAcquisitionCallback));
+        ixn->nodeId());
 
     // Construct a union stage from the two branches.
     auto makeSlotVector = [](sbe::value::SlotId headSlot, const sbe::value::SlotVector& varSlots) {
@@ -805,8 +799,7 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
     boost::optional<sbe::value::SlotId> indexKeyPatternSlot,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     PlanYieldPolicy* yieldPolicy,
-    PlanNodeId planNodeId,
-    sbe::LockAcquisitionCallback lockAcquisitionCallback) {
+    PlanNodeId planNodeId) {
     auto recordIdSlot = slotIdGenerator->generate();
     auto lowKeySlot = slotIdGenerator->generate();
     auto highKeySlot = slotIdGenerator->generate();
@@ -860,8 +853,7 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
                                                  lowKeySlot,
                                                  highKeySlot,
                                                  yieldPolicy,
-                                                 planNodeId,
-                                                 std::move(lockAcquisitionCallback));
+                                                 planNodeId);
 
     // Add a project on top of the index scan to remember the snapshotId of the most recent index
     // key returned by the IndexScan above. Otherwise, the index key's snapshot id would be
@@ -896,7 +888,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     const IndexScanNode* ixn,
     const sbe::IndexKeysInclusionSet& originalIndexKeyBitset,
     PlanYieldPolicy* yieldPolicy,
-    sbe::LockAcquisitionCallback lockAcquisitionCallback,
     StringMap<const IndexAccessMethod*>* iamMap,
     bool needsCorruptionCheck) {
 
@@ -970,23 +961,21 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
         auto&& [lowKey, highKey] = intervals[0];
         sbe::value::SlotId recordIdSlot;
 
-        std::tie(recordIdSlot, stage) =
-            generateSingleIntervalIndexScan(collection,
-                                            indexName,
-                                            keyPattern,
-                                            ixn->direction == 1,
-                                            std::move(lowKey),
-                                            std::move(highKey),
-                                            indexKeyBitset,
-                                            indexKeySlots,
-                                            snapshotIdSlot,
-                                            indexIdSlot,
-                                            indexKeySlot,
-                                            indexKeyPatternSlot,
-                                            state.slotIdGenerator,
-                                            yieldPolicy,
-                                            ixn->nodeId(),
-                                            std::move(lockAcquisitionCallback));
+        std::tie(recordIdSlot, stage) = generateSingleIntervalIndexScan(collection,
+                                                                        indexName,
+                                                                        keyPattern,
+                                                                        ixn->direction == 1,
+                                                                        std::move(lowKey),
+                                                                        std::move(highKey),
+                                                                        indexKeyBitset,
+                                                                        indexKeySlots,
+                                                                        snapshotIdSlot,
+                                                                        indexIdSlot,
+                                                                        indexKeySlot,
+                                                                        indexKeyPatternSlot,
+                                                                        state.slotIdGenerator,
+                                                                        yieldPolicy,
+                                                                        ixn->nodeId());
 
         outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
     } else if (intervals.size() > 1) {
@@ -1007,8 +996,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
                                                     indexKeyPatternSlot,
                                                     state.slotIdGenerator,
                                                     yieldPolicy,
-                                                    ixn->nodeId(),
-                                                    std::move(lockAcquisitionCallback));
+                                                    ixn->nodeId());
 
         outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
     } else {
@@ -1027,8 +1015,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
             indexKeyPatternSlot,
             state.slotIdGenerator,
             state.spoolIdGenerator,
-            yieldPolicy,
-            std::move(lockAcquisitionCallback));
+            yieldPolicy);
 
         outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
     }

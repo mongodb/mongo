@@ -40,16 +40,13 @@ namespace sbe {
 using ScanOpenCallback = std::function<void(OperationContext*, const CollectionPtr&, bool)>;
 
 struct ScanCallbacks {
-    ScanCallbacks(LockAcquisitionCallback lockAcquisition,
-                  IndexKeyCorruptionCheckCallback indexKeyCorruptionCheck = {},
+    ScanCallbacks(IndexKeyCorruptionCheckCallback indexKeyCorruptionCheck = {},
                   IndexKeyConsistencyCheckCallback indexKeyConsistencyCheck = {},
                   ScanOpenCallback scanOpen = {})
-        : lockAcquisitionCallback(std::move(lockAcquisition)),
-          indexKeyCorruptionCheckCallback(std::move(indexKeyCorruptionCheck)),
+        : indexKeyCorruptionCheckCallback(std::move(indexKeyCorruptionCheck)),
           indexKeyConsistencyCheckCallBack(std::move(indexKeyConsistencyCheck)),
           scanOpenCallback(std::move(scanOpen)) {}
 
-    LockAcquisitionCallback lockAcquisitionCallback;
     IndexKeyCorruptionCheckCallback indexKeyCorruptionCheckCallback;
     IndexKeyConsistencyCheckCallback indexKeyConsistencyCheckCallBack;
     ScanOpenCallback scanOpenCallback;
@@ -112,6 +109,8 @@ private:
     NamespaceString _collName;
     uint64_t _catalogEpoch;
 
+    CollectionPtr _coll;
+
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.
     TrialRunTracker* _tracker{nullptr};
@@ -133,7 +132,6 @@ private:
     bool _open{false};
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
-    boost::optional<AutoGetCollectionForReadMaybeLockFree> _coll;
     RecordId _key;
     bool _firstGetNext{false};
 
@@ -219,6 +217,8 @@ private:
     NamespaceString _collName;
     uint64_t _catalogEpoch;
 
+    CollectionPtr _coll;
+
     std::shared_ptr<ParallelState> _state;
 
     const ScanCallbacks _scanCallbacks;
@@ -239,7 +239,6 @@ private:
     bool _open{false};
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
-    boost::optional<AutoGetCollectionForReadMaybeLockFree> _coll;
 };
 }  // namespace sbe
 }  // namespace mongo

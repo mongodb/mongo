@@ -71,8 +71,7 @@ public:
                    boost::optional<value::SlotId> seekKeySlotLow,
                    boost::optional<value::SlotId> seekKeySlotHigh,
                    PlanYieldPolicy* yieldPolicy,
-                   PlanNodeId nodeId,
-                   LockAcquisitionCallback lockAcquisitionCallback);
+                   PlanNodeId nodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -119,7 +118,7 @@ private:
     NamespaceString _collName;
     uint64_t _catalogEpoch;
 
-    LockAcquisitionCallback _lockAcquisitionCallback;
+    CollectionPtr _coll;
 
     std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
@@ -139,7 +138,6 @@ private:
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
     std::weak_ptr<const IndexCatalogEntry> _weakIndexCatalogEntry;
     boost::optional<Ordering> _ordering{boost::none};
-    boost::optional<AutoGetCollectionForReadMaybeLockFree> _coll;
     boost::optional<KeyStringEntry> _nextRecord;
 
     // This buffer stores values that are projected out of the index entry. Values in the

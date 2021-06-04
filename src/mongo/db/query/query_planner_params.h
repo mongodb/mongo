@@ -120,16 +120,9 @@ struct QueryPlannerParams {
         // $or use the same fields and have the same indexes available, as in this example.
         ENUMERATE_OR_CHILDREN_LOCKSTEP = 1 << 12,
 
-        // Instructs the planner to produce a plan which will *not* check at runtime that the node's
-        // replica set member state allows reads. Typically, replica set members will only serve
-        // reads to clients if thet are in parimary or secondary state. Client reads are disallowed
-        // in other states, e.g. during initial sync. Internal operations, on the other hand, can
-        // use this flag to exempt themselves from this repl set note state requirement.
-        OMIT_REPL_STATE_PERMITS_READS_CHECK = 1 << 13,
-
         // Ensure that any plan generated returns data that is "owned." That is, all BSONObjs are
         // in an "owned" state and are not pointing to data that belongs to the storage engine.
-        RETURN_OWNED_DATA = 1 << 14,
+        RETURN_OWNED_DATA = 1 << 13,
     };
 
     // See Options enum above.

@@ -141,8 +141,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     std::unique_ptr<sbe::EExpression> seekRecordIdExpression,
     PlanYieldPolicy* yieldPolicy,
     bool isTailableResumeBranch,
-    bool resumeAfterRecordId,
-    sbe::LockAcquisitionCallback lockAcquisitionCallback) {
+    bool resumeAfterRecordId) {
     invariant(seekRecordIdExpression);
 
     const auto forward = csn->direction == CollectionScanParams::FORWARD;
@@ -174,7 +173,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
                                                                   forward,
                                                                   yieldPolicy,
                                                                   csn->nodeId(),
-                                                                  lockAcquisitionCallback),
+                                                                  sbe::ScanCallbacks{}),
                                        sbe::makeSV(seekSlot),
                                        sbe::makeSV(seekSlot),
                                        nullptr,
@@ -247,8 +246,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     const CollectionPtr& collection,
     const CollectionScanNode* csn,
     PlanYieldPolicy* yieldPolicy,
-    bool isTailableResumeBranch,
-    sbe::LockAcquisitionCallback lockAcquisitionCallback) {
+    bool isTailableResumeBranch) {
     invariant(collection->ns().isOplog());
     // We can apply oplog scan optimizations only when at least one of the following was specified.
     invariant(csn->resumeAfterRecordId || csn->minRecord || csn->maxRecord);
@@ -293,8 +291,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     auto&& [fields, slots, tsSlot] = makeOplogTimestampSlotsIfNeeded(
         state.env, state.slotIdGenerator, shouldTrackLatestOplogTimestamp);
 
-    sbe::ScanCallbacks callbacks(
-        lockAcquisitionCallback, {}, {}, makeOpenCallbackIfNeeded(collection, csn));
+    sbe::ScanCallbacks callbacks({}, {}, makeOpenCallbackIfNeeded(collection, csn));
     auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                             resultSlot,
                                             recordIdSlot,
@@ -321,8 +318,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                                std::move(seekRecordIdExpression),
                                                yieldPolicy,
                                                isTailableResumeBranch,
-                                               csn->resumeAfterRecordId.has_value(),
-                                               lockAcquisitionCallback);
+                                               csn->resumeAfterRecordId.has_value());
     }
 
     // Create a filter which checks the first document to ensure either that its 'ts' is less than
@@ -367,7 +363,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
         // the expression does match, then it returns 'false', which causes the filter (and as a
         // result, the branch) to EOF immediately. Note that the resultSlot and recordIdSlot
         // arguments to the ScanStage are boost::none, as we do not need them.
-        sbe::ScanCallbacks branchCallbacks(lockAcquisitionCallback);
+        sbe::ScanCallbacks branchCallbacks{};
         auto minTsBranch = sbe::makeS<sbe::FilterStage<false, true>>(
             sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                        boost::none /* resultSlot */,
@@ -511,7 +507,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                            true /* forward */,
                                            yieldPolicy,
                                            csn->nodeId(),
-                                           std::move(lockAcquisitionCallback)),
+                                           sbe::ScanCallbacks{}),
                 sbe::makeSV(),
                 sbe::makeSV(*seekRecordIdSlot),
                 nullptr,
@@ -542,8 +538,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     const CollectionPtr& collection,
     const CollectionScanNode* csn,
     PlanYieldPolicy* yieldPolicy,
-    bool isTailableResumeBranch,
-    sbe::LockAcquisitionCallback lockAcquisitionCallback) {
+    bool isTailableResumeBranch) {
     const auto forward = csn->direction == CollectionScanParams::FORWARD;
 
     invariant(!csn->shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
@@ -569,8 +564,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     auto&& [fields, slots, tsSlot] = makeOplogTimestampSlotsIfNeeded(
         state.env, state.slotIdGenerator, csn->shouldTrackLatestOplogTimestamp);
 
-    sbe::ScanCallbacks callbacks(
-        lockAcquisitionCallback, {}, {}, makeOpenCallbackIfNeeded(collection, csn));
+    sbe::ScanCallbacks callbacks({}, {}, makeOpenCallbackIfNeeded(collection, csn));
     auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                             resultSlot,
                                             recordIdSlot,
@@ -596,8 +590,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                                                std::move(seekRecordIdExpression),
                                                yieldPolicy,
                                                isTailableResumeBranch,
-                                               true, /* resumeAfterRecordId  */
-                                               lockAcquisitionCallback);
+                                               true /* resumeAfterRecordId  */);
     }
 
     if (csn->filter) {
@@ -629,22 +622,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     const CollectionPtr& collection,
     const CollectionScanNode* csn,
     PlanYieldPolicy* yieldPolicy,
-    bool isTailableResumeBranch,
-    sbe::LockAcquisitionCallback lockAcquisitionCallback) {
+    bool isTailableResumeBranch) {
     if (csn->minRecord || csn->maxRecord || csn->stopApplyingFilterAfterFirstMatch) {
-        return generateOptimizedOplogScan(state,
-                                          collection,
-                                          csn,
-                                          yieldPolicy,
-                                          isTailableResumeBranch,
-                                          std::move(lockAcquisitionCallback));
+        return generateOptimizedOplogScan(
+            state, collection, csn, yieldPolicy, isTailableResumeBranch);
     } else {
-        return generateGenericCollScan(state,
-                                       collection,
-                                       csn,
-                                       yieldPolicy,
-                                       isTailableResumeBranch,
-                                       std::move(lockAcquisitionCallback));
+        return generateGenericCollScan(state, collection, csn, yieldPolicy, isTailableResumeBranch);
     }
 }
 }  // namespace mongo::stage_builder

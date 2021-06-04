@@ -76,7 +76,7 @@ using std::vector;
 static const NamespaceString nss("unittests.QueryStageMultiPlan");
 
 std::unique_ptr<QuerySolution> createQuerySolution() {
-    auto soln = std::make_unique<QuerySolution>(QueryPlannerParams::Options::DEFAULT);
+    auto soln = std::make_unique<QuerySolution>();
     soln->cacheData = std::make_unique<SolutionCacheData>();
     soln->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
     soln->cacheData->tree = std::make_unique<PlanCacheIndexTree>();
@@ -499,12 +499,8 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
         std::make_unique<MultiPlanStage>(_expCtx.get(), ctx.getCollection(), cq.get());
 
     // Put each plan into the MultiPlanStage. Takes ownership of 'firstPlan' and 'secondPlan'.
-    mps->addPlan(std::make_unique<QuerySolution>(QueryPlannerParams::Options::DEFAULT),
-                 std::move(firstPlan),
-                 ws.get());
-    mps->addPlan(std::make_unique<QuerySolution>(QueryPlannerParams::Options::DEFAULT),
-                 std::move(secondPlan),
-                 ws.get());
+    mps->addPlan(std::make_unique<QuerySolution>(), std::move(firstPlan), ws.get());
+    mps->addPlan(std::make_unique<QuerySolution>(), std::move(secondPlan), ws.get());
 
     // Making a PlanExecutor chooses the best plan.
     auto exec = uassertStatusOK(plan_executor_factory::make(_expCtx,
