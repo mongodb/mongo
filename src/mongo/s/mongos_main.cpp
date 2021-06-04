@@ -685,13 +685,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
     globalConnPool.addHook(new ShardingConnectionHook(std::move(unshardedHookList)));
 
-    auto shardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
-    shardedHookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(serviceContext));
-    shardedHookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
-    shardedHookList->addHook(
-        std::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext));
-    shardedHookList->addHook(std::make_unique<rpc::CommittedOpTimeMetadataHook>(serviceContext));
-
     // Hook up a Listener for changes from the ReplicaSetMonitor
     // This will last for the scope of this function. i.e. until shutdown finishes
     auto shardingRSCL =
