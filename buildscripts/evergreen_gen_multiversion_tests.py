@@ -7,6 +7,7 @@ import re
 import tempfile
 from typing import Optional, List
 from collections import defaultdict
+from sys import platform
 
 from subprocess import check_output
 
@@ -221,7 +222,10 @@ def get_multiversion_resmoke_args(is_sharded: bool) -> str:
 
 def get_backports_required_hash_for_shell_version(mongo_shell_path=None):
     """Parse the last-lts shell binary to get the commit hash."""
-    shell_version = check_output([mongo_shell_path, "--version"]).decode('utf-8')
+    if platform.startswith("win"):
+        shell_version = check_output([mongo_shell_path + ".exe", "--version"]).decode('utf-8')
+    else:
+        shell_version = check_output([mongo_shell_path, "--version"]).decode('utf-8')
     for line in shell_version.splitlines():
         if "gitVersion" in line:
             version_line = line.split(':')[1]
