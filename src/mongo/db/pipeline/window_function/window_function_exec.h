@@ -96,6 +96,12 @@ public:
         return _function->getValue();
     }
 
+    void reset() {
+        _function->reset();
+        _values = std::queue<Value>();
+        doReset();
+    }
+
 protected:
     WindowFunctionExecRemovable(PartitionIterator* iter,
                                 PartitionAccessor::Policy policy,
@@ -105,10 +111,6 @@ protected:
         : WindowFunctionExec(PartitionAccessor(iter, policy), memTracker),
           _input(std::move(input)),
           _function(std::move(function)) {}
-
-    void reset() {
-        _function->reset();
-    }
 
     void addValue(Value v) {
         long long prior = _function->getApproximateSize();
@@ -141,6 +143,12 @@ private:
      * entered it? which have left it?) and call addValue(), removeValue() as needed.
      */
     virtual void update() = 0;
+
+    /**
+     * Derived classes should reset their own internal state in the implementation of this instead
+     * of overriding `reset()` to allow for resetting the values owned by the base class.
+     */
+    virtual void doReset() = 0;
 
     std::unique_ptr<WindowFunctionState> _function;
 };

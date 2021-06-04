@@ -55,16 +55,15 @@ public:
                                         WindowBounds::DocumentBased bounds,
                                         MemoryUsageTracker::PerFunctionMemoryTracker* memTracker);
 
-    void reset() final {
-        _values = std::queue<Value>();
-        _initialized = false;
-        _memTracker->set(sizeof(*this));
-        WindowFunctionExecRemovable::reset();
-    }
-
 private:
     void update() final;
     void initialize();
+
+    void doReset() final {
+        _initialized = false;
+        _memTracker->set(sizeof(*this));
+    }
+
 
     void removeFirstValueIfExists() {
         if (_values.size() == 0) {

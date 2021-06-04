@@ -252,4 +252,28 @@ assert.sameMembers(
         {x: 3, y: 0},
         {x: 3, y: 0},
     ]);
+
+// Test that all values in the executors are cleared between partitions.
+coll.drop();
+
+// Create values such that not all will be removed from the first partition and one will be removed
+// from the second.
+assert.commandWorked(coll.insert([
+    {partitionBy: 1, time: new Date(2020, 1, 1, 0, 30, 0, 0), temp: 10},
+    {partitionBy: 1, time: new Date(2020, 1, 1, 1, 31, 0, 0), temp: 11},
+    {partitionBy: 1, time: new Date(2020, 1, 1, 1, 32, 0, 0), temp: 12},
+    {partitionBy: 1, time: new Date(2020, 1, 1, 1, 33, 0, 0), temp: 13},
+    {partitionBy: 2, time: new Date(2020, 1, 1, 2, 31, 0, 0), temp: 5},
+    {partitionBy: 2, time: new Date(2020, 1, 1, 2, 35, 0, 0), temp: 6},
+    {partitionBy: 2, time: new Date(2020, 1, 1, 3, 34, 0, 0), temp: 2},
+]));
+
+const pipeline = [{
+    $setWindowFields: {
+        partitionBy: "$partitionBy",
+        sortBy: {time: 1},
+        output: {min: {$min: "$temp", window: {range: [-1, 0], unit: "hour"}}}
+    }
+}];
+assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}));
 })();
