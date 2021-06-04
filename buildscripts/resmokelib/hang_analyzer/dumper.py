@@ -144,7 +144,6 @@ class WindowsDumper(Dumper):
         """Return the commands that attach to each process, dump info and detach."""
         assert isinstance(pinfo.pidv, int)
 
-        dump_command = ""
         if take_dump:
             # Dump to file, dump_<process name>.<pid>.mdmp
             dump_file = "dump_%s.%d.%s" % (os.path.splitext(pinfo.name)[0], pinfo.pidv,
@@ -152,14 +151,18 @@ class WindowsDumper(Dumper):
             dump_command = ".dump /ma %s" % dump_file
             self._root_logger.info("Dumping core to %s", dump_file)
 
-        cmds = [
-            "!peb",  # Dump current exe, & environment variables
-            "lm",  # Dump loaded modules
-            dump_command,
-            "!uniqstack -pn",  # Dump All unique Threads with function arguments
-            "!cs -l",  # Dump all locked critical sections
-            ".detach",  # Detach
-        ]
+            cmds = [
+                dump_command,
+                ".detach",  # Detach
+            ]
+        else:
+            cmds = [
+                "!peb",  # Dump current exe, & environment variables
+                "lm",  # Dump loaded modules
+                "!uniqstack -pn",  # Dump All unique Threads with function arguments
+                "!cs -l",  # Dump all locked critical sections
+                ".detach",  # Detach
+            ]
 
         return cmds
 
@@ -216,24 +219,32 @@ class LLDBDumper(Dumper):
     def _process_specific(self, pinfo, take_dump, logger=None):
         """Return the commands that attach to each process, dump info and detach."""
         cmds = []
-        dump_files = self._dump_files(pinfo)
-        for pid in pinfo.pidv:
-            dump_command = ""
-            if take_dump:
+
+        if take_dump:
+            dump_files = self._dump_files(pinfo)
+            for pid in pinfo.pidv:
                 # Dump to file, dump_<process name>.<pid>.core
                 dump_file = dump_files[pid]
                 dump_command = "process save-core %s" % dump_file
                 self._root_logger.info("Dumping core to %s", dump_file)
 
-            cmds += [
-                "platform shell kill -CONT %d" % pid,
-                "attach -p %d" % pid,
-                "target modules list",
-                "thread backtrace all",
-                dump_command,
-                "process detach",
-                "platform shell kill -STOP %d" % pid,
-            ]
+                cmds += [
+                    "platform shell kill -CONT %d" % pid,
+                    "attach -p %d" % pid,
+                    dump_command,
+                    "process detach",
+                    "platform shell kill -STOP %d" % pid,
+                ]
+        else:
+            for pid in pinfo.pidv:
+                cmds += [
+                    "platform shell kill -CONT %d" % pid,
+                    "attach -p %d" % pid,
+                    "target modules list",
+                    "thread backtrace all",
+                    "process detach",
+                    "platform shell kill -STOP %d" % pid,
+                ]
 
         return cmds
 
@@ -349,60 +360,68 @@ class GDBDumper(Dumper):
     def _process_specific(  # pylint: disable=too-many-locals
             self, pinfo, take_dump, logger=None):
         """Return the commands that attach to each process, dump info and detach."""
-        mongodb_dump_locks = "mongodb-dump-locks"
-        mongodb_show_locks = "mongodb-show-locks"
-        mongodb_uniqstack = "mongodb-uniqstack mongodb-bt-if-active"
-        mongodb_javascript_stack = "mongodb-javascript-stack"
-        mongod_dump_sessions = "mongod-dump-sessions"
-        mongodb_dump_mutexes = "mongodb-dump-mutexes"
-        mongodb_dump_recovery_units = "mongodb-dump-recovery-units"
-
         cmds = []
-        for pid in pinfo.pidv:
-            if not logger.mongo_process_filename:
-                raw_stacks_commands = []
-            else:
-                base, ext = os.path.splitext(logger.mongo_process_filename)
-                raw_stacks_filename = "%s_%d_raw_stacks%s" % (base, pid, ext)
-                raw_stacks_commands = [
-                    'echo \\nWriting raw stacks to %s.\\n' % raw_stacks_filename,
-                    # This sends output to log file rather than stdout until we turn logging off.
-                    'set logging redirect on',
-                    'set logging file ' + raw_stacks_filename,
-                    'set logging on',
-                    'thread apply all bt',
-                    'set logging off',
-                ]
 
-            dump_command = ""
-            if take_dump:
+        if take_dump:
+            for pid in pinfo.pidv:
                 # Dump to file, dump_<process name>.<pid>.core
                 dump_file = "dump_%s.%d.%s" % (pinfo.name, pid, self.get_dump_ext())
                 dump_command = "gcore %s" % dump_file
                 self._root_logger.info("Dumping core to %s", dump_file)
+                cmds += [
+                    "attach %d" % pid,
+                    "handle SIGSTOP ignore noprint",
+                    # Lock the scheduler, before running commands, which execute code in the attached process.
+                    "set scheduler-locking on",
+                    dump_command,
+                    "detach",
+                ]
+        else:
+            mongodb_dump_locks = "mongodb-dump-locks"
+            mongodb_show_locks = "mongodb-show-locks"
+            mongodb_uniqstack = "mongodb-uniqstack mongodb-bt-if-active"
+            mongodb_javascript_stack = "mongodb-javascript-stack"
+            mongod_dump_sessions = "mongod-dump-sessions"
+            mongodb_dump_mutexes = "mongodb-dump-mutexes"
+            mongodb_dump_recovery_units = "mongodb-dump-recovery-units"
 
-            mongodb_waitsfor_graph = "mongodb-waitsfor-graph debugger_waitsfor_%s_%d.gv" % \
-                (pinfo.name, pid)
+            for pid in pinfo.pidv:
+                if not logger.mongo_process_filename:
+                    raw_stacks_commands = []
+                else:
+                    base, ext = os.path.splitext(logger.mongo_process_filename)
+                    raw_stacks_filename = "%s_%d_raw_stacks%s" % (base, pid, ext)
+                    raw_stacks_commands = [
+                        'echo \\nWriting raw stacks to %s.\\n' % raw_stacks_filename,
+                        # This sends output to log file rather than stdout until we turn logging off.
+                        'set logging redirect on',
+                        'set logging file ' + raw_stacks_filename,
+                        'set logging on',
+                        'thread apply all bt',
+                        'set logging off',
+                    ]
 
-            cmds += [
-                "attach %d" % pid,
-                "handle SIGSTOP ignore noprint",
-                "info sharedlibrary",
-                "info threads",  # Dump a simple list of commands to get the thread name
-            ] + raw_stacks_commands + [
-                mongodb_uniqstack,
-                # Lock the scheduler, before running commands, which execute code in the attached process.
-                "set scheduler-locking on",
-                dump_command,
-                mongodb_dump_locks,
-                mongodb_show_locks,
-                mongodb_waitsfor_graph,
-                mongodb_javascript_stack,
-                mongod_dump_sessions,
-                mongodb_dump_mutexes,
-                mongodb_dump_recovery_units,
-                "detach",
-            ]
+                mongodb_waitsfor_graph = "mongodb-waitsfor-graph debugger_waitsfor_%s_%d.gv" % \
+                    (pinfo.name, pid)
+
+                cmds += [
+                    "attach %d" % pid,
+                    "handle SIGSTOP ignore noprint",
+                    "info sharedlibrary",
+                    "info threads",  # Dump a simple list of commands to get the thread name
+                ] + raw_stacks_commands + [
+                    mongodb_uniqstack,
+                    # Lock the scheduler, before running commands, which execute code in the attached process.
+                    "set scheduler-locking on",
+                    mongodb_dump_locks,
+                    mongodb_show_locks,
+                    mongodb_waitsfor_graph,
+                    mongodb_javascript_stack,
+                    mongod_dump_sessions,
+                    mongodb_dump_mutexes,
+                    mongodb_dump_recovery_units,
+                    "detach",
+                ]
 
         return cmds
 
