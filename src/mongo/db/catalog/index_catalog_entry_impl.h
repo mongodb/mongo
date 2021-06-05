@@ -238,16 +238,8 @@ private:
     // synchronized with the '_indexMultikeyPathsMutex' mutex or are atomic. We don't have the ABA
     // problem as multikey may only go from disabled to enabled. When multikey it stays multikey.
 
-    // Set to true if this index can track path-level multikey information in the catalog. This
-    // member is effectively const after IndexCatalogEntry::init() is called.
-    mutable bool _indexTracksMultikeyPathsInCatalog = false;
-
     // Set to true if this index may contain multikey data.
     mutable AtomicWord<bool> _isMultikeyForRead;
-
-    // Set to true after a transaction commit successfully updates multikey on the catalog data. At
-    // this point, future writers do not need to update the catalog.
-    mutable AtomicWord<bool> _isMultikeyForWrite;
 
     // Controls concurrent access to '_indexMultikeyPathsForRead'.
     // We acquire this mutex rather than the RESOURCE_METADATA lock as a performance optimization
