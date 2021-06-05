@@ -39,5 +39,22 @@ namespace stdx {
 template <class Key, class Value, class Hasher = DefaultHasher<Key>, typename... Args>
 using unordered_map = absl::node_hash_map<Key, Value, EnsureTrustedHasher<Hasher, Key>, Args...>;
 
+/**
+ * Removes the elements from `c` for which `pred(elem)` is true.
+ * Returns the count of elements erased.
+ * See https://en.cppreference.com/w/cpp/container/unordered_map/erase_if
+ * Workaround for the `void erase(iterator)` of `absl::node_hash_map`.
+ */
+template <typename Key, typename T, typename Hash, typename Eq, typename Alloc, typename Pred>
+size_t erase_if(absl::node_hash_map<Key, T, Hash, Eq, Alloc>& c, Pred&& pred) {
+    auto oldSize = c.size();
+    for (auto i = c.begin(), last = c.end(); i != last;)
+        if (pred(*i))
+            c.erase(i++);
+        else
+            ++i;
+    return oldSize - c.size();
+}
+
 }  // namespace stdx
 }  // namespace mongo
