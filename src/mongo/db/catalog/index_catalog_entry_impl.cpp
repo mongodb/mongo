@@ -76,8 +76,6 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
     _descriptor->_entry = this;
     _isReady = collection->isIndexReady(_descriptor->indexName());
 
-    _isMultikeyForRead.store(_catalogIsMultikey(opCtx, collection, nullptr));
-
     auto nss = DurableCatalog::get(opCtx)->getEntry(_catalogId).nss;
     const BSONObj& collation = _descriptor->collation();
     if (!collation.isEmpty()) {
@@ -143,7 +141,7 @@ bool IndexCatalogEntryImpl::isFrozen() const {
 
 bool IndexCatalogEntryImpl::isMultikey(OperationContext* const opCtx,
                                        const CollectionPtr& collection) const {
-    return _isMultikeyForRead.load();
+    return _catalogIsMultikey(opCtx, collection, nullptr);
 }
 
 MultikeyPaths IndexCatalogEntryImpl::getMultikeyPaths(OperationContext* opCtx,
@@ -268,11 +266,6 @@ void IndexCatalogEntryImpl::forceSetMultikey(OperationContext* const opCtx,
     // currently support path-level multikey path tracking.
     coll->forceSetIndexIsMultikey(opCtx, _descriptor.get(), isMultikey, multikeyPaths);
 
-    // The prior call to set the multikey metadata in the catalog does some validation and clean up
-    // based on the inputs, so reset the multikey variables based on what is actually in the durable
-    // catalog entry.
-    _isMultikeyForRead.store(_catalogIsMultikey(opCtx, coll, nullptr));
-
     // Since multikey metadata has changed, invalidate the query cache.
     CollectionQueryInfo::get(coll).clearQueryCacheForSetMultikey(coll);
 }
@@ -376,15 +369,6 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
     // information on an index created before 3.4.
     auto indexMetadataHasChanged =
         collection->setIndexIsMultikey(opCtx, _descriptor->indexName(), multikeyPaths);
-
-    // In the absence of using the storage engine to read from the catalog, we must set multikey
-    // prior to the storage engine transaction committing.
-    //
-    // Moreover, there must not be an `onRollback` handler to reset this back to false. Given a long
-    // enough pause in processing `onRollback` handlers, a later writer that successfully flipped
-    // multikey can be undone. Alternatively, one could use a counter instead of a boolean to avoid
-    // that problem.
-    _isMultikeyForRead.store(true);
 
     if (indexMetadataHasChanged) {
         LOGV2_DEBUG(4718705,

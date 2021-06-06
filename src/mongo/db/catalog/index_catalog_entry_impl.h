@@ -234,13 +234,6 @@ private:
     bool _isFrozen;
     AtomicWord<bool> _isDropped;  // Whether the index drop is committed.
 
-    // Members for multikey are mutable so they can be changed in const functions. We don't have
-    // the ABA problem as multikey may only go from disabled to enabled. When multikey it stays
-    // multikey.
-
-    // Set to true if this index may contain multikey data.
-    mutable AtomicWord<bool> _isMultikeyForRead;
-
     // The earliest snapshot that is allowed to read this index.
     boost::optional<Timestamp> _minVisibleSnapshot;
 };
