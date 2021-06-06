@@ -845,6 +845,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
                     getGlobalReplSettings().usingReplSets() ||
                         repl::ReplSettings::shouldRecoverFromOplogAsStandalone())),
       _isOplog(NamespaceString::oplog(params.ns)),
+      _forceUpdateWithFullDocument(params.forceUpdateWithFullDocument),
       _oplogMaxSize(params.oplogMaxSize),
       _cappedCallback(params.cappedCallback),
       _shuttingDown(false),
@@ -1473,7 +1474,8 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
     const int kMaxDiffBytes = len / 10;
 
     bool skip_update = false;
-    if (!_isLogged && len > kMinLengthForDiff && len <= old_length + kMaxDiffBytes) {
+    if (!_forceUpdateWithFullDocument && !_isLogged && len > kMinLengthForDiff &&
+        len <= old_length + kMaxDiffBytes) {
         int nentries = kMaxEntries;
         std::vector<WT_MODIFY> entries(nentries);
 

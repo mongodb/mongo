@@ -112,6 +112,7 @@ public:
         WiredTigerSizeStorer* sizeStorer;
         bool isReadOnly;
         bool tracksSizeAdjustments;
+        bool forceUpdateWithFullDocument;
     };
 
     WiredTigerRecordStore(WiredTigerKVEngine* kvEngine, OperationContext* opCtx, Params params);
@@ -337,6 +338,9 @@ private:
     const bool _isLogged;
     // True if the namespace of this record store starts with "local.oplog.", and false otherwise.
     const bool _isOplog;
+    // TODO (SERVER-57482): Remove special handling of skipping "wiredtiger_calc_modify()".
+    // True if force to update with the full document, and false otherwise.
+    const bool _forceUpdateWithFullDocument;
     boost::optional<int64_t> _oplogMaxSize;
     RecordId _oplogFirstRecord;
 

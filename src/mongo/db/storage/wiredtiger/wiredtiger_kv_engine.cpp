@@ -1482,6 +1482,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     params.sizeStorer = _sizeStorer.get();
     params.isReadOnly = _readOnly;
     params.tracksSizeAdjustments = true;
+    params.forceUpdateWithFullDocument = options.timeseries != boost::none;
 
     if (NamespaceString::oplog(ns)) {
         // The oplog collection must have a size provided.
@@ -1624,6 +1625,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     // Temporary collections do not need to reconcile collection size/counts.
     params.tracksSizeAdjustments = false;
     params.isReadOnly = false;
+    params.forceUpdateWithFullDocument = false;
 
     std::unique_ptr<WiredTigerRecordStore> rs;
     rs = std::make_unique<StandardWiredTigerRecordStore>(this, opCtx, params);

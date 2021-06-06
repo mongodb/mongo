@@ -82,6 +82,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newNonCappedRecordStore(
     params.sizeStorer = nullptr;
     params.isReadOnly = false;
     params.tracksSizeAdjustments = true;
+    params.forceUpdateWithFullDocument = collOptions.timeseries != boost::none;
 
     auto ret = std::make_unique<StandardWiredTigerRecordStore>(&_engine, &opCtx, params);
     ret->postConstructorInit(&opCtx);
@@ -132,6 +133,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     params.sizeStorer = nullptr;
     params.isReadOnly = false;
     params.tracksSizeAdjustments = true;
+    params.forceUpdateWithFullDocument = false;
     return std::make_unique<StandardWiredTigerRecordStore>(&_engine, &opCtx, params);
 }
 
