@@ -53,24 +53,27 @@ void APIVersionMetrics::update(std::string appName, const APIParameters& apiPara
 }
 
 void APIVersionMetrics::_removeStaleTimestamps(WithLock lk, Date_t now) {
-    for (auto appNameIter = _apiVersionMetrics.begin(); appNameIter != _apiVersionMetrics.end();
-         appNameIter++) {
+    for (auto appNameIter = _apiVersionMetrics.begin(); appNameIter != _apiVersionMetrics.end();) {
         auto& versionTimestamps = appNameIter->second;
 
-        for (auto versionIter = versionTimestamps.begin(); versionIter != versionTimestamps.end();
-             versionIter++) {
+        for (auto versionIter = versionTimestamps.begin();
+             versionIter != versionTimestamps.end();) {
             auto timestamp = versionIter->second;
 
             // Remove any timestamps that are more than one day old.
             if (now - Days(1) > timestamp) {
-                versionTimestamps.erase(versionIter);
+                versionTimestamps.erase(versionIter++);
+            } else {
+                ++versionIter;
             }
         }
 
         // If there are no more timestamps for an application, remove the map associated with
         // application name.
         if (appNameIter->second.empty()) {
-            _apiVersionMetrics.erase(appNameIter);
+            _apiVersionMetrics.erase(appNameIter++);
+        } else {
+            ++appNameIter;
         }
     }
 }
