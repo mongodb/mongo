@@ -76,11 +76,7 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
     _descriptor->_entry = this;
     _isReady = collection->isIndexReady(_descriptor->indexName());
 
-    {
-        stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
-        _isMultikeyForRead.store(
-            _catalogIsMultikey(opCtx, collection, &_indexMultikeyPathsForRead));
-    }
+    _isMultikeyForRead.store(_catalogIsMultikey(opCtx, collection, nullptr));
 
     auto nss = DurableCatalog::get(opCtx)->getEntry(_catalogId).nss;
     const BSONObj& collation = _descriptor->collation();
@@ -152,8 +148,10 @@ bool IndexCatalogEntryImpl::isMultikey(OperationContext* const opCtx,
 
 MultikeyPaths IndexCatalogEntryImpl::getMultikeyPaths(OperationContext* opCtx,
                                                       const CollectionPtr& collection) const {
-    stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
-    return _indexMultikeyPathsForRead;
+    MultikeyPaths indexMultikeyPathsForRead;
+    [[maybe_unused]] const bool isMultikeyInCatalog =
+        _catalogIsMultikey(opCtx, collection, &indexMultikeyPathsForRead);
+    return indexMultikeyPathsForRead;
 }
 
 // ---
@@ -273,10 +271,7 @@ void IndexCatalogEntryImpl::forceSetMultikey(OperationContext* const opCtx,
     // The prior call to set the multikey metadata in the catalog does some validation and clean up
     // based on the inputs, so reset the multikey variables based on what is actually in the durable
     // catalog entry.
-    {
-        stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
-        _isMultikeyForRead.store(_catalogIsMultikey(opCtx, coll, &_indexMultikeyPathsForRead));
-    }
+    _isMultikeyForRead.store(_catalogIsMultikey(opCtx, coll, nullptr));
 
     // Since multikey metadata has changed, invalidate the query cache.
     CollectionQueryInfo::get(coll).clearQueryCacheForSetMultikey(coll);
@@ -390,15 +385,7 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
     // multikey can be undone. Alternatively, one could use a counter instead of a boolean to avoid
     // that problem.
     _isMultikeyForRead.store(true);
-    MultikeyPaths indexMultikeyPathsForWrite;
-    [[maybe_unused]] const bool isMultikeyInCatalog =
-        _catalogIsMultikey(opCtx, collection, &indexMultikeyPathsForWrite);
-    if (!indexMultikeyPathsForWrite.empty()) {
-        _indexMultikeyPathsForRead = indexMultikeyPathsForWrite;
-        for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-            _indexMultikeyPathsForRead[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
-        }
-    }
+
     if (indexMetadataHasChanged) {
         LOGV2_DEBUG(4718705,
                     1,
