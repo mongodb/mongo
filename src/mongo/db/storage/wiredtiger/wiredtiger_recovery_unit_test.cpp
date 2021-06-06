@@ -105,6 +105,7 @@ public:
         params.sizeStorer = nullptr;
         params.tracksSizeAdjustments = true;
         params.isReadOnly = false;
+        params.forceUpdateWithFullDocument = false;
 
         auto ret = std::make_unique<StandardWiredTigerRecordStore>(&_engine, opCtx, params);
         ret->postConstructorInit(opCtx);
