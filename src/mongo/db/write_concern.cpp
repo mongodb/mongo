@@ -125,6 +125,13 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                 }
             }
 
+            // We don't want to apply customized getLastErrorDefaults values during a
+            // multi-document transaction, so return the default WriteConcernOptions.
+            if (opCtx->inMultiDocumentTransaction() &&
+                !isTransactionCommand(cmdObj.firstElementFieldName())) {
+                return WriteConcernOptions();
+            }
+
             auto getLastErrorDefault =
                 repl::ReplicationCoordinator::get(opCtx)->getGetLastErrorDefault();
             // Since replication configs always include all fields (explicitly setting them to the
