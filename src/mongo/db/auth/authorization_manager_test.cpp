@@ -214,47 +214,6 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
 
 #endif
 
-/**
- * An implementation of AuthzManagerExternalStateMock that overrides the getUserDescription method
- * to return the user document unmodified from how it was inserted.  When using this insert user
- * documents in the format that would be returned from a usersInfo command run with
- * showPrivilges:true, rather than the format that would normally be stored in a system.users
- * collection.  The main difference between using this mock and the normal
- * AuthzManagerExternalStateMock is that with this one you should specify the 'inheritedPrivileges'
- * field in any user documents added.
- */
-class AuthzManagerExternalStateMockWithExplicitUserPrivileges
-    : public AuthzManagerExternalStateMock {
-public:
-    /**
-     * This version of getUserDescription just loads the user doc directly as it was inserted into
-     * the mock's user document catalog, without performing any role resolution.  This way the tests
-     * can control exactly what privileges are returned for the user.
-     */
-    Status getUserDescription(OperationContext* opCtx,
-                              const UserRequest& user,
-                              BSONObj* result) override {
-        return _getUserDocument(opCtx, user.name, result);
-    }
-
-private:
-    Status _getUserDocument(OperationContext* opCtx, const UserName& userName, BSONObj* userDoc) {
-        Status status =
-            findOne(opCtx,
-                    AuthorizationManager::usersCollectionNamespace,
-                    BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                         << userName.getUser() << AuthorizationManager::USER_DB_FIELD_NAME
-                         << userName.getDB()),
-                    userDoc);
-        if (status == ErrorCodes::NoMatchingDocument) {
-            status = Status(ErrorCodes::UserNotFound,
-                            str::stream() << "Could not find user \"" << userName.getUser()
-                                          << "\" for db \"" << userName.getDB() << "\"");
-        }
-        return status;
-    }
-};
-
 // Tests SERVER-21535, unrecognized actions should be ignored rather than causing errors.
 TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
     ASSERT_OK(externalState->insertPrivilegeDocument(
