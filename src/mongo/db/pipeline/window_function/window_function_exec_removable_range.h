@@ -68,13 +68,12 @@ public:
                                      WindowBounds bounds,
                                      MemoryUsageTracker::PerFunctionMemoryTracker* memTracker);
 
-    void reset() final {
+private:
+    void doReset() final {
         _lastEndpoints = boost::none;
         _memTracker->set(0);
-        WindowFunctionExecRemovable::reset();
     }
 
-private:
     void update() final;
 
     boost::intrusive_ptr<ExpressionFieldPath> _sortBy;
