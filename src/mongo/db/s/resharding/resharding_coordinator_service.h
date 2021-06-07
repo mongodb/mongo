@@ -188,6 +188,11 @@ public:
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override;
 
+    std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> getAllReshardingInstances(
+        OperationContext* opCtx) {
+        return getAllInstances(opCtx);
+    }
+
     /**
      * Tries to abort all active reshardCollection operations. Note that this doesn't differentiate
      * between operations interrupted due to stepdown or abort. Callers who wish to confirm that
@@ -206,7 +211,7 @@ class ReshardingCoordinatorService::ReshardingCoordinator final
 public:
     explicit ReshardingCoordinator(
         const ReshardingCoordinatorService* coordinatorService,
-        const BSONObj& state,
+        const ReshardingCoordinatorDocument& coordinatorDoc,
         std::shared_ptr<ReshardingCoordinatorExternalState> externalState);
     ~ReshardingCoordinator() = default;
 
@@ -225,6 +230,10 @@ public:
      */
     void installCoordinatorDoc(OperationContext* opCtx,
                                const ReshardingCoordinatorDocument& doc) noexcept;
+
+    CommonReshardingMetadata getMetadata() const {
+        return _metadata;
+    }
 
     /**
      * Returns a Future that will be resolved when all work associated with this Instance has
@@ -422,6 +431,10 @@ private:
 
     // The primary-only service instance corresponding to the coordinator instance. Not owned.
     const ReshardingCoordinatorService* const _coordinatorService;
+
+    // The in-memory representation of the immutable portion of the document in
+    // config.reshardingOperations.
+    const CommonReshardingMetadata _metadata;
 
     // Observes writes that indicate state changes for this resharding operation and notifies
     // 'this' when all donors/recipients have entered some state so that 'this' can transition

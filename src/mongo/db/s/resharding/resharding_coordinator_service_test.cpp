@@ -201,7 +201,10 @@ public:
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
         return std::make_shared<ReshardingCoordinator>(
-            this, std::move(initialState), std::make_shared<ExternalStateForTest>());
+            this,
+            ReshardingCoordinatorDocument::parse(
+                IDLParserErrorContext("ReshardingCoordinatorStateDoc"), std::move(initialState)),
+            std::make_shared<ExternalStateForTest>());
     }
 };
 

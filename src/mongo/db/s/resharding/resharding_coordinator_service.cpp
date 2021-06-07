@@ -926,7 +926,10 @@ ThreadPool::Limits ReshardingCoordinatorService::getThreadPoolLimits() const {
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService::constructInstance(
     BSONObj initialState) {
     return std::make_shared<ReshardingCoordinator>(
-        this, std::move(initialState), std::make_shared<ReshardingCoordinatorExternalStateImpl>());
+        this,
+        ReshardingCoordinatorDocument::parse(IDLParserErrorContext("ReshardingCoordinatorStateDoc"),
+                                             std::move(initialState)),
+        std::make_shared<ReshardingCoordinatorExternalStateImpl>());
 }
 
 ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
@@ -971,13 +974,13 @@ void ReshardingCoordinatorService::abortAllReshardCollection(OperationContext* o
 
 ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(
     const ReshardingCoordinatorService* coordinatorService,
-    const BSONObj& state,
+    const ReshardingCoordinatorDocument& coordinatorDoc,
     std::shared_ptr<ReshardingCoordinatorExternalState> externalState)
     : PrimaryOnlyService::TypedInstance<ReshardingCoordinator>(),
-      _id(state["_id"].wrap().getOwned()),
+      _id(coordinatorDoc.getReshardingUUID().toBSON()),
       _coordinatorService(coordinatorService),
-      _coordinatorDoc(ReshardingCoordinatorDocument::parse(
-          IDLParserErrorContext("ReshardingCoordinatorStateDoc"), state)),
+      _metadata(coordinatorDoc.getCommonReshardingMetadata()),
+      _coordinatorDoc(coordinatorDoc),
       _markKilledExecutor(std::make_shared<ThreadPool>([] {
           ThreadPool::Options options;
           options.poolName = "ReshardingCoordinatorCancelableOpCtxPool";
@@ -1122,7 +1125,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_runUntilReadyToPersistDeci
             }
 
             if (_coordinatorDoc.getState() < CoordinatorStateEnum::kPreparingToDonate) {
-                // Participants were never made aware of the resharding opeartion. Abort without
+                // Participants were never made aware of the resharding operation. Abort without
                 // waiting for participant acknowledgement.
                 _onAbortCoordinatorOnly(executor, status);
             } else {
