@@ -514,16 +514,21 @@ public:
     RadixStore(const RadixStore& other) : _root(make_intrusive_node<Head>(*(other._root))) {}
     RadixStore(const Head& other) : _root(make_intrusive_node<Head>(other)) {}
 
-    friend void swap(RadixStore& first, RadixStore& second) {
-        std::swap(first._root, second._root);
-    }
-
     RadixStore(RadixStore&& other) {
         _root = std::move(other._root);
     }
 
-    RadixStore& operator=(RadixStore other) {
-        swap(*this, other);
+    RadixStore& operator=(const RadixStore& other) {
+        if (this != &other) {
+            _root = make_intrusive_node<Head>(*(other._root));
+        }
+        return *this;
+    }
+
+    RadixStore& operator=(RadixStore&& other) {
+        if (this != &other) {
+            _root = std::move(other._root);
+        }
         return *this;
     }
 
