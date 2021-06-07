@@ -93,6 +93,16 @@ SharedSemiFuture<void> TenantMigrationRecipientAccessBlocker::getCanReadFuture(
         return SharedSemiFuture<void>();
     }
 
+    if (opCtx->getClient()->session() &&
+        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient)) {
+        LOGV2_DEBUG(5739900,
+                    1,
+                    "Internal tenant read got excluded from the MTAB filtering",
+                    "tenantId"_attr = _tenantId,
+                    "opId"_attr = opCtx->getOpID());
+        return SharedSemiFuture<void>();
+    }
+
     auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     auto atClusterTime = [opCtx, &readConcernArgs]() -> boost::optional<Timestamp> {
         if (auto atClusterTime = readConcernArgs.getArgsAtClusterTime()) {

@@ -1,7 +1,7 @@
 /**
  * Tests that during tenant migration, a new recipient node's state document and in-memory state is
  * initialized after initial sync, when 1) the node hasn't begun cloning data yet, 2) is cloning
- * data.
+ * data, and 3) is in the tenant oplog application phase.
  *
  * @tags: [requires_fcv_49, requires_majority_read_concern, requires_persistence,
  * incompatible_with_eft, incompatible_with_windows_tls, incompatible_with_macos]
@@ -35,8 +35,11 @@ if (!TenantMigrationUtil.isFeatureFlagEnabled(donorRst.getPrimary())) {
     return;
 }
 
+const testDBName = 'testDB';
+const testCollName = 'testColl';
+
 // Restarts a node, allows the node to go through initial sync, and then makes sure its state
-// matches up with the primary's.
+// matches up with the primary's. Returns the initial sync node.
 function restartNodeAndCheckState(tenantId, tenantMigrationTest, checkMtab) {
     // Restart a node and allow it to complete initial sync.
     const recipientRst = tenantMigrationTest.getRecipientRst();
@@ -84,9 +87,51 @@ function restartNodeAndCheckState(tenantId, tenantMigrationTest, checkMtab) {
                   `Mtab didn't match, primary: ${primaryMtab}, on new node: ${newNodeMtab}`);
     }
 
+    return initialSyncNode;
+}
+
+// Restarts a node for before tenant oplog application. Ensures its state matches up with the
+// primary's, and then steps it up.
+function restartNodeAndCheckStateBeforeOplogApplication(
+    tenantId, tenantMigrationTest, checkMtab, fpOnRecipient) {
+    fpOnRecipient.wait();
+
+    const initialSyncNode = restartNodeAndCheckState(tenantId, tenantMigrationTest, checkMtab);
+
     jsTestLog("Stepping up the new node.");
     // Now step up the new node
     assert.commandWorked(initialSyncNode.adminCommand({"replSetStepUp": 1}));
+    fpOnRecipient.off();
+}
+
+// Pauses the recipient before the tenant oplog application phase, and inserts documents on the
+// donor that the recipient tenant oplog applier must apply. Then restarts node, allows initial
+// sync, and steps the restarted node up.
+function restartNodeAndCheckStateDuringOplogApplication(
+    tenantId, tenantMigrationTest, checkMtab, fpOnRecipient) {
+    fpOnRecipient.wait();
+
+    // Insert documents into the donor after data cloning but before tenant oplog application, so
+    // that the recipient has entries to apply during tenant oplog application.
+    tenantMigrationTest.insertDonorDB(
+        tenantMigrationTest.tenantDB(tenantId, testDBName),
+        testCollName,
+        [...Array(30).keys()].map((i) => ({a: i, b: "George Harrison - All Things Must Pass"})));
+
+    // Pause the tenant oplog applier before applying a batch.
+    const originalRecipientPrimary = tenantMigrationTest.getRecipientPrimary();
+    const fpPauseOplogApplierOnBatch =
+        configureFailPoint(originalRecipientPrimary, "fpBeforeTenantOplogApplyingBatch");
+    fpOnRecipient.off();
+
+    // Wait until the oplog applier has started and is trying to apply a batch. Then restart a node.
+    fpPauseOplogApplierOnBatch.wait();
+    const initialSyncNode = restartNodeAndCheckState(tenantId, tenantMigrationTest, checkMtab);
+
+    jsTestLog("Stepping up the new node.");
+    // Now step up the new node
+    assert.commandWorked(initialSyncNode.adminCommand({"replSetStepUp": 1}));
+    fpPauseOplogApplierOnBatch.off();
 }
 
 // This function does the following:
@@ -98,25 +143,26 @@ function restartNodeAndCheckState(tenantId, tenantMigrationTest, checkMtab) {
 // 4. Makes sure the restarted node's state is as expected.
 // 5. Steps up the restarted node as the recipient primary, lifts the recipient failpoint, and
 //    allows the migration to complete.
-function runTestCase(tenantId, recipientFailpoint, checkMtab) {
-    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst: donorRst});
+function runTestCase(tenantId, recipientFailpoint, checkMtab, restartNodeAndCheckStateFunction) {
+    const tenantMigrationTest = new TenantMigrationTest({
+        name: jsTestName(),
+        donorRst: donorRst,
+        sharedOptions: {setParameter: {tenantApplierBatchSizeOps: 2}}
+    });
 
     const migrationOpts = {migrationIdString: extractUUIDFromObject(UUID()), tenantId: tenantId};
-    const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
-    const collName = "testColl";
+    const dbName = tenantMigrationTest.tenantDB(tenantId, testDBName);
     const originalRecipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
     const fpOnRecipient =
         configureFailPoint(originalRecipientPrimary, recipientFailpoint, {action: "hang"});
-    tenantMigrationTest.insertDonorDB(dbName, collName);
+    tenantMigrationTest.insertDonorDB(dbName, testCollName);
 
     jsTestLog(`Starting a tenant migration with migrationID ${
         migrationOpts.migrationIdString}, and tenantId ${tenantId}`);
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
-    fpOnRecipient.wait();
-    restartNodeAndCheckState(tenantId, tenantMigrationTest, checkMtab);
-    fpOnRecipient.off();
+    restartNodeAndCheckStateFunction(tenantId, tenantMigrationTest, checkMtab, fpOnRecipient);
 
     // Allow the migration to run to completion.
     jsTestLog("Allowing migration to run to completion.");
@@ -128,12 +174,20 @@ function runTestCase(tenantId, recipientFailpoint, checkMtab) {
     tenantMigrationTest.stop();
 }
 
-runTestCase(
-    'tenantId1', "fpAfterStartingOplogFetcherMigrationRecipientInstance", false /* checkMtab */);
-runTestCase('tenantId2', "fpAfterDataConsistentMigrationRecipientInstance", true /* checkMtab */);
+runTestCase('tenantId1',
+            "fpAfterStartingOplogFetcherMigrationRecipientInstance",
+            false /* checkMtab */,
+            restartNodeAndCheckStateBeforeOplogApplication);
+runTestCase('tenantId2',
+            "fpAfterDataConsistentMigrationRecipientInstance",
+            true /* checkMtab */,
+            restartNodeAndCheckStateBeforeOplogApplication);
 
-// TODO: SERVER-57399 Add a test case to initial sync a node while the recipient is in the oplog
-// application phase.
+// Test case to initial sync a node while the recipient is in the oplog application phase.
+runTestCase('tenantId3',
+            "fpAfterFetchingCommittedTransactions",
+            true /* checkMtab */,
+            restartNodeAndCheckStateDuringOplogApplication);
 
 donorRst.stopSet();
 })();
