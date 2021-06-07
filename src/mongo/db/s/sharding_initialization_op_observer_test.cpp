@@ -137,10 +137,14 @@ TEST_F(ShardingInitializationOpObserverTest, GlobalInitDoesntGetsCalledIfNSIsNot
 
 TEST_F(ShardingInitializationOpObserverTest, OnInsertOpThrowWithIncompleteShardIdentityDocument) {
     DBDirectClient client(operationContext());
-    client.insert("admin.system.version",
-                  BSON("_id" << ShardIdentityType::IdName << ShardIdentity::kShardNameFieldName
-                             << kShardName));
-    ASSERT(!client.getLastError().empty());
+
+    auto response = client.insertAcknowledged(
+        "admin.system.version",
+        {BSON("_id" << ShardIdentityType::IdName << ShardIdentity::kShardNameFieldName
+                    << kShardName)});
+
+    ASSERT_NOT_OK(getStatusFromWriteCommandReply(response));
+    ASSERT_EQ(0, response["n"].Int());
 }
 
 }  // namespace

@@ -131,8 +131,9 @@ protected:
         if (docs.empty())
             return;
 
-        client()->insert(kNss.ns(), docs);
-        ASSERT_EQ("", client()->getLastError());
+        auto response = client()->insertAcknowledged(kNss.ns(), docs);
+        ASSERT_OK(getStatusFromWriteCommandReply(response));
+        ASSERT_GT(response["n"].Int(), 0);
     }
 
     /**

@@ -53,14 +53,8 @@ LogicalSessionRecord makeRecord(Date_t time = Date_t::now()) {
 
 Status insertRecord(OperationContext* opCtx, LogicalSessionRecord record) {
     DBDirectClient client(opCtx);
-
-    client.insert(kTestNS.toString(), record.toBSON());
-    auto errorString = client.getLastError();
-    if (errorString.empty()) {
-        return Status::OK();
-    }
-
-    return {ErrorCodes::DuplicateSession, errorString};
+    auto response = client.insertAcknowledged(kTestNS.toString(), {record.toBSON()});
+    return getStatusFromWriteCommandReply(response);
 }
 
 BSONObj lsidQuery(const LogicalSessionId& lsid) {

@@ -83,7 +83,6 @@ env.Program(
         'directclienttests.cpp',
         'documentsourcetests.cpp',
         'extensions_callback_real_test.cpp',
-        'gle_test.cpp',
         'index_access_method_test.cpp',
         'indexcatalogtests.cpp',
         'indexupdatetests.cpp',

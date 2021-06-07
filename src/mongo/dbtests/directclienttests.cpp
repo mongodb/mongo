@@ -68,15 +68,16 @@ public:
         objs.push_back(BSON("_id" << 1));
         objs.push_back(BSON("_id" << 2));
 
-
         client.dropCollection(ns);
-        client.insert(ns, objs);
-        ASSERT_EQUALS(client.getLastErrorDetailed()["code"].numberInt(), 11000);
+
+        auto response = client.insertAcknowledged(ns, objs);
+        ASSERT_EQUALS(ErrorCodes::DuplicateKey, getStatusFromWriteCommandReply(response));
         ASSERT_EQUALS((int)client.count(NamespaceString(ns)), 1);
 
         client.dropCollection(ns);
-        client.insert(ns, objs, InsertOption_ContinueOnError);
-        ASSERT_EQUALS(client.getLastErrorDetailed()["code"].numberInt(), 11000);
+
+        response = client.insertAcknowledged(ns, objs, InsertOption_ContinueOnError);
+        ASSERT_EQUALS(ErrorCodes::DuplicateKey, getStatusFromWriteCommandReply(response));
         ASSERT_EQUALS((int)client.count(NamespaceString(ns)), 2);
     }
 };
@@ -128,8 +129,8 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
 
-        client.insert("", BSONObj(), 0);
-        ASSERT(!client.getLastError().empty());
+        auto response = client.insertAcknowledged("", {BSONObj()}, 0);
+        ASSERT_EQ(ErrorCodes::InvalidNamespace, getStatusFromCommandResult(response));
     }
 };
 
@@ -140,8 +141,8 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
 
-        client.update("", Query(), BSON("$set" << BSON("x" << 1)));
-        ASSERT(!client.getLastError().empty());
+        auto response = client.updateAcknowledged("", Query(), BSON("$set" << BSON("x" << 1)));
+        ASSERT_EQ(ErrorCodes::InvalidNamespace, getStatusFromCommandResult(response));
     }
 };
 
@@ -152,8 +153,8 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
 
-        client.remove("", Query());
-        ASSERT(!client.getLastError().empty());
+        auto response = client.removeAcknowledged("", Query());
+        ASSERT_EQ(ErrorCodes::InvalidNamespace, getStatusFromCommandResult(response));
     }
 };
 

@@ -457,30 +457,9 @@ TEST(MockDBClientConnTest, CyclingCmd) {
     }
 }
 
-TEST(MockDBClientConnTest, CmdWithMultiFields) {
-    MockRemoteDBServer server("test");
-    server.setCommandReply("getLastError", BSON("ok" << 1 << "n" << 10));
-
-    MockDBClientConnection conn(&server);
-    BSONObj response;
-    ASSERT(conn.runCommand(
-        "foo.baz", BSON("getLastError" << 1 << "w" << 2 << "journal" << true), response));
-
-    ASSERT_EQUALS(10, response["n"].numberInt());
-}
-
-TEST(MockDBClientConnTest, BadCmd) {
-    MockRemoteDBServer server("test");
-    server.setCommandReply("getLastError", BSON("ok" << 0));
-
-    MockDBClientConnection conn(&server);
-    BSONObj response;
-    ASSERT(!conn.runCommand("foo.baz", BSON("getLastError" << 1), response));
-}
-
 TEST(MockDBClientConnTest, MultipleStoredResponse) {
     MockRemoteDBServer server("test");
-    server.setCommandReply("getLastError", BSON("ok" << 1 << "n" << 10));
+    server.setCommandReply("serverStatus", BSON("ok" << 0));
     server.setCommandReply("isMaster", BSON("ok" << 1 << "secondary" << false));
 
     MockDBClientConnection conn(&server);
@@ -495,8 +474,7 @@ TEST(MockDBClientConnTest, MultipleStoredResponse) {
 
     {
         BSONObj response;
-        ASSERT(conn.runCommand("a.b", BSON("getLastError" << 1), response));
-        ASSERT_EQUALS(10, response["n"].numberInt());
+        ASSERT(!conn.runCommand("a.b", BSON("serverStatus" << 1), response));
     }
 }
 

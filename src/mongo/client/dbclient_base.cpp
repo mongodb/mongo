@@ -879,17 +879,11 @@ unsigned long long DBClientBase::query(std::function<void(DBClientCursorBatchIte
     return n;
 }
 
-void DBClientBase::insert(const string& ns,
-                          BSONObj obj,
-                          int flags,
-                          boost::optional<BSONObj> writeConcernObj) {
-    insert(ns, std::vector<BSONObj>{obj}, flags, writeConcernObj);
-}
-
-void DBClientBase::insert(const string& ns,
-                          const vector<BSONObj>& v,
-                          int flags,
-                          boost::optional<BSONObj> writeConcernObj) {
+namespace {
+OpMsgRequest createInsertRequest(const string& ns,
+                                 const vector<BSONObj>& v,
+                                 int flags,
+                                 boost::optional<BSONObj> writeConcernObj) {
     bool ordered = !(flags & InsertOption_ContinueOnError);
     auto nss = NamespaceString(ns);
     BSONObjBuilder cmdBuilder;
@@ -901,33 +895,15 @@ void DBClientBase::insert(const string& ns,
     auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
     request.sequences.push_back({"documents", v});
 
-    runFireAndForgetCommand(std::move(request));
+    return request;
 }
 
-void DBClientBase::remove(const string& ns,
-                          Query obj,
-                          int flags,
-                          boost::optional<BSONObj> writeConcernObj) {
-    int limit = (flags & RemoveOption_JustOne) ? 1 : 0;
-    auto nss = NamespaceString(ns);
-
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("delete", nss.coll());
-    if (writeConcernObj) {
-        cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
-    }
-    auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
-    request.sequences.push_back({"deletes", {BSON("q" << obj.obj << "limit" << limit)}});
-
-    runFireAndForgetCommand(std::move(request));
-}
-
-void DBClientBase::update(const string& ns,
-                          Query query,
-                          BSONObj obj,
-                          bool upsert,
-                          bool multi,
-                          boost::optional<BSONObj> writeConcernObj) {
+OpMsgRequest createUpdateRequest(const string& ns,
+                                 Query query,
+                                 BSONObj obj,
+                                 bool upsert,
+                                 bool multi,
+                                 boost::optional<BSONObj> writeConcernObj) {
     auto nss = NamespaceString(ns);
 
     BSONObjBuilder cmdBuilder;
@@ -940,6 +916,87 @@ void DBClientBase::update(const string& ns,
         {"updates",
          {BSON("q" << query.obj << "u" << obj << "upsert" << upsert << "multi" << multi)}});
 
+    return request;
+}
+
+OpMsgRequest createRemoveRequest(const string& ns,
+                                 Query obj,
+                                 int flags,
+                                 boost::optional<BSONObj> writeConcernObj) {
+    int limit = (flags & RemoveOption_JustOne) ? 1 : 0;
+    auto nss = NamespaceString(ns);
+
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append("delete", nss.coll());
+    if (writeConcernObj) {
+        cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
+    }
+    auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
+    request.sequences.push_back({"deletes", {BSON("q" << obj.obj << "limit" << limit)}});
+
+    return request;
+}
+}  // namespace
+
+BSONObj DBClientBase::insertAcknowledged(const string& ns,
+                                         const vector<BSONObj>& v,
+                                         int flags,
+                                         boost::optional<BSONObj> writeConcernObj) {
+    OpMsgRequest request = createInsertRequest(ns, v, flags, writeConcernObj);
+    rpc::UniqueReply reply = runCommand(std::move(request));
+    return reply->getCommandReply();
+}
+
+void DBClientBase::insert(const string& ns,
+                          BSONObj obj,
+                          int flags,
+                          boost::optional<BSONObj> writeConcernObj) {
+    insert(ns, std::vector<BSONObj>{obj}, flags, writeConcernObj);
+}
+
+void DBClientBase::insert(const string& ns,
+                          const vector<BSONObj>& v,
+                          int flags,
+                          boost::optional<BSONObj> writeConcernObj) {
+    auto request = createInsertRequest(ns, v, flags, writeConcernObj);
+    runFireAndForgetCommand(std::move(request));
+}
+
+BSONObj DBClientBase::removeAcknowledged(const string& ns,
+                                         Query obj,
+                                         int flags,
+                                         boost::optional<BSONObj> writeConcernObj) {
+    OpMsgRequest request = createRemoveRequest(ns, obj, flags, writeConcernObj);
+    rpc::UniqueReply reply = runCommand(std::move(request));
+    return reply->getCommandReply();
+}
+
+void DBClientBase::remove(const string& ns,
+                          Query obj,
+                          int flags,
+                          boost::optional<BSONObj> writeConcernObj) {
+    auto request = createRemoveRequest(ns, obj, flags, writeConcernObj);
+    runFireAndForgetCommand(std::move(request));
+}
+
+BSONObj DBClientBase::updateAcknowledged(const string& ns,
+                                         Query query,
+                                         BSONObj obj,
+                                         bool upsert,
+                                         bool multi,
+                                         boost::optional<BSONObj> writeConcernObj) {
+    auto request = createUpdateRequest(ns, query, obj, upsert, multi, writeConcernObj);
+    rpc::UniqueReply reply = runCommand(std::move(request));
+    return reply->getCommandReply();
+}
+
+void DBClientBase::update(const string& ns,
+                          Query query,
+                          BSONObj obj,
+                          bool upsert,
+                          bool multi,
+                          boost::optional<BSONObj> writeConcernObj) {
+    auto request = createUpdateRequest(ns, query, obj, upsert, multi, writeConcernObj);
     runFireAndForgetCommand(std::move(request));
 }
 

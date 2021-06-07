@@ -687,7 +687,15 @@ public:
                                                     int options = 0);
 
     /**
-       insert an object into the database
+     * Executes an acknowledged command to insert a vector of documents.
+     */
+    virtual BSONObj insertAcknowledged(const std::string& ns,
+                                       const std::vector<BSONObj>& v,
+                                       int flags = 0,
+                                       boost::optional<BSONObj> writeConcernObj = boost::none);
+
+    /**
+     * Executes a fire-and-forget command to insert a single document.
      */
     virtual void insert(const std::string& ns,
                         BSONObj obj,
@@ -695,7 +703,7 @@ public:
                         boost::optional<BSONObj> writeConcernObj = boost::none);
 
     /**
-       insert a vector of objects into the database
+     * Executes a fire-and-forget command to insert a vector of documents.
      */
     virtual void insert(const std::string& ns,
                         const std::vector<BSONObj>& v,
@@ -703,7 +711,17 @@ public:
                         boost::optional<BSONObj> writeConcernObj = boost::none);
 
     /**
-       updates objects matching query
+     * Executes an acknowledged command to update the objects that match the query.
+     */
+    virtual BSONObj updateAcknowledged(const std::string& ns,
+                                       Query query,
+                                       BSONObj obj,
+                                       bool upsert = false,
+                                       bool multi = false,
+                                       boost::optional<BSONObj> writeConcernObj = boost::none);
+
+    /**
+     * Executes a fire-and-forget command to update the objects that match the query.
      */
     virtual void update(const std::string& ns,
                         Query query,
@@ -718,6 +736,17 @@ public:
                         int flags,
                         boost::optional<BSONObj> writeConcernObj = boost::none);
 
+    /**
+     * Executes an acknowledged command to remove the objects that match the query.
+     */
+    virtual BSONObj removeAcknowledged(const std::string& ns,
+                                       Query query,
+                                       int flags = 0,
+                                       boost::optional<BSONObj> writeConcernObj = boost::none);
+
+    /**
+     * Executes a fire-and-forget command to remove the objects that match the query.
+     */
     virtual void remove(const std::string& ns,
                         Query query,
                         int flags = 0,

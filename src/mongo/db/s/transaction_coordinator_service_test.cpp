@@ -239,8 +239,11 @@ TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, OperationsBlockBeforeSte
 
 TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, StepUpFailsDueToBadCoordinatorDocument) {
     DBDirectClient client(operationContext());
-    client.insert(NamespaceString::kTransactionCoordinatorsNamespace.ns(), BSON("IllegalKey" << 1));
-    ASSERT_EQ("", client.getLastError());
+
+    auto response = client.insertAcknowledged(
+        NamespaceString::kTransactionCoordinatorsNamespace.ns(), {BSON("IllegalKey" << 1)});
+    ASSERT_OK(getStatusFromWriteCommandReply(response));
+    ASSERT_EQ(1, response["n"].Int());
 
     service()->onStepUp(operationContext());
     auto stepDownGuard = makeGuard([&] { service()->onStepDown(); });

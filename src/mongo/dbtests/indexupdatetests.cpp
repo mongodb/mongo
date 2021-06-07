@@ -568,9 +568,9 @@ public:
         indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale"
                                                                   << "fr")));
         client.createIndex(_ns, indexSpec);
-        client.insert(_ns, BSON("a" << BSONSymbol("mySymbol")));
-        ASSERT_EQUALS(client.getLastErrorDetailed()["code"].numberInt(),
-                      ErrorCodes::CannotBuildIndexKeys);
+
+        auto response = client.insertAcknowledged(_ns, {BSON("a" << BSONSymbol("mySymbol"))});
+        ASSERT_EQUALS(getStatusFromWriteCommandReply(response), ErrorCodes::CannotBuildIndexKeys);
         ASSERT_EQUALS(client.count(_nss), 0U);
     }
 };
@@ -584,8 +584,10 @@ public:
         IndexSpec indexSpec;
         indexSpec.addKey("a");
         client.createIndex(_ns, indexSpec);
-        client.insert(_ns, BSON("a" << BSONSymbol("mySymbol")));
-        ASSERT(client.getLastError().empty());
+
+        auto response = client.insertAcknowledged(_ns, {BSON("a" << BSONSymbol("mySymbol"))});
+        ASSERT_OK(getStatusFromWriteCommandReply(response));
+        ASSERT_EQUALS(response["n"].Int(), 1);
         ASSERT_EQUALS(client.count(_nss), 1U);
     }
 };
@@ -600,9 +602,10 @@ public:
         indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale"
                                                                   << "fr")));
         client.createIndex(_ns, indexSpec);
-        client.insert(_ns, BSON("a" << BSON("b" << 99 << "c" << BSONSymbol("mySymbol"))));
-        ASSERT_EQUALS(client.getLastErrorDetailed()["code"].numberInt(),
-                      ErrorCodes::CannotBuildIndexKeys);
+
+        auto response = client.insertAcknowledged(
+            _ns, {BSON("a" << BSON("b" << 99 << "c" << BSONSymbol("mySymbol")))});
+        ASSERT_EQUALS(getStatusFromWriteCommandReply(response), ErrorCodes::CannotBuildIndexKeys);
         ASSERT_EQUALS(client.count(_nss), 0U);
     }
 };
@@ -617,9 +620,10 @@ public:
         indexSpec.addKey("a").addOptions(BSON("collation" << BSON("locale"
                                                                   << "fr")));
         client.createIndex(_ns, indexSpec);
-        client.insert(_ns, BSON("a" << BSON_ARRAY(99 << BSONSymbol("mySymbol"))));
-        ASSERT_EQUALS(client.getLastErrorDetailed()["code"].numberInt(),
-                      ErrorCodes::CannotBuildIndexKeys);
+
+        auto response =
+            client.insertAcknowledged(_ns, {BSON("a" << BSON_ARRAY(99 << BSONSymbol("mySymbol")))});
+        ASSERT_EQUALS(getStatusFromWriteCommandReply(response), ErrorCodes::CannotBuildIndexKeys);
         ASSERT_EQUALS(client.count(_nss), 0U);
     }
 };
@@ -658,9 +662,10 @@ public:
         IndexSpec indexSpec;
         indexSpec.addKey("a");
         client.createIndex(_ns, indexSpec);
-        client.insert(_ns, BSON("a" << BSON_ARRAY(99 << BSONSymbol("mySymbol"))));
-        ASSERT_EQUALS(client.getLastErrorDetailed()["code"].numberInt(),
-                      ErrorCodes::CannotBuildIndexKeys);
+
+        auto response =
+            client.insertAcknowledged(_ns, {BSON("a" << BSON_ARRAY(99 << BSONSymbol("mySymbol")))});
+        ASSERT_EQUALS(getStatusFromWriteCommandReply(response), ErrorCodes::CannotBuildIndexKeys);
     }
 };
 
