@@ -1028,7 +1028,6 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
 
     invariant(!result.getValue().documents.empty());
     LOG(2) << "Setting begin applying timestamp to " << _initialSyncState->beginApplyingTimestamp
-           << " using last oplog entry: " << redact(result.getValue().documents.front())
            << ", ns: " << _opts.localOplogNS << " and the begin fetching timestamp to "
            << _initialSyncState->beginFetchingTimestamp;
 
