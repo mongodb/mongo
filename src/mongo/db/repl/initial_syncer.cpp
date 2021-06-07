@@ -1165,14 +1165,12 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
                             << _initialSyncState->beginFetchingTimestamp.toBSON());
 
     invariant(!result.getValue().documents.empty());
-    LOGV2_DEBUG(21177,
+    LOGV2_DEBUG(4431600,
                 2,
-                "Setting begin applying timestamp to {beginApplyingTimestamp} using last "
-                "oplog entry: {lastOplogEntry}, ns: {namespace} and the begin "
-                "fetching timestamp to {beginFetchingTimestamp}",
+                "Setting begin applying timestamp to {beginApplyingTimestamp}, ns: "
+                "{namespace} and the begin fetching timestamp to {beginFetchingTimestamp}",
                 "Setting begin applying timestamp and begin fetching timestamp",
                 "beginApplyingTimestamp"_attr = _initialSyncState->beginApplyingTimestamp,
-                "lastOplogEntry"_attr = redact(result.getValue().documents.front()),
                 "namespace"_attr = _opts.localOplogNS,
                 "beginFetchingTimestamp"_attr = _initialSyncState->beginFetchingTimestamp);
 
