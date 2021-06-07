@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/memory_usage_tracker.h"
+#include "mongo/db/pipeline/partition_key_comparator.h"
 #include "mongo/db/pipeline/window_function/spillable_cache.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -241,16 +242,15 @@ private:
     void advanceToNextPartition() {
         tassert(5340101,
                 "Invalid call to PartitionIterator::advanceToNextPartition",
-                _nextPartition != boost::none);
+                _nextPartitionDoc != boost::none);
         resetCache();
-        // The memory accounted for in the _nextPartition will be moved to the spillable cache, so
-        // subtract it out here.
+        // The memory accounted for in the _nextPartitionDoc will be moved to the spillable cache,
+        // so subtract it out here.
         _tracker->update(-1 * getNextPartitionStateSize());
 
-        // Cache is cleared, and we are moving the _nextPartition value to different positions.
-        _cache->addDocument(std::move(_nextPartition->_doc));
-        _partitionKey = std::move(_nextPartition->_partitionKey);
-        _nextPartition.reset();
+        // Cache is cleared, and we are moving the _nextPartitionDoc value to different positions.
+        _cache->addDocument(std::move(*_nextPartitionDoc));
+        _nextPartitionDoc.reset();
         _state = IteratorState::kIntraPartition;
     }
 
@@ -270,20 +270,16 @@ private:
     // the value of the "$ts" field. This _sortExpr is used in getEndpoints().
     boost::optional<boost::intrusive_ptr<ExpressionFieldPath>> _sortExpr;
 
-    Value _partitionKey;
+    std::unique_ptr<PartitionKeyComparator> _partitionComparator = nullptr;
     std::vector<int> _slots;
 
     // When encountering the first document of the next partition, we stash it away until the
     // iterator has advanced to it. This document is not accessible until then.
-    struct NextPartitionState {
-        Document _doc;
-        Value _partitionKey;
-    };
-    boost::optional<NextPartitionState> _nextPartition;
+    boost::optional<Document> _nextPartitionDoc;
     size_t getNextPartitionStateSize() const {
-        if (_nextPartition) {
-            return _nextPartition->_doc.getApproximateSize() +
-                _nextPartition->_partitionKey.getApproximateSize();
+        if (_nextPartitionDoc) {
+            return _nextPartitionDoc->getApproximateSize() +
+                _partitionComparator->getApproximateSize();
         }
         return 0;
     }
