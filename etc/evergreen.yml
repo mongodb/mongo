@@ -8317,7 +8317,7 @@ buildvariants:
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_windows_tls
   tasks:
-    - name: compile_test_and_package_serial_TG
+    - name: compile_and_archive_dist_test_then_package_TG
       distros:
         - windows-vsCurrent-xlarge
     - name: audit
@@ -10056,7 +10056,7 @@ buildvariants:
     test_flags: >-
         --runAllFeatureFlagTests
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - rhel72-zseries-build
   - name: jsCore
@@ -10753,7 +10753,7 @@ buildvariants:
     test_flags: >-
         --runAllFeatureFlagTests
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_and_archive_dist_test_then_package_TG
   - name: compile_benchmarks
   - name: .aggregation
 #  - name: .auth
@@ -10982,7 +10982,7 @@ buildvariants:
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_and_archive_dist_test_then_package_TG
   - name: compile_benchmarks
   - name: .aggregation
   - name: .auth
