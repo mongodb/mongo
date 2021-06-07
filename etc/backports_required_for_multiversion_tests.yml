@@ -154,6 +154,8 @@ all:
     test_file: jstests/sharding/read_pref_with_hedging_mode.js
   - ticket: SERVER-56377
     test_file: jstests/concurrency/fsm_workloads/findAndModify_flip_location.js
+  - ticket: SERVER-56518
+    test_file: jstests/sharding/txn_writes_during_movechunk.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
