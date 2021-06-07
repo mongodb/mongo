@@ -10,6 +10,7 @@
  *  requires_find_command,
  *  requires_non_retryable_writes,
  *  multiversion_incompatible,
+ *  tenant_migration_incompatible,
  * ]
  */
 
