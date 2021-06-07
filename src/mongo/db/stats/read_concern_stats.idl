@@ -49,6 +49,42 @@ structs:
         type: long
         default: 0
 
+  CWRCReadConcernOps:
+    description: "A struct representing CWRC readConcern level usages by read operations"
+    strict: true
+    fields:
+      local:
+        type: long
+        default: 0
+      available:
+        type: long
+        # Not supported in transactions.
+        optional: true
+      majority:
+        type: long
+        default: 0
+  
+  ImplicitDefaultReadConcernOps:
+    description: "A struct representing implict-default readConcern level usages by read operations"
+    strict: true
+    fields:
+      local:
+        type: long
+        default: 0
+      available:
+        type: long
+        # Not supported in transactions.
+        optional: true
+  
+  NoneInfo:
+    description: "A struct representing non-explicit readConcern level counters breakdown"
+    strict: true
+    fields:
+      CWRC:
+        type: CWRCReadConcernOps
+      implicitDefault:
+        type: ImplicitDefaultReadConcernOps
+  
   ReadConcernOps:
     description: "A struct representing readConcern level usages by read operations"
     strict: true
@@ -56,11 +92,14 @@ structs:
       none:
         type: long
         default: 0
+      noneInfo:
+        type: NoneInfo
       local:
         type: long
         default: 0
       available:
         type: long
+        # Not supported in transactions.
         optional: true
       majority:
         type: long
@@ -69,6 +108,7 @@ structs:
         type: SnapshotOps
       linearizable:
         type: long
+        # Not supported in transactions.
         optional: true
 
   ReadConcernStats:

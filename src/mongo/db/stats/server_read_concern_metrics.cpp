@@ -50,40 +50,34 @@ ServerReadConcernMetrics* ServerReadConcernMetrics::get(OperationContext* opCtx)
     return get(opCtx->getServiceContext());
 }
 
-void ServerReadConcernMetrics::recordReadConcern(const repl::ReadConcernArgs& readConcernArgs,
-                                                 bool isTransaction) {
-    auto& ops = isTransaction ? _transactionOps : _nonTransactionOps;
 
-    if (!readConcernArgs.hasLevel()) {
-        ops.noLevelCount.fetchAndAdd(1);
-        return;
-    }
-
+void ServerReadConcernMetrics::ReadConcernLevelCounters::recordReadConcern(
+    const repl::ReadConcernArgs& readConcernArgs, bool isTransaction) {
     switch (readConcernArgs.getLevel()) {
         case repl::ReadConcernLevel::kAvailableReadConcern:
             invariant(!isTransaction);
-            ops.levelAvailableCount.fetchAndAdd(1);
+            levelAvailableCount.fetchAndAdd(1);
             break;
 
         case repl::ReadConcernLevel::kLinearizableReadConcern:
             invariant(!isTransaction);
-            ops.levelLinearizableCount.fetchAndAdd(1);
+            levelLinearizableCount.fetchAndAdd(1);
             break;
 
         case repl::ReadConcernLevel::kLocalReadConcern:
-            ops.levelLocalCount.fetchAndAdd(1);
+            levelLocalCount.fetchAndAdd(1);
             break;
 
         case repl::ReadConcernLevel::kMajorityReadConcern:
-            ops.levelMajorityCount.fetchAndAdd(1);
+            levelMajorityCount.fetchAndAdd(1);
             break;
 
         case repl::ReadConcernLevel::kSnapshotReadConcern:
             if (readConcernArgs.getArgsAtClusterTime() &&
                 !readConcernArgs.wasAtClusterTimeSelected()) {
-                ops.atClusterTimeCount.fetchAndAdd(1);
+                atClusterTimeCount.fetchAndAdd(1);
             } else {
-                ops.levelSnapshotCount.fetchAndAdd(1);
+                levelSnapshotCount.fetchAndAdd(1);
             }
             break;
 
@@ -92,27 +86,86 @@ void ServerReadConcernMetrics::recordReadConcern(const repl::ReadConcernArgs& re
     }
 }
 
+void ServerReadConcernMetrics::ReadConcernCounters::recordReadConcern(
+    const repl::ReadConcernArgs& readConcernArgs, bool isTransaction) {
+    if (!readConcernArgs.getProvenance().isClientSupplied() || !readConcernArgs.hasLevel()) {
+        if (readConcernArgs.getProvenance().isCustomDefault()) {
+            cWRCLevelCount.recordReadConcern(readConcernArgs, isTransaction);
+        } else {
+            implicitDefaultLevelCount.recordReadConcern(readConcernArgs, isTransaction);
+        }
+
+        noLevelCount.fetchAndAdd(1);
+        return;
+    }
+
+    explicitLevelCount.recordReadConcern(readConcernArgs, isTransaction);
+}
+
+void ServerReadConcernMetrics::recordReadConcern(const repl::ReadConcernArgs& readConcernArgs,
+                                                 bool isTransaction) {
+    auto& ops = isTransaction ? _transactionOps : _nonTransactionOps;
+    ops.recordReadConcern(readConcernArgs, isTransaction);
+}
+
+void ServerReadConcernMetrics::ReadConcernLevelCounters::updateStats(ReadConcernOps* stats,
+                                                                     bool isTransaction) {
+    SnapshotOps snapshotOps;
+    snapshotOps.setWithoutClusterTime(levelSnapshotCount.load());
+    snapshotOps.setWithClusterTime(atClusterTimeCount.load());
+    stats->setSnapshot(snapshotOps);
+
+    stats->setLocal(levelLocalCount.load());
+    stats->setMajority(levelMajorityCount.load());
+    if (!isTransaction) {
+        stats->setAvailable(levelAvailableCount.load());
+        stats->setLinearizable(levelLinearizableCount.load());
+    }
+}
+
+void ServerReadConcernMetrics::ReadConcernLevelCounters::updateStats(CWRCReadConcernOps* stats,
+                                                                     bool isTransaction) {
+    stats->setLocal(levelLocalCount.load());
+    stats->setMajority(levelMajorityCount.load());
+    if (!isTransaction) {
+        stats->setAvailable(levelAvailableCount.load());
+    }
+}
+
+void ServerReadConcernMetrics::ReadConcernLevelCounters::updateStats(
+    ImplicitDefaultReadConcernOps* stats, bool isTransaction) {
+    stats->setLocal(levelLocalCount.load());
+    if (!isTransaction) {
+        stats->setAvailable(levelAvailableCount.load());
+    }
+}
+
+
+void ServerReadConcernMetrics::ReadConcernCounters::updateStats(ReadConcernOps* stats,
+                                                                bool isTransaction) {
+    stats->setNone(noLevelCount.load());
+    explicitLevelCount.updateStats(stats, isTransaction);
+
+    NoneInfo noneInfoSection;
+    CWRCReadConcernOps cWRCReadConcernOps;
+    cWRCLevelCount.updateStats(&cWRCReadConcernOps, isTransaction);
+
+    ImplicitDefaultReadConcernOps implicitDefaultReadConcernOps;
+    implicitDefaultLevelCount.updateStats(&implicitDefaultReadConcernOps, isTransaction);
+
+    noneInfoSection.setCWRC(cWRCReadConcernOps);
+    noneInfoSection.setImplicitDefault(implicitDefaultReadConcernOps);
+
+    stats->setNoneInfo(noneInfoSection);
+}
+
 void ServerReadConcernMetrics::updateStats(ReadConcernStats* stats, OperationContext* opCtx) {
     ReadConcernOps nonTransactionOps;
-    SnapshotOps nonTransactionSnapshotOps;
-    nonTransactionSnapshotOps.setWithoutClusterTime(_nonTransactionOps.levelSnapshotCount.load());
-    nonTransactionSnapshotOps.setWithClusterTime(_nonTransactionOps.atClusterTimeCount.load());
-    nonTransactionOps.setNone(_nonTransactionOps.noLevelCount.load());
-    nonTransactionOps.setAvailable(_nonTransactionOps.levelAvailableCount.load());
-    nonTransactionOps.setLinearizable(_nonTransactionOps.levelLinearizableCount.load());
-    nonTransactionOps.setLocal(_nonTransactionOps.levelLocalCount.load());
-    nonTransactionOps.setMajority(_nonTransactionOps.levelMajorityCount.load());
-    nonTransactionOps.setSnapshot(nonTransactionSnapshotOps);
+    _nonTransactionOps.updateStats(&nonTransactionOps, false /* isTransaction */);
     stats->setNonTransactionOps(nonTransactionOps);
 
     ReadConcernOps transactionOps;
-    SnapshotOps transactionSnapshotOps;
-    transactionSnapshotOps.setWithoutClusterTime(_transactionOps.levelSnapshotCount.load());
-    transactionSnapshotOps.setWithClusterTime(_transactionOps.atClusterTimeCount.load());
-    transactionOps.setNone(_transactionOps.noLevelCount.load());
-    transactionOps.setLocal(_transactionOps.levelLocalCount.load());
-    transactionOps.setMajority(_transactionOps.levelMajorityCount.load());
-    transactionOps.setSnapshot(transactionSnapshotOps);
+    _transactionOps.updateStats(&transactionOps, true /* isTransaction */);
     stats->setTransactionOps(transactionOps);
 }
 

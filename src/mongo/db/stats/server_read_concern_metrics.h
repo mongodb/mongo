@@ -60,17 +60,44 @@ public:
     void updateStats(ReadConcernStats* stats, OperationContext* opCtx);
 
 private:
-    struct readConcernCounters {
+    struct ReadConcernLevelCounters {
         AtomicWord<unsigned long long> levelAvailableCount{0};
         AtomicWord<unsigned long long> levelLinearizableCount{0};
         AtomicWord<unsigned long long> levelLocalCount{0};
         AtomicWord<unsigned long long> levelMajorityCount{0};
         AtomicWord<unsigned long long> levelSnapshotCount{0};
         AtomicWord<unsigned long long> atClusterTimeCount{0};
-        AtomicWord<unsigned long long> noLevelCount{0};
+        /**
+         * Updates RC level counters for the level of 'readConcernArgs'.
+         */
+        void recordReadConcern(const repl::ReadConcernArgs& readConcernArgs, bool isTransaction);
+
+        /**
+         * Appends the accumulated RC level counters to a readConcernOps stats object.
+         */
+        void updateStats(ReadConcernOps* stats, bool isTransaction);
+        void updateStats(CWRCReadConcernOps* stats, bool isTransaction);
+        void updateStats(ImplicitDefaultReadConcernOps* stats, bool isTransaction);
     };
-    readConcernCounters _nonTransactionOps;
-    readConcernCounters _transactionOps;
+
+    struct ReadConcernCounters {
+        AtomicWord<unsigned long long> noLevelCount{0};
+        ReadConcernLevelCounters explicitLevelCount;
+        ReadConcernLevelCounters cWRCLevelCount;
+        ReadConcernLevelCounters implicitDefaultLevelCount;
+
+        /**
+         * Updates RC counters for the level of 'readConcernArgs'.
+         */
+        void recordReadConcern(const repl::ReadConcernArgs& readConcernArgs, bool isTransaction);
+
+        /**
+         * Appends the accumulated RC counters to a readConcern stats object.
+         */
+        void updateStats(ReadConcernOps* stats, bool isTransaction);
+    };
+    ReadConcernCounters _nonTransactionOps;
+    ReadConcernCounters _transactionOps;
 };
 
 }  // namespace mongo
