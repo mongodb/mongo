@@ -483,8 +483,6 @@ using UniqueSSLContext =
 using UniqueSSL = std::unique_ptr<SSL, OpenSSLDeleter<decltype(::SSL_free), ::SSL_free>>;
 static const int BUFFER_SIZE = 8 * 1024;
 
-using UniqueX509 = std::unique_ptr<X509, OpenSSLDeleter<decltype(X509_free), ::X509_free>>;
-
 using UniqueOpenSSLStringStack =
     std::unique_ptr<STACK_OF(OPENSSL_STRING),
                     OpenSSLDeleter<decltype(X509_email_free), ::X509_email_free>>;
@@ -2462,22 +2460,21 @@ Status SSLManagerOpenSSL::_parseAndValidateCertificateFromBIO(
     SSLX509Name* subjectName,
     bool verifyHasSubjectAlternativeName,
     Date_t* serverCertificateExpirationDate) {
-    X509* x509 = PEM_read_bio_X509(
-        inBio.get(), nullptr, &SSLManagerOpenSSL::password_cb, static_cast<void*>(&keyPassword));
+    UniqueX509 x509(PEM_read_bio_X509(
+        inBio.get(), nullptr, &SSLManagerOpenSSL::password_cb, static_cast<void*>(&keyPassword)));
     if (x509 == nullptr) {
         return Status(
             ErrorCodes::InvalidSSLConfiguration,
             "Cannot retrieve certificate from keyfile '{}' when setting subject name. error: {}"_format(
                 fileNameForLogging, getSSLErrorMessage(ERR_get_error())));
     }
-    ON_BLOCK_EXIT([&] { X509_free(x509); });
 
-    *subjectName = getCertificateSubjectX509Name(x509);
+    *subjectName = getCertificateSubjectX509Name(x509.get());
 
     if (verifyHasSubjectAlternativeName) {
         bool hasSan = false;
         STACK_OF(GENERAL_NAME)* sanNames = static_cast<STACK_OF(GENERAL_NAME)*>(
-            X509_get_ext_d2i(x509, NID_subject_alt_name, nullptr, nullptr));
+            X509_get_ext_d2i(x509.get(), NID_subject_alt_name, nullptr, nullptr));
         if (nullptr != sanNames) {
             int sanNamesCount = sk_GENERAL_NAME_num(sanNames);
             hasSan = (0 != sanNamesCount);
@@ -2492,13 +2489,13 @@ Status SSLManagerOpenSSL::_parseAndValidateCertificateFromBIO(
         }
     }
 
-    auto notBeforeMillis = convertASN1ToMillis(X509_get_notBefore(x509));
+    auto notBeforeMillis = convertASN1ToMillis(X509_get_notBefore(x509.get()));
     if (notBeforeMillis == Date_t()) {
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       "notBefore certificate date conversion failed");
     }
 
-    auto notAfterMillis = convertASN1ToMillis(X509_get_notAfter(x509));
+    auto notAfterMillis = convertASN1ToMillis(X509_get_notAfter(x509.get()));
     if (notAfterMillis == Date_t()) {
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       "notAfter certificate date conversion failed");
@@ -2984,7 +2981,7 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     if (!_sslConfiguration.hasCA && isSSLServer)
         return SSLPeerInfo(sni);
 
-    X509* peerCert = SSL_get_peer_certificate(conn);
+    UniqueX509 peerCert(SSL_get_peer_certificate(conn));
 
     if (nullptr == peerCert) {  // no certificate presented by peer
         if (_weakValidation) {
@@ -3003,7 +3000,6 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
                           "no SSL certificate provided by peer; connection rejected");
         }
     }
-    ON_BLOCK_EXIT([&] { X509_free(peerCert); });
 
     long result = SSL_get_verify_result(conn);
 
@@ -3036,14 +3032,15 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     }
 
     // TODO: check optional cipher restriction, using cert.
-    auto peerSubject = getCertificateSubjectX509Name(peerCert);
+    auto peerSubject = getCertificateSubjectX509Name(peerCert.get());
     LOGV2_DEBUG(23229,
                 2,
                 "Accepted TLS connection from peer: {peerSubject}",
                 "Accepted TLS connection from peer",
                 "peerSubject"_attr = peerSubject);
 
-    StatusWith<stdx::unordered_set<RoleName>> swPeerCertificateRoles = _parsePeerRoles(peerCert);
+    StatusWith<stdx::unordered_set<RoleName>> swPeerCertificateRoles =
+        _parsePeerRoles(peerCert.get());
     if (!swPeerCertificateRoles.isOK()) {
         return Future<SSLPeerInfo>::makeReady(swPeerCertificateRoles.getStatus());
     }
@@ -3056,7 +3053,7 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     if (remoteHost.empty()) {
         const auto exprThreshold = tlsX509ExpirationWarningThresholdDays;
         if (exprThreshold > 0) {
-            const auto expiration = X509_get0_notAfter(peerCert);
+            const auto expiration = X509_get0_notAfter(peerCert.get());
             time_t threshold = (Date_t::now() + Days(exprThreshold)).toTimeT();
 
             if (X509_cmp_time(expiration, &threshold) < 0) {
@@ -3099,7 +3096,7 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     StringBuilder certificateNames;
 
     STACK_OF(GENERAL_NAME)* sanNames = static_cast<STACK_OF(GENERAL_NAME)*>(
-        X509_get_ext_d2i(peerCert, NID_subject_alt_name, nullptr, nullptr));
+        X509_get_ext_d2i(peerCert.get(), NID_subject_alt_name, nullptr, nullptr));
 
     if (sanNames != nullptr) {
         int sanNamesList = sk_GENERAL_NAME_num(sanNames);
