@@ -432,6 +432,11 @@ void ServiceStateMachine::Impl::sinkCallback(Status status) {
     } else {
         _state.store(State::Source);
     }
+    // Performance testing showed a significant benefit from yielding here.
+    // TODO SERVER-57531: Once we enable the use of a fixed-size thread pool
+    // for handling client connection handshaking, we should only yield here if
+    // we're on a dedicated thread.
+    executor()->yieldIfAppropriate();
 }
 
 Future<void> ServiceStateMachine::Impl::processMessage() {
