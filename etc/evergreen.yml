@@ -324,6 +324,7 @@ variables:
   - enterprise-rhel-62-64-bit-majority-read-concern-off
   - enterprise-rhel-62-64-bit-multi-txn-oplog-entries
   - enterprise-rhel-62-64-bit-required-inmem
+  - enterprise-rhel-62-64-bit-store_fam_images_in_side_coll
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-70-64-bit-kitchen-sink
   - enterprise-rhel-71-ppc64le
