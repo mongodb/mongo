@@ -117,6 +117,9 @@ public:
                       ReshardingOperationStatusEnum status,
                       Date_t runningOperationEndTime) noexcept;
 
+    // Records the chunk imbalance count for the most recent resharding operation.
+    void setLastReshardChunkImbalanceCount(int64_t newCount) noexcept;
+
     struct ReporterOptions {
         ReporterOptions(Role role, UUID id, NamespaceString nss, BSONObj shardKey, bool unique)
             : role(role),
