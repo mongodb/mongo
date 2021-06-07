@@ -786,7 +786,6 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
 
     invariant(!result.getValue().documents.empty());
     LOG(2) << "Setting begin timestamp to " << _initialSyncState->beginTimestamp
-           << " using last oplog entry: " << redact(result.getValue().documents.front())
            << ", ns: " << _opts.localOplogNS;
 
 
