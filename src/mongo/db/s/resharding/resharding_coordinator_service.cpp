@@ -38,6 +38,8 @@
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/balancer/balance_stats.h"
+#include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
@@ -1134,6 +1136,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_persistDecisionAndFinishRe
         .then([this, self = shared_from_this(), executor] {
             _tellAllParticipantsToRefresh(_coordinatorDoc.getSourceNss(), executor);
         })
+        .then([this] { _updateChunkImbalanceMetrics(_coordinatorDoc.getSourceNss()); })
         .then([this, self = shared_from_this(), executor] {
             // The shared_ptr maintaining the ReshardingCoordinatorService Instance object gets
             // deleted from the PrimaryOnlyService's map. Thus, shared_from_this() is necessary to
@@ -1658,6 +1661,46 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsTo
                                                             << WriteConcernOptions::Majority)),
                                        {participantShardIds.begin(), participantShardIds.end()},
                                        **executor);
+}
+
+void ReshardingCoordinatorService::ReshardingCoordinator::_updateChunkImbalanceMetrics(
+    const NamespaceString& nss) {
+    auto cancellableOpCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = cancellableOpCtx.get();
+
+    try {
+        auto routingInfo = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                         nss));
+
+        const auto collectionZones =
+            uassertStatusOK(Grid::get(opCtx)->catalogClient()->getTagsForCollection(opCtx, nss));
+
+        const auto& keyPattern = routingInfo.getShardKeyPattern().getKeyPattern();
+
+        ZoneInfo zoneInfo;
+        for (const auto& tag : collectionZones) {
+            uassertStatusOK(zoneInfo.addRangeToZone(
+                ZoneRange(keyPattern.extendRangeBound(tag.getMinKey(), false),
+                          keyPattern.extendRangeBound(tag.getMaxKey(), false),
+                          tag.getTag())));
+        }
+
+        const auto allShardsWithOpTime =
+            uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllShards(
+                opCtx, repl::ReadConcernLevel::kLocalReadConcern));
+
+        auto imbalanceCount =
+            getMaxChunkImbalanceCount(routingInfo, allShardsWithOpTime.value, zoneInfo);
+
+        ReshardingMetrics::get(opCtx->getServiceContext())
+            ->setLastReshardChunkImbalanceCount(imbalanceCount);
+    } catch (const DBException& ex) {
+        LOGV2_WARNING(5543000,
+                      "Encountered error while trying to update resharding chunk imbalance metrics",
+                      "namespace"_attr = nss,
+                      "error"_attr = redact(ex.toStatus()));
+    }
 }
 
 }  // namespace mongo

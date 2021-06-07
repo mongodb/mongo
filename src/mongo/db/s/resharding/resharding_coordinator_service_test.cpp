@@ -411,6 +411,12 @@ public:
             opCtx->getServiceContext()->getPreciseClockSource()->now());
         client.insert(CollectionType::ConfigNS.ns(), originalNssCatalogEntry.toBSON());
 
+        DatabaseType dbDoc(coordinatorDoc.getSourceNss().db().toString(),
+                           coordinatorDoc.getDonorShards().front().getId(),
+                           true,
+                           DatabaseVersion{UUID::gen()});
+        client.insert(DatabaseType::ConfigNS.ns(), dbDoc.toBSON());
+
         return coordinatorDoc;
     }
 

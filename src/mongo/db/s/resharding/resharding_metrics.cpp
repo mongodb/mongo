@@ -61,6 +61,7 @@ constexpr auto kCoordinatorState = "coordinatorState";
 constexpr auto kDonorState = "donorState";
 constexpr auto kRecipientState = "recipientState";
 constexpr auto kOpStatus = "opStatus";
+constexpr auto kLastOpEndingChunkImbalance = "lastOpEndingChunkImbalance";
 
 using MetricsPtr = std::unique_ptr<ReshardingMetrics>;
 
@@ -153,6 +154,8 @@ public:
 
     TimeInterval inCriticalSection;
     int64_t writesDuringCriticalSection = 0;
+
+    int64_t chunkImbalanceCount = 0;
 
     boost::optional<DonorStateEnum> donorState;
     boost::optional<RecipientStateEnum> recipientState;
@@ -402,6 +405,15 @@ void ReshardingMetrics::setDocumentsToCopyForCurrentOp(int64_t documents, int64_
     _currentOp->bytesToCopy = bytes;
 }
 
+void ReshardingMetrics::setLastReshardChunkImbalanceCount(int64_t newCount) noexcept {
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    invariant(_currentOp, kNoOperationInProgress);
+    invariant(_currentOp->coordinatorState);
+
+    _cumulativeOp->chunkImbalanceCount = newCount;
+}
+
 void ReshardingMetrics::onDocumentsCopied(int64_t documents, int64_t bytes) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
     if (!_currentOp)
@@ -577,6 +589,7 @@ void ReshardingMetrics::serializeCumulativeOpMetrics(BSONObjBuilder* bob) const 
     bob->append(kOplogsApplied, ops.oplogEntriesApplied);
     bob->append(kWritesDuringCritialSection, ops.writesDuringCriticalSection);
     bob->append(kOplogsFetched, ops.oplogEntriesFetched);
+    bob->append(kLastOpEndingChunkImbalance, ops.chunkImbalanceCount);
 }
 
 Date_t ReshardingMetrics::_now() const {
