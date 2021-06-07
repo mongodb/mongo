@@ -169,6 +169,7 @@ env.Library(
         'request_types/move_primary.idl',
         'request_types/refine_collection_shard_key.idl',
         'request_types/remove_shard_from_zone_request_type.cpp',
+        'request_types/remove_tags.idl',
         'request_types/reshard_collection.idl',
         'request_types/resharding_operation_time.idl',
         'request_types/set_allow_migrations.idl',

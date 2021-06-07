@@ -102,6 +102,7 @@ let viewsCommandTests = {
     _configsvrRenameCollectionMetadata: {skip: isAnInternalCommand},
     _configsvrRemoveShard: {skip: isAnInternalCommand},
     _configsvrRemoveShardFromZone: {skip: isAnInternalCommand},
+    _configsvrRemoveTags: {skip: isAnInternalCommand},
     _configsvrReshardCollection: {skip: isAnInternalCommand},
     _configsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _configsvrShardCollection: {skip: isAnInternalCommand},
