@@ -45,6 +45,9 @@
 #include "mongo/util/future_util.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeRunningCoordinatorInstance);
+
 namespace {
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
@@ -153,10 +156,14 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 _scopedLocks.emplace(lock.moveToAnotherThread());
             }
 
-            stdx::lock_guard<Latch> lg(_mutex);
-            if (!_constructionCompletionPromise.getFuture().isReady()) {
-                _constructionCompletionPromise.emplaceValue();
+            {
+                stdx::lock_guard<Latch> lg(_mutex);
+                if (!_constructionCompletionPromise.getFuture().isReady()) {
+                    _constructionCompletionPromise.emplaceValue();
+                }
             }
+
+            hangBeforeRunningCoordinatorInstance.pauseWhileSet();
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             static constexpr auto& errorMsg =
