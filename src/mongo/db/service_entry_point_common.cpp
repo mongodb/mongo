@@ -357,7 +357,9 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
         return readConcernParseStatus;
     }
 
-    bool clientSuppliedReadConcern = readConcernArgs.isSpecified();
+    // Represents whether the client explicitly defines read concern within the cmdObj or not.
+    // It will be set to false also if the client specifies empty read concern {readConcern: {}}.
+    bool clientSuppliedReadConcern = !readConcernArgs.isEmpty();
     bool customDefaultWasApplied = false;
     auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel(),
                                                               readConcernArgs.isImplicitDefault());

@@ -7,8 +7,6 @@
 (function() {
 "use strict";
 
-load('jstests/replsets/rslib.js');  // For isDefaultReadConcernLocalFlagEnabled.
-
 // Verifies that the server status response has the fields that we expect.
 function verifyServerStatusFields(serverStatusResponse) {
     assert(serverStatusResponse.hasOwnProperty("readConcernCounters"),
@@ -72,65 +70,79 @@ function verifyServerStatusFields(serverStatusResponse) {
 
 // Verifies that the given value of the server status response is incremented in the way
 // we expect.
-function verifyServerStatusChange(initialStatus,
-                                  newStatus,
-                                  field,
+function verifyServerStatusChange(initialStats,
+                                  newStats,
+                                  fields,
                                   expectedIncrement,
-                                  isDefaultReadConcernLocalFlagEnabled,
                                   {isTransaction = false, atClusterTime = false} = {}) {
-    if (isDefaultReadConcernLocalFlagEnabled) {
-        // TODO SERVER-56860: remove once we update semantics for readConcernCounters.
-        if (field === "none") {
-            field = "local";
-        }
+    verifyServerStatusFields(newStats);
+    initialStats = initialStats.readConcernCounters;
+    newStats = newStats.readConcernCounters;
+    if (!Array.isArray(fields)) {
+        fields = [fields];
     }
 
-    // TODO SERVER-56860: remove once we update semantics for readConcernCounters.
-    if (field === "legacy") {
-        field = "none";
+    if (fields.length === 1 && fields[0] === "none") {
+        // Implicit default RC was used.
+        fields.push("noneInfo.implicitDefault.local");
     }
 
-    verifyServerStatusFields(newStatus);
-    let initialCounters = initialStatus.readConcernCounters;
-    let newCounters = newStatus.readConcernCounters;
-    let initialOps, newOps;
-    let fieldPath = "serverStatus.readConcernCounters";
-    if (isTransaction) {
-        initialOps = initialCounters.transactionOps;
-        newOps = newCounters.transactionOps;
-        fieldPath = fieldPath + ".transactionOps";
-    } else {
-        initialOps = initialCounters.nonTransactionOps;
-        newOps = newCounters.nonTransactionOps;
-        fieldPath = fieldPath + ".nonTransactionOps";
-    }
-
-    if (field === "snapshot") {
-        initialOps = initialOps.snapshot;
-        newOps = newOps.snapshot;
-        fieldPath = fieldPath + ".snapshot";
-        if (atClusterTime) {
-            field = "withClusterTime";
+    fields.forEach(field => {
+        let fieldPath;
+        if (isTransaction) {
+            fieldPath = "transactionOps";
         } else {
-            field = "withoutClusterTime";
+            fieldPath = "nonTransactionOps";
         }
-    }
+        if (field === "snapshot") {
+            fieldPath = fieldPath + ".snapshot";
+            if (atClusterTime) {
+                field = "withClusterTime";
+            } else {
+                field = "withoutClusterTime";
+            }
+        }
 
-    fieldPath = fieldPath + "." + field;
-    assert.eq(initialOps[field] + expectedIncrement,
-              newOps[field],
-              "expected " + fieldPath + " to increase by " + expectedIncrement +
-                  ", initialStats: " + tojson(initialCounters) +
-                  ", newStats: " + tojson(newCounters));
+        fieldPath = fieldPath + "." + field;
+        let pathComponents = fieldPath.split(".");
+        let initialParent = initialStats;
+        let newParent = newStats;
+        for (let i = 0; i < pathComponents.length - 1; i++) {
+            assert(initialParent.hasOwnProperty(pathComponents[i]),
+                   "initialStats did not contain component " + i + " of path " + fieldPath +
+                       ", initialStats: " + tojson(initialStats));
+            initialParent = initialParent[pathComponents[i]];
 
-    // Update the value of the field to the new value so we can compare the rest of the fields using
-    // assert.docEq.
-    initialOps[field] = newOps[field];
+            assert(newParent.hasOwnProperty(pathComponents[i]),
+                   "newStats did not contain component " + i + " of path " + fieldPath +
+                       ", newStats: " + tojson(newStats));
+            newParent = newParent[pathComponents[i]];
+        }
 
-    assert.docEq(initialCounters,
-                 newCounters,
-                 "Expected docEq after updating " + fieldPath + ", initialCounters: " +
-                     tojson(initialCounters + ", newCounters: " + tojson(newCounters)));
+        // Test the expected increment of the changed element. The element may not exist in the
+        // initial stats, in which case it is treated as 0.
+        let lastPathComponent = pathComponents[pathComponents.length - 1];
+        let initialValue = 0;
+        if (initialParent.hasOwnProperty(lastPathComponent)) {
+            initialValue = initialParent[lastPathComponent];
+        }
+        assert(newParent.hasOwnProperty(lastPathComponent),
+               "newStats did not contain last component of path " + fieldPath +
+                   ", newStats: " + tojson(newStats));
+        assert.eq(initialValue + expectedIncrement,
+                  newParent[lastPathComponent],
+                  "expected " + fieldPath + " to increase by " + expectedIncrement +
+                      ", initialStats: " + tojson(initialStats) +
+                      ", newStats: " + tojson(newStats));
+
+        // Update the value of the field to the new value so we can compare the rest of the fields
+        // using assert.docEq.
+        initialParent[lastPathComponent] = newParent[lastPathComponent];
+    });
+    assert.docEq(initialStats,
+                 newStats,
+                 "Expected docEq after updating " + tojson(fields) +
+                     ", initialStats: " + tojson(initialStats) + ", newStats: " + tojson(newStats));
 }
 
 const rst = new ReplSetTest({nodes: 1});
@@ -144,8 +156,6 @@ const testColl = testDB[collName];
 testDB.runCommand({drop: collName});
 assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "majority"}}));
 assert.commandWorked(testColl.insert({_id: 0}, {writeConcern: {w: 'majority'}}));
-
-const isDefaultRCLocalFlagEnabled = isDefaultReadConcernLocalFlagEnabled(primary);
 
 const sessionOptions = {
     causalConsistency: false
@@ -175,14 +185,14 @@ let newStatus;
 primary.forceReadMode("legacy");
 assert.eq(testColl.find().itcount(), 1);
 newStatus = getServerStatus(testDB);
-verifyServerStatusChange(serverStatus, newStatus, "legacy", 1, isDefaultRCLocalFlagEnabled);
+verifyServerStatusChange(serverStatus, newStatus, "none", 1);
 primary.forceReadMode("commands");
 serverStatus = newStatus;
 
 // Run a command without a readConcern.
 assert.eq(testColl.find().itcount(), 1);
 newStatus = getServerStatus(testDB);
-verifyServerStatusChange(serverStatus, newStatus, "none", 1, isDefaultRCLocalFlagEnabled);
+verifyServerStatusChange(serverStatus, newStatus, "none", 1);
 serverStatus = newStatus;
 
 // Non-transaction reads.
@@ -195,25 +205,25 @@ for (let level of ["none", "local", "available", "snapshot", "majority", "linear
 
     assert.commandWorked(testDB.runCommand({find: collName, readConcern: readConcern}));
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled);
+    verifyServerStatusChange(serverStatus, newStatus, level, 1);
     serverStatus = newStatus;
 
     assert.commandWorked(testDB.runCommand(
         {aggregate: collName, pipeline: [], cursor: {}, readConcern: readConcern}));
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled);
+    verifyServerStatusChange(serverStatus, newStatus, level, 1);
     serverStatus = newStatus;
 
     assert.commandWorked(
         testDB.runCommand({distinct: collName, key: "_id", readConcern: readConcern}));
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled);
+    verifyServerStatusChange(serverStatus, newStatus, level, 1);
     serverStatus = newStatus;
 
     if (level !== "snapshot") {
         assert.commandWorked(testDB.runCommand({count: collName, readConcern: readConcern}));
         newStatus = getServerStatus(testDB);
-        verifyServerStatusChange(serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled);
+        verifyServerStatusChange(serverStatus, newStatus, level, 1);
         serverStatus = newStatus;
     }
 
@@ -231,7 +241,7 @@ for (let level of ["none", "local", "available", "snapshot", "majority", "linear
             readConcern: readConcern
         }));
         newStatus = getServerStatus(testDB);
-        verifyServerStatusChange(serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled);
+        verifyServerStatusChange(serverStatus, newStatus, level, 1);
         serverStatus = newStatus;
     }
 
@@ -242,7 +252,7 @@ for (let level of ["none", "local", "available", "snapshot", "majority", "linear
     serverStatus = getServerStatus(testDB);
     assert.commandWorked(testDB.runCommand({getMore: res.cursor.id, collection: collName}));
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(serverStatus, newStatus, level, 0, isDefaultRCLocalFlagEnabled);
+    verifyServerStatusChange(serverStatus, newStatus, level, 0);
 }
 
 // Test non-transaction snapshot with atClusterTime.
@@ -254,8 +264,7 @@ serverStatus = getServerStatus(testDB);
 assert.commandWorked(testDB.runCommand(
     {find: "atClusterTime", readConcern: {level: "snapshot", atClusterTime: insertTimestamp}}));
 newStatus = getServerStatus(testDB);
-verifyServerStatusChange(
-    serverStatus, newStatus, "snapshot", 1, isDefaultRCLocalFlagEnabled, {atClusterTime: true});
+verifyServerStatusChange(serverStatus, newStatus, "snapshot", 1, {atClusterTime: true});
 serverStatus = newStatus;
 
 // Transaction reads.
@@ -268,24 +277,21 @@ for (let level of ["none", "local", "snapshot", "majority"]) {
     }
     assert.eq(sessionColl.find().itcount(), 1);
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(
-        serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled, {isTransaction: true});
+    verifyServerStatusChange(serverStatus, newStatus, level, 1, {isTransaction: true});
     serverStatus = newStatus;
 
     // Run a second find in the same transaction. It will inherit the readConcern from the
     // transaction.
     assert.eq(sessionColl.find().itcount(), 1);
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(
-        serverStatus, newStatus, level, 1, isDefaultRCLocalFlagEnabled, {isTransaction: true});
+    verifyServerStatusChange(serverStatus, newStatus, level, 1, {isTransaction: true});
     serverStatus = newStatus;
 
     // Run an insert in the same transaction. This should not count toward the readConcern metrics.
     assert.commandWorked(
         sessionDb.runCommand({insert: "transaction", documents: [{level: level}]}));
     newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(
-        serverStatus, newStatus, level, 0, isDefaultRCLocalFlagEnabled, {isTransaction: true});
+    verifyServerStatusChange(serverStatus, newStatus, level, 0, {isTransaction: true});
     assert.commandWorked(session.abortTransaction_forTesting());
     serverStatus = newStatus;
 }
@@ -300,20 +306,100 @@ serverStatus = getServerStatus(testDB);
 
 assert.eq(sessionColl.find().itcount(), 1);
 newStatus = getServerStatus(testDB);
-verifyServerStatusChange(serverStatus, newStatus, "snapshot", 1, isDefaultRCLocalFlagEnabled, {
-    isTransaction: true,
-    atClusterTime: true
-});
+verifyServerStatusChange(
+    serverStatus, newStatus, "snapshot", 1, {isTransaction: true, atClusterTime: true});
 serverStatus = newStatus;
 
 // Perform another read in the same transaction.
 assert.eq(sessionColl.find().itcount(), 1);
 newStatus = getServerStatus(testDB);
-verifyServerStatusChange(serverStatus, newStatus, "snapshot", 1, isDefaultRCLocalFlagEnabled, {
-    isTransaction: true,
-    atClusterTime: true
-});
+verifyServerStatusChange(
+    serverStatus, newStatus, "snapshot", 1, {isTransaction: true, atClusterTime: true});
 assert.commandWorked(session.abortTransaction_forTesting());
+
+// Non-transaction CWRC reads.
+for (let level of ["local", "available", "majority"]) {
+    jsTestLog("Testing non-transaction reads with CWRC readConcern " + level);
+    assert.commandWorked(
+        primary.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: level}}));
+
+    assert.commandWorked(testDB.runCommand({find: collName}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, ["none", "noneInfo.CWRC." + level], 1);
+    serverStatus = newStatus;
+
+    assert.commandWorked(testDB.runCommand({aggregate: collName, pipeline: [], cursor: {}}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, ["none", "noneInfo.CWRC." + level], 1);
+    serverStatus = newStatus;
+
+    assert.commandWorked(testDB.runCommand({distinct: collName, key: "_id"}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, ["none", "noneInfo.CWRC." + level], 1);
+    serverStatus = newStatus;
+
+    assert.commandWorked(testDB.runCommand({count: collName}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, ["none", "noneInfo.CWRC." + level], 1);
+    serverStatus = newStatus;
+
+    if (level in ["local", "available"]) {
+        // mapReduce only support local and available.
+        assert.commandWorked(testDB.runCommand({
+            mapReduce: collName,
+            map: function() {
+                emit(this.a, this.a);
+            },
+            reduce: function(key, vals) {
+                return 1;
+            },
+            out: {inline: 1}
+        }));
+        newStatus = getServerStatus(testDB);
+        verifyServerStatusChange(serverStatus, newStatus, ["none", "noneInfo.CWRC." + level], 1);
+        serverStatus = newStatus;
+    }
+
+    // getMore does not count toward readConcern metrics. getMore inherits the readConcern of the
+    // originating command.
+    let res = assert.commandWorked(testDB.runCommand({find: collName, batchSize: 0}));
+    serverStatus = getServerStatus(testDB);
+    assert.commandWorked(testDB.runCommand({getMore: res.cursor.id, collection: collName}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, ["none", "noneInfo.CWRC." + level], 0);
+}
+
+// Transaction CWRC reads.
+for (let level of ["local", "majority"]) {
+    jsTestLog("Testing transaction reads with CWRC readConcern " + level);
+    assert.commandWorked(
+        primary.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: level}}));
+
+    session.startTransaction({readConcern: {}});
+
+    assert.eq(sessionColl.find().itcount(), 1);
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(
+        serverStatus, newStatus, ["none", "noneInfo.CWRC." + level], 1, {isTransaction: true});
+    serverStatus = newStatus;
+
+    // Run a second find in the same transaction. It will inherit the readConcern from the
+    // transaction.
+    assert.eq(sessionColl.find().itcount(), 1);
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(
+        serverStatus, newStatus, ["none", "noneInfo.CWRC." + level], 1, {isTransaction: true});
+    serverStatus = newStatus;
+
+    // Run an insert in the same transaction. This should not count toward the readConcern metrics.
+    assert.commandWorked(
+        sessionDb.runCommand({insert: "transaction", documents: [{level: level}]}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(
+        serverStatus, newStatus, ["none", "noneInfo.CWRC." + level], 0, {isTransaction: true});
+    assert.commandWorked(session.abortTransaction_forTesting());
+    serverStatus = newStatus;
+}
 
 session.endSession();
 rst.stopSet();
