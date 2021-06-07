@@ -148,6 +148,16 @@ void sendAuthenticatedCommandToShards(OperationContext* opCtx,
                                       const BSONObj& command,
                                       const std::vector<ShardId>& shardIds,
                                       const std::shared_ptr<executor::TaskExecutor>& executor) {
+    // TODO SERVER-57519: remove the following scope
+    {
+        // Ensure ShardRegistry is initialized before using the AsyncRequestsSender that relies on
+        // unsafe functions (SERVER-57280)
+        auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+        if (!shardRegistry->isUp()) {
+            shardRegistry->reload(opCtx);
+        }
+    }
+
     // The AsyncRequestsSender ignore impersonation metadata so we need to manually attach them to
     // the command
     BSONObjBuilder bob(command);
