@@ -176,10 +176,6 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken);
 
-    ExecutorFuture<void> _applyThenTransitionToSteadyState(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancellationToken& abortToken);
-
     ExecutorFuture<void> _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken);
