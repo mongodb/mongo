@@ -30,7 +30,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/s/request_types/merge_chunks_request_type.h"
+#include "mongo/s/request_types/merge_chunk_request_gen.h"
 
 namespace mongo {
 namespace {
@@ -48,13 +48,13 @@ namespace {
  *   writeConcern: <BSONObj>
  * }
  */
-class ConfigSvrMergeChunksCommand : public BasicCommand {
+class ConfigSvrMergeChunksCommand : public TypedCommand<ConfigSvrMergeChunksCommand> {
 public:
-    ConfigSvrMergeChunksCommand() : BasicCommand("_configsvrCommitChunksMerge") {}
+    using Request = ConfigSvrMergeChunks;
 
     std::string help() const override {
         return "Internal command, which is sent by a shard to the sharding config server. Do "
-               "not call directly. Receives, validates, and processes a MergeChunksRequest";
+               "not call directly. Receives, validates, and processes a ConfigSvrMergeChunks";
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -65,50 +65,53 @@ public:
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::internal)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        ConfigSvrMergeResponse typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "_configsvrCommitChunksMerge can only be run on config servers",
+                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+            uassert(ErrorCodes::InvalidNamespace,
+                    "invalid namespace specified for request",
+                    ns().isValid());
+
+            // Set the operation context read concern level to local for reads into the config
+            // database.
+            repl::ReadConcernArgs::get(opCtx) =
+                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+            const BSONObj shardAndCollVers = uassertStatusOK(
+                ShardingCatalogManager::get(opCtx)->commitChunksMerge(opCtx,
+                                                                      ns(),
+                                                                      request().getCollectionUUID(),
+                                                                      request().getChunkRange(),
+                                                                      request().getShard(),
+                                                                      request().getValidAfter()));
+            return ConfigSvrMergeResponse{
+                ChunkVersion::fromBSONThrowing(shardAndCollVers["shardVersion"].Obj())};
         }
-        return Status::OK();
-    }
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(cmdObj);
-    }
+    private:
+        NamespaceString ns() const override {
+            return request().getCommandParameter();
+        }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        uassert(ErrorCodes::IllegalOperation,
-                "_configsvrCommitChunksMerge can only be run on config servers",
-                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+        bool supportsWriteConcern() const override {
+            return true;
+        }
 
-        // Set the operation context read concern level to local for reads into the config database.
-        repl::ReadConcernArgs::get(opCtx) =
-            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-        auto parsedRequest = uassertStatusOK(MergeChunksRequest::parseFromConfigCommand(cmdObj));
-
-        const BSONObj shardAndCollVers = uassertStatusOK(
-            ShardingCatalogManager::get(opCtx)->commitChunksMerge(opCtx,
-                                                                  parsedRequest.getNamespace(),
-                                                                  parsedRequest.getCollectionUUID(),
-                                                                  parsedRequest.getChunkRange(),
-                                                                  parsedRequest.getShardId(),
-                                                                  parsedRequest.getValidAfter()));
-        result.appendElements(shardAndCollVers);
-
-        return true;
-    }
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            if (!AuthorizationSession::get(opCtx->getClient())
+                     ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                        ActionType::internal)) {
+                uasserted(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+        }
+    };
 
 } configsvrMergeChunksCmd;
+
 }  // namespace
 }  // namespace mongo

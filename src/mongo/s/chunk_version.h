@@ -88,6 +88,13 @@ public:
         return uassertStatusOK(fromBSON(obj));
     }
 
+    static ChunkVersion fromBSONArrayThrowing(const BSONElement& element) {
+        uassert(ErrorCodes::TypeMismatch,
+                "Invalid type for chunkVersion element. Expected an array",
+                element.type() == Array);
+        return fromBSONThrowing(element.Obj());
+    }
+
     /**
      * NOTE: This format should not be used. Use fromBSONThrowing instead.
      *
@@ -228,6 +235,13 @@ public:
     void appendLegacyWithField(BSONObjBuilder* out, StringData field) const;
 
     BSONObj toBSON() const;
+
+    /**
+     * Same as ChunkVersion::appendWithField adapted for IDL
+     */
+    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+        appendWithField(builder, fieldName);
+    }
 
     /**
      * NOTE: This format serializes chunk version as a timestamp (without the epoch) for

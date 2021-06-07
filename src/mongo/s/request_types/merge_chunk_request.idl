@@ -1,0 +1,130 @@
+# Copyright (C) 2021-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# _configsvrCommitChunkMerge / _configsvrCommitChunksMerge IDL File
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/util/uuid.h"
+        - "mongo/s/chunk_version.h"
+        - "mongo/s/request_types/merge_chunk_request_valid.h"
+    
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/s/sharding_types.idl"
+    - "mongo/s/chunk_range.idl"
+
+types:
+    # Non-IDL response used UUIDtoBSON instead of UUID::toCDR
+    my_uuid:
+        bson_serialization_type: object
+        description: "A UUID for some reason not generic uuid type."
+        cpp_type: "mongo::UUID"
+        deserializer: "mongo::UUID::parse"
+        serializer: "mongo::UUID::toBSON"
+
+    # serialize [<major/minor>, <epoch>, <timestamp>]
+    # equivalent to using ChunkVersion::appendToCommand / ChunkVersion::parseFromCommand
+    ChunkVersionArray:
+       bson_serialization_type: any
+       description: "An object representing a chunk version for a collection."
+       cpp_type: "ChunkVersion"
+       serializer: "ChunkVersion::serializeToBSON"
+       deserializer: "ChunkVersion::fromBSONArrayThrowing"
+
+structs:
+    ConfigSvrMergeResponse:
+        description: "Response of the _configsvrCommitChunkMerge command."
+        strict: false
+        fields:
+            shardVersion:
+                type: ChunkVersionArray
+                description: "Latest version of the shard."
+
+commands:
+    _configsvrCommitChunkMerge:
+        command_name: _configsvrCommitChunkMerge
+        cpp_name: "ConfigSvrMergeChunk"
+        description: "The internal _configsvrCommitChunkMerge command on the config server."
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        strict: false
+        reply_type: ConfigSvrMergeResponse
+        fields:
+            shard:
+                type: shard_id
+                description: "String identifier for a shard's name"
+            collEpoch:
+                type: objectid
+                cpp_name: "epoch"
+                description: "Uniquely identifies this instance of the collection, in case of
+                              drop/create or shard key refine."
+            chunkBoundaries:
+                type: array<object_owned>
+                description: "Chunk bounds to merge."
+                validator: { callback: 'chunkBoundsNotEmpty' }
+            validAfter:
+                type: timestamp
+                description: "The time after which this chunk is at this shard."
+                optional: true
+            writeConcern:
+                description: "The level of write concern for the creation operation"
+                type: object
+                optional: true
+
+    _configsvrCommitChunksMerge:
+        command_name: _configsvrCommitChunksMerge
+        cpp_name: ConfigSvrMergeChunks
+        description: "The internal _configsvrCommitChunksMerge command on the config server."
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        strict: false
+        reply_type: ConfigSvrMergeResponse
+        fields:
+            shard:
+                description: "The id of the shard."
+                type: shard_id
+            collUUID:
+                type: my_uuid
+                cpp_name: "collectionUUID"
+                description: "The UUID of the collection that the chunk belongs to."
+            chunkRange:
+                type: chunk_range
+                cpp_name: "chunkRange"
+                description: "Chunk bounds to merge."
+            validAfter:
+                type: timestamp
+                description: "The time after which this chunk is at this shard."
+                optional: true
+            writeConcern:
+                description: "The level of write concern for the creation operation."
+                type: object
+                optional: true
