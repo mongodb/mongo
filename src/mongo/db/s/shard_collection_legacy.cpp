@@ -558,10 +558,11 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
 
         if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
             if (serverGlobalParams.featureCompatibility.getVersion() ==
-                FCVersion::kFullyDowngradedTo44) {
+                    FCVersion::kFullyDowngradedTo44 ||
+                serverGlobalParams.featureCompatibility.getVersion() == FCVersion::kVersion49) {
                 checkForExistingChunks(opCtx, nss, boost::none);
             } else if (serverGlobalParams.featureCompatibility.getVersion() ==
-                       FCVersion::kVersion49) {
+                       FCVersion::kVersion50) {
                 if (auto optUUID = sharding_ddl_util::getCollectionUUID(opCtx, nss))
                     checkForExistingChunks(opCtx, nss, optUUID);
             } else {
