@@ -266,7 +266,7 @@ bool BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
 
     _waitToCommitBatch(batch);
 
-    BucketAccess bucket(this, batch->bucket());
+    BucketAccess bucket(this, batch->bucket(), BucketState::kPrepared);
     if (batch->finished()) {
         // Someone may have aborted it while we were waiting.
         return false;
@@ -274,8 +274,6 @@ bool BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
         abort(batch);
         return false;
     }
-
-    invariant(_setBucketState(bucket->_id, BucketState::kPrepared));
 
     auto prevMemoryUsage = bucket->_memoryUsage;
     batch->_prepareCommit();
@@ -293,9 +291,8 @@ void BucketCatalog::finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& 
     Bucket* ptr(batch->bucket());
     batch->_finish(info);
 
-    BucketAccess bucket(this, ptr);
+    BucketAccess bucket(this, ptr, BucketState::kNormal);
     if (bucket) {
-        invariant(_setBucketState(bucket->_id, BucketState::kNormal));
         bucket->_preparedBatch.reset();
     }
 
@@ -655,14 +652,13 @@ boost::optional<BucketCatalog::BucketState> BucketCatalog::_setBucketState(const
                 state = BucketState::kNormal;
             } else if (state == BucketState::kPreparedAndCleared) {
                 state = BucketState::kCleared;
-            } else {
-                invariant(state != BucketState::kCleared);
             }
             break;
         }
         case BucketState::kPrepared: {
-            invariant(state == BucketState::kNormal);
-            state = BucketState::kPrepared;
+            if (state == BucketState::kNormal) {
+                state = BucketState::kPrepared;
+            }
             break;
         }
         case BucketState::kCleared: {
@@ -857,7 +853,9 @@ BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog,
     _findOrCreateOpenBucketThenLock(hashedNormalizedKey, hashedKey);
 }
 
-BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog, Bucket* bucket)
+BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog,
+                                          Bucket* bucket,
+                                          boost::optional<BucketState> targetState)
     : _catalog(catalog) {
     {
         auto lk = _catalog->_lockShared();
@@ -870,11 +868,18 @@ BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog, Bucket* bucket
         _acquire();
     }
 
-    stdx::lock_guard statesLk{_catalog->_statesMutex};
-    auto statesIt = _catalog->_bucketStates.find(_bucket->_id);
-    invariant(statesIt != _catalog->_bucketStates.end());
-    auto& [_, state] = *statesIt;
-    if (state == BucketState::kCleared || state == BucketState::kPreparedAndCleared) {
+    boost::optional<BucketState> state{BucketState::kCleared};
+    if (targetState) {
+        invariant(*targetState == BucketState::kNormal || *targetState == BucketState::kPrepared);
+        state = _catalog->_setBucketState(_bucket->_id, *targetState);
+    } else {
+        stdx::lock_guard statesLk{_catalog->_statesMutex};
+        auto statesIt = _catalog->_bucketStates.find(_bucket->_id);
+        if (statesIt != _catalog->_bucketStates.end()) {
+            state = statesIt->second;
+        }
+    }
+    if (!state || state == BucketState::kCleared || state == BucketState::kPreparedAndCleared) {
         release();
     }
 }
