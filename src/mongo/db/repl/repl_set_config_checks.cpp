@@ -106,11 +106,6 @@ Status ensureNoNewlyAddedMembers(const ReplSetConfig& config) {
  */
 Status isFCVCompatible(const ReplSetConfig& config) {
     auto version = serverGlobalParams.featureCompatibility.getVersion();
-    // New shard servers using 'latest' binaries will default to the 'lastLTS' FCV prior to being
-    // added to the cluster. If they have not yet been added to a sharded cluster via addShard,
-    // allow them to use 'secondaryDelaySecs'.
-    bool isNewShardServer = (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-                             !ShardingState::get(getGlobalServiceContext())->enabled());
     // TODO (SERVER-53354) If we are currently upgrading, we check if the feature flag is enabled
     // for the target version. We use the generic FCV references here to avoid having to update the
     // FCV constants used after each continuous release. After release, we should make sure to
@@ -147,8 +142,11 @@ Status isFCVCompatible(const ReplSetConfig& config) {
                               << "Incompatible delay field name. If the node is in FCV "
                               << featureFlagVersion << ", it must use secondaryDelaySecs.");
         }
-        //(Generic FCV reference): feature flag support
-        if (!isEnabled && iter->hasSecondaryDelaySecs() && !isNewShardServer) {
+        if (!isEnabled && iter->hasSecondaryDelaySecs() &&
+            serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+            // Shard servers using 'latest' binaries will default to the 'lastLTS' FCV, so
+            // explicitly allow them to use 'secondaryDelaySecs'.
+            //(Generic FCV reference): feature flag support
             auto latestVersion = FeatureCompatibilityVersionParser::toString(
                 ServerGlobalParams::FeatureCompatibility::kLatest);
             return Status(ErrorCodes::BadValue,

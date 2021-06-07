@@ -1,7 +1,6 @@
 /**
- * Tests that new shard servers using the 'latest' binary in 'lastLTSFCV' are able to use the
- * 'secondaryDelaySecs' field. Once the shard is added to a sharded cluster, it must abide by
- * the FCV restrictions of that cluster.
+ * Tests that shard servers using the 'latest' binary in 'lastLTSFCV' are able to use the
+ * 'secondaryDelaySecs' field during user initiated and internal reconfigs.
  *
  * TODO SERVER-55128: Remove this test once 5.0 becomes 'lastLTS'.
  */
@@ -10,13 +9,13 @@
 "use strict";
 
 function checkForSecondaryDelaySecs(primaryDB) {
-    let config = primaryDB.runCommand({replSetGetConfig: 1}).config;
+    let config = assert.commandWorked(primaryDB.runCommand({replSetGetConfig: 1})).config;
     assert.eq(config.members[0].secondaryDelaySecs, 0, config);
     assert(!config.members[0].hasOwnProperty('slaveDelay'), config);
 }
 
 function checkForSlaveDelaySecs(primaryDB) {
-    let config = primaryDB.runCommand({replSetGetConfig: 1}).config;
+    let config = assert.commandWorked(primaryDB.runCommand({replSetGetConfig: 1})).config;
     assert.eq(config.members[0].slaveDelay, 0, config);
     assert(!config.members[0].hasOwnProperty('secondaryDelaySecs'), config);
 }
@@ -81,8 +80,10 @@ let shard3 = new ReplSetTest({
 });
 
 shard3.startSet();
-shard3.initiate();
-latestShardPrimaryAdminDB = shard3.getPrimary().getDB("admin");
+shard3.initiateWithHighElectionTimeout();
+let latestShardPrimary = shard3.getPrimary();
+latestShardPrimaryAdminDB = latestShardPrimary.getDB("admin");
+
 checkFCV(latestShardPrimaryAdminDB, lastLTSFCV);
 // Even though shard3 is in the 'lastLTSFCV', its config should still have the
 // 'secondaryDelaySecs' field.
@@ -95,12 +96,28 @@ checkFCV(latestShardPrimaryAdminDB, lastLTSFCV);
 // Since the FCV was not updated, secondaryDelaySecs is still present in the config.
 checkForSecondaryDelaySecs(latestShardPrimaryAdminDB);
 
-// The cluster wide FCV is 'lastLTSFCV', which is 4.4 in this case. Despite replSetGetConfig
-// returning 'secondaryDelaySecs' for shard3, future reconfigs on shard3  must use 'slaveDelay'.
+jsTestLog(
+    "Test that shard servers running 'latest' binaries can use both 'secondaryDelaySecs' and" +
+    " 'slaveDelay' in a cluster running 'lastLTSFCV'");
+// Shards running 'latest' binVersions can reconfig using 'secondaryDelaySecs' even in the
+// 'lastLTSFCV'.
 config = latestShardPrimaryAdminDB.runCommand({replSetGetConfig: 1}).config;
 config.version++;
-assert.commandFailedWithCode(latestShardPrimaryAdminDB.runCommand({replSetReconfig: config}),
-                             ErrorCodes.NewReplicaSetConfigurationIncompatible);
+assert.commandWorked(latestShardPrimaryAdminDB.runCommand({replSetReconfig: config}));
+checkForSecondaryDelaySecs(latestShardPrimaryAdminDB);
+
+// Shards can use 'secondaryDelaySecs' during automatic internal reconfigs in the 'lastLTSFCV'.
+assert.commandWorked(latestShardPrimaryAdminDB.adminCommand({replSetStepDown: 1, force: true}));
+shard3.stepUp(latestShardPrimary);
+assert.eq(latestShardPrimary, shard3.getPrimary());
+const stepUpConfig =
+    assert.commandWorked(latestShardPrimaryAdminDB.runCommand({replSetGetConfig: 1})).config;
+
+// Stepup runs a reconfig with the same config version but higher config term.
+assert.eq(config.version, stepUpConfig.version);
+assert.eq(config.term + 1, stepUpConfig.term);
+// Confirm that the stepup reconfig used 'secondaryDelaySecs'.
+checkForSecondaryDelaySecs(latestShardPrimaryAdminDB);
 
 delete config.members[0].secondaryDelaySecs;
 config.members[0].slaveDelay = 0;
