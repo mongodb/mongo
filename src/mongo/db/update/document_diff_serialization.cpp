@@ -31,6 +31,7 @@
 
 #include "mongo/db/update/document_diff_serialization.h"
 
+#include <fmt/format.h>
 #include <stack>
 
 #include "mongo/util/str.h"
@@ -277,21 +278,38 @@ public:
             }
         }
 
+        // +1 for leading char. +1 to round up from digits10.
+        static constexpr size_t fieldNameSize = std::numeric_limits<std::uint64_t>::digits10 + 2;
+        char fieldNameStorage[fieldNameSize];
+
+        auto formatFieldName = [&](char pre, size_t idx) {
+            const char* fieldNameStorageEnd =
+                fmt::format_to(fieldNameStorage, FMT_STRING("{}{}"), pre, idx);
+            return StringData(static_cast<const char*>(fieldNameStorage), fieldNameStorageEnd);
+        };
+
+        // Make sure that 'doc_diff::kUpdateSectionFieldName' is a single character.
+        static_assert(doc_diff::kUpdateSectionFieldName.size() == 1,
+                      "doc_diff::kUpdateSectionFieldName should be a single character.");
+
         for (; _childIt != _node.getChildren().end(); ++_childIt) {
             auto&& [idx, child] = *_childIt;
-            auto idxAsStr = std::to_string(idx);
 
             switch (child->type()) {
                 case (NodeType::kUpdate): {
                     const auto& valueNode = checked_cast<const UpdateNode&>(*child);
                     appendElementToBuilder(
-                        valueNode.elt, doc_diff::kUpdateSectionFieldName + idxAsStr, &_bob);
+                        valueNode.elt,
+                        formatFieldName(doc_diff::kUpdateSectionFieldName[0], idx),
+                        &_bob);
                     break;
                 }
                 case (NodeType::kInsert): {
                     const auto& valueNode = checked_cast<const InsertNode&>(*child);
                     appendElementToBuilder(
-                        valueNode.elt, doc_diff::kUpdateSectionFieldName + idxAsStr, &_bob);
+                        valueNode.elt,
+                        formatFieldName(doc_diff::kUpdateSectionFieldName[0], idx),
+                        &_bob);
                     break;
                 }
                 case (NodeType::kDocumentInsert): {
@@ -303,14 +321,14 @@ public:
                     ++_childIt;
                     return std::make_unique<DocumentInsertFrame>(
                         *checked_cast<DocumentInsertionNode*>(child.get()),
-                        BSONObjBuilder(
-                            _bob.subobjStart(doc_diff::kUpdateSectionFieldName + idxAsStr)));
+                        BSONObjBuilder(_bob.subobjStart(
+                            formatFieldName(doc_diff::kUpdateSectionFieldName[0], idx))));
                 }
                 case (NodeType::kDocumentSubDiff):
                 case (NodeType::kArray): {
                     InternalNode* subNode = checked_cast<InternalNode*>(child.get());
                     BSONObjBuilder childBuilder = _bob.subobjStart(
-                        std::string(1, doc_diff::kSubDiffSectionFieldPrefix) + idxAsStr);
+                        formatFieldName(doc_diff::kSubDiffSectionFieldPrefix, idx));
 
                     ++_childIt;
                     return makeSubNodeFrameHelper(subNode, std::move(childBuilder));

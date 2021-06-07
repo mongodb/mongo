@@ -32,6 +32,80 @@
 
 namespace mongo {
 
+namespace {
+enum class NumericPathComponentResult {
+    kNumericOrDollar,
+    kConsecutiveNumbers,
+    kNonNumericOrDollar
+};
+
+NumericPathComponentResult checkNumericOrDollarPathComponent(const FieldRef& path,
+                                                             size_t pathIdx,
+                                                             const StringData& pathComponent) {
+    if (pathComponent == "$"_sd) {
+        return NumericPathComponentResult::kNumericOrDollar;
+    }
+
+    if (FieldRef::isNumericPathComponentLenient(pathComponent)) {
+        // Peek ahead to see if the next component is also all digits. This implies that the
+        // update is attempting to create a numeric field name which would violate the
+        // "ambiguous field name in array" constraint for multi-key indexes. Break early in this
+        // case and conservatively return that this path affects the prefix of the consecutive
+        // numerical path components. For instance, an input such as 'a.0.1.b.c' would return
+        // the canonical index path of 'a'.
+        if ((pathIdx + 1) < path.numParts() &&
+            FieldRef::isNumericPathComponentLenient(path.getPart(pathIdx + 1))) {
+            return NumericPathComponentResult::kConsecutiveNumbers;
+        }
+        return NumericPathComponentResult::kNumericOrDollar;
+    }
+
+    return NumericPathComponentResult::kNonNumericOrDollar;
+}
+
+/**
+ * Checks whether a given Document path overlaps with an indexed path
+ */
+bool pathOverlaps(const FieldRef& path, const FieldRef& indexedPath) {
+    size_t pathIdx = 0;
+    size_t indexedPathIdx = 0;
+
+    while (pathIdx < path.numParts() && indexedPathIdx < indexedPath.numParts()) {
+        auto pathComponent = path.getPart(pathIdx);
+
+        // The first part of the path must always be a valid field name, since it's not possible to
+        // store a top-level array or '$' field name in a document.
+        if (pathIdx > 0) {
+            NumericPathComponentResult res =
+                checkNumericOrDollarPathComponent(path, pathIdx, pathComponent);
+            if (res == NumericPathComponentResult::kNumericOrDollar) {
+                ++pathIdx;
+                continue;
+            }
+            if (res == NumericPathComponentResult::kConsecutiveNumbers) {
+                // This case implies that the update is attempting to create a numeric field name
+                // which would violate the "ambiguous field name in array" constraint for multi-key
+                // indexes. Break early in this case and conservatively return that this path
+                // affects the prefix of the consecutive numerical path components. For instance, an
+                // input path such as 'a.0.1.b.c' would match indexed path of 'a.d'.
+                return true;
+            }
+        }
+
+        StringData indexedPathComponent = indexedPath.getPart(indexedPathIdx);
+        if (pathComponent != indexedPathComponent) {
+            return false;
+        }
+
+        ++pathIdx;
+        ++indexedPathIdx;
+    }
+
+    return true;
+}
+}  // namespace
+
+
 UpdateIndexData::UpdateIndexData() : _allPathsIndexed(false) {}
 
 void UpdateIndexData::addPath(const FieldRef& path) {
@@ -57,11 +131,10 @@ bool UpdateIndexData::mightBeIndexed(const FieldRef& path) const {
         return true;
     }
 
-    FieldRef canonicalPath = getCanonicalIndexField(path);
-
-    for (const auto& idx : _canonicalPaths) {
-        if (_startsWith(canonicalPath, idx) || _startsWith(idx, canonicalPath))
+    for (const auto& indexedPath : _canonicalPaths) {
+        if (pathOverlaps(path, indexedPath)) {
             return true;
+        }
     }
 
     for (const auto& pathComponent : _pathComponents) {
@@ -89,22 +162,12 @@ FieldRef UpdateIndexData::getCanonicalIndexField(const FieldRef& path) {
     for (size_t i = 1; i < path.numParts(); ++i) {
         auto pathComponent = path.getPart(i);
 
-        if (pathComponent == "$"_sd) {
+        NumericPathComponentResult res = checkNumericOrDollarPathComponent(path, i, pathComponent);
+        if (res == NumericPathComponentResult::kNumericOrDollar) {
             continue;
         }
-
-        if (FieldRef::isNumericPathComponentLenient(pathComponent)) {
-            // Peek ahead to see if the next component is also all digits. This implies that the
-            // update is attempting to create a numeric field name which would violate the
-            // "ambiguous field name in array" constraint for multi-key indexes. Break early in this
-            // case and conservatively return that this path affects the prefix of the consecutive
-            // numerical path components. For instance, an input such as 'a.0.1.b.c' would return
-            // the canonical index path of 'a'.
-            if ((i + 1) < path.numParts() &&
-                FieldRef::isNumericPathComponentLenient(path.getPart(i + 1))) {
-                break;
-            }
-            continue;
+        if (res == NumericPathComponentResult::kConsecutiveNumbers) {
+            break;
         }
 
         buf.appendPart(pathComponent);
