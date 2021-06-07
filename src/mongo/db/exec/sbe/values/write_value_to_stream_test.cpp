@@ -40,11 +40,46 @@ constexpr char kStringLong[] =
     "this is a super duper duper duper duper duper duper duper duper duper duper duper duper duper "
     "duper duper duper duper duper duper duper duper duper duper duper long string!";
 constexpr char kCode[] = "function test() { return 'Hello world!'; }";
+constexpr char kCodeLong[] =
+    "function product(a, b) {console.log(\"Logging a very very very very "
+    "very very very very very very very very very very very very very very very very very large "
+    "string\");"
+    "return a * b; // Function returns the product of a and b }";
+constexpr char kPatternShort[] = "^a.*";
+constexpr char kPatternLong[] =
+    "a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a."
+    "a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a"
+    ".a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.";
+constexpr char kFlag[] = "imxs";
 
 namespace mongo::sbe {
 
 void writeToStream(std::ostream& os, std::pair<value::TypeTags, value::Value> value) {
     os << value;
+}
+
+std::pair<value::TypeTags, value::Value> makeNestedArray(size_t depth,
+                                                         value::Value arr,
+                                                         value::Value topArr) {
+    if (depth < 1) {
+        return {value::TypeTags::Array, topArr};
+    }
+    auto [aTag, aVal] = value::makeNewArray();
+    auto arrV = value::getArrayView(arr);
+    arrV->push_back(aTag, aVal);
+    return makeNestedArray(depth - 1, aVal, topArr);
+}
+
+std::pair<value::TypeTags, value::Value> makeNestedObject(size_t depth,
+                                                          value::Value obj,
+                                                          value::Value topObj) {
+    if (depth < 1) {
+        return {value::TypeTags::Object, topObj};
+    }
+    auto [oTag, oVal] = value::makeNewObject();
+    auto objV = value::getObjectView(obj);
+    objV->push_back(std::to_string(depth), oTag, oVal);
+    return makeNestedObject(depth - 1, oVal, topObj);
 }
 
 TEST(WriteValueToStream, ShortBSONBinDataTest) {
@@ -123,6 +158,164 @@ TEST(WriteValueToStream, LongStringBigTest) {
     ASSERT_EQUALS(expectedString, oss.str());
 }
 
+TEST(WriteValueToStream, BigArrayTest) {
+    auto [aTag, aVal] = value::makeNewArray();
+    value::ValueGuard aGuard{aTag, aVal};
+    auto [sTag, sVal] = value::makeNewString("a");
+    value::ValueGuard sGuard{sTag, sVal};
+    auto testArr = value::getArrayView(aVal);
+    for (size_t i = 0; i < value::kArrayObjectOrNestingMaxDepth + 1; ++i) {
+        testArr->push_back(sTag, sVal);
+    }
+    std::ostringstream oss;
+    writeToStream(oss, {value::TypeTags::Array, aVal});
+    auto expectedArray = R"(["a", "a", "a", "a", "a", "a", "a", "a", "a", "a", ...])";
+    ASSERT_EQUALS(expectedArray, oss.str());
+}
+
+
+TEST(WriteValueToStream, NestedArrayTest) {
+    auto [aTag, aVal] = value::makeNewArray();
+    auto [tag, val] = makeNestedArray(value::kArrayObjectOrNestingMaxDepth, aVal, aVal);
+    value::ValueGuard guard{tag, val};
+    std::ostringstream oss;
+    writeToStream(oss, {tag, val});
+    auto expectedArray = "[[[[[[[[[[...]]]]]]]]]]";
+    ASSERT_EQUALS(expectedArray, oss.str());
+}
+
+TEST(WriteValueToStream, NestedObjectTest) {
+    auto [oTag, oVal] = value::makeNewObject();
+    auto [tag, val] = makeNestedObject(value::kArrayObjectOrNestingMaxDepth, oVal, oVal);
+    value::ValueGuard guard{tag, val};
+    std::ostringstream oss;
+    writeToStream(oss, {tag, val});
+    auto expectedObj =
+        R"({"10" : {"9" : {"8" : {"7" : {"6" : {"5" : {"4" : {"3" : {"2" : {...}}}}}}}}}})";
+    ASSERT_EQUALS(expectedObj, oss.str());
+}
+
+TEST(WriteValueToStream, BigArrayInObjectInArrayTest) {
+    auto [aTag, aVal] = value::makeNewArray();
+    value::ValueGuard aGuard{aTag, aVal};
+
+    auto arrV = value::getArrayView(aVal);
+    auto [oTag, oVal] = value::makeNewObject();
+    arrV->push_back(oTag, oVal);
+
+    auto [iaTag, iaVal] = value::makeNewArray();
+    auto objV = value::getObjectView(oVal);
+    objV->push_back("field", iaTag, iaVal);
+
+    auto testArr = value::getArrayView(iaVal);
+    auto [sTag, sVal] = value::makeNewString("a");
+    for (size_t i = 0; i < value::kArrayObjectOrNestingMaxDepth + 1; ++i) {
+        testArr->push_back(sTag, sVal);
+    }
+
+    std::ostringstream oss;
+    writeToStream(oss, {aTag, aVal});
+    auto expectedObj = R"([{"field" : ["a", "a", "a", "a", "a", "a", "a", "a", "a", "a", ...]}])";
+    ASSERT_EQUALS(expectedObj, oss.str());
+}
+
+
+TEST(WriteValueToStream, BigObjectInArrayInObjectTest) {
+    auto [oTag, oVal] = value::makeNewObject();
+    value::ValueGuard oGuard{oTag, oVal};
+
+    auto objV = value::getObjectView(oVal);
+    auto [aTag, aVal] = value::makeNewArray();
+    objV->push_back("field", aTag, aVal);
+
+    auto [ioTag, ioVal] = value::makeNewObject();
+    auto arrV = value::getArrayView(aVal);
+    arrV->push_back(ioTag, ioVal);
+
+    auto testObj = value::getObjectView(ioVal);
+    auto [sTag, sVal] = value::makeNewString("a");
+    for (size_t i = 0; i < value::kArrayObjectOrNestingMaxDepth + 1; ++i) {
+        testObj->push_back(std::to_string(i), sTag, sVal);
+    }
+
+    std::ostringstream oss;
+    writeToStream(oss, {oTag, oVal});
+    auto expectedObj =
+        R"({"field" : [{"0" : "a", "1" : "a", "2" : "a", "3" : "a", "4" : "a", "5" : "a", "6" : "a",)"
+        R"( "7" : "a", "8" : "a", "9" : "a", ...}]})";
+    ASSERT_EQUALS(expectedObj, oss.str());
+}
+
+TEST(WriteValueToStream, SmallArrayTest) {
+    auto [aTag, aVal] = value::makeNewArray();
+    value::ValueGuard aGuard{aTag, aVal};
+    auto [sTag, sVal] = value::makeNewString("a");
+    value::ValueGuard sGuard{sTag, sVal};
+    auto testArr = value::getArrayView(aVal);
+    for (size_t i = 0; i < value::kArrayObjectOrNestingMaxDepth - 1; ++i) {
+        testArr->push_back(sTag, sVal);
+    }
+    std::ostringstream oss;
+    writeToStream(oss, {aTag, aVal});
+    auto expectedArray = R"(["a", "a", "a", "a", "a", "a", "a", "a", "a"])";
+    ASSERT_EQUALS(expectedArray, oss.str());
+}
+
+TEST(WriteValueToStream, BigObjTest) {
+    auto [oTag, oVal] = value::makeNewObject();
+    value::ValueGuard aGuard{oTag, oVal};
+    auto [sTag, sVal] = value::makeNewString("a");
+    value::ValueGuard sGuard{sTag, sVal};
+    auto testObj = value::getObjectView(oVal);
+    for (size_t i = 0; i < value::kArrayObjectOrNestingMaxDepth + 1; ++i) {
+        testObj->push_back(std::to_string(i), sTag, sVal);
+    }
+    std::ostringstream oss;
+    writeToStream(oss, {value::TypeTags::Object, oVal});
+    auto expectedArray =
+        R"({"0" : "a", "1" : "a", "2" : "a", "3" : "a", "4" : "a", "5" : "a", "6" : "a", "7" : "a",)"
+        R"( "8" : "a", "9" : "a", ...})";
+    ASSERT_EQUALS(expectedArray, oss.str());
+}
+
+TEST(WriteValueToStream, SmallObjTest) {
+    auto [oTag, oVal] = value::makeNewObject();
+    value::ValueGuard aGuard{oTag, oVal};
+    auto [sTag, sVal] = value::makeNewString("a");
+    value::ValueGuard sGuard{sTag, sVal};
+    auto testObj = value::getObjectView(oVal);
+    for (size_t i = 0; i < value::kArrayObjectOrNestingMaxDepth - 1; ++i) {
+        testObj->push_back(std::to_string(i), sTag, sVal);
+    }
+    std::ostringstream oss;
+    writeToStream(oss, {value::TypeTags::Object, oVal});
+    auto expectedArray =
+        R"({"0" : "a", "1" : "a", "2" : "a", "3" : "a", "4" : "a", "5" : "a", "6" : "a", "7" : "a",)"
+        R"( "8" : "a"})";
+    ASSERT_EQUALS(expectedArray, oss.str());
+}
+
+TEST(WriteValueToStream, SmallBsonRegex) {
+    auto [regTag, regVal] = value::makeNewBsonRegex(kPatternShort, kFlag);
+    value::ValueGuard regGuard{regTag, regVal};
+    std::ostringstream oss;
+    writeToStream(oss, {regTag, regVal});
+    auto expectedRegex = "/^a.*/imxs";
+    ASSERT_EQUALS(expectedRegex, oss.str());
+}
+
+TEST(WriteValueToStream, BigBsonRegex) {
+    auto [regTag, regVal] = value::makeNewBsonRegex(kPatternLong, kFlag);
+    value::ValueGuard regGuard{regTag, regVal};
+    std::ostringstream oss;
+    writeToStream(oss, {regTag, regVal});
+    auto expectedRegex =
+        "/a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a."
+        "a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a. ... "
+        "/imxs";
+    ASSERT_EQUALS(expectedRegex, oss.str());
+}
+
 TEST(WriteValueToStream, StringSmallTest) {
     auto [tag, val] = value::makeNewString("F");
     value::ValueGuard guard{tag, val};
@@ -180,6 +373,19 @@ TEST(WriteValueToStream, BSONCodeTest) {
     std::ostringstream oss;
     writeToStream(oss, value);
     auto expectedString = "Javascript(" + std::string(kCode) + ")";
+    ASSERT_EQUALS(expectedString, oss.str());
+}
+
+TEST(WriteValueToStream, BSONLongCodeTest) {
+    auto bsonCode = BSON("code" << BSONCode(kCodeLong));
+    auto val = value::bitcastFrom<const char*>(bsonCode["code"].value());
+    const std::pair<value::TypeTags, value::Value> value(value::TypeTags::bsonJavascript, val);
+    std::ostringstream oss;
+    writeToStream(oss, value);
+    auto expectedString =
+        "Javascript(function product(a, b) {console.log(\"Logging a very very very very very "
+        "very "
+        "very very very very very very very very very very very very very very very large st...)";
     ASSERT_EQUALS(expectedString, oss.str());
 }
 

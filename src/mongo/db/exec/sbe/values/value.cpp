@@ -404,49 +404,77 @@ void writeTagToStream(T& stream, const TypeTags tag) {
 
 namespace {
 template <typename T>
-void writeStringDataToStream(T& stream, StringData sd) {
-    stream << '"';
+void writeStringDataToStream(T& stream, StringData sd, bool isJavaScript = false) {
+    if (!isJavaScript) {
+        stream << '"';
+    }
     if (sd.size() <= kStringMaxDisplayLength) {
-        stream << sd << '"';
+        stream << sd;
+        if (!isJavaScript) {
+            stream << '"';
+        }
     } else {
-        stream << sd.substr(0, kStringMaxDisplayLength) << "\"...";
+        stream << sd.substr(0, kStringMaxDisplayLength);
+        if (!isJavaScript) {
+            stream << "\"...";
+        } else {
+            stream << "...";
+        }
     }
 }
 
 template <typename T>
-void writeArrayToStream(T& stream, TypeTags tag, Value val) {
+void writeArrayToStream(T& stream, TypeTags tag, Value val, size_t depth = 1) {
     stream << '[';
+    auto shouldTruncate = true;
+    size_t iter = 0;
     if (auto ae = ArrayEnumerator{tag, val}; !ae.atEnd()) {
-        for (;;) {
+        while (iter < kArrayObjectOrNestingMaxDepth && depth < kArrayObjectOrNestingMaxDepth) {
             auto [aeTag, aeVal] = ae.getViewOfValue();
-            writeValueToStream(stream, aeTag, aeVal);
-
+            if (aeTag == TypeTags::Array || aeTag == TypeTags::Object) {
+                ++depth;
+            }
+            writeValueToStream(stream, aeTag, aeVal, depth);
             ae.advance();
             if (ae.atEnd()) {
+                shouldTruncate = false;
                 break;
             }
-
             stream << ", ";
+            ++iter;
+        }
+        if (shouldTruncate || depth > kArrayObjectOrNestingMaxDepth) {
+            stream << "...";
         }
     }
     stream << ']';
 }
 
 template <typename T>
-void writeObjectToStream(T& stream, TypeTags tag, Value val) {
+void writeObjectToStream(T& stream, TypeTags tag, Value val, size_t depth = 1) {
     stream << '{';
+    auto shouldTruncate = true;
+    size_t iter = 0;
     if (auto oe = ObjectEnumerator{tag, val}; !oe.atEnd()) {
-        for (;;) {
+        while (iter < kArrayObjectOrNestingMaxDepth && depth < kArrayObjectOrNestingMaxDepth) {
             stream << "\"" << oe.getFieldName() << "\" : ";
             auto [oeTag, oeVal] = oe.getViewOfValue();
-            writeValueToStream(stream, oeTag, oeVal);
+            if (oeTag == TypeTags::Array || oeTag == TypeTags::Object) {
+                ++depth;
+            }
+            writeValueToStream(stream, oeTag, oeVal, depth);
 
             oe.advance();
             if (oe.atEnd()) {
+                shouldTruncate = false;
                 break;
             }
 
             stream << ", ";
+            ++iter;
+        }
+        if (shouldTruncate || depth > kArrayObjectOrNestingMaxDepth) {
+            stream << "...";
         }
     }
     stream << '}';
@@ -476,10 +504,22 @@ void writeCollatorToStream(T& stream, const CollatorInterface* collator) {
         stream << "null";
     }
 }
+
+template <typename T>
+void writeBsonRegexToStream(T& stream, const BsonRegex& regex) {
+    stream << '/';
+    if (regex.pattern.size() <= kStringMaxDisplayLength) {
+        stream << regex.pattern;
+    } else {
+        stream << regex.pattern.substr(0, kStringMaxDisplayLength) << " ... ";
+    }
+    stream << '/' << regex.flags;
+}
+
 }  // namespace
 
 template <typename T>
-void writeValueToStream(T& stream, TypeTags tag, Value val) {
+void writeValueToStream(T& stream, TypeTags tag, Value val, size_t depth = 1) {
     switch (tag) {
         case TypeTags::NumberInt32:
             stream << bitcastTo<int32_t>(val);
@@ -515,11 +555,11 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
         case TypeTags::Array:
         case TypeTags::ArraySet:
         case TypeTags::bsonArray:
-            writeArrayToStream(stream, tag, val);
+            writeArrayToStream(stream, tag, val, depth);
             break;
         case TypeTags::Object:
         case TypeTags::bsonObject:
-            writeObjectToStream(stream, tag, val);
+            writeObjectToStream(stream, tag, val, depth);
             break;
         case TypeTags::ObjectId:
         case TypeTags::bsonObjectId:
@@ -596,12 +636,13 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             writeCollatorToStream(stream, getCollatorView(val));
             break;
         case TypeTags::bsonRegex: {
-            const auto regex = getBsonRegexView(val);
-            stream << '/' << regex.pattern << '/' << regex.flags;
+            writeBsonRegexToStream(stream, getBsonRegexView(val));
             break;
         }
         case TypeTags::bsonJavascript:
-            stream << "Javascript(" << getBsonJavascriptView(val) << ")";
+            stream << "Javascript(";
+            writeStringDataToStream(stream, getStringView(TypeTags::StringBig, val), true);
+            stream << ")";
             break;
         case TypeTags::bsonDBPointer: {
             const auto dbptr = getBsonDBPointerView(val);
