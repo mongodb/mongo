@@ -103,6 +103,7 @@ DEFAULTS = {
     "transport_layer": None,
     "user_friendly_output": None,
     "mixed_bin_versions": None,
+    "multiversion_bin_version": "last_lts",
     "linear_chain": None,
     "num_replset_nodes": None,
     "num_shards": None,
@@ -238,6 +239,20 @@ class SuiteOptions(_SuiteOptions):
 
 SuiteOptions.ALL_INHERITED = SuiteOptions(  # type: ignore
     **dict(list(zip(SuiteOptions._fields, itertools.repeat(SuiteOptions.INHERIT)))))
+
+
+class MultiversionOptions(object):
+    """Represent the multiversion version choices."""
+
+    LAST_LTS = "last_lts"
+    LAST_CONTINOUS = "last_continous"
+
+    @classmethod
+    def all_options(cls):
+        """Return available version options for multiversion."""
+
+        return [cls.LAST_LTS, cls.LAST_CONTINOUS]
+
 
 ##
 # Variables that are set by the user at the command line or with --options.
@@ -447,6 +462,9 @@ MAJORITY_READ_CONCERN = None
 
 # Specifies the binary versions of each node we should run for a replica set.
 MIXED_BIN_VERSIONS = None
+
+# Specifies the binary version of last-lts or last-continous when multiversion enabled
+MULTIVERSION_BIN_VERSION = None
 
 # Specifies the number of replica set members in a ReplicaSetFixture.
 NUM_REPLSET_NODES = None

@@ -63,6 +63,8 @@ class ReplSetBuilder(FixtureBuilder):
         """Build a replica set."""
         # We hijack the mixed_bin_versions passed to the fixture.
         mixed_bin_versions = kwargs.pop("mixed_bin_versions", config.MIXED_BIN_VERSIONS)
+        multiversion_bin_version = kwargs.pop("multiversion_bin_version",
+                                              config.MULTIVERSION_BIN_VERSION)
         if USE_LEGACY_MULTIVERSION:
             # We mark the use of the legacy multiversion system by allowing
             # access to mixed_bin_versions.
@@ -86,7 +88,20 @@ class ReplSetBuilder(FixtureBuilder):
         classes = []
         fcv = None
 
-        lts_class_suffix = "_last_lts"
+        multiversion_class_suffix = "_" + multiversion_bin_version
+        shell_version = {
+            config.MultiversionOptions.LAST_LTS:
+                multiversionconstants.LAST_LTS_MONGO_BINARY,
+            config.MultiversionOptions.LAST_CONTINOUS:
+                multiversionconstants.LAST_CONTINUOUS_MONGO_BINARY
+        }[multiversion_bin_version]
+
+        mongod_version = {
+            config.MultiversionOptions.LAST_LTS:
+                multiversionconstants.LAST_LTS_MONGOD_BINARY,
+            config.MultiversionOptions.LAST_CONTINOUS:
+                multiversionconstants.LAST_CONTINUOUS_MONGOD_BINARY
+        }[multiversion_bin_version]
 
         if mixed_bin_versions is None:
             executables = [latest_mongod for x in range(num_nodes)]
@@ -102,17 +117,17 @@ class ReplSetBuilder(FixtureBuilder):
                 ]
                 classes = [latest_class for x in range(num_nodes)]
             else:
-                load_version(version_path_suffix=lts_class_suffix,
-                             shell_path=multiversionconstants.LAST_LTS_MONGO_BINARY)
+                load_version(version_path_suffix=multiversion_class_suffix,
+                             shell_path=shell_version)
 
                 if not is_config_svr:
                     executables = [
-                        latest_mongod if
-                        (x == "new") else multiversionconstants.LAST_LTS_MONGOD_BINARY
+                        latest_mongod if (x == "new") else mongod_version
                         for x in mixed_bin_versions
                     ]
                     classes = [
-                        latest_class if (x == "new") else f"{latest_class}{lts_class_suffix}"
+                        latest_class if
+                        (x == "new") else f"{latest_class}{multiversion_class_suffix}"
                         for x in mixed_bin_versions
                     ]
             if is_config_svr:
@@ -122,7 +137,10 @@ class ReplSetBuilder(FixtureBuilder):
                 classes = [latest_class, latest_class]
 
             num_versions = len(mixed_bin_versions)
-            fcv = multiversionconstants.LAST_LTS_FCV
+            fcv = {
+                config.MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_FCV,
+                config.MultiversionOptions.LAST_CONTINOUS: multiversionconstants.LAST_CONTINUOUS_FCV
+            }[multiversion_bin_version]
 
             if num_versions != num_nodes and not is_config_svr:
                 msg = (("The number of binary versions specified: {} do not match the number of"\
@@ -146,7 +164,7 @@ class ReplSetBuilder(FixtureBuilder):
         return replset
 
     @classmethod
-    def _new_mongod(cls, replset, index, executable, mongod_class):  # TODO Not a class method
+    def _new_mongod(cls, replset, index, executable, mongod_class):
         """Return a standalone.MongoDFixture configured to be used as replica-set member."""
         mongod_logger = replset.get_logger_for_mongod(index)
         mongod_options = replset.get_options_for_mongod(index)
@@ -157,7 +175,7 @@ class ReplSetBuilder(FixtureBuilder):
 
 
 def load_version(version_path_suffix=None, shell_path=None):
-    """Load the last_lts fixtures."""
+    """Load the last_lts/last_continous fixtures."""
     with RETRIEVE_LOCK, registry.suffix(version_path_suffix):
         # Only one thread needs to retrieve the fixtures.
         retrieve_dir = os.path.relpath(os.path.join(RETRIEVE_DIR, version_path_suffix))

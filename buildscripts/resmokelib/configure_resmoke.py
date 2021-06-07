@@ -208,6 +208,8 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     if _config.MIXED_BIN_VERSIONS is not None:
         _config.MIXED_BIN_VERSIONS = _config.MIXED_BIN_VERSIONS.split("-")
 
+    _config.MULTIVERSION_BIN_VERSION = config.pop("multiversion_bin_version")
+
     _config.INSTALL_DIR = config.pop("install_dir")
     if _config.INSTALL_DIR is not None:
         # Normalize the path so that on Windows dist-test/bin

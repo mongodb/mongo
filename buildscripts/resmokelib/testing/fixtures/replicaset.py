@@ -129,7 +129,6 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             self.initial_sync_node.await_ready()
 
         # Legacy multiversion line
-        # TODO (SERVER-57255): Don't delete steady state constraint options when backporting to 5.0.
         if self.mixed_bin_versions:
             for i in range(self.num_nodes):
                 print("node[i] version: " + self.nodes[i].mongod_executable +
