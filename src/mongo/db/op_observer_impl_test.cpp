@@ -1650,6 +1650,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionPreImageTest) {
                                        << "z");
     OpObserver::OplogDeleteEntryArgs args;
     args.deletedDoc = &deletedDoc;
+    args.preImageRecordingEnabledForCollection = true;
     opObserver().aboutToDelete(opCtx(), nss1, deletedDoc);
     opObserver().onDelete(opCtx(), nss1, uuid1, 0, args);
 
@@ -1726,6 +1727,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPreImageTest) {
                                        << "z");
     OpObserver::OplogDeleteEntryArgs args;
     args.deletedDoc = &deletedDoc;
+    args.preImageRecordingEnabledForCollection = true;
     opObserver().aboutToDelete(opCtx(), nss1, deletedDoc);
     opObserver().onDelete(opCtx(), nss1, uuid1, 0, args);
 

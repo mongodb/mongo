@@ -15,6 +15,7 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {_id
 let coll = st.s.getDB('test').user;
 assert.commandWorked(coll.insert({_id: 'updateMe'}));
 assert.commandWorked(coll.insert({_id: 'deleteMe'}));
+assert.commandWorked(coll.insert({_id: 'deleteMeUsingFindAndModify'}));
 
 pauseMigrateAtStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
 
@@ -31,6 +32,7 @@ session.startTransaction();
 sessionColl.insert({_id: 'insertMe'});
 sessionColl.update({_id: 'updateMe'}, {$inc: {y: 1}});
 sessionColl.remove({_id: 'deleteMe'});
+sessionColl.findAndModify({query: {_id: 'deleteMeUsingFindAndModify'}, remove: true});
 
 pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 unpauseMigrateAtStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
@@ -40,6 +42,8 @@ let recipientColl = st.rs1.getPrimary().getDB('test').user;
 assert.eq(null, recipientColl.findOne({_id: 'insertMe'}));
 assert.eq({_id: 'updateMe'}, recipientColl.findOne({_id: 'updateMe'}));
 assert.eq({_id: 'deleteMe'}, recipientColl.findOne({_id: 'deleteMe'}));
+assert.eq({_id: 'deleteMeUsingFindAndModify'},
+          recipientColl.findOne({_id: 'deleteMeUsingFindAndModify'}));
 
 assert.commandWorked(session.commitTransaction_forTesting());
 
@@ -49,6 +53,7 @@ joinMoveChunk();
 assert.eq({_id: 'insertMe'}, recipientColl.findOne({_id: 'insertMe'}));
 assert.eq({_id: 'updateMe', y: 1}, recipientColl.findOne({_id: 'updateMe'}));
 assert.eq(null, recipientColl.findOne({_id: 'deleteMe'}));
+assert.eq(null, recipientColl.findOne({_id: 'deleteMeUsingFindAndModify'}));
 
 assert.eq(null, recipientColl.findOne({x: 1}));
 
