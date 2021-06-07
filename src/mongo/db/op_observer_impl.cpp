@@ -625,7 +625,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
         auto operation = MutableOplogEntry::makeDeleteOperation(nss, uuid.get(), documentKey);
-        if (args.deletedDoc) {
+        if (args.deletedDoc && args.preImageRecordingEnabledForCollection) {
             operation.setPreImage(args.deletedDoc->getOwned());
         }
 
