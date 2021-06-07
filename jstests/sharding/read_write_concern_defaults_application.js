@@ -99,6 +99,7 @@ let testCases = {
     _configsvrRefineCollectionShardKey: {skip: "internal command"},
     _configsvrRemoveShard: {skip: "internal command"},
     _configsvrRemoveShardFromZone: {skip: "internal command"},
+    _configsvrRemoveTags: {skip: "internal command"},
     _configsvrRenameCollection: {skip: "internal command"},
     _configsvrRenameCollectionMetadata: {skip: "internal command"},
     _configsvrReshardCollection: {skip: "internal command"},

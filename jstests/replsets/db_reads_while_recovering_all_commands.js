@@ -50,6 +50,7 @@ const allCommands = {
     _configsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
     _configsvrRemoveShard: {skip: isPrimaryOnly},
     _configsvrRemoveShardFromZone: {skip: isPrimaryOnly},
+    _configsvrRemoveTags: {skip: isPrimaryOnly},
     _configsvrRenameCollectionMetadata: {skip: isAnInternalCommand},
     _configsvrReshardCollection: {skip: isPrimaryOnly},
     _configsvrSetAllowMigrations: {skip: isPrimaryOnly},
