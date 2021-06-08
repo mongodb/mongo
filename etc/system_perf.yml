@@ -14,12 +14,18 @@ variables:
   _real_compile_amazon2: &_compile_amazon2
       - name: compile
         variant: compile-amazon2
+      - name: schedule_global_auto_tasks
+        variant: task_generation
   _real_compile_amazon-64: &_compile_amazon-64
       - name: compile
         variant: compile-linux-64-amzn
+      - name: schedule_global_auto_tasks
+        variant: task_generation
   _real_compile_rhel70: &_compile_rhel70
       - name: compile
         variant: compile-rhel70
+      - name: schedule_global_auto_tasks
+        variant: task_generation
   _real_expansions: &_expansion_updates
     # TODO: Disable in SERVER-57226.
     - key: enable_detect_changes
@@ -29,8 +35,14 @@ variables:
 ###
 # **Or**: Leave this section uncommented to bypass/skip compile.
 #  _skip_compile_amazon2: &_compile_amazon2
+#      - name: schedule_global_auto_tasks
+#        variant: task_generation
 #  _skip_compile_rhel70: &_compile_rhel70
+#      - name: schedule_global_auto_tasks
+#        variant: task_generation
 #  _skip_compile_amazon-64: &_compile_amazon-64
+#      - name: schedule_global_auto_tasks
+#        variant: task_generation
 #      - name: compile
 #        variant: compile-linux-64-amzn
 #  _skip_expansions: &_expansion_updates
@@ -462,34 +474,6 @@ tasks:
         vars:
           test_control: "tpcc"
 
-  - name: insert_remove
-    priority: 5
-    commands:
-      - func: f_run_dsi_workload
-        vars:
-          test_control: "insert_remove"
-
-  - name: validate_cmd
-    priority: 5
-    commands:
-      - func: f_run_dsi_workload
-        vars:
-          test_control: "validate_cmd"
-
-  - name: service_architecture_workloads
-    priority: 5
-    commands:
-      - func: f_run_dsi_workload
-        vars:
-          test_control: "service_architecture_workloads"
-
-  - name: big_update
-    priority: 5
-    commands:
-      - func: f_run_dsi_workload
-        vars:
-          test_control: "big_update"
-
   - name: industry_benchmarks
     priority: 5
     commands:
@@ -552,20 +536,6 @@ tasks:
       - func: f_run_dsi_workload
         vars:
           test_control: "map_reduce_workloads"
-
-  - name: genny_canaries
-    priority: 5
-    commands:
-      - func: f_run_dsi_workload
-        vars:
-          test_control: "genny_canaries"
-
-  - name: genny_overhead
-    priority: 5
-    commands:
-      - func: f_run_dsi_workload
-        vars:
-          test_control: "genny_overhead"
 
   - name: retryable_writes_workloads
     priority: 5
@@ -739,16 +709,16 @@ tasks:
 
 
 buildvariants:
-#  - name: task_generation
-#    display_name: Task Generation
-#    modules: *modules
-#    expansions:
-#      platform: linux
-#      project_dir: dsi
-#    run_on:
-#        - amazon2-build
-#    tasks:
-#      - name: schedule_global_auto_tasks
+  - name: task_generation
+    display_name: Task Generation
+    modules: *modules
+    expansions:
+      platform: linux
+      project_dir: dsi
+    run_on:
+        - amazon2-build
+    tasks:
+      - name: schedule_global_auto_tasks
 
   # We are explicitly tracking the Linux 64 Amazon variant compile options from evergreen.yml.  If we can get
   # proper artifacts directly from that project, we should do that and remove these tasks.
@@ -822,6 +792,8 @@ buildvariants:
         - "rhel70-perf-single"
     depends_on: *_compile_amazon-64
     tasks: &1nodetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: crud_workloads
@@ -842,8 +814,6 @@ buildvariants:
       - name: linkbench
       - name: linkbench2
       - name: tpcc
-      - name: insert_remove
-      - name: big_update
       - name: sb_large_scale
       - name: sb_timeseries
 
@@ -862,15 +832,12 @@ buildvariants:
         - "rhel70-perf-single"
     depends_on: *_compile_amazon-64
     tasks: &standalonetasks
-#      - name: schedule_patch_auto_tasks
-#      - name: schedule_variant_auto_tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: crud_workloads
-      - name: genny_canaries
-      - name: genny_overhead
       - name: cursor_manager
-      - name: insert_remove
       - name: mixed_workloads
       - name: misc_workloads
       - name: map_reduce_workloads
@@ -881,8 +848,6 @@ buildvariants:
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
-      - name: big_update
-      - name: validate_cmd
 
   - name: linux-standalone-audit
     display_name: Linux Standalone Audit
@@ -900,6 +865,8 @@ buildvariants:
         - "rhel70-perf-single"
     depends_on: *_compile_amazon2
     tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: crud_workloads
       - name: smoke_test
@@ -920,6 +887,8 @@ buildvariants:
         - "rhel70-perf-single"
     depends_on: *_compile_amazon2
     tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: smoke_test
 
@@ -939,6 +908,8 @@ buildvariants:
         - "rhel70-perf-single"
     depends_on: *_compile_amazon2
     tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: smoke_test
 
@@ -958,9 +929,10 @@ buildvariants:
         - "rhel70-perf-shard"
     depends_on: *_compile_amazon-64
     tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: crud_workloads
-      - name: insert_remove
       - name: mixed_workloads
       - name: misc_workloads
       - name: map_reduce_workloads
@@ -987,6 +959,8 @@ buildvariants:
         - "rhel70-perf-shard-lite"
     depends_on: *_compile_amazon-64
     tasks: &shardlitetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: bestbuy_agg
       - name: bestbuy_agg_merge_different_db
       - name: bestbuy_agg_merge_same_db
@@ -1022,12 +996,12 @@ buildvariants:
         - "rhel70-perf-replset"
     depends_on: *_compile_amazon-64
     tasks: &3nodetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: industry_benchmarks_secondary_reads
       - name: crud_workloads
-      - name: insert_remove
-      - name: service_architecture_workloads
       - name: mixed_workloads
       - name: misc_workloads
       - name: map_reduce_workloads
@@ -1048,7 +1022,6 @@ buildvariants:
       - name: tpcc
       - name: linkbench
       - name: linkbench2
-      - name: big_update
       - name: sb_large_scale
       - name: sb_timeseries
 
@@ -1067,10 +1040,11 @@ buildvariants:
         - "rhel70-perf-replset"
     depends_on: *_compile_amazon-64
     tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: industry_benchmarks_secondary_reads
       - name: crud_workloads
-      - name: service_architecture_workloads
       - name: mixed_workloads
       - name: smoke_test
       - name: industry_benchmarks_wmajority
@@ -1079,7 +1053,6 @@ buildvariants:
       - name: tpcc
       - name: linkbench
       - name: linkbench2
-      - name: big_update
 
   - name: linux-3-node-replSet-ssl
     display_name: Linux 3-Node ReplSet (SSL)
@@ -1096,6 +1069,8 @@ buildvariants:
         - "rhel70-perf-replset"
     depends_on: *_compile_amazon-64
     tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: mixed_workloads
 
@@ -1114,6 +1089,8 @@ buildvariants:
         - "rhel70-perf-replset"
     depends_on: *_compile_amazon-64
     tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: initialsync
       - name: initialsync-logkeeper-short
 
@@ -1134,6 +1111,8 @@ buildvariants:
         - "rhel70-perf-initialsync-logkeeper"
     depends_on: *_compile_amazon-64
     tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: initialsync-logkeeper
 
   - name: atlas-like-M60
@@ -1152,12 +1131,12 @@ buildvariants:
         - "rhel70-perf-M60-like"
     depends_on: *_compile_rhel70
     tasks:  # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup.
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: industry_benchmarks_secondary_reads
       - name: crud_workloads
-      # - name: insert_remove
-      # - name: service_architecture_workloads
       - name: mixed_workloads
       - name: misc_workloads
       - name: map_reduce_workloads
@@ -1176,4 +1155,3 @@ buildvariants:
       - name: secondary_reads
       # - name: tpcc # TPCC with SSL currently broken https://jira.mongodb.org/browse/TIG-1681
       - name: linkbench
-      # - name: big_update
