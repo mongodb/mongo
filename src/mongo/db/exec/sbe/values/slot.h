@@ -205,7 +205,7 @@ private:
 
     bool _owned{false};
     TypeTags _tag{TypeTags::Nothing};
-    Value _val;
+    Value _val{0};
 };
 
 /**
