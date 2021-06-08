@@ -76,7 +76,7 @@ private:
     // accumulating/removing values.
     bool _initialized = false;
 
-    int _lowerBound;
+    int _lowerBound = 0;
     // Will stay boost::none if right unbounded.
     boost::optional<int> _upperBound = boost::none;
 };
