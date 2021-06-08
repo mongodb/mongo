@@ -125,6 +125,10 @@ public:
         return _cm->uuidMatches(uuid);
     }
 
+    boost::optional<UUID> getUUID() const {
+        return _cm->getUUID();
+    }
+
     /**
      * Returns just the shard key fields, if the collection is sharded, and the _id field, from
      * `doc`. Does not alter any field values (e.g. by hashing); values are copied verbatim.

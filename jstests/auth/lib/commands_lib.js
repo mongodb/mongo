@@ -2451,6 +2451,20 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "_configsvrCommitChunksMerge",
+          command: {_configsvrCommitChunksMerge: "x.y"},
+          skipSharded: true,
+          expectFail: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
+          ]
+        },
+        {
           testname: "_configsvrCommitChunkSplit",
           command: {_configsvrCommitChunkSplit: "x.y"},
           skipSharded: true,

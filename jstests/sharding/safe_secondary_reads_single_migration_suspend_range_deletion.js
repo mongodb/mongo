@@ -51,6 +51,7 @@
         _configsvrBalancerStop: {skip: "primary only"},
         _configsvrClearJumboFlag: {skip: "primary only"},
         _configsvrCommitChunkMerge: {skip: "primary only"},
+        _configsvrCommitChunksMerge: {skip: "primary only"},
         _configsvrCommitChunkMigration: {skip: "primary only"},
         _configsvrCommitChunkSplit: {skip: "primary only"},
         _configsvrCommitMovePrimary: {skip: "primary only"},
