@@ -58,5 +58,6 @@ int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity);
  */
 int getBucketRoundingSecondsFromGranularity(BucketGranularityEnum granularity);
 
+bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& option2);
 }  // namespace timeseries
 }  // namespace mongo

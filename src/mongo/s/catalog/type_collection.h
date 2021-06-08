@@ -86,6 +86,7 @@ public:
     static constexpr auto kAllowMigrationsFieldName = kPre50CompatibleAllowMigrationsFieldName;
     using CollectionTypeBase::kNssFieldName;
     using CollectionTypeBase::kReshardingFieldsFieldName;
+    using CollectionTypeBase::kTimeseriesFieldsFieldName;
     using CollectionTypeBase::kTimestampFieldName;
     using CollectionTypeBase::kUniqueFieldName;
     using CollectionTypeBase::kUpdatedAtFieldName;

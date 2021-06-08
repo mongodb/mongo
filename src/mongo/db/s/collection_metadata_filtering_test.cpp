@@ -213,32 +213,5 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
         operationContext(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup));
 }
 
-TEST_F(CollectionMetadataFilteringTest, DisallowOpsOnShardedTimeseriesCollection) {
-    TypeCollectionTimeseriesFields timeseriesFields("fieldName");
-    prepareTestData(timeseriesFields);
-
-    BSONObj readConcern = BSON("readConcern" << BSON("level"
-                                                     << "snapshot"
-                                                     << "atClusterTime" << Timestamp(100, 0)));
-
-    auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
-    ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
-
-    AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
-    auto* const css = CollectionShardingState::get(operationContext(), kNss);
-
-    auto check = [&](const DBException& ex) {
-        ASSERT_EQ(ex.code(), ErrorCodes::NotImplemented) << ex.toString();
-        ASSERT_STRING_CONTAINS(ex.reason(),
-                               "Operations on sharded time-series collections are not supported");
-    };
-
-    ASSERT_THROWS_WITH_CHECK(
-        css->getOwnershipFilter(operationContext(),
-                                CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup),
-        AssertionException,
-        check);
-}
-
 }  // namespace
 }  // namespace mongo

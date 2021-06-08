@@ -445,7 +445,9 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
 
     auto coll = makeCollectionType(version);
-    coll.setTimeseriesFields(TypeCollectionTimeseriesFields("fieldName"));
+    TypeCollectionTimeseriesFields tsFields;
+    tsFields.setTimeseriesOptions(TimeseriesOptions("fieldName"));
+    coll.setTimeseriesFields(tsFields);
 
     const auto scopedCollProv = scopedCollectionProvider(coll);
     const auto scopedChunksProv = scopedChunksProvider(makeChunks(version));

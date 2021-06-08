@@ -52,6 +52,9 @@ namespace timeseries {
 StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesIndexSpecBSON);
 
+StatusWith<BSONObj> createBucketsShardKeySpecFromTimeseriesShardKeySpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesIndexSpecBSON);
+
 /**
  * Maps the buckets collection index spec 'bucketsIndexSpecBSON' to the index schema of the
  * time-series collection using the information provided in 'timeseriesOptions'.

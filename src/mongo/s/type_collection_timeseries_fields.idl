@@ -30,16 +30,12 @@ global:
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/db/timeseries/timeseries.idl"
 
 structs:
     TypeCollectionTimeseriesFields:
         description: "Fields for time-series buckets collection fields in config.collections."
         strict: false
-        fields:
-            timeField:
-                description: "The name of the top-level field to be used for time."
-                type: string
-            metaField:
-                description: "The name of the top-level field describing the series."
-                type: string
-                optional: true
+        inline_chained_structs: true
+        chained_structs:
+            TimeseriesOptions: TimeseriesOptions

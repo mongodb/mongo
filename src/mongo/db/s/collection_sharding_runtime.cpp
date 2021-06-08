@@ -333,10 +333,6 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     const auto& currentMetadata = optCurrentMetadata->get();
 
-    uassert(ErrorCodes::NotImplemented,
-            "Operations on sharded time-series collections are not supported",
-            !currentMetadata.isSharded() || !currentMetadata.getTimeseriesFields());
-
     auto wantedShardVersion = currentMetadata.getShardVersion();
 
     {

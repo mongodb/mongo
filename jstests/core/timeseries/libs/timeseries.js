@@ -10,6 +10,12 @@ var TimeseriesTest = class {
             .featureFlagTimeseriesCollection.value;
     }
 
+    static shardedtimeseriesCollectionsEnabled(conn) {
+        return assert
+            .commandWorked(conn.adminCommand({getParameter: 1, featureFlagShardedTimeSeries: 1}))
+            .featureFlagShardedTimeSeries.value;
+    }
+
     /**
      * Adjusts the values in 'fields' by a random amount.
      * Ensures that the new values stay in the range [0, 100].

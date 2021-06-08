@@ -78,6 +78,18 @@ int getBucketRoundingSecondsFromGranularity(BucketGranularityEnum granularity) {
     }
     MONGO_UNREACHABLE;
 }
+bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& option2) {
+    const auto option1BucketSpan = option1.getBucketMaxSpanSeconds()
+        ? *option1.getBucketMaxSpanSeconds()
+        : getMaxSpanSecondsFromGranularity(option1.getGranularity());
+    const auto option2BucketSpan = option2.getBucketMaxSpanSeconds()
+        ? *option2.getBucketMaxSpanSeconds()
+        : getMaxSpanSecondsFromGranularity(option2.getGranularity());
+    return option1.getTimeField() == option1.getTimeField() &&
+        option1.getMetaField() == option2.getMetaField() &&
+        option1.getGranularity() == option2.getGranularity() &&
+        option1BucketSpan == option2BucketSpan;
+}
 
 }  // namespace timeseries
 }  // namespace mongo

@@ -33,14 +33,17 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/shard_collection_legacy.h"
 #include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -129,7 +132,7 @@ CreateCollectionResponse createCollectionLegacy(OperationContext* opCtx,
     uassert(ErrorCodes::IllegalOperation,
             "can't shard system namespaces",
             !nss.isSystem() || nss == NamespaceString::kLogicalSessionsNamespace ||
-                nss.isTemporaryReshardingCollection());
+                nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection());
 
     auto optNumInitialChunks = request.getNumInitialChunks();
     if (optNumInitialChunks) {
@@ -177,16 +180,42 @@ CreateCollectionResponse createCollectionLegacy(OperationContext* opCtx,
 }
 
 CreateCollectionResponse createCollection(OperationContext* opCtx,
-                                          const NamespaceString& nss,
+                                          NamespaceString nss,
                                           const ShardsvrCreateCollection& request) {
     uassert(
         ErrorCodes::NotImplemented, "create collection not implemented yet", request.getShardKey());
 
+    auto bucketsNs = nss.makeTimeseriesBucketsNamespace();
+    auto bucketsColl =
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
+    CreateCollectionRequest createCmdRequest = request.getCreateCollectionRequest();
+
+    // If the 'system.buckets' exists or 'timeseries' parameters are passed in, we know that we are
+    // trying shard a timeseries collection.
+    if (bucketsColl || createCmdRequest.getTimeseries()) {
+        uassert(5731502,
+                "Sharding a timeseries collection feature is not enabled",
+                feature_flags::gFeatureFlagShardedTimeSeries.isEnabledAndIgnoreFCV());
+
+        if (!createCmdRequest.getTimeseries()) {
+            createCmdRequest.setTimeseries(bucketsColl->getTimeseriesOptions());
+        } else if (bucketsColl) {
+            uassert(5731500,
+                    str::stream() << "the 'timeseries' spec provided must match that of exists '"
+                                  << nss << "' collection",
+                    timeseries::optionsAreEqual(*createCmdRequest.getTimeseries(),
+                                                *bucketsColl->getTimeseriesOptions()));
+        }
+        nss = bucketsNs;
+        createCmdRequest.setShardKey(
+            uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
+                *createCmdRequest.getTimeseries(), *createCmdRequest.getShardKey())));
+    }
+
     auto coordinatorDoc = CreateCollectionCoordinatorDocument();
     coordinatorDoc.setShardingDDLCoordinatorMetadata(
-        {{nss, DDLCoordinatorTypeEnum::kCreateCollection}});
-    coordinatorDoc.setCreateCollectionRequest(request.getCreateCollectionRequest());
-
+        {{std::move(nss), DDLCoordinatorTypeEnum::kCreateCollection}});
+    coordinatorDoc.setCreateCollectionRequest(std::move(createCmdRequest));
     auto service = ShardingDDLCoordinatorService::getService(opCtx);
     auto createCollectionCoordinator = checked_pointer_cast<CreateCollectionCoordinator>(
         service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
@@ -247,6 +276,7 @@ public:
 
             LOGV2_DEBUG(
                 5277910, 1, "Running new create collection procedure", "namespace"_attr = ns());
+
             return createCollection(opCtx, ns(), request());
         }
 

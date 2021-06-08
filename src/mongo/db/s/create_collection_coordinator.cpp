@@ -73,11 +73,14 @@ OptionsAndIndexes getCollectionOptionsAndIndexes(OperationContext* opCtx,
     // There must be a collection at this time.
     invariant(!all.empty());
     auto& entry = all.front();
+
     if (entry["options"].isABSONObj()) {
         optionsBob.appendElements(entry["options"].Obj());
     }
     optionsBob.append(entry["info"]["uuid"]);
-    idIndex = entry["idIndex"].Obj().getOwned();
+    if (entry["idIndex"]) {
+        idIndex = entry["idIndex"].Obj().getOwned();
+    }
 
     auto indexSpecsList = localClient.getIndexSpecs(nssOrUUID, false, 0);
 
@@ -539,7 +542,7 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
     uassert(ErrorCodes::IllegalOperation,
             "can't shard system namespaces",
             !nss().isSystem() || nss() == NamespaceString::kLogicalSessionsNamespace ||
-                nss().isTemporaryReshardingCollection());
+                nss().isTemporaryReshardingCollection() || nss().isTimeseriesBucketsCollection());
 
     if (_doc.getNumInitialChunks()) {
         // Ensure numInitialChunks is within valid bounds.
@@ -713,6 +716,12 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
                         *_collectionUUID);
 
     coll.setKeyPattern(_shardKeyPattern->getKeyPattern());
+
+    if (_doc.getCreateCollectionRequest().getTimeseries()) {
+        TypeCollectionTimeseriesFields timeseriesFields;
+        timeseriesFields.setTimeseriesOptions(*_doc.getCreateCollectionRequest().getTimeseries());
+        coll.setTimeseriesFields(std::move(timeseriesFields));
+    }
 
     if (_collation) {
         coll.setDefaultCollation(_collation.value());
