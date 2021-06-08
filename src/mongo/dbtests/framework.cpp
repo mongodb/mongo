@@ -53,6 +53,7 @@
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
@@ -66,6 +67,11 @@ namespace mongo {
 namespace dbtests {
 
 int runDbTests(int argc, char** argv) {
+    if (frameworkGlobalParams.suites.empty()) {
+        LOGV2_ERROR(5733802, "The [suite] argument is required for dbtest and not specified here.");
+        return EXIT_FAILURE;
+    }
+
     frameworkGlobalParams.perfHist = 1;
     frameworkGlobalParams.seed = time(nullptr);
     frameworkGlobalParams.runsPerTest = 1;
