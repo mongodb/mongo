@@ -13,7 +13,7 @@
  *     Switch a new writeable object.
  */
 static int
-__block_switch_writeable(WT_SESSION_IMPL *session, WT_BLOCK *block, uint64_t object_id)
+__block_switch_writeable(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t object_id)
 {
     WT_DECL_RET;
 
@@ -73,7 +73,7 @@ err:
  */
 int
 __wt_block_switch_object(
-  WT_SESSION_IMPL *session, WT_BLOCK *block, uint64_t object_id, uint32_t flags)
+  WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t object_id, uint32_t flags)
 {
     WT_UNUSED(flags);
 

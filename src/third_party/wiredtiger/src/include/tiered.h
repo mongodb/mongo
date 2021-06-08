@@ -64,7 +64,7 @@ struct __wt_tiered_work_unit {
     uint32_t type;                        /* Type of operation */
     uint64_t op_val;                      /* A value for the operation */
     WT_TIERED *tiered;                    /* Tiered tree */
-    uint64_t id;                          /* Id of the object */
+    uint32_t id;                          /* Id of the object */
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_TIERED_WORK_FORCE 0x1u /* Force operation */
 #define WT_TIERED_WORK_FREE 0x2u  /* Free data after operation */
@@ -113,8 +113,8 @@ struct __wt_tiered {
 
     WT_BLOCK_FILE_OPENER opener;
 
-    uint64_t current_id; /* Current object id number */
-    uint64_t next_id;    /* Next object number */
+    uint32_t current_id; /* Current object id number */
+    uint32_t next_id;    /* Next object number */
 
     WT_COLLATOR *collator; /* TODO: handle custom collation */
     /* TODO: What about compression, encryption, etc? Do we need to worry about that here? */
@@ -125,6 +125,7 @@ struct __wt_tiered {
     uint32_t flags;
 };
 
+/* FIXME: Currently the WT_TIERED_OBJECT data structure is not used. */
 /*
  * WT_TIERED_OBJECT --
  *     Definition of a tiered object. This is a single object in a tiered tree.
@@ -149,6 +150,7 @@ struct __wt_tiered_object {
     uint32_t flags;
 };
 
+/* FIXME: Currently the WT_TIERED_TREE data structure is not used. */
 /*
  * WT_TIERED_TREE --
  *     Definition of the shared tiered portion of a tree.

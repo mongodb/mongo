@@ -196,7 +196,7 @@ struct __wt_bm {
     int (*salvage_valid)(WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t, bool);
     int (*size)(WT_BM *, WT_SESSION_IMPL *, wt_off_t *);
     int (*stat)(WT_BM *, WT_SESSION_IMPL *, WT_DSRC_STATS *stats);
-    int (*switch_object)(WT_BM *, WT_SESSION_IMPL *, uint64_t, uint32_t);
+    int (*switch_object)(WT_BM *, WT_SESSION_IMPL *, uint32_t, uint32_t);
     int (*sync)(WT_BM *, WT_SESSION_IMPL *, bool);
     int (*verify_addr)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     int (*verify_end)(WT_BM *, WT_SESSION_IMPL *);
@@ -325,10 +325,10 @@ struct __wt_block_desc {
  */
 struct __wt_block_file_opener {
     /* An id to be used with the open call to reference the current object. */
-#define WT_TIERED_CURRENT_ID 0xFFFFFFFFFFFFFFFFULL
+#define WT_TIERED_CURRENT_ID 0xFFFFFFFFUL
     int (*open)(
-      WT_BLOCK_FILE_OPENER *, WT_SESSION_IMPL *, uint64_t, WT_FS_OPEN_FILE_TYPE, u_int, WT_FH **);
-    uint64_t (*current_object_id)(WT_BLOCK_FILE_OPENER *);
+      WT_BLOCK_FILE_OPENER *, WT_SESSION_IMPL *, uint32_t, WT_FS_OPEN_FILE_TYPE, u_int, WT_FH **);
+    uint32_t (*current_object_id)(WT_BLOCK_FILE_OPENER *);
     void *cookie; /* Used in open call */
 };
 

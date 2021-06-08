@@ -98,7 +98,7 @@ __wt_tiered_get_drop_shared(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT **entr
  *     Add a drop local work unit for the given ID to the queue.
  */
 int
-__wt_tiered_put_drop_local(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint64_t id)
+__wt_tiered_put_drop_local(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
 {
     WT_TIERED_WORK_UNIT *entry;
     uint64_t now;
@@ -120,7 +120,7 @@ __wt_tiered_put_drop_local(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint64_t
  *     Add a drop shared work unit for the given ID to the queue.
  */
 int
-__wt_tiered_put_drop_shared(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint64_t id)
+__wt_tiered_put_drop_shared(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
 {
     WT_TIERED_WORK_UNIT *entry;
 
