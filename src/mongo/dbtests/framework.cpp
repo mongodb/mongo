@@ -113,7 +113,7 @@ int runDbTests(int argc, char** argv) {
 
     {
         auto opCtx = globalServiceContext->makeOperationContext(&cc());
-        initializeStorageEngine(opCtx.get(), StorageEngineInitFlags::kNone);
+        initializeStorageEngine(opCtx.get(), StorageEngineInitFlags{});
     }
 
     StorageControl::startStorageControls(globalServiceContext, true /*forTestOnly*/);

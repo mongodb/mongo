@@ -406,8 +406,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     // initialized, a noop recovery unit is used until the initialization is complete.
     auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 
-    auto lastShutdownState =
-        initializeStorageEngine(startupOpCtx.get(), StorageEngineInitFlags::kNone);
+    auto lastShutdownState = initializeStorageEngine(startupOpCtx.get(), StorageEngineInitFlags{});
     StorageControl::startStorageControls(serviceContext);
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED

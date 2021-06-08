@@ -35,7 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/bitwise_enum_operators.h"
+#include "mongo/stdx/utility.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_mode.h"
@@ -70,21 +70,19 @@ public:
 
     virtual ~ServiceExecutor() = default;
     using Task = unique_function<void()>;
-    enum ScheduleFlags {
-        // No flags (kEmptyFlags) specifies that this is a normal task and that the executor should
-        // launch new threads as needed to run the task.
-        kEmptyFlags = 1 << 0,
 
-        // Deferred tasks will never get a new thread launched to run them.
-        kDeferredTask = 1 << 1,
-
-        // MayRecurse indicates that a task may be run recursively.
-        kMayRecurse = 1 << 2,
-
-        // MayYieldBeforeSchedule indicates that the executor may yield on the current thread before
-        // scheduling the task.
-        kMayYieldBeforeSchedule = 1 << 3,
+    /** With no flags set, `scheduleTask` will launch new threads as needed. */
+    enum class ScheduleFlags {
+        kDeferredTask = 1 << 0,           /**< Never given a newly launched thread. */
+        kMayRecurse = 1 << 1,             /**< May be run recursively. */
+        kMayYieldBeforeSchedule = 1 << 2, /**< May yield before scheduling. */
     };
+    friend constexpr ScheduleFlags operator&(ScheduleFlags a, ScheduleFlags b) noexcept {
+        return ScheduleFlags{stdx::to_underlying(a) & stdx::to_underlying(b)};
+    }
+    friend constexpr ScheduleFlags operator|(ScheduleFlags a, ScheduleFlags b) noexcept {
+        return ScheduleFlags{stdx::to_underlying(a) | stdx::to_underlying(b)};
+    }
 
     /*
      * Starts the ServiceExecutor. This may create threads even if no tasks are scheduled.
@@ -108,8 +106,7 @@ public:
      * for execution on the service executor. May throw if "scheduleTask" returns a non-okay status.
      */
     void schedule(OutOfLineExecutor::Task func) override {
-        iassert(scheduleTask([task = std::move(func)]() mutable { task(Status::OK()); },
-                             ScheduleFlags::kEmptyFlags));
+        iassert(scheduleTask([task = std::move(func)]() mutable { task(Status::OK()); }, {}));
     }
 
     /*
@@ -255,7 +252,5 @@ public:
 };
 
 }  // namespace transport
-
-ENABLE_BITMASK_OPERATORS(transport::ServiceExecutor::ScheduleFlags)
 
 }  // namespace mongo

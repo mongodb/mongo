@@ -99,7 +99,7 @@ Status ServiceExecutorSynchronous::scheduleTask(Task task, ScheduleFlags flags) 
     }
 
     if (!_localWorkQueue.empty()) {
-        if (flags & ScheduleFlags::kMayYieldBeforeSchedule) {
+        if ((flags & ScheduleFlags::kMayYieldBeforeSchedule) != ScheduleFlags{}) {
             yieldIfAppropriate();
         }
 
@@ -107,7 +107,7 @@ Status ServiceExecutorSynchronous::scheduleTask(Task task, ScheduleFlags flags) 
         // performance in testing. Try to limit the amount of recursion so we don't blow up the
         // stack, even though this shouldn't happen with this executor that uses blocking network
         // I/O.
-        if ((flags & ScheduleFlags::kMayRecurse) &&
+        if ((flags & ScheduleFlags::kMayRecurse) != ScheduleFlags{} &&
             (_localRecursionDepth < synchronousServiceExecutorRecursionLimit.loadRelaxed())) {
             ++_localRecursionDepth;
             task();

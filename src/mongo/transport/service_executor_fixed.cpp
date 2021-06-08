@@ -354,7 +354,7 @@ Status ServiceExecutorFixed::scheduleTask(Task task, ScheduleFlags flags) try {
     }
 
     auto mayExecuteTaskInline = [&] {
-        if (!(flags & ScheduleFlags::kMayRecurse))
+        if ((flags & ScheduleFlags::kMayRecurse) == ScheduleFlags{})
             return false;
         if (!_executorContext)
             return false;

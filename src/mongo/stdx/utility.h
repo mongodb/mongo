@@ -51,5 +51,12 @@ using std::as_const;
 
 #endif
 
+/** https://en.cppreference.com/w/cpp/utility/to_underlying */
+template <typename E>
+constexpr auto to_underlying(E e) noexcept {
+    static_assert(std::is_enum_v<E>, "E is not an enumeration");
+    return static_cast<std::underlying_type_t<E>>(e);
+}
+
 }  // namespace stdx
 }  // namespace mongo

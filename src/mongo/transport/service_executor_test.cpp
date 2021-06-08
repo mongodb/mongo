@@ -149,7 +149,7 @@ void scheduleBasicTask(ServiceExecutor* exec, bool expectSuccess) {
     auto barrier = std::make_shared<unittest::Barrier>(2);
     auto task = [barrier] { barrier->countDownAndWait(); };
 
-    auto status = exec->scheduleTask(std::move(task), ServiceExecutor::kEmptyFlags);
+    auto status = exec->scheduleTask(std::move(task), {});
     if (expectSuccess) {
         ASSERT_OK(status);
         barrier->countDownAndWait();
@@ -217,7 +217,7 @@ public:
 
 TEST_F(ServiceExecutorFixedFixture, ScheduleFailsBeforeStartup) {
     auto executorHandle = ServiceExecutorHandle();
-    ASSERT_NOT_OK(executorHandle->scheduleTask([] {}, ServiceExecutor::kEmptyFlags));
+    ASSERT_NOT_OK(executorHandle->scheduleTask([] {}, {}));
 }
 
 TEST_F(ServiceExecutorFixedFixture, JoinWorksBeforeShutdown) {
@@ -236,7 +236,7 @@ TEST_F(ServiceExecutorFixedFixture, JoinWorksBeforeShutdown) {
     executorHandle.joinWithoutShutdown();
 
     // Poke the executor to make sure it is shutdown.
-    ASSERT_NOT_OK(executorHandle->scheduleTask([] {}, ServiceExecutor::kEmptyFlags));
+    ASSERT_NOT_OK(executorHandle->scheduleTask([] {}, {}));
 }
 
 TEST_F(ServiceExecutorFixedFixture, BasicTaskRuns) {
@@ -244,8 +244,8 @@ TEST_F(ServiceExecutorFixedFixture, BasicTaskRuns) {
     executorHandle.start();
 
     auto barrier = std::make_shared<unittest::Barrier>(2);
-    ASSERT_OK(executorHandle->scheduleTask([barrier]() mutable { barrier->countDownAndWait(); },
-                                           ServiceExecutor::kEmptyFlags));
+    ASSERT_OK(
+        executorHandle->scheduleTask([barrier]() mutable { barrier->countDownAndWait(); }, {}));
     barrier->countDownAndWait();
 }
 
@@ -259,7 +259,8 @@ TEST_F(ServiceExecutorFixedFixture, RecursiveTask) {
     recursiveTask = [&, barrier, executor = *executorHandle] {
         if (executor->getRecursionDepthForExecutorThread() <
             fixedServiceExecutorRecursionLimit.load()) {
-            ASSERT_OK(executor->scheduleTask(recursiveTask, ServiceExecutor::kMayRecurse));
+            ASSERT_OK(
+                executor->scheduleTask(recursiveTask, ServiceExecutor::ScheduleFlags::kMayRecurse));
         } else {
             // This test never returns unless the service executor can satisfy the recursion depth.
             barrier->countDownAndWait();
@@ -267,7 +268,8 @@ TEST_F(ServiceExecutorFixedFixture, RecursiveTask) {
     };
 
     // Schedule recursive task and wait for the recursion to stop
-    ASSERT_OK(executorHandle->scheduleTask(recursiveTask, ServiceExecutor::kMayRecurse));
+    ASSERT_OK(
+        executorHandle->scheduleTask(recursiveTask, ServiceExecutor::ScheduleFlags::kMayRecurse));
     barrier->countDownAndWait();
 }
 
@@ -285,7 +287,7 @@ TEST_F(ServiceExecutorFixedFixture, FlattenRecursiveScheduledTasks) {
     recursiveTask = [&, barrier, executor = *executorHandle] {
         ASSERT_EQ(executor->getRecursionDepthForExecutorThread(), 1);
         if (tasksToSchedule.fetchAndSubtract(1) > 0) {
-            ASSERT_OK(executor->scheduleTask(recursiveTask, ServiceExecutor::kEmptyFlags));
+            ASSERT_OK(executor->scheduleTask(recursiveTask, {}));
         } else {
             // Once there are no more tasks to schedule, notify the main thread to proceed.
             barrier->countDownAndWait();
@@ -293,8 +295,8 @@ TEST_F(ServiceExecutorFixedFixture, FlattenRecursiveScheduledTasks) {
     };
 
     // Schedule the recursive task and wait for the execution to finish.
-    ASSERT_OK(
-        executorHandle->scheduleTask(recursiveTask, ServiceExecutor::kMayYieldBeforeSchedule));
+    ASSERT_OK(executorHandle->scheduleTask(
+        recursiveTask, ServiceExecutor::ScheduleFlags::kMayYieldBeforeSchedule));
     barrier->countDownAndWait();
 }
 
@@ -310,7 +312,7 @@ TEST_F(ServiceExecutorFixedFixture, ShutdownTimeLimit) {
             invoked->emplaceValue();
             mayReturn->getFuture().get();
         },
-        ServiceExecutor::kEmptyFlags));
+        {}));
 
     invoked->getFuture().get();
     ASSERT_NOT_OK(executorHandle->shutdown(kShutdownTime));
@@ -330,8 +332,8 @@ TEST_F(ServiceExecutorFixedFixture, ScheduleSucceedsBeforeShutdown) {
 
         // The executor accepts the work, but hasn't used the underlying pool yet.
         thread = stdx::thread([&] {
-            ASSERT_OK(executorHandle->scheduleTask([&, barrier] { barrier->countDownAndWait(); },
-                                                   ServiceExecutor::kEmptyFlags));
+            ASSERT_OK(
+                executorHandle->scheduleTask([&, barrier] { barrier->countDownAndWait(); }, {}));
         });
         failpoint->waitForTimesEntered(1);
 
@@ -353,8 +355,7 @@ TEST_F(ServiceExecutorFixedFixture, ScheduleFailsAfterShutdown) {
     executorHandle.start();
 
     ASSERT_OK(executorHandle->shutdown(kShutdownTime));
-    ASSERT_NOT_OK(
-        executorHandle->scheduleTask([] { MONGO_UNREACHABLE; }, ServiceExecutor::kEmptyFlags));
+    ASSERT_NOT_OK(executorHandle->scheduleTask([] { MONGO_UNREACHABLE; }, {}));
 }
 
 TEST_F(ServiceExecutorFixedFixture, RunTaskAfterWaitingForData) {
