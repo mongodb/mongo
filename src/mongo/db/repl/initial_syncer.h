@@ -99,10 +99,6 @@ struct InitialSyncerOptions {
     // This default value is based on the duration in OplogBatcher::run().
     Milliseconds getApplierBatchCallbackRetryWait{1000};
 
-    // Replication settings
-    NamespaceString localOplogNS = NamespaceString::kRsOplogNamespace;
-    NamespaceString remoteOplogNS = NamespaceString::kRsOplogNamespace;
-
     GetMyLastOptimeFn getMyLastOptime;
     SetMyLastOptimeFn setMyLastOptime;
     ResetOptimesFn resetOptimes;
@@ -112,12 +108,6 @@ struct InitialSyncerOptions {
     // The oplog fetcher will restart the oplog tailing query this many times on non-cancellation
     // failures.
     std::uint32_t oplogFetcherMaxFetcherRestarts = 0;
-
-    std::string toString() const {
-        return str::stream() << "InitialSyncerOptions -- "
-                             << " localOplogNs: " << localOplogNS.toString()
-                             << " remoteOplogNS: " << remoteOplogNS.toString();
-    }
 };
 
 /**

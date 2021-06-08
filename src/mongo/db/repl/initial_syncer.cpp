@@ -387,7 +387,7 @@ std::string InitialSyncer::getDiagnosticString() const {
     LockGuard lk(_mutex);
     str::stream out;
     out << "InitialSyncer -"
-        << " opts: " << _opts.toString() << " oplogFetcher: " << _oplogFetcher->toString()
+        << " oplogFetcher: " << _oplogFetcher->toString()
         << " opsBuffered: " << _oplogBuffer->getSize() << " active: " << _isActive_inlock()
         << " shutting down: " << _isShuttingDown_inlock();
     if (_initialSyncState) {
@@ -784,13 +784,13 @@ void InitialSyncer::_chooseSyncSourceCallback(
 
 Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
     // truncate oplog; drop user databases.
-    LOGV2_DEBUG(21171,
+    LOGV2_DEBUG(4540700,
                 1,
                 "About to truncate the oplog, if it exists, ns:{namespace}, and drop all "
                 "user databases (so that we can clone them).",
                 "About to truncate the oplog, if it exists, and drop all user databases (so that "
                 "we can clone them)",
-                "namespace"_attr = _opts.localOplogNS);
+                "namespace"_attr = NamespaceString::kRsOplogNamespace);
 
     auto opCtx = makeOpCtx();
 
@@ -798,25 +798,25 @@ Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
     UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx.get());
 
     // 1.) Truncate the oplog.
-    LOGV2_DEBUG(21172,
+    LOGV2_DEBUG(4540701,
                 2,
                 "Truncating the existing oplog: {namespace}",
                 "Truncating the existing oplog",
-                "namespace"_attr = _opts.localOplogNS);
+                "namespace"_attr = NamespaceString::kRsOplogNamespace);
     Timer timer;
-    auto status = _storage->truncateCollection(opCtx.get(), _opts.localOplogNS);
+    auto status = _storage->truncateCollection(opCtx.get(), NamespaceString::kRsOplogNamespace);
     LOGV2(21173,
           "Initial syncer oplog truncation finished in: {durationMillis}ms",
           "Initial syncer oplog truncation finished",
           "durationMillis"_attr = timer.millis());
     if (!status.isOK()) {
         // 1a.) Create the oplog.
-        LOGV2_DEBUG(21174,
+        LOGV2_DEBUG(4540702,
                     2,
                     "Creating the oplog: {namespace}",
                     "Creating the oplog",
-                    "namespace"_attr = _opts.localOplogNS);
-        status = _storage->createOplog(opCtx.get(), _opts.localOplogNS);
+                    "namespace"_attr = NamespaceString::kRsOplogNamespace);
+        status = _storage->createOplog(opCtx.get(), NamespaceString::kRsOplogNamespace);
         if (!status.isOK()) {
             return status;
         }
@@ -1171,7 +1171,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
                 "{namespace} and the begin fetching timestamp to {beginFetchingTimestamp}",
                 "Setting begin applying timestamp and begin fetching timestamp",
                 "beginApplyingTimestamp"_attr = _initialSyncState->beginApplyingTimestamp,
-                "namespace"_attr = _opts.localOplogNS,
+                "namespace"_attr = NamespaceString::kRsOplogNamespace,
                 "beginFetchingTimestamp"_attr = _initialSyncState->beginFetchingTimestamp);
 
     const auto configResult = _dataReplicatorExternalState->getCurrentConfig();
@@ -1449,7 +1449,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
         // initial_syncer_test.cpp
         auto status = _storage->insertDocument(
             opCtx.get(),
-            _opts.localOplogNS,
+            NamespaceString::kRsOplogNamespace,
             TimestampedBSONObj{oplogSeedDoc, resultOpTimeAndWallTime.opTime.getTimestamp()},
             resultOpTimeAndWallTime.opTime.getTerm());
         if (!status.isOK()) {
@@ -1850,14 +1850,15 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
 
 Status InitialSyncer::_scheduleLastOplogEntryFetcher_inlock(
     Fetcher::CallbackFn callback, LastOplogEntryFetcherRetryStrategy retryStrategy) {
-    BSONObj query = BSON("find" << _opts.remoteOplogNS.coll() << "sort" << BSON("$natural" << -1)
-                                << "limit" << 1 << ReadConcernArgs::kReadConcernFieldName
-                                << ReadConcernArgs::kImplicitDefault);
+    BSONObj query =
+        BSON("find" << NamespaceString::kRsOplogNamespace.coll() << "sort" << BSON("$natural" << -1)
+                    << "limit" << 1 << ReadConcernArgs::kReadConcernFieldName
+                    << ReadConcernArgs::kImplicitDefault);
 
     _lastOplogEntryFetcher = std::make_unique<Fetcher>(
         *_attemptExec,
         _syncSource,
-        _opts.remoteOplogNS.db().toString(),
+        NamespaceString::kRsOplogNamespace.db().toString(),
         query,
         callback,
         ReadPreferenceSetting::secondaryPreferredMetadata(),
