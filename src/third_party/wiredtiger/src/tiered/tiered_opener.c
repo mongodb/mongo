@@ -13,7 +13,7 @@
  *     Open an object by number.
  */
 static int
-__tiered_opener_open(WT_BLOCK_FILE_OPENER *opener, WT_SESSION_IMPL *session, uint64_t object_id,
+__tiered_opener_open(WT_BLOCK_FILE_OPENER *opener, WT_SESSION_IMPL *session, uint32_t object_id,
   WT_FS_OPEN_FILE_TYPE type, u_int flags, WT_FH **fhp)
 {
     WT_BUCKET_STORAGE *bstorage;
@@ -53,7 +53,7 @@ err:
  * __tiered_opener_current_id --
  *     Get the current writeable object id.
  */
-static uint64_t
+static uint32_t
 __tiered_opener_current_id(WT_BLOCK_FILE_OPENER *opener)
 {
     WT_TIERED *tiered;

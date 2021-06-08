@@ -443,7 +443,7 @@ __bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
  *     Modify the tiered object.
  */
 static int
-__bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint64_t object_id, uint32_t flags)
+__bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t object_id, uint32_t flags)
 {
     return (__wt_block_switch_object(session, bm->block, object_id, flags));
 }
@@ -453,7 +453,7 @@ __bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint64_t object_id, uint
  *     Modify the tiered object; readonly version.
  */
 static int
-__bm_switch_object_readonly(WT_BM *bm, WT_SESSION_IMPL *session, uint64_t object_id, uint32_t flags)
+__bm_switch_object_readonly(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t object_id, uint32_t flags)
 {
     WT_UNUSED(object_id);
     WT_UNUSED(flags);

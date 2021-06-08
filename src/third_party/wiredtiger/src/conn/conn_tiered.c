@@ -228,7 +228,7 @@ __wt_tier_do_flush(
  *     Given an ID generate the URI names and call the flush code.
  */
 int
-__wt_tier_flush(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint64_t id)
+__wt_tier_flush(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
 {
     WT_DECL_RET;
     const char *local_uri, *obj_uri;

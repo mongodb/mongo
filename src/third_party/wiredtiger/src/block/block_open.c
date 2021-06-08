@@ -185,8 +185,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, WT_BLOCK_FILE_OP
     block->allocfirst = WT_STRING_MATCH("first", cval.str, cval.len);
     block->has_objects = (opener != NULL);
     if (block->has_objects)
-        /* FIXME-WT-7588 fix 32 bit vs 64 bit mismatch. */
-        block->objectid = (uint32_t)opener->current_object_id(opener);
+        block->objectid = opener->current_object_id(opener);
 
     /* Configuration: optional OS buffer cache maximum size. */
     WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));

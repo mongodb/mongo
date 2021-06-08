@@ -275,7 +275,7 @@ __tiered_update_metadata(WT_SESSION_IMPL *session, WT_TIERED *tiered, const char
     newconfig = NULL;
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
-    WT_RET(__wt_buf_fmt(session, tmp, "last=%" PRIu64 ",tiers=(", tiered->current_id));
+    WT_RET(__wt_buf_fmt(session, tmp, "last=%" PRIu32 ",tiers=(", tiered->current_id));
     for (i = 0; i < WT_TIERED_MAX_TIERS; ++i) {
         if (tiered->tiers[i].name == NULL) {
             __wt_verbose(session, WT_VERB_TIERED, "TIER_UPDATE_META: names[%" PRIu32 "] NULL", i);
@@ -404,7 +404,7 @@ __wt_tiered_switch(WT_SESSION_IMPL *session, const char *config)
  */
 int
 __wt_tiered_name(
-  WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, uint64_t id, uint32_t flags, const char **retp)
+  WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, uint32_t id, uint32_t flags, const char **retp)
 {
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
@@ -429,12 +429,12 @@ __wt_tiered_name(
         if (LF_ISSET(WT_TIERED_NAME_PREFIX))
             WT_ERR(__wt_buf_fmt(session, tmp, "file:%s-", name));
         else
-            WT_ERR(__wt_buf_fmt(session, tmp, "file:%s-%010" PRIu64 ".wtobj", name, id));
+            WT_ERR(__wt_buf_fmt(session, tmp, "file:%s-%010" PRIu32 ".wtobj", name, id));
     } else if (LF_ISSET(WT_TIERED_NAME_OBJECT)) {
         if (LF_ISSET(WT_TIERED_NAME_PREFIX))
             WT_ERR(__wt_buf_fmt(session, tmp, "object:%s-", name));
         else
-            WT_ERR(__wt_buf_fmt(session, tmp, "object:%s-%010" PRIu64 ".wtobj", name, id));
+            WT_ERR(__wt_buf_fmt(session, tmp, "object:%s-%010" PRIu32 ".wtobj", name, id));
     } else {
         WT_ASSERT(session, !LF_ISSET(WT_TIERED_NAME_PREFIX));
         WT_ASSERT(session, LF_ISSET(WT_TIERED_NAME_SHARED));
@@ -504,7 +504,7 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR(__wt_strndup(session, cval.str, cval.len, &tiered->value_format));
 
     WT_ERR(__wt_config_getones(session, config, "last", &cval));
-    tiered->current_id = (uint64_t)cval.val;
+    tiered->current_id = (uint32_t)cval.val;
     tiered->next_id = tiered->current_id + 1;
     __wt_verbose(session, WT_VERB_TIERED, "TIERED_OPEN: current %d, next %d",
       (int)tiered->current_id, (int)tiered->next_id);
