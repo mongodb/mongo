@@ -161,7 +161,8 @@ public:
                    long long cursorId,
                    int nToReturn,
                    int options,
-                   std::vector<BSONObj> initialBatch = {});
+                   std::vector<BSONObj> initialBatch = {},
+                   boost::optional<Timestamp> operationTime = boost::none);
 
     static StatusWith<std::unique_ptr<DBClientCursor>> fromAggregationRequest(
         DBClientBase* client,
@@ -289,7 +290,8 @@ private:
                    int queryOptions,
                    int bs,
                    std::vector<BSONObj> initialBatch,
-                   boost::optional<BSONObj> readConcernObj);
+                   boost::optional<BSONObj> readConcernObj,
+                   boost::optional<Timestamp> operationTime);
 
     int nextBatchSize();
 
