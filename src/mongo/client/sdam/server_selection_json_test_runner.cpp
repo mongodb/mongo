@@ -387,18 +387,19 @@ private:
                                         setName);
         _topologyDescription = std::make_shared<TopologyDescription>(config);
 
-        if (_jsonTest.hasField("in_latency_window")) {
-            const std::vector<BSONElement>& bsonLatencyWindow =
-                _jsonTest["in_latency_window"].Array();
-            for (const auto& serverDescription : serverDescriptions) {
-                _topologyDescription->installServerDescription(serverDescription);
+        std::vector<BSONElement> bsonLatencyWindow;
+        if (auto inLatencyWindowElem = _jsonTest["in_latency_window"]) {
+            bsonLatencyWindow = inLatencyWindowElem.Array();
+        }
 
-                for (auto bsonServer : bsonLatencyWindow) {
-                    auto server = bsonServer.Obj();
-                    if (serverDescription->getAddress() ==
-                        HostAndPort(server.getStringField("address"))) {
-                        _inLatencyWindow.push_back(serverDescription);
-                    }
+        for (const auto& serverDescription : serverDescriptions) {
+            _topologyDescription->installServerDescription(serverDescription);
+
+            for (auto bsonServer : bsonLatencyWindow) {
+                auto server = bsonServer.Obj();
+                if (serverDescription->getAddress() ==
+                    HostAndPort(server.getStringField("address"))) {
+                    _inLatencyWindow.push_back(serverDescription);
                 }
             }
         }
