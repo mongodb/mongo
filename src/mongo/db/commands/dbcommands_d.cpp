@@ -162,7 +162,7 @@ protected:
         // need to read the current filter, if any. If we're not changing either value, then we can
         // acquire a shared lock instead of exclusive.
         const bool readOnly = (profilingLevel < 0 || profilingLevel > 2) && !request.getFilter();
-        const LockMode dbMode = readOnly ? MODE_S : MODE_X;
+        const LockMode dbMode = readOnly ? MODE_IS : MODE_IX;
 
         // Accessing system.profile collection should not conflict with oplog application.
         ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
