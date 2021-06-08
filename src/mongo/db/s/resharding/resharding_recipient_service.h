@@ -229,6 +229,9 @@ private:
 
     void _startMetrics();
 
+    // Restore metrics using the persisted metrics after stepping up.
+    void _restoreMetrics();
+
     // Initializes the _abortSource and generates a token from it to return back the caller.
     //
     // Should only be called once per lifetime.
