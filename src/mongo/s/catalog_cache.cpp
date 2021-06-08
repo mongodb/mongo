@@ -302,6 +302,17 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutin
     return routingInfoStatus;
 }
 
+StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutingInfo(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    auto routingInfoStatus = _getCollectionRoutingInfoAt(opCtx, nss, boost::none).statusWithInfo;
+    if (routingInfoStatus.isOK() && !routingInfoStatus.getValue().cm()) {
+        return {ErrorCodes::NamespaceNotSharded,
+                str::stream() << "Collection " << nss.ns() << " is not sharded."};
+    }
+
+    return routingInfoStatus;
+}
+
 void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
                                           const DatabaseVersion& databaseVersion) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);

@@ -190,6 +190,13 @@ public:
         OperationContext* opCtx, const NamespaceString& nss);
 
     /**
+     * Same as getCollectionRoutingInfoWithRefresh above, but in addition returns a
+     * NamespaceNotSharded error if the collection is not sharded.
+     */
+    StatusWith<CachedCollectionRoutingInfo> getShardedCollectionRoutingInfo(
+        OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
      * Non-blocking method that marks the current cached database entry as needing refresh if the
      * entry's databaseVersion matches 'databaseVersion'.
      *
