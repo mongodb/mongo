@@ -243,17 +243,15 @@ class _SlowFieldUsageChecker(_FieldUsageCheckerBase):
                     (_get_field_constant_name(field))
                 with writer.IndentedScopedBlock(self._writer, pred, '}'):
                     if field.default:
+                        default_value = (field.type.cpp_type + "::" + field.default) \
+                            if field.type.is_enum else field.default
                         if field.chained_struct_field:
                             self._writer.write_line('%s.%s(%s);' % (_get_field_member_name(
                                 field.chained_struct_field), _get_field_member_setter_name(field),
-                                                                    field.default))
-                        elif field.type.is_enum:
-                            self._writer.write_line(
-                                '%s = %s::%s;' % (_get_field_member_name(field),
-                                                  field.type.cpp_type, field.default))
+                                                                    default_value))
                         else:
                             self._writer.write_line(
-                                '%s = %s;' % (_get_field_member_name(field), field.default))
+                                '%s = %s;' % (_get_field_member_name(field), default_value))
                     else:
                         self._writer.write_line(
                             'ctxt.throwMissingField(%s);' % (_get_field_constant_name(field)))
