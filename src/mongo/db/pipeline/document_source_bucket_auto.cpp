@@ -101,6 +101,11 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::doGetNext() {
         _populated = true;
     }
 
+    if (!_sortedInput) {
+        // We have been disposed. Return EOF.
+        return GetNextResult::makeEOF();
+    }
+
     if (_currentBucketDetails.currentBucketNum++ < _nBuckets) {
         if (auto bucket = populateNextBucket()) {
             return makeDocument(*bucket);
