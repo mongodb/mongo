@@ -152,12 +152,18 @@ bool VoteRequester::Algorithm::hasReceivedSufficientResponses() const {
         return true;
     }
 
+    // We require the primary's response during catchup takeover. An error response from the primary
+    // is not a yes, no or pending, but is still a response. Therefore, we handle the case in which
+    // we have received some response (even if error) from all nodes first.
+    if (_responsesProcessed == static_cast<int>(_targets.size())) {
+        return true;
+    }
+
     if (_primaryHost && _primaryVote == PrimaryVote::Pending) {
         return false;
     }
 
-    return _staleTerm || _votes >= _rsConfig.getMajorityVoteCount() ||
-        _responsesProcessed == static_cast<int>(_targets.size());
+    return _staleTerm || _votes >= _rsConfig.getMajorityVoteCount();
 }
 
 VoteRequester::Result VoteRequester::Algorithm::getResult() const {

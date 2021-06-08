@@ -539,6 +539,32 @@ TEST_F(VoteRequesterCatchupTakeoverDryRunTest, CatchupTakeoverPrimarySaysNoLoseE
     stopCapturingLogMessages();
 }
 
+TEST_F(VoteRequesterCatchupTakeoverDryRunTest,
+       CatchupTakeoverAllNodesRespondedMeansSufficientResponses) {
+    startCapturingLogMessages();
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+
+    // Getting a good response from the other secondaries is insufficient.
+    processResponse(requestFrom("host2"), votedYes());
+    processResponse(requestFrom("host3"), votedYes());
+    processResponse(requestFrom("host4"), votedYes());
+    ASSERT_FALSE(hasReceivedSufficientResponses());
+
+    // Getting an error response from the primary means all targets have responded, and so we have
+    // received sufficient responses.
+    processResponse(requestFrom("host1"), badRemoteCommandResponse());
+    ASSERT_EQUALS(1, countLogLinesContaining("failed to receive response from host1:27017"));
+    ASSERT_TRUE(hasReceivedSufficientResponses());
+
+    // An error response from the primary is equivalent to it saying NO.
+    ASSERT(VoteRequester::Result::kPrimaryRespondedNo == getResult());
+
+    // Only the secondaries are counted; the primary is excluded from the responders since it gave
+    // an error response.
+    ASSERT_EQUALS(3, getNumResponders());
+    stopCapturingLogMessages();
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
