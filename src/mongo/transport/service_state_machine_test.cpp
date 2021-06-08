@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/client_strand.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -536,9 +537,15 @@ public:
 
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) noexcept override {
-        return ExecutorFuture<void>(_fixture->_threadPool)
-            .then([this, opCtx, request] { return _fixture->_handleRequest(opCtx, request); })
-            .unsafeToInlineFuture();
+        auto [p, f] = makePromiseFuture<DbResponse>();
+        ExecutorFuture<void>(_fixture->_threadPool)
+            .then([this, opCtx, &request, p = std::move(p)]() mutable {
+                auto strand = ClientStrand::get(opCtx->getClient());
+                strand->run(
+                    [&] { p.setWith([&] { return _fixture->_handleRequest(opCtx, request); }); });
+            })
+            .getAsync([](auto) {});
+        return std::move(f);
     }
 
     void onEndSession(const transport::SessionHandle& session) override {
