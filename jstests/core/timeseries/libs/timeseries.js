@@ -10,6 +10,12 @@ var TimeseriesTest = class {
             .featureFlagTimeseriesCollection.value;
     }
 
+    static shardedtimeseriesCollectionsEnabled(conn) {
+        return assert
+            .commandWorked(conn.adminCommand({getParameter: 1, featureFlagShardedTimeSeries: 1}))
+            .featureFlagShardedTimeSeries.value;
+    }
+
     /**
      * Returns whether time-series updates and deletes are supported.
      */

@@ -87,6 +87,11 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
+
+        uassert(5731501,
+                "Sharding a buckets collection is not allowed",
+                !nss.isTimeseriesBucketsCollection());
+
         auto shardCollRequest =
             ShardCollection::parse(IDLParserErrorContext("ShardCollection"), cmdObj);
 
@@ -97,6 +102,7 @@ public:
         requestParamsObj.setNumInitialChunks(shardCollRequest.getNumInitialChunks());
         requestParamsObj.setPresplitHashedZones(shardCollRequest.getPresplitHashedZones());
         requestParamsObj.setCollation(shardCollRequest.getCollation());
+        requestParamsObj.setTimeseries(shardCollRequest.getTimeseries());
         shardsvrCollRequest.setCreateCollectionRequest(std::move(requestParamsObj));
         shardsvrCollRequest.setDbName(nss.db());
 

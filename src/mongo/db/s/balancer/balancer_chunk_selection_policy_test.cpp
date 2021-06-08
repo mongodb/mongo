@@ -246,7 +246,10 @@ TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCannotBeAutoSplit
     const auto collUUID = UUID::gen();
     ChunkVersion version(2, 0, OID::gen(), Timestamp(42));
     setUpDatabase(kDbName, kShardId0);
-    setUpCollection(kNamespace, collUUID, version, TypeCollectionTimeseriesFields("fieldName"));
+
+    TypeCollectionTimeseriesFields tsFields;
+    tsFields.setTimeseriesOptions(TimeseriesOptions("fieldName"));
+    setUpCollection(kNamespace, collUUID, version, std::move(tsFields));
 
     // Set up two zones
     setUpTags(kNamespace,
@@ -290,7 +293,10 @@ TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCannotBeBalanced)
     const auto collUUID = UUID::gen();
     ChunkVersion version(2, 0, OID::gen(), Timestamp(42));
     setUpDatabase(kDbName, kShardId0);
-    setUpCollection(kNamespace, collUUID, version, TypeCollectionTimeseriesFields("fieldName"));
+
+    TypeCollectionTimeseriesFields tsFields;
+    tsFields.setTimeseriesOptions(TimeseriesOptions("fieldName"));
+    setUpCollection(kNamespace, collUUID, version, std::move(tsFields));
 
     auto addChunk = [&](const BSONObj& min, const BSONObj& max) {
         setUpChunk(kNamespace, collUUID, min, max, kShardId0, version);

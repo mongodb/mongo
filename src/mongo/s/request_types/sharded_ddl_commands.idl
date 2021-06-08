@@ -39,6 +39,7 @@ imports:
     - "mongo/s/chunk_version.idl"
     - "mongo/s/database_version.idl"
     - "mongo/s/resharding/common_types.idl"
+    - "mongo/db/timeseries/timeseries.idl"
 
 types:
     CollectionType:
@@ -116,6 +117,10 @@ structs:
                 description: >-
                     A specific set of points to create initial splits at, currently used only by
                     mapReduce.
+                optional: true
+            timeseries:
+                description: "The options to create the time-series collection with."
+                type: TimeseriesOptions
                 optional: true
             collation:
                 type: object_owned

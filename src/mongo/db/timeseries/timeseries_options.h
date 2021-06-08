@@ -63,5 +63,6 @@ StatusWith<std::pair<TimeseriesOptions, bool>> applyTimeseriesOptionsModificatio
 
 BSONObj generateViewPipeline(const TimeseriesOptions& options, bool asArray);
 
+bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& option2);
 }  // namespace timeseries
 }  // namespace mongo

@@ -621,7 +621,9 @@ TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedO
     ChunkVersion collectionVersion(1, 0, OID::gen(), boost::none /* timestamp */);
 
     CollectionType collectionType = makeCollectionType(collectionVersion);
-    collectionType.setTimeseriesFields(TypeCollectionTimeseriesFields("fieldName"));
+    TypeCollectionTimeseriesFields tsFields;
+    tsFields.setTimeseriesOptions(TimeseriesOptions("fieldName"));
+    collectionType.setTimeseriesFields(tsFields);
 
     vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
 

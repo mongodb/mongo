@@ -42,8 +42,10 @@ namespace mongo {
 
 namespace timeseries {
 
-StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
-    const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesIndexSpecBSON) {
+namespace {
+StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions& timeseriesOptions,
+                                                        const BSONObj& timeseriesIndexSpecBSON,
+                                                        bool isShardKeySpec) {
     auto timeField = timeseriesOptions.getTimeField();
     auto metaField = timeseriesOptions.getMetaField();
 
@@ -68,8 +70,10 @@ StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
             if (elem.number() >= 0) {
                 builder.appendAs(
                     elem, str::stream() << timeseries::kControlMinFieldNamePrefix << timeField);
-                builder.appendAs(
-                    elem, str::stream() << timeseries::kControlMaxFieldNamePrefix << timeField);
+                if (!isShardKeySpec) {
+                    builder.appendAs(
+                        elem, str::stream() << timeseries::kControlMaxFieldNamePrefix << timeField);
+                }
             } else {
                 builder.appendAs(
                     elem, str::stream() << timeseries::kControlMaxFieldNamePrefix << timeField);
@@ -111,6 +115,17 @@ StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
     }
 
     return builder.obj();
+}
+}  // namespace
+
+StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesIndexSpecBSON) {
+    return createBucketsSpecFromTimeseriesSpec(timeseriesOptions, timeseriesIndexSpecBSON, false);
+}
+
+StatusWith<BSONObj> createBucketsShardKeySpecFromTimeseriesShardKeySpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesShardKeySpecBSON) {
+    return createBucketsSpecFromTimeseriesSpec(timeseriesOptions, timeseriesShardKeySpecBSON, true);
 }
 
 boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(

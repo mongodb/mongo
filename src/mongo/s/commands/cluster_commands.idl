@@ -31,6 +31,7 @@ global:
 
 imports:
   - "mongo/idl/basic_types.idl"
+  - "mongo/db/timeseries/timeseries.idl"
 
 server_parameters:
     KillSessionsMaxConcurrency:
@@ -95,4 +96,8 @@ structs:
       collation:
         type: object
         description: "The collation to use for the shard key index."
+        optional: true
+      timeseries:
+        description: "The options to create the time-series collection with."
+        type: TimeseriesOptions
         optional: true
