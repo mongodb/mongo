@@ -153,7 +153,6 @@ void ReshardingMetrics::onStepUp(Role role) noexcept {
 
     // TODO SERVER-53913 Implement donor metrics rehydration.
     // TODO SERVER-53914 Implement coordinator metrics rehydration.
-    // TODO SERVER-53912 Implement recipient metrics rehydration.
 
     // TODO SERVER-57094 Resume the runningOperation duration from a timestamp stored on disk
     // instead of starting from the current time.
