@@ -7,8 +7,7 @@ enable_logging=true,
 checkpoint_manager=
 (
     enabled=true,
-    interval=m,
-    op_count=20
+    op_rate=5s
 ),
 runtime_monitor=
 (

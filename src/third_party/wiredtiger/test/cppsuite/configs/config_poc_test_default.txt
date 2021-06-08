@@ -6,8 +6,7 @@ cache_size_mb=1000,
 checkpoint_manager=
 (
     enabled=true,
-    op_count=20,
-    interval=m,
+    op_rate=5s
 ),
 runtime_monitor=
 (
