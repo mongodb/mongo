@@ -158,7 +158,7 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
                     << sessionIdBson << " cannot be found");
         }
 
-        return entry.getImage();
+        return entry.getImage().getOwned();
     }
 
     // Extract image from oplog.

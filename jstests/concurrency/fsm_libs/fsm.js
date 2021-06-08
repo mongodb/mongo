@@ -1,6 +1,18 @@
 'use strict';
 
 var fsm = (function() {
+    const kIsRunningInsideTransaction = Symbol('isRunningInsideTransaction');
+
+    function forceRunningOutsideTransaction(data) {
+        if (data[kIsRunningInsideTransaction]) {
+            const err =
+                new Error('Intentionally thrown to stop state function from running inside of a' +
+                          ' multi-statement transaction');
+            err.isNotSupported = true;
+            throw err;
+        }
+    }
+
     // args.data = 'this' object of the state functions
     // args.db = database object
     // args.collName = collection name
@@ -63,7 +75,9 @@ var fsm = (function() {
                     let data;
                     withTxnAndAutoRetry(args.db.getSession(), () => {
                         data = TransactionsUtil.deepCopyObject({}, args.data);
+                        data[kIsRunningInsideTransaction] = true;
                         fn.call(data, args.db, args.collName, connCache);
+                        delete data[kIsRunningInsideTransaction];
                     });
                     args.data = data;
                 } catch (e) {
@@ -128,5 +142,9 @@ var fsm = (function() {
         assert(false, 'not reached');
     }
 
-    return {run: runFSM, _getWeightedRandomChoice: getWeightedRandomChoice};
+    return {
+        forceRunningOutsideTransaction,
+        run: runFSM,
+        _getWeightedRandomChoice: getWeightedRandomChoice
+    };
 })();
