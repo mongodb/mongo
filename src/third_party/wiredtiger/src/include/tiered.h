@@ -46,6 +46,18 @@ struct __wt_tiered_manager {
 #define WT_TIERED_NAME_SHARED 0x8u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 
+/* Flush tier flags */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_FLUSH_TIER_FORCE 0x1u
+#define WT_FLUSH_TIER_OFF 0x2u
+#define WT_FLUSH_TIER_ON 0x4u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
+
+/*
+ * The flush state is a simple counter we manipulate atomically.
+ */
+#define WT_FLUSH_STATE_DONE(state) ((state) == 0)
+
 /*
  * Different types of work units for tiered trees.
  */
