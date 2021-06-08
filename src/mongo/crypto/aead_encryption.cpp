@@ -410,14 +410,14 @@ Status aeadDecryptDataFrame(FLEDecryptionFrame& dataframe) {
     auto associatedData = dataframe.getAssociatedData();
     auto& plaintext = dataframe.getPlaintextMutable();
     size_t outLen = plaintext.size();
-    uassertStatusOK(aeadDecrypt(*dataframe.getKey(),
+    Status status = aeadDecrypt(*dataframe.getKey(),
                                 ciphertext,
                                 associatedData.data<uint8_t>(),
                                 associatedData.length(),
                                 plaintext.data(),
-                                &outLen));
+                                &outLen);
     plaintext.resize(outLen);
-    return Status::OK();
+    return status;
 }
 
 Status aeadDecryptLocalKMS(const SymmetricKey& key,
