@@ -303,7 +303,8 @@ void SdamServerSelector::_verifyMaxstalenessWireVersions(TopologyDescriptionPtr 
     for (auto& server : topologyDescription->getServers()) {
         uassert(ErrorCodes::IncompatibleServerVersion,
                 "Incompatible wire version",
-                server->getMaxWireVersion() >= WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+                server->getType() == ServerType::kUnknown ||
+                    server->getMaxWireVersion() >= WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     }
 }
 

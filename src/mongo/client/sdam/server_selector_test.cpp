@@ -177,6 +177,36 @@ TEST_F(ServerSelectorTestFixture, ShouldThrowOnWireError) {
                        ErrorCodes::IncompatibleServerVersion);
 }
 
+TEST_F(ServerSelectorTestFixture, ShouldNotThrowWireErrorIfOnlyOneServerUnknown) {
+    TopologyStateMachine stateMachine(sdamConfiguration);
+    auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
+    auto primary = ServerDescriptionBuilder()
+                       .withAddress(HostAndPort("s0"))
+                       .withType(ServerType::kRSPrimary)
+                       .withLastUpdateTime(Date_t::now())
+                       .withLastWriteDate(Date_t::now())
+                       .withRtt(Milliseconds{1})
+                       .withSetName("set")
+                       .withHost(HostAndPort("s0"))
+                       .withHost(HostAndPort("s1"))
+                       .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                       .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                       .instance();
+    stateMachine.onServerDescription(*topologyDescription, primary);
+
+    auto downedServer = ServerDescriptionBuilder().withAddress(HostAndPort("s1")).instance();
+    stateMachine.onServerDescription(*topologyDescription, downedServer);
+
+    ASSERT(topologyDescription->isWireVersionCompatible());
+
+    const auto ninetySeconds = Seconds(90);
+    const auto readPref =
+        ReadPreferenceSetting(ReadPreference::Nearest, TagSets::emptySet, ninetySeconds);
+    auto result = selector.selectServers(topologyDescription, readPref);
+    ASSERT(result);
+    ASSERT_EQ(primary->getAddress(), (*result)[0]->getAddress());
+}
+
 TEST_F(ServerSelectorTestFixture, ShouldReturnNoneIfTopologyUnknown) {
     auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
     ASSERT_EQ(TopologyType::kUnknown, topologyDescription->getType());
