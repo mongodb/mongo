@@ -58,6 +58,7 @@ static const char *OPS_PER_TRANSACTION = "ops_per_transaction";
 static const char *READ_CONFIG = "read_config";
 static const char *STABLE_LAG = "stable_lag";
 static const char *STAT_CACHE_SIZE = "stat_cache_size";
+static const char *STAT_DB_SIZE = "stat_db_size";
 static const char *THREAD_COUNT = "thread_count";
 static const char *UPDATE_CONFIG = "update_config";
 static const char *VALUE_SIZE = "value_size";

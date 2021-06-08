@@ -120,11 +120,7 @@ class workload_validation {
                  * The data model is now fully updated for the last read collection. It can be
                  * checked.
                  */
-                check_reference(session, collection_name, database.collections.at(collection_name));
-                /* Clear memory. */
-                delete database.collections[collection_name].values;
-                database.collections[collection_name].values = nullptr;
-
+                check_reference(session, collection_name, database);
                 collection_name = key_collection_name;
             }
         };
@@ -139,12 +135,8 @@ class workload_validation {
          * empty if there is no collections to check after the end of the test (no collections
          * created or all deleted).
          */
-        if (!collection_name.empty()) {
-            check_reference(session, collection_name, database.collections.at(collection_name));
-            /* Clear memory. */
-            delete database.collections[collection_name].values;
-            database.collections[collection_name].values = nullptr;
-        }
+        if (!collection_name.empty())
+            check_reference(session, collection_name, database);
     }
 
     private:
@@ -200,25 +192,17 @@ class workload_validation {
              * the key has been inserted previously in an existing collection and can be safely
              * deleted.
              */
-            database.collections.at(collection_name).keys.at(key).exists = false;
-            delete database.collections.at(collection_name).values;
-            database.collections.at(collection_name).values = nullptr;
+            database.delete_record(collection_name, key);
             break;
         case tracking_operation::INSERT: {
             /*
              * Keys are unique, it is safe to assume the key has not been encountered before.
              */
-            database.collections[collection_name].keys[key].exists = true;
-            if (database.collections[collection_name].values == nullptr)
-                database.collections[collection_name].values = new std::map<key_value_t, value_t>();
-            value_t v;
-            v.value = key_value_t(value);
-            std::pair<key_value_t, value_t> pair(key_value_t(key), v);
-            database.collections[collection_name].values->insert(pair);
+            database.insert_record(collection_name, key, value);
             break;
         }
         case tracking_operation::UPDATE:
-            database.collections[collection_name].values->at(key).value = key_value_t(value);
+            database.update_record(collection_name, key, value);
             break;
         default:
             testutil_die(DEBUG_ERROR, "Unexpected operation in the tracking table: %d",
@@ -232,8 +216,7 @@ class workload_validation {
      * representation in memory of the collection values and keys according to the tracking table.
      */
     void
-    check_reference(
-      WT_SESSION *session, const std::string &collection_name, const collection_t &collection)
+    check_reference(WT_SESSION *session, const std::string &collection_name, database &database)
     {
         bool is_valid;
         key_t key;
@@ -247,7 +230,7 @@ class workload_validation {
               collection_name.c_str());
 
         /* Walk through each key/value pair of the current collection. */
-        for (const auto &keys : collection.keys) {
+        for (const auto &keys : database.get_keys(collection_name)) {
             key_str = keys.first;
             key = keys.second;
             /* The key/value pair exists. */
@@ -263,12 +246,12 @@ class workload_validation {
 
             /* Check the associated value is valid. */
             if (key.exists) {
-                testutil_assert(collection.values != nullptr);
                 if (!verify_value(session, collection_name, key_str.c_str(),
-                      collection.values->at(key_str).value))
+                      database.get_record(collection_name, key_str.c_str()).value))
                     testutil_die(DEBUG_ERROR,
                       "check_reference: failed for key %s / value %s in collection %s.",
-                      key_str.c_str(), collection.values->at(key_str).value.c_str(),
+                      key_str.c_str(),
+                      database.get_record(collection_name, key_str.c_str()).value.c_str(),
                       collection_name.c_str());
             }
         }

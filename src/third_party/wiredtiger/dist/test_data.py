@@ -134,6 +134,9 @@ checkpoint_manager = enabled_config_false + component_config
 runtime_monitor = enabled_config_true + component_config + [
     Config('stat_cache_size', '', '''
         The maximum cache percentage that can be hit while running.''',
+        type='category', subconfig=limit_stat),
+    Config('stat_db_size', '', '''
+        The maximum on-disk database size in bytes that can be hit while running.''',
         type='category', subconfig=limit_stat)
 ]
 
