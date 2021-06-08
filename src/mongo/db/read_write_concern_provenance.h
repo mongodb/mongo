@@ -102,7 +102,7 @@ public:
     /**
      * Returns true if this provenance has been set to an actual source, or false if it is unset.
      */
-    const bool hasSource() const {
+    bool hasSource() const {
         return static_cast<bool>(getSource());
     }
 
@@ -111,21 +111,21 @@ public:
      * either unset (the client specified RWC but without provenance) or explicitly the
      * "clientSupplied" source.
      */
-    const bool isClientSupplied() const {
+    bool isClientSupplied() const {
         return !hasSource() || *getSource() == Source::clientSupplied;
     }
 
     /**
      * Returns true if the RWC was an implicit default.
      */
-    const bool isImplicitDefault() const {
+    bool isImplicitDefault() const {
         return hasSource() && *getSource() == Source::implicitDefault;
     }
 
     /**
      * Returns true if the RWC was a custom default.
      */
-    const bool isCustomDefault() const {
+    bool isCustomDefault() const {
         return hasSource() && *getSource() == Source::customDefault;
     }
 
