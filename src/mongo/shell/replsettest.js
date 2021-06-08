@@ -3260,8 +3260,11 @@ var ReplSetTest = function(opts) {
         if (isObject(opts.nodes)) {
             var len = 0;
             for (var i in opts.nodes) {
+                // opts.nodeOptions and opts.nodes[i] may contain nested objects that have
+                // the same key, e.g. setParameter. So we need to recursively merge them.
+                // Object.assign and Object.merge do not merge nested objects of the same key.
                 var options = self.nodeOptions["n" + len] =
-                    Object.merge(opts.nodeOptions, opts.nodes[i]);
+                    _deepObjectMerge(opts.nodeOptions, opts.nodes[i]);
                 if (i.startsWith("a")) {
                     options.arbiter = true;
                 }
@@ -3381,6 +3384,26 @@ var ReplSetTest = function(opts) {
         _constructFromExistingNodes(opts.rstArgs);
     } else {
         _constructStartNewInstances(opts);
+    }
+
+    /**
+     * Recursively merge the target and source object.
+     */
+    function _deepObjectMerge(target, source) {
+        if (!(target instanceof Object)) {
+            return (source === undefined || source === null) ? target : source;
+        }
+
+        if (!(source instanceof Object)) {
+            return target;
+        }
+
+        let res = Object.assign({}, target);
+        Object.keys(source).forEach(k => {
+            res[k] = _deepObjectMerge(target[k], source[k]);
+        });
+
+        return res;
     }
 };
 

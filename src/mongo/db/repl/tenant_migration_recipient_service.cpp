@@ -144,6 +144,7 @@ MONGO_FAIL_POINT_DEFINE(fpAfterRecordingRecipientPrimaryStartingFCV);
 MONGO_FAIL_POINT_DEFINE(fpAfterComparingRecipientAndDonorFCV);
 MONGO_FAIL_POINT_DEFINE(fpAfterRetrievingStartOpTimesMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(fpSetSmallAggregationBatchSize);
+MONGO_FAIL_POINT_DEFINE(fpBeforeWaitingForRetryableWritePreFetchMajorityCommitted);
 MONGO_FAIL_POINT_DEFINE(pauseAfterRetrievingRetryableWritesBatch);
 MONGO_FAIL_POINT_DEFINE(fpAfterFetchingRetryableWritesEntriesBeforeStartOpTime);
 MONGO_FAIL_POINT_DEFINE(fpAfterStartingOplogFetcherMigrationRecipientInstance);
@@ -1173,11 +1174,21 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
     AggregateCommandRequest aggRequest(NamespaceString::kSessionTransactionsTableNamespace,
                                        std::move(serializedPipeline));
 
+    // Use local read concern. This is because secondary oplog application coalesces multiple
+    // updates to the same config.transactions record into a single update of the most recent
+    // retryable write statement, and since after SERVER-47844, the committed snapshot of a
+    // secondary can be in the middle of batch, the combination of these two makes secondary
+    // majority reads on config.transactions not always reflect committed retryable writes at
+    // that majority commit point. So we need to do a local read to fetch the retryable writes
+    // so that we don't miss the config.transactions record and later do a majority read on the
+    // donor's last applied operationTime to make sure the fetched results are majority committed.
     auto readConcernArgs = repl::ReadConcernArgs(
-        boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kMajorityReadConcern));
+        boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kLocalReadConcern));
     aggRequest.setReadConcern(readConcernArgs.toBSONInner());
     // We must set a writeConcern on internal commands.
     aggRequest.setWriteConcern(WriteConcernOptions());
+    // Allow aggregation to write to temporary files in case it reaches memory restriction.
+    aggRequest.setAllowDiskUse(true);
 
     // Failpoint to set a small batch size on the aggregation request.
     if (MONGO_unlikely(fpSetSmallAggregationBatchSize.shouldFail())) {
@@ -1222,6 +1233,29 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
             }
         }
     }
+
+    // Do a majority read on the sync source to make sure the pre-fetch result exists on a
+    // majority of nodes in the set. The timestamp we wait on is the donor's last applied
+    // operationTime, which is guaranteed to be at batch boundary if the sync source is a
+    // secondary. We do not check the rollbackId - rollback would lead to the sync source
+    // closing connections so the migration would fail and retry.
+    auto operationTime = cursor->getOperationTime();
+    uassert(5663100,
+            "Donor operationTime not available in retryable write pre-fetch result.",
+            operationTime);
+    LOGV2_DEBUG(5663101,
+                1,
+                "Waiting for retryable write pre-fetch result to be majority committed.",
+                "operationTime"_attr = operationTime);
+
+    fpBeforeWaitingForRetryableWritePreFetchMajorityCommitted.pauseWhileSet();
+
+    BSONObj readResult;
+    BSONObj cmd = ClonerUtils::buildMajorityWaitRequest(*operationTime);
+    _client.get()->runCommand("admin", cmd, readResult, QueryOption_SecondaryOk);
+    uassertStatusOKWithContext(
+        getStatusFromCommandResult(readResult),
+        "Failed to wait for retryable writes pre-fetch result majority committed");
 
     // Update _stateDoc to indicate that we've finished the retryable writes oplog entry fetching
     // stage.

@@ -7,6 +7,7 @@ selector:
   # Expects oplog entries to be in $v:2 format.
   - jstests/replsets/v2_delta_oplog_entries.js
   - jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application.js
+  - jstests/replsets/tenant_migration_recipient_fetches_retryable_writes_entry_after_committed_snapshot.js
 
 executor:
   config:

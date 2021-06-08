@@ -312,18 +312,7 @@ createRetryableWritesOplogFetchingPipelineForTenantMigrations(
             .firstElement(),
         expCtx));
 
-    // 9. Filter out all oplog entries from the `history` array that occur after
-    //    `startFetchingTimestamp`. Since the oplog fetching and application stages will already
-    //    capture entries after `startFetchingTimestamp`, we only need the earlier part of the oplog
-    //    chain.
-    stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
-                    history: {$filter: {\
-                        input: '$history',\
-                        cond: {$lt: ['$$this.ts', " + startFetchingTimestamp.toString() +
-                                                                 "]}}}}"),
-                                                        expCtx));
-
-    // 10. Sort the oplog entries in each oplog chain. The $reduce expression sorts the `history`
+    // 9. Sort the oplog entries in each oplog chain. The $reduce expression sorts the `history`
     //    array in ascending `depthForTenantMigration` order. The $reverseArray expression will
     //    give an array in ascending timestamp order.
     stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
@@ -338,6 +327,17 @@ createRetryableWritesOplogFetchingPipelineForTenantMigrations(
                                 {$subtract: [\
                                     {$add: ['$$this.depthForTenantMigration', 1]},\
                                     {$size: '$history'}]}]}]}}}}}"),
+                                                        expCtx));
+
+    // 10. Filter out all oplog entries from the `history` array that occur after
+    //    `startFetchingTimestamp`. Since the oplog fetching and application stages will already
+    //    capture entries after `startFetchingTimestamp`, we only need the earlier part of the oplog
+    //    chain.
+    stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
+                    history: {$filter: {\
+                        input: '$history',\
+                        cond: {$lt: ['$$this.ts', " + startFetchingTimestamp.toString() +
+                                                                 "]}}}}"),
                                                         expCtx));
 
     // 11. Combine the oplog entries.

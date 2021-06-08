@@ -544,14 +544,16 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                      queryOptions,
                      batchSize,
                      {},
-                     readConcernObj) {}
+                     readConcernObj,
+                     boost::none) {}
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                const NamespaceStringOrUUID& nsOrUuid,
                                long long cursorId,
                                int nToReturn,
                                int queryOptions,
-                               std::vector<BSONObj> initialBatch)
+                               std::vector<BSONObj> initialBatch,
+                               boost::optional<Timestamp> operationTime)
     : DBClientCursor(client,
                      nsOrUuid,
                      BSONObj(),  // query
@@ -562,7 +564,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                      queryOptions,
                      0,
                      std::move(initialBatch),  // batchSize
-                     boost::none) {}
+                     boost::none,
+                     operationTime) {}
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                const NamespaceStringOrUUID& nsOrUuid,
@@ -574,7 +577,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                                int queryOptions,
                                int batchSize,
                                std::vector<BSONObj> initialBatch,
-                               boost::optional<BSONObj> readConcernObj)
+                               boost::optional<BSONObj> readConcernObj,
+                               boost::optional<Timestamp> operationTime)
     : batch{std::move(initialBatch)},
       _client(client),
       _originalHost(_client->getServerAddress()),
@@ -592,7 +596,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       cursorId(cursorId),
       _ownCursor(true),
       wasError(false),
-      _readConcernObj(readConcernObj) {
+      _readConcernObj(readConcernObj),
+      _operationTime(operationTime) {
     if (queryOptions & QueryOptionLocal_forceOpQuery) {
         // Legacy OP_QUERY does not support UUIDs.
         invariant(!_nsOrUuid.uuid());
@@ -620,12 +625,18 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
         firstBatch.emplace_back(elem.Obj().getOwned());
     }
 
+    boost::optional<Timestamp> operationTime = boost::none;
+    if (ret.hasField(LogicalTime::kOperationTimeFieldName)) {
+        operationTime = LogicalTime::fromOperationTime(ret).asTimestamp();
+    }
+
     return {std::make_unique<DBClientCursor>(client,
                                              aggRequest.getNamespace(),
                                              cursorId,
                                              0,
                                              useExhaust ? QueryOption_Exhaust : 0,
-                                             firstBatch)};
+                                             firstBatch,
+                                             operationTime)};
 }
 
 DBClientCursor::~DBClientCursor() {

@@ -322,17 +322,6 @@ const aggRes = donorPrimary.getDB("config").runCommand({
             as: "history",
             depthField: "depthForTenantMigration"
         }},
-        // Now that we have the whole chain, filter out entries that occurred after
-        // `startFetchingTimestamp`, since these entries will be fetched during the oplog fetching
-        // phase.
-        {$set: {
-            history: {
-                $filter: {
-                    input: "$history",
-                    cond: {$lt: ["$$this.ts", startFetchingTimestamp]}
-                }
-            }
-        }},
         // Sort the oplog entries in each oplog chain.
         {$set: {
             history: {$reverseArray: {$reduce: {
@@ -350,6 +339,17 @@ const aggRes = donorPrimary.getDB("config").runCommand({
                     ]},
                 ]},
             }}},
+        }},
+        // Now that we have the whole sorted chain, filter out entries that occurred after
+        // `startFetchingTimestamp`, since these entries will be fetched during the oplog fetching
+        // phase.
+        {$set: {
+            history: {
+                $filter: {
+                    input: "$history",
+                    cond: {$lt: ["$$this.ts", startFetchingTimestamp]}
+                }
+            }
         }},
         // Combine the oplog entries.
         {$set: {history: {$concatArrays: ["$preImageOps", "$history", "$postImageOps"]}}},
