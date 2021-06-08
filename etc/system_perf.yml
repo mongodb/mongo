@@ -666,7 +666,9 @@ buildvariants:
     run_on:
         - "rhel70-perf-single"
     depends_on: *_compile_rhel70
-    tasks: &1nodetasks
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: crud_workloads
       - name: mixed_workloads
@@ -697,7 +699,9 @@ buildvariants:
     run_on:
         - "rhel70-perf-single"
     depends_on: *_compile_rhel70
-    tasks: &standalonetasks
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: crud_workloads
       - name: cursor_manager
@@ -724,7 +728,9 @@ buildvariants:
     run_on:
         - "rhel70-perf-single"
     depends_on: *_compile_amazon2
-    tasks: &standalonetasks
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: crud_workloads
       - name: smoke_test
@@ -744,6 +750,8 @@ buildvariants:
         - "rhel70-perf-shard"
     depends_on: *_compile_rhel70
     tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: crud_workloads
       - name: mixed_workloads
@@ -770,7 +778,9 @@ buildvariants:
     run_on:
         - "rhel70-perf-shard-lite"
     depends_on: *_compile_rhel70
-    tasks: &shardlitetasks
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: bestbuy_agg
       - name: bestbuy_query
       - name: change_streams_latency
@@ -798,7 +808,9 @@ buildvariants:
     run_on:
         - "rhel70-perf-replset"
     depends_on: *_compile_rhel70
-    tasks: &3nodetasks
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: industry_benchmarks_secondary_reads
       - name: crud_workloads
@@ -834,6 +846,8 @@ buildvariants:
         - "rhel70-perf-replset"
     depends_on: *_compile_rhel70
     tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: initialsync
 
   - name: linux-replSet-initialsync-logkeeper
@@ -853,4 +867,6 @@ buildvariants:
         - "rhel70-perf-initialsync-logkeeper"
     depends_on: *_compile_rhel70
     tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: initialsync-logkeeper
