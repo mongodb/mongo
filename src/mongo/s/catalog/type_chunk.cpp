@@ -115,6 +115,12 @@ StatusWith<ChunkRange> ChunkRange::fromBSON(const BSONObj& obj) {
     return ChunkRange(minKey.Obj().getOwned(), maxKey.Obj().getOwned());
 }
 
+BSONObj ChunkRange::toBSON() const {
+    BSONObjBuilder builder;
+    append(&builder);
+    return builder.obj();
+}
+
 bool ChunkRange::containsKey(const BSONObj& key) const {
     return _minKey.woCompare(key) <= 0 && key.woCompare(_maxKey) < 0;
 }

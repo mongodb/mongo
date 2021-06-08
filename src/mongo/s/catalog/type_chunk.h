@@ -67,6 +67,8 @@ public:
         return _maxKey;
     }
 
+    BSONObj toBSON() const;
+
     const Status extractKeyPattern(KeyPattern* shardKeyPatternOut) const;
 
     /**
