@@ -59,13 +59,13 @@ class test : public database_operation {
     {
         _config = new configuration(name, config);
         _checkpoint_manager = new checkpoint_manager(_config->get_subconfig(CHECKPOINT_MANAGER));
-        _runtime_monitor = new runtime_monitor(_config->get_subconfig(RUNTIME_MONITOR));
+        _runtime_monitor = new runtime_monitor(_config->get_subconfig(RUNTIME_MONITOR), _database);
         _timestamp_manager = new timestamp_manager(_config->get_subconfig(TIMESTAMP_MANAGER));
         _workload_tracking = new workload_tracking(_config->get_subconfig(WORKLOAD_TRACKING),
           OPERATION_TRACKING_TABLE_CONFIG, TABLE_OPERATION_TRACKING, SCHEMA_TRACKING_TABLE_CONFIG,
           TABLE_SCHEMA_TRACKING);
-        _workload_generator = new workload_generator(
-          _config->get_subconfig(WORKLOAD_GENERATOR), this, _timestamp_manager, _workload_tracking);
+        _workload_generator = new workload_generator(_config->get_subconfig(WORKLOAD_GENERATOR),
+          this, _timestamp_manager, _workload_tracking, _database);
         _thread_manager = new thread_manager();
         /*
          * Ordering is not important here, any dependencies between components should be resolved
@@ -191,6 +191,7 @@ class test : public database_operation {
     timestamp_manager *_timestamp_manager = nullptr;
     workload_generator *_workload_generator = nullptr;
     workload_tracking *_workload_tracking = nullptr;
+    database _database;
 };
 } // namespace test_harness
 

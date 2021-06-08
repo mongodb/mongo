@@ -38,6 +38,7 @@ extern "C" {
 #include "core/component.h"
 #include "core/throttle.h"
 #include "connection_manager.h"
+#include "workload/database_operation.h"
 
 namespace test_harness {
 /* Static statistic get function. */
@@ -52,7 +53,7 @@ get_stat(WT_CURSOR *cursor, int stat_field, int64_t *valuep)
 
 class statistic {
     public:
-    statistic(configuration *config)
+    explicit statistic(configuration *config)
     {
         _enabled = config->get_bool(ENABLED);
     }
@@ -75,13 +76,13 @@ class statistic {
 
 class cache_limit_statistic : public statistic {
     public:
-    cache_limit_statistic(configuration *config) : statistic(config)
+    explicit cache_limit_statistic(configuration *config) : statistic(config)
     {
         limit = config->get_int(LIMIT);
     }
 
     void
-    check(WT_CURSOR *cursor)
+    check(WT_CURSOR *cursor) override final
     {
         testutil_assert(cursor != nullptr);
         int64_t cache_bytes_image, cache_bytes_other, cache_bytes_max;
@@ -96,11 +97,10 @@ class cache_limit_statistic : public statistic {
          */
         use_percent = ((cache_bytes_image + cache_bytes_other + 0.0) / cache_bytes_max) * 100;
         if (use_percent > limit) {
-            std::string error_string =
+            const std::string error_string =
               "runtime_monitor: Cache usage exceeded during test! Limit: " + std::to_string(limit) +
               " usage: " + std::to_string(use_percent);
-            debug_print(error_string, DEBUG_ERROR);
-            testutil_assert(use_percent < limit);
+            testutil_die(-1, error_string.c_str());
         } else
             debug_print("Cache usage: " + std::to_string(use_percent), DEBUG_TRACE);
     }
@@ -109,13 +109,89 @@ class cache_limit_statistic : public statistic {
     int64_t limit;
 };
 
+static std::string
+collection_name_to_file_name(const std::string &collection_name)
+{
+    /* Strip out the URI prefix. */
+    const size_t colon_pos = collection_name.find(':');
+    testutil_assert(colon_pos != std::string::npos);
+    const auto stripped_name = collection_name.substr(colon_pos + 1);
+
+    /* Now add the directory and file extension. */
+    return std::string(DEFAULT_DIR) + "/" + stripped_name + ".wt";
+}
+
+class db_size_statistic : public statistic {
+    public:
+    db_size_statistic(configuration *config, database &database)
+        : statistic(config), _database(database)
+    {
+        _limit = config->get_int(LIMIT);
+#ifdef _WIN32
+        debug_print("Database size checking is not implemented on Windows", DEBUG_ERROR);
+#endif
+    }
+    virtual ~db_size_statistic() = default;
+
+    /* Don't need the stat cursor for this. */
+    void
+    check(WT_CURSOR *) override final
+    {
+        const auto file_names = get_file_names();
+#ifndef _WIN32
+        size_t db_size = 0;
+        for (const auto &name : file_names) {
+            struct stat sb;
+            if (stat(name.c_str(), &sb) == 0) {
+                db_size += sb.st_size;
+                debug_print(name + " was " + std::to_string(sb.st_size) + " bytes", DEBUG_TRACE);
+            } else
+                /* The only good reason for this to fail is if the file hasn't been created yet. */
+                testutil_assert(errno == ENOENT);
+        }
+        debug_print("Current database size is " + std::to_string(db_size) + " bytes", DEBUG_TRACE);
+        if (db_size > _limit) {
+            const std::string error_string =
+              "runtime_monitor: Database size limit exceeded during test! Limit: " +
+              std::to_string(_limit) + " db size: " + std::to_string(db_size);
+            testutil_die(-1, error_string.c_str());
+        }
+#else
+        static_cast<void>(file_names);
+        static_cast<void>(_database);
+        static_cast<void>(_limit);
+#endif
+    }
+
+    private:
+    std::vector<std::string>
+    get_file_names()
+    {
+        std::vector<std::string> file_names;
+        for (const auto &name : _database.get_collection_names())
+            file_names.push_back(collection_name_to_file_name(name));
+
+        /* Add WiredTiger internal tables. */
+        file_names.push_back(std::string(DEFAULT_DIR) + "/" + WT_HS_FILE);
+        file_names.push_back(std::string(DEFAULT_DIR) + "/" + WT_METAFILE);
+
+        return file_names;
+    }
+
+    database &_database;
+    int64_t _limit;
+};
+
 /*
  * The runtime monitor class is designed to track various statistics or other runtime signals
  * relevant to the given workload.
  */
 class runtime_monitor : public component {
     public:
-    runtime_monitor(configuration *config) : component("runtime_monitor", config) {}
+    runtime_monitor(configuration *config, database &database)
+        : component("runtime_monitor", config), _database(database)
+    {
+    }
 
     ~runtime_monitor()
     {
@@ -147,6 +223,10 @@ class runtime_monitor : public component {
             sub_config = _config->get_subconfig(STAT_CACHE_SIZE);
             _stats.push_back(new cache_limit_statistic(sub_config));
             delete sub_config;
+
+            sub_config = _config->get_subconfig(STAT_DB_SIZE);
+            _stats.push_back(new db_size_statistic(sub_config, _database));
+            delete sub_config;
         }
     }
 
@@ -163,6 +243,7 @@ class runtime_monitor : public component {
     WT_CURSOR *_cursor = nullptr;
     WT_SESSION *_session = nullptr;
     std::vector<statistic *> _stats;
+    database &_database;
 };
 } // namespace test_harness
 

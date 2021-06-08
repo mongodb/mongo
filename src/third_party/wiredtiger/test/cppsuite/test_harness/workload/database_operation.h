@@ -69,7 +69,7 @@ class database_operation {
         collection_count = config->get_int(COLLECTION_COUNT);
         for (size_t i = 0; i < collection_count; ++i) {
             collection_name = "table:collection" + std::to_string(i);
-            database.collections[collection_name] = {};
+            database.add_collection(collection_name);
             testutil_check(
               session->create(session, collection_name.c_str(), DEFAULT_FRAMEWORK_SCHEMA));
             ts = timestamp_manager->get_next_ts();
@@ -87,8 +87,7 @@ class database_operation {
         /* Keys must be unique. */
         testutil_assert(key_count <= pow(10, key_size));
 
-        for (const auto &it_collections : database.collections) {
-            collection_name = it_collections.first;
+        for (const auto &collection_name : database.get_collection_names()) {
             key_cpt = 0;
             /*
              * WiredTiger lets you open a cursor on a collection using the same pointer. When a

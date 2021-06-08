@@ -30,6 +30,7 @@
 #define THREAD_CONTEXT_H
 
 #include "../core/throttle.h"
+#include "../timestamp_manager.h"
 #include "database_model.h"
 #include "random_generator.h"
 #include "workload_tracking.h"
@@ -153,7 +154,7 @@ class thread_context {
     transaction_context transaction;
     test_harness::timestamp_manager *timestamp_manager;
     test_harness::workload_tracking *tracking;
-    test_harness::database database;
+    test_harness::database &database;
     int64_t key_size = 0;
     int64_t value_size = 0;
 

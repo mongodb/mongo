@@ -50,24 +50,77 @@ struct value_t {
 /* A collection is made of mapped Key objects. */
 struct collection_t {
     std::map<key_value_t, key_t> keys;
-    std::map<key_value_t, value_t> *values = {nullptr};
+    std::map<key_value_t, value_t> values;
 };
 
 /* Representation of the collections in memory. */
 class database {
     public:
-    const std::vector<std::string>
-    get_collection_names() const
+    std::vector<std::string>
+    get_collection_names()
     {
+        std::lock_guard<std::mutex> lg(_mtx);
         std::vector<std::string> collection_names;
 
-        for (auto const &it : collections)
+        for (auto const &it : _collections)
             collection_names.push_back(it.first);
 
         return (collection_names);
     }
 
-    std::map<std::string, collection_t> collections;
+    std::map<key_value_t, key_t>
+    get_keys(const std::string &collection_name)
+    {
+        std::lock_guard<std::mutex> lg(_mtx);
+        return (_collections.at(collection_name).keys);
+    }
+
+    void
+    add_collection(const std::string &collection_name)
+    {
+        std::lock_guard<std::mutex> lg(_mtx);
+        testutil_assert(_collections.find(collection_name) == _collections.end());
+        _collections[collection_name] = {};
+    }
+
+    value_t
+    get_record(const std::string &collection_name, const char *key)
+    {
+        std::lock_guard<std::mutex> lg(_mtx);
+        return (_collections.at(collection_name).values.at(key));
+    }
+
+    void
+    insert_record(const std::string &collection_name, const char *key, const char *value)
+    {
+        std::lock_guard<std::mutex> lg(_mtx);
+        auto &c = _collections.at(collection_name);
+        c.keys[key].exists = true;
+        value_t v;
+        v.value = key_value_t(value);
+        c.values.emplace(key_value_t(key), v);
+    }
+
+    void
+    update_record(const std::string &collection_name, const char *key, const char *value)
+    {
+        std::lock_guard<std::mutex> lg(_mtx);
+        auto &c = _collections.at(collection_name);
+        c.values.at(key).value = key_value_t(value);
+    }
+
+    void
+    delete_record(const std::string &collection_name, const char *key)
+    {
+        std::lock_guard<std::mutex> lg(_mtx);
+        auto &c = _collections.at(collection_name);
+        c.keys.at(key).exists = false;
+        c.values.erase(key);
+    }
+
+    private:
+    std::map<std::string, collection_t> _collections;
+    std::mutex _mtx;
 };
 } // namespace test_harness
 
