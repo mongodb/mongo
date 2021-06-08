@@ -73,6 +73,72 @@ BSONObj scaleIndividualShardStatistics(const BSONObj& shardStats, int scale) {
     return builder.obj();
 }
 
+/**
+ * Takes the shard's "shardTimeseriesStats" and adds it to the sum across shards saved in
+ * "clusterTimeseriesStats". All of the mongod "timeseries" collStats are numbers except for the
+ * "bucketsNs" field, which we specially track in "timeseriesBucketsNs".
+ *
+ * Invariants that "shardTimeseriesStats" is non-empty.
+ */
+void aggregateTimeseriesStats(const BSONObj& shardTimeseriesStats,
+                              std::map<std::string, long long>* clusterTimeseriesStats,
+                              std::string* timeseriesBucketsNs) {
+    invariant(!shardTimeseriesStats.isEmpty());
+
+    // It's currently impossible to have multiple shards with timeseries info because sharded
+    // timeseries collections are not yet supported.
+    invariant(clusterTimeseriesStats->empty());
+
+    for (const auto& shardTimeseriesStat : shardTimeseriesStats) {
+        // "bucketsNs" is the only timeseries stat that is not a number, so it requires special
+        // handling.
+        if (shardTimeseriesStat.type() == BSONType::String) {
+            invariant(shardTimeseriesStat.fieldNameStringData() == "bucketsNs",
+                      str::stream() << "Found an unexpected field '"
+                                    << shardTimeseriesStat.fieldNameStringData()
+                                    << "' in a shard's 'timeseries' subobject: "
+                                    << shardTimeseriesStats.toString());
+            if (timeseriesBucketsNs->empty()) {
+                *timeseriesBucketsNs = shardTimeseriesStat.String();
+            } else {
+                // All shards should have the same timeseries buckets collection namespace.
+                invariant(*timeseriesBucketsNs == shardTimeseriesStat.String(),
+                          str::stream()
+                              << "Found different timeseries buckets collection namespaces on "
+                              << "different shards, for the same collection. Previous shard's ns: "
+                              << *timeseriesBucketsNs
+                              << ", current shard's ns: " << shardTimeseriesStat.String());
+            }
+            continue;
+        }
+
+        // Use 'numberLong' to ensure integers are safely converted to long type.
+        (*clusterTimeseriesStats)[shardTimeseriesStat.fieldName()] +=
+            shardTimeseriesStat.numberLong();
+    }
+}
+
+/**
+ * Adds a "timeseries" field to "result" that contains the summed timeseries statistics in
+ * "clusterTimeseriesStats". "timeseriesBucketNs" is specially handled and added to the "timeseries"
+ * sub-document because it is the only non-number timeseries statistic.
+ *
+ * Invariants that "clusterTimeseriesStats" and "timeseriesBucketNs" are set.
+ */
+void appendTimeseriesInfoToResult(const std::map<std::string, long long>& clusterTimeseriesStats,
+                                  const std::string& timeseriesBucketNs,
+                                  BSONObjBuilder* result) {
+    invariant(!clusterTimeseriesStats.empty());
+    invariant(!timeseriesBucketNs.empty());
+
+    BSONObjBuilder timeseriesSubObjBuilder(result->subobjStart("timeseries"));
+    timeseriesSubObjBuilder.append("bucketsNs", timeseriesBucketNs);
+    for (const auto& statEntry : clusterTimeseriesStats) {
+        timeseriesSubObjBuilder.appendNumber(statEntry.first, statEntry.second);
+    }
+    timeseriesSubObjBuilder.done();
+}
+
 class CollectionStats : public BasicCommand {
 public:
     CollectionStats() : BasicCommand("collStats", "collstats") {}
@@ -151,12 +217,14 @@ public:
         BSONObjBuilder shardStats;
         std::map<std::string, long long> counts;
         std::map<std::string, long long> indexSizes;
+        std::map<std::string, long long> clusterTimeseriesStats;
 
         long long maxSize = 0;
         long long unscaledCollSize = 0;
 
         int nindexes = 0;
         bool warnedAboutIndexes = false;
+        std::string timeseriesBucketsNs;
 
         for (const auto& shardResult : unscaledShardResults) {
             const auto& shardId = shardResult.shardId;
@@ -189,6 +257,9 @@ public:
                     // match across shards
                     if (!result.hasField(e.fieldName()))
                         result.append(e);
+                } else if (fieldName == "timeseries") {
+                    aggregateTimeseriesStats(
+                        e.Obj(), &clusterTimeseriesStats, &timeseriesBucketsNs);
                 } else if (fieldIsAnyOf(
                                fieldName,
                                {"count", "size", "storageSize", "totalIndexSize", "totalSize"})) {
@@ -245,6 +316,12 @@ public:
             } else {
                 result.appendNumber(countEntry.first, countEntry.second);
             }
+        }
+
+        if (!clusterTimeseriesStats.empty() || !timeseriesBucketsNs.empty()) {
+            // 'clusterTimeseriesStats' and 'timeseriesBucketsNs' should both be set. If only one is
+            // ever set, the error will be caught in appendTimeseriesInfoToResult().
+            appendTimeseriesInfoToResult(clusterTimeseriesStats, timeseriesBucketsNs, &result);
         }
 
         {
