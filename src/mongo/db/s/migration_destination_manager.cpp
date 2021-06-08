@@ -965,6 +965,33 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     auto fromShard =
         uassertStatusOK(Grid::get(outerOpCtx)->shardRegistry()->getShard(outerOpCtx, _fromShard));
 
+    // The conventional usage of retryable writes is to assign statement id's to all of
+    // the writes done as part of the data copying so that _recvChunkStart is
+    // conceptually a retryable write batch. However, we are using an alternate approach to do those
+    // writes under an AlternativeClientRegion because 1) threading the
+    // statement id's through to all the places where they are needed would make this code more
+    // complex, and 2) some of the operations, like creating the collection or building indexes, are
+    // not currently supported in retryable writes.
+    {
+        auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
+        {
+            stdx::lock_guard<Client> lk(*newClient.get());
+            newClient->setSystemOperationKillableByStepdown(lk);
+        }
+
+        AlternativeClientRegion acr(newClient);
+        auto executor =
+            Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
+        auto altOpCtx = CancelableOperationContext(
+            cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
+
+        _dropLocalIndexesIfNecessary(altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes);
+        cloneCollectionIndexesAndOptions(altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes);
+
+        timing.done(1);
+        migrateThreadHangAtStep1.pauseWhileSet();
+    }
+
     {
         const ChunkRange range(_min, _max);
 
@@ -1023,38 +1050,21 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                 outerOpCtx, latestOpTime, WriteConcerns::kMajorityWriteConcern, &ignoreResult));
         });
 
-        timing.done(1);
-        migrateThreadHangAtStep1.pauseWhileSet();
+        timing.done(2);
+        migrateThreadHangAtStep2.pauseWhileSet();
     }
 
-    // The conventional usage of retryable writes is to assign statement id's to all of
-    // the writes done as part of the data copying so that _recvChunkStart is
-    // conceptually a retryable write batch. However, we are using an alternate approach to do those
-    // writes under an AlternativeClientRegion because 1) threading the
-    // statement id's through to all the places where they are needed would make this code more
-    // complex, and 2) some of the operations, like creating the collection or building indexes, are
-    // not currently supported in retryable writes.
     auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
     {
         stdx::lock_guard<Client> lk(*newClient.get());
         newClient->setSystemOperationKillableByStepdown(lk);
     }
-
     AlternativeClientRegion acr(newClient);
     auto executor =
         Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
     auto newOpCtxPtr = CancelableOperationContext(
         cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
     auto opCtx = newOpCtxPtr.get();
-
-    {
-        _dropLocalIndexesIfNecessary(opCtx, _nss, donorCollectionOptionsAndIndexes);
-        cloneCollectionIndexesAndOptions(opCtx, _nss, donorCollectionOptionsAndIndexes);
-
-        timing.done(2);
-        migrateThreadHangAtStep2.pauseWhileSet();
-    }
-
     repl::OpTime lastOpApplied;
     {
         // 3. Initial bulk clone
