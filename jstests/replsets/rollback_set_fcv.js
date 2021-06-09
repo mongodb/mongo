@@ -15,6 +15,7 @@
 load("jstests/replsets/libs/rollback_test.js");
 load('jstests/libs/parallel_shell_helpers.js');
 load("jstests/libs/fail_point_util.js");
+load("jstests/replsets/rslib.js");
 
 function setFCV(fcv) {
     assert.commandFailedWithCode(db.adminCommand({setFeatureCompatibilityVersion: fcv}),
@@ -37,6 +38,11 @@ function rollbackFCVFromDowngradingOrUpgrading(fromFCV, toFCV) {
 
     // Ensure the cluster starts at the correct FCV.
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
+    // Wait until the config has propagated to the other nodes and the primary has learned of it, so
+    // that the config replication check in 'setFeatureCompatibilityVersion' is satisfied. This is
+    // only important since 'setFeatureCompatibilityVersion' is known to implicitly call internal
+    // reconfigs as part of upgrade/downgrade behavior.
+    rollbackTest.getTestFixture().waitForConfigReplication(primary);
 
     jsTestLog("Testing rolling back FCV from {version: " + lastLTSFCV +
               ", targetVersion: " + fromFCV + "} to {version: " + toFCV + "}");
