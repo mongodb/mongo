@@ -6194,7 +6194,8 @@ tasks:
   - name: run_dbtest
   - name: replica_sets_jscore_passthrough
   commands:
-    - func: "fetch artifacts"
+    - command: manifest.load
+    - func: "git get project"
     - func: "f_expansions_write"
     - func: "kill processes"
     - func: "cleanup environment"
@@ -6223,7 +6224,8 @@ tasks:
   - name: replica_sets_jscore_passthrough
   stepback: false
   commands:
-    - func: "fetch artifacts"
+    - command: manifest.load
+    - func: "git get project"
     - func: "f_expansions_write"
     - func: "kill processes"
     - func: "cleanup environment"
