@@ -15,7 +15,6 @@
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                      // for extendWorkload
 load('jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js');  // for $config
-load("jstests/libs/write_concern_util.js");  // For isDefaultWriteConcernMajorityFlagEnabled.
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.data.prefix = 'map_reduce_interrupt';
@@ -44,11 +43,6 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.states.mapReduce = function mapReduce(db, collName) {
-        // TODO (SERVER-56640): Fix the test to work with the new default write concern.
-        if (isDefaultWriteConcernMajorityFlagEnabled(db)) {
-            jsTestLog("Skipping test because the default WC majority feature flag is enabled.");
-            return;
-        }
         try {
             $super.states.mapReduce.apply(this, arguments);
         } catch (err) {
@@ -63,6 +57,27 @@ var $config = extendWorkload($config, function($config, $super) {
                 throw err;
             }
         }
+    };
+
+    $config.setup = function setup(db, collName, cluster) {
+        // The default WC is majority and this workload may not be able to satisfy majority writes.
+        if (cluster.isSharded()) {
+            cluster.executeOnMongosNodes(function(db) {
+                assert.commandWorked(db.adminCommand({
+                    setDefaultRWConcern: 1,
+                    defaultWriteConcern: {w: 1},
+                    writeConcern: {w: "majority"}
+                }));
+            });
+        } else if (cluster.isReplication()) {
+            assert.commandWorked(db.adminCommand({
+                setDefaultRWConcern: 1,
+                defaultWriteConcern: {w: 1},
+                writeConcern: {w: "majority"}
+            }));
+        }
+
+        $super.setup.apply(this, arguments);
     };
 
     $config.teardown = function teardown(db, collname, cluster) {
