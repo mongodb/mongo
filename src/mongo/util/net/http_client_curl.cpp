@@ -488,8 +488,10 @@ public:
     CurlHandle(executor::ConnectionPool::ConnectionHandle handle, CURL* curlHandle)
         : _poolHandle(std::move(handle)), _handle(curlHandle) {}
 
+    CurlHandle(CurlHandle&& other) = default;
+
     ~CurlHandle() {
-        if (!_success) {
+        if (!_success && _poolHandle.get() != nullptr) {
             _poolHandle->indicateFailure(
                 Status(ErrorCodes::HostUnreachable, "unknown curl handle failure"));
         }
@@ -528,25 +530,27 @@ public:
           _pool(std::make_shared<executor::ConnectionPool>(
               _typeFactory, "Curl", makePoolOptions(Seconds(60)))) {}
 
-    CurlHandle get(HostAndPort server, Protocols protocol);
+    StatusWith<CurlHandle> get(HostAndPort server, Protocols protocol);
 
 private:
     std::shared_ptr<CurlHandleTypeFactory> _typeFactory;
     std::shared_ptr<executor::ConnectionPool> _pool;
 };
 
-CurlHandle CurlPool::get(HostAndPort server, Protocols protocol) {
+StatusWith<CurlHandle> CurlPool::get(HostAndPort server, Protocols protocol) {
 
     auto sslMode = mapProtocolToSSLMode(protocol);
 
     auto semi = _pool->get(server, sslMode, Seconds(60));
 
     StatusWith<executor::ConnectionPool::ConnectionHandle> swHandle = std::move(semi).getNoThrow();
-    invariant(swHandle.isOK());
+    if (!swHandle.isOK()) {
+        return swHandle.getStatus();
+    }
 
     auto curlHandle = static_cast<PooledCurlHandle*>(swHandle.getValue().get())->get();
 
-    return CurlHandle(std::move(swHandle.getValue()), curlHandle);
+    return {CurlHandle(std::move(swHandle.getValue()), curlHandle)};
 }
 
 HostAndPort exactHostAndPortFromUrl(StringData url) {
@@ -615,13 +619,15 @@ public:
 
             auto server = exactHostAndPortFromUrl(url);
 
-            CurlHandle handle(factory.get(server, protocol));
+            auto swHandle(factory.get(server, protocol));
+            uassertStatusOK(swHandle.getStatus());
+
+            CurlHandle handle(std::move(swHandle.getValue()));
             auto reply = request(handle.get(), method, url, cdr);
 
             // indidicateFailure will be called if indicateSuccess is not called.
             handle.indicateSuccess();
             return reply;
-
         } else {
             // Make a request with a non-pooled handle. This is needed during server startup when
             // thread spawning is not allowed which is required by the thread pool.
