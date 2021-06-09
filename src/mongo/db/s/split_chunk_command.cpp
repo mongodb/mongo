@@ -47,11 +47,6 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
-
-using std::string;
-using std::unique_ptr;
-using std::vector;
-
 namespace {
 
 class SplitChunkCommand : public ErrmsgCommandDeprecated {
@@ -116,7 +111,7 @@ public:
 
         auto chunkRange = uassertStatusOK(ChunkRange::fromBSON(cmdObj));
 
-        string shardName;
+        std::string shardName;
         auto parseShardNameStatus = bsonExtractStringField(cmdObj, "from", &shardName);
         uassertStatusOK(parseShardNameStatus);
 
@@ -125,7 +120,7 @@ public:
               "Received splitChunk request",
               "request"_attr = redact(cmdObj));
 
-        vector<BSONObj> splitKeys;
+        std::vector<BSONObj> splitKeys;
         {
             BSONElement splitKeysElem;
             auto splitKeysElemStatus =
