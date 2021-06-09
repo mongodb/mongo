@@ -387,7 +387,11 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
         // means that we have a collection with the same namespace but a different UUID, in which
         // case we should also fail the migration.
         auto status =
-            getStorageInterface()->createCollection(opCtx.get(), _sourceNss, _collectionOptions);
+            getStorageInterface()->createCollection(opCtx.get(),
+                                                    _sourceNss,
+                                                    _collectionOptions,
+                                                    !_idIndexSpec.isEmpty() /* createIdIndex */,
+                                                    _idIndexSpec);
         uassertStatusOKWithContext(status, "Tenant collection cloner: create collection");
     }
 

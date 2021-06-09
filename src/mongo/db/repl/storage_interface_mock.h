@@ -170,7 +170,9 @@ public:
 
     Status createCollection(OperationContext* opCtx,
                             const NamespaceString& nss,
-                            const CollectionOptions& options) override {
+                            const CollectionOptions& options,
+                            const bool createIdIndex = true,
+                            const BSONObj& idIndexSpec = BSONObj()) override {
         return createCollFn(opCtx, nss, options);
     }
 

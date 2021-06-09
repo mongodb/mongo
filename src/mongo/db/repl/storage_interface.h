@@ -169,7 +169,9 @@ public:
      */
     virtual Status createCollection(OperationContext* opCtx,
                                     const NamespaceString& nss,
-                                    const CollectionOptions& options) = 0;
+                                    const CollectionOptions& options,
+                                    const bool createIdIndex = true,
+                                    const BSONObj& idIndexSpec = BSONObj()) = 0;
 
     /**
      * Creates all the specified non-_id indexes on a given collection, which must be empty.

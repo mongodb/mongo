@@ -469,7 +469,9 @@ StatusWith<size_t> StorageInterfaceImpl::getOplogMaxSize(OperationContext* opCtx
 
 Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
                                               const NamespaceString& nss,
-                                              const CollectionOptions& options) {
+                                              const CollectionOptions& options,
+                                              const bool createIdIndex,
+                                              const BSONObj& idIndexSpec) {
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::createCollection", nss.ns(), [&] {
         AutoGetDb databaseWriteGuard(opCtx, nss.db(), MODE_IX);
         auto db = databaseWriteGuard.ensureDbExists();
@@ -481,7 +483,7 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
         Lock::CollectionLock lk(opCtx, nss, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
         try {
-            auto coll = db->createCollection(opCtx, nss, options);
+            auto coll = db->createCollection(opCtx, nss, options, createIdIndex, idIndexSpec);
             invariant(coll);
         } catch (const AssertionException& ex) {
             return ex.toStatus();
