@@ -91,7 +91,7 @@ bool IDLParserErrorContext::checkAndAssertBinDataTypeSlowPath(const BSONElement&
     if (element.binDataType() != type) {
         std::string path = getElementPath(element);
         uasserted(ErrorCodes::TypeMismatch,
-                  str::stream() << "BSON field '" << path << "' is the wrong bindData type '"
+                  str::stream() << "BSON field '" << path << "' is the wrong binData type '"
                                 << typeName(element.binDataType()) << "', expected type '"
                                 << typeName(type) << "'");
     }
