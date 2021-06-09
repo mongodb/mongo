@@ -846,7 +846,7 @@ private:
     UniqueIndexData _indexData;
     UniqueIndexData::const_iterator _indexDataIt;
     UniqueIndexData::const_iterator _indexDataEnd;
-    size_t _reversePos;
+    size_t _reversePos = 0;
 };
 
 bool CursorUnique::advanceNextInternal() {
