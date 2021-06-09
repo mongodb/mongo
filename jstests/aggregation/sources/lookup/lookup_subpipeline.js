@@ -2,7 +2,10 @@
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and anyEq.
+load("jstests/aggregation/extras/utils.js");                     // For assertErrorCode and anyEq.
+load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
+load("jstests/libs/discover_topology.js");                       // For findNonConfigNodes.
+load("jstests/libs/fixture_helpers.js");                         // For isSharded.
 
 const testName = "lookup_subpipeline";
 
@@ -11,14 +14,10 @@ const from = db.from;
 const thirdColl = db.thirdColl;
 const fourthColl = db.fourthColl;
 
-function generateNestedPipeline(foreignCollName, numLevels) {
-    let pipeline = [{"$lookup": {pipeline: [], from: foreignCollName, as: "same"}}];
-
-    for (let level = 1; level < numLevels; level++) {
-        pipeline = [{"$lookup": {pipeline: pipeline, from: foreignCollName, as: "same"}}];
-    }
-
-    return pipeline;
+if (FixtureHelpers.isSharded(from)) {
+    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
+                           "internalQueryAllowShardedLookup",
+                           true);
 }
 
 // Helper for testing that pipeline returns correct set of results.
@@ -555,41 +554,9 @@ expectedResults = [{
 }];
 testPipeline(pipeline, expectedResults, coll);
 
-// Deeply nested $lookup pipeline. Confirm that we can execute an aggregation with nested
-// $lookup sub-pipelines up to the maximum depth, but not beyond.
-let nestedPipeline = generateNestedPipeline("lookup", 20);
-assert.commandWorked(
-    coll.getDB().runCommand({aggregate: coll.getName(), pipeline: nestedPipeline, cursor: {}}));
-
-nestedPipeline = generateNestedPipeline("lookup", 21);
-assertErrorCode(coll, nestedPipeline, ErrorCodes.MaxSubPipelineDepthExceeded);
-
-// Confirm that maximum $lookup sub-pipeline depth is respected when aggregating views whose
-// combined nesting depth exceeds the limit.
-nestedPipeline = generateNestedPipeline("lookup", 10);
-coll.getDB().view1.drop();
-assert.commandWorked(
-    coll.getDB().runCommand({create: "view1", viewOn: "lookup", pipeline: nestedPipeline}));
-
-nestedPipeline = generateNestedPipeline("view1", 10);
-coll.getDB().view2.drop();
-assert.commandWorked(
-    coll.getDB().runCommand({create: "view2", viewOn: "view1", pipeline: nestedPipeline}));
-
-// Confirm that a composite sub-pipeline depth of 20 is allowed.
-assert.commandWorked(coll.getDB().runCommand({aggregate: "view2", pipeline: [], cursor: {}}));
-
-const pipelineWhichExceedsNestingLimit = generateNestedPipeline("view2", 1);
-coll.getDB().view3.drop();
-assert.commandWorked(coll.getDB().runCommand(
-    {create: "view3", viewOn: "view2", pipeline: pipelineWhichExceedsNestingLimit}));
-
 //
 // Error cases.
 //
-
-// Confirm that a composite sub-pipeline depth greater than 20 fails.
-assertErrorCode(coll.getDB().view3, [], ErrorCodes.MaxSubPipelineDepthExceeded);
 
 // 'pipeline' and 'let' must be of expected type.
 assertErrorCode(coll, [{$lookup: {pipeline: 1, from: "from", as: "as"}}], ErrorCodes.TypeMismatch);
