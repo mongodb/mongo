@@ -805,6 +805,7 @@ tasks:
     exec_timeout_secs: 216000 # 2.5 days
     commands:
       - func: f_run_dsi_workload
+        timeout_secs: 216000 # 2.5 days
         vars:
           test_control: "initialsync-logkeeper"
 
