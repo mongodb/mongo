@@ -80,7 +80,7 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
 
     auto& winner = candidates[winnerIdx];
     tassert(5323803,
-            str::stream() << "winning candidate retruned an error: " << winner.status,
+            str::stream() << "winning candidate returned an error: " << winner.status,
             winner.status.isOK());
 
     LOGV2_DEBUG(
