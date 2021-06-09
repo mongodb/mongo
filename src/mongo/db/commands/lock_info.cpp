@@ -81,7 +81,7 @@ public:
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
         auto lockToClientMap = LockManager::getLockToClientMap(opCtx->getServiceContext());
-        getGlobalLockManager()->getLockInfoBSON(lockToClientMap, &result);
+        LockManager::get(opCtx)->getLockInfoBSON(lockToClientMap, &result);
         return true;
     }
 } cmdLockInfo;
