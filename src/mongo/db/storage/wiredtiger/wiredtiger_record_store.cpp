@@ -775,7 +775,15 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
         ss << "prefix_compression,";
     }
 
-    ss << "block_compressor=" << wiredTigerGlobalOptions.collectionBlockCompressor << ",";
+    ss << "block_compressor=";
+    if (options.timeseries) {
+        // Time-series collections use zstd compression by default.
+        ss << WiredTigerGlobalOptions::kDefaultTimeseriesCollectionCompressor;
+    } else {
+        // All other collections use the globally configured default.
+        ss << wiredTigerGlobalOptions.collectionBlockCompressor;
+    }
+    ss << ",";
 
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())->getTableCreateConfig(ns);
 
