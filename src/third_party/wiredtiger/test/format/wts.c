@@ -358,7 +358,7 @@ create_object(WT_CONNECTION *conn)
         CONFIG_APPEND(p, ",assert=(read_timestamp=%s)", g.c_txn_timestamps ? "always" : "never");
     if (g.c_assert_write_timestamp)
         CONFIG_APPEND(p, ",assert=(write_timestamp=on),write_timestamp_usage=%s",
-          g.c_txn_timestamps ? "always" : "never");
+          g.c_txn_timestamps ? "key_consistent" : "never");
 
     /* Configure LSM. */
     if (DATASOURCE("lsm")) {
