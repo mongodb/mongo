@@ -116,9 +116,6 @@ public:
     static constexpr auto kPostImageOpFieldName = "postImageOp"_sd;
 
 private:
-    template <typename Callable>
-    auto _withTemporaryOperationContext(Callable&& callable);
-
     std::vector<repl::OplogEntry> _fillBatch(Pipeline& pipeline);
 
     const NamespaceString _oplogBufferNss;
