@@ -1561,6 +1561,10 @@ methods = {
     Config('force', 'false', r'''
         force sharing of all data''',
         type='boolean'),
+    Config('lock_wait', 'true', r'''
+        wait for locks, if \c lock_wait=false, fail if any required locks are
+        not available immediately''',
+        type='boolean'),
     Config('sync', 'on', r'''
         wait for all objects to be flushed to the shared storage to the level
         specified. The \c off setting does not wait for any

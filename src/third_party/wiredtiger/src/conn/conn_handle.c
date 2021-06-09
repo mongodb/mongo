@@ -51,6 +51,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
     WT_SPIN_INIT_TRACKED(session, &conn->checkpoint_lock, checkpoint);
     WT_RET(__wt_spin_init(session, &conn->encryptor_lock, "encryptor"));
     WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
+    WT_RET(__wt_spin_init(session, &conn->flush_tier_lock, "flush tier"));
     WT_SPIN_INIT_TRACKED(session, &conn->metadata_lock, metadata);
     WT_RET(__wt_spin_init(session, &conn->reconfig_lock, "reconfigure"));
     WT_SPIN_INIT_SESSION_TRACKED(session, &conn->schema_lock, schema);
@@ -116,6 +117,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
     __wt_rwlock_destroy(session, &conn->dhandle_lock);
     __wt_spin_destroy(session, &conn->encryptor_lock);
     __wt_spin_destroy(session, &conn->fh_lock);
+    __wt_spin_destroy(session, &conn->flush_tier_lock);
     __wt_rwlock_destroy(session, &conn->hot_backup_lock);
     __wt_spin_destroy(session, &conn->metadata_lock);
     __wt_spin_destroy(session, &conn->reconfig_lock);

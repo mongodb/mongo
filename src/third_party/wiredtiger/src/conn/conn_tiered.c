@@ -350,12 +350,15 @@ int
 __wt_flush_tier(WT_SESSION_IMPL *session, const char *config)
 {
     WT_CONFIG_ITEM cval;
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     uint32_t flags;
     const char *cfg[3];
+    bool wait;
 
+    conn = S2C(session);
     WT_STAT_CONN_INCR(session, flush_tier);
-    if (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_TIERED_MGR))
+    if (FLD_ISSET(conn->server_flags, WT_CONN_SERVER_TIERED_MGR))
         WT_RET_MSG(
           session, EINVAL, "Cannot call flush_tier when storage manager thread is configured");
 
@@ -372,6 +375,21 @@ __wt_flush_tier(WT_SESSION_IMPL *session, const char *config)
     else if (WT_STRING_MATCH("on", cval.str, cval.len))
         LF_SET(WT_FLUSH_TIER_ON);
 
+    WT_RET(__wt_config_gets(session, cfg, "lock_wait", &cval));
+    if (cval.val)
+        wait = true;
+    else
+        wait = false;
+
+    /*
+     * We have to hold the lock around both the wait call for a previous flush tier and the
+     * execution of the current flush tier call.
+     */
+    if (wait)
+        __wt_spin_lock(session, &conn->flush_tier_lock);
+    else
+        WT_RET(__wt_spin_trylock(session, &conn->flush_tier_lock));
+
     /*
      * We cannot perform another flush tier until any earlier ones are done. Often threads will wait
      * after the flush tier based on the sync setting so this check will be fast. But if sync is
@@ -379,8 +397,11 @@ __wt_flush_tier(WT_SESSION_IMPL *session, const char *config)
      * holding the schema lock.
      */
     __flush_tier_wait(session);
-
-    WT_WITH_SCHEMA_LOCK(session, ret = __flush_tier_once(session, flags));
+    if (wait)
+        WT_WITH_SCHEMA_LOCK(session, ret = __flush_tier_once(session, flags));
+    else
+        WT_WITH_SCHEMA_LOCK_NOWAIT(session, ret, ret = __flush_tier_once(session, flags));
+    __wt_spin_unlock(session, &conn->flush_tier_lock);
 
     if (ret == 0 && LF_ISSET(WT_FLUSH_TIER_ON))
         __flush_tier_wait(session);
