@@ -312,27 +312,11 @@ createRetryableWritesOplogFetchingPipelineForTenantMigrations(
             .firstElement(),
         expCtx));
 
-    // 9. Sort the oplog entries in each oplog chain. The $reduce expression sorts the `history`
-    //    array in ascending `depthForTenantMigration` order. The $reverseArray expression will
-    //    give an array in ascending timestamp order.
-    stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
-                    history: {$reverseArray: {$reduce: {\
-                        input: '$history',\
-                        initialValue: {$range: [0, {$size: '$history'}]},\
-                        in: {$concatArrays: [\
-                            {$slice: ['$$value', '$$this.depthForTenantMigration']},\
-                            ['$$this'],\
-                            {$slice: [\
-                                '$$value',\
-                                {$subtract: [\
-                                    {$add: ['$$this.depthForTenantMigration', 1]},\
-                                    {$size: '$history'}]}]}]}}}}}"),
-                                                        expCtx));
-
-    // 10. Filter out all oplog entries from the `history` array that occur after
+    // 9. Filter out all oplog entries from the `history` array that occur after
     //    `startFetchingTimestamp`. Since the oplog fetching and application stages will already
     //    capture entries after `startFetchingTimestamp`, we only need the earlier part of the oplog
-    //    chain.
+    //    chain. We do not need to sort the history after this since we will put the fetched entries
+    //    into the oplog buffer collection, where entries are read in timestamp order.
     stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
                     history: {$filter: {\
                         input: '$history',\
@@ -340,13 +324,13 @@ createRetryableWritesOplogFetchingPipelineForTenantMigrations(
                                                                  "]}}}}"),
                                                         expCtx));
 
-    // 11. Combine the oplog entries.
+    // 10. Combine the oplog entries.
     stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
                         'history': {$concatArrays: [\
                             '$preImageOps', '$postImageOps', '$history']}}"),
                                                         expCtx));
 
-    // 12. Fetch the complete oplog entries. `completeOplogEntry` is expected to contain exactly one
+    // 11. Fetch the complete oplog entries. `completeOplogEntry` is expected to contain exactly one
     //     element.
     stages.emplace_back(DocumentSourceLookUp::createFromBson(
         Doc{{"$lookup",
@@ -358,11 +342,11 @@ createRetryableWritesOplogFetchingPipelineForTenantMigrations(
             .firstElement(),
         expCtx));
 
-    // 13. Unwind oplog entries in each chain to the top-level array.
+    // 12. Unwind oplog entries in each chain to the top-level array.
     stages.emplace_back(
         DocumentSourceUnwind::create(expCtx, "completeOplogEntry", false, boost::none));
 
-    // 14. Replace root.
+    // 13. Replace root.
     stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
         fromjson("{$replaceRoot: {newRoot: '$completeOplogEntry'}}").firstElement(), expCtx));
 
