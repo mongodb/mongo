@@ -469,7 +469,7 @@ Status validate(OperationContext* opCtx,
         // an index build that has just failed and is trying to write using the same timestamp we
         // are using to read. Impose a generous maximum timeout to force validate to time out and
         // allow the index build to make progress. See SERVER-53445.
-        opCtx->lockState()->setMaxLockTimeout(duration_cast<Milliseconds>(Seconds(30)));
+        opCtx->lockState()->setMaxLockTimeout(duration_cast<Milliseconds>(Seconds(15)));
     }
 
     try {

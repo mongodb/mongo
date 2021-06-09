@@ -220,7 +220,7 @@ public:
             // just failed and is trying to write using the same timestamp we are using to read.
             // Impose a generous maximum timeout to force dbHash to time out and allow the index
             // build to make progress. See SERVER-53376.
-            opCtx->lockState()->setMaxLockTimeout(duration_cast<Milliseconds>(Seconds(30)));
+            opCtx->lockState()->setMaxLockTimeout(duration_cast<Milliseconds>(Seconds(15)));
 
             // Additionally, if we are performing a read at a timestamp, then we allow oplog
             // application to proceed concurrently with the dbHash command. This is done
