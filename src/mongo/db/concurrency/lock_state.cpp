@@ -537,7 +537,7 @@ void LockerImpl::lock(OperationContext* opCtx, ResourceId resId, LockMode mode, 
 
 void LockerImpl::downgrade(ResourceId resId, LockMode newMode) {
     LockRequestsMap::Iterator it = _requests.find(resId);
-    globalLockManager.downgrade(it.objAddr(), newMode);
+    getGlobalLockManager()->downgrade(it.objAddr(), newMode);
 }
 
 bool LockerImpl::unlock(ResourceId resId) {
@@ -876,8 +876,8 @@ LockResult LockerImpl::_lockBegin(OperationContext* opCtx, ResourceId resId, Loc
     // otherwise we might reset state if the lock becomes granted very fast.
     _notify.clear();
 
-    LockResult result = isNew ? globalLockManager.lock(resId, request, mode)
-                              : globalLockManager.convert(resId, request, mode);
+    LockResult result = isNew ? getGlobalLockManager()->lock(resId, request, mode)
+                              : getGlobalLockManager()->convert(resId, request, mode);
 
     if (result == LOCK_WAITING) {
         globalStats.recordWait(_id, resId, mode);
@@ -1042,7 +1042,7 @@ void LockerImpl::_releaseTicket() {
 }
 
 bool LockerImpl::_unlockImpl(LockRequestsMap::Iterator* it) {
-    if (globalLockManager.unlock(it->objAddr())) {
+    if (getGlobalLockManager()->unlock(it->objAddr())) {
         if (it->key() == resourceIdGlobal) {
             invariant(_modeForTicket != MODE_NONE);
 
