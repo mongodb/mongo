@@ -72,10 +72,6 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
     if (ret != WT_PREPARE_CONFLICT)
         return ret;
 
-    tassert(ErrorCodes::WriteConflict,
-            "Hit a prepare conflict while holding a resource on the oplog",
-            !opCtx->recoveryUnit()->isTimestamped());
-
     auto recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
     int attempts = 1;
     // If we return from this function, we have either returned successfully or we've returned an
