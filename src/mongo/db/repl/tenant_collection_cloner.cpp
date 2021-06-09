@@ -386,7 +386,11 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
         // No collection with the same UUID exists. But if this still fails with NamespaceExists, it
         // means that we have a collection with the same namespace but a different UUID.
         auto status =
-            getStorageInterface()->createCollection(opCtx.get(), _sourceNss, _collectionOptions);
+            getStorageInterface()->createCollection(opCtx.get(),
+                                                    _sourceNss,
+                                                    _collectionOptions,
+                                                    !_idIndexSpec.isEmpty() /* createIdIndex */,
+                                                    _idIndexSpec);
         if (status == ErrorCodes::NamespaceExists && getSharedData()->isResuming()) {
             // If we are resuming from a recipient failover and we have a collection on disk with
             // the same namespace but a different uuid, it means this collection must have been

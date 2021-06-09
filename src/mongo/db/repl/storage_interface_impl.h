@@ -81,7 +81,9 @@ public:
 
     Status createCollection(OperationContext* opCtx,
                             const NamespaceString& nss,
-                            const CollectionOptions& options) override;
+                            const CollectionOptions& options,
+                            const bool createIdIndex = true,
+                            const BSONObj& idIndexSpec = BSONObj()) override;
 
     Status createIndexesOnEmptyCollection(OperationContext* opCtx,
                                           const NamespaceString& nss,
