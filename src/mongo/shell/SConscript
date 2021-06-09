@@ -180,25 +180,26 @@ if get_option('ssl') == 'on':
         ],
     )
 
-    scriptingEnv = env.Clone()
-    scriptingEnv.InjectMozJS()
+    if get_option('js-engine') != 'none':
+        scriptingEnv = env.Clone()
+        scriptingEnv.InjectMozJS()
 
-    scriptingEnv.Library(
-        target="encrypted_dbclient",
-        source=[
-            "encrypted_dbclient_base.cpp",
-            "fle_shell_options.idl",
-        ],
-        LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/client/clientdriver_minimal',
-            '$BUILD_DIR/mongo/crypto/aead_encryption',
-            '$BUILD_DIR/mongo/crypto/symmetric_crypto',
-            '$BUILD_DIR/mongo/scripting/scripting',
-            '$BUILD_DIR/mongo/shell/shell_options_register',
-            '$BUILD_DIR/third_party/shim_mozjs',
-            'kms',
-        ],
-    )
+        scriptingEnv.Library(
+            target="encrypted_dbclient",
+            source=[
+                "encrypted_dbclient_base.cpp",
+                "fle_shell_options.idl",
+            ],
+            LIBDEPS_PRIVATE=[
+                '$BUILD_DIR/mongo/client/clientdriver_minimal',
+                '$BUILD_DIR/mongo/crypto/aead_encryption',
+                '$BUILD_DIR/mongo/crypto/symmetric_crypto',
+                '$BUILD_DIR/mongo/scripting/scripting',
+                '$BUILD_DIR/mongo/shell/shell_options_register',
+                '$BUILD_DIR/third_party/shim_mozjs',
+                'kms',
+            ],
+        )
 
 env.Library(
     target="linenoise_utf8",

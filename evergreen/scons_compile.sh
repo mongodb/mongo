@@ -32,7 +32,7 @@ fi
 
 # Conditionally enable scons time debugging
 if [ "${show_scons_timings}" = "true" ]; then
-  extra_args="$extra_args --debug=time"
+  extra_args="$extra_args --debug=time,stacktrace"
 fi
 
 # Build packages where the upload tasks expect them

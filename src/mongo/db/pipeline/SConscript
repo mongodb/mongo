@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 
 Import('env')
+Import("get_option")
 
 env = env.Clone()
 
@@ -403,7 +404,7 @@ env.Library(
 env.CppUnitTest(
     target='db_pipeline_test',
     source=[
-        'accumulator_js_test.cpp',
+        'accumulator_js_test.cpp' if get_option('js-engine') != 'none' else [],
         'accumulator_test.cpp',
         'aggregation_request_test.cpp',
         'dependencies_test.cpp',
@@ -462,7 +463,7 @@ env.CppUnitTest(
         'expression_date_test.cpp',
         'expression_field_path_test.cpp',
         'expression_find_internal_test.cpp',
-        'expression_javascript_test.cpp',
+        'expression_javascript_test.cpp' if get_option('js-engine') != 'none' else [],
         'expression_nary_test.cpp',
         'expression_object_test.cpp',
         'expression_or_test.cpp',

@@ -2,6 +2,7 @@
 
 Import("env")
 Import("has_option")
+Import("get_option")
 
 env = env.Clone()
 
@@ -699,7 +700,7 @@ env.CppUnitTest(
     source=[
         "index_filter_commands_test.cpp",
         "list_collections_filter_test.cpp",
-        "mr_test.cpp",
+        "mr_test.cpp" if get_option('js-engine') != 'none' else [],
         "parse_log_component_settings_test.cpp",
         "plan_cache_commands_test.cpp",
     ],

@@ -786,7 +786,6 @@ functions:
         - "src/evergreen/functions/venv_setup.sh"
       env:
         pip_dir: ${pip_dir}
-        workdir: ${workdir}
 
   "upload pip requirements": &upload_pip_requirements
     command: s3.put
@@ -7052,6 +7051,16 @@ task_groups:
   - compile_all
   - package
 
+- <<: *compile_task_group_template
+  name: compile_and_test_TG
+  tasks:
+  - compile_dist_test
+  - compile_unittests
+  - run_unittests
+  - compile_dbtest
+  - run_dbtest
+  - compile_all
+
 # These `parallel` task groups are only appropriate for builders that
 # use --link-model=dynamic, and have scons_cache_scope: shared and
 # scons_cache_mode: all. Such builders are able to share all build
@@ -8748,6 +8757,46 @@ buildvariants:
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
+
+- name: enterprise-macos-rosetta-2
+  display_name: "Enterprise macOS Via Rosetta 2"
+  modules:
+  - enterprise
+  run_on:
+  - macos-1100-arm64
+  expansions:
+    test_flags: --excludeWithAnyTags=incompatible_with_macos
+    compile_env: DEVELOPER_DIR=/Applications/Xcode12.4.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --link-model=dynamic --disable-warnings-as-errors --variables-files=etc/scons/xcode_macosx.vars
+    resmoke_jobs_max: 6
+    num_scons_link_jobs_available: 0.99
+  tasks:
+  - name: compile_test_and_package_serial_TG
+  - name: audit
+  - name: auth_audit_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore !.ssl
+  - name: .jscore .common !.decimal !.sharding
+  - name: .logical_session_cache .one_sec
+  - name: mqlrun
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+
+- name: enterprise-macos-arm64
+  display_name: "~ Enterprise macOS arm64 (--js-engine=none)"
+  modules:
+  - enterprise
+  run_on:
+  - macos-1100-arm64
+  expansions:
+    test_flags: --excludeWithAnyTags=incompatible_with_macos
+    compile_env: DEVELOPER_DIR=/Applications/Xcode12.4.app
+    compile_flags: --ssl --js-engine=none -j$(sysctl -n hw.logicalcpu) --link-model=dynamic --libc++ --disable-warnings-as-errors --variables-files=etc/scons/xcode_macosx_arm.vars
+    resmoke_jobs_max: 6
+    num_scons_link_jobs_available: 0.99
+  tasks:
+  - name: compile_and_test_TG
 
 ###########################################
 #          Embedded SDK buildvariants     #
