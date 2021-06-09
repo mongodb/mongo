@@ -43,8 +43,8 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -133,16 +133,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
                                                    const std::vector<BSONObj>& splitKeys,
                                                    const std::string& shardName,
                                                    const OID& expectedCollectionEpoch) {
-    const std::string whyMessage(str::stream()
-                                 << "splitting chunk " << redact(chunkRange.toString()) << " in "
-                                 << nss.toString());
-    auto scopedDistLock = DistLockManager::get(opCtx)->lock(
-        opCtx, nss.ns(), whyMessage, DistLockManager::kDefaultLockTimeout);
-    if (!scopedDistLock.isOK()) {
-        return scopedDistLock.getStatus().withContext(
-            str::stream() << "could not acquire collection lock for " << nss.toString()
-                          << " to split chunk " << chunkRange.toString());
-    }
+    auto scopedSplitOrMergeChunk(uassertStatusOK(
+        ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(opCtx, nss, chunkRange)));
 
     // If the shard key is hashed, then we must make sure that the split points are of supported
     // data types.
