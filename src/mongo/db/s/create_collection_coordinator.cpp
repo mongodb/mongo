@@ -332,7 +332,7 @@ boost::optional<BSONObj> CreateCollectionCoordinator::reportForCurrentOp(
     if (const auto& optComment = getForwardableOpMetadata().getComment()) {
         cmdBob.append(optComment.get().firstElement());
     }
-    cmdBob.append("request", _doc.getCreateCollectionRequest().toBSON());
+    cmdBob.appendElements(_doc.getCreateCollectionRequest().toBSON());
 
     BSONObjBuilder bob;
     bob.append("type", "op");

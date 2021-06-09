@@ -56,9 +56,8 @@ let getCurrentOpOfDDL = (ddlOpThread, desc) => {
     assert.eq(nss, currOp[0].ns);
     // It must have at least the shardKey.
     assert(currOp[0].hasOwnProperty('command'));
-    assert(currOp[0].command.hasOwnProperty('request'));
-    assert(currOp[0].command.request.hasOwnProperty('shardKey'));
-    assert.eq(shardKey, currOp[0].command.request.shardKey);
+    assert(currOp[0].command.hasOwnProperty('shardKey'));
+    assert.eq(shardKey, currOp[0].command.shardKey);
 }
 
 {
@@ -74,9 +73,10 @@ let getCurrentOpOfDDL = (ddlOpThread, desc) => {
     // There must be one operation running with the appropiate ns.
     assert.eq(1, currOp.length);
     assert.eq(nss, currOp[0].ns);
+
     // It must have the target collection.
-    assert(currOp[0].hasOwnProperty('to'));
-    assert.eq(toNss, currOp[0].to);
+    assert(currOp[0].hasOwnProperty('command'));
+    assert.docEq({to: toNss, dropTarget: true, stayTemp: false}, currOp[0].command);
 }
 
 {

@@ -106,12 +106,13 @@ boost::optional<BSONObj> RenameCollectionCoordinator::reportForCurrentOp(
     if (const auto& optComment = getForwardableOpMetadata().getComment()) {
         cmdBob.append(optComment.get().firstElement());
     }
+    cmdBob.appendElements(_doc.getRenameCollectionRequest().toBSON());
+
     BSONObjBuilder bob;
     bob.append("type", "op");
     bob.append("desc", "RenameCollectionCoordinator");
     bob.append("op", "command");
     bob.append("ns", nss().toString());
-    bob.append("to", _doc.getTo().toString());
     bob.append("command", cmdBob.obj());
     bob.append("currentPhase", _doc.getPhase());
     bob.append("active", true);
