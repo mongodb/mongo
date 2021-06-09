@@ -36,6 +36,26 @@ imports:
     - "mongo/s/resharding/common_types.idl"
 
 structs:
+    ReshardingRecipientMetrics:
+        description: "Contains metrics about the resharding operation on a recipient."
+        strict: false
+        fields:
+            operationRuntime:
+                type: ReshardingMetricsTimeInterval
+                description: >-
+                    The time interval of the entire resharding operation on this recipient.
+                optional: true
+            documentCopy:
+                type: ReshardingMetricsTimeInterval
+                description: >-
+                    The time interval that it takes to clone documents on this recipient.
+                optional: true
+            oplogApplication:
+                type: ReshardingMetricsTimeInterval
+                description: >-
+                    The time interval that it takes to apply oplog entries on this recipient.
+                optional: true
+
     ReshardingRecipientDocument:
         description: "Represents a resharding operation on the recipient shard."
         inline_chained_structs: true
@@ -62,3 +82,6 @@ structs:
             startConfigTxnCloneTime:
                 type:  date
                 optional: true
+            metrics:
+                type: ReshardingRecipientMetrics
+                description: "Metrics related to this recipient."

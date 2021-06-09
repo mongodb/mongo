@@ -154,8 +154,10 @@ protected:
         RecipientShardContext recipCtx;
         recipCtx.setState(RecipientStateEnum::kCloning);
 
-        ReshardingRecipientDocument doc(
-            std::move(recipCtx), {kThisShard.getShardId(), kOtherShard.getShardId()}, 1000);
+        ReshardingRecipientDocument doc(std::move(recipCtx),
+                                        {kThisShard.getShardId(), kOtherShard.getShardId()},
+                                        1000,
+                                        ReshardingRecipientMetrics());
 
         NamespaceString sourceNss = kOriginalNss;
         auto sourceUUID = UUID::gen();

@@ -64,6 +64,16 @@ structs:
             # overwrite with a single $set.
             mutableState: RecipientShardContext
 
+    ReshardingCoordinatorMetrics:
+        description: "Contains metrics about the resharding operation on the coordinator."
+        strict: false
+        fields:
+            operationRuntime:
+                    type: ReshardingMetricsTimeInterval
+                    description: >-
+                        The time interval of the entire resharding operation on the coordinator.
+                    optional: true
+
     ReshardingCoordinatorDocument:
         description: "Represents a resharding operation on the coordinator."
         inline_chained_structs: true
@@ -109,3 +119,6 @@ structs:
                     index on in order to prevent multiple resharding operations from being active at
                     the same time.
                 default: true
+            metrics:
+                type: ReshardingCoordinatorMetrics
+                description: "Metrics related to the coordinator."

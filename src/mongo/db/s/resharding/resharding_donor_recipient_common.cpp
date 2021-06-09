@@ -267,7 +267,8 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
     auto recipientDoc = ReshardingRecipientDocument{
         std::move(recipientCtx),
         reshardingFields.getRecipientFields()->getDonorShards(),
-        reshardingFields.getRecipientFields()->getMinimumOperationDurationMillis()};
+        reshardingFields.getRecipientFields()->getMinimumOperationDurationMillis(),
+        ReshardingRecipientMetrics()};
 
     auto sourceNss = reshardingFields.getRecipientFields()->getSourceNss();
     auto sourceUUID = reshardingFields.getRecipientFields()->getSourceUUID();
