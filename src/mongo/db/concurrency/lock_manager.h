@@ -47,6 +47,7 @@
 
 namespace mongo {
 
+class OperationContext;
 class ServiceContext;
 
 /**
@@ -59,11 +60,26 @@ class LockManager {
 
 public:
     /**
+     * Retrieves the lock manager instance attached to this ServiceContext.
+     * The lock manager is now a decoration on the service context and this is the accessor that
+     * most callers should prefer outside of startup, lock internals, and debugger scripts.
+     * Using the ServiceContext and OperationContext versions where possible is preferable to
+     * getGlobalLockManager().
+     */
+    static LockManager* get(ServiceContext* service);
+    static LockManager* get(ServiceContext& service);
+    static LockManager* get(OperationContext* opCtx);
+
+    /**
      * Gets a mapping of lock to client info.
      * Used by dump() and the lockInfo command.
      */
     static std::map<LockerId, BSONObj> getLockToClientMap(ServiceContext* serviceContext);
 
+    /**
+     * Default constructors are meant for unit tests only. The lock manager should generally be
+     * accessed as a decorator on the ServiceContext.
+     */
     LockManager();
     ~LockManager();
 

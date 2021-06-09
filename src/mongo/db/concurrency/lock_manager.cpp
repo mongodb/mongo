@@ -44,8 +44,10 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 
@@ -129,6 +131,7 @@ static const char* LockRequestStatusNames[] = {
 MONGO_STATIC_ASSERT((sizeof(LockRequestStatusNames) / sizeof(LockRequestStatusNames[0])) ==
                     LockRequest::StatusCount);
 
+auto getLockManager = ServiceContext::declareDecoration<LockManager>();
 }  // namespace
 
 /**
@@ -416,6 +419,22 @@ const unsigned LockManager::_numLockBuckets(128);
 // Balance scalability of intent locks against potential added cost of conflicting locks.
 // The exact value doesn't appear very important, but should be power of two
 const unsigned LockManager::_numPartitions = 32;
+
+// static
+LockManager* LockManager::get(ServiceContext* service) {
+    return &getLockManager(service);
+}
+
+// static
+LockManager* LockManager::get(ServiceContext& service) {
+    return &getLockManager(service);
+}
+
+// static
+LockManager* LockManager::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
+
 
 // static
 std::map<LockerId, BSONObj> LockManager::getLockToClientMap(ServiceContext* serviceContext) {
