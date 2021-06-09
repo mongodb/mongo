@@ -104,13 +104,9 @@ CollectionShardingRuntime* CollectionShardingRuntime::get_UNSAFE(ServiceContext*
 ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     OperationContext* opCtx, OrphanCleanupPolicy orphanCleanupPolicy) {
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
-    // TODO (SERVER-52764): No operations should be calling getOwnershipFilter without a shard
-    // version
-    //
-    // invariant(optReceivedShardVersion,
-    //          "getOwnershipFilter called by operation that doesn't specify shard version");
-    if (!optReceivedShardVersion)
-        return {kUnshardedCollection};
+    // No operations should be calling getOwnershipFilter without a shard version
+    invariant(optReceivedShardVersion,
+              "getOwnershipFilter called by operation that doesn't specify shard version");
 
     auto metadata = _getMetadataWithVersionCheckAt(
         opCtx, repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime());
