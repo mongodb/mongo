@@ -72,8 +72,7 @@ assert.eq(projectOnlyPipeline({$ref: "$link.$ref"}), [{_id: 0, $ref: otherColl.g
 
 // One cannot refer to a top-level DBRef field, however, as it will be interpreted as a variable
 // dereference.
-const err = assert.throws(() => coll.aggregate({$project: {x: "$$ref"}}).toArray());
-assert.eq(err.code, 17276);
+assert.throwsWithCode(() => coll.aggregate({$project: {x: "$$ref"}}).toArray(), 17276);
 
 // It can be accessed through $$ROOT, however.
 assert.eq(coll.aggregate([

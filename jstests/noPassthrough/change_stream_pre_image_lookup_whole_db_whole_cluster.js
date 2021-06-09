@@ -54,17 +54,16 @@ assert.commandWorked(collWithPreImages.remove({_id: 0}));
 assert.commandWorked(sentinelColl.insert({_id: "last_change_sentinel"}));
 
 // Confirm that attempting to open a whole-db stream on this database with mode "required" fails.
-const csWholeDBErr = assert.throws(function() {
+assert.throwsWithCode(function() {
     const wholeDBStream =
         testDB.watch([], {fullDocumentBeforeChange: "required", resumeAfter: resumeToken});
 
     return assert.soon(() => wholeDBStream.hasNext() &&
                            wholeDBStream.next().documentKey._id === "last_change_sentinel");
-});
-assert.eq(csWholeDBErr.code, 51770);
+}, 51770);
 
 // Confirm that attempting to open a whole-cluster stream on with mode "required" fails.
-const csWholeClusterErr = assert.throws(function() {
+assert.throwsWithCode(function() {
     const wholeClusterStream = adminDB.watch([], {
         fullDocumentBeforeChange: "required",
         resumeAfter: resumeToken,
@@ -73,8 +72,7 @@ const csWholeClusterErr = assert.throws(function() {
 
     return assert.soon(() => wholeClusterStream.hasNext() &&
                            wholeClusterStream.next().documentKey._id == "last_change_sentinel");
-});
-assert.eq(csWholeClusterErr.code, 51770);
+}, 51770);
 
 // However, if we open a whole-db or whole-cluster stream that filters for only the namespace with
 // pre-images, then the cursor can proceed. This is because the $match gets moved ahead of the

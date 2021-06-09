@@ -19,18 +19,18 @@ assert.doesNotThrow(
 
 // Now lower the limit to test that it's configuration is obeyed.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxPushBytes: 100}));
-let error = assert.throws(
-    () => coll.aggregate([{$unwind: "$y"}, {$group: {_id: null, strings: {$push: "$y"}}}]));
-assert.eq(error.code, ErrorCodes.ExceededMemoryLimit);
+assert.throwsWithCode(
+    () => coll.aggregate([{$unwind: "$y"}, {$group: {_id: null, strings: {$push: "$y"}}}]),
+    ErrorCodes.ExceededMemoryLimit);
 
 // Test that using $addToSet behaves similarly.
 assert.doesNotThrow(
     () => coll.aggregate([{$unwind: "$y"}, {$group: {_id: null, strings: {$addToSet: "$y"}}}]));
 
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxAddToSetBytes: 100}));
-error = assert.throws(
-    () => coll.aggregate([{$unwind: "$y"}, {$group: {_id: null, strings: {$addToSet: "$y"}}}]));
-assert.eq(error.code, ErrorCodes.ExceededMemoryLimit);
+assert.throwsWithCode(
+    () => coll.aggregate([{$unwind: "$y"}, {$group: {_id: null, strings: {$addToSet: "$y"}}}]),
+    ErrorCodes.ExceededMemoryLimit);
 
 MongoRunner.stopMongod(conn);
 }());

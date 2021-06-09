@@ -20,8 +20,7 @@ assertErrorCode(sourceColl, [{$out: targetColl.getName()}], 28769);
 
 // Test that the "legacy" mode will not succeed when outputting to a sharded collection, even
 // for explain.
-let error = assert.throws(() => sourceColl.explain().aggregate([{$out: targetColl.getName()}]));
-assert.eq(error.code, 28769);
+assert.throwsWithCode(() => sourceColl.explain().aggregate([{$out: targetColl.getName()}]), 28769);
 
 // Then test that the $out fails if the collection becomes sharded between establishing the
 // cursor and performing the $out.
@@ -32,8 +31,8 @@ const cursorResponse = assert.commandWorked(mongosDB.runCommand({
     cursor: {batchSize: 0}
 }));
 st.shardColl(targetColl, {_id: 1}, false);
-error = assert.throws(() => new DBCommandCursor(mongosDB, cursorResponse).itcount());
-assert.eq(error.code, ErrorCodes.IllegalOperation);
+assert.throwsWithCode(() => new DBCommandCursor(mongosDB, cursorResponse).itcount(),
+                      ErrorCodes.IllegalOperation);
 
 st.stop();
 }());

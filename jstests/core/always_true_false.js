@@ -36,8 +36,7 @@ assert(coll.drop());
 
 // Check that a rooted-$or query with each clause false will not return any results.
 assert.commandWorked(coll.insert([{}, {}, {}]));
-const emptyOrError = assert.throws(() => coll.find({$or: []}).itcount());
-assert.eq(emptyOrError.code, ErrorCodes.BadValue);
+assert.throwsWithCode(() => coll.find({$or: []}).itcount(), ErrorCodes.BadValue);
 
 assert.eq(coll.find({$or: [{$alwaysFalse: 1}]}).itcount(), 0);
 assert.eq(coll.find({$or: [{a: {$all: []}}]}).itcount(), 0);

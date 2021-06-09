@@ -47,10 +47,9 @@ function createDanglingIndexEntry(doc) {
     const sessionDB = session.getDatabase(dbName);
     session.startTransaction();
 
-    const error = assert.throws(() => {
+    assert.throwsWithCode(() => {
         sessionDB[collName].find(doc).toArray();
-    });
-    assert.eq(error.code, ErrorCodes.DataCorruptionDetected);
+    }, ErrorCodes.DataCorruptionDetected);
     session.abortTransaction_forTesting();
 }
 

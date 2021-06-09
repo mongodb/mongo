@@ -9,8 +9,8 @@ var db = conn.getDB('db');
 assert.commandWorked(db.adminCommand({setParameter: 1, jsHeapLimitMB: 1}));
 
 db.foo.insert({x: 1});
-const e = assert.throws(() => db.foo.findOne({$where: 'sleep(10000);'}));
-assert.eq(e.code, ErrorCodes.ExceededMemoryLimit);
+assert.throwsWithCode(() => db.foo.findOne({$where: 'sleep(10000);'}),
+                      ErrorCodes.ExceededMemoryLimit);
 
 var returnCode = runProgram("mongo", "--jsHeapLimitMB=1", "--nodb", "--eval='exit();'");
 assert.eq(returnCode, 1);

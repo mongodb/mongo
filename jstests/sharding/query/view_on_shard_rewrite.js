@@ -57,8 +57,8 @@ assertReadOnView(mongosDB.getCollection(viewName));
 // View read with sharded collection on the primary shard is rejected. This mimics what happens
 // when mongos sends the equivalent read, with the caveat that mongos will use the view definition
 // returned to rewrite the query and execute against the underlying collection.
-const result = assert.throws(() => shardDB.getCollection(viewName).findOne({}));
-assert.eq(result.code, ErrorCodes.CommandOnShardedViewNotSupportedOnMongod);
+assert.throwsWithCode(() => shardDB.getCollection(viewName).findOne({}),
+                      ErrorCodes.CommandOnShardedViewNotSupportedOnMongod);
 
 st.stop();
 })();

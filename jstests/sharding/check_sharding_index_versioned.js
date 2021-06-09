@@ -17,14 +17,13 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 //
 // Note the shell connects to shards with a DBClient, which throws StaleConfig errors as JS
 // exceptions when the error does not come from a mongos.
-const error = assert.throws(() => {
+assert.throwsWithCode(() => {
     st.rs0.getPrimary().getDB(dbName).runCommand({
         checkShardingIndex: ns,
         keyPattern: {x: 1},
         shardVersion: [Timestamp(99, 10101), ObjectId()],
     });
-});
-assert.eq(error.code, ErrorCodes.StaleConfig);
+}, ErrorCodes.StaleConfig);
 
 st.stop();
 })();

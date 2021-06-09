@@ -31,6 +31,5 @@ const pipeline = [
     }
 ];
 
-const err = assert.throws(() => coll.aggregate(pipeline));
-assert.eq(err.code, 16410);
+assert.throwsWithCode(() => coll.aggregate(pipeline), 16410);
 })();

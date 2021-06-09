@@ -80,11 +80,11 @@ assert.commandWorked(db.t1.insert({_id: 2, a: 1}));
 
 // Verify that the system rejects a request to open a change stream on a system.* collection through
 // a mongos process even if parameter allowToRunOnSystemNS=true.
-const changeStreamOpenError = assert.throws(
+assert.throwsWithCode(
     () => systemCollection.watch([], {allowToRunOnSystemNS: true}),
+    ErrorCodes.InvalidNamespace,
     [],
     "expected a request with 'allowToRunOnSystemNS: true' to open a change stream on a system collection through mongos to fail");
-assert.eq(changeStreamOpenError.code, ErrorCodes.InvalidNamespace);
 
 const systemCollectionThroughShard = st.shard0.getCollection(systemCollection.getFullName());
 

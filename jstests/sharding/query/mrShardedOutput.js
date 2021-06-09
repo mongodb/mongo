@@ -38,19 +38,19 @@ for (let i = 0; i < numDocs; ++i) {
 assert.commandWorked(bulk.execute());
 
 // Should not be able to replace to a sharded collection.
-let error = assert.throws(
-    () => inputColl.mapReduce(map, reduce, {out: {replace: outputColl.getName(), sharded: true}}));
-assert.eq(error.code, ErrorCodes.InvalidOptions);
+assert.throwsWithCode(
+    () => inputColl.mapReduce(map, reduce, {out: {replace: outputColl.getName(), sharded: true}}),
+    ErrorCodes.InvalidOptions);
 
 // Should fail if we specify "merge" or "reduce" with sharded: true and the collection does not yet
 // exist as sharded.
-error = assert.throws(
-    () => inputColl.mapReduce(map, reduce, {out: {merge: outputColl.getName(), sharded: true}}));
-assert.eq(error.code, ErrorCodes.InvalidOptions);
+assert.throwsWithCode(
+    () => inputColl.mapReduce(map, reduce, {out: {merge: outputColl.getName(), sharded: true}}),
+    ErrorCodes.InvalidOptions);
 
-error = assert.throws(
-    () => inputColl.mapReduce(map, reduce, {out: {reduce: outputColl.getName(), sharded: true}}));
-assert.eq(error.code, ErrorCodes.InvalidOptions);
+assert.throwsWithCode(
+    () => inputColl.mapReduce(map, reduce, {out: {reduce: outputColl.getName(), sharded: true}}),
+    ErrorCodes.InvalidOptions);
 
 // Now create and shard the output collection, again with one chunk on each shard.
 st.shardColl(outputColl, {_id: 1}, {_id: numDocs / 2}, {_id: numDocs / 2});
@@ -73,9 +73,9 @@ assert.eq(evenResult.value.count * 2, oddResult.value.count, [evenResult, oddRes
 
 // Should not be able to use replace mode if the collection exists and is sharded, even if the
 // 'sharded' option is not specified.
-error =
-    assert.throws(() => inputColl.mapReduce(map, reduce, {out: {replace: outputColl.getName()}}));
-assert.eq(error.code, ErrorCodes.IllegalOperation);
+assert.throwsWithCode(
+    () => inputColl.mapReduce(map, reduce, {out: {replace: outputColl.getName()}}),
+    ErrorCodes.IllegalOperation);
 
 st.stop();
 }());

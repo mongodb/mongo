@@ -82,16 +82,16 @@ assert.eq(opTimeCmd.errmsg, "afterOpTime not compatible with linearizable read c
 assert.eq(opTimeCmd.code, ErrorCodes.FailedToParse);
 
 // A $out aggregation is not allowed with readConcern level "linearizable".
-let outResult = assert.throws(() => primary.getDB("test").foo.aggregate(
-                                  [{$out: "out"}], {readConcern: {level: "linearizable"}}));
-assert.eq(outResult.code, ErrorCodes.InvalidOptions);
+assert.throwsWithCode(() => primary.getDB("test").foo.aggregate(
+                          [{$out: "out"}], {readConcern: {level: "linearizable"}}),
+                      ErrorCodes.InvalidOptions);
 
 // A $merge aggregation is not allowed with readConcern level "linearizable".
-let mergeResult =
-    assert.throws(() => primary.getDB("test").foo.aggregate(
-                      [{$merge: {into: "out", whenMatched: "replace", whenNotMatched: "insert"}}],
-                      {readConcern: {level: "linearizable"}}));
-assert.eq(mergeResult.code, ErrorCodes.InvalidOptions);
+assert.throwsWithCode(
+    () => primary.getDB("test").foo.aggregate(
+        [{$merge: {into: "out", whenMatched: "replace", whenNotMatched: "insert"}}],
+        {readConcern: {level: "linearizable"}}),
+    ErrorCodes.InvalidOptions);
 
 primary = replTest.getPrimary();
 

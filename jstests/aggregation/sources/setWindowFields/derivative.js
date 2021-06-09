@@ -210,8 +210,7 @@ assert.commandWorked(coll.insert([
     {time: 1, y: 100},
     {time: 2, y: 100},
 ]));
-let err = assert.throws(() => coll.aggregate(derivativeStage('millisecond')).toArray());
-assert.eq(err.code, 5624900);
+assert.throwsWithCode(() => coll.aggregate(derivativeStage('millisecond')).toArray(), 5624900);
 result = coll.aggregate([derivativeStage(), {$unset: '_id'}]).toArray();
 assert.sameMembers(result, [
     {time: 0, y: 100, dy: null},
@@ -227,8 +226,7 @@ assert.commandWorked(coll.insert([
     {time: ISODate("2020-01-01T00:00:00.002Z"), y: 6},
     {time: ISODate("2020-01-01T00:00:00.003Z"), y: 5},
 ]));
-err = assert.throws(() => coll.aggregate(derivativeStage()).toArray());
-assert.eq(err.code, 5624901);
+assert.throwsWithCode(() => coll.aggregate(derivativeStage()).toArray(), 5624901);
 result = coll.aggregate([derivativeStage('millisecond'), {$unset: '_id'}]).toArray();
 assert.sameMembers(result, [
     {time: ISODate("2020-01-01T00:00:00.000Z"), y: 5, dy: null},
@@ -288,10 +286,8 @@ assert.commandWorked(coll.insert([
     {time: 12, y: 0},
     {time: 13, y: 0},
 ]));
-err = assert.throws(() => coll.aggregate(derivativeStage()).toArray());
-assert.eq(err.code, 5624901);
-err = assert.throws(() => coll.aggregate(derivativeStage('second')).toArray());
-assert.eq(err.code, 5624900);
+assert.throwsWithCode(() => coll.aggregate(derivativeStage()).toArray(), 5624901);
+assert.throwsWithCode(() => coll.aggregate(derivativeStage('second')).toArray(), 5624900);
 
 // Some examples of unbounded windows.
 coll.drop();

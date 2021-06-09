@@ -580,6 +580,18 @@ assert = (function() {
         return error;
     };
 
+    assert.throwsWithCode = function(func, code, params, msg) {
+        if (arguments.length < 2) {
+            throw new Error("assert.throwsWithCode expects at least 2 arguments");
+        }
+        // Remove the 'code' parameter, and any undefined parameters, from the list of arguments.
+        // Use .apply() to preserve the length of the 'arguments' object.
+        const newArgs = [func, params, msg].filter(element => element !== undefined);
+        const error = assert.throws.apply(null, newArgs);
+
+        assert.eq(error.code, code);
+    };
+
     assert.doesNotThrow = function(func, params, msg) {
         _validateAssertionMessage(msg);
 

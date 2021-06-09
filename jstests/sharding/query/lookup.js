@@ -601,15 +601,15 @@ setParameterOnAllHosts(nodeList, "internalQueryAllowShardedLookup", false);
 // Re shard the foreign collection on _id.
 st.shardColl(mongosDB.from, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
 
-let err = assert.throws(
+assert.throwsWithCode(
     () =>
         sourceColl
             .aggregate([{
                 $lookup: {localField: "a", foreignField: "b", from: fromColl.getName(), as: "same"}
             }])
-            .itcount());
-assert.eq(err.code, 28769);
-err = assert.throws(
+            .itcount(),
+    28769);
+assert.throwsWithCode(
     () => sourceColl
               .aggregate(
                   [{
@@ -617,9 +617,9 @@ err = assert.throws(
                           {localField: "a", foreignField: "b", from: fromColl.getName(), as: "same"}
                   }],
                   {allowDiskUse: true})
-              .itcount());
-assert.eq(err.code, 28769);
-err = assert.throws(() => sourceColl
+              .itcount(),
+    28769);
+assert.throwsWithCode(() => sourceColl
                                   .aggregate(
                                       [
                                         {$_internalSplitPipeline: {mergeType: "anyShard"}},
@@ -633,9 +633,8 @@ err = assert.throws(() => sourceColl
                                         }
                                       ],
                                       {allowDiskUse: true})
-                                  .itcount());
-assert.eq(err.code, 28769);
-err = assert.throws(
+                                  .itcount(), 28769);
+assert.throwsWithCode(
     () => sourceColl
               .aggregate(
                   [{$facet: {
@@ -645,8 +644,7 @@ err = assert.throws(
                     }
                   }}],
                   {allowDiskUse: true})
-              .itcount());
-assert.eq(err.code, 40170);
+              .itcount(), 40170);
 
 st.stop();
 }());

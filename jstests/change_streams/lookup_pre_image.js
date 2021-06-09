@@ -116,8 +116,7 @@ assert.docEq(latestChange.fullDocument, {_id: "y", foo: "bar"});
 // The "whenAvailable" cursor retrieves a document without the pre-image...
 assert.docEq(latestChange, cst.getOneChange(csPreImageWhenAvailableCursor));
 // ... but the "required" cursor throws an exception.
-const csErr = assert.throws(() => cst.getOneChange(csPreImageRequiredCursor));
-assert.eq(csErr.code, 51770);
+assert.throwsWithCode(() => cst.getOneChange(csPreImageRequiredCursor), 51770);
 
 // Test pre-image lookup for an op-style update operation.
 assert.commandWorked(coll.update({_id: "y"}, {$set: {foo: "baz"}}));
