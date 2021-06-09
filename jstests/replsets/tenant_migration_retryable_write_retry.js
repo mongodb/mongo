@@ -239,8 +239,7 @@ assert.commandWorked(donorPrimary.getDB(kDbName).runCommand({
 }));
 
 // The aggregation pipeline will return an array of retryable writes oplog entries (pre-image/
-// post-image oplog entries included) with "ts" < "startFetchingTimestamp" and sorted in ascending
-// order of "ts".
+// post-image oplog entries included) with "ts" < "startFetchingTimestamp".
 const aggRes = donorPrimary.getDB("config").runCommand({
     aggregate: "transactions",
     pipeline: [
@@ -322,25 +321,7 @@ const aggRes = donorPrimary.getDB("config").runCommand({
             as: "history",
             depthField: "depthForTenantMigration"
         }},
-        // Sort the oplog entries in each oplog chain.
-        {$set: {
-            history: {$reverseArray: {$reduce: {
-                input: "$history",
-                initialValue: {$range: [0, {$size: "$history"}]},
-                in: {$concatArrays: [
-                    {$slice: ["$$value", "$$this.depthForTenantMigration"]},
-                    ["$$this"],
-                    {$slice: [
-                        "$$value",
-                        {$subtract: [
-                            {$add: ["$$this.depthForTenantMigration", 1]},
-                            {$size: "$history"},
-                        ]},
-                    ]},
-                ]},
-            }}},
-        }},
-        // Now that we have the whole sorted chain, filter out entries that occurred after
+        // Now that we have the whole chain, filter out entries that occurred after
         // `startFetchingTimestamp`, since these entries will be fetched during the oplog fetching
         // phase.
         {$set: {
@@ -428,11 +409,6 @@ assert.eq(
     aggRes.cursor.firstBatch.length,
     sessionsOnDonor.reduce(
         (numOplogEntries, sessionOnDonor) => sessionOnDonor.numOplogEntries + numOplogEntries, 0));
-
-// Verify that the oplog docs are sorted in ascending order of "ts".
-for (let i = 1; i < aggRes.cursor.firstBatch.length; i++) {
-    assert.lt(0, bsonWoCompare(aggRes.cursor.firstBatch[i].ts, aggRes.cursor.firstBatch[i - 1].ts));
-}
 
 for (let sessionOnDonor of sessionsOnDonor) {
     // Find the returned oplog docs for the session.
