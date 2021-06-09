@@ -58,7 +58,11 @@
 #                  "_notTheID" : 1
 #              }
 #          },
-#          // Only populated if this collection is the temporary resharding collection
+#          // Only populated if:
+#	   // a) This collection is the temporary resharding collection, or
+# 	   // b) This is the original collection and the coordinator has
+#	   //    chosen to commit the contents of the temporary collection to
+#	   //    the original
 #          "recipientFields" : {
 #              "fetchTimestamp" : Timestamp(3, 4),
 #              "originalNamespace" : "foo.bar",
