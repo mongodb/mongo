@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
@@ -857,14 +858,24 @@ void ReshardingDonorService::DonorStateMachine::insertStateDocument(
 void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
     DonorShardContext&& newDonorCtx) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    PersistentTaskStore<ReshardingDonorDocument> store(
-        NamespaceString::kDonorReshardingOperationsNamespace);
-    store.update(
-        opCtx.get(),
-        BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << _metadata.getReshardingUUID()),
-        BSON("$set" << BSON(ReshardingDonorDocument::kMutableStateFieldName
-                            << newDonorCtx.toBSON())),
-        kNoWaitWriteConcern);
+    const auto& nss = NamespaceString::kDonorReshardingOperationsNamespace;
+
+    writeConflictRetry(opCtx.get(), "DonorStateMachine::_updateDonorDocument", nss.toString(), [&] {
+        AutoGetCollection coll(opCtx.get(), nss, MODE_X);
+
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << nss.toString() << " does not exist",
+                coll);
+
+        WriteUnitOfWork wuow(opCtx.get());
+        Helpers::update(opCtx.get(),
+                        nss.toString(),
+                        BSON(ReshardingDonorDocument::kReshardingUUIDFieldName
+                             << _metadata.getReshardingUUID()),
+                        BSON("$set" << BSON(ReshardingDonorDocument::kMutableStateFieldName
+                                            << newDonorCtx.toBSON())));
+        wuow.commit();
+    });
 
     _donorCtx = newDonorCtx;
 }
@@ -875,7 +886,7 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
 
     const auto& nss = NamespaceString::kDonorReshardingOperationsNamespace;
     writeConflictRetry(opCtx.get(), "DonorStateMachine::_removeDonorDocument", nss.toString(), [&] {
-        AutoGetCollection coll(opCtx.get(), nss, MODE_IX);
+        AutoGetCollection coll(opCtx.get(), nss, MODE_X);
 
         if (!coll) {
             return;

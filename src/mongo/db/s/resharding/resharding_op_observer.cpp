@@ -95,9 +95,8 @@ boost::optional<Timestamp> _calculatePin(OperationContext* opCtx) {
     // can be write skew resulting in the wrong pin, including leaking a resource. We enforce the
     // collection is held in exclusive mode to prevent this.
 
-    // TODO: Uncomment
-    // invariant(opCtx->lockState()->isCollectionLockedForMode(
-    //     NamespaceString::kDonorReshardingOperationsNamespace, LockMode::MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString::kDonorReshardingOperationsNamespace, LockMode::MODE_X));
 
     // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise abandon
     // the snapshot when exitting the function.
