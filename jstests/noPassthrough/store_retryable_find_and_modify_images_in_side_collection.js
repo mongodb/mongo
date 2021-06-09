@@ -54,6 +54,14 @@
         assert.eq(expectedTs.getTime(), imageDoc.ts.getTime(), imageDoc);
     }
 
+    function assertRetryCommand(cmdResponse, retryResponse) {
+        // The retry response can contain a different 'clusterTime' from the initial response.
+        delete cmdResponse.$clusterTime;
+        delete retryResponse.$clusterTime;
+
+        assert.eq(cmdResponse, retryResponse);
+    }
+
     function runTests(lsid, mainConn, primary, secondary, storeImagesInSideCollection, docId) {
         const setParam = {
             setParameter: 1,
@@ -124,7 +132,7 @@
         }
         // Assert that retrying the command will produce the same response.
         let retryRes = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
-        assert.eq(res, retryRes);
+        assertRetryCommand(res, retryRes);
 
         ////////////////////////////////////////////////////////////////////////
         // Test findAndModify command (in-place update, return post-image)
@@ -164,7 +172,7 @@
         }
         // Assert that retrying the command will produce the same response.
         retryRes = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
-        assert.eq(res, retryRes);
+        assertRetryCommand(res, retryRes);
 
         ////////////////////////////////////////////////////////////////////////
         // Test findAndModify command (replacement update, return pre-image)
@@ -203,7 +211,7 @@
 
         // Assert that retrying the command will produce the same response.
         retryRes = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
-        assert.eq(res, retryRes);
+        assertRetryCommand(res, retryRes);
 
         ////////////////////////////////////////////////////////////////////////
         // Test findAndModify command (replacement update, return post-image)
@@ -244,7 +252,7 @@
         }
         // Assert that retrying the command will produce the same response.
         retryRes = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
-        assert.eq(res, retryRes);
+        assertRetryCommand(res, retryRes);
 
         ////////////////////////////////////////////////////////////////////////
         // Test findAndModify command (remove, return pre-image)
@@ -280,7 +288,7 @@
         }
         // Assert that retrying the command will produce the same response.
         retryRes = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
-        assert.eq(res, retryRes);
+        assertRetryCommand(res, retryRes);
     }
 
     const lsid = UUID();
