@@ -1,7 +1,7 @@
 // Tests that the aggregate command can use command-level let variables with $merge. Note $merge
 // tests must be run in a noPassthrough suite so the other operators are exercised in
 // jstests/core/command_let_variables.js.
-// @tags: [assumes_against_mongod_not_mongos, requires_fcv46]
+// @tags: [requires_fcv46]
 
 (function() {
 "use strict";
@@ -125,4 +125,35 @@ assert.commandWorked(db.runCommand({
     let : {variable: "OUTER"}
 }));
 assert.eq(targetColl.aggregate({$match: {$expr: {$eq: ["$var", "INNER"]}}}).toArray().length, 1);
+
+// Test that expressions wrapped with $literal are serialized correctly in combination with
+// pipelines containing $merge.
+prepMergeTargetColl();
+assert.commandWorked(db.runCommand({
+    aggregate: coll.getName(),
+    pipeline: [{$project: {var : "$$variable"}}, {$merge: {into: targetColl.getName()}}],
+    let : {variable: {$literal: "$notAFieldPath"}},
+    cursor: {}
+}));
+assert.eq(targetColl.aggregate({$match: {$expr: {$eq: ["$var", {$literal: "$notAFieldPath"}]}}})
+              .toArray()
+              .length,
+          4);
+
+prepMergeTargetColl();
+assert.commandWorked(db.runCommand({
+    aggregate: coll.getName(),
+    pipeline: [{
+        $merge: {
+            into: targetColl.getName(),
+            let : {variable: {$literal: "$notAFieldPath"}},
+            whenMatched: [{$addFields: {"var": "$$variable"}}]
+        }
+    }],
+    cursor: {},
+}));
+assert.eq(targetColl.aggregate({$match: {$expr: {$eq: ["$var", {$literal: "$notAFieldPath"}]}}})
+              .toArray()
+              .length,
+          1);
 }());
