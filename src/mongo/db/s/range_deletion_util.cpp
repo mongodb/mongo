@@ -440,7 +440,10 @@ void snapshotRangeDeletionsForRename(OperationContext* opCtx,
 
     auto rangeDeletionTasks = getPersistentRangeDeletionTasks(opCtx, fromNss);
     for (auto& task : rangeDeletionTasks) {
-        task.setNss(toNss);  // Associate task to the new namespace
+        // Associate task to the new namespace
+        task.setNss(toNss);
+        // Assign a new id to prevent duplicate key conflicts with the source range deletion task
+        task.setId(UUID::gen());
         store.add(opCtx, task);
     }
 }
@@ -453,13 +456,12 @@ void restoreRangeDeletionTasksForRename(OperationContext* opCtx, const Namespace
 
     const auto query = QUERY(RangeDeletionTask::kNssFieldName << nss.ns());
 
-    // Remove eventual leftovers from a previously uncompleted restore
-    rangeDeletionsStore.remove(opCtx, query);
-
     rangeDeletionsForRenameStore.forEach(opCtx, query, [&](const RangeDeletionTask& deletionTask) {
-        auto task = deletionTask;
-        task.setId(UUID::gen());  // Assign a new id to prevent duplicate key errors
-        rangeDeletionsStore.add(opCtx, task);
+        try {
+            rangeDeletionsStore.add(opCtx, deletionTask);
+        } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+            // Task already scheduled in a previous call of this method
+        }
         return true;
     });
 }
