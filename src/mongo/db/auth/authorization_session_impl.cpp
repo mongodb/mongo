@@ -71,6 +71,7 @@ auto authorizationSessionCreateRegistration =
     MONGO_WEAK_FUNCTION_REGISTRATION(AuthorizationSession::create, authorizationSessionCreateImpl);
 
 constexpr StringData ADMIN_DBNAME = "admin"_sd;
+constexpr StringData SYSTEM_BUCKETS_PREFIX = "system.buckets."_sd;
 
 bool checkContracts() {
     // Only check contracts in testing modes, invalid contracts should not break customers.
@@ -409,7 +410,7 @@ bool AuthorizationSessionImpl::isAuthorizedForActionsOnNamespace(const Namespace
     return isAuthorizedForPrivilege(Privilege(ResourcePattern::forExactNamespace(ns), actions));
 }
 
-static const int resourceSearchListCapacity = 5;
+static const int resourceSearchListCapacity = 7;
 /**
  * Builds from "target" an exhaustive list of all ResourcePatterns that match "target".
  *
@@ -440,6 +441,14 @@ static const int resourceSearchListCapacity = 5;
  *                  db,
  *                  coll,
  *                  db.coll }
+ * target is a system buckets collection, db.system.buckets.coll:
+ *   searchList = { ResourcePattern::forAnyResource(),
+ *                  ResourcePattern::forAnySystemBuckets(),
+ *                  ResourcePattern::forAnySystemBucketsInDatabase("db"),
+ *                  ResourcePattern::forAnySystemBucketsInAnyDatabase("coll"),
+ *                  ResourcePattern::forExactSystemBucketsCollection("db", "coll"),
+ *                  system.buckets.coll,
+ *                  db.system.buckets.coll }
  * target is a system collection, db.system.coll:
  *   searchList = { ResourcePattern::forAnyResource(),
  *                  system.coll,
@@ -460,6 +469,16 @@ static int buildResourceSearchList(const ResourcePattern& target,
                 resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
             }
             resourceSearchList[size++] = ResourcePattern::forDatabaseName(target.ns().db());
+        } else if (target.ns().coll().startsWith(SYSTEM_BUCKETS_PREFIX) &&
+                   target.ns().coll().size() > SYSTEM_BUCKETS_PREFIX.size()) {
+            auto bucketColl = target.ns().coll().substr(SYSTEM_BUCKETS_PREFIX.size());
+            resourceSearchList[size++] =
+                ResourcePattern::forExactSystemBucketsCollection(target.ns().db(), bucketColl);
+            resourceSearchList[size++] = ResourcePattern::forAnySystemBuckets();
+            resourceSearchList[size++] =
+                ResourcePattern::forAnySystemBucketsInDatabase(target.ns().db());
+            resourceSearchList[size++] =
+                ResourcePattern::forAnySystemBucketsInAnyDatabase(bucketColl);
         }
 
         // All collections can be matched by a collection resource for their name
@@ -659,6 +678,12 @@ bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringD
             return true;
         }
 
+        // Any resource will match any system_buckets collection in the database
+        if (user->hasActionsForResource(ResourcePattern::forAnySystemBuckets()) ||
+            user->hasActionsForResource(ResourcePattern::forAnySystemBucketsInDatabase(db))) {
+            return true;
+        }
+
         // If the user is authorized for anyNormalResource, then they implicitly have access
         // to most databases.
         if (db != "local" && db != "config" &&
@@ -676,9 +701,22 @@ bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringD
                 return true;
             }
 
+            // User can see system_buckets in any database so we consider them to have permission in
+            // this database
+            if (privilege.first.isAnySystemBucketsCollectionInAnyDB()) {
+                return true;
+            }
+
             // If the user has an exact namespace privilege on a collection in this database, they
             // have access to a resource in this database.
             if (privilege.first.isExactNamespacePattern() &&
+                privilege.first.databaseToMatch() == db) {
+                return true;
+            }
+
+            // If the user has an exact namespace privilege on a system.buckets collection in this
+            // database, they have access to a resource in this database.
+            if (privilege.first.isExactSystemBucketsCollection() &&
                 privilege.first.databaseToMatch() == db) {
                 return true;
             }

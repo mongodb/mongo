@@ -96,6 +96,78 @@ TEST(PrivilegeParserTest, IsValidTest) {
     parsedPrivilege.parseBSON(
         BSON("resource" << BSON("cluster" << true) << "actions" << BSON_ARRAY("find")), &errmsg);
     ASSERT(parsedPrivilege.isValid(&errmsg));
+
+
+    // Works with no db and system_buckets any
+    parsedPrivilege.parseBSON(BSON("resource" << BSON("system_buckets"
+                                                      << "")
+                                              << "actions" << BSON_ARRAY("find")),
+                              &errmsg);
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+
+    // Works with empty db and system_buckets any
+    parsedPrivilege.parseBSON(BSON("resource" << BSON("db"
+                                                      << ""
+                                                      << "system_buckets"
+                                                      << "")
+                                              << "actions" << BSON_ARRAY("find")),
+                              &errmsg);
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+
+    // Works with real db and system_buckets foo
+    parsedPrivilege.parseBSON(BSON("resource" << BSON("db"
+                                                      << "test"
+                                                      << "system_buckets"
+                                                      << "foo")
+                                              << "actions" << BSON_ARRAY("find")),
+                              &errmsg);
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+
+    // Works with real db and system_buckets any
+    parsedPrivilege.parseBSON(BSON("resource" << BSON("db"
+                                                      << "test"
+                                                      << "system_buckets"
+                                                      << "")
+                                              << "actions" << BSON_ARRAY("find")),
+                              &errmsg);
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+
+    // Works with only system_buckets and no db
+    parsedPrivilege.parseBSON(BSON("resource" << BSON("system_buckets"
+                                                      << "foo")
+                                              << "actions" << BSON_ARRAY("find")),
+                              &errmsg);
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+
+    // Fails with real db and system_buckets foo and any
+    parsedPrivilege.parseBSON(BSON("resource" << BSON("db"
+                                                      << "test"
+                                                      << "system_buckets"
+                                                      << "foo"
+                                                      << "anyResource" << true)
+                                              << "actions" << BSON_ARRAY("find")),
+                              &errmsg);
+    ASSERT_FALSE(parsedPrivilege.isValid(&errmsg));
+
+    // Fails with real db and system_buckets foo and any
+    parsedPrivilege.parseBSON(BSON("resource" << BSON("db"
+                                                      << "test"
+                                                      << "system_buckets"
+                                                      << "foo"
+                                                      << "cluster" << true)
+                                              << "actions" << BSON_ARRAY("find")),
+                              &errmsg);
+    ASSERT_FALSE(parsedPrivilege.isValid(&errmsg));
+
+
+    // Fails with real collection and system_buckets foo
+    parsedPrivilege.parseBSON(BSON("resource" << BSON("collection"
+                                                      << "test"
+                                                      << "system_buckets"
+                                                      << "foo")
+                                              << "actions" << BSON_ARRAY("find")),
+                              &errmsg);
+    ASSERT_FALSE(parsedPrivilege.isValid(&errmsg));
 }
 
 TEST(PrivilegeParserTest, ConvertBetweenPrivilegeTest) {
@@ -129,6 +201,7 @@ TEST(PrivilegeParserTest, ConvertBetweenPrivilegeTest) {
     ASSERT(parsedPrivilege.getResource().isCollectionSet());
     ASSERT_EQUALS("", parsedPrivilege.getResource().getDb());
     ASSERT_EQUALS("", parsedPrivilege.getResource().getCollection());
+    ASSERT_FALSE(parsedPrivilege.getResource().isSystemBucketsSet());
     ASSERT(parsedPrivilege.isActionsSet());
     ASSERT(actionsVector == parsedPrivilege.getActions());
 
@@ -156,6 +229,7 @@ TEST(PrivilegeParserTest, ConvertBetweenPrivilegeTest) {
     ASSERT(parsedPrivilege.getResource().isCollectionSet());
     ASSERT_EQUALS("test", parsedPrivilege.getResource().getDb());
     ASSERT_EQUALS("foo", parsedPrivilege.getResource().getCollection());
+    ASSERT_FALSE(parsedPrivilege.getResource().isSystemBucketsSet());
     ASSERT(parsedPrivilege.isActionsSet());
     ASSERT(actionsVector == parsedPrivilege.getActions());
 
@@ -182,6 +256,7 @@ TEST(PrivilegeParserTest, ConvertBetweenPrivilegeTest) {
     ASSERT(parsedPrivilege.getResource().isCollectionSet());
     ASSERT_EQUALS("test", parsedPrivilege.getResource().getDb());
     ASSERT_EQUALS("", parsedPrivilege.getResource().getCollection());
+    ASSERT_FALSE(parsedPrivilege.getResource().isSystemBucketsSet());
     ASSERT(parsedPrivilege.isActionsSet());
     ASSERT(actionsVector == parsedPrivilege.getActions());
 
@@ -208,6 +283,7 @@ TEST(PrivilegeParserTest, ConvertBetweenPrivilegeTest) {
     ASSERT(parsedPrivilege.getResource().isCollectionSet());
     ASSERT_EQUALS("", parsedPrivilege.getResource().getDb());
     ASSERT_EQUALS("foo", parsedPrivilege.getResource().getCollection());
+    ASSERT_FALSE(parsedPrivilege.getResource().isSystemBucketsSet());
     ASSERT(parsedPrivilege.isActionsSet());
     ASSERT(actionsVector == parsedPrivilege.getActions());
 
@@ -229,6 +305,139 @@ TEST(PrivilegeParserTest, ConvertBetweenPrivilegeTest) {
     ASSERT(parsedPrivilege.getResource().getCluster());
     ASSERT_FALSE(parsedPrivilege.getResource().isDbSet());
     ASSERT_FALSE(parsedPrivilege.getResource().isCollectionSet());
+    ASSERT_FALSE(parsedPrivilege.getResource().isSystemBucketsSet());
+    ASSERT(parsedPrivilege.isActionsSet());
+    ASSERT(actionsVector == parsedPrivilege.getActions());
+
+    // Works with any system.buckets resource
+    parsedPrivilege.parseBSON(BSON("resource" << BSON("system_buckets"
+                                                      << "")
+                                              << "actions" << BSON_ARRAY("find")),
+                              &errmsg);
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+    ASSERT_OK(ParsedPrivilege::parsedPrivilegeToPrivilege(
+        parsedPrivilege, &privilege, &unrecognizedActions));
+    ASSERT(unrecognizedActions.empty());
+    ASSERT(privilege.getActions().contains(ActionType::find));
+    ASSERT(!privilege.getActions().contains(ActionType::insert));
+    ASSERT_EQUALS(privilege.getResourcePattern(), ResourcePattern::forAnySystemBuckets());
+
+    ASSERT(ParsedPrivilege::privilegeToParsedPrivilege(privilege, &parsedPrivilege, &errmsg));
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+    ASSERT(parsedPrivilege.isResourceSet());
+    ASSERT_TRUE(parsedPrivilege.getResource().isSystemBucketsSet());
+    ASSERT_EQUALS(parsedPrivilege.getResource().getSystemBuckets(), "");
+    ASSERT_FALSE(parsedPrivilege.getResource().isClusterSet());
+    ASSERT_FALSE(parsedPrivilege.getResource().isDbSet());
+    ASSERT_FALSE(parsedPrivilege.getResource().isCollectionSet());
+    ASSERT(parsedPrivilege.isActionsSet());
+    ASSERT(actionsVector == parsedPrivilege.getActions());
+
+    // Works with any system.buckets resource with empty db
+    parsedPrivilege.parseBSON(BSON("resource" << BSON("db"
+                                                      << ""
+                                                      << "system_buckets"
+                                                      << "")
+                                              << "actions" << BSON_ARRAY("find")),
+                              &errmsg);
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+    ASSERT_OK(ParsedPrivilege::parsedPrivilegeToPrivilege(
+        parsedPrivilege, &privilege, &unrecognizedActions));
+    ASSERT(unrecognizedActions.empty());
+    ASSERT(privilege.getActions().contains(ActionType::find));
+    ASSERT(!privilege.getActions().contains(ActionType::insert));
+    ASSERT_EQUALS(privilege.getResourcePattern(), ResourcePattern::forAnySystemBuckets());
+
+    ASSERT(ParsedPrivilege::privilegeToParsedPrivilege(privilege, &parsedPrivilege, &errmsg));
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+    ASSERT(parsedPrivilege.isResourceSet());
+    ASSERT_TRUE(parsedPrivilege.getResource().isSystemBucketsSet());
+    ASSERT_EQUALS(parsedPrivilege.getResource().getSystemBuckets(), "");
+    ASSERT_FALSE(parsedPrivilege.getResource().isClusterSet());
+    ASSERT_FALSE(parsedPrivilege.getResource().isDbSet());
+    ASSERT_FALSE(parsedPrivilege.getResource().isCollectionSet());
+    ASSERT(parsedPrivilege.isActionsSet());
+    ASSERT(actionsVector == parsedPrivilege.getActions());
+
+    // Works with system.buckets.foo resource in test db
+    parsedPrivilege.parseBSON(BSON("resource" << BSON("db"
+                                                      << "test"
+                                                      << "system_buckets"
+                                                      << "foo")
+                                              << "actions" << BSON_ARRAY("find")),
+                              &errmsg);
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+    ASSERT_OK(ParsedPrivilege::parsedPrivilegeToPrivilege(
+        parsedPrivilege, &privilege, &unrecognizedActions));
+    ASSERT(unrecognizedActions.empty());
+    ASSERT(privilege.getActions().contains(ActionType::find));
+    ASSERT(!privilege.getActions().contains(ActionType::insert));
+    ASSERT_EQUALS(privilege.getResourcePattern(),
+                  ResourcePattern::forExactSystemBucketsCollection("test", "foo"));
+
+    ASSERT(ParsedPrivilege::privilegeToParsedPrivilege(privilege, &parsedPrivilege, &errmsg));
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+    ASSERT(parsedPrivilege.isResourceSet());
+    ASSERT_TRUE(parsedPrivilege.getResource().isSystemBucketsSet());
+    ASSERT_EQUALS(parsedPrivilege.getResource().getSystemBuckets(), "foo");
+    ASSERT_FALSE(parsedPrivilege.getResource().isClusterSet());
+    ASSERT_TRUE(parsedPrivilege.getResource().isDbSet());
+    ASSERT_FALSE(parsedPrivilege.getResource().isCollectionSet());
+    ASSERT_EQUALS("test", parsedPrivilege.getResource().getDb());
+    ASSERT(parsedPrivilege.isActionsSet());
+    ASSERT(actionsVector == parsedPrivilege.getActions());
+
+
+    // Works with any system.buckets resource named foo
+    parsedPrivilege.parseBSON(BSON("resource" << BSON("system_buckets"
+                                                      << "foo")
+                                              << "actions" << BSON_ARRAY("find")),
+                              &errmsg);
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+    ASSERT_OK(ParsedPrivilege::parsedPrivilegeToPrivilege(
+        parsedPrivilege, &privilege, &unrecognizedActions));
+    ASSERT(unrecognizedActions.empty());
+    ASSERT(privilege.getActions().contains(ActionType::find));
+    ASSERT(!privilege.getActions().contains(ActionType::insert));
+    ASSERT_EQUALS(privilege.getResourcePattern(),
+                  ResourcePattern::forAnySystemBucketsInAnyDatabase("foo"));
+
+    ASSERT(ParsedPrivilege::privilegeToParsedPrivilege(privilege, &parsedPrivilege, &errmsg));
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+    ASSERT(parsedPrivilege.isResourceSet());
+    ASSERT_TRUE(parsedPrivilege.getResource().isSystemBucketsSet());
+    ASSERT_EQUALS(parsedPrivilege.getResource().getSystemBuckets(), "foo");
+    ASSERT_FALSE(parsedPrivilege.getResource().isClusterSet());
+    ASSERT_FALSE(parsedPrivilege.getResource().isDbSet());
+    ASSERT_FALSE(parsedPrivilege.getResource().isCollectionSet());
+    ASSERT(parsedPrivilege.isActionsSet());
+    ASSERT(actionsVector == parsedPrivilege.getActions());
+
+
+    // Works with any system.buckets resource in db test
+    parsedPrivilege.parseBSON(BSON("resource" << BSON("db"
+                                                      << "test"
+                                                      << "system_buckets"
+                                                      << "")
+                                              << "actions" << BSON_ARRAY("find")),
+                              &errmsg);
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+    ASSERT_OK(ParsedPrivilege::parsedPrivilegeToPrivilege(
+        parsedPrivilege, &privilege, &unrecognizedActions));
+    ASSERT(unrecognizedActions.empty());
+    ASSERT(privilege.getActions().contains(ActionType::find));
+    ASSERT(!privilege.getActions().contains(ActionType::insert));
+    ASSERT_EQUALS(privilege.getResourcePattern(),
+                  ResourcePattern::forAnySystemBucketsInDatabase("test"));
+    ASSERT(ParsedPrivilege::privilegeToParsedPrivilege(privilege, &parsedPrivilege, &errmsg));
+    ASSERT(parsedPrivilege.isValid(&errmsg));
+    ASSERT(parsedPrivilege.isResourceSet());
+    ASSERT_TRUE(parsedPrivilege.getResource().isSystemBucketsSet());
+    ASSERT_EQUALS(parsedPrivilege.getResource().getSystemBuckets(), "");
+    ASSERT_FALSE(parsedPrivilege.getResource().isClusterSet());
+    ASSERT_TRUE(parsedPrivilege.getResource().isDbSet());
+    ASSERT_FALSE(parsedPrivilege.getResource().isCollectionSet());
+    ASSERT_EQUALS("test", parsedPrivilege.getResource().getDb());
     ASSERT(parsedPrivilege.isActionsSet());
     ASSERT(actionsVector == parsedPrivilege.getActions());
 }

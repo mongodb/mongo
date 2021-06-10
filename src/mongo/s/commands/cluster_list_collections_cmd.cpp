@@ -43,6 +43,8 @@
 namespace mongo {
 namespace {
 
+constexpr auto systemBucketsDot = "system.buckets."_sd;
+
 bool cursorCommandPassthroughPrimaryShard(OperationContext* opCtx,
                                           StringData dbName,
                                           const CachedDatabaseInfo& dbInfo,
@@ -111,6 +113,16 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
         uassertStatusOK(newFilterOr.pushBack(systemCollectionsFilter));
     }
 
+    // system_buckets DB resource grants all system_buckets.* collections so create a filter to
+    // include them
+    if (authzSession->isAuthorizedForAnyActionOnResource(
+            ResourcePattern::forAnySystemBucketsInDatabase(dbName)) ||
+        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnySystemBuckets())) {
+        mutablebson::Element systemCollectionsFilter = rewrittenCmdObj.makeElementObject(
+            "", BSON("name" << BSON("$regex" << BSONRegEx("^system\\.buckets\\."))));
+        uassertStatusOK(newFilterOr.pushBack(systemCollectionsFilter));
+    }
+
     // Compute the set of collection names which would be permissible to return.
     std::set<std::string> collectionNames;
     for (UserNameIterator nameIter = authzSession->getAuthenticatedUserNames(); nameIter.more();
@@ -120,6 +132,12 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
             if (resource.isCollectionPattern() ||
                 (resource.isExactNamespacePattern() && resource.databaseToMatch() == dbName)) {
                 collectionNames.emplace(resource.collectionToMatch().toString());
+            }
+
+            if (resource.isAnySystemBucketsCollectionInAnyDB() ||
+                (resource.isExactSystemBucketsCollection() &&
+                 resource.databaseToMatch() == dbName)) {
+                collectionNames.emplace(systemBucketsDot + resource.collectionToMatch().toString());
             }
         }
     }

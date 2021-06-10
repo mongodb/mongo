@@ -45,6 +45,7 @@ using str::stream;
 
 const BSONField<bool> ParsedResource::anyResource("anyResource");
 const BSONField<bool> ParsedResource::cluster("cluster");
+const BSONField<string> ParsedResource::systemBuckets("system_buckets");
 const BSONField<string> ParsedResource::db("db");
 const BSONField<string> ParsedResource::collection("collection");
 
@@ -65,14 +66,20 @@ bool ParsedResource::isValid(std::string* errMsg) const {
         ++numCandidateTypes;
     if (isClusterSet())
         ++numCandidateTypes;
-    if (isDbSet() || isCollectionSet())
+    if (isDbSet() || isCollectionSet() || isSystemBucketsSet())
         ++numCandidateTypes;
 
-    if (isDbSet() != isCollectionSet()) {
+    if (!isSystemBucketsSet() && isDbSet() != isCollectionSet()) {
         *errMsg = stream() << "resource must set both " << db.name() << " and " << collection.name()
                            << " or neither, but not exactly one.";
         return false;
+    } else if (isSystemBucketsSet()) {
+        if (isCollectionSet()) {
+            *errMsg = stream() << "system_buckets and collection cannot both be set";
+            return false;
+        }
     }
+
     if (numCandidateTypes != 1) {
         *errMsg = stream() << "resource must have exactly " << db.name() << " and "
                            << collection.name() << " set, or have only " << cluster.name()
@@ -80,20 +87,24 @@ bool ParsedResource::isValid(std::string* errMsg) const {
                            << " or have only " << anyResource.name() << " set";
         return false;
     }
+
     if (isAnyResourceSet() && !getAnyResource()) {
         *errMsg = stream() << anyResource.name() << " must be true when specified";
         return false;
     }
+
     if (isClusterSet() && !getCluster()) {
         *errMsg = stream() << cluster.name() << " must be true when specified";
         return false;
     }
+
     if (isDbSet() &&
         (!NamespaceString::validDBName(getDb(), NamespaceString::DollarInDbNameBehavior::Allow) &&
          !getDb().empty())) {
         *errMsg = stream() << getDb() << " is not a valid database name";
         return false;
     }
+
     if (isCollectionSet() &&
         (!NamespaceString::validCollectionName(getCollection()) && !getCollection().empty())) {
         // local.oplog.$main is a real collection that the server will create. But, collection
@@ -104,6 +115,7 @@ bool ParsedResource::isValid(std::string* errMsg) const {
             return false;
         }
     }
+
     return true;
 }
 
@@ -115,6 +127,9 @@ BSONObj ParsedResource::toBSON() const {
 
     if (_isClusterSet)
         builder.append(cluster(), _cluster);
+
+    if (_isSystemBucketsSet)
+        builder.append(systemBuckets(), _systemBuckets);
 
     if (_isDbSet)
         builder.append(db(), _db);
@@ -143,6 +158,11 @@ bool ParsedResource::parseBSON(const BSONObj& source, string* errMsg) {
         return false;
     _isClusterSet = fieldState == FieldParser::FIELD_SET;
 
+    fieldState = FieldParser::extract(source, systemBuckets, &_systemBuckets, errMsg);
+    if (fieldState == FieldParser::FIELD_INVALID)
+        return false;
+    _isSystemBucketsSet = fieldState == FieldParser::FIELD_SET;
+
     fieldState = FieldParser::extract(source, db, &_db, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID)
         return false;
@@ -163,6 +183,9 @@ void ParsedResource::clear() {
     _cluster = false;
     _isClusterSet = false;
 
+    _systemBuckets.clear();
+    _isSystemBucketsSet = false;
+
     _db.clear();
     _isDbSet = false;
 
@@ -178,6 +201,9 @@ void ParsedResource::cloneTo(ParsedResource* other) const {
 
     other->_cluster = _cluster;
     other->_isClusterSet = _isClusterSet;
+
+    other->_systemBuckets = _systemBuckets;
+    other->_isSystemBucketsSet = _isSystemBucketsSet;
 
     other->_db = _db;
     other->_isDbSet = _isDbSet;
@@ -224,6 +250,24 @@ bool ParsedResource::isClusterSet() const {
 bool ParsedResource::getCluster() const {
     dassert(_isClusterSet);
     return _cluster;
+}
+
+void ParsedResource::setSystemBuckets(StringData collection) {
+    _systemBuckets = collection.toString();
+    _isSystemBucketsSet = true;
+}
+
+void ParsedResource::unsetSystemBuckets() {
+    _isSystemBucketsSet = false;
+}
+
+bool ParsedResource::isSystemBucketsSet() const {
+    return _isSystemBucketsSet;
+}
+
+const std::string& ParsedResource::getSystemBuckets() const {
+    dassert(_isSystemBucketsSet);
+    return _systemBuckets;
 }
 
 void ParsedResource::setDb(StringData db) {
@@ -419,6 +463,40 @@ Status ParsedPrivilege::parsedPrivilegeToPrivilege(const ParsedPrivilege& parsed
         resource = ResourcePattern::forAnyResource();
     } else if (parsedResource.isClusterSet() && parsedResource.getCluster()) {
         resource = ResourcePattern::forClusterResource();
+    } else if (parsedResource.isSystemBucketsSet()) {
+        if (parsedResource.isDbSet()) {
+            if (parsedResource.getDb().empty()) {
+                if (parsedResource.getSystemBuckets().empty()) {
+                    // {db: "", system_buckets: ""} - match any system buckets in any db
+                    resource = ResourcePattern::forAnySystemBuckets();
+                } else {
+                    // {db: "", system_buckets: "<coll>"} - match any system.buckets.<coll> in
+                    // any db
+                    resource = ResourcePattern::forAnySystemBucketsInAnyDatabase(
+                        parsedResource.getSystemBuckets());
+                }
+            } else {
+                if (parsedResource.getSystemBuckets().empty()) {
+                    // {db: "<db>", system_buckets: ""} - match any system buckets in db <db>
+                    resource =
+                        ResourcePattern::forAnySystemBucketsInDatabase(parsedResource.getDb());
+                } else {
+                    // {db: "<db>", system_buckets: "<coll>"} - match <db>.system.buckets.<coll>
+                    resource = ResourcePattern::forExactSystemBucketsCollection(
+                        parsedResource.getDb(), parsedResource.getSystemBuckets());
+                }
+            }
+        } else {
+            if (parsedResource.getSystemBuckets().empty()) {
+                // {system_buckets: ""} - match any system buckets in any db
+                resource = ResourcePattern::forAnySystemBuckets();
+            } else {
+                // {system_buckets: "<coll>"} - match any system.buckets.<coll> in any db
+                resource = ResourcePattern::forAnySystemBucketsInAnyDatabase(
+                    parsedResource.getSystemBuckets());
+            }
+        }
+
     } else {
         if (parsedResource.isDbSet() && !parsedResource.getDb().empty()) {
             if (parsedResource.isCollectionSet() && !parsedResource.getCollection().empty()) {
@@ -458,6 +536,16 @@ bool ParsedPrivilege::privilegeToParsedPrivilege(const Privilege& privilege,
         parsedResource.setCollection("");
     } else if (privilege.getResourcePattern().isClusterResourcePattern()) {
         parsedResource.setCluster(true);
+    } else if (privilege.getResourcePattern().isAnySystemBucketsCollection()) {
+        parsedResource.setSystemBuckets("");
+    } else if (privilege.getResourcePattern().isAnySystemBucketsCollectionInDB()) {
+        parsedResource.setSystemBuckets("");
+        parsedResource.setDb(privilege.getResourcePattern().databaseToMatch());
+    } else if (privilege.getResourcePattern().isAnySystemBucketsCollectionInAnyDB()) {
+        parsedResource.setSystemBuckets(privilege.getResourcePattern().collectionToMatch());
+    } else if (privilege.getResourcePattern().isExactSystemBucketsCollection()) {
+        parsedResource.setDb(privilege.getResourcePattern().databaseToMatch());
+        parsedResource.setSystemBuckets(privilege.getResourcePattern().collectionToMatch());
     } else if (privilege.getResourcePattern().isAnyResourcePattern()) {
         parsedResource.setAnyResource(true);
     } else {

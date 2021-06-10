@@ -99,6 +99,43 @@ public:
     }
 
     /**
+     * Returns a pattern that matches any collection with the prefix "system.buckets." in any
+     * database.
+     */
+    static ResourcePattern forAnySystemBuckets() {
+        return ResourcePattern(MatchTypeEnum::kMatchAnySystemBucketResource);
+    }
+
+    /**
+     * Returns a pattern that matches any collection with the prefix "system.buckets." in database
+     * "db".
+     */
+    static ResourcePattern forAnySystemBucketsInDatabase(StringData dbName) {
+        return ResourcePattern(MatchTypeEnum::kMatchAnySystemBucketInDBResource,
+                               NamespaceString(dbName, ""));
+    }
+
+    /**
+     * Returns a pattern that matches any collection with the prefix "system.buckets.<collection>"
+     * in any database.
+     */
+    static ResourcePattern forAnySystemBucketsInAnyDatabase(StringData collectionName) {
+        return ResourcePattern(MatchTypeEnum::kMatchSystemBucketInAnyDBResource,
+                               NamespaceString("", collectionName));
+    }
+
+    /**
+     * Returns a pattern that matches a collection with the name
+     * "<dbName>.system.buckets.<collectionName>"
+     */
+    static ResourcePattern forExactSystemBucketsCollection(StringData dbName,
+                                                           StringData collectionName) {
+        invariant(!collectionName.startsWith("system.buckets."));
+        return ResourcePattern(MatchTypeEnum::kMatchExactSystemBucketResource,
+                               NamespaceString(dbName, collectionName));
+    }
+
+    /**
      * Constructs a pattern that never matches.
      */
     ResourcePattern() : _matchType(MatchTypeEnum::kMatchNever) {}
@@ -146,6 +183,34 @@ public:
     }
 
     /**
+     * Returns true if this pattern matches a <db>.system.buckets.<collection name>.
+     */
+    bool isExactSystemBucketsCollection() const {
+        return _matchType == MatchTypeEnum::kMatchExactSystemBucketResource;
+    }
+
+    /**
+     * Returns true if this pattern matches a system.buckets.<collection name> in any db.
+     */
+    bool isAnySystemBucketsCollectionInAnyDB() const {
+        return _matchType == MatchTypeEnum::kMatchSystemBucketInAnyDBResource;
+    }
+
+    /**
+     * Returns true if this pattern matches a system.buckets.* in <db>.
+     */
+    bool isAnySystemBucketsCollectionInDB() const {
+        return _matchType == MatchTypeEnum::kMatchAnySystemBucketInDBResource;
+    }
+
+    /**
+     * Returns true if this pattern matches any collection prefixed with system.buckets
+     */
+    bool isAnySystemBucketsCollection() const {
+        return _matchType == MatchTypeEnum::kMatchAnySystemBucketResource;
+    }
+
+    /**
      * Returns the namespace that this pattern matches.
      *
      * Behavior is undefined unless isExactNamespacePattern() is true.
@@ -158,7 +223,7 @@ public:
      * Returns the database that this pattern matches.
      *
      * Behavior is undefined unless the pattern is of type matchDatabaseName or
-     * matchExactNamespace
+     * matchExactNamespace or matchExactSystemBucketResource or matchAnySystemBucketInDBResource
      */
     StringData databaseToMatch() const {
         return _ns.db();
@@ -168,7 +233,7 @@ public:
      * Returns the collection that this pattern matches.
      *
      * Behavior is undefined unless the pattern is of type matchCollectionName or
-     * matchExactNamespace
+     * matchExactNamespace or matchExactSystemBucketResource
      */
     StringData collectionToMatch() const {
         return _ns.coll();
