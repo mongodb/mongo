@@ -99,8 +99,9 @@ function runMongodTest(desc, func) {
 
 function runMongodFailTest(desc, options) {
     print(desc);
-    const mongo = MongoRunner.runMongod(Object.merge(mongodOptions, options));
-    assert(!mongo, "MongoD started successfully with bad options");
+    assert.throws(() => MongoRunner.runMongod(Object.merge(mongodOptions, options)),
+                  [],
+                  "MongoD started successfully with bad options");
 }
 
 function runMongosTest(desc, func) {

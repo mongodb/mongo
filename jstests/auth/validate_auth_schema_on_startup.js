@@ -32,7 +32,7 @@ assert.commandWorked(adminDB[authSchemaColl].update({_id: 'authSchema'}, {curren
 MongoRunner.stopMongod(mongod);
 
 // Confirm start up fails, even without --auth.
-assert.eq(null, MongoRunner.runMongod({dbpath: dbpath, noCleanData: true}));
+assert.throws(() => MongoRunner.runMongod({dbpath: dbpath, noCleanData: true}));
 
 // Confirm startup works with the flag to disable validation so the document can be repaired.
 mongod = MongoRunner.runMongod(

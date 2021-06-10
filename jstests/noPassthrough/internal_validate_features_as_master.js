@@ -16,13 +16,15 @@ assert.eq(res.internalValidateFeaturesAsMaster, true);
 MongoRunner.stopMongod(conn);
 
 // internalValidateFeaturesAsMaster cannot be set with --replSet.
-conn = MongoRunner.runMongod(
-    {replSet: "replSetName", setParameter: "internalValidateFeaturesAsMaster=0"});
-assert.eq(null, conn, "mongod was unexpectedly able to start up");
+assert.throws(() => MongoRunner.runMongod(
+                  {replSet: "replSetName", setParameter: "internalValidateFeaturesAsMaster=0"}),
+              [],
+              "mongod was unexpectedly able to start up");
 
-conn = MongoRunner.runMongod(
-    {replSet: "replSetName", setParameter: "internalValidateFeaturesAsMaster=1"});
-assert.eq(null, conn, "mongod was unexpectedly able to start up");
+assert.throws(() => MongoRunner.runMongod(
+                  {replSet: "replSetName", setParameter: "internalValidateFeaturesAsMaster=1"}),
+              [],
+              "mongod was unexpectedly able to start up");
 
 // internalValidateFeaturesAsMaster cannot be set via runtime parameter.
 conn = MongoRunner.runMongod({});

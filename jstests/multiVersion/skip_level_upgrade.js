@@ -60,8 +60,7 @@ for (let i = 0; i < versions.length; i++) {
     // Restart the mongod with the latest binary version on the old version's data files.
     // Should fail due to being a skip level upgrade.
     mongodOptions = Object.extend({binVersion: 'latest'}, defaultOptions);
-    conn = MongoRunner.runMongod(mongodOptions);
-    assert.eq(null, conn);
+    assert.throws(() => MongoRunner.runMongod(mongodOptions));
 
     // Restart the mongod with the latest version with --repair. Should fail due to being a
     // skip level upgrade.

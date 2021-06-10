@@ -54,7 +54,7 @@ try {
     // succeeds.
     assert(false);
 } catch (e) {
-    assert(e.message.includes("Failed to connect"));
+    assert.eq("StopError", e.name);
 }
 
 // Restart with the 'latest' binary.

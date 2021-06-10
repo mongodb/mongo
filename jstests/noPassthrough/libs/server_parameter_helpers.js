@@ -96,12 +96,11 @@ function testNumericServerParameter(parameterName,
         if (hasLowerBound) {
             jsTest.log("Checking that '" + parameterName + "' cannot be set below bounds to '" +
                        lowerOutOfBounds + "' on startup");
-            let conn3 =
-                MongoRunner.runMongod({setParameter: parameterName + "=" + lowerOutOfBounds});
-            assert.eq(null,
-                      conn3,
-                      "expected mongod to fail to startup with an invalid '" + parameterName + "'" +
-                          " server parameter setting '" + lowerOutOfBounds + "'.");
+            assert.throws(
+                () => MongoRunner.runMongod({setParameter: parameterName + "=" + lowerOutOfBounds}),
+                [],
+                "expected mongod to fail to startup with an invalid '" + parameterName + "'" +
+                    " server parameter setting '" + lowerOutOfBounds + "'.");
         }
 
         if (hasUpperBound) {

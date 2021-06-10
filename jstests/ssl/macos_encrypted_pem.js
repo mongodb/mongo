@@ -13,8 +13,7 @@ requireSSLProvider('apple', function() {
         sslCAFile: "jstests/libs/ca.pem",
     });
 
-    const mongod = MongoRunner.runMongod(config);
-    assert(mongod === null, "MongoD unexpectedly started up");
+    assert.throws(() => MongoRunner.runMongod(config), [], "MongoD unexpectedly started up");
 
     assert.eq(rawMongoProgramOutput().includes(
                   "Using encrypted PKCS#1/PKCS#8 PEM files is not supported on this platform"),

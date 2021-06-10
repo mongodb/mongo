@@ -47,11 +47,14 @@ function test(serverDP, clientDP, shouldSucceed) {
         serverOpts.sslDisabledProtocols = serverDP;
     }
     clearRawMongoProgramOutput();
-    const mongod = MongoRunner.runMongod(serverOpts);
-    if (!mongod) {
+    let mongod;
+    try {
+        mongod = MongoRunner.runMongod(serverOpts);
+    } catch (e) {
         assert(!shouldSucceed);
         return;
     }
+    assert(mongod);
 
     let clientOpts = [];
     if (clientDP !== null) {

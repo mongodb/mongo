@@ -1417,14 +1417,15 @@ function appendSetParameterArgs(argArray) {
 /**
  * Continuously tries to establish a connection to the server on the specified port.
  *
- * If a connection cannot be established within a time limit, an exception will be thrown. If
- * the process for the given 'pid' is found to no longer be running, this function will
- * terminate and return null.
+ * If a connection cannot be established within a time limit, or if the process terminated
+ * with a non-zero exit code, an exception will be thrown. If the process for the given
+ * 'pid' is found to have gracefully terminated, this function will terminate and return
+ * null.
  *
  * @param {int} [pid] the process id of the node to connect to.
  * @param {int} [port] the port of the node to connect to.
  * @param {int} [undoLiveRecordPid=null] the process id of the `live-record` process.
- * @returns a new Mongo connection object, or null if the process is not running.
+ * @returns a new Mongo connection object, or null if the process gracefully terminated.
  */
 MongoRunner.awaitConnection = function({pid, port, undoLiveRecordPid = null} = {}) {
     var conn = null;
@@ -1442,6 +1443,9 @@ MongoRunner.awaitConnection = function({pid, port, undoLiveRecordPid = null} = {
                 serverExitCodeMap[port] = res.exitCode;
                 if (undoLiveRecordPid) {
                     _stopUndoLiveRecord(undoLiveRecordPid);
+                }
+                if (res.exitCode !== MongoRunner.EXIT_CLEAN) {
+                    throw new MongoRunner.StopError(res.exitCode);
                 }
                 return true;
             }

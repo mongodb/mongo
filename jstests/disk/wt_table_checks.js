@@ -67,12 +67,11 @@ MongoRunner.stopMongod(conn);
  */
 jsTest.log("Test 4.");
 
-conn = startMongodOnExistingPath(dbpath, {
-    replSet: "mySet",
-    setParameter:
-        "failpoint.crashAfterUpdatingFirstTableLoggingSettings=" + tojson({"mode": "alwaysOn"})
-});
-assert(!conn);
+assert.throws(() => startMongodOnExistingPath(dbpath, {
+                  replSet: "mySet",
+                  setParameter: "failpoint.crashAfterUpdatingFirstTableLoggingSettings=" +
+                      tojson({"mode": "alwaysOn"})
+              }));
 
 // Cannot use checkLog here as the server is no longer running.
 logContents = rawMongoProgramOutput();

@@ -24,39 +24,33 @@ var coll = conn.getCollection('test.foo');
 coll.insertOne({a: 1});
 MongoRunner.stopMongod(conn);
 
-conn = MongoRunner.runMongod(
-    {dbpath: dbdir, noCleanData: true, queryableBackupMode: '', replSet: 'bar'});
+assert.throws(
+    () => MongoRunner.runMongod(
+        {dbpath: dbdir, noCleanData: true, queryableBackupMode: '', replSet: 'bar'}),
+    [],
+    "mongod should fail to start when both --queryableBackupMode and --replSet are provided");
 
-assert.eq(null,
-          conn,
-          "mongod should fail to start when both --queryableBackupMode and --replSet are provided");
-
-conn = MongoRunner.runMongod(
-    {dbpath: dbdir, noCleanData: true, queryableBackupMode: '', configsvr: ''});
-
-assert.eq(
-    null,
-    conn,
+assert.throws(
+    () => MongoRunner.runMongod(
+        {dbpath: dbdir, noCleanData: true, queryableBackupMode: '', configsvr: ''}),
+    [],
     "mongod should fail to start when both --queryableBackupMode and --configsvr are provided");
 
-conn =
-    MongoRunner.runMongod({dbpath: dbdir, noCleanData: true, queryableBackupMode: '', upgrade: ''});
+assert.throws(
+    () => MongoRunner.runMongod(
+        {dbpath: dbdir, noCleanData: true, queryableBackupMode: '', upgrade: ''}),
+    [],
+    "mongod should fail to start when both --queryableBackupMode and --upgrade are provided");
 
-assert.eq(null,
-          conn,
-          "mongod should fail to start when both --queryableBackupMode and --upgrade are provided");
+assert.throws(
+    () => MongoRunner.runMongod(
+        {dbpath: dbdir, noCleanData: true, queryableBackupMode: '', repair: ''}),
+    [],
+    "mongod should fail to start when both --queryableBackupMode and --repair are provided");
 
-conn =
-    MongoRunner.runMongod({dbpath: dbdir, noCleanData: true, queryableBackupMode: '', repair: ''});
-
-assert.eq(null,
-          conn,
-          "mongod should fail to start when both --queryableBackupMode and --repair are provided");
-
-conn =
-    MongoRunner.runMongod({dbpath: dbdir, noCleanData: true, queryableBackupMode: '', profile: 1});
-
-assert.eq(null,
-          conn,
-          "mongod should fail to start when both --queryableBackupMode and --profile are provided");
+assert.throws(
+    () => MongoRunner.runMongod(
+        {dbpath: dbdir, noCleanData: true, queryableBackupMode: '', profile: 1}),
+    [],
+    "mongod should fail to start when both --queryableBackupMode and --profile are provided");
 })();

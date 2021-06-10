@@ -43,19 +43,22 @@ assert.eq(res.internalValidateFeaturesAsPrimary, true);
 MongoRunner.stopMongod(conn);
 
 // internalValidateFeaturesAsPrimary cannot be set with --replSet.
-conn = MongoRunner.runMongod(
-    {replSet: "replSetName", setParameter: "internalValidateFeaturesAsPrimary=0"});
-assert.eq(null, conn, "mongod was unexpectedly able to start up");
+assert.throws(() => MongoRunner.runMongod(
+                  {replSet: "replSetName", setParameter: "internalValidateFeaturesAsPrimary=0"}),
+              [],
+              "mongod was unexpectedly able to start up");
 
-conn = MongoRunner.runMongod(
-    {replSet: "replSetName", setParameter: "internalValidateFeaturesAsPrimary=1"});
-assert.eq(null, conn, "mongod was unexpectedly able to start up");
+assert.throws(() => MongoRunner.runMongod(
+                  {replSet: "replSetName", setParameter: "internalValidateFeaturesAsPrimary=1"}),
+              [],
+              "mongod was unexpectedly able to start up");
 
 // Correct error message is logged based on parameter name.
 conn = MongoRunner.runMongod({});
 joinShell = startParallelShell(() => {
-    MongoRunner.runMongod(
-        {replSet: "replSetName", setParameter: "internalValidateFeaturesAsPrimary=0"});
+    assert.throws(
+        () => MongoRunner.runMongod(
+            {replSet: "replSetName", setParameter: "internalValidateFeaturesAsPrimary=0"}));
 }, conn.port);
 joinShell();
 let joinShellOutput = rawMongoProgramOutput();
@@ -66,8 +69,9 @@ assert(!joinShellOutput.match(
 
 clearRawMongoProgramOutput();
 joinShell = startParallelShell(() => {
-    MongoRunner.runMongod(
-        {replSet: "replSetName", setParameter: "internalValidateFeaturesAsMaster=0"});
+    assert.throws(
+        () => MongoRunner.runMongod(
+            {replSet: "replSetName", setParameter: "internalValidateFeaturesAsMaster=0"}));
 }, conn.port);
 joinShell();
 joinShellOutput = rawMongoProgramOutput();

@@ -6,13 +6,15 @@
 'use strict';
 
 print("When allowlist is empty, the server does not start.");
-assert.eq(null,
-          MongoRunner.runMongod(
-              {auth: null, keyFile: "jstests/libs/key1", clusterIpSourceAllowlist: ""}));
+assert.throws(() => MongoRunner.runMongod(
+                  {auth: null, keyFile: "jstests/libs/key1", clusterIpSourceAllowlist: ""}),
+              [],
+              "The server unexpectedly started");
 // Check that the same behavior is seen with the deprecated 'clusterIpSourceWhiteList' flag.
-assert.eq(null,
-          MongoRunner.runMongod(
-              {auth: null, keyFile: "jstests/libs/key1", clusterIpSourceWhitelist: ""}));
+assert.throws(() => MongoRunner.runMongod(
+                  {auth: null, keyFile: "jstests/libs/key1", clusterIpSourceWhitelist: ""}),
+              [],
+              "The server unexpectedly started");
 
 function testIpAllowlist(description, allowlistString, authResult) {
     print(description);

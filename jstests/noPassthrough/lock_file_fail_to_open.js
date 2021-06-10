@@ -13,10 +13,7 @@ var mongo1 = MongoRunner.runMongod({dbpath: dbPath, waitForConnect: true});
 clearRawMongoProgramOutput();
 // Start another one which should fail to start as there is already a lockfile in its
 // dbpath.
-var mongo2 = null;
-mongo2 = MongoRunner.runMongod({dbpath: dbPath, noCleanData: true});
-// We should have failed to start.
-assert(mongo2 === null);
+assert.throws(() => MongoRunner.runMongod({dbpath: dbPath, noCleanData: true}));
 
 var logContents = rawMongoProgramOutput();
 assert(logContents.indexOf("Unable to lock the lock file") > 0 ||

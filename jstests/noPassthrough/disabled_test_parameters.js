@@ -4,7 +4,7 @@
 'use strict';
 
 function assertFails(opts) {
-    assert.eq(null, MongoRunner.runMongod(opts), "Mongod startup up");
+    assert.throws(() => MongoRunner.runMongod(opts), [], "Mongod startup up");
 }
 
 function assertStarts(opts) {

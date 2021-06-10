@@ -26,10 +26,10 @@ let doStartupFailTests = function(version, dbpath) {
     // Now attempt to start up a new mongod without clearing the data files from 'dbpath', which
     // contain the admin database but are missing the FCV document. The mongod should fail to
     // start up if there is a non-local collection and the FCV document is missing.
-    let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: version, noCleanData: true});
-    assert.eq(null,
-              conn,
-              "expected mongod to fail when data files are present but no FCV document is found.");
+    assert.throws(
+        () => MongoRunner.runMongod({dbpath: dbpath, binVersion: version, noCleanData: true}),
+        [],
+        "expected mongod to fail when data files are present but no FCV document is found.");
 };
 
 /**

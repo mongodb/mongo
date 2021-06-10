@@ -17,8 +17,12 @@ if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wired
 
     // Subsequent attempts to start server using same dbpath but different
     // wiredTigerDirectoryForIndexes and directoryperdb options should fail.
-    assert.isnull(MongoRunner.runMongod({dbpath: dbpath, restart: true}));
-    assert.isnull(MongoRunner.runMongod({dbpath: dbpath, restart: true, directoryperdb: ''}));
-    assert.isnull(MongoRunner.runMongod(
-        {dbpath: dbpath, restart: true, wiredTigerDirectoryForIndexes: '', directoryperdb: ''}));
+    assert.throws(() => MongoRunner.runMongod({dbpath: dbpath, restart: true}));
+    assert.throws(() => MongoRunner.runMongod({dbpath: dbpath, restart: true, directoryperdb: ''}));
+    assert.throws(() => MongoRunner.runMongod({
+        dbpath: dbpath,
+        restart: true,
+        wiredTigerDirectoryForIndexes: '',
+        directoryperdb: ''
+    }));
 }

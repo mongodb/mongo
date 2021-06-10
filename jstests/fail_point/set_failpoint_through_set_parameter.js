@@ -6,13 +6,13 @@
 
 "use strict";
 
-var assertStartupSucceeds = function(conn) {
+function assertStartupSucceeds(conn) {
     assert.commandWorked(conn.adminCommand({hello: 1}));
-};
+}
 
-var assertStartupFails = function(conn) {
-    assert.eq(null, conn);
-};
+function assertStartupFails(fun) {
+    assert.throws(fun, [], "Server started, when it was expected to fail");
+}
 
 var validFailpointPayload = {'mode': 'alwaysOn'};
 var validFailpointPayloadWithData = {'mode': 'alwaysOn', 'data': {x: 1}};
@@ -26,18 +26,18 @@ configRS.initiate();
 
 // Setting a failpoint via --setParameter fails if enableTestCommands is not on.
 TestData.enableTestCommands = false;
-assertStartupFails(
-    MongoRunner.runMongod({setParameter: "failpoint.dummy=" + tojson(validFailpointPayload)}));
-assertStartupFails(MongoRunner.runMongos({
+assertStartupFails(() => MongoRunner.runMongod(
+                       {setParameter: "failpoint.dummy=" + tojson(validFailpointPayload)}));
+assertStartupFails(() => MongoRunner.runMongos({
     setParameter: "failpoint.dummy=" + tojson(validFailpointPayload),
     configdb: configRS.getURL()
 }));
 TestData.enableTestCommands = true;
 
 // Passing an invalid failpoint payload fails.
-assertStartupFails(
-    MongoRunner.runMongod({setParameter: "failpoint.dummy=" + tojson(invalidFailpointPayload)}));
-assertStartupFails(MongoRunner.runMongos({
+assertStartupFails(() => MongoRunner.runMongod(
+                       {setParameter: "failpoint.dummy=" + tojson(invalidFailpointPayload)}));
+assertStartupFails(() => MongoRunner.runMongos({
     setParameter: "failpoint.dummy=" + tojson(invalidFailpointPayload),
     configdb: configRS.getURL()
 }));

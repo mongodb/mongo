@@ -92,11 +92,13 @@ function runTest(client, restartCommand) {
         if (m) {
             MongoRunner.stopMongod(m, null, {user: 'admin', pwd: 'pass'});
         }
-        m = MongoRunner.runMongod({auth: "", setParameter: setParams});
-
-        if (m) {
-            m.getDB("admin").createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
+        try {
+            m = MongoRunner.runMongod({auth: "", setParameter: setParams});
+        } catch (e) {
+            return null;
         }
+
+        m.getDB("admin").createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
 
         return m;
     });

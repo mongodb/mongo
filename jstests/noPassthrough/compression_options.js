@@ -35,7 +35,7 @@ var runTest = function(optionValue, expected) {
     MongoRunner.stopMongod(mongo);
 };
 
-assert.isnull(MongoRunner.runMongod({networkMessageCompressors: "snappy,disabled"}));
+assert.throws(() => MongoRunner.runMongod({networkMessageCompressors: "snappy,disabled"}));
 
 runTest("snappy", ["snappy"]);
 runTest("disabled", undefined);

@@ -37,8 +37,9 @@ MongoRunner.stopMongod(conn);
 jsTest.log("Assert mongod doesn\'t start with CA file missing and clusterAuthMode=x509.");
 
 var sslParams = {clusterAuthMode: 'x509', sslMode: 'requireSSL', sslPEMKeyFile: SERVER_CERT};
-var conn = MongoRunner.runMongod(sslParams);
-assert.isnull(conn, "server started with x509 clusterAuthMode but no CA file");
+assert.throws(() => MongoRunner.runMongod(sslParams),
+              [],
+              "server started with x509 clusterAuthMode but no CA file");
 
 jsTest.log("Assert mongos doesn\'t start with CA file missing and clusterAuthMode=x509.");
 
@@ -60,13 +61,15 @@ var startOptions = {
 
 var configRS = new ReplSetTest(rstOptions);
 configRS.startSet(startOptions);
-var mongos = MongoRunner.runMongos({
+
+// Make sure the mongoS failed to start up for the proper reason.
+assert.throws(() => MongoRunner.runMongos({
     clusterAuthMode: 'x509',
     sslMode: 'requireSSL',
     sslPEMKeyFile: SERVER_CERT,
     configdb: configRS.getURL()
-});
-// Make sure the mongoS failed to start up for the proper reason.
-assert.eq(null, mongos, "mongos started with x509 clusterAuthMode but no CA file");
+}),
+              [],
+              "mongos started with x509 clusterAuthMode but no CA file");
 assert.neq(-1, rawMongoProgramOutput().search("No TLS certificate validation can be performed"));
 configRS.stopSet();

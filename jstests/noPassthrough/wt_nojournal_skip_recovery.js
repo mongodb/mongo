@@ -67,13 +67,14 @@ assert.neq(0, exitCode, 'expected shell to exit abnormally due to mongod being t
 
 // Restart the mongod with journaling disabled, but configure it to error if the database needs
 // recovery.
-conn = MongoRunner.runMongod({
+assert.throws(() => MongoRunner.runMongod({
     dbpath: dbpath,
     noCleanData: true,
     nojournal: '',
     wiredTigerEngineConfigString: 'log=(recover=error)',
-});
-assert.eq(null, conn, 'mongod should not have started up because it requires recovery');
+}),
+              [],
+              'mongod should not have started up because it requires recovery');
 
 // Remove the journal files.
 assert(removeFile(dbpath + '/journal'), 'failed to remove the journal directory');

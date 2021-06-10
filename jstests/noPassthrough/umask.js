@@ -90,7 +90,7 @@ mongodOptions.setParameter = {
     honorSystemUmask: true,
     processUmask: '022',
 };
-assert.eq(null, MongoRunner.runMongod(mongodOptions));
+assert.throws(() => MongoRunner.runMongod(mongodOptions));
 
 // Okay to start with both if honorSystemUmask is false.
 mongodOptions.setParameter = {

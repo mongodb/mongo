@@ -49,7 +49,12 @@ for (let i = 0; i < versions.length; i++) {
     let mongodOptions = Object.extend({binVersion: version.binVersion}, defaultOptions);
 
     // Start a mongod with specified version.
-    let conn = MongoRunner.runMongod(mongodOptions);
+    let conn = null;
+    try {
+        conn = MongoRunner.runMongod(mongodOptions);
+    } catch (e) {
+        print(e);
+    }
 
     if ((conn === null) && (i > 0) && !authSchemaUpgraded) {
         // As of 4.0, mongod will refuse to start up with authSchema 3

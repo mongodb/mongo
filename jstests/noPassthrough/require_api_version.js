@@ -126,26 +126,24 @@ function runTest(db, supportsTransctions, writeConcern = {}, secondaries = []) {
 }
 
 function requireApiVersionOnShardOrConfigServerTest() {
-    let shardsvrMongod =
-        MongoRunner.runMongod({shardsvr: "", setParameter: {"requireApiVersion": true}});
-    assert.eq(null,
-              shardsvrMongod,
-              "mongod should not be able to start up with --shardsvr and requireApiVersion=true");
+    assert.throws(
+        () => MongoRunner.runMongod({shardsvr: "", setParameter: {"requireApiVersion": true}}),
+        [],
+        "mongod should not be able to start up with --shardsvr and requireApiVersion=true");
 
-    let configsvrMongod =
-        MongoRunner.runMongod({configsvr: "", setParameter: {"requireApiVersion": 1}});
-    assert.eq(null,
-              configsvrMongod,
-              "mongod should not be able to start up with --configsvr and requireApiVersion=true");
+    assert.throws(
+        () => MongoRunner.runMongod({configsvr: "", setParameter: {"requireApiVersion": 1}}),
+        [],
+        "mongod should not be able to start up with --configsvr and requireApiVersion=true");
 
-    shardsvrMongod = MongoRunner.runMongod({shardsvr: ""});
+    const shardsvrMongod = MongoRunner.runMongod({shardsvr: ""});
     assert.neq(null, shardsvrMongod, "mongod was not able to start up");
     assert.commandFailed(
         shardsvrMongod.adminCommand({setParameter: 1, requireApiVersion: true}),
         "should not be able to set requireApiVersion=true on mongod that was started with --shardsvr");
     MongoRunner.stopMongod(shardsvrMongod);
 
-    configsvrMongod = MongoRunner.runMongod({configsvr: ""});
+    const configsvrMongod = MongoRunner.runMongod({configsvr: ""});
     assert.neq(null, configsvrMongod, "mongod was not able to start up");
     assert.commandFailed(
         configsvrMongod.adminCommand({setParameter: 1, requireApiVersion: 1}),

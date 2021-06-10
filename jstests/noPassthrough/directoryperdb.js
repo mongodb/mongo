@@ -75,5 +75,5 @@ checkDirRemoved(dbname, dbpath);
 MongoRunner.stopMongod(m);
 
 // Subsequent attempt to start server using same dbpath without directoryperdb should fail.
-assert.isnull(MongoRunner.runMongod({dbpath: dbpath, restart: true}));
+assert.throws(() => MongoRunner.runMongod({dbpath: dbpath, restart: true}));
 }());

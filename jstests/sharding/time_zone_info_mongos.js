@@ -24,13 +24,17 @@ function testWithGoodTimeZoneDir(tzGoodInfoDir) {
     assert.eq(mongosCfg.parsed.processManagement.timeZoneInfo, tzGoodInfoDir);
 
     // Test that a bad timezone file causes mongoS startup to fail.
-    let conn = MongoRunner.runMongos({configdb: st.configRS.getURL(), timeZoneInfo: tzBadInfo});
-    assert.eq(conn, null, "expected launching mongos with bad timezone rules to fail");
+    assert.throws(
+        () => MongoRunner.runMongos({configdb: st.configRS.getURL(), timeZoneInfo: tzBadInfo}),
+        [],
+        "expected launching mongos with bad timezone rules to fail");
     assert.neq(-1, rawMongoProgramOutput().search(/Fatal assertion.*40475/));
 
     // Test that a non-existent timezone directory causes mongoS startup to fail.
-    conn = MongoRunner.runMongos({configdb: st.configRS.getURL(), timeZoneInfo: tzNoInfo});
-    assert.eq(conn, null, "expected launching mongos with bad timezone rules to fail");
+    assert.throws(
+        () => MongoRunner.runMongos({configdb: st.configRS.getURL(), timeZoneInfo: tzNoInfo}),
+        [],
+        "expected launching mongos with bad timezone rules to fail");
     // Look for either old or new error message
     assert(rawMongoProgramOutput().includes("Error creating service context") ||
            rawMongoProgramOutput().includes("Failed to create service context"));

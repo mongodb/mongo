@@ -45,9 +45,12 @@ assert.commandFailedWithCode(
 
 // Restart mongod with a negative maximum BSON depth and test that it fails to start.
 MongoRunner.stopMongod(conn);
-conn = MongoRunner.runMongod({setParameter: "maxBSONDepth=-4"});
-assert.eq(null, conn, "Expected mongod to fail at startup because depth was negative");
 
-conn = MongoRunner.runMongod({setParameter: "maxBSONDepth=1"});
-assert.eq(null, conn, "Expected mongod to fail at startup because depth was too low");
+assert.throws(() => MongoRunner.runMongod({setParameter: "maxBSONDepth=-4"}),
+              [],
+              "Expected mongod to fail at startup because depth was negative");
+
+assert.throws(() => MongoRunner.runMongod({setParameter: "maxBSONDepth=1"}),
+              [],
+              "Expected mongod to fail at startup because depth was too low");
 }());

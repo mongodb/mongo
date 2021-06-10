@@ -7,7 +7,13 @@ function runTest(name, config, expect) {
     jsTest.log('Running test: ' + name);
     clearRawMongoProgramOutput();
 
-    const mongod = MongoRunner.runMongod(config);
+    let mongod = null;
+    let err = null;
+    try {
+        mongod = MongoRunner.runMongod(config);
+    } catch (e) {
+        err = e;
+    }
     assert.eq(null, mongod, 'Mongod started unexpectedly');
 
     const output = rawMongoProgramOutput();
