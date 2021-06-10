@@ -73,13 +73,12 @@ reshardingTest.withReshardingInBackground(
 
             jsTestLog("Attempting collMod");
             assert.commandFailedWithCode(
-                sourceCollection.runCommand({collMod: sourceCollection.getName(), maxTimeMS: 5000}),
+                sourceCollection.runCommand({collMod: sourceCollection.getName()}),
                 ErrorCodes.ReshardCollectionInProgress);
 
             jsTestLog("Attempting drop index");
             assert.commandFailedWithCode(
-                sourceCollection.runCommand(
-                    {dropIndexes: collName, index: {oldKey: 1}, maxTimeMS: 5000}),
+                sourceCollection.runCommand({dropIndexes: collName, index: {oldKey: 1}}),
                 ErrorCodes.ReshardCollectionInProgress);
 
             jsTestLog("Completed operations");
