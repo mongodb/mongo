@@ -118,7 +118,9 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
 
     // Even if you have a service context, it may not have a transport layer (mostly for unittests).
     if (!_tl) {
-        LOGV2_WARNING(22601, "No TransportLayer configured during NetworkInterface startup");
+        if (TestingProctor::instance().isEnabled()) {
+            LOGV2_WARNING(22601, "No TransportLayer configured during NetworkInterface startup");
+        }
         _ownedTransportLayer =
             transport::TransportLayerManager::makeAndStartDefaultEgressTransportLayer();
         _tl = _ownedTransportLayer.get();
