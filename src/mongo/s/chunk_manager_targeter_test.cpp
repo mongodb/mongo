@@ -32,6 +32,8 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/session_catalog_router.h"
@@ -362,6 +364,57 @@ TEST_F(ChunkManagerTargeterTest, TargetDeleteWithHashedPrefixHashedShardKey) {
     ASSERT_THROWS_CODE(cmTargeter.targetDelete(operationContext(), BatchItemRef(&request, 0)),
                        DBException,
                        ErrorCodes::ShardKeyNotFound);
+}
+
+TEST(ChunkManagerTargeterTest, ExtractBucketsShardKeyFromTimeseriesDocument) {
+    const StringData timeField = "tm";
+    const StringData metaField = "mm";
+
+    TimeseriesOptions options{std::string(timeField)};
+    options.setMetaField(metaField);
+    auto date = Date_t::now();
+
+    auto checkShardKey = [&](const BSONObj& tsShardKeyPattern,
+                             const BSONObj& metaValue = BSONObj()) {
+        auto inputDoc = [&]() {
+            BSONObjBuilder builder;
+            builder << timeField << date;
+            if (!metaValue.isEmpty()) {
+                builder << metaField << metaValue;
+            }
+            return builder.obj();
+        }();
+        auto inputBucket = [&]() {
+            BSONObjBuilder builder;
+            builder << timeseries::kBucketControlFieldName
+                    << BSON(timeseries::kBucketControlMinFieldName << BSON(timeField << date));
+            if (!metaValue.isEmpty()) {
+                builder << timeseries::kBucketMetaFieldName << metaValue;
+            }
+            return builder.obj();
+        }();
+
+        auto bucketsShardKeyPattern =
+            timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(options,
+                                                                            tsShardKeyPattern);
+        ASSERT_OK(bucketsShardKeyPattern);
+        ShardKeyPattern pattern{bucketsShardKeyPattern.getValue()};
+
+        auto expectedShardKey = pattern.extractShardKeyFromDoc(inputBucket);
+        auto actualShardKey = ChunkManagerTargeter::extractBucketsShardKeyFromTimeseriesDoc(
+            inputDoc, pattern, options);
+
+        ASSERT_BSONOBJ_EQ(expectedShardKey, actualShardKey);
+    };
+
+    checkShardKey(BSON(timeField << 1));
+    checkShardKey(BSON(timeField << 1 << metaField << 1));
+    checkShardKey(BSON(timeField << 1 << (str::stream() << metaField << ".nested.value") << 1));
+
+    checkShardKey(BSON(timeField << 1), BSON("nested" << 123));
+    checkShardKey(BSON(timeField << 1 << metaField << 1), BSON("nested" << 123));
+    checkShardKey(BSON(timeField << 1 << (str::stream() << metaField << ".nested.value") << 1),
+                  BSON("nested" << BSON("value" << 123)));
 }
 
 }  // namespace
