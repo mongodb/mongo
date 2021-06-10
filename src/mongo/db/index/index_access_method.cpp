@@ -764,9 +764,17 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
             continue;
         }
 
-        WriteUnitOfWork wunit(opCtx);
-        Status status = builder->addKey(data.first);
-        wunit.commit();
+        Status status = writeConflictRetry(
+            opCtx, "addingKey", _indexCatalogEntry->getNSSFromCatalog(opCtx).ns(), [&] {
+                WriteUnitOfWork wunit(opCtx);
+                Status status = builder->addKey(data.first);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                wunit.commit();
+                return Status::OK();
+            });
 
         if (!status.isOK()) {
             // Duplicates are checked before inserting.
