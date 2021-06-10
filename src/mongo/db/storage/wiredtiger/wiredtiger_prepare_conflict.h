@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -55,6 +56,8 @@ void wiredTigerPrepareConflictLog(int attempt);
  */
 void wiredTigerPrepareConflictFailPointLog();
 
+void wiredTigerPrepareConflictOplogResourceLog();
+
 /**
  * Runs the argument function f as many times as needed for f to return an error other than
  * WT_PREPARE_CONFLICT. Each time f returns WT_PREPARE_CONFLICT we wait until the current unit of
@@ -71,6 +74,17 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
                                                                      : WT_READ_CHECK(f());
     if (ret != WT_PREPARE_CONFLICT)
         return ret;
+
+    if (opCtx->recoveryUnit()->isTimestamped()) {
+        // This transaction is holding a resource in the form of an oplog slot. Committed
+        // transactions that get a later oplog slot will be unable to replicate until this resource
+        // is released (in the form of this transaction committing or aborting). For this case, we
+        // choose to abort our transaction and retry instead of blocking. It's possible that we can
+        // be blocking on a prepared update that requires replication to make progress, creating a
+        // stall in the MDB cluster.
+        wiredTigerPrepareConflictOplogResourceLog();
+        throw WriteConflictException();
+    }
 
     auto recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
     int attempts = 1;
