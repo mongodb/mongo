@@ -1164,7 +1164,7 @@ __wt_block_extlist_write(
     WT_EXT *ext;
     WT_PAGE_HEADER *dsk;
     size_t size;
-    uint32_t objectid, entries;
+    uint32_t entries;
     uint8_t *p;
 
     WT_RET(__block_extlist_dump(session, block, el, "write"));
@@ -1222,8 +1222,7 @@ __wt_block_extlist_write(
 
     /* Write the extent list to disk. */
     WT_ERR(__wt_block_write_off(
-      session, block, tmp, &objectid, &el->offset, &el->size, &el->checksum, true, true, true));
-    WT_UNUSED(objectid); /* TODO: tiered: check */
+      session, block, tmp, &el->objectid, &el->offset, &el->size, &el->checksum, true, true, true));
 
     /*
      * Remove the allocated blocks from the system's allocation list, extent blocks never appear on

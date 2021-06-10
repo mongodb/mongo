@@ -864,8 +864,11 @@ __create_tiered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const
          * By default use the connection level bucket and prefix. Then we add in any user
          * configuration that may override the system one.
          */
-        WT_ERR(__wt_buf_fmt(session, tmp, ",tiered_storage=(bucket=%s,bucket_prefix=%s)",
-          conn->bstorage->bucket, conn->bstorage->bucket_prefix));
+        WT_ERR(__wt_buf_fmt(session, tmp,
+          ",tiered_storage=(bucket=%s,bucket_prefix=%s)"
+          ",id=%" PRIu32 ",version=(major=%d,minor=%d),checkpoint_lsn=",
+          conn->bstorage->bucket, conn->bstorage->bucket_prefix, ++conn->next_file_id,
+          WT_BTREE_MAJOR_VERSION_MAX, WT_BTREE_MINOR_VERSION_MAX));
         cfg[1] = tmp->data;
         cfg[2] = config;
         cfg[3] = "tiers=()";
