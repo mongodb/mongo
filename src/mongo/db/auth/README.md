@@ -471,7 +471,7 @@ For users possessing a given set of roles, their effective privileges and
 Each role imparts privileges in the form of a set of `actions` permitted
 against a given `resource`.  The strings in the `actions` list correspond
 1:1 with `ActionType` values as specified [here](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/db/auth/action_type.h).
-Resources may be specified in any of the following five formats:
+Resources may be specified in any of the following nine formats:
 
 | `resource` | Meaning |
 | --- | --- |
@@ -480,6 +480,10 @@ Resources may be specified in any of the following five formats:
 | { db: '', collection: 'system.views' } | The specific named collection on all DBs |
 | { db: 'test', collection: 'system.view' } | The specific namespace (db+collection) as written |
 | { cluster: true } | Used only by cluster-level actions such as `replsetConfigure`. |
+| { system_bucket: '' } | Any collection with a prefix of `system.buckets.` in any db|
+| { db: '', system_buckets: 'example' } | A collection named `system.buckets.example` in any db|
+| { db: 'test', system_buckets: '' } | Any collection with a prefix of `system.buckets.` in `test` db|
+| { db: 'test', system_buckets: 'example' } | A collected named `system.buckets.example` in `test` db|
 
 #### Normal resources
 

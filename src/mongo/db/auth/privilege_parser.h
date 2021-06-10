@@ -54,6 +54,7 @@ public:
 
     static const BSONField<bool> anyResource;
     static const BSONField<bool> cluster;
+    static const BSONField<std::string> systemBuckets;
     static const BSONField<std::string> db;
     static const BSONField<std::string> collection;
 
@@ -101,6 +102,11 @@ public:
     bool isCollectionSet() const;
     const std::string& getCollection() const;
 
+    void setSystemBuckets(StringData collection);
+    void unsetSystemBuckets();
+    bool isSystemBucketsSet() const;
+    const std::string& getSystemBuckets() const;
+
 private:
     // Convention: (M)andatory, (O)ptional
 
@@ -111,6 +117,11 @@ private:
     // (O) Only present if the resource is the cluster
     bool _cluster;
     bool _isClusterSet;
+
+    // (O) Only present if the resource is the system.buckets.<collection> or system.buckets.*
+    // resource
+    std::string _systemBuckets;
+    bool _isSystemBucketsSet;
 
     // (O) database portion of the resource
     std::string _db;

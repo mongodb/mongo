@@ -52,6 +52,15 @@ std::string ResourcePattern::toString() const {
             return "<all normal resources>";
         case MatchTypeEnum::kMatchAnyResource:
             return "<all resources>";
+        case MatchTypeEnum::kMatchExactSystemBucketResource:
+            return "<" + _ns.db().toString() + ".system.bucket" + _ns.coll().toString() +
+                " resources>";
+        case MatchTypeEnum::kMatchSystemBucketInAnyDBResource:
+            return "<any system.bucket." + _ns.coll().toString() + ">";
+        case MatchTypeEnum::kMatchAnySystemBucketInDBResource:
+            return "<" + _ns.db().toString() + "system.bucket.*>";
+        case MatchTypeEnum::kMatchAnySystemBucketResource:
+            return "<any system.bucket resources>";
         default:
             return "<unknown resource pattern type>";
     }

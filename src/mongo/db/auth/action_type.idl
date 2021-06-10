@@ -193,3 +193,11 @@ enums:
             kMatchAnyNormalResource : "any_normal"
             # Matches absolutely anything.
             kMatchAnyResource : "any"
+            # Matches a collection named "<db>.system.buckets.<collection>"
+            kMatchExactSystemBucketResource : "system_buckets"
+            # Matches a collection named "system.buckets.<collection>" in any db
+            kMatchSystemBucketInAnyDBResource : "system_buckets_in_any_db"
+            # Matches any collection with a prefix of "system.buckets." in db
+            kMatchAnySystemBucketInDBResource : "any_system_buckets_in_db"
+            # Matches any collection with a prefix of "system.buckets." in any db
+            kMatchAnySystemBucketResource : "any_system_buckets"

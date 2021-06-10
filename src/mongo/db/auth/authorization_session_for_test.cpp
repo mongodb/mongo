@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <memory>
 
+#include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
@@ -58,6 +59,18 @@ void AuthorizationSessionForTest::assumePrivilegesForDB(PrivilegeVector privileg
     _authenticatedUsers.add(userHandle);
     _testUsers.emplace_back(std::move(userHandle));
     _buildAuthenticatedRolesVector();
+}
+
+
+void AuthorizationSessionForTest::assumePrivilegesForBuiltinRole(const RoleName& roleName) {
+    PrivilegeVector privileges;
+    auth::addPrivilegesForBuiltinRole(roleName, &privileges);
+    StringData db = roleName.getDB();
+    if (db.empty()) {
+        db = "admin"_sd;
+    }
+
+    assumePrivilegesForDB(privileges, db);
 }
 
 void AuthorizationSessionForTest::revokePrivilegesForDB(StringData dbName) {

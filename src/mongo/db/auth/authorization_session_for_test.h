@@ -77,6 +77,11 @@ public:
      */
     void revokeAllPrivileges();
 
+    /**
+     * Grants this session all privileges for the given builtin role. Do not mix with other methods.
+     */
+    void assumePrivilegesForBuiltinRole(const RoleName& roleName);
+
 private:
     std::vector<UserHandle> _testUsers;
 };
