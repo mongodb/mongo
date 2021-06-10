@@ -503,5 +503,10 @@ bool isPathPrefixOf(StringData first, StringData second) {
 
     return second.startsWith(first) && second[first.size()] == '.';
 }
+
+bool bidirectionalPathPrefixOf(StringData first, StringData second) {
+    return first == second || expression::isPathPrefixOf(first, second) ||
+        expression::isPathPrefixOf(second, first);
+}
 }  // namespace expression
 }  // namespace mongo

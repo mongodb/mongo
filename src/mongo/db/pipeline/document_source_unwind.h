@@ -92,6 +92,13 @@ public:
         return _indexPath;
     }
 
+protected:
+    /**
+     * Attempts to swap with a subsequent $sort stage if the $sort is on a different field.
+     */
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
 private:
     DocumentSourceUnwind(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          const FieldPath& fieldPath,

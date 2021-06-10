@@ -110,6 +110,12 @@ bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>&
 bool isPathPrefixOf(StringData first, StringData second);
 
 /**
+ * Returns true if the first path is equal to the second path or if either is a prefix
+ * of the other.
+ */
+bool bidirectionalPathPrefixOf(StringData first, StringData second);
+
+/**
  * Applies 'func' to each node of 'expr', where the first argument is a pointer to that actual node
  * (not a copy), and the second argument is the path to that node. Callers should not depend on the
  * order of the traversal of the nodes.

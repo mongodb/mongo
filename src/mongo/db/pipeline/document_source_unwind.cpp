@@ -34,6 +34,8 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
@@ -212,6 +214,39 @@ DocumentSource::GetModPathsReturn DocumentSourceUnwind::getModifiedPaths() const
         modifiedFields.insert(_indexPath->fullPath());
     }
     return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedFields), {}};
+}
+
+Pipeline::SourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    tassert(5482200, "DocumentSourceUnwind: itr must point to this object", *itr == this);
+
+    if (std::next(itr) == container->end()) {
+        return container->end();
+    }
+
+    // If the following stage is $sort (on a different field), push before $unwind.
+    auto nextSort = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get());
+    if (nextSort) {
+        auto unwindPath = _unwindPath.fullPath();
+
+        // Checks if any of the $sort's paths depend on the unwind path (or vice versa).
+        SortPattern sortKeyPattern = nextSort->getSortKeyPattern();
+        bool sortPathMatchesUnwindPath =
+            std::any_of(sortKeyPattern.begin(), sortKeyPattern.end(), [&](auto& sortKey) {
+                // If 'sortKey' is a $meta expression, we can do the swap.
+                if (!sortKey.fieldPath)
+                    return false;
+                return expression::bidirectionalPathPrefixOf(unwindPath,
+                                                             sortKey.fieldPath->fullPath());
+            });
+
+        if (!sortPathMatchesUnwindPath) {
+            std::swap(*itr, *std::next(itr));
+            return itr == container->begin() ? itr : std::prev(itr);
+        }
+    }
+
+    return std::next(itr);
 }
 
 Value DocumentSourceUnwind::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {

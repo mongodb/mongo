@@ -363,6 +363,195 @@ TEST(PipelineOptimizationTest, LimitDoesNotSwapBeforeSkipWithoutSort) {
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
+TEST(PipelineOptimizationTest, SortSwapsBeforeUnwind) {
+    std::string inputPipe =
+        "[{$unwind : {path: '$a'}}"
+        ",{$sort : {b: 1}}"
+        "]";
+    std::string outputPipe =
+        "[{$sort : {sortKey: {b: 1}}}"
+        ",{$unwind : {path: '$a'}}"
+        "]";
+    std::string serializedPipe =
+        "[{$sort : {b: 1}}"
+        ",{$unwind : {path: '$a'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortSwapsBeforeUnwindMultipleSorts) {
+    std::string inputPipe =
+        "[{$unwind : {path: '$a'}}"
+        ",{$sort : {b: 1}}"
+        ",{$sort : {c: 1}}"
+        "]";
+    std::string outputPipe =
+        "[{$sort : {sortKey: {c: 1}}}"
+        ",{$unwind : {path: '$a'}}"
+        "]";
+    std::string serializedPipe =
+        "[{$sort : {c: 1}}"
+        ",{$unwind : {path: '$a'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortSwapsBeforeUnwindDifferentDotPaths) {
+    std::string inputPipe =
+        "[{$unwind : {path: '$a.b'}}"
+        ",{$sort : {'a.c': 1}}"
+        "]";
+    std::string outputPipe =
+        "[{$sort : {sortKey: {'a.c': 1}}}"
+        ",{$unwind : {path: '$a.b'}}"
+        "]";
+    std::string serializedPipe =
+        "[{$sort : {'a.c': 1}}"
+        ",{$unwind : {path: '$a.b'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortSwapsBeforeUnwindMultipleSortPaths) {
+    std::string inputPipe =
+        "[{$unwind : {path: '$a'}}"
+        ",{$sort : {b: 1, c: 1}}"
+        "]";
+    std::string outputPipe =
+        "[{$sort : {sortKey: {b: 1, c: 1}}}"
+        ",{$unwind : {path: '$a'}}"
+        "]";
+    std::string serializedPipe =
+        "[{$sort : {b: 1, c: 1}}"
+        ",{$unwind : {path: '$a'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortDoesNotSwapBeforeUnwindMultipleSortPaths) {
+    std::string inputPipe =
+        "[{$unwind : {path: '$a'}}"
+        ",{$sort : {b: 1, a: 1}}"
+        "]";
+    std::string outputPipe =
+        "[{$unwind : {path: '$a'}}"
+        ",{$sort : {sortKey: {b: 1, a: 1}}}"
+        "]";
+    std::string serializedPipe =
+        "[{$unwind : {path: '$a'}}"
+        ",{$sort : {b: 1, a: 1}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortDoesNotSwapBeforeUnwindBecauseSortPathPrefixOfUnwindPath) {
+    std::string inputPipe =
+        "[{$unwind : {path: '$b.a'}}"
+        ",{$sort : {b: 1}}"
+        "]";
+    std::string outputPipe =
+        "[{$unwind : {path: '$b.a'}}"
+        ",{$sort : {sortKey: {b: 1}}}"
+        "]";
+    std::string serializedPipe =
+        "[{$unwind : {path: '$b.a'}}"
+        ",{$sort : {b: 1}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortDoesNotSwapBeforeUnwindBecauseUnwindPathPrefixOfSortPath) {
+    std::string inputPipe =
+        "[{$unwind : {path: '$b'}}"
+        ",{$sort : {'b.a': 1}}"
+        "]";
+    std::string outputPipe =
+        "[{$unwind : {path: '$b'}}"
+        ",{$sort : {sortKey: {'b.a': 1}}}"
+        "]";
+    std::string serializedPipe =
+        "[{$unwind : {path: '$b'}}"
+        ",{$sort : {'b.a': 1}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortDoesNotSwapBeforeUnwindBecauseUnwindPathEqualToSortPath) {
+    std::string inputPipe =
+        "[{$unwind : {path: '$a.b'}}"
+        ",{$sort : {'a.b': 1}}"
+        "]";
+    std::string outputPipe =
+        "[{$unwind : {path: '$a.b'}}"
+        ",{$sort : {sortKey: {'a.b': 1}}}"
+        "]";
+    std::string serializedPipe =
+        "[{$unwind : {path: '$a.b'}}"
+        ",{$sort : {'a.b': 1}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAsSortDoesNotInterfere) {
+    string inputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$unwind: {path: '$same'}}"
+        ",{$sort : {'a.b': 1}}"
+        "]";
+    string outputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right', unwinding: {preserveNullAndEmptyArrays: false}}}"
+        ",{$sort : {sortKey: {'a.b': 1}}}]";
+    string serializedPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$unwind: {path: '$same'}}"
+        ",{$sort : {'a.b': 1}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortSwapsBeforeUnwindMetaWithFieldPath) {
+    std::string inputPipe =
+        "[{ $match: { $text: { $search: \"operating\" } }}"
+        ",{$unwind : {path: '$a'}}"
+        ",{$sort : {score: {$meta: \"textScore\"}, c: 1}}"
+        "]";
+    std::string outputPipe =
+        "[{$match: {$text: {$search: \"operating\", $language: \"\", $caseSensitive: false, "
+        "$diacriticSensitive: false}}}"
+        ",{$sort: {sortKey: {$computed0: {$meta: \"textScore\"}, c: 1}}}"
+        ",{$unwind : {path: '$a'}}"
+        "]";
+    std::string serializedPipe =
+        "[{ $match: { $text: { $search: \"operating\" } }}"
+        ",{$sort: {$computed0: {$meta: \"textScore\"}, c: 1}}"
+        ",{$unwind : {path: '$a'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortSwapsBeforeUnwindMetaWithoutFieldPath) {
+    std::string inputPipe =
+        "[{ $match: { $text: { $search: \"operating\" } }}"
+        ",{$unwind : {path: '$a'}}"
+        ",{$sort : {score: {$meta: \"textScore\"}}}"
+        "]";
+    std::string outputPipe =
+        "[{$match: {$text: {$search: \"operating\", $language: \"\", $caseSensitive: false, "
+        "$diacriticSensitive: false}}}"
+        ",{$sort: {sortKey: {$computed0: {$meta: \"textScore\"}}}}"
+        ",{$unwind : {path: '$a'}}"
+        "]";
+    std::string serializedPipe =
+        "[{ $match: { $text: { $search: \"operating\" } }}"
+        ",{$sort: {$computed0: {$meta: \"textScore\"}}}"
+        ",{$unwind : {path: '$a'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST(PipelineOptimizationTest, SortMatchProjSkipLimBecomesMatchTopKSortSkipProj) {
     std::string inputPipe =
         "[{$sort: {a: 1}}"
