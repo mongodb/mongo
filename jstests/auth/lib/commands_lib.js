@@ -5971,11 +5971,12 @@ var authCommandsLib = {
               }]
           },
           skipSharded: false,
-          skipTest: (conn) => true, // TODO SERVER-54877 re-enable this test case
           // Only enterprise knows of this aggregation stage.
-          //skipTest:
-          //    (conn) =>
-          //        !conn.getDB("admin").runCommand({buildInfo: 1}).modules.includes("enterprise"),
+          skipTest:
+              (conn) =>
+                  !conn.getDB("admin").runCommand({buildInfo: 1}).modules.includes("enterprise"),
+          // Instead of configuring mongot, lets make the search to return EOF early.
+          disableSearch: true,
           testcases: [
               {
                 runOnDb: firstDbName,
@@ -5988,17 +5989,7 @@ var authCommandsLib = {
                 privileges:
                     [{resource: {db: secondDbName, collection: "foo"}, actions: ["find"]}]
               }
-          ],
-          setup: function(db) {
-              // Configure the $search stage to always return EOF so we can avoid the hassle
-              // of giving mongod a host and port for mongot.
-              const cmd = {configureFailPoint: "searchReturnEofImmediately", mode: "alwaysOn"};
-              FixtureHelpers.runCommandOnEachPrimary({db: db.getSiblingDB("admin"), cmdObj: cmd});
-          },
-          teardown: function(db) {
-              const cmd = {configureFailPoint: "searchReturnEofImmediately", mode: "off"};
-              FixtureHelpers.runCommandOnEachPrimary({db: db.getSiblingDB("admin"), cmdObj: cmd});
-          }
+          ]
         },
         {
           testname: "startRecordingTraffic",
