@@ -34,6 +34,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/session_catalog_router.h"
@@ -372,7 +373,10 @@ TEST(ChunkManagerTargeterTest, ExtractBucketsShardKeyFromTimeseriesDocument) {
 
     TimeseriesOptions options{std::string(timeField)};
     options.setMetaField(metaField);
-    auto date = Date_t::now();
+    auto dateStatus = dateFromISOString("2021-01-01T00:00:15.555Z");
+    ASSERT_OK(dateStatus);
+    auto date = dateStatus.getValue();
+    auto roundedDate = timeseries::roundTimestampToGranularity(date, options.getGranularity());
 
     auto checkShardKey = [&](const BSONObj& tsShardKeyPattern,
                              const BSONObj& metaValue = BSONObj()) {
@@ -384,10 +388,12 @@ TEST(ChunkManagerTargeterTest, ExtractBucketsShardKeyFromTimeseriesDocument) {
             }
             return builder.obj();
         }();
+
         auto inputBucket = [&]() {
             BSONObjBuilder builder;
             builder << timeseries::kBucketControlFieldName
-                    << BSON(timeseries::kBucketControlMinFieldName << BSON(timeField << date));
+                    << BSON(timeseries::kBucketControlMinFieldName
+                            << BSON(timeField << roundedDate));
             if (!metaValue.isEmpty()) {
                 builder << timeseries::kBucketMetaFieldName << metaValue;
             }

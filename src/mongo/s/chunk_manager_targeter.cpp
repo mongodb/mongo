@@ -44,6 +44,7 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
@@ -290,13 +291,15 @@ BSONObj ChunkManagerTargeter::extractBucketsShardKeyFromTimeseriesDoc(
     uassert(5743702,
             str::stream() << "'" << timeField
                           << "' must be present and contain a valid BSON UTC datetime value",
-            !timeElement.eoo());
+            !timeElement.eoo() && timeElement.type() == BSONType::Date);
+    auto roundedTimeValue = timeseries::roundTimestampToGranularity(
+        timeElement.date(), timeseriesOptions.getGranularity());
     {
         BSONObjBuilder controlBuilder{builder.subobjStart(timeseries::kBucketControlFieldName)};
         {
             BSONObjBuilder minBuilder{
                 controlBuilder.subobjStart(timeseries::kBucketControlMinFieldName)};
-            minBuilder.append(timeElement);
+            minBuilder.append(timeField, roundedTimeValue);
             minBuilder.done();
         }
         controlBuilder.done();

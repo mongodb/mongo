@@ -35,6 +35,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/not_primary_error_tracker',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         'query/cluster_query',
         'write_ops/cluster_write_ops',
     ],
