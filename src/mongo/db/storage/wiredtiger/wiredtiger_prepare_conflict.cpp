@@ -33,10 +33,18 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 
+#include <mutex>
+
+#include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
+
+namespace {
+std::once_flag logPrepareWithTimestampOnce;
+}
 
 // When set, simulates WT_PREPARE_CONFLICT returned from WiredTiger API calls.
 MONGO_FAIL_POINT_DEFINE(WTPrepareConflictForReads);
@@ -52,6 +60,13 @@ void wiredTigerPrepareConflictLog(int attempts) {
 
 void wiredTigerPrepareConflictFailPointLog() {
     log() << "WTPrintPrepareConflictLog fail point enabled.";
+}
+
+void wiredTigerPrepareConflictOplogResourceLog() {
+    std::call_once(logPrepareWithTimestampOnce, [] {
+        log() << "Hit a prepare conflict while holding a resource on the oplog";
+        printStackTrace();
+    });
 }
 
 }  // namespace mongo
