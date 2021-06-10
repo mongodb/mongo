@@ -45,7 +45,7 @@ class EvgExpansions(BaseModel):
     should_shuffle: Should remove shuffle tests before executing.
     suite: Resmoke suite to run the tests.
     task_id: ID of task currently being executed.
-    task_path_suffix: Multiversion configuration if needed.
+    require_multiversion: Requires downloading Multiversion binaries.
     timeout_secs: Timeout to set for task execution.
     use_large_distro: Should tasks be generated to run on a large distro.
     """
@@ -68,7 +68,7 @@ class EvgExpansions(BaseModel):
     task_id: str
     timeout_secs: int
     use_large_distro: Optional[bool]
-    task_path_suffix: Optional[str]
+    require_multiversion: Optional[bool]
 
     @classmethod
     def from_yaml_file(cls, path: str) -> "EvgExpansions":
@@ -97,7 +97,7 @@ class EvgExpansions(BaseModel):
             jstestfuzz_vars=self.jstestfuzz_vars, variant=self.build_variant,
             continue_on_failure=self.continue_on_failure, resmoke_jobs_max=self.resmoke_jobs_max,
             should_shuffle=self.should_shuffle, timeout_secs=self.timeout_secs,
-            use_multiversion=self.task_path_suffix, suite=self.suite,
+            require_multiversion=self.require_multiversion, suite=self.suite,
             use_large_distro=self.use_large_distro, large_distro_name=self.large_distro_name,
             config_location=
             f"{self.build_variant}/{self.revision}/generate_tasks/{self.name}_gen-{self.build_id}.tgz"

@@ -34,7 +34,7 @@ class FuzzerGenTaskParams(NamedTuple):
     resmoke_jobs_max: Maximum number of jobs resmoke should execute in parallel.
     should_shuffle: Should tests be executed out of order.
     timeout_secs: Timeout before test execution is considered hung.
-    use_multiversion: Multiversion configuration if tests should run in multiversion mode.
+    require_multiversion: Requires downloading Multiversion binaries.
     use_large_distro: Should tests be generated on a large distro.
     add_to_display_task: Should generated tasks be grouped in a display task.
     """
@@ -51,7 +51,7 @@ class FuzzerGenTaskParams(NamedTuple):
     resmoke_jobs_max: int
     should_shuffle: bool
     timeout_secs: int
-    use_multiversion: Optional[str]
+    require_multiversion: Optional[bool]
     use_large_distro: Optional[bool]
     large_distro_name: Optional[str]
     config_location: str
@@ -96,7 +96,7 @@ class FuzzerGenTaskService:
             "resmoke_args": f"{suite_arg} {params.resmoke_args}",
             "resmoke_jobs_max": params.resmoke_jobs_max,
             "should_shuffle": params.should_shuffle,
-            "task_path_suffix": params.use_multiversion,
+            "require_multiversion": params.require_multiversion,
             "timeout_secs": params.timeout_secs,
             "task": params.task_name,
             "gen_task_config_location": params.config_location,
@@ -105,8 +105,8 @@ class FuzzerGenTaskService:
         commands = [
             FunctionCall("do setup"),
             FunctionCall("configure evergreen api credentials")
-            if params.use_multiversion else None,
-            FunctionCall("do multiversion setup") if params.use_multiversion else None,
+            if params.require_multiversion else None,
+            FunctionCall("do multiversion setup") if params.require_multiversion else None,
             FunctionCall("setup jstestfuzz"),
             FunctionCall("run jstestfuzz", params.jstestfuzz_params()),
             FunctionCall("run generated tests", run_tests_vars)

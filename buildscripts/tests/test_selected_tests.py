@@ -282,7 +282,7 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
                         "jstests/core/latch_analyzer.js",
                     ],
                     resmoke_args="",
-                    use_multiversion=None,
+                    require_multiversion=None,
                     distro="",
                 ),
             "auth_gen":
@@ -290,7 +290,7 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
                     display_task_name="task 2",
                     tests=["jstests/auth/auth3.js"],
                     resmoke_args="",
-                    use_multiversion=None,
+                    require_multiversion=None,
                     distro="",
                 ),
         }
@@ -323,7 +323,7 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
                         "jstests/core/latch_analyzer.js",
                     ],
                     resmoke_args="",
-                    use_multiversion=None,
+                    require_multiversion=None,
                     distro="",
                 ),
         }
@@ -346,7 +346,7 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
                         "jstests/core/latch_analyzer.js",
                     ],
                     resmoke_args="",
-                    use_multiversion=None,
+                    require_multiversion=None,
                     distro="",
                 ),
         }

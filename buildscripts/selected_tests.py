@@ -419,7 +419,7 @@ class SelectedTestsOrchestrator:
             gen_params = ResmokeGenTaskParams(
                 use_large_distro=task_config.get("use_large_distro", False),
                 large_distro_name=task_config.get("large_distro_name"),
-                use_multiversion=task_config.get("use_multiversion"),
+                require_multiversion=task_config.get("require_multiversion"),
                 repeat_suites=task_config.get("repeat_suites", 1),
                 resmoke_args=task_config["resmoke_args"],
                 resmoke_jobs_max=task_config.get("resmoke_jobs_max"),

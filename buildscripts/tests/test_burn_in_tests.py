@@ -24,7 +24,7 @@ def create_tests_by_task_mock(n_tasks, n_tests):
         f"task_{i}_gen":
         under_test.TaskInfo(display_task_name=f"task_{i}", resmoke_args=f"--suites=suite_{i}",
                             tests=[f"jstests/tests_{j}" for j in range(n_tests)],
-                            use_multiversion=None, distro=f"distro_{i}")
+                            require_multiversion=None, distro=f"distro_{i}")
         for i in range(n_tasks)
     }
 
@@ -321,7 +321,7 @@ def create_variant_task_mock(task_name, suite_name, distro="distro"):
     variant_task.resmoke_suite = suite_name
     variant_task.get_vars_suite_name.return_value = suite_name
     variant_task.combined_resmoke_args = f"--suites={suite_name}"
-    variant_task.multiversion_path = None
+    variant_task.require_multiversion = None
     variant_task.run_on = [distro]
     return variant_task
 
@@ -346,7 +346,7 @@ class TestTaskInfo(unittest.TestCase):
         self.assertIn(suite_name, task_info.resmoke_args)
         for test in test_list:
             self.assertIn(test, task_info.tests)
-        self.assertIsNone(task_info.use_multiversion)
+        self.assertIsNone(task_info.require_multiversion)
         self.assertEqual(distro_name, task_info.distro)
 
     def test_generated_task_no_large_on_task(self):
@@ -370,7 +370,7 @@ class TestTaskInfo(unittest.TestCase):
         self.assertIn(suite_name, task_info.resmoke_args)
         for test in test_list:
             self.assertIn(test, task_info.tests)
-        self.assertIsNone(task_info.use_multiversion)
+        self.assertIsNone(task_info.require_multiversion)
         self.assertEqual(distro_name, task_info.distro)
 
     def test_generated_task_no_large_on_build_variant(self):
@@ -394,7 +394,7 @@ class TestTaskInfo(unittest.TestCase):
         self.assertIn(suite_name, task_info.resmoke_args)
         for test in test_list:
             self.assertIn(test, task_info.tests)
-        self.assertIsNone(task_info.use_multiversion)
+        self.assertIsNone(task_info.require_multiversion)
         self.assertEqual(distro_name, task_info.distro)
 
     def test_generated_task_large_distro(self):
@@ -424,7 +424,7 @@ class TestTaskInfo(unittest.TestCase):
         self.assertIn(suite_name, task_info.resmoke_args)
         for test in test_list:
             self.assertIn(test, task_info.tests)
-        self.assertIsNone(task_info.use_multiversion)
+        self.assertIsNone(task_info.require_multiversion)
         self.assertEqual(large_distro_name, task_info.distro)
 
 
@@ -472,7 +472,7 @@ class TestCreateTaskList(unittest.TestCase):
         self.assertIn("suite_1", task_info.resmoke_args)
         for i in range(3):
             self.assertIn(f"test{i}.js", task_info.tests)
-        self.assertIsNone(task_info.use_multiversion)
+        self.assertIsNone(task_info.require_multiversion)
         self.assertEqual("distro 1", task_info.distro)
 
     def test_create_task_list_with_excludes(self):

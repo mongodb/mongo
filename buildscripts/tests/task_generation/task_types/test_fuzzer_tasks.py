@@ -21,7 +21,7 @@ def build_mock_fuzzer_params(multi_version=None, jstestfuzz_vars="vars for jstes
         resmoke_jobs_max=5,
         should_shuffle=True,
         timeout_secs=100,
-        use_multiversion=multi_version,
+        require_multiversion=multi_version,
         use_large_distro=None,
         add_to_display_task=True,
         large_distro_name="large distro",

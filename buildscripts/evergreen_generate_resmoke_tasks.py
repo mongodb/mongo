@@ -73,7 +73,7 @@ class EvgExpansions(BaseModel):
     task_id: ID of task creating the generated configuration.
     task_name: Name of task creating the generated configuration.
     use_large_distro: Should the generated tasks run on "large" distros.
-    use_multiversion: Multiversion configuration if generated tasks are multiversion.
+    require_multiversion: Requires downloading Multiversion binaries.
     """
 
     build_id: str
@@ -93,7 +93,7 @@ class EvgExpansions(BaseModel):
     task_id: str
     task_name: str
     use_large_distro: bool = False
-    use_multiversion: Optional[str]
+    require_multiversion: Optional[bool]
 
     @classmethod
     def from_yaml_file(cls, path: str) -> "EvgExpansions":
@@ -159,8 +159,9 @@ class EvgExpansions(BaseModel):
         """Get the parameters to use for generating tasks."""
         return ResmokeGenTaskParams(
             use_large_distro=self.use_large_distro, large_distro_name=self.large_distro_name,
-            use_multiversion=self.use_multiversion, repeat_suites=self.resmoke_repeat_suites,
-            resmoke_args=self.resmoke_args, resmoke_jobs_max=self.resmoke_jobs_max, config_location=
+            require_multiversion=self.require_multiversion,
+            repeat_suites=self.resmoke_repeat_suites, resmoke_args=self.resmoke_args,
+            resmoke_jobs_max=self.resmoke_jobs_max, config_location=
             f"{self.build_variant}/{self.revision}/generate_tasks/{self.task}_gen-{self.build_id}.tgz"
         )
 

@@ -42,7 +42,7 @@ def create_tests_by_task_mock(n_tasks, n_tests, multiversion_values=None):
             display_task_name=f"task_{i}",
             resmoke_args=f"--suites=suite_{i}",
             tests=[f"jstests/tests_{j}" for j in range(n_tests)],
-            use_multiversion=multiversion_values[i],
+            require_multiversion=multiversion_values[i],
             distro="",
         )
         for i in range(n_tasks)
@@ -75,7 +75,7 @@ def create_multiversion_tests_by_task_mock(n_tasks, n_tests):
             display_task_name=f"task_{i}",
             resmoke_args=f"--suites=suite_{i}",
             tests=[f"jstests/{MV_MOCK_TESTS[MV_MOCK_SUITES[i]][j]}" for j in range(n_tests)],
-            use_multiversion=None,
+            require_multiversion=None,
             distro="",
         )
         for i in range(n_tasks)
@@ -130,7 +130,7 @@ def create_variant_task_mock(task_name, suite_name, distro="distro"):
     variant_task.resmoke_suite = suite_name
     variant_task.get_vars_suite_name.return_value = suite_name
     variant_task.combined_resmoke_args = f"--suites={suite_name}"
-    variant_task.multiversion_path = None
+    variant_task.require_multiversion = None
     variant_task.run_on = [distro]
     return variant_task
 
@@ -334,34 +334,10 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
 
 
 class TestGenerateConfig(unittest.TestCase):
-    def test_validate_use_multiversion(self):
+    def test_validate_multiversion(self):
         evg_conf_mock = MagicMock()
-
         gen_config = under_test.GenerateConfig("build_variant", "project")
-
         gen_config.validate(evg_conf_mock)
-
-
-class TestCreateGenerateTasksConfig(unittest.TestCase):
-    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    def test_multiversion_path_is_used(self):
-        n_tasks = 1
-        n_tests = 1
-        build_variant = BuildVariant("variant")
-        gen_config = MagicMock(run_build_variant="variant", distro=None)
-        repeat_config = MagicMock()
-        multiversion_path = "multiversion_path"
-        tests_by_task = create_tests_by_task_mock(n_tasks, n_tests, [multiversion_path])
-        mock_evg_api = MagicMock()
-
-        executor = GenerateBurnInExecutor(gen_config, repeat_config, mock_evg_api)
-        executor.add_config_for_build_variant(build_variant, tests_by_task)
-
-        shrub_project = ShrubProject.empty().add_build_variant(build_variant)
-        evg_config_dict = shrub_project.as_dict()
-        tasks = evg_config_dict["tasks"]
-        self.assertEqual(n_tasks * n_tests, len(tasks))
-        self.assertEqual(multiversion_path, tasks[0]["commands"][3]["vars"]["task_path_suffix"])
 
 
 class TestGatherTaskInfo(unittest.TestCase):
@@ -372,7 +348,7 @@ class TestGatherTaskInfo(unittest.TestCase):
         evg_conf_mock = MagicMock()
         evg_conf_mock.get_task.return_value.is_generate_resmoke_task = False
         task_mock = create_variant_task_mock("task 1", suite_name, distro_name)
-        task_mock.multiversion_path = "/path/to/multiversion"
+        task_mock.require_multiversion = True
         test_list = [f"test{i}.js" for i in range(3)]
         tests_by_suite = {
             suite_name: test_list,
@@ -385,5 +361,5 @@ class TestGatherTaskInfo(unittest.TestCase):
         self.assertIn(suite_name, task_info.resmoke_args)
         for test in test_list:
             self.assertIn(test, task_info.tests)
-        self.assertEqual(task_mock.multiversion_path, task_info.use_multiversion)
+        self.assertEqual(task_mock.require_multiversion, task_info.require_multiversion)
         self.assertEqual(distro_name, task_info.distro)

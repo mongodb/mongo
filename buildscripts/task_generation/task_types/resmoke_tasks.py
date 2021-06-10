@@ -32,7 +32,7 @@ class ResmokeGenTaskParams(NamedTuple):
     Parameters describing how a specific resmoke suite should be generated.
 
     use_large_distro: Whether generated tasks should be run on a "large" distro.
-    use_multiversion: Multiversion configuration if generated tasks are multiversion.
+    require_multiversion: Requires downloading Multiversion binaries.
     repeat_suites: How many times generated suites should be repeated.
     resmoke_args: Arguments to pass to resmoke in generated tasks.
     resmoke_jobs_max: Max number of jobs that resmoke should execute in parallel.
@@ -41,7 +41,7 @@ class ResmokeGenTaskParams(NamedTuple):
 
     use_large_distro: bool
     large_distro_name: Optional[str]
-    use_multiversion: Optional[str]
+    require_multiversion: Optional[bool]
     repeat_suites: int
     resmoke_args: str
     resmoke_jobs_max: Optional[int]
@@ -136,12 +136,12 @@ class ResmokeGenTaskService:
         run_tests_vars = self._get_run_tests_vars(target_suite_file, suite.suite_name, params,
                                                   suite.build_variant)
 
-        use_multiversion = params.use_multiversion
+        require_multiversion = params.require_multiversion
         timeout_cmd = timeout_est.generate_timeout_cmd(self.gen_task_options.is_patch,
                                                        params.repeat_suites,
                                                        self.gen_task_options.use_default_timeouts)
         commands = resmoke_commands("run generated tests", run_tests_vars, timeout_cmd,
-                                    use_multiversion)
+                                    require_multiversion)
 
         return Task(sub_task_name, commands, self._get_dependencies())
 
@@ -165,8 +165,8 @@ class ResmokeGenTaskService:
         if params.resmoke_jobs_max:
             variables["resmoke_jobs_max"] = params.resmoke_jobs_max
 
-        if params.use_multiversion:
-            variables["task_path_suffix"] = params.use_multiversion
+        if params.require_multiversion:
+            variables["require_multiversion"] = params.require_multiversion
 
         return variables
 
