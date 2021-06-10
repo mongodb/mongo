@@ -156,20 +156,19 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertDictEqual(task_commands[0], task.run_tests_command)
 
     def test_run_tests_multiversion(self):
-        multiversion_path = "/data/multiversion"
+        require_multiversion = True
         task_commands = [{"func": "do multiversion setup"},
                          {
                              "func": "run tests", "vars": {
-                                 "task_path_suffix": multiversion_path,
+                                 "require_multiversion": True,
                                  "resmoke_args": "--suites=core --shellWriteMode=commands"
                              }
                          }]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        self.assertTrue(task.is_multiversion_task)
         self.assertEqual(task.multiversion_setup_command, {"func": "do multiversion setup"})
-        self.assertEqual(multiversion_path, task.multiversion_path)
+        self.assertEqual(require_multiversion, task.require_multiversion)
 
     def test_run_tests_no_multiversion(self):
         task_commands = [{
@@ -179,9 +178,9 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        self.assertFalse(task.is_multiversion_task)
+        self.assertIsNone(task.require_multiversion)
         self.assertIsNone(task.multiversion_setup_command)
-        self.assertIsNone(task.multiversion_path)
+        self.assertIsNone(task.require_multiversion)
 
     def test_resmoke_args_gen(self):
         task_commands = [{
@@ -271,19 +270,18 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual("jsCore", task.generated_task_name)
 
     def test_gen_resmoke_multiversion(self):
-        multiversion_path = "/data/multiversion"
+        require_multiversion = True
         task_name = "core"
         task_commands = [{
             "func": "generate resmoke tasks", "vars": {
                 "task": task_name, "resmoke_args": "--shellWriteMode=commands",
-                "use_multiversion": multiversion_path
+                "require_multiversion": require_multiversion
             }
         }]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        self.assertTrue(task.is_multiversion_task)
-        self.assertEqual(multiversion_path, task.multiversion_path)
+        self.assertEqual(require_multiversion, task.require_multiversion)
 
     def test_gen_resmoke_no_multiversion(self):
         task_name = "core"
@@ -294,8 +292,7 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        self.assertFalse(task.is_multiversion_task)
-        self.assertIsNone(task.multiversion_path)
+        self.assertIsNone(task.require_multiversion)
 
     def test_get_vars_suite_name_generate_resmoke_tasks(self):
         task_name = "jsCore"

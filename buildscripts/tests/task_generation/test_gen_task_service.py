@@ -26,7 +26,7 @@ def build_mock_fuzzer_params(multi_version=None, use_large_distro=None, add_to_d
         resmoke_jobs_max=5,
         should_shuffle=True,
         timeout_secs=100,
-        use_multiversion=multi_version,
+        require_multiversion=multi_version,
         use_large_distro=use_large_distro,
         add_to_display_task=add_to_display,
         large_distro_name=large_distro_name,

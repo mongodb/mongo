@@ -13,21 +13,21 @@ MAX_SHRUB_TASKS_FOR_SINGLE_TASK = 1000
 
 def resmoke_commands(run_tests_fn_name: str, run_tests_vars: Dict[str, Any],
                      timeout_info: TimeoutInfo,
-                     use_multiversion: Optional[str] = None) -> List[ShrubCommand]:
+                     require_multiversion: Optional[bool] = None) -> List[ShrubCommand]:
     """
     Create a list of commands to run a resmoke task.
 
     :param run_tests_fn_name: Name of function to run resmoke tests.
     :param run_tests_vars: Dictionary of variables to pass to run_tests function.
     :param timeout_info: Timeout info for task.
-    :param use_multiversion: If True include multiversion setup.
+    :param require_multiversion: Requires downloading Multiversion binaries.
     :return: List of commands to run a resmoke task.
     """
     commands = [
         timeout_info.cmd,
         FunctionCall("do setup"),
-        FunctionCall("configure evergreen api credentials") if use_multiversion else None,
-        FunctionCall("do multiversion setup") if use_multiversion else None,
+        FunctionCall("configure evergreen api credentials") if require_multiversion else None,
+        FunctionCall("do multiversion setup") if require_multiversion else None,
         FunctionCall(run_tests_fn_name, run_tests_vars),
     ]
 

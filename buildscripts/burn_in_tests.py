@@ -257,14 +257,14 @@ class TaskInfo(NamedTuple):
     display_task_name: Display name of task.
     resmoke_args: Arguments to provide to resmoke on task invocation.
     tests: List of tests to run as part of task.
-    use_multiversion: If running under multiversion, path to multiversion binaries.
+    require_multiversion: Requires downloading Multiversion binaries.
     distro: Evergreen distro task runs on.
     """
 
     display_task_name: str
     resmoke_args: str
     tests: List[str]
-    use_multiversion: Optional[str]
+    require_multiversion: Optional[bool]
     distro: str
 
     @classmethod
@@ -281,8 +281,9 @@ class TaskInfo(NamedTuple):
         """
         return cls(
             display_task_name=_get_task_name(task), resmoke_args=_set_resmoke_args(task),
-            tests=tests_by_suite[task.resmoke_suite], use_multiversion=task.multiversion_path,
-            distro=_distro_to_run_task_on(task, evg_proj_config, build_variant))
+            tests=tests_by_suite[task.resmoke_suite],
+            require_multiversion=task.require_multiversion, distro=_distro_to_run_task_on(
+                task, evg_proj_config, build_variant))
 
 
 def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,

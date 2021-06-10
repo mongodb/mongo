@@ -34,7 +34,7 @@ def build_mock_gen_options(use_default_timeouts=False):
 def build_mock_gen_params(repeat_suites=1, resmoke_args="resmoke args"):
     return under_test.ResmokeGenTaskParams(
         use_large_distro=False,
-        use_multiversion=None,
+        require_multiversion=None,
         repeat_suites=repeat_suites,
         resmoke_args=resmoke_args,
         resmoke_jobs_max=None,

@@ -88,7 +88,7 @@ class EvgExpansions(BaseModel):
     resmoke_jobs_max: Optional[int]
     should_shuffle: Optional[bool]
     timeout_secs: Optional[int]
-    use_multiversion: Optional[str]
+    require_multiversion: Optional[bool]
     use_large_distro: Optional[bool]
     large_distro_name: Optional[str]
     revision: str
@@ -151,7 +151,7 @@ class EvgExpansions(BaseModel):
             resmoke_jobs_max=self.resmoke_jobs_max,
             should_shuffle=self.should_shuffle,
             timeout_secs=self.timeout_secs,
-            use_multiversion=self.use_multiversion,
+            require_multiversion=self.require_multiversion,
             suite=self.suite or self.task,
             use_large_distro=self.use_large_distro,
             large_distro_name=self.large_distro_name,

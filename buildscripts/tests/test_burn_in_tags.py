@@ -126,7 +126,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
                 display_task_name="aggregation_mongos_passthrough",
                 resmoke_args="--suites=aggregation_mongos_passthrough --storageEngine=wiredTiger",
                 tests=["jstests/aggregation/ifnull.js"],
-                use_multiversion=None,
+                require_multiversion=None,
                 distro="",
             )
         }  # yapf: disable

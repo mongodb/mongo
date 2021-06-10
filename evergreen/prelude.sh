@@ -1,5 +1,5 @@
 if [[ "$0" == *"/evergreen/prelude.sh" ]]; then
-  echo "ERROR: do not execute this script. source it instead. ie: . prelude.sh"
+  echo "ERROR: do not execute this script. source it instead. i.e.: . prelude.sh"
   exit 1
 fi
 set -o errexit

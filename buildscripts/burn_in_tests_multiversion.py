@@ -40,7 +40,6 @@ MULTIVERSION_CONFIG_KEY = gen_multiversion.MULTIVERSION_CONFIG_KEY
 MULTIVERSION_PASSTHROUGH_TAG = gen_multiversion.PASSTHROUGH_TAG
 RANDOM_MULTIVERSION_REPLSETS_TAG = gen_multiversion.RANDOM_REPLSETS_TAG
 BURN_IN_MULTIVERSION_TASK = gen_multiversion.BURN_IN_TASK
-TASK_PATH_SUFFIX = "/data/multiversion"
 DEFAULT_CONFIG_DIR = "generated_resmoke_config"
 DEFAULT_TEST_SUITE_DIR = os.path.join("buildscripts", "resmokeconfig", "suites")
 
