@@ -12,7 +12,6 @@
 
 load("jstests/libs/discover_topology.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
-load("jstests/sharding/libs/resharding_test_util.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 
@@ -48,27 +47,12 @@ let createIndexFailpoint = configureFailPoint(donor0, "hangIndexBuildBeforeCommi
 createIndexThread.start();
 createIndexFailpoint.wait();
 
-let removeDonorDocFailpoint = configureFailPoint(donor0, "removeDonorDocFailpoint");
 reshardingTest.withReshardingInBackground(
     {
         newShardKeyPattern: {newKey: 1},
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
     },
-    () => {
-        // TODO SERVER-51696: Review if these checks can be made in a cpp unittest instead.
-        ReshardingTestUtil.assertDonorAbortsLocally(
-            donor0,
-            donorShardNames[0],
-            inputCollection.getFullName(),
-            ErrorCodes.BackgroundOperationInProgressForNamespace);
-
-        removeDonorDocFailpoint.off();
-
-        // Note: even though the recipient state machine does not exist by the time the donor
-        // errors, recipients should still acknowledge they saw the coordinator's abort.
-        ReshardingTestUtil.assertAllParticipantsReportDoneToCoordinator(
-            configsvr, inputCollection.getFullName());
-    },
+    () => {},
     {expectedErrorCode: ErrorCodes.BackgroundOperationInProgressForNamespace});
 
 // Resume index build.

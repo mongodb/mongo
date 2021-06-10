@@ -9,7 +9,6 @@
 load("jstests/libs/discover_topology.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
-load("jstests/sharding/libs/resharding_test_util.js");
 
 const originalCollectionNs = "reshardingDb.coll";
 const enterAbortFailpointName = "reshardingPauseCoordinatorBeforeStartingErrorFlow";
