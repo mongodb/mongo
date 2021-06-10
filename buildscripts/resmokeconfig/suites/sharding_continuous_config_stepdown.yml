@@ -211,6 +211,7 @@ selector:
   - jstests/sharding/refine_collection_shard_key_changelog.js
   # This is expected to fail if the config server steps down during moveChunk.
   - jstests/sharding/index_operations_abort_concurrent_outgoing_migrations.js
+  - jstests/sharding/move_chunk_critical_section_non_internal_client_abort.js
   # Runs commands on mongos which target the primary configsvr, and then checks the outcome using
   # profiling/logging (on the configsvr primary), so cannot tolerate the configsvr primary changing.
   - jstests/sharding/read_write_concern_defaults_application.js
