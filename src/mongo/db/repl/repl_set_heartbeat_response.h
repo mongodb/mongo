@@ -186,6 +186,11 @@ public:
         _durableOpTime = time.opTime;
         _durableWallTime = time.wallTime;
     }
+    void unsetDurableOpTimeAndWallTime() {
+        _durableOpTimeSet = false;
+        _durableOpTime = OpTime();
+        _durableWallTime = Date_t();
+    }
     void setTerm(long long term) {
         _term = term;
     }
