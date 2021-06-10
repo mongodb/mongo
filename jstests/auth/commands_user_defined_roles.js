@@ -18,6 +18,7 @@ var testUser = "userDefinedRolesTestUser";
 var testRole = "userDefinedRolesTestRole";
 
 load("jstests/auth/lib/commands_lib.js");
+load("jstests/libs/fail_point_util.js");
 
 /**
  * Run the command specified in 't' with the privileges specified in 'privileges'.
@@ -98,6 +99,13 @@ function runOneTest(conn, t) {
     var failures = [];
     var msg;
 
+    // Some tests requires mongot, however, setting this failpoint will make search queries to
+    // return EOF, that way all the hassle of setting it up can be avoided.
+    let disableSearchFailpoint;
+    if (t.disableSearch) {
+        disableSearchFailpoint = configureFailPoint(conn.rs0 ? conn.rs0.getPrimary() : conn,
+                                                    'searchReturnEofImmediately');
+    }
     for (var i = 0; i < t.testcases.length; i++) {
         var testcase = t.testcases[i];
         if (!("privileges" in testcase)) {
@@ -183,6 +191,10 @@ function runOneTest(conn, t) {
         if (msg) {
             failures.push(t.testname + ": " + msg);
         }
+    }
+
+    if (disableSearchFailpoint) {
+        disableSearchFailpoint.off();
     }
 
     return failures;
