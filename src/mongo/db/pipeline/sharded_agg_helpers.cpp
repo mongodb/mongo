@@ -1261,16 +1261,26 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(Pipeline* owne
     invariant(pipeline->getSources().empty() ||
               !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
 
+    if (expCtx->ns.isConfigDotCacheDotChunks()) {
+        // We take special care to attach the local cursor stage to 'ownedPipeline' here rather than
+        // attaching it to a serialized and re-parsed copy of the pipeline to avoid optimizations
+        // such as the $sequentialCache stage from being lost. This is safe because each shard has
+        // its own complete copy of any "config.cache.chunks.*" namespace.
+        return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
+            pipeline.release());
+    }
+
     auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
     return shardVersionRetry(
         expCtx->opCtx, catalogCache, expCtx->ns, "targeting pipeline to attach cursors"_sd, [&]() {
             auto pipelineToTarget = pipeline->clone();
-            if (allowTargetingShards && !expCtx->ns.isConfigDotCacheDotChunks() &&
-                expCtx->ns.db() != "local") {
-                return targetShardsAndAddMergeCursors(expCtx, std::move(pipelineToTarget));
+            if (!allowTargetingShards || expCtx->ns.db() == "local") {
+                // If the db is local, this may be a change stream examining the oplog. We know the
+                // oplog (and any other local collections) will not be sharded.
+                return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
+                    pipelineToTarget.release());
             }
-            return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
-                pipelineToTarget.release());
+            return targetShardsAndAddMergeCursors(expCtx, std::move(pipelineToTarget));
         });
 }
 
