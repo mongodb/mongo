@@ -20,10 +20,13 @@ var lastStableFCV = "4.2";
  * {featureCompatibilityVersion: {version: <required>, targetVersion: <optional>}, ok: 1}.
  */
 function checkFCV(adminDB, version, targetVersion) {
-    let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion.version, version, tojson(res));
-    assert.eq(res.featureCompatibilityVersion.targetVersion, targetVersion, tojson(res));
+    const isMongod = !adminDB.getMongo().isMongos();
+    if (isMongod) {
+        let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+        assert.commandWorked(res);
+        assert.eq(res.featureCompatibilityVersion.version, version, tojson(res));
+        assert.eq(res.featureCompatibilityVersion.targetVersion, targetVersion, tojson(res));
+    }
 
     // This query specifies an explicit readConcern because some FCV tests pass a connection that
     // has manually run isMaster with internalClient, and mongod expects internalClients (ie. other
