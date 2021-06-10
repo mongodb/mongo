@@ -164,8 +164,8 @@ jsTestLog({"oplog buffer ns": kOplogBufferNS});
 
 // We expect to see retryableWrite2, retryableWrite3, retryableWrite3's postImage, and
 // bulkRetryableWrite0 (bulk insert batch size is 1).
-let cursor = recipientOplogBuffer.find();
-assert.eq(cursor.itcount(), 4, "Incorrect number of oplog entries in buffer: " + cursor.toArray());
+const findRes = recipientOplogBuffer.find().toArray();
+assert.eq(findRes.length, 4, `Incorrect number of oplog entries in buffer: ${tojson(findRes)}`);
 assert.eq(1, recipientOplogBuffer.find({"entry.o._id": "retryableWrite2"}).itcount());
 assert.eq(1, recipientOplogBuffer.find({"entry.o._id": "retryableWrite3"}).itcount());
 assert.eq(1, recipientOplogBuffer.find({"entry.o2._id": "retryableWrite3"}).itcount());

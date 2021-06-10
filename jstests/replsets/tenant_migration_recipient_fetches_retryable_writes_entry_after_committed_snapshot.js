@@ -208,10 +208,10 @@ jsTestLog(`oplog buffer ns: ${kOplogBufferNS}`);
 
 // Number of entries fetched into oplog buffer is the majority committed count - 1 since we only
 // fetch entries that occur before startFetchingDonorOpTime, which is equal to the commit point.
-const cursor = recipientOplogBuffer.find();
+const findRes = recipientOplogBuffer.find().toArray();
 const expectedCount = counterMajorityCommitted - 1;
 assert.eq(
-    cursor.itcount(), expectedCount, `Incorrect number of oplog entries: ${cursor.toArray()}`);
+    findRes.length, expectedCount, `Incorrect number of oplog buffer entries: ${tojson(findRes)}`);
 
 // Resume replication on all the secondaries and wait for migration to complete.
 for (const fp of stopReplProducerOnDocumentFailpoints) {
