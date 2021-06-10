@@ -350,7 +350,7 @@ BSONObj VariablesParseState::serialize(const Variables& vars) const {
     auto bob = BSONObjBuilder{};
     for (auto&& [var_name, id] : _variables)
         if (vars.hasValue(id))
-            bob << var_name << vars.getValue(id);
+            bob << var_name << Value(DOC("$literal" << vars.getValue(id)));
 
     // System variables have to be added separately since the variable IDs are reserved and not
     // allocated like normal variables, and so not present in '_variables'.
@@ -363,7 +363,7 @@ std::pair<LegacyRuntimeConstants, BSONObj> VariablesParseState::transitionalComp
     auto bob = BSONObjBuilder{};
     for (auto&& [var_name, id] : _variables)
         if (vars.hasValue(id))
-            bob << var_name << vars.getValue(id);
+            bob << var_name << Value(DOC("$literal" << vars.getValue(id)));
 
     return {vars.transitionalExtractRuntimeConstants(), bob.obj()};
 }
