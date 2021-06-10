@@ -99,7 +99,7 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
                               << " can contain at most one 'hashed' field, and/or multiple "
                                  "numerical fields set to a value of 1. Failed to parse field "
                               << patternEl.fieldNameStringData(),
-                (patternEl.isNumber() && patternEl.numberInt() == 1) ||
+                (patternEl.isNumber() && patternEl.safeNumberInt() == 1) ||
                     (isHashedPattern && numHashedFields == 1));
         parsedPaths.emplace_back(std::move(newFieldRef));
     }
