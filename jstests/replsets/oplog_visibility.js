@@ -88,10 +88,11 @@ for (let node of replTest.nodes) {
         oplogStart = timestamps[0];
         let cursor =
             local.getCollection("oplog.rs").find({ts: {$gte: oplogStart}}).sort({$natural: 1});
-        for (let observedTsIdx in timestamps) {
+        for (let observedTsIdx = 0; observedTsIdx < timestamps.length; ++observedTsIdx) {
             let observedTs = timestamps[observedTsIdx];
             assert(cursor.hasNext());
-            let actualTs = cursor.next()["ts"];
+            let doc = cursor.next();
+            let actualTs = doc["ts"];
             assert.eq(actualTs, observedTs, function() {
                 let prev = null;
                 let next = null;
