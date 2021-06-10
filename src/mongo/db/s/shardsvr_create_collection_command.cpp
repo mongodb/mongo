@@ -234,8 +234,7 @@ public:
             FixedFCVRegion fcvRegion(opCtx);
 
             bool useNewPath = [&] {
-                return fcvRegion->getVersion() == FCVersion::kVersion50 &&
-                    feature_flags::gShardingFullDDLSupport.isEnabled(*fcvRegion);
+                return feature_flags::gShardingFullDDLSupport.isEnabled(*fcvRegion);
             }();
 
             if (!useNewPath) {
