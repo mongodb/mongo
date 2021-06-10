@@ -95,8 +95,8 @@ __wt_bm_read(
      * In diagnostic mode, verify the block we're about to read isn't on the available list, or for
      * live systems, the discard list.
      */
-    WT_RET(
-      __wt_block_misplaced(session, block, "read", offset, size, bm->is_live, __func__, __LINE__));
+    WT_RET(__wt_block_misplaced(
+      session, block, "read", offset, size, bm->is_live, __PRETTY_FUNCTION__, __LINE__));
 #endif
     /* Read the block. */
     __wt_capacity_throttle(session, size, WT_THROTTLE_READ);

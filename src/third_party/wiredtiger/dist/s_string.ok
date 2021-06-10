@@ -147,6 +147,7 @@ FOREACH
 FS
 FTRUNCATE
 FULLFSYNC
+FUNCSIG
 Facebook
 FindClose
 FindFirstFile
