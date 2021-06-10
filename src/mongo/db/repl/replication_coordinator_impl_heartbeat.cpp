@@ -248,6 +248,25 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             // after this function, so we cannot and don't need to wait for it to finish.
             _processReplSetMetadata_inlock(replMetadata.getValue());
         }
+
+        // Arbiters are always expected to report null durable optimes (and wall times).
+        // If that is not the case here, make sure to correct these times before ingesting them.
+        auto memberInConfig = _rsConfig.findMemberByHostAndPort(target);
+        if ((hbResponse.hasState() && hbResponse.getState().arbiter()) ||
+            (_rsConfig.isInitialized() && memberInConfig && memberInConfig->isArbiter())) {
+            if (hbResponse.hasDurableOpTime() &&
+                (!hbResponse.getDurableOpTime().isNull() ||
+                 hbResponse.getDurableOpTimeAndWallTime().wallTime != Date_t())) {
+                LOGV2_FOR_HEARTBEATS(
+                    5662000,
+                    1,
+                    "Received non-null durable optime/walltime for arbiter from heartbeat. "
+                    "Ignoring value(s).",
+                    "target"_attr = target,
+                    "durableOpTimeAndWallTime"_attr = hbResponse.getDurableOpTimeAndWallTime());
+                hbResponse.unsetDurableOpTimeAndWallTime();
+            }
+        }
     }
     const Date_t now = _replExecutor->now();
     Microseconds networkTime(0);

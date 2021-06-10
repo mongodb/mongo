@@ -1405,6 +1405,24 @@ StatusWith<bool> TopologyCoordinator::setLastOptime(const UpdatePositionArgs::Up
 
     invariant(memberId == memberData->getMemberId());
 
+    auto durableOpTime = args.durableOpTime;
+    auto durableWallTime = args.durableWallTime;
+
+    // Arbiters are always expected to report null durable optimes (and wall times).
+    // If that is not the case here, make sure to correct these times before ingesting them.
+    auto& memberInConfig = _rsConfig.getMemberAt(memberData->getConfigIndex());
+    if ((memberData->getState().arbiter() || memberInConfig.isArbiter()) &&
+        (!args.durableOpTime.isNull() || args.durableWallTime != Date_t())) {
+        LOGV2(5662001,
+              "Received non-null durable optime/walltime for arbiter from "
+              "replSetUpdatePosition. Ignoring value(s).",
+              "memberId"_attr = memberId,
+              "durableOpTime"_attr = args.durableOpTime,
+              "durableWallTime"_attr = args.durableWallTime);
+        durableOpTime = OpTime();
+        durableWallTime = Date_t();
+    }
+
     LOGV2_DEBUG(21815,
                 3,
                 "Node with memberID {memberId} currently has optime {oldLastAppliedOpTime} "
@@ -1415,12 +1433,12 @@ StatusWith<bool> TopologyCoordinator::setLastOptime(const UpdatePositionArgs::Up
                 "oldLastAppliedOpTime"_attr = memberData->getLastAppliedOpTime(),
                 "oldLastDurableOpTime"_attr = memberData->getLastDurableOpTime(),
                 "newAppliedOpTime"_attr = args.appliedOpTime,
-                "newDurableOpTime"_attr = args.durableOpTime);
+                "newDurableOpTime"_attr = durableOpTime);
 
     bool advancedOpTime = memberData->advanceLastAppliedOpTimeAndWallTime(
         {args.appliedOpTime, args.appliedWallTime}, now);
-    advancedOpTime = memberData->advanceLastDurableOpTimeAndWallTime(
-                         {args.durableOpTime, args.durableWallTime}, now) ||
+    advancedOpTime =
+        memberData->advanceLastDurableOpTimeAndWallTime({durableOpTime, durableWallTime}, now) ||
         advancedOpTime;
     return advancedOpTime;
 }
