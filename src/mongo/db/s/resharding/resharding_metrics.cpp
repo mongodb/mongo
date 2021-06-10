@@ -85,19 +85,16 @@ Milliseconds remainingTime(Milliseconds elapsedTime, double elapsedWork, double 
     return Milliseconds(Milliseconds::rep(remainingMsec));
 }
 
-// TODO SERVER-57217 Remove special-casing for the non-existence of the boost::optional.
 static StringData serializeState(boost::optional<RecipientStateEnum> e) {
-    return RecipientState_serializer(e ? *e : RecipientStateEnum::kUnused);
+    return RecipientState_serializer(*e);
 }
 
-// TODO SERVER-57217 Remove special-casing for the non-existence of the boost::optional.
 static StringData serializeState(boost::optional<DonorStateEnum> e) {
-    return DonorState_serializer(e ? *e : DonorStateEnum::kUnused);
+    return DonorState_serializer(*e);
 }
 
-// TODO SERVER-57217 Remove special-casing for the non-existence of the boost::optional.
 static StringData serializeState(boost::optional<CoordinatorStateEnum> e) {
-    return CoordinatorState_serializer(e ? *e : CoordinatorStateEnum::kUnused);
+    return CoordinatorState_serializer(*e);
 }
 
 // Allows tracking elapsed time for the resharding operation and its sub operations (e.g.,
@@ -192,10 +189,6 @@ void ReshardingMetrics::OperationMetrics::appendCurrentOpMetrics(BSONObjBuilder*
 
     bob->append(kOpTimeElapsed, getElapsedTime(runningOperation));
 
-    bob->append(kOpTimeRemaining,
-                !remainingMsec ? int64_t{-1} /** -1 is a specified integer null value */
-                               : durationCount<Seconds>(*remainingMsec));
-
     switch (role) {
         case Role::kDonor:
             bob->append(kWritesDuringCritialSection, writesDuringCriticalSection);
@@ -204,6 +197,9 @@ void ReshardingMetrics::OperationMetrics::appendCurrentOpMetrics(BSONObjBuilder*
             bob->append(kOpStatus, ReshardingOperationStatus_serializer(opStatus));
             break;
         case Role::kRecipient:
+            bob->append(kOpTimeRemaining,
+                        !remainingMsec ? int64_t{-1} /** -1 is a specified integer null value */
+                                       : durationCount<Seconds>(*remainingMsec));
             bob->append(kDocumentsToCopy, documentsToCopy);
             bob->append(kDocumentsCopied, documentsCopied);
             bob->append(kBytesToCopy, bytesToCopy);

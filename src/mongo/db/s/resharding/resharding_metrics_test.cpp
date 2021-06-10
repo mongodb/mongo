@@ -237,7 +237,7 @@ TEST_F(ReshardingMetricsTest, TestOperationStatus) {
 }
 
 TEST_F(ReshardingMetricsTest, TestElapsedTime) {
-    startOperation(ReshardingMetrics::Role::kRecipient);
+    startOperation(ReshardingMetrics::Role::kDonor);
     const auto elapsedTime = 1;
     advanceTime(Seconds(elapsedTime));
     checkMetrics(
@@ -282,11 +282,6 @@ TEST_F(ReshardingMetricsTest, TestDonorAndRecipientMetrics) {
     checkMetrics(currentDonorOpReport, "totalCriticalSectionTimeElapsedSecs", elapsedTime * 2);
     checkMetrics(
         currentDonorOpReport, "countWritesDuringCriticalSection", kWritesDuringCriticalSection);
-
-    // Expected remaining time = totalCopyTimeElapsedSecs + 2 * estimated time to copy remaining
-    checkMetrics(currentDonorOpReport,
-                 "remainingOperationTimeEstimatedSecs",
-                 elapsedTime + 2 * (100 - kCopyProgress) / kCopyProgress * elapsedTime);
 
     const auto cumulativeReportAfterCompletion = getReport(OpReportType::CumulativeReport);
     checkMetrics(
@@ -407,7 +402,7 @@ TEST_F(ReshardingMetricsTest, EstimatedRemainingOperationTime) {
     const auto elapsedTime = 1;
 
     startOperation(ReshardingMetrics::Role::kRecipient);
-    checkMetrics(kTag, -1, OpReportType::CurrentOpReportDonorRole);
+    checkMetrics(kTag, -1, OpReportType::CurrentOpReportRecipientRole);
 
     const auto kDocumentsToCopy = 2;
     const auto kBytesToCopy = 200;
@@ -419,7 +414,7 @@ TEST_F(ReshardingMetricsTest, EstimatedRemainingOperationTime) {
     advanceTime(Seconds(elapsedTime));
     // Since 50% of the data is copied, the remaining copy time equals the elapsed copy time, which
     // is equal to `elapsedTime` seconds.
-    checkMetrics(kTag, elapsedTime + 2 * elapsedTime, OpReportType::CurrentOpReportDonorRole);
+    checkMetrics(kTag, elapsedTime + 2 * elapsedTime, OpReportType::CurrentOpReportRecipientRole);
 
     const auto kOplogEntriesFetched = 4;
     const auto kOplogEntriesApplied = 2;
@@ -432,7 +427,7 @@ TEST_F(ReshardingMetricsTest, EstimatedRemainingOperationTime) {
     // So far, the time to apply oplog entries equals `elapsedTime` seconds.
     checkMetrics(kTag,
                  elapsedTime * (kOplogEntriesFetched / kOplogEntriesApplied - 1),
-                 OpReportType::CurrentOpReportDonorRole);
+                 OpReportType::CurrentOpReportRecipientRole);
 }
 
 TEST_F(ReshardingMetricsTest, CurrentOpReportForDonor) {
@@ -460,7 +455,6 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForDonor) {
                              "unique: {3},"
                              "collation: {{ locale: \"simple\" }} }},"
                              "totalOperationTimeElapsedSecs: 5,"
-                             "remainingOperationTimeEstimatedSecs: -1,"
                              "countWritesDuringCriticalSection: 0,"
                              "totalCriticalSectionTimeElapsedSecs : 3,"
                              "donorState: \"{4}\","
@@ -573,7 +567,6 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForCoordinator) {
                              "unique: {3},"
                              "collation: {{ locale: \"simple\" }} }},"
                              "totalOperationTimeElapsedSecs: {4},"
-                             "remainingOperationTimeEstimatedSecs: -1,"
                              "coordinatorState: \"{5}\","
                              "opStatus: \"running\" }}",
                              options.id.toString(),
