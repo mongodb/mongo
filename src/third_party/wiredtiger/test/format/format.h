@@ -35,14 +35,29 @@
 
 #define EXTPATH "../../ext/" /* Extensions path */
 
+#ifndef LZ4_PATH
 #define LZ4_PATH EXTPATH "compressors/lz4/.libs/libwiredtiger_lz4.so"
+#endif
+
+#ifndef SNAPPY_PATH
 #define SNAPPY_PATH EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
+#endif
+
+#ifndef ZLIB_PATH
 #define ZLIB_PATH EXTPATH "compressors/zlib/.libs/libwiredtiger_zlib.so"
+#endif
+
+#ifndef ZSTD_PATH
 #define ZSTD_PATH EXTPATH "compressors/zstd/.libs/libwiredtiger_zstd.so"
+#endif
 
+#ifndef REVERSE_PATH
 #define REVERSE_PATH EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
+#endif
 
+#ifndef ROTN_PATH
 #define ROTN_PATH EXTPATH "encryptors/rotn/.libs/libwiredtiger_rotn.so"
+#endif
 
 #undef M
 #define M(v) ((v)*WT_MILLION) /* Million */
