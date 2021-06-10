@@ -43,6 +43,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
@@ -239,7 +240,32 @@ ChunkManagerTargeter::ChunkManagerTargeter(OperationContext* opCtx,
 
 void ChunkManagerTargeter::_init(OperationContext* opCtx) {
     cluster::createDatabase(opCtx, _nss.db());
-    _cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
+
+    // Check if we target sharded time-series collection. For such collections we target write
+    // operations to the underlying buckets collection.
+    //
+    // A sharded time-series collection by definition is a view, which has underlying sharded
+    // buckets collection. We know that 'ChunkManager::isSharded()' is false for all views. Checking
+    // this condition first can potentially save us extra cache lookup. After that, we lookup
+    // routing info for the underlying buckets collection. The absense of this routing info means
+    // that this collection does not exist. Finally, we check if this underlying collection is
+    // sharded. If all these conditions pass, we are targeting sharded time-series collection.
+    bool isShardedTimeseriesCollection = false;
+    auto routingInfo = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
+    if (!routingInfo.isSharded()) {
+        auto bucketsNs = _nss.makeTimeseriesBucketsNamespace();
+        auto bucketsRoutingInfo = getCollectionRoutingInfoForTxnCmd(opCtx, bucketsNs);
+        if (bucketsRoutingInfo.isOK() && bucketsRoutingInfo.getValue().isSharded()) {
+            _nss = bucketsNs;
+            _cm = bucketsRoutingInfo.getValue();
+            isShardedTimeseriesCollection = true;
+        }
+    }
+
+    // For all other collections, use the original routing info.
+    if (!isShardedTimeseriesCollection) {
+        _cm = routingInfo;
+    }
 
     if (_targetEpoch) {
         uassert(ErrorCodes::StaleEpoch, "Collection has been dropped", _cm->isSharded());
@@ -253,12 +279,54 @@ const NamespaceString& ChunkManagerTargeter::getNS() const {
     return _nss;
 }
 
+BSONObj ChunkManagerTargeter::extractBucketsShardKeyFromTimeseriesDoc(
+    const BSONObj& doc,
+    const ShardKeyPattern& pattern,
+    const TimeseriesOptions& timeseriesOptions) {
+    BSONObjBuilder builder;
+
+    auto timeField = timeseriesOptions.getTimeField();
+    auto timeElement = doc.getField(timeField);
+    uassert(5743702,
+            str::stream() << "'" << timeField
+                          << "' must be present and contain a valid BSON UTC datetime value",
+            !timeElement.eoo());
+    {
+        BSONObjBuilder controlBuilder{builder.subobjStart(timeseries::kBucketControlFieldName)};
+        {
+            BSONObjBuilder minBuilder{
+                controlBuilder.subobjStart(timeseries::kBucketControlMinFieldName)};
+            minBuilder.append(timeElement);
+            minBuilder.done();
+        }
+        controlBuilder.done();
+    }
+
+    if (auto metaField = timeseriesOptions.getMetaField(); metaField) {
+        if (auto metaElement = doc.getField(*metaField); !metaElement.eoo()) {
+            builder.appendAs(metaElement, timeseries::kBucketMetaFieldName);
+        }
+    }
+
+    auto docWithShardKey = builder.obj();
+    return pattern.extractShardKeyFromDoc(docWithShardKey);
+}
+
 ShardEndpoint ChunkManagerTargeter::targetInsert(OperationContext* opCtx,
                                                  const BSONObj& doc) const {
     BSONObj shardKey;
 
     if (_cm->isSharded()) {
-        shardKey = _cm->getShardKeyPattern().extractShardKeyFromDoc(doc);
+        const auto& shardKeyPattern = _cm->getShardKeyPattern();
+        if (_nss.isTimeseriesBucketsCollection()) {
+            auto tsFields = _cm->getTimeseriesFields();
+            tassert(5743701, "Missing timeseriesFields on buckets collection", tsFields);
+            shardKey = extractBucketsShardKeyFromTimeseriesDoc(
+                doc, shardKeyPattern, tsFields->getTimeseriesOptions());
+        } else {
+            shardKey = shardKeyPattern.extractShardKeyFromDoc(doc);
+        }
+
         // The shard key would only be empty after extraction if we encountered an error case, such
         // as the shard key possessing an array value or array descendants. If the shard key
         // presented to the targeter was empty, we would emplace the missing fields, and the
@@ -270,8 +338,7 @@ ShardEndpoint ChunkManagerTargeter::targetInsert(OperationContext* opCtx,
 
     // Target the shard key or database primary
     if (!shardKey.isEmpty()) {
-        return uassertStatusOK(
-            _targetShardKey(shardKey, CollationSpec::kSimpleSpec, doc.objsize()));
+        return uassertStatusOK(_targetShardKey(shardKey, CollationSpec::kSimpleSpec));
     }
 
     // TODO (SERVER-51070): Remove the boost::none when the config server can support shardVersion
@@ -331,8 +398,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
         uassert(ErrorCodes::ShardKeyNotFound,
                 str::stream() << msg << " :: could not extract exact shard key",
                 !shardKey.isEmpty());
-        return std::vector{
-            uassertStatusOKWithContext(_targetShardKey(shardKey, collation, 0), msg)};
+        return std::vector{uassertStatusOKWithContext(_targetShardKey(shardKey, collation), msg)};
     };
 
     // If this is an upsert, then the query must contain an exact match on the shard key. If we were
@@ -400,7 +466,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
 
     // Target the shard key or delete query
     if (!shardKey.isEmpty()) {
-        auto swEndpoint = _targetShardKey(shardKey, collation, 0);
+        auto swEndpoint = _targetShardKey(shardKey, collation);
         if (swEndpoint.isOK()) {
             return std::vector{std::move(swEndpoint.getValue())};
         }
@@ -464,8 +530,7 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
 }
 
 StatusWith<ShardEndpoint> ChunkManagerTargeter::_targetShardKey(const BSONObj& shardKey,
-                                                                const BSONObj& collation,
-                                                                long long estDataSize) const {
+                                                                const BSONObj& collation) const {
     try {
         auto chunk = _cm->findIntersectingChunk(shardKey, collation);
         return ShardEndpoint(chunk.getShardId(), _cm->getVersion(chunk.getShardId()), boost::none);

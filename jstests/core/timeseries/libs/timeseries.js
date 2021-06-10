@@ -154,8 +154,8 @@ var TimeseriesTest = class {
     /**
      * Runs the provided test with both ordered and unordered inserts.
      */
-    static run(testFn) {
-        if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
+    static run(testFn, theDb) {
+        if (!TimeseriesTest.timeseriesCollectionsEnabled((theDb || db).getMongo())) {
             jsTestLog("Skipping test because the time-series collection feature flag is disabled");
             return;
         }

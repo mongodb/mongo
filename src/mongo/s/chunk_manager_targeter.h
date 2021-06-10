@@ -64,6 +64,9 @@ public:
      * Initializes the targeter with the latest routing information for the namespace, which means
      * it may have to block and load information from the config server.
      *
+     * If 'nss' is a sharded time-series collection, replaces this value with namespace string of a
+     * time-series buckets collection.
+     *
      * If 'expectedEpoch' is specified, the targeter will throws 'StaleEpoch' exception if the epoch
      * for 'nss' ever becomes different from 'expectedEpoch'. Otherwise, the targeter will continue
      * targeting even if the collection gets dropped and recreated.
@@ -107,6 +110,11 @@ public:
 
     int getNShardsOwningChunks() const override;
 
+    static BSONObj extractBucketsShardKeyFromTimeseriesDoc(
+        const BSONObj& doc,
+        const ShardKeyPattern& pattern,
+        const TimeseriesOptions& timeseriesOptions);
+
 private:
     void _init(OperationContext* opCtx);
 
@@ -131,11 +139,10 @@ private:
      * If 'collation' is empty, we use the collection default collation for targeting.
      */
     StatusWith<ShardEndpoint> _targetShardKey(const BSONObj& shardKey,
-                                              const BSONObj& collation,
-                                              long long estDataSize) const;
+                                              const BSONObj& collation) const;
 
     // Full namespace of the collection for this targeter
-    const NamespaceString _nss;
+    NamespaceString _nss;
 
     // Stores last error occurred
     boost::optional<LastErrorType> _lastError;
