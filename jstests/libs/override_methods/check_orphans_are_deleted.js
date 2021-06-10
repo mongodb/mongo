@@ -51,7 +51,11 @@ ShardingTest.prototype.checkOrphansAreDeleted = function() {
         });
     } else {
         assert.commandWorked(mongosConn.adminCommand({balancerStop: 1}));
-        waitForOngoingChunkSplits(this);
+        try {
+            waitForOngoingChunkSplits(this);
+        } catch (e) {
+            print("Unable to wait for ongoing chunk splits: " + e);
+        }
 
         // Use config.shards so we will not miss shards added outside of ShardingTest.
         mongosConn.getDB('config').shards.find().forEach(shardDoc => {
