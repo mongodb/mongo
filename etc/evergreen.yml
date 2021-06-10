@@ -342,7 +342,6 @@ variables:
   - enterprise-ubuntu1804-64
   - enterprise-ubuntu1804-arm64
   - enterprise-ubuntu1804-ppc64le
-  - enterprise-ubuntu1804-s390x
   - enterprise-windows-64-2k8
   - enterprise-windows-64-2k8-async
   - enterprise-windows-64-2k8-compile-all
