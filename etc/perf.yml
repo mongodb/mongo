@@ -705,7 +705,7 @@ tasks:
 buildvariants:
   - name: linux-wt-standalone
     display_name: Standalone Linux inMemory
-    batchtime: 90  # 1.5 hours
+    batchtime: 240  # 4 hours
     modules: *modules
     expansions:
       # We are explicitly tracking the rhel62 variant compile options from evergreen.yml for
@@ -752,7 +752,7 @@ buildvariants:
 
   - name: linux-wt-repl
     display_name: 1-Node ReplSet Linux inMemory
-    batchtime: 90  # 1.5 hours
+    batchtime: 240  # 4 hours
     modules: *modules
     expansions:
       mongod_exec_wrapper: *exec_wrapper
