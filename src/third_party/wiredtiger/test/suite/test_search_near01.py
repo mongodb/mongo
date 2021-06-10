@@ -215,6 +215,7 @@ class test_search_near01(wttest.WiredTigerTestCase):
         uri = 'table:test_row_search'
         self.session.create(uri, 'key_format=u,value_format=u')
         cursor = self.session.open_cursor(uri)
+        expect_count = self.get_stat(stat.conn.cursor_next_skip_lt_100)
         session2 = self.conn.open_session()
         l = "abcdefghijklmnopqrstuvwxyz"
         # Insert keys a -> z, except c
@@ -238,8 +239,9 @@ class test_search_near01(wttest.WiredTigerTestCase):
         cursor2.set_key('c')
         cursor2.search_near()
 
+        expect_count += 1
         skip_count = self.get_stat(stat.conn.cursor_next_skip_lt_100)
-        self.assertEqual(skip_count, 3)
+        self.assertEqual(skip_count, expect_count)
         session2.commit_transaction()
 
         # Perform an insertion and removal of a key next to another key, then search for the
@@ -256,8 +258,9 @@ class test_search_near01(wttest.WiredTigerTestCase):
         cursor.set_key('dd')
         cursor.search_near()
         self.session.commit_transaction()
+        expect_count += 1
         skip_count = self.get_stat(stat.conn.cursor_next_skip_lt_100)
-        self.assertEqual(skip_count, 4)
+        self.assertEqual(skip_count, expect_count)
 
     # Test a basic prepared scenario.
     def test_prepared(self):

@@ -37,7 +37,8 @@ __meta_btree_apply(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
             continue;
         }
 
-        if (file_func == NULL || skip || !WT_PREFIX_MATCH(uri, "file:"))
+        if (file_func == NULL || skip ||
+          (!WT_PREFIX_MATCH(uri, "file:") && !WT_PREFIX_MATCH(uri, "tiered:")))
             continue;
 
         /*
