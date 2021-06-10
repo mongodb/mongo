@@ -291,12 +291,13 @@
  */
 #ifdef HAVE_DIAGNOSTIC
 #define __wt_hazard_set(session, walk, busyp) \
-    __wt_hazard_set_func(session, walk, busyp, __func__, __LINE__)
+    __wt_hazard_set_func(session, walk, busyp, __PRETTY_FUNCTION__, __LINE__)
 #define __wt_scr_alloc(session, size, scratchp) \
-    __wt_scr_alloc_func(session, size, scratchp, __func__, __LINE__)
-#define __wt_page_in(session, ref, flags) __wt_page_in_func(session, ref, flags, __func__, __LINE__)
+    __wt_scr_alloc_func(session, size, scratchp, __PRETTY_FUNCTION__, __LINE__)
+#define __wt_page_in(session, ref, flags) \
+    __wt_page_in_func(session, ref, flags, __PRETTY_FUNCTION__, __LINE__)
 #define __wt_page_swap(session, held, want, flags) \
-    __wt_page_swap_func(session, held, want, flags, __func__, __LINE__)
+    __wt_page_swap_func(session, held, want, flags, __PRETTY_FUNCTION__, __LINE__)
 #else
 #define __wt_hazard_set(session, walk, busyp) __wt_hazard_set_func(session, walk, busyp)
 #define __wt_scr_alloc(session, size, scratchp) __wt_scr_alloc_func(session, size, scratchp)

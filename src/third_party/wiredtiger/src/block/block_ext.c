@@ -575,7 +575,8 @@ __wt_block_free(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, 
       (intmax_t)offset, (intmax_t)size);
 
 #ifdef HAVE_DIAGNOSTIC
-    WT_RET(__wt_block_misplaced(session, block, "free", offset, size, true, __func__, __LINE__));
+    WT_RET(__wt_block_misplaced(
+      session, block, "free", offset, size, true, __PRETTY_FUNCTION__, __LINE__));
 #endif
     if (objectid == block->objectid) {
         WT_RET(__wt_block_ext_prealloc(session, 5));

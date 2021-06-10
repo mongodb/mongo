@@ -929,10 +929,10 @@ struct __wt_ref {
         (ref)->hist[(ref)->histoff].state = (uint16_t)(s);                \
         (ref)->histoff = ((ref)->histoff + 1) % WT_ELEMENTS((ref)->hist); \
     } while (0)
-#define WT_REF_SET_STATE(ref, s)                       \
-    do {                                               \
-        WT_REF_SAVE_STATE(ref, s, __func__, __LINE__); \
-        WT_PUBLISH((ref)->state, s);                   \
+#define WT_REF_SET_STATE(ref, s)                                  \
+    do {                                                          \
+        WT_REF_SAVE_STATE(ref, s, __PRETTY_FUNCTION__, __LINE__); \
+        WT_PUBLISH((ref)->state, s);                              \
     } while (0)
 #else
 #define WT_REF_SET_STATE(ref, s) WT_PUBLISH((ref)->state, s)
@@ -951,7 +951,7 @@ struct __wt_ref {
 
 /* A macro wrapper allowing us to remember the callers code location */
 #define WT_REF_CAS_STATE(session, ref, old_state, new_state) \
-    __wt_ref_cas_state_int(session, ref, old_state, new_state, __func__, __LINE__)
+    __wt_ref_cas_state_int(session, ref, old_state, new_state, __PRETTY_FUNCTION__, __LINE__)
 
 #define WT_REF_LOCK(session, ref, previous_statep)                             \
     do {                                                                       \

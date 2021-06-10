@@ -100,8 +100,8 @@ value_missing_error(const std::string &str)
 
 /*
  * Run a specific test.
- * test_name: specifies which test to run.
- * config: defines the configuration used for the test.
+ * - test_name: specifies which test to run.
+ * - config: defines the configuration used for the test.
  */
 int64_t
 run_test(const std::string &test_name, const std::string &config)
@@ -131,6 +131,9 @@ main(int argc, char *argv[])
     std::string cfg, config_filename, test_name, current_test_name;
     int64_t error_code = 0;
     const std::vector<std::string> all_tests = {"example_test", "poc_test"};
+
+    /* Set the program name for error messages. */
+    (void)testutil_set_progname(argv);
 
     /* Parse args
      * -C   : Configuration. Cannot be used with -f. If no specific test is specified to be run, the

@@ -102,31 +102,31 @@ typedef struct {
  * testutil_assert --
  *     Complain and quit if something isn't true.
  */
-#define testutil_assert(a)                                        \
-    do {                                                          \
-        if (!(a))                                                 \
-            testutil_die(0, "%s/%d: %s", __func__, __LINE__, #a); \
+#define testutil_assert(a)                                                   \
+    do {                                                                     \
+        if (!(a))                                                            \
+            testutil_die(0, "%s/%d: %s", __PRETTY_FUNCTION__, __LINE__, #a); \
     } while (0)
 
 /*
  * testutil_assertfmt --
  *     Complain and quit if something isn't true.
  */
-#define testutil_assertfmt(a, fmt, ...)                                              \
-    do {                                                                             \
-        if (!(a))                                                                    \
-            testutil_die(0, "%s/%d: %s: " fmt, __func__, __LINE__, #a, __VA_ARGS__); \
+#define testutil_assertfmt(a, fmt, ...)                                                         \
+    do {                                                                                        \
+        if (!(a))                                                                               \
+            testutil_die(0, "%s/%d: %s: " fmt, __PRETTY_FUNCTION__, __LINE__, #a, __VA_ARGS__); \
     } while (0)
 
 /*
  * testutil_check --
  *     Complain and quit if a function call fails.
  */
-#define testutil_check(call)                                           \
-    do {                                                               \
-        int __r;                                                       \
-        if ((__r = (call)) != 0)                                       \
-            testutil_die(__r, "%s/%d: %s", __func__, __LINE__, #call); \
+#define testutil_check(call)                                                      \
+    do {                                                                          \
+        int __r;                                                                  \
+        if ((__r = (call)) != 0)                                                  \
+            testutil_die(__r, "%s/%d: %s", __PRETTY_FUNCTION__, __LINE__, #call); \
     } while (0)
 
 /*
@@ -134,10 +134,10 @@ typedef struct {
  *     Complain and quit if a function call fails, returning errno. The error test must be
  *     specified, not just the call, because system calls fail in a variety of ways.
  */
-#define testutil_checksys(call)                                          \
-    do {                                                                 \
-        if (call)                                                        \
-            testutil_die(errno, "%s/%d: %s", __func__, __LINE__, #call); \
+#define testutil_checksys(call)                                                     \
+    do {                                                                            \
+        if (call)                                                                   \
+            testutil_die(errno, "%s/%d: %s", __PRETTY_FUNCTION__, __LINE__, #call); \
     } while (0)
 
 /*
@@ -148,7 +148,8 @@ typedef struct {
     do {                                                                                  \
         int __r;                                                                          \
         if ((__r = (call)) != 0)                                                          \
-            testutil_die(__r, "%s/%d: %s: " fmt, __func__, __LINE__, #call, __VA_ARGS__); \
+            testutil_die(                                                                 \
+              __r, "%s/%d: %s: " fmt, __PRETTY_FUNCTION__, __LINE__, #call, __VA_ARGS__); \
     } while (0)
 
 /*
@@ -156,11 +157,11 @@ typedef struct {
  *     Complain and quit if a function call fails. A special name because it appears in the
  *     documentation. Allow any non-negative values.
  */
-#define error_sys_check(call)                                          \
-    do {                                                               \
-        int __r;                                                       \
-        if ((__r = (int)(call)) < 0 && __r != ENOTSUP)                 \
-            testutil_die(__r, "%s/%d: %s", __func__, __LINE__, #call); \
+#define error_sys_check(call)                                                     \
+    do {                                                                          \
+        int __r;                                                                  \
+        if ((__r = (int)(call)) < 0 && __r != ENOTSUP)                            \
+            testutil_die(__r, "%s/%d: %s", __PRETTY_FUNCTION__, __LINE__, #call); \
     } while (0)
 
 /*
@@ -169,11 +170,11 @@ typedef struct {
  *     documentation. Ignore ENOTSUP to allow library calls which might not be included in any
  *     particular build.
  */
-#define error_check(call)                                              \
-    do {                                                               \
-        int __r;                                                       \
-        if ((__r = (call)) != 0 && __r != ENOTSUP)                     \
-            testutil_die(__r, "%s/%d: %s", __func__, __LINE__, #call); \
+#define error_check(call)                                                         \
+    do {                                                                          \
+        int __r;                                                                  \
+        if ((__r = (call)) != 0 && __r != ENOTSUP)                                \
+            testutil_die(__r, "%s/%d: %s", __PRETTY_FUNCTION__, __LINE__, #call); \
     } while (0)
 
 /*
