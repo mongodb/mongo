@@ -117,6 +117,10 @@ public:
 
     Status setTimestamp(Timestamp timestamp) override;
 
+    bool isTimestamped() const override {
+        return _isTimestamped;
+    }
+
     void setCommitTimestamp(Timestamp timestamp) override;
 
     void clearCommitTimestamp() override;

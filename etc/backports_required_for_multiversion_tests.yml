@@ -139,6 +139,8 @@ all:
     test_file: jstests/core/neq_null_correctly_cache.js
   - ticket: SERVER-56377
     test_file: jstests/concurrency/fsm_workloads/findAndModify_flip_location.js
+  - ticket: SERVER-57476
+    test_file: jstests/replsets/assert_on_prepare_conflict_with_hole.js
 
 suites:
 
