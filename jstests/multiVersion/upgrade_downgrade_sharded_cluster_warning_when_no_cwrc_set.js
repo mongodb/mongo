@@ -38,9 +38,11 @@ function testShardingUpgrade(setCWWC) {
                 ' concern is set');
 
     } else {
-        assert(rawMongoProgramOutput().match('5686202'),
-               'Sharded cluster should have warning when upgrading to 5.0 if no cluster-wide read' +
-                   ' concern is set');
+        assert.soon(
+            () => rawMongoProgramOutput().match('5686202'),
+            'Sharded cluster should have warning when upgrading to 5.0 if no cluster-wide read' +
+                ' concern is set',
+            ReplSetTest.kDefaultTimeoutMS);
     }
 
     jsTestLog("Setting FCV to 5.0");
@@ -51,9 +53,11 @@ function testShardingUpgrade(setCWWC) {
             'Sharded cluster should not have warning when upgrading FCV to 5.0 if cluster-wide ' +
                 'read concern is set');
     } else {
-        assert(rawMongoProgramOutput().match('5686200'),
-               'Sharded cluster should have warning when upgrading FCV to 5.0 if no cluster-wide ' +
-                   'read concern is set');
+        assert.soon(
+            () => rawMongoProgramOutput().match('5686200'),
+            'Sharded cluster should have warning when upgrading FCV to 5.0 if no cluster-wide ' +
+                'read concern is set',
+            ReplSetTest.kDefaultTimeoutMS);
     }
 
     st.stop();
@@ -79,9 +83,10 @@ function testShardingDowngrade(setCWWC) {
                'Sharded cluster should not have warning when downgrading FCV from 5.0 if ' +
                    'cluster-wide read concern is set');
     } else {
-        assert(rawMongoProgramOutput().match('5686201'),
-               'Sharded cluster should have warning when downgrading FCV from 5.0 if no ' +
-                   'cluster-wide read concern is set');
+        assert.soon(() => rawMongoProgramOutput().match('5686201'),
+                    'Sharded cluster should have warning when downgrading FCV from 5.0 if no ' +
+                        'cluster-wide read concern is set',
+                    ReplSetTest.kDefaultTimeoutMS);
     }
 
     st.upgradeCluster('last-lts');

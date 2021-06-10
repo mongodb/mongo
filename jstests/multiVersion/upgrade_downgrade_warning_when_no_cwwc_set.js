@@ -27,9 +27,11 @@ function testReplSetUpgrade(setCWWC) {
                    'concern is set');
 
     } else {
-        assert(rawMongoProgramOutput().match('5569202'),
-               'Replica set should have warning when upgrading to 5.0 if no cluster-wide write ' +
-                   'concern is set');
+        assert.soon(
+            () => rawMongoProgramOutput().match('5569202'),
+            'Replica set should have warning when upgrading to 5.0 if no cluster-wide write ' +
+                'concern is set',
+            ReplSetTest.kDefaultTimeoutMS);
     }
 
     primary = replTest.getPrimary();
@@ -41,10 +43,11 @@ function testReplSetUpgrade(setCWWC) {
             'Replica set should not have warning when upgrading FCV to 5.0 if cluster-wide write' +
                 ' concern is set');
     } else {
-        assert(
-            rawMongoProgramOutput().match('5569200'),
+        assert.soon(
+            () => rawMongoProgramOutput().match('5569200'),
             'Replica set should have warning when upgrading FCV to 5.0 if no cluster-wide write' +
-                ' concern is set');
+                ' concern is set',
+            ReplSetTest.kDefaultTimeoutMS);
     }
 
     replTest.stopSet();
@@ -68,9 +71,11 @@ function testReplSetDowngrade(setCWWC) {
                'Replica set should not have warning when downgrading FCV from 5.0 if cluster-wide' +
                    ' write concern is set');
     } else {
-        assert(rawMongoProgramOutput().match('5569201'),
-               'Replica set should have warning when downgrading FCV from 5.0 if no cluster-wide' +
-                   ' write concern is set');
+        assert.soon(
+            () => rawMongoProgramOutput().match('5569201'),
+            'Replica set should have warning when downgrading FCV from 5.0 if no cluster-wide' +
+                ' write concern is set',
+            ReplSetTest.kDefaultTimeoutMS);
     }
 
     replTest.upgradeSet({binVersion: "last-lts"});
@@ -108,10 +113,11 @@ function testShardingUpgrade(setCWWC) {
                 ' concern is set');
 
     } else {
-        assert(
-            rawMongoProgramOutput().match('5569202'),
+        assert.soon(
+            () => rawMongoProgramOutput().match('5569202'),
             'Sharded cluster should have warning when upgrading to 5.0 if no cluster-wide write' +
-                ' concern is set');
+                ' concern is set',
+            ReplSetTest.kDefaultTimeoutMS);
     }
 
     jsTestLog("Setting FCV to 5.0");
@@ -122,9 +128,11 @@ function testShardingUpgrade(setCWWC) {
             'Sharded cluster should not have warning when upgrading FCV to 5.0 if cluster-wide ' +
                 'write concern is set');
     } else {
-        assert(rawMongoProgramOutput().match('5569200'),
-               'Sharded cluster should have warning when upgrading FCV to 5.0 if no cluster-wide ' +
-                   'write concern is set');
+        assert.soon(
+            () => rawMongoProgramOutput().match('5569200'),
+            'Sharded cluster should have warning when upgrading FCV to 5.0 if no cluster-wide ' +
+                'write concern is set',
+            ReplSetTest.kDefaultTimeoutMS);
     }
 
     st.stop();
@@ -150,9 +158,10 @@ function testShardingDowngrade(setCWWC) {
                'Sharded cluster should not have warning when downgrading FCV from 5.0 if ' +
                    'cluster-wide write concern is set');
     } else {
-        assert(rawMongoProgramOutput().match('5569201'),
-               'Sharded cluster should have warning when downgrading FCV from 5.0 if no ' +
-                   'cluster-wide write concern is set');
+        assert.soon(() => rawMongoProgramOutput().match('5569201'),
+                    'Sharded cluster should have warning when downgrading FCV from 5.0 if no ' +
+                        'cluster-wide write concern is set',
+                    ReplSetTest.kDefaultTimeoutMS);
     }
 
     st.upgradeCluster('last-lts');
