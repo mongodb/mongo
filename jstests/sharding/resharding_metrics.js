@@ -117,7 +117,6 @@ function verifyCurrentOpOutput(reshardingTest, inputCollection) {
             "ns": kNamespace,
             "originatingCommand": undefined,
             "totalOperationTimeElapsedSecs": undefined,
-            "remainingOperationTimeEstimatedSecs": undefined,
             "countWritesDuringCriticalSection": 0,
             "totalCriticalSectionTimeElapsedSecs": undefined,
             "donorState": undefined,
@@ -152,7 +151,6 @@ function verifyCurrentOpOutput(reshardingTest, inputCollection) {
         "ns": kNamespace,
         "originatingCommand": undefined,
         "totalOperationTimeElapsedSecs": undefined,
-        "remainingOperationTimeEstimatedSecs": undefined,
         "coordinatorState": undefined,
         "opStatus": "running",
     });
