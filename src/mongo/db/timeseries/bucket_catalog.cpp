@@ -150,13 +150,6 @@ OperationId getOpId(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-long long roundTimestampDown(const Date_t& time, const TimeseriesOptions& options) {
-    int roundingSeconds =
-        timeseries::getBucketRoundingSecondsFromGranularity(options.getGranularity());
-    long long seconds = durationCount<Seconds>(time.toDurationSinceEpoch());
-    return (seconds - (seconds % roundingSeconds));
-}
-
 BSONObj buildControlMinTimestampDoc(StringData timeField, long long roundedSeconds) {
     BSONObjBuilder builder;
     builder.append(timeField, Date_t::fromMillisSinceEpoch(1000 * roundedSeconds));
@@ -654,7 +647,8 @@ const std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::_getExecutio
 void BucketCatalog::_setIdTimestamp(Bucket* bucket,
                                     const Date_t& time,
                                     const TimeseriesOptions& options) {
-    auto const roundedSeconds = roundTimestampDown(time, options);
+    auto roundedTime = timeseries::roundTimestampToGranularity(time, options.getGranularity());
+    auto const roundedSeconds = durationCount<Seconds>(roundedTime.toDurationSinceEpoch());
     bucket->_id.setTimestamp(roundedSeconds);
 
     // Make sure we set the control.min time field to match the rounded _id timestamp.

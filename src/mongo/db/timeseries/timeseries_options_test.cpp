@@ -27,42 +27,37 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/time_support.h"
+
 
 namespace mongo {
 
-class NamespaceString;
-class OperationContext;
+TEST(TimeseriesOptionsTest, RoundTimestampToGranularity) {
+    std::vector<std::tuple<BucketGranularityEnum, std::string, std::string>> testCases{
+        {BucketGranularityEnum::Seconds, "2021-01-01T00:00:15.555Z", "2021-01-01T00:00:00.000Z"},
+        {BucketGranularityEnum::Seconds, "2021-01-01T00:00:30.555Z", "2021-01-01T00:00:00.000Z"},
+        {BucketGranularityEnum::Seconds, "2021-01-01T00:00:45.555Z", "2021-01-01T00:00:00.000Z"},
 
-/**
- * Namespace for helper functions related to time-series collections.
- */
-namespace timeseries {
+        {BucketGranularityEnum::Minutes, "2021-01-01T00:15:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {BucketGranularityEnum::Minutes, "2021-01-01T00:30:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {BucketGranularityEnum::Minutes, "2021-01-01T00:45:00.000Z", "2021-01-01T00:00:00.000Z"},
 
-/**
- * Returns a copy of the time-series options for namespace 'nss', if 'nss' refers to a time-series
- * collection. Otherwise returns boost::none.
- */
-boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
-                                                        const NamespaceString& nss);
+        {BucketGranularityEnum::Hours, "2021-01-01T06:00:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {BucketGranularityEnum::Hours, "2021-01-01T12:00:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {BucketGranularityEnum::Hours, "2021-01-01T18:00:00.000Z", "2021-01-01T00:00:00.000Z"},
+    };
 
-/**
- * Returns the default bucket timespan associated with the given granularity.
- */
-int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity);
+    for (const auto& [granularity, input, expectedOutput] : testCases) {
+        auto inputDate = dateFromISOString(input);
+        ASSERT_OK(inputDate);
+        auto roundedDate =
+            timeseries::roundTimestampToGranularity(inputDate.getValue(), granularity);
+        ASSERT_EQ(dateToISOStringUTC(roundedDate), expectedOutput);
+    }
+}
 
-StatusWith<std::pair<TimeseriesOptions, bool>> applyTimeseriesOptionsModifications(
-    const TimeseriesOptions& current, const BSONObj& mod);
-
-BSONObj generateViewPipeline(const TimeseriesOptions& options, bool asArray);
-
-bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& option2);
-
-/**
- * Rounds down timestamp to the specified granularity.
- */
-Date_t roundTimestampToGranularity(const Date_t& time, BucketGranularityEnum granularity);
-}  // namespace timeseries
 }  // namespace mongo

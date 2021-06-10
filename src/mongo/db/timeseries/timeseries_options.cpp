@@ -103,33 +103,6 @@ int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity) {
     MONGO_UNREACHABLE;
 }
 
-int getBucketRoundingSecondsFromGranularity(BucketGranularityEnum granularity) {
-    switch (granularity) {
-        case BucketGranularityEnum::Seconds:
-            // Round down to nearest minute.
-            return 60;
-        case BucketGranularityEnum::Minutes:
-            // Round down to nearest hour.
-            return 60 * 60;
-        case BucketGranularityEnum::Hours:
-            // Round down to hearest day.
-            return 60 * 60 * 24;
-    }
-    MONGO_UNREACHABLE;
-}
-bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& option2) {
-    const auto option1BucketSpan = option1.getBucketMaxSpanSeconds()
-        ? *option1.getBucketMaxSpanSeconds()
-        : getMaxSpanSecondsFromGranularity(option1.getGranularity());
-    const auto option2BucketSpan = option2.getBucketMaxSpanSeconds()
-        ? *option2.getBucketMaxSpanSeconds()
-        : getMaxSpanSecondsFromGranularity(option2.getGranularity());
-    return option1.getTimeField() == option1.getTimeField() &&
-        option1.getMetaField() == option2.getMetaField() &&
-        option1.getGranularity() == option2.getGranularity() &&
-        option1BucketSpan == option2BucketSpan;
-}
-
 StatusWith<std::pair<TimeseriesOptions, bool>> applyTimeseriesOptionsModifications(
     const TimeseriesOptions& currentOptions, const BSONObj& mod) {
     TimeseriesOptions newOptions = currentOptions;
@@ -171,5 +144,44 @@ BSONObj generateViewPipeline(const TimeseriesOptions& options, bool asArray) {
                              << *options.getBucketMaxSpanSeconds() << "exclude" << BSONArray())));
 }
 
+bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& option2) {
+    const auto option1BucketSpan = option1.getBucketMaxSpanSeconds()
+        ? *option1.getBucketMaxSpanSeconds()
+        : getMaxSpanSecondsFromGranularity(option1.getGranularity());
+    const auto option2BucketSpan = option2.getBucketMaxSpanSeconds()
+        ? *option2.getBucketMaxSpanSeconds()
+        : getMaxSpanSecondsFromGranularity(option2.getGranularity());
+    return option1.getTimeField() == option1.getTimeField() &&
+        option1.getMetaField() == option2.getMetaField() &&
+        option1.getGranularity() == option2.getGranularity() &&
+        option1BucketSpan == option2BucketSpan;
+}
+
+namespace {
+/**
+ * Returns the number of seconds used to round down the bucket ID and control.min timestamp.
+ */
+int getBucketRoundingSecondsFromGranularity(BucketGranularityEnum granularity) {
+    switch (granularity) {
+        case BucketGranularityEnum::Seconds:
+            // Round down to nearest minute.
+            return 60;
+        case BucketGranularityEnum::Minutes:
+            // Round down to nearest hour.
+            return 60 * 60;
+        case BucketGranularityEnum::Hours:
+            // Round down to nearest day.
+            return 60 * 60 * 24;
+    }
+    MONGO_UNREACHABLE;
+}
+}  // namespace
+
+Date_t roundTimestampToGranularity(const Date_t& time, BucketGranularityEnum granularity) {
+    int roundingSeconds = getBucketRoundingSecondsFromGranularity(granularity);
+    long long timeSeconds = durationCount<Seconds>(time.toDurationSinceEpoch());
+    long long roundedTimeSeconds = (timeSeconds - (timeSeconds % roundingSeconds));
+    return Date_t::fromDurationSinceEpoch(Seconds{roundedTimeSeconds});
+}
 }  // namespace timeseries
 }  // namespace mongo
