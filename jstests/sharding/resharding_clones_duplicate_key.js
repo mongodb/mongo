@@ -10,10 +10,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/discover_topology.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
-load("jstests/sharding/libs/resharding_test_util.js");
 
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 1});
 reshardingTest.setup();
@@ -51,28 +48,12 @@ assert.commandWorked(inputCollection.insert([
 const mongos = inputCollection.getMongo();
 const recipientShardNames = reshardingTest.recipientShardNames;
 
-const topology = DiscoverTopology.findConnectedNodes(mongos);
-const recipient0 = new Mongo(topology.shards[recipientShardNames[0]].primary);
-const configsvr = new Mongo(topology.configsvr.nodes[0]);
-
-const fp = configureFailPoint(recipient0, "removeRecipientDocFailpoint");
-
-reshardingTest.withReshardingInBackground(
-    {
-        newShardKeyPattern: {newKey: 1},
-        newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
-    },
-    () => {
-        // TODO SERVER-51696: Review if these checks can be made in a cpp unittest instead.
-        ReshardingTestUtil.assertRecipientAbortsLocally(recipient0,
-                                                        recipientShardNames[0],
-                                                        inputCollection.getFullName(),
-                                                        ErrorCodes.DuplicateKey);
-        fp.off();
-        ReshardingTestUtil.assertAllParticipantsReportDoneToCoordinator(
-            configsvr, inputCollection.getFullName());
-    },
-    {expectedErrorCode: ErrorCodes.DuplicateKey});
+reshardingTest.withReshardingInBackground({
+    newShardKeyPattern: {newKey: 1},
+    newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
+},
+                                          () => {},
+                                          {expectedErrorCode: ErrorCodes.DuplicateKey});
 
 const idleCursors = mongos.getDB("admin")
                         .aggregate([

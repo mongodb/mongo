@@ -10,10 +10,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/discover_topology.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
-load("jstests/sharding/libs/resharding_test_util.js");
 
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2});
 reshardingTest.setup();
@@ -29,10 +26,6 @@ const inputCollection = reshardingTest.createShardedCollection({
 });
 
 const recipientShardNames = reshardingTest.recipientShardNames;
-const topology = DiscoverTopology.findConnectedNodes(inputCollection.getMongo());
-const recipient1Conn = new Mongo(topology.shards[recipientShardNames[1]].primary);
-const removeRecipientDocFailpoint =
-    configureFailPoint(recipient1Conn, "removeRecipientDocFailpoint");
 
 reshardingTest.withReshardingInBackground(
     {
@@ -62,12 +55,6 @@ reshardingTest.withReshardingInBackground(
     },
     {
         expectedErrorCode: 5356800,
-        postDecisionPersistedFn: () => {
-            ReshardingTestUtil.assertRecipientAbortsLocally(
-                recipient1Conn, recipient1Conn.shardName, "reshardingDb.coll", 5356800);
-
-            removeRecipientDocFailpoint.off();
-        }
     });
 
 reshardingTest.teardown();
