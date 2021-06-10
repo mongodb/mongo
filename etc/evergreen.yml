@@ -1,4 +1,12 @@
 #####################################################
+#                  YAML Conventions                 #
+#####################################################
+# Please see our conventions document at
+# https://wiki.corp.mongodb.com/pages/viewpage.action?pageId=133273894
+# for help navigating this document, or for help with our lint rules.
+
+
+#####################################################
 #               A note on expansions                #
 #####################################################
 
@@ -7008,10 +7016,12 @@ task_groups:
     - func: "set up win mount script"
     - func: "generate compile expansions"
   teardown_group:
+    - func: "f_expansions_write"
     - func: "umount shared scons directory"
     - func: "cleanup environment"
   setup_task:
     - func: "apply compile expansions"
+    - func: "f_expansions_write"
     - func: "set task expansion macros"
     - func: "f_expansions_write"
   teardown_task:
@@ -7036,6 +7046,7 @@ task_groups:
     - func: "umount shared scons directory"
   setup_task:
     - func: "set task expansion macros"
+    - func: "f_expansions_write"
     - func: "apply compile expansions"
     - func: "f_expansions_write"
   teardown_task:
@@ -7061,6 +7072,7 @@ task_groups:
     - func: "umount shared scons directory"
   setup_task:
     - func: "set task expansion macros"
+    - func: "f_expansions_write"
     - func: "apply compile expansions"
     - func: "f_expansions_write"
   teardown_task:
