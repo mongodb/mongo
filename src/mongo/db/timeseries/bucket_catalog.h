@@ -550,7 +550,9 @@ private:
                      const TimeseriesOptions& options,
                      ExecutionStats* stats,
                      const Date_t& time);
-        BucketAccess(BucketCatalog* catalog, Bucket* bucket);
+        BucketAccess(BucketCatalog* catalog,
+                     Bucket* bucket,
+                     boost::optional<BucketState> targetState = boost::none);
         ~BucketAccess();
 
         bool isLocked() const;
