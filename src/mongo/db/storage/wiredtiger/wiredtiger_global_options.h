@@ -43,6 +43,7 @@ public:
     WiredTigerGlobalOptions()
         : cacheSizeGB(0),
           statisticsLogDelaySecs(0),
+          zstdCompressorLevel(0),
           directoryForIndexes(false),
           maxCacheOverflowFileSizeGBDeprecated(0),
           useCollectionPrefixCompression(false),
