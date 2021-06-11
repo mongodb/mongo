@@ -3,29 +3,32 @@
  *  1) explode for sort query planner behavior related to the selection of MERGE_SORT stage;
  *  2) MERGE_SORT stage execution.
  * @tags: [
+ *   assumes_no_implicit_collection_creation_after_drop,
  *   requires_find_command,
  * ]
  */
 (function() {
 "use strict";
 
-const testDB = db.getSiblingDB(jsTestName());
-const coll = testDB.explode_for_sort;
+const collNamePrefix = 'merge_sort_collation_';
+let collCount = 0;
 
 // Executes a test case that creates a collection and indexes, inserts documents, issues a find
 // query on a collection and compares the results with the expected collection.
 function executeQueryTestCase(testCase) {
+    let coll = db.getCollection(collNamePrefix + collCount++);
+    Object.assign(testCase, {ns: coll.getFullName()});
     jsTestLog(tojson(testCase));
 
-    // Drop the test database.
-    assert.commandWorked(testDB.dropDatabase());
+    // Drop the test collection.
+    coll.drop();
 
     // Create a collection.
     const collectionOptions = {};
     if (testCase.collectionCollation !== undefined) {
         collectionOptions.collation = testCase.collectionCollation;
     }
-    assert.commandWorked(testDB.createCollection(coll.getName(), collectionOptions));
+    assert.commandWorked(db.createCollection(coll.getName(), collectionOptions));
 
     // Create index(es).
     if (testCase.indexes !== undefined) {
