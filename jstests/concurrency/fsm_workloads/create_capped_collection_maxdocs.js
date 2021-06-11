@@ -7,7 +7,12 @@
  * occurs once the collection reaches a certain size or contains a
  * certain number of documents.
  *
- * @tags: [requires_capped]
+ * As of SERVER-16049, capped deletes are replicated. This means that capped deletes can be rolled
+ * back without rolling back the insert that caused the capped collection to trigger the delete.
+ * This makes it possible for the capped collection to exceed its capped limit temporarily until
+ * the next insert is performed successfully without rolling back.
+ *
+ * @tags: [does_not_support_stepdowns, requires_capped]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                // for extendWorkload
 load('jstests/concurrency/fsm_workloads/create_capped_collection.js');  // for $config
