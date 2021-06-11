@@ -51,589 +51,643 @@ protected:
         shard.setHost(_shardName + ":12");
         setupShards({shard});
     }
+
+    const NamespaceString _nss1{"TestDB.TestColl1"};
+    const NamespaceString _nss2{"TestDB.TestColl2"};
+    const KeyPattern _keyPattern{BSON("x" << 1)};
 };
 
-const NamespaceString kNamespace("TestDB.TestColl");
-const KeyPattern kKeyPattern(BSON("x" << 1));
-
 TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
-    ChunkType chunk;
-    chunk.setName(OID::gen());
-    chunk.setNS(kNamespace);
+    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+        const auto collEpoch = OID::gen();
 
-    auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
-    chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+        const auto collUuid = UUID::gen();
+        ChunkType chunk;
+        chunk.setName(OID::gen());
+        chunk.setNS(nss);
+        chunk.setCollectionUUID(collUuid);
 
-    // Construct chunk to be merged
-    auto chunk2(chunk);
-    chunk2.setName(OID::gen());
+        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        chunk.setVersion(origVersion);
+        chunk.setShard(ShardId("shard0000"));
 
-    auto chunkMin = BSON("a" << 1);
-    auto chunkBound = BSON("a" << 5);
-    auto chunkMax = BSON("a" << 10);
-    // first chunk boundaries
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkBound);
-    // second chunk boundaries
-    chunk2.setMin(chunkBound);
-    chunk2.setMax(chunkMax);
+        // Construct chunk to be merged
+        auto chunk2(chunk);
+        chunk2.setName(OID::gen());
 
-    std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
+        auto chunkMin = BSON("a" << 1);
+        auto chunkBound = BSON("a" << 5);
+        auto chunkMax = BSON("a" << 10);
+        // first chunk boundaries
+        chunk.setMin(chunkMin);
+        chunk.setMax(chunkBound);
+        // second chunk boundaries
+        chunk2.setMin(chunkBound);
+        chunk2.setMax(chunkMax);
 
-    setupCollection(kNamespace, kKeyPattern, {chunk, chunk2});
+        std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
 
-    Timestamp validAfter{100, 0};
+        setupCollection(nss, _keyPattern, {chunk, chunk2});
 
-    auto versions = assertGet(ShardingCatalogManager::get(operationContext())
-                                  ->commitChunkMerge(operationContext(),
-                                                     kNamespace,
-                                                     origVersion.epoch(),
-                                                     chunkBoundaries,
-                                                     "shard0000",
-                                                     validAfter));
+        Timestamp validAfter{100, 0};
 
-    auto collVersion = assertGet(ChunkVersion::parseWithField(versions, "collectionVersion"));
-    auto shardVersion = assertGet(ChunkVersion::parseWithField(versions, "shardVersion"));
+        auto versions = assertGet(
+            ShardingCatalogManager::get(operationContext())
+                ->commitChunkMerge(
+                    operationContext(), nss, collEpoch, chunkBoundaries, "shard0000", validAfter));
 
-    ASSERT_TRUE(origVersion.isOlderThan(shardVersion));
-    ASSERT_EQ(collVersion, shardVersion);
+        auto collVersion = assertGet(ChunkVersion::parseWithField(versions, "collectionVersion"));
+        auto shardVersion = assertGet(ChunkVersion::parseWithField(versions, "shardVersion"));
 
-    // Check for increment on mergedChunk's minor version
-    auto expectedShardVersion = ChunkVersion(origVersion.majorVersion(),
-                                             origVersion.minorVersion() + 1,
-                                             origVersion.epoch(),
-                                             origVersion.getTimestamp());
-    ASSERT_EQ(expectedShardVersion, shardVersion);
+        ASSERT_TRUE(origVersion.isOlderThan(shardVersion));
+        ASSERT_EQ(collVersion, shardVersion);
 
-    auto findResponse = uassertStatusOK(
-        getConfigShard()->exhaustiveFindOnConfig(operationContext(),
-                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
-                                                 ChunkType::ConfigNS,
-                                                 BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                                 BSON(ChunkType::lastmod << -1),
-                                                 boost::none));
+        // Check for increment on mergedChunk's minor version
+        auto expectedShardVersion = ChunkVersion(origVersion.majorVersion(),
+                                                 origVersion.minorVersion() + 1,
+                                                 origVersion.epoch(),
+                                                 origVersion.getTimestamp());
+        ASSERT_EQ(expectedShardVersion, shardVersion);
 
-    const auto& chunksVector = findResponse.docs;
 
-    // There should be exactly one chunk left in the collection
-    ASSERT_EQ(1u, chunksVector.size());
+        const auto query = collTimestamp ? BSON(ChunkType::collectionUUID() << collUuid)
+                                         : BSON(ChunkType::ns(nss.ns()));
+        auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            query,
+            BSON(ChunkType::lastmod << -1),
+            boost::none));
 
-    // MergedChunk should have range [chunkMin, chunkMax]
-    auto mergedChunk = uassertStatusOK(ChunkType::fromConfigBSON(
-        chunksVector.front(), collVersion.epoch(), collVersion.getTimestamp()));
-    ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
-    ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
+        const auto& chunksVector = findResponse.docs;
 
-    // Check that the shard version returned by the merge matches the CSRS one
-    ASSERT_EQ(shardVersion, mergedChunk.getVersion());
+        // There should be exactly one chunk left in the collection
+        ASSERT_EQ(1u, chunksVector.size());
 
-    // Make sure history is there
-    ASSERT_EQ(1UL, mergedChunk.getHistory().size());
-    ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
+        // MergedChunk should have range [chunkMin, chunkMax]
+        auto mergedChunk = uassertStatusOK(ChunkType::fromConfigBSON(
+            chunksVector.front(), collVersion.epoch(), collVersion.getTimestamp()));
+        ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
+        ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
+
+        // Check that the shard version returned by the merge matches the CSRS one
+        ASSERT_EQ(shardVersion, mergedChunk.getVersion());
+
+        // Make sure history is there
+        ASSERT_EQ(1UL, mergedChunk.getHistory().size());
+        ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
+    };
+
+    test(_nss1, boost::none /* timestamp */);
+    test(_nss2, Timestamp(42));
 }
 
 TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
-    const auto collEpoch = OID::gen();
-    const auto collTimestamp = boost::none;
+    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+        const auto collEpoch = OID::gen();
+        const auto collUuid = UUID::gen();
+        ChunkType chunk;
+        chunk.setName(OID::gen());
+        chunk.setNS(nss);
+        chunk.setCollectionUUID(collUuid);
 
-    ChunkType chunk;
-    chunk.setName(OID::gen());
-    chunk.setNS(kNamespace);
+        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        chunk.setVersion(origVersion);
+        chunk.setShard(ShardId("shard0000"));
 
-    auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
-    chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+        // Construct chunks to be merged
+        auto chunk2(chunk);
+        auto chunk3(chunk);
+        chunk2.setName(OID::gen());
+        chunk3.setName(OID::gen());
 
-    // Construct chunks to be merged
-    auto chunk2(chunk);
-    auto chunk3(chunk);
-    chunk2.setName(OID::gen());
-    chunk3.setName(OID::gen());
+        auto chunkMin = BSON("a" << 1);
+        auto chunkBound = BSON("a" << 5);
+        auto chunkBound2 = BSON("a" << 7);
+        auto chunkMax = BSON("a" << 10);
+        // first chunk boundaries
+        chunk.setMin(chunkMin);
+        chunk.setMax(chunkBound);
+        // second chunk boundaries
+        chunk2.setMin(chunkBound);
+        chunk2.setMax(chunkBound2);
+        // third chunk boundaries
+        chunk3.setMin(chunkBound2);
+        chunk3.setMax(chunkMax);
 
-    auto chunkMin = BSON("a" << 1);
-    auto chunkBound = BSON("a" << 5);
-    auto chunkBound2 = BSON("a" << 7);
-    auto chunkMax = BSON("a" << 10);
-    // first chunk boundaries
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkBound);
-    // second chunk boundaries
-    chunk2.setMin(chunkBound);
-    chunk2.setMax(chunkBound2);
-    // third chunk boundaries
-    chunk3.setMin(chunkBound2);
-    chunk3.setMax(chunkMax);
+        // Record chunk boundaries for passing into commitChunkMerge
+        std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkBound2, chunkMax};
 
-    // Record chunk boundaries for passing into commitChunkMerge
-    std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkBound2, chunkMax};
+        setupCollection(nss, _keyPattern, {chunk, chunk2, chunk3});
 
-    setupCollection(kNamespace, kKeyPattern, {chunk, chunk2, chunk3});
+        Timestamp validAfter{100, 0};
 
-    Timestamp validAfter{100, 0};
+        ASSERT_OK(
+            ShardingCatalogManager::get(operationContext())
+                ->commitChunkMerge(
+                    operationContext(), nss, collEpoch, chunkBoundaries, "shard0000", validAfter));
 
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->commitChunkMerge(operationContext(),
-                                     kNamespace,
-                                     origVersion.epoch(),
-                                     chunkBoundaries,
-                                     "shard0000",
-                                     validAfter));
+        const auto query = collTimestamp ? BSON(ChunkType::collectionUUID() << collUuid)
+                                         : BSON(ChunkType::ns(nss.ns()));
+        auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            query,
+            BSON(ChunkType::lastmod << -1),
+            boost::none));
 
-    auto findResponse = uassertStatusOK(
-        getConfigShard()->exhaustiveFindOnConfig(operationContext(),
-                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
-                                                 ChunkType::ConfigNS,
-                                                 BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                                 BSON(ChunkType::lastmod << -1),
-                                                 boost::none));
+        const auto& chunksVector = findResponse.docs;
 
-    const auto& chunksVector = findResponse.docs;
+        // There should be exactly one chunk left in the collection
+        ASSERT_EQ(1u, chunksVector.size());
 
-    // There should be exactly one chunk left in the collection
-    ASSERT_EQ(1u, chunksVector.size());
+        // MergedChunk should have range [chunkMin, chunkMax]
+        auto mergedChunk = uassertStatusOK(
+            ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
+        ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
+        ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
-    // MergedChunk should have range [chunkMin, chunkMax]
-    auto mergedChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
-    ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
-    ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
+        {
+            // Check for increment on mergedChunk's minor version
+            ASSERT_EQ(origVersion.majorVersion(), mergedChunk.getVersion().majorVersion());
+            ASSERT_EQ(origVersion.minorVersion() + 1, mergedChunk.getVersion().minorVersion());
+        }
 
-    {
-        // Check for increment on mergedChunk's minor version
-        ASSERT_EQ(origVersion.majorVersion(), mergedChunk.getVersion().majorVersion());
-        ASSERT_EQ(origVersion.minorVersion() + 1, mergedChunk.getVersion().minorVersion());
-    }
+        // Make sure history is there
+        ASSERT_EQ(1UL, mergedChunk.getHistory().size());
+        ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
+    };
 
-    // Make sure history is there
-    ASSERT_EQ(1UL, mergedChunk.getHistory().size());
-    ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
+    test(_nss1, boost::none /* timestamp */);
+    test(_nss2, Timestamp(42));
 }
 
 TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
-    const auto collEpoch = OID::gen();
-    const auto collTimestamp = boost::none;
+    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+        const auto collEpoch = OID::gen();
 
-    ChunkType chunk, otherChunk;
-    chunk.setName(OID::gen());
-    chunk.setNS(kNamespace);
-    otherChunk.setName(OID::gen());
-    otherChunk.setNS(kNamespace);
+        const auto collUuid = UUID::gen();
+        ChunkType chunk, otherChunk;
+        chunk.setName(OID::gen());
+        chunk.setNS(nss);
+        chunk.setCollectionUUID(collUuid);
+        otherChunk.setName(OID::gen());
+        otherChunk.setNS(nss);
+        otherChunk.setCollectionUUID(collUuid);
 
-    auto origVersion = ChunkVersion(1, 2, collEpoch, collTimestamp);
-    chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+        auto origVersion = ChunkVersion(1, 2, collEpoch, collTimestamp);
+        chunk.setVersion(origVersion);
+        chunk.setShard(ShardId("shard0000"));
 
-    // Construct chunk to be merged
-    auto chunk2(chunk);
-    chunk2.setName(OID::gen());
+        // Construct chunk to be merged
+        auto chunk2(chunk);
+        chunk2.setName(OID::gen());
 
-    auto chunkMin = BSON("a" << 1);
-    auto chunkBound = BSON("a" << 5);
-    auto chunkMax = BSON("a" << 10);
-    // first chunk boundaries
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkBound);
-    // second chunk boundaries
-    chunk2.setMin(chunkBound);
-    chunk2.setMax(chunkMax);
+        auto chunkMin = BSON("a" << 1);
+        auto chunkBound = BSON("a" << 5);
+        auto chunkMax = BSON("a" << 10);
+        // first chunk boundaries
+        chunk.setMin(chunkMin);
+        chunk.setMax(chunkBound);
+        // second chunk boundaries
+        chunk2.setMin(chunkBound);
+        chunk2.setMax(chunkMax);
 
-    // Record chunk boundaries for passing into commitChunkMerge
-    std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
+        // Record chunk boundaries for passing into commitChunkMerge
+        std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
 
-    // Set up other chunk with competing version
-    auto competingVersion = ChunkVersion(2, 1, collEpoch, boost::none /* timestamp */);
-    otherChunk.setVersion(competingVersion);
-    otherChunk.setShard(ShardId("shard0000"));
-    otherChunk.setMin(BSON("a" << 10));
-    otherChunk.setMax(BSON("a" << 20));
+        // Set up other chunk with competing version
+        auto competingVersion = ChunkVersion(2, 1, collEpoch, collTimestamp);
+        otherChunk.setVersion(competingVersion);
+        otherChunk.setShard(ShardId("shard0000"));
+        otherChunk.setMin(BSON("a" << 10));
+        otherChunk.setMax(BSON("a" << 20));
 
-    setupCollection(kNamespace, kKeyPattern, {chunk, chunk2, otherChunk});
+        setupCollection(nss, _keyPattern, {chunk, chunk2, otherChunk});
 
-    Timestamp validAfter{100, 0};
+        Timestamp validAfter{100, 0};
 
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->commitChunkMerge(operationContext(),
-                                     kNamespace,
-                                     collEpoch,
-                                     chunkBoundaries,
-                                     "shard0000",
-                                     validAfter));
+        ASSERT_OK(
+            ShardingCatalogManager::get(operationContext())
+                ->commitChunkMerge(
+                    operationContext(), nss, collEpoch, chunkBoundaries, "shard0000", validAfter));
 
-    auto findResponse = uassertStatusOK(
-        getConfigShard()->exhaustiveFindOnConfig(operationContext(),
-                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
-                                                 ChunkType::ConfigNS,
-                                                 BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                                 BSON(ChunkType::lastmod << -1),
-                                                 boost::none));
+        const auto query = collTimestamp ? BSON(ChunkType::collectionUUID() << collUuid)
+                                         : BSON(ChunkType::ns(nss.ns()));
+        auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            query,
+            BSON(ChunkType::lastmod << -1),
+            boost::none));
 
-    const auto& chunksVector = findResponse.docs;
+        const auto& chunksVector = findResponse.docs;
 
-    // There should be exactly two chunks left in the collection: one merged, one competing
-    ASSERT_EQ(2u, chunksVector.size());
+        // There should be exactly two chunks left in the collection: one merged, one competing
+        ASSERT_EQ(2u, chunksVector.size());
 
-    // MergedChunk should have range [chunkMin, chunkMax]
-    auto mergedChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
-    ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
-    ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
+        // MergedChunk should have range [chunkMin, chunkMax]
+        auto mergedChunk = uassertStatusOK(
+            ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
+        ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
+        ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
-    {
-        // Check for minor increment on collection version
-        ASSERT_EQ(competingVersion.majorVersion(), mergedChunk.getVersion().majorVersion());
-        ASSERT_EQ(competingVersion.minorVersion() + 1, mergedChunk.getVersion().minorVersion());
-    }
+        {
+            // Check for minor increment on collection version
+            ASSERT_EQ(competingVersion.majorVersion(), mergedChunk.getVersion().majorVersion());
+            ASSERT_EQ(competingVersion.minorVersion() + 1, mergedChunk.getVersion().minorVersion());
+        }
 
-    // Make sure history is there
-    ASSERT_EQ(1UL, mergedChunk.getHistory().size());
-    ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
+        // Make sure history is there
+        ASSERT_EQ(1UL, mergedChunk.getHistory().size());
+        ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
+    };
+
+    test(_nss1, boost::none /* timestamp */);
+    test(_nss2, Timestamp(42));
 }
 
 TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
-    const auto collEpoch = OID::gen();
-    const auto collTimestamp = boost::none;
+    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+        const auto collEpoch = OID::gen();
 
-    ChunkType chunk;
-    chunk.setName(OID::gen());
-    chunk.setNS(kNamespace);
+        const auto collUuid = UUID::gen();
+        ChunkType chunk;
+        chunk.setName(OID::gen());
+        chunk.setNS(nss);
+        chunk.setCollectionUUID(collUuid);
 
-    auto origVersion = ChunkVersion(1, 2, collEpoch, collTimestamp);
-    chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+        auto origVersion = ChunkVersion(1, 2, collEpoch, collTimestamp);
+        chunk.setVersion(origVersion);
+        chunk.setShard(ShardId("shard0000"));
 
-    // Construct chunk to be merged
-    auto chunk2(chunk);
-    chunk2.setName(OID::gen());
+        // Construct chunk to be merged
+        auto chunk2(chunk);
+        chunk2.setName(OID::gen());
 
-    auto chunkMin = BSON("a" << 1);
-    auto chunkBound = BSON("a" << 5);
-    auto chunkMax = BSON("a" << 10);
-    // first chunk boundaries
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkBound);
-    // second chunk boundaries
-    chunk2.setMin(chunkBound);
-    chunk2.setMax(chunkMax);
+        auto chunkMin = BSON("a" << 1);
+        auto chunkBound = BSON("a" << 5);
+        auto chunkMax = BSON("a" << 10);
+        // first chunk boundaries
+        chunk.setMin(chunkMin);
+        chunk.setMax(chunkBound);
+        // second chunk boundaries
+        chunk2.setMin(chunkBound);
+        chunk2.setMax(chunkMax);
 
-    // Record chunk boundaries for passing into commitChunkMerge
-    std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
+        // Record chunk boundaries for passing into commitChunkMerge
+        std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
 
-    // Set up unmerged chunk
-    auto otherChunk(chunk);
-    otherChunk.setName(OID::gen());
-    otherChunk.setMin(BSON("a" << 10));
-    otherChunk.setMax(BSON("a" << 20));
+        // Set up unmerged chunk
+        auto otherChunk(chunk);
+        otherChunk.setName(OID::gen());
+        otherChunk.setMin(BSON("a" << 10));
+        otherChunk.setMax(BSON("a" << 20));
 
-    setupCollection(kNamespace, kKeyPattern, {chunk, chunk2, otherChunk});
+        setupCollection(nss, _keyPattern, {chunk, chunk2, otherChunk});
 
-    Timestamp validAfter{1};
+        Timestamp validAfter{1};
+        ASSERT_OK(
+            ShardingCatalogManager::get(operationContext())
+                ->commitChunkMerge(
+                    operationContext(), nss, collEpoch, chunkBoundaries, "shard0000", validAfter));
+        const auto query = collTimestamp ? BSON(ChunkType::collectionUUID() << collUuid)
+                                         : BSON(ChunkType::ns(nss.ns()));
+        auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            query,
+            BSON(ChunkType::lastmod << -1),
+            boost::none));
 
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->commitChunkMerge(operationContext(),
-                                     kNamespace,
-                                     origVersion.epoch(),
-                                     chunkBoundaries,
-                                     "shard0000",
-                                     validAfter));
+        const auto& chunksVector = findResponse.docs;
 
-    auto findResponse = uassertStatusOK(
-        getConfigShard()->exhaustiveFindOnConfig(operationContext(),
-                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
-                                                 ChunkType::ConfigNS,
-                                                 BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                                 BSON(ChunkType::lastmod << -1),
-                                                 boost::none));
+        // There should be exactly two chunks left in the collection: one merged, one untouched
+        ASSERT_EQ(2u, chunksVector.size());
 
-    const auto& chunksVector = findResponse.docs;
+        // MergedChunk should have range [chunkMin, chunkMax]
+        auto mergedChunk = uassertStatusOK(
+            ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
+        ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
+        ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
-    // There should be exactly two chunks left in the collection: one merged, one untouched
-    ASSERT_EQ(2u, chunksVector.size());
+        {
+            // Check for increment on mergedChunk's minor version
+            ASSERT_EQ(origVersion.majorVersion(), mergedChunk.getVersion().majorVersion());
+            ASSERT_EQ(origVersion.minorVersion() + 1, mergedChunk.getVersion().minorVersion());
+        }
 
-    // MergedChunk should have range [chunkMin, chunkMax]
-    auto mergedChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
-    ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
-    ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
+        // OtherChunk should have been left alone
+        auto foundOtherChunk = uassertStatusOK(
+            ChunkType::fromConfigBSON(chunksVector.back(), collEpoch, collTimestamp));
+        ASSERT_BSONOBJ_EQ(otherChunk.getMin(), foundOtherChunk.getMin());
+        ASSERT_BSONOBJ_EQ(otherChunk.getMax(), foundOtherChunk.getMax());
+    };
 
-    {
-        // Check for increment on mergedChunk's minor version
-        ASSERT_EQ(origVersion.majorVersion(), mergedChunk.getVersion().majorVersion());
-        ASSERT_EQ(origVersion.minorVersion() + 1, mergedChunk.getVersion().minorVersion());
-    }
-
-    // OtherChunk should have been left alone
-    auto foundOtherChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.back(), collEpoch, collTimestamp));
-    ASSERT_BSONOBJ_EQ(otherChunk.getMin(), foundOtherChunk.getMin());
-    ASSERT_BSONOBJ_EQ(otherChunk.getMax(), foundOtherChunk.getMax());
+    test(_nss1, boost::none /* timestamp */);
+    test(_nss2, Timestamp(42));
 }
 
 TEST_F(MergeChunkTest, NonExistingNamespace) {
-    ChunkType chunk;
-    chunk.setNS(kNamespace);
+    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+        const auto collEpoch = OID::gen();
 
-    auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
-    chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+        ChunkType chunk;
+        chunk.setNS(nss);
+        chunk.setCollectionUUID(UUID::gen());
 
-    // Construct chunk to be merged
-    auto chunk2(chunk);
+        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        chunk.setVersion(origVersion);
+        chunk.setShard(ShardId("shard0000"));
 
-    auto chunkMin = BSON("a" << 1);
-    auto chunkBound = BSON("a" << 5);
-    auto chunkMax = BSON("a" << 10);
-    // first chunk boundaries
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkBound);
-    chunk2.setMin(chunkBound);
-    chunk2.setMax(chunkMax);
+        // Construct chunk to be merged
+        auto chunk2(chunk);
 
-    // Record chunk boundaries for passing into commitChunkMerge
-    std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
+        auto chunkMin = BSON("a" << 1);
+        auto chunkBound = BSON("a" << 5);
+        auto chunkMax = BSON("a" << 10);
+        // first chunk boundaries
+        chunk.setMin(chunkMin);
+        chunk.setMax(chunkBound);
+        chunk2.setMin(chunkBound);
+        chunk2.setMax(chunkMax);
 
-    setupCollection(kNamespace, kKeyPattern, {chunk, chunk2});
+        // Record chunk boundaries for passing into commitChunkMerge
+        std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
 
-    Timestamp validAfter{1};
+        setupCollection(nss, _keyPattern, {chunk, chunk2});
 
-    auto mergeStatus = ShardingCatalogManager::get(operationContext())
-                           ->commitChunkMerge(operationContext(),
-                                              NamespaceString("TestDB.NonExistingColl"),
-                                              origVersion.epoch(),
-                                              chunkBoundaries,
-                                              "shard0000",
-                                              validAfter);
-    ASSERT_NOT_OK(mergeStatus);
+        Timestamp validAfter{1};
+
+        auto mergeStatus = ShardingCatalogManager::get(operationContext())
+                               ->commitChunkMerge(operationContext(),
+                                                  NamespaceString("TestDB.NonExistingColl"),
+                                                  collEpoch,
+                                                  chunkBoundaries,
+                                                  "shard0000",
+                                                  validAfter);
+        ASSERT_NOT_OK(mergeStatus);
+    };
+
+    test(_nss1, boost::none /* timestamp */);
+    test(_nss2, Timestamp(42));
 }
 
 TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
-    ChunkType chunk;
-    chunk.setNS(kNamespace);
+    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+        const auto collEpoch = OID::gen();
 
-    auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
-    chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+        ChunkType chunk;
+        chunk.setNS(nss);
+        chunk.setCollectionUUID(UUID::gen());
 
-    // Construct chunk to be merged
-    auto chunk2(chunk);
+        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        chunk.setVersion(origVersion);
+        chunk.setShard(ShardId("shard0000"));
 
-    auto chunkMin = BSON("a" << 1);
-    auto chunkBound = BSON("a" << 5);
-    auto chunkMax = BSON("a" << 10);
-    // first chunk boundaries
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkBound);
-    chunk2.setMin(chunkBound);
-    chunk2.setMax(chunkMax);
+        // Construct chunk to be merged
+        auto chunk2(chunk);
 
-    // Record chunk baoundaries for passing into commitChunkMerge
-    std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
+        auto chunkMin = BSON("a" << 1);
+        auto chunkBound = BSON("a" << 5);
+        auto chunkMax = BSON("a" << 10);
+        // first chunk boundaries
+        chunk.setMin(chunkMin);
+        chunk.setMax(chunkBound);
+        chunk2.setMin(chunkBound);
+        chunk2.setMax(chunkMax);
 
-    setupCollection(kNamespace, kKeyPattern, {chunk, chunk2});
+        // Record chunk baoundaries for passing into commitChunkMerge
+        std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
 
-    Timestamp validAfter{1};
+        setupCollection(nss, _keyPattern, {chunk, chunk2});
 
-    auto mergeStatus = ShardingCatalogManager::get(operationContext())
-                           ->commitChunkMerge(operationContext(),
-                                              kNamespace,
-                                              OID::gen(),
-                                              chunkBoundaries,
-                                              "shard0000",
-                                              validAfter);
-    ASSERT_EQ(ErrorCodes::StaleEpoch, mergeStatus);
+        Timestamp validAfter{1};
+
+        auto mergeStatus =
+            ShardingCatalogManager::get(operationContext())
+                ->commitChunkMerge(
+                    operationContext(), nss, OID::gen(), chunkBoundaries, "shard0000", validAfter);
+        ASSERT_EQ(ErrorCodes::StaleEpoch, mergeStatus);
+    };
+
+    test(_nss1, boost::none /* timestamp */);
+    test(_nss2, Timestamp(42));
 }
 
 TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
-    const auto collEpoch = OID::gen();
-    const auto collTimestamp = boost::none;
+    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+        const auto collEpoch = OID::gen();
 
-    ChunkType chunk;
-    chunk.setName(OID::gen());
-    chunk.setNS(kNamespace);
+        const auto collUuid = UUID::gen();
+        ChunkType chunk;
+        chunk.setName(OID::gen());
+        chunk.setNS(nss);
+        chunk.setCollectionUUID(collUuid);
 
-    auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
-    chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        chunk.setVersion(origVersion);
+        chunk.setShard(ShardId("shard0000"));
 
-    // Construct chunk to be merged
-    auto chunk2(chunk);
-    chunk2.setName(OID::gen());
+        // Construct chunk to be merged
+        auto chunk2(chunk);
+        chunk2.setName(OID::gen());
 
-    auto chunkMin = BSON("a" << 1);
-    auto chunkBound = BSON("a" << 5);
-    auto chunkMax = BSON("a" << 10);
-    // first chunk boundaries
-    chunk.setMin(chunkMin);
-    chunk.setMax(chunkBound);
-    // second chunk boundaries
-    chunk2.setMin(chunkBound);
-    chunk2.setMax(chunkMax);
+        auto chunkMin = BSON("a" << 1);
+        auto chunkBound = BSON("a" << 5);
+        auto chunkMax = BSON("a" << 10);
+        // first chunk boundaries
+        chunk.setMin(chunkMin);
+        chunk.setMax(chunkBound);
+        // second chunk boundaries
+        chunk2.setMin(chunkBound);
+        chunk2.setMax(chunkMax);
 
-    std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
+        std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
 
-    ChunkType mergedChunk(chunk);
-    auto mergedVersion = chunk.getVersion();
-    mergedVersion.incMinor();
-    mergedChunk.setVersion(mergedVersion);
-    mergedChunk.setMax(chunkMax);
+        ChunkType mergedChunk(chunk);
+        auto mergedVersion = chunk.getVersion();
+        mergedVersion.incMinor();
+        mergedChunk.setVersion(mergedVersion);
+        mergedChunk.setMax(chunkMax);
 
-    setupCollection(kNamespace, kKeyPattern, {mergedChunk});
+        setupCollection(nss, _keyPattern, {mergedChunk});
 
-    Timestamp validAfter{1};
+        Timestamp validAfter{1};
 
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->commitChunkMerge(operationContext(),
-                                     kNamespace,
-                                     origVersion.epoch(),
-                                     chunkBoundaries,
-                                     "shard0000",
-                                     validAfter));
+        ASSERT_OK(
+            ShardingCatalogManager::get(operationContext())
+                ->commitChunkMerge(
+                    operationContext(), nss, collEpoch, chunkBoundaries, "shard0000", validAfter));
 
-    // Verify that no change to config.chunks happened.
-    auto findResponse = uassertStatusOK(
-        getConfigShard()->exhaustiveFindOnConfig(operationContext(),
-                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
-                                                 ChunkType::ConfigNS,
-                                                 BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                                 BSON(ChunkType::lastmod << -1),
-                                                 boost::none));
+        // Verify that no change to config.chunks happened.
+        const auto query = collTimestamp ? BSON(ChunkType::collectionUUID() << collUuid)
+                                         : BSON(ChunkType::ns(nss.ns()));
+        auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            query,
+            BSON(ChunkType::lastmod << -1),
+            boost::none));
 
-    const auto& chunksVector = findResponse.docs;
+        const auto& chunksVector = findResponse.docs;
 
-    // There should be exactly one chunk left in the collection
-    ASSERT_EQ(1u, chunksVector.size());
+        // There should be exactly one chunk left in the collection
+        ASSERT_EQ(1u, chunksVector.size());
 
-    // MergedChunk should have range [chunkMin, chunkMax]
-    ChunkType foundChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
-    ASSERT_BSONOBJ_EQ(mergedChunk.toConfigBSON(), foundChunk.toConfigBSON());
+        // MergedChunk should have range [chunkMin, chunkMax]
+        ChunkType foundChunk = uassertStatusOK(
+            ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
+        ASSERT_BSONOBJ_EQ(mergedChunk.toConfigBSON(), foundChunk.toConfigBSON());
+    };
+
+    test(_nss1, boost::none /* timestamp */);
+    test(_nss2, Timestamp(42));
 }
 
 TEST_F(MergeChunkTest, ChunkBoundariesOutOfOrderFails) {
-    const OID epoch = OID::gen();
-    const std::vector<BSONObj> chunkBoundaries{
-        BSON("a" << 100), BSON("a" << 200), BSON("a" << 30), BSON("a" << 400)};
+    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+        const auto collEpoch = OID::gen();
+        const std::vector<BSONObj> chunkBoundaries{
+            BSON("a" << 100), BSON("a" << 200), BSON("a" << 30), BSON("a" << 400)};
 
-    {
-        std::vector<ChunkType> originalChunks;
-        ChunkVersion version = ChunkVersion(1, 0, epoch, boost::none /* timestamp */);
+        {
+            std::vector<ChunkType> originalChunks;
+            ChunkVersion version = ChunkVersion(1, 0, collEpoch, collTimestamp);
 
-        ChunkType chunk;
-        chunk.setName(OID::gen());
-        chunk.setNS(kNamespace);
-        chunk.setShard(ShardId("shard0000"));
+            ChunkType chunk;
+            chunk.setName(OID::gen());
+            chunk.setNS(nss);
+            chunk.setCollectionUUID(UUID::gen());
 
-        chunk.setVersion(version);
-        chunk.setMin(BSON("a" << 100));
-        chunk.setMax(BSON("a" << 200));
-        originalChunks.push_back(chunk);
+            chunk.setShard(ShardId("shard0000"));
 
-        version.incMinor();
-        chunk.setName(OID::gen());
-        chunk.setMin(BSON("a" << 200));
-        chunk.setMax(BSON("a" << 300));
-        chunk.setVersion(version);
-        originalChunks.push_back(chunk);
+            chunk.setVersion(version);
+            chunk.setMin(BSON("a" << 100));
+            chunk.setMax(BSON("a" << 200));
+            originalChunks.push_back(chunk);
 
-        version.incMinor();
-        chunk.setName(OID::gen());
-        chunk.setMin(BSON("a" << 300));
-        chunk.setMax(BSON("a" << 400));
-        chunk.setVersion(version);
-        originalChunks.push_back(chunk);
+            version.incMinor();
+            chunk.setName(OID::gen());
+            chunk.setMin(BSON("a" << 200));
+            chunk.setMax(BSON("a" << 300));
+            chunk.setVersion(version);
+            originalChunks.push_back(chunk);
 
-        setupCollection(kNamespace, kKeyPattern, originalChunks);
-    }
+            version.incMinor();
+            chunk.setName(OID::gen());
+            chunk.setMin(BSON("a" << 300));
+            chunk.setMax(BSON("a" << 400));
+            chunk.setVersion(version);
+            originalChunks.push_back(chunk);
 
-    Timestamp validAfter{1};
+            setupCollection(nss, _keyPattern, originalChunks);
+        }
 
-    ASSERT_EQ(
-        ErrorCodes::InvalidOptions,
-        ShardingCatalogManager::get(operationContext())
-            ->commitChunkMerge(
-                operationContext(), kNamespace, epoch, chunkBoundaries, "shard0000", validAfter));
+        Timestamp validAfter{1};
+
+        ASSERT_EQ(
+            ErrorCodes::InvalidOptions,
+            ShardingCatalogManager::get(operationContext())
+                ->commitChunkMerge(
+                    operationContext(), nss, collEpoch, chunkBoundaries, "shard0000", validAfter));
+    };
+
+    test(_nss1, boost::none /* timestamp */);
+    test(_nss2, Timestamp(42));
 }
 
 TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
-    const auto collEpoch = OID::gen();
-    const auto collTimestamp = boost::none;
+    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+        const auto collEpoch = OID::gen();
 
-    ChunkType chunk1;
-    chunk1.setName(OID::gen());
-    chunk1.setNS(kNamespace);
+        const auto collUuid = UUID::gen();
+        ChunkType chunk1;
+        chunk1.setName(OID::gen());
+        chunk1.setNS(nss);
+        chunk1.setCollectionUUID(collUuid);
 
-    auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
-    chunk1.setVersion(origVersion);
-    chunk1.setShard(ShardId("shard0000"));
 
-    auto chunk2(chunk1);
-    auto chunk3(chunk1);
-    chunk2.setName(OID::gen());
-    chunk3.setName(OID::gen());
+        auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+        chunk1.setVersion(origVersion);
+        chunk1.setShard(ShardId("shard0000"));
 
-    auto chunkMin = BSON("a" << kMinBSONKey);
-    auto chunkBound1 = BSON("a" << BSON("$maxKey" << 1));
-    auto chunkBound2 = BSON("a" << BSON("$mixKey" << 1));
-    auto chunkMax = BSON("a" << kMaxBSONKey);
+        auto chunk2(chunk1);
+        auto chunk3(chunk1);
+        chunk2.setName(OID::gen());
+        chunk3.setName(OID::gen());
 
-    // first chunk boundaries
-    chunk1.setMin(chunkMin);
-    chunk1.setMax(chunkBound1);
-    // second chunk boundaries
-    chunk2.setMin(chunkBound1);
-    chunk2.setMax(chunkBound2);
-    // third chunk boundaries
-    chunk3.setMin(chunkBound2);
-    chunk3.setMax(chunkMax);
+        auto chunkMin = BSON("a" << kMinBSONKey);
+        auto chunkBound1 = BSON("a" << BSON("$maxKey" << 1));
+        auto chunkBound2 = BSON("a" << BSON("$mixKey" << 1));
+        auto chunkMax = BSON("a" << kMaxBSONKey);
 
-    setupCollection(kNamespace, kKeyPattern, {chunk1, chunk2, chunk3});
+        // first chunk boundaries
+        chunk1.setMin(chunkMin);
+        chunk1.setMax(chunkBound1);
+        // second chunk boundaries
+        chunk2.setMin(chunkBound1);
+        chunk2.setMax(chunkBound2);
+        // third chunk boundaries
+        chunk3.setMin(chunkBound2);
+        chunk3.setMax(chunkMax);
 
-    // Record chunk boundaries for passing into commitChunkMerge
-    std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound1, chunkBound2, chunkMax};
-    Timestamp validAfter{100, 0};
+        setupCollection(nss, _keyPattern, {chunk1, chunk2, chunk3});
 
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->commitChunkMerge(operationContext(),
-                                     kNamespace,
-                                     origVersion.epoch(),
-                                     chunkBoundaries,
-                                     "shard0000",
-                                     validAfter));
+        // Record chunk boundaries for passing into commitChunkMerge
+        std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound1, chunkBound2, chunkMax};
+        Timestamp validAfter{100, 0};
 
-    auto findResponse = uassertStatusOK(
-        getConfigShard()->exhaustiveFindOnConfig(operationContext(),
-                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
-                                                 ChunkType::ConfigNS,
-                                                 BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                                 BSON(ChunkType::lastmod << -1),
-                                                 boost::none));
+        ASSERT_OK(
+            ShardingCatalogManager::get(operationContext())
+                ->commitChunkMerge(
+                    operationContext(), nss, collEpoch, chunkBoundaries, "shard0000", validAfter));
 
-    const auto& chunksVector = findResponse.docs;
+        const auto query = collTimestamp ? BSON(ChunkType::collectionUUID() << collUuid)
+                                         : BSON(ChunkType::ns(nss.ns()));
+        auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            query,
+            BSON(ChunkType::lastmod << -1),
+            boost::none));
 
-    // There should be exactly one chunk left in the collection
-    ASSERT_EQ(1u, chunksVector.size());
+        const auto& chunksVector = findResponse.docs;
 
-    // MergedChunk should have range [chunkMin, chunkMax]
-    auto mergedChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
-    ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
-    ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
+        // There should be exactly one chunk left in the collection
+        ASSERT_EQ(1u, chunksVector.size());
 
-    {
-        // Check for increment on mergedChunk's minor version
-        ASSERT_EQ(origVersion.majorVersion(), mergedChunk.getVersion().majorVersion());
-        ASSERT_EQ(origVersion.minorVersion() + 1, mergedChunk.getVersion().minorVersion());
-    }
+        // MergedChunk should have range [chunkMin, chunkMax]
+        auto mergedChunk = uassertStatusOK(
+            ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
+        ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
+        ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
-    // Make sure history is there
-    ASSERT_EQ(1UL, mergedChunk.getHistory().size());
-    ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
+        {
+            // Check for increment on mergedChunk's minor version
+            ASSERT_EQ(origVersion.majorVersion(), mergedChunk.getVersion().majorVersion());
+            ASSERT_EQ(origVersion.minorVersion() + 1, mergedChunk.getVersion().minorVersion());
+        }
+
+        // Make sure history is there
+        ASSERT_EQ(1UL, mergedChunk.getHistory().size());
+        ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
+    };
+
+    test(_nss1, boost::none /* timestamp */);
+    test(_nss2, Timestamp(42));
 }
 
 }  // namespace

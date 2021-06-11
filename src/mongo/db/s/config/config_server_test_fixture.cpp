@@ -333,7 +333,11 @@ void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
             return UUID::gen();
         }
     }();
-    CollectionType coll(nss, chunks[0].getVersion().epoch(), Date_t::now(), collUUID);
+    CollectionType coll(nss,
+                        chunks[0].getVersion().epoch(),
+                        chunks[0].getVersion().getTimestamp(),
+                        Date_t::now(),
+                        collUUID);
     coll.setTimestamp(chunks.front().getVersion().getTimestamp());
     coll.setKeyPattern(shardKey);
     ASSERT_OK(
@@ -347,11 +351,26 @@ void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
 
 StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(
     OperationContext* opCtx,
+    const NamespaceStringOrUUID& nssOrUuid,
     const BSONObj& minKey,
     const OID& collEpoch,
     const boost::optional<Timestamp>& collTimestamp) {
-    auto doc =
-        findOneOnConfigCollection(opCtx, ChunkType::ConfigNS, BSON(ChunkType::min() << minKey));
+    const auto query = nssOrUuid.uuid()
+        ? BSON(ChunkType::collectionUUID() << *nssOrUuid.uuid() << ChunkType::min(minKey))
+        : BSON(ChunkType::ns(nssOrUuid.nss()->ns()) << ChunkType::min(minKey));
+    auto doc = findOneOnConfigCollection(opCtx, ChunkType::ConfigNS, query);
+    if (!doc.isOK())
+        return doc.getStatus();
+
+    return ChunkType::fromConfigBSON(doc.getValue(), collEpoch, collTimestamp);
+}
+
+StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(
+    OperationContext* opCtx,
+    const BSONObj& minKey,
+    const OID& collEpoch,
+    const boost::optional<Timestamp>& collTimestamp) {
+    auto doc = findOneOnConfigCollection(opCtx, ChunkType::ConfigNS, BSON(ChunkType::min(minKey)));
     if (!doc.isOK())
         return doc.getStatus();
 

@@ -48,14 +48,6 @@ const KeyPattern kKeyPattern(BSON("x" << 1));
 
 class ClearJumboFlagTest : public ConfigServerTestFixture {
 public:
-    const NamespaceString& ns() {
-        return _namespace;
-    }
-
-    const OID& epoch() {
-        return _epoch;
-    }
-
     ChunkRange jumboChunk() {
         return ChunkRange(BSON("x" << MINKEY), BSON("x" << 0));
     }
@@ -67,76 +59,117 @@ public:
 protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
-
         ShardType shard;
-        shard.setName("shard");
+        shard.setName(_shardName);
         shard.setHost("shard:12");
-
         setupShards({shard});
+    }
 
+    void makeCollection(const NamespaceString& nss,
+                        const UUID& collUuid,
+                        const OID& epoch,
+                        const boost::optional<Timestamp>& timestamp) {
         ChunkType chunk;
         chunk.setName(OID::gen());
-        chunk.setNS(_namespace);
-        chunk.setVersion({12, 7, _epoch, boost::none /* timestamp */});
-        chunk.setShard(shard.getName());
+        chunk.setNS(nss);
+        chunk.setCollectionUUID(collUuid);
+        chunk.setVersion({12, 7, epoch, timestamp});
+        chunk.setShard(_shardName);
         chunk.setMin(jumboChunk().getMin());
         chunk.setMax(jumboChunk().getMax());
         chunk.setJumbo(true);
 
         ChunkType otherChunk;
         otherChunk.setName(OID::gen());
-        otherChunk.setNS(_namespace);
-        otherChunk.setVersion({14, 7, _epoch, boost::none /* timestamp */});
-        otherChunk.setShard(shard.getName());
+        otherChunk.setNS(nss);
+        otherChunk.setCollectionUUID(collUuid);
+        otherChunk.setVersion({14, 7, epoch, timestamp});
+        otherChunk.setShard(_shardName);
         otherChunk.setMin(nonJumboChunk().getMin());
         otherChunk.setMax(nonJumboChunk().getMax());
 
-        setupCollection(_namespace, kKeyPattern, {chunk, otherChunk});
+        setupCollection(nss, kKeyPattern, {chunk, otherChunk});
     }
 
-private:
-    const NamespaceString _namespace{"TestDB.TestColl"};
-    const OID _epoch{OID::gen()};
+    const std::string _shardName = "shard";
+    const NamespaceString _nss1{"TestDB.TestColl1"};
+    const NamespaceString _nss2{"TestDB.TestColl2"};
 };
 
 TEST_F(ClearJumboFlagTest, ClearJumboShouldBumpVersion) {
-    const auto collEpoch = epoch();
-    const auto collTimestamp = boost::none;
+    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+        const auto collUuid = UUID::gen();
+        const auto collEpoch = OID::gen();
+        makeCollection(nss, collUuid, collEpoch, collTimestamp);
 
-    ShardingCatalogManager::get(operationContext())
-        ->clearJumboFlag(operationContext(), ns(), collEpoch, jumboChunk());
+        ShardingCatalogManager::get(operationContext())
+            ->clearJumboFlag(operationContext(), nss, collEpoch, jumboChunk());
 
-    auto chunkDoc = uassertStatusOK(
-        getChunkDoc(operationContext(), jumboChunk().getMin(), collEpoch, collTimestamp));
-    ASSERT_FALSE(chunkDoc.getJumbo());
-    ASSERT_EQ(ChunkVersion(15, 0, collEpoch, collTimestamp), chunkDoc.getVersion());
+        const auto nssOrUuid =
+            collTimestamp ? NamespaceStringOrUUID(nss.db().toString(), collUuid) : nss;
+
+        auto chunkDoc = uassertStatusOK(getChunkDoc(
+            operationContext(), nssOrUuid, jumboChunk().getMin(), collEpoch, collTimestamp));
+        ASSERT_FALSE(chunkDoc.getJumbo());
+        ASSERT_EQ(ChunkVersion(15, 0, collEpoch, collTimestamp), chunkDoc.getVersion());
+    };
+
+    test(_nss1, boost::none /* timestamp */);
+    test(_nss2, Timestamp(42));
 }
 
 TEST_F(ClearJumboFlagTest, ClearJumboShouldNotBumpVersionIfChunkNotJumbo) {
-    const auto collEpoch = epoch();
-    const auto collTimestamp = boost::none;
+    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+        const auto collUuid = UUID::gen();
+        const auto collEpoch = OID::gen();
+        makeCollection(nss, collUuid, collEpoch, collTimestamp);
 
-    ShardingCatalogManager::get(operationContext())
-        ->clearJumboFlag(operationContext(), ns(), collEpoch, nonJumboChunk());
+        ShardingCatalogManager::get(operationContext())
+            ->clearJumboFlag(operationContext(), nss, collEpoch, nonJumboChunk());
 
-    auto chunkDoc = uassertStatusOK(
-        getChunkDoc(operationContext(), nonJumboChunk().getMin(), collEpoch, collTimestamp));
-    ASSERT_FALSE(chunkDoc.getJumbo());
-    ASSERT_EQ(ChunkVersion(14, 7, collEpoch, collTimestamp), chunkDoc.getVersion());
+        const auto nssOrUuid =
+            collTimestamp ? NamespaceStringOrUUID(nss.db().toString(), collUuid) : nss;
+
+        auto chunkDoc = uassertStatusOK(getChunkDoc(
+            operationContext(), nssOrUuid, nonJumboChunk().getMin(), collEpoch, collTimestamp));
+        ASSERT_FALSE(chunkDoc.getJumbo());
+        ASSERT_EQ(ChunkVersion(14, 7, collEpoch, collTimestamp), chunkDoc.getVersion());
+    };
+
+    test(_nss1, boost::none /* timestamp */);
+    test(_nss2, Timestamp(42));
 }
 
 TEST_F(ClearJumboFlagTest, AssertsOnEpochMismatch) {
-    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
-                           ->clearJumboFlag(operationContext(), ns(), OID::gen(), jumboChunk()),
-                       AssertionException,
-                       ErrorCodes::StaleEpoch);
+    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+        const auto collUuid = UUID::gen();
+        const auto collEpoch = OID::gen();
+        makeCollection(nss, collUuid, collEpoch, collTimestamp);
+
+        ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                               ->clearJumboFlag(operationContext(), nss, OID::gen(), jumboChunk()),
+                           AssertionException,
+                           ErrorCodes::StaleEpoch);
+    };
+
+    test(_nss1, boost::none /* timestamp */);
+    test(_nss2, Timestamp(42));
 }
 
 TEST_F(ClearJumboFlagTest, AssertsIfChunkCantBeFound) {
-    ChunkRange imaginaryChunk(BSON("x" << 0), BSON("x" << 10));
-    ASSERT_THROWS(ShardingCatalogManager::get(operationContext())
-                      ->clearJumboFlag(operationContext(), ns(), OID::gen(), imaginaryChunk),
-                  AssertionException);
+    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+        const auto collEpoch = OID::gen();
+        const auto collUuid = UUID::gen();
+        makeCollection(nss, collUuid, collEpoch, collTimestamp);
+
+        ChunkRange imaginaryChunk(BSON("x" << 0), BSON("x" << 10));
+        ASSERT_THROWS(ShardingCatalogManager::get(operationContext())
+                          ->clearJumboFlag(operationContext(), nss, OID::gen(), imaginaryChunk),
+                      AssertionException);
+    };
+
+    test(_nss1, boost::none /* timestamp */);
+    test(_nss2, Timestamp(42));
 }
 
 }  // namespace

@@ -58,3 +58,11 @@ commands:
                              epoch.
                 type: ChunkVersion
                 optional: false
+            collectionUUID:
+                description: The collection's UUID. This field was introduced in 5.0 as mandatory.
+                type: uuid
+                optional: true
+            nss:
+                description: The collection's namespace. This field was introduced in 5.0 as mandatory.
+                type: namespacestring
+                optional: true
