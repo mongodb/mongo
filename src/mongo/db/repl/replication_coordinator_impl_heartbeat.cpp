@@ -75,6 +75,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(blockHeartbeatStepdown);
 MONGO_FAIL_POINT_DEFINE(blockHeartbeatReconfigFinish);
+MONGO_FAIL_POINT_DEFINE(hangAfterTrackingNewHandleInHandleHeartbeatResponseForTest);
 MONGO_FAIL_POINT_DEFINE(waitForPostActionCompleteInHbReconfig);
 
 }  // namespace
@@ -149,7 +150,9 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget_inlock(const HostAnd
 void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj response,
                                                                  int targetIndex,
                                                                  Milliseconds ping) {
-    CallbackHandle handle;
+    // Make a handle to a valid no-op.
+    CallbackHandle handle = uassertStatusOK(
+        _replExecutor->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& args) {}));
     RemoteCommandRequest request;
     request.target = _rsConfig.getMemberAt(targetIndex).getHostAndPort();
     executor::TaskExecutor::ResponseStatus status(response, ping);
@@ -166,6 +169,8 @@ void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj respons
         // Pretend we sent a request so that _untrackHeartbeatHandle_inlock succeeds.
         _trackHeartbeatHandle_inlock(handle, HeartbeatState::kSent, request.target);
     }
+
+    hangAfterTrackingNewHandleInHandleHeartbeatResponseForTest.pauseWhileSet();
 
     _handleHeartbeatResponse(cbData);
 }
