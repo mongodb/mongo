@@ -1,6 +1,7 @@
 // @tags: [
 //   requires_fastcount,
 //   requires_non_retryable_writes,
+//   requires_multi_updates,
 // ]
 
 //
@@ -626,7 +627,7 @@ indexes.forEach(function(index) {
         let result = coll.update(q, {$set: {stored: ObjectId()}}, {multi: true});
         // only check nModified if write commands are enabled
         if (coll.getMongo().writeMode() == "commands") {
-            assert.eq(p.nI, result.nModified, "update " + p.name);
+            assert.eq(p.nI, result.nModified, `update ${p.name}; result: ${tojson(result)}`);
         }
         // Remove & restore matching docs
         assert.eq(p.nI, coll.remove(q).nRemoved, "remove " + p.name);
