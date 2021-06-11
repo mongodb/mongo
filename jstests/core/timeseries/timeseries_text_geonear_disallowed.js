@@ -8,7 +8,6 @@
  *     does_not_support_stepdowns,
  *     requires_fcv_50,
  *     requires_timeseries,
- *     requires_wiredtiger,
  * ]
  */
 
@@ -79,8 +78,12 @@ assert.commandFailedWithCode(
 
 // $text
 // Text indices are disallowed on collections clustered by _id.
-assert.commandFailedWithCode(tsColl.createIndex({"tags.descr": "text"}), ErrorCodes.InvalidOptions);
-// Since a Text index can't be created, a $text query should fail due to a missing index.
-assert.commandFailedWithCode(assert.throws(() => tsColl.find({$text: {$search: "1"}}).itcount()),
-                                          ErrorCodes.IndexNotFound);
+if (TimeseriesTest.supportsClusteredIndexes(db.getMongo())) {
+    assert.commandFailedWithCode(tsColl.createIndex({"tags.descr": "text"}),
+                                 ErrorCodes.InvalidOptions);
+    // Since a Text index can't be created, a $text query should fail due to a missing index.
+    assert.commandFailedWithCode(
+        assert.throws(() => tsColl.find({$text: {$search: "1"}}).itcount()),
+                     ErrorCodes.IndexNotFound);
+}
 })();
