@@ -290,8 +290,14 @@ public:
     /**
      * If a chunk matching 'requestedChunk' exists, bumps the chunk's version to one greater than
      * the current collection version.
+     *
+     * 'nss' and 'collUUID' were added to the ConfigsvrEnsureChunkVersionIsGreaterThanCommand
+     * in 5.0. They are optional in 5.0 because the request may come from a previous version (4.4)
+     * that doesn't pass these extra fields.
      */
     void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
+                                         const boost::optional<NamespaceString>& nss,
+                                         const boost::optional<UUID>& collUUID,
                                          const BSONObj& minKey,
                                          const BSONObj& maxKey,
                                          const ChunkVersion& version);

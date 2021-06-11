@@ -848,6 +848,8 @@ void deleteMigrationCoordinatorDocumentLocally(OperationContext* opCtx, const UU
 }
 
 void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const UUID& collUUID,
                                      const ChunkRange& range,
                                      const ChunkVersion& preMigrationChunkVersion) {
     ConfigsvrEnsureChunkVersionIsGreaterThan ensureChunkVersionIsGreaterThanRequest;
@@ -855,6 +857,8 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
     ensureChunkVersionIsGreaterThanRequest.setMinKey(range.getMin());
     ensureChunkVersionIsGreaterThanRequest.setMaxKey(range.getMax());
     ensureChunkVersionIsGreaterThanRequest.setVersion(preMigrationChunkVersion);
+    ensureChunkVersionIsGreaterThanRequest.setNss(nss);
+    ensureChunkVersionIsGreaterThanRequest.setCollectionUUID(collUUID);
     const auto ensureChunkVersionIsGreaterThanRequestBSON =
         ensureChunkVersionIsGreaterThanRequest.toBSON({});
 
@@ -984,8 +988,11 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
 
             // The decision is not known. Recover the decision from the config server.
 
-            ensureChunkVersionIsGreaterThan(
-                opCtx, doc.getRange(), doc.getPreMigrationChunkVersion());
+            ensureChunkVersionIsGreaterThan(opCtx,
+                                            doc.getNss(),
+                                            doc.getCollectionUuid(),
+                                            doc.getRange(),
+                                            doc.getPreMigrationChunkVersion());
 
             hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(opCtx);
 

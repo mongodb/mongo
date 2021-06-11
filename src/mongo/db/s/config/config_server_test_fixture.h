@@ -106,7 +106,20 @@ protected:
                          const std::vector<ChunkType>& chunks);
 
     /**
-     * Retrieves the chunk document from the config server.
+     * Retrieves the chunk document <nssOrUuid, minKey> from the config server.
+     * This is the recommended way to get a chunk document.
+     */
+    StatusWith<ChunkType> getChunkDoc(OperationContext* opCtx,
+                                      const NamespaceStringOrUUID& nssOrUuid,
+                                      const BSONObj& minKey,
+                                      const OID& collEpoch,
+                                      const boost::optional<Timestamp>& collTimestamp);
+
+    /**
+     * Retrieves the chunk document <minKey> from the config server.
+     * This function assumes that there is just one chunk document associated to minKey. This can
+     * lead to some problems in scenarios where there are two or more collections that are splitted
+     * in the same way.
      */
     StatusWith<ChunkType> getChunkDoc(OperationContext* opCtx,
                                       const BSONObj& minKey,

@@ -138,20 +138,26 @@ BSONArray buildMergeChunksTransactionPrecond(const std::vector<ChunkType>& chunk
                                              const ChunkVersion& collVersion) {
     BSONArrayBuilder preCond;
 
+    const bool collHasTimestamp = (bool)collVersion.getTimestamp();
     for (const auto& chunk : chunksToMerge) {
         BSONObj query = BSON(ChunkType::min(chunk.getMin()) << ChunkType::max(chunk.getMax()));
-        if (collVersion.getTimestamp()) {
-            query = query.addFields(BSON(ChunkType::collectionUUID << chunk.getCollectionUUID()));
+        if (collHasTimestamp) {
+            query = query.addFields(BSON(ChunkType::collectionUUID() << chunk.getCollectionUUID()));
         } else {
             query = query.addFields(BSON(ChunkType::ns(chunk.getNS().ns())));
         }
 
+        const auto collectionIdentityMatchCondition = collHasTimestamp
+            ? BSON(ChunkType::collectionUUID()
+                   << chunk.getCollectionUUID() << ChunkType::shard(chunk.getShard().toString()))
+            : BSON(ChunkType::epoch(collVersion.epoch())
+                   << ChunkType::shard(chunk.getShard().toString()));
+
         BSONObjBuilder b;
         b.append("ns", ChunkType::ConfigNS.ns());
         b.append("q", BSON("query" << query << "orderby" << BSON(ChunkType::lastmod() << -1)));
-        b.append("res",
-                 BSON(ChunkType::epoch(collVersion.epoch())
-                      << ChunkType::shard(chunk.getShard().toString())));
+        b.append("res", collectionIdentityMatchCondition);
+
         preCond.append(b.obj());
     }
     return preCond.arr();
@@ -292,7 +298,7 @@ boost::optional<ChunkType> getControlChunkForMigrate(OperationContext* opCtx,
 
 // Helper function to find collection version and shard version.
 StatusWith<ChunkVersion> getMaxChunkVersionFromQueryResponse(
-    const NamespaceString& nss, const StatusWith<Shard::QueryResponse>& queryResponse) {
+    const CollectionType& coll, const StatusWith<Shard::QueryResponse>& queryResponse) {
 
     if (!queryResponse.isOK()) {
         return queryResponse.getStatus();
@@ -301,11 +307,14 @@ StatusWith<ChunkVersion> getMaxChunkVersionFromQueryResponse(
     const auto& chunksVector = queryResponse.getValue().docs;
     if (chunksVector.empty()) {
         return {ErrorCodes::Error(50577),
-                str::stream() << "Collection '" << nss.ns()
+                str::stream() << "Collection '" << coll.getNss().ns()
                               << "' no longer either exists, is sharded, or has chunks"};
     }
 
-    return ChunkVersion::parseLegacyWithField(chunksVector.front(), ChunkType::lastmod());
+    const auto chunk = uassertStatusOK(
+        ChunkType::fromConfigBSON(chunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
+
+    return chunk.getVersion();
 }
 
 // Helper function to get the collection version for nss. Always uses kLocalReadConcern.
@@ -329,16 +338,10 @@ StatusWith<ChunkVersion> getCollectionVersion(OperationContext* opCtx, const Nam
     }
 
     const CollectionType coll(findCollResponse.getValue().docs[0]);
-    const auto chunksQuery = [&]() {
-        if (coll.getTimestamp()) {
-            return BSON(ChunkType::collectionUUID << coll.getUuid());
-        } else {
-            return BSON(ChunkType::ns(coll.getNss().ns()));
-        }
-    }();
-
+    const auto chunksQuery = coll.getTimestamp() ? BSON(ChunkType::collectionUUID << coll.getUuid())
+                                                 : BSON(ChunkType::ns(coll.getNss().ns()));
     return getMaxChunkVersionFromQueryResponse(
-        nss,
+        coll,
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -359,19 +362,13 @@ BSONObj getShardAndCollectionVersion(OperationContext* opCtx,
     auto collectionVersion = uassertStatusOKWithContext(
         std::move(swCollectionVersion), "Couldn't retrieve collection version from config server");
 
-    const auto chunksQuery = [&]() {
-        if (coll.getTimestamp()) {
-            return BSON(ChunkType::collectionUUID
-                        << coll.getUuid() << ChunkType::shard()
-                        << fromShard);  // Query all chunks for this namespace and shard.
-        } else {
-            return BSON(ChunkType::ns()
-                        << coll.getNss().ns() << ChunkType::shard()
-                        << fromShard);  // Query all chunks for this namespace and shard.
-        }
-    }();
+    const auto chunksQuery = coll.getTimestamp()
+        ? BSON(ChunkType::collectionUUID << coll.getUuid()
+                                         << ChunkType::shard(fromShard.toString()))
+        : BSON(ChunkType::ns(coll.getNss().ns()) << ChunkType::shard(fromShard.toString()));
+
     auto swDonorShardVersion = getMaxChunkVersionFromQueryResponse(
-        coll.getNss(),
+        coll,
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -551,15 +548,6 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
 
     auto collVersion = swCollVersion.getValue();
 
-    // Return an error if collection epoch does not match epoch of request.
-    if (collVersion.epoch() != requestEpoch) {
-        return {ErrorCodes::StaleEpoch,
-                str::stream() << "splitChunk cannot split chunk " << range.toString()
-                              << ". Epoch of collection '" << nss.ns() << "' has changed."
-                              << " Current epoch: " << collVersion.epoch()
-                              << ", cmd epoch: " << requestEpoch};
-    }
-
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto findCollResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
@@ -574,10 +562,19 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
             !findCollResponse.docs.empty());
     const CollectionType coll(findCollResponse.docs[0]);
 
+    // Return an error if collection epoch does not match epoch of request.
+    if (coll.getEpoch() != requestEpoch) {
+        return {ErrorCodes::StaleEpoch,
+                str::stream() << "splitChunk cannot split chunk " << range.toString()
+                              << ". Epoch of collection '" << nss.ns() << "' has changed."
+                              << " Current epoch: " << coll.getEpoch()
+                              << ", cmd epoch: " << requestEpoch};
+    }
+
     // Find the chunk history.
     const auto collNsOrUUID = getNsOrUUIDForChunkTargeting(coll);
     const auto origChunk = _findChunkOnConfig(
-        opCtx, collNsOrUUID, collVersion.epoch(), collVersion.getTimestamp(), range.getMin());
+        opCtx, collNsOrUUID, coll.getEpoch(), coll.getTimestamp(), range.getMin());
     if (!origChunk.isOK()) {
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         return origChunk.getStatus();
@@ -680,11 +677,14 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         }
 
         b.append("q", BSON("query" << query << "orderby" << BSON(ChunkType::lastmod() << -1)));
-        {
-            BSONObjBuilder bb(b.subobjStart("res"));
-            bb.append(ChunkType::epoch(), requestEpoch);
-            bb.append(ChunkType::shard(), shardName);
-        }
+
+        const auto resultMustMatch = origChunk.getValue().getVersion().getTimestamp()
+            ? BSON(ChunkType::collectionUUID()
+                   << origChunk.getValue().getCollectionUUID() << ChunkType::shard(shardName))
+            : BSON(ChunkType::epoch(requestEpoch) << ChunkType::shard(shardName));
+
+        b.append("res", resultMustMatch);
+
         preCond.append(b.obj());
     }
 
@@ -774,15 +774,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
         return swCollVersion.getStatus().withContext(str::stream()
                                                      << "mergeChunk cannot merge chunks.");
     }
-
     auto collVersion = swCollVersion.getValue();
-
-    // Return an error if epoch of chunk does not match epoch of request
-    if (collVersion.epoch() != requestEpoch) {
-        return {ErrorCodes::StaleEpoch,
-                str::stream() << "Epoch of chunk does not match epoch of request. Chunk epoch: "
-                              << collVersion.epoch() << ", request epoch: " << requestEpoch};
-    }
 
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto findCollResponse = uassertStatusOK(
@@ -798,13 +790,17 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
             !findCollResponse.docs.empty());
     const CollectionType coll(findCollResponse.docs[0]);
 
+    if (coll.getEpoch() != requestEpoch) {
+        return {ErrorCodes::StaleEpoch,
+                str::stream()
+                    << "Epoch of collection does not match epoch of request. Collection epoch: "
+                    << coll.getEpoch() << ", request epoch: " << requestEpoch};
+    }
+
     // Check if the chunk(s) have already been merged. If so, return success.
     const auto collNsOrUUID = getNsOrUUIDForChunkTargeting(coll);
-    auto minChunkOnDisk = uassertStatusOK(_findChunkOnConfig(opCtx,
-                                                             collNsOrUUID,
-                                                             collVersion.epoch(),
-                                                             collVersion.getTimestamp(),
-                                                             chunkBoundaries.front()));
+    auto minChunkOnDisk = uassertStatusOK(_findChunkOnConfig(
+        opCtx, collNsOrUUID, coll.getEpoch(), coll.getTimestamp(), chunkBoundaries.front()));
     if (minChunkOnDisk.getMax().woCompare(chunkBoundaries.back()) == 0) {
         auto replyWithVersions = getShardAndCollectionVersion(opCtx, coll, ShardId(shardName));
         // Makes sure that the last thing we read in getCurrentChunk and
@@ -821,11 +817,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
     // Do not use the first chunk boundary as a max bound while building chunks
     for (size_t i = 1; i < chunkBoundaries.size(); ++i) {
         // Read the original chunk from disk to lookup that chunk's '_id' field.
-        auto currentChunk = uassertStatusOK(_findChunkOnConfig(opCtx,
-                                                               collNsOrUUID,
-                                                               collVersion.epoch(),
-                                                               collVersion.getTimestamp(),
-                                                               chunkBoundaries[i - 1]));
+        auto currentChunk = uassertStatusOK(_findChunkOnConfig(
+            opCtx, collNsOrUUID, coll.getEpoch(), coll.getTimestamp(), chunkBoundaries[i - 1]));
 
         // Ensure the chunk boundaries are strictly increasing
         if (chunkBoundaries[i].woCompare(currentChunk.getMin()) <= 0) {
@@ -1033,7 +1026,6 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
     return getShardAndCollectionVersion(opCtx, coll, shardId);
 }
 
-
 StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -1097,13 +1089,10 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
             "Collection is undergoing changes and chunks cannot be moved",
             coll.getAllowMigrations());
 
-    const auto findChunkQuery = [&]() {
-        if (coll.getTimestamp()) {
-            return BSON(ChunkType::collectionUUID() << coll.getUuid());
-        } else {
-            return BSON(ChunkType::ns() << coll.getNss().ns());
-        }
-    }();
+    const auto findChunkQuery = coll.getTimestamp()
+        ? BSON(ChunkType::collectionUUID() << coll.getUuid())
+        : BSON(ChunkType::ns(coll.getNss().ns()));
+
     auto findResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -1373,14 +1362,11 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
         return;
     }
 
+    const auto allChunksQuery = coll.getTimestamp()
+        ? BSON(ChunkType::collectionUUID << coll.getUuid())
+        : BSON(ChunkType::ns(coll.getNss().ns()));
+
     // Must use local read concern because we will perform subsequent writes.
-    const auto allChunksQuery = [&]() {
-        if (coll.getTimestamp()) {
-            return BSON(ChunkType::collectionUUID << coll.getUuid());
-        } else {
-            return BSON(ChunkType::ns(coll.getNss().ns()));
-        }
-    }();
     auto findResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -1420,12 +1406,12 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
                             currentCollectionVersion.getTimestamp());
 
 
-    BSONObj chunkQuery(BSON(ChunkType::epoch(collectionEpoch)
-                            << ChunkType::min(chunk.getMin()) << ChunkType::max(chunk.getMax())));
+    BSONObj chunkQuery(BSON(ChunkType::min(chunk.getMin()) << ChunkType::max(chunk.getMax())));
     if (coll.getTimestamp()) {
         chunkQuery = chunkQuery.addFields(BSON(ChunkType::collectionUUID << coll.getUuid()));
     } else {
-        chunkQuery = chunkQuery.addFields(BSON(ChunkType::ns(coll.getNss().ns())));
+        chunkQuery = chunkQuery.addFields(
+            BSON(ChunkType::ns(coll.getNss().ns()) << ChunkType::epoch(collectionEpoch)));
     }
 
     BSONObjBuilder updateBuilder;
@@ -1451,10 +1437,13 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
             didUpdate);
 }
 
-void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
-                                                             const BSONObj& minKey,
-                                                             const BSONObj& maxKey,
-                                                             const ChunkVersion& version) {
+void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(
+    OperationContext* opCtx,
+    const boost::optional<NamespaceString>& nss,
+    const boost::optional<UUID>& collUuid,
+    const BSONObj& minKey,
+    const BSONObj& maxKey,
+    const ChunkVersion& version) {
     auto earlyReturnBeforeDoingWriteGuard = makeGuard([&] {
         // Ensure waiting for writeConcern of the data read.
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
@@ -1465,81 +1454,124 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
     // move chunks on different collections to proceed in parallel.
     Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
-    const auto requestedChunkQuery =
-        BSON(ChunkType::min(minKey) << ChunkType::max(maxKey) << ChunkType::epoch(version.epoch()));
     const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    // Get the chunk matching the requested chunk.
-    const auto matchingChunksVector =
-        uassertStatusOK(
-            configShard->exhaustiveFindOnConfig(opCtx,
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                repl::ReadConcernLevel::kLocalReadConcern,
-                                                ChunkType::ConfigNS,
-                                                requestedChunkQuery,
-                                                BSONObj() /* sort */,
-                                                1 /* limit */))
-            .docs;
-    if (matchingChunksVector.empty()) {
-        // This can happen in a number of cases, such as that the collection has been dropped, its
-        // shard key has been refined, the chunk has been split, or the chunk has been merged.
-        LOGV2(23884,
-              "ensureChunkVersionIsGreaterThan did not find any chunks with minKey {minKey}, "
-              "maxKey {maxKey}, and epoch {epoch}. Returning success.",
-              "ensureChunkVersionIsGreaterThan did not find any matching chunks; returning success",
-              "minKey"_attr = minKey,
-              "maxKey"_attr = maxKey,
-              "epoch"_attr = version.epoch());
-        return;
+    CollectionType coll;
+    {
+        auto findCollResponse = uassertStatusOK(configShard->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            CollectionType::ConfigNS,
+            BSON(CollectionType::kEpochFieldName << version.epoch()),
+            {} /* sort */,
+            1));
+
+        if (findCollResponse.docs.empty()) {
+            LOGV2(5731600,
+                  "ensureChunkVersionIsGreaterThan did not find a collection with epoch "
+                  "{epoch} epoch; returning success.",
+                  "epoch"_attr = version.epoch());
+            return;
+        }
+
+        coll = CollectionType(findCollResponse.docs[0]);
+        dassert(!collUuid || *collUuid == coll.getUuid());
     }
 
-    const auto currentChunk = uassertStatusOK(ChunkType::fromConfigBSON(
-        matchingChunksVector.front(), version.epoch(), version.getTimestamp()));
+    const auto requestedChunkQuery = coll.getTimestamp()
+        ? BSON(ChunkType::min(minKey)
+               << ChunkType::max(maxKey) << ChunkType::collectionUUID() << *collUuid)
+        : BSON(ChunkType::min(minKey) << ChunkType::max(maxKey) << ChunkType::ns(coll.getNss().ns())
+                                      << ChunkType::epoch(version.epoch()));
 
-    if (version.isOlderThan(currentChunk.getVersion())) {
-        LOGV2(23885,
-              "ensureChunkVersionIsGreaterThan found that the chunk with minKey {minKey}, maxKey "
-              "{maxKey}, and epoch {epoch} already has a higher version than {version}. Current "
-              "chunk is {currentChunk}. Returning success.",
-              "ensureChunkVersionIsGreaterThan found that the chunk already has a higher version; "
-              "returning success",
-              "minKey"_attr = minKey,
-              "maxKey"_attr = maxKey,
-              "epoch"_attr = version.epoch(),
-              "version"_attr = version,
-              "currentChunk"_attr = currentChunk.toConfigBSON());
-        return;
+    // Get the chunk matching the requested chunk.
+    ChunkType matchingChunk;
+    {
+        const auto matchingChunksVector =
+            uassertStatusOK(configShard->exhaustiveFindOnConfig(
+                                opCtx,
+                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                repl::ReadConcernLevel::kLocalReadConcern,
+                                ChunkType::ConfigNS,
+                                requestedChunkQuery,
+                                BSONObj() /* sort */,
+                                1 /* limit */))
+                .docs;
+        if (matchingChunksVector.empty()) {
+            // This can happen in a number of cases, such as that the collection has been
+            // dropped, its shard key has been refined, the chunk has been split, or the chunk
+            // has been merged.
+            LOGV2(23884,
+                  "ensureChunkVersionIsGreaterThan did not find any chunks with minKey {minKey}, "
+                  "maxKey {maxKey}, and epoch {epoch}. Returning success.",
+                  "ensureChunkVersionIsGreaterThan did not find any matching chunks; returning "
+                  "success",
+                  "minKey"_attr = minKey,
+                  "maxKey"_attr = maxKey,
+                  "epoch"_attr = version.epoch());
+            return;
+        }
+
+        matchingChunk = uassertStatusOK(ChunkType::fromConfigBSON(
+            matchingChunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
+
+        if (version.isOlderThan(matchingChunk.getVersion())) {
+            LOGV2(23885,
+                  "ensureChunkVersionIsGreaterThan found that the chunk with minKey {minKey}, "
+                  "maxKey "
+                  "{maxKey}, and epoch {epoch} already has a higher version than {version}. "
+                  "Current "
+                  "chunk is {currentChunk}. Returning success.",
+                  "ensureChunkVersionIsGreaterThan found that the chunk already has a higher "
+                  "version; "
+                  "returning success",
+                  "minKey"_attr = minKey,
+                  "maxKey"_attr = maxKey,
+                  "epoch"_attr = version.epoch(),
+                  "version"_attr = version,
+                  "currentChunk"_attr = matchingChunk.toConfigBSON());
+            return;
+        }
     }
 
     // Get the chunk with the current collectionVersion for this epoch.
-    const auto highestChunksVector =
-        uassertStatusOK(
-            configShard->exhaustiveFindOnConfig(opCtx,
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                repl::ReadConcernLevel::kLocalReadConcern,
-                                                ChunkType::ConfigNS,
-                                                BSON(ChunkType::epoch(version.epoch())) /* query */,
-                                                BSON(ChunkType::lastmod << -1) /* sort */,
-                                                1 /* limit */))
-            .docs;
-    if (highestChunksVector.empty()) {
-        LOGV2(23886,
-              "ensureChunkVersionIsGreaterThan did not find any chunks with epoch {epoch} when "
-              "attempting to find the collectionVersion. The collection must have been dropped "
-              "concurrently or had its shard key refined. Returning success.",
-              "ensureChunkVersionIsGreaterThan did not find any chunks with a matching epoch when "
-              "attempting to find the collectionVersion. The collection must have been dropped "
-              "concurrently or had its shard key refined. Returning success.",
-              "epoch"_attr = version.epoch());
-        return;
+    ChunkType highestChunk;
+    {
+        const auto highestChunksVector =
+            uassertStatusOK(configShard->exhaustiveFindOnConfig(
+                                opCtx,
+                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                repl::ReadConcernLevel::kLocalReadConcern,
+                                ChunkType::ConfigNS,
+                                BSON(ChunkType::epoch(version.epoch())) /* query */,
+                                BSON(ChunkType::lastmod << -1) /* sort */,
+                                1 /* limit */))
+                .docs;
+        if (highestChunksVector.empty()) {
+            LOGV2(23886,
+                  "ensureChunkVersionIsGreaterThan did not find any chunks with epoch {epoch} "
+                  "when "
+                  "attempting to find the collectionVersion. The collection must have been "
+                  "dropped "
+                  "concurrently or had its shard key refined. Returning success.",
+                  "ensureChunkVersionIsGreaterThan did not find any chunks with a matching epoch "
+                  "when "
+                  "attempting to find the collectionVersion. The collection must have been "
+                  "dropped "
+                  "concurrently or had its shard key refined. Returning success.",
+                  "epoch"_attr = version.epoch());
+            return;
+        }
+        highestChunk = uassertStatusOK(ChunkType::fromConfigBSON(
+            highestChunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
     }
-    const auto highestChunk = uassertStatusOK(ChunkType::fromConfigBSON(
-        highestChunksVector.front(), version.epoch(), version.getTimestamp()));
 
-    // Generate a new version for the chunk by incrementing the collectionVersion's major version.
-    auto newChunk = currentChunk;
+    // Generate a new version for the chunk by incrementing the collectionVersion's major
+    // version.
+    auto newChunk = matchingChunk;
     newChunk.setVersion(ChunkVersion(
-        highestChunk.getVersion().majorVersion() + 1, 0, version.epoch(), version.getTimestamp()));
+        highestChunk.getVersion().majorVersion() + 1, 0, coll.getEpoch(), coll.getTimestamp()));
 
     // Update the chunk, if it still exists, to have the bumped version.
     earlyReturnBeforeDoingWriteGuard.dismiss();
@@ -1551,27 +1583,29 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
                                                                 false /* upsert */,
                                                                 kNoWaitWriteConcern));
     if (didUpdate) {
-        LOGV2(
-            23887,
-            "ensureChunkVersionIsGreaterThan bumped the version of the chunk with minKey {minKey}, "
-            "maxKey {maxKey}, and epoch {epoch}. Chunk is now {newChunk}",
-            "ensureChunkVersionIsGreaterThan bumped the the chunk version",
-            "minKey"_attr = minKey,
-            "maxKey"_attr = maxKey,
-            "epoch"_attr = version.epoch(),
-            "newChunk"_attr = newChunk.toConfigBSON());
+        LOGV2(23887,
+              "ensureChunkVersionIsGreaterThan bumped the version of the chunk with minKey "
+              "{minKey}, "
+              "maxKey {maxKey}, and epoch {epoch}. Chunk is now {newChunk}",
+              "ensureChunkVersionIsGreaterThan bumped the the chunk version",
+              "minKey"_attr = minKey,
+              "maxKey"_attr = maxKey,
+              "epoch"_attr = version.epoch(),
+              "newChunk"_attr = newChunk.toConfigBSON());
     } else {
-        LOGV2(
-            23888,
-            "ensureChunkVersionIsGreaterThan did not find a chunk matching minKey {minKey}, "
-            "maxKey {maxKey}, and epoch {epoch} when trying to bump its version. The collection "
-            "must have been dropped concurrently or had its shard key refined. Returning success.",
-            "ensureChunkVersionIsGreaterThan did not find a matching chunk when trying to bump its "
-            "version. The collection must have been dropped concurrently or had its shard key "
-            "refined. Returning success.",
-            "minKey"_attr = minKey,
-            "maxKey"_attr = maxKey,
-            "epoch"_attr = version.epoch());
+        LOGV2(23888,
+              "ensureChunkVersionIsGreaterThan did not find a chunk matching minKey {minKey}, "
+              "maxKey {maxKey}, and epoch {epoch} when trying to bump its version. The "
+              "collection "
+              "must have been dropped concurrently or had its shard key refined. Returning "
+              "success.",
+              "ensureChunkVersionIsGreaterThan did not find a matching chunk when trying to bump "
+              "its "
+              "version. The collection must have been dropped concurrently or had its shard key "
+              "refined. Returning success.",
+              "minKey"_attr = minKey,
+              "maxKey"_attr = maxKey,
+              "epoch"_attr = version.epoch());
     }
 }
 
