@@ -96,14 +96,6 @@ assert.commandFailed(db.runCommand({
     "index": {"keyPattern": {a: 1}, "name": "index1", "expireAfterSeconds": 1000}
 }));
 
-// try to modify a faulty TTL index with a non-numeric expireAfterSeconds field
-t.dropIndex({a: 1});
-t.createIndex({a: 1}, {"expireAfterSeconds": "50"});
-var res =
-    db.runCommand({"collMod": coll, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}});
-debug(res);
-assert.eq(0, res.ok, "shouldn't be able to modify faulty index spec");
-
 // try with new index, this time set expireAfterSeconds
 t.dropIndex({a: 1});
 t.createIndex({a: 1}, {"expireAfterSeconds": 50});

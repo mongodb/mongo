@@ -206,9 +206,12 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             if (cmr.indexExpireAfterSeconds.eoo() && cmr.indexHidden.eoo()) {
                 return Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds or hidden field");
             }
-            if (!cmr.indexExpireAfterSeconds.eoo() && !cmr.indexExpireAfterSeconds.isNumber()) {
-                return Status(ErrorCodes::InvalidOptions,
-                              "expireAfterSeconds field must be a number");
+            if (!cmr.indexExpireAfterSeconds.eoo()) {
+                if (auto status = index_key_validate::validateExpireAfterSeconds(
+                        cmr.indexExpireAfterSeconds.safeNumberLong());
+                    !status.isOK()) {
+                    return {ErrorCodes::InvalidOptions, status.reason()};
+                }
             }
             if (!cmr.indexHidden.eoo() && !cmr.indexHidden.isBoolean()) {
                 return Status(ErrorCodes::InvalidOptions, "hidden field must be a boolean");
@@ -244,10 +247,16 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             if (!cmr.indexExpireAfterSeconds.eoo()) {
                 BSONElement oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
                 if (oldExpireSecs.eoo()) {
-                    return Status(ErrorCodes::InvalidOptions,
-                                  "no expireAfterSeconds field to update");
-                }
-                if (!oldExpireSecs.isNumber()) {
+                    if (cmr.idx->isIdIndex()) {
+                        return Status(ErrorCodes::InvalidOptions,
+                                      "the _id field does not support TTL indexes");
+                    }
+                    if (cmr.idx->getNumFields() != 1) {
+                        return Status(ErrorCodes::InvalidOptions,
+                                      "TTL indexes are single-field indexes, compound indexes do "
+                                      "not support TTL");
+                    }
+                } else if (!oldExpireSecs.isNumber()) {
                     return Status(ErrorCodes::InvalidOptions,
                                   "existing expireAfterSeconds field is not a number");
                 }
@@ -415,6 +424,8 @@ public:
         // add the fields to BSONObjBuilder result
         if (!_oldExpireSecs.eoo()) {
             _result->appendAs(_oldExpireSecs, "expireAfterSeconds_old");
+        }
+        if (!_newExpireSecs.eoo()) {
             _result->appendAs(_newExpireSecs, "expireAfterSeconds_new");
         }
         if (!_newHidden.eoo()) {
@@ -597,6 +608,13 @@ Status _collModInternal(OperationContext* opCtx,
             if (indexExpireAfterSeconds) {
                 newExpireSecs = indexExpireAfterSeconds;
                 oldExpireSecs = idx->infoObj().getField("expireAfterSeconds");
+                // If this collection was not previously TTL, inform the TTL monitor when we commit.
+                if (oldExpireSecs.eoo()) {
+                    auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
+                    opCtx->recoveryUnit()->onCommit([ttlCache, uuid = coll->uuid(), &idx](auto _) {
+                        ttlCache->registerTTLInfo(uuid, idx->indexName());
+                    });
+                }
                 if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs !=
                                                                     newExpireSecs)) {
                     // Change the value of "expireAfterSeconds" on disk.
@@ -620,8 +638,9 @@ Status _collModInternal(OperationContext* opCtx,
             indexCollModInfo =
                 IndexCollModInfo{!indexExpireAfterSeconds ? boost::optional<Seconds>()
                                                           : Seconds(newExpireSecs.safeNumberLong()),
-                                 !indexExpireAfterSeconds ? boost::optional<Seconds>()
-                                                          : Seconds(oldExpireSecs.safeNumberLong()),
+                                 !indexExpireAfterSeconds || oldExpireSecs.eoo()
+                                     ? boost::optional<Seconds>()
+                                     : Seconds(oldExpireSecs.safeNumberLong()),
                                  !indexHidden ? boost::optional<bool>() : newHidden.booleanSafe(),
                                  !indexHidden ? boost::optional<bool>() : oldHidden.booleanSafe(),
                                  idx->indexName()};

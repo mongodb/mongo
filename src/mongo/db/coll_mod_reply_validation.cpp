@@ -31,17 +31,6 @@
 
 namespace mongo::coll_mod_reply_validation {
 void validateReply(const CollModReply& reply) {
-    auto eAS_new = reply.getExpireAfterSeconds_new().is_initialized();
-    auto eAS_old = reply.getExpireAfterSeconds_old().is_initialized();
-
-    if ((!eAS_new && eAS_old) || (eAS_new && !eAS_old)) {
-        uassert(
-            ErrorCodes::CommandResultSchemaViolation,
-            str::stream() << "Invalid CollModReply: Reply should define either both fields "
-                          << "(expireAfterSeconds_new and expireAfterSeconds_old) or none of them.",
-            false);
-    }
-
     auto hidden_new = reply.getHidden_new().is_initialized();
     auto hidden_old = reply.getHidden_old().is_initialized();
 

@@ -716,7 +716,7 @@ Status validateIndexSpecTTL(const BSONObj& indexSpec) {
     if (auto status = validateExpireAfterSeconds(expireAfterSecondsElt.safeNumberLong());
         !status.isOK()) {
         return {ErrorCodes::CannotCreateIndex,
-                str::stream() << status.reason() << "index spec: " << indexSpec};
+                str::stream() << status.reason() << ". Index spec: " << indexSpec};
     }
 
     const BSONObj key = indexSpec["key"].Obj();
