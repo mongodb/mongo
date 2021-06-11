@@ -3685,6 +3685,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     initialStateDocument.setState(TenantMigrationRecipientStateEnum::kStarted);
     // Set the 'expireAt' field to indicate the migration is garbage collectable.
     auto opCtx = makeOperationContext();
+    initialStateDocument.setStartAt(opCtx->getServiceContext()->getFastClockSource()->now());
     initialStateDocument.setExpireAt(opCtx->getServiceContext()->getFastClockSource()->now());
     ASSERT_EQ(0, initialStateDocument.getNumRestartsDueToRecipientFailure());
 

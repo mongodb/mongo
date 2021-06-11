@@ -782,12 +782,12 @@ std::vector<HostAndPort> TenantMigrationRecipientService::Instance::_getExcluded
 }
 
 SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(WithLock) {
-    // If the instance state is not 'kUninitialized', then the instance is restarted by step up. So,
+    // If the instance state has a startAt field, then the instance is restarted by step up. So,
     // skip persisting the state doc. And, PrimaryOnlyService::onStepUp() waits for majority commit
     // of the primary no-op oplog entry written by the node in the newer term before scheduling the
     // Instance::run(). So, it's also safe to assume that instance's state document written in an
     // older term on disk won't get rolled back for step up case.
-    if (_stateDoc.getState() != TenantMigrationRecipientStateEnum::kUninitialized) {
+    if (_stateDoc.getStartAt()) {
         return SemiFuture<void>::makeReady();
     }
 
@@ -799,8 +799,17 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
                 "connectionString"_attr = _donorConnectionString,
                 "readPreference"_attr = _readPreference);
 
+    if (_stateDoc.getState() != TenantMigrationRecipientStateEnum::kDone) {
+        _stateDoc.setState(TenantMigrationRecipientStateEnum::kStarted);
+    } else {
+        // If we don't have a startAt field, we shouldn't have an expireAt either.
+        // If the state is 'kDone' without the expireAt field, it means a recipientForgetMigration
+        // command is received before a recipientSyncData command or after the state doc is garbage
+        // collected. We want to re-initialize the state doc but immediately mark it garbage
+        // collectable to account for delayed recipientSyncData commands.
+        invariant(!_stateDoc.getExpireAt());
+    }
     // Persist the state doc before starting the data sync.
-    _stateDoc.setState(TenantMigrationRecipientStateEnum::kStarted);
     _stateDoc.setStartAt(getGlobalServiceContext()->getFastClockSource()->now());
 
     return ExecutorFuture(**_scopedExecutor)
@@ -1979,6 +1988,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
 
                        if (_stateDoc.getState() !=
                                TenantMigrationRecipientStateEnum::kUninitialized &&
+                           _stateDoc.getState() != TenantMigrationRecipientStateEnum::kDone &&
                            !_stateDocPersistedPromise.getFuture().isReady() &&
                            !_stateDoc.getExpireAt()) {
                            // If our state is initialized and we haven't fulfilled the
@@ -2017,7 +2027,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        uassert(ErrorCodes::TenantMigrationForgotten,
                                str::stream() << "Migration " << getMigrationUUID()
                                              << " already marked for garbage collect",
-                               !_stateDoc.getExpireAt());
+                               _stateDoc.getState() != TenantMigrationRecipientStateEnum::kDone &&
+                                   !_stateDoc.getExpireAt());
 
                        // Must abort if flagged for cancellation above.
                        uassert(ErrorCodes::TenantMigrationAborted,

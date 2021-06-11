@@ -115,12 +115,26 @@ SharedSemiFuture<void> TenantMigrationRecipientAccessBlocker::getCanReadFuture(
 
     stdx::lock_guard<Latch> lk(_mutex);
     if (_state.isReject()) {
+        LOGV2_DEBUG(5749100,
+                    1,
+                    "Tenant read is blocked on the recipient before migration completes",
+                    "tenantId"_attr = _tenantId,
+                    "opId"_attr = opCtx->getOpID(),
+                    "command"_attr = command);
         return SharedSemiFuture<void>(Status(
             ErrorCodes::SnapshotTooOld, "Tenant read is not allowed before migration completes"));
     }
     invariant(_state.isRejectBefore());
     invariant(_rejectBeforeTimestamp);
     if (atClusterTime && *atClusterTime < *_rejectBeforeTimestamp) {
+        LOGV2_DEBUG(5749101,
+                    1,
+                    "Tenant read is blocked on the recipient before migration completes",
+                    "tenantId"_attr = _tenantId,
+                    "opId"_attr = opCtx->getOpID(),
+                    "command"_attr = command,
+                    "atClusterTime"_attr = *atClusterTime,
+                    "rejectBeforeTimestamp"_attr = *_rejectBeforeTimestamp);
         return SharedSemiFuture<void>(Status(
             ErrorCodes::SnapshotTooOld, "Tenant read is not allowed before migration completes"));
     }
