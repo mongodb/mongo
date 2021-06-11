@@ -6890,7 +6890,6 @@ task_groups:
 - <<: *compile_task_group_template
   name: compile_ninja_next_TG
   tasks:
-  - compile_build_tools_next
   - compile_ninja_next
 
 - <<: *compile_task_group_template
@@ -7335,10 +7334,15 @@ buildvariants:
   - name: compile_ninja_next_TG
     distros:
     - ubuntu1804-build
+  - name: compile_build_tools_next_TG
+    distros:
+    - ubuntu1804-build
   - name: libdeps_graph_linting_TG
     distros:
       - ubuntu1804-build
   - name: compile_ninja_TG
+    distros:
+    - ubuntu1804-build
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -7544,10 +7548,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu2004-large
-  - name: compile_ninja_next_TG
-    distros:
-    - ubuntu2004-large
-  - name: compile_ninja_TG
   - name: .aggfuzzer .common !.multiversion
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -8498,6 +8498,9 @@ buildvariants:
   - name: compile_ninja_next_TG
     distros:
     - windows-vsCurrent-large
+  - name: compile_build_tools_next_TG
+    distros:
+    - windows-vsCurrent-large
   - name: audit
   # Do not add more tasks to this list.
 
@@ -8603,6 +8606,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_ninja_next_TG
+  - name: compile_build_tools_next_TG
   - name: libdeps_graph_linting_TG
   - name: audit
   - name: auth_audit_gen
