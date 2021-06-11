@@ -32,10 +32,16 @@ secondaryAdminDB.auth("admin", "admin");
 const secondaryTestDB = rst.getSecondary().getDB("test");
 secondaryTestDB.auth("NotTrusted", "pwd");
 
-// Cluster time should be gossipped in the steady state.
-let res = assert.commandWorked(secondaryTestDB.runCommand({find: "foo", filter: {}}));
-assert.hasFields(res, ["$clusterTime", "operationTime"]);
-const validClusterTimeMetadata = res.$clusterTime;
+// Cluster time should be gossipped in the steady state. This requires the secondary to have cached
+// the cluster time keys which requires reading from a majority snapshot and may not have happened
+// immediately after replica set startup, so retry until times are returned.
+let res, validClusterTimeMetadata;
+assert.soonNoExcept(() => {
+    res = assert.commandWorked(secondaryTestDB.runCommand({find: "foo", filter: {}}));
+    assert.hasFields(res, ["$clusterTime", "operationTime"]);
+    validClusterTimeMetadata = res.$clusterTime;
+    return true;
+});
 
 // After entering maintenance mode, cluster time should no longer be gossipped, in or out.
 assert.commandWorked(secondaryAdminDB.adminCommand({replSetMaintenance: 1}));
