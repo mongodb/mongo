@@ -279,7 +279,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     if (!hint.isEmpty()) {
         BSONElement natural = hint[query_request_helper::kNaturalSortField];
         if (natural) {
-            csn->direction = natural.numberInt() >= 0 ? 1 : -1;
+            csn->direction = natural.safeNumberInt() >= 0 ? 1 : -1;
         }
     }
 
