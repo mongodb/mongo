@@ -218,7 +218,7 @@ private:
      * Synchronously invokes the recipient shard with the specified command and either returns the
      * command response (if succeeded) or the status, if the command failed.
      */
-    StatusWith<BSONObj> _callRecipient(const BSONObj& cmdObj);
+    StatusWith<BSONObj> _callRecipient(OperationContext* opCtx, const BSONObj& cmdObj);
 
     /**
      * Get the disklocs that belong to the chunk migrated and sort them in _cloneLocs (to avoid
