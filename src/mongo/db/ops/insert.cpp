@@ -190,11 +190,7 @@ Status userAllowedWriteNS(OperationContext* opCtx, const NamespaceString& ns) {
         return Status::OK();
     }
 
-    // TODO (SERVER-49545): Remove the FCV check when 5.0 becomes last-lts.
-    if (ns.isSystemDotProfile() ||
-        (ns.isSystemDotViews() && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-         serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-             ServerGlobalParams::FeatureCompatibility::Version::kVersion47)) ||
+    if (ns.isSystemDotProfile() || ns.isSystemDotViews() ||
         (ns.isOplog() &&
          repl::ReplicationCoordinator::get(getGlobalServiceContext())->isReplEnabled())) {
         return Status(ErrorCodes::InvalidNamespace, str::stream() << "cannot write to " << ns);
