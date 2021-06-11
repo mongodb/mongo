@@ -159,6 +159,18 @@ Mongo.prototype.adminCommand = function(cmd) {
     return this.getDB("admin").runCommand(cmd);
 };
 
+Mongo.prototype._setSecurityToken = function(token) {
+    this._securityToken = token;
+};
+
+Mongo.prototype.runCommand = function(dbname, cmd, options) {
+    return this._runCommandImpl(dbname, cmd, options, this._securityToken || {});
+};
+
+Mongo.prototype.runCommandWithMetadata = function(dbname, cmd, metadata) {
+    return this._runCommandWithMetadataImpl(dbname, cmd, metadata, this._securityToken || {});
+};
+
 /**
  * Returns all log components and current verbosity values
  */

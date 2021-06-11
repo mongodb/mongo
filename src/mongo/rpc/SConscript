@@ -42,8 +42,8 @@ protoEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/auth/security_token',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-        '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/third_party/wiredtiger/wiredtiger_checksum' if wiredtiger else [],
     ],
@@ -124,6 +124,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/db/auth/security_token',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/signed_logical_time',
         'client_metadata',
@@ -181,6 +182,7 @@ if wiredtiger:
             'metadata/egress_metadata_hook_list_test.cpp',
             'metadata/oplog_query_metadata_test.cpp',
             'metadata/repl_set_metadata_test.cpp',
+            'metadata/security_token_metadata_test.cpp',
             'metadata/tracking_metadata_test.cpp',
             'metadata_test.cpp',
             'object_check_test.cpp',
@@ -191,6 +193,7 @@ if wiredtiger:
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/client/clientdriver_minimal',
+            '$BUILD_DIR/mongo/db/service_context_test_fixture',
             '$BUILD_DIR/third_party/wiredtiger/wiredtiger_checksum',
             'client_metadata',
             'metadata',

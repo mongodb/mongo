@@ -73,6 +73,7 @@ struct RemoteCommandRequestBase {
     std::string dbname;
     BSONObj metadata{rpc::makeEmptyMetadata()};
     BSONObj cmdObj;
+    BSONObj securityToken;
 
     // OperationContext is added to each request to allow OP_Command metadata attachment access to
     // the Client object. The OperationContext is only accessed on the thread that calls

@@ -1284,7 +1284,7 @@ void ExecCommandDatabase::_initiateCommand() {
         }
     });
 
-    rpc::readRequestMetadata(opCtx, request.body, command->requiresAuth());
+    rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
     rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);

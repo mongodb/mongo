@@ -34,17 +34,30 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/message.h"
 
 namespace mongo {
 
+/**
+ * OpMsg packets are made up of the following sequence of possible fields.
+ *
+ * ----------------------------
+ * uint32_t           flags;     // One or more of the flags fields defined below
+ *                               // Bits 0-15 MUST be supported by the receiving peer
+ *                               // Bits 16-31 are OPTIONAL and may be ignored
+ * DocumentSequence[] docs;      // Zero or more name/BSON pairs describing the message
+ * optional<uint32_t> checksum;  // CRC-32C checksum for the preceeding data.
+ * ----------------------------
+ */
 struct OpMsg {
     struct DocumentSequence {
         std::string name;
         std::vector<BSONObj> objs;
     };
 
+    // Flags
     static constexpr uint32_t kChecksumPresent = 1 << 0;
     static constexpr uint32_t kMoreToCome = 1 << 1;
     static constexpr uint32_t kExhaustSupported = 1 << 16;
@@ -144,6 +157,7 @@ struct OpMsg {
     }
 
     BSONObj body;
+    BSONObj securityToken;
     std::vector<DocumentSequence> sequences;
 };
 
@@ -238,6 +252,11 @@ public:
         resumeBody().appendElements(body);
     }
 
+    BSONObjBuilder beginSecurityToken();
+    void setSecurityToken(const BSONObj& token) {
+        beginSecurityToken().appendElements(token);
+    }
+
     /**
      * Finish building and return a Message ready to give to the networking layer for transmission.
      * It is illegal to call any methods on this object after calling this.
@@ -299,6 +318,7 @@ private:
         kEmpty,
         kDocSequence,
         kBody,
+        kSecurityToken,
         kDone,
     };
 

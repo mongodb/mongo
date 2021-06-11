@@ -69,8 +69,6 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(_markNodeAsFailed);
         MONGO_DECLARE_JS_FUNCTION(logout);
         MONGO_DECLARE_JS_FUNCTION(remove);
-        MONGO_DECLARE_JS_FUNCTION(runCommand);
-        MONGO_DECLARE_JS_FUNCTION(runCommandWithMetadata);
         MONGO_DECLARE_JS_FUNCTION(setClientRPCProtocols);
         MONGO_DECLARE_JS_FUNCTION(update);
         MONGO_DECLARE_JS_FUNCTION(getMinWireVersion);
@@ -79,6 +77,8 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(isMongos);
         MONGO_DECLARE_JS_FUNCTION(isTLS);
         MONGO_DECLARE_JS_FUNCTION(getApiParameters);
+        MONGO_DECLARE_JS_FUNCTION(_runCommandImpl);
+        MONGO_DECLARE_JS_FUNCTION(_runCommandWithMetadataImpl);
         MONGO_DECLARE_JS_FUNCTION(_startSession);
     };
 

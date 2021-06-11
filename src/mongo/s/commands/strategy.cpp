@@ -614,7 +614,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         apiVersionMetrics.update(appName, apiParams);
     }
 
-    rpc::readRequestMetadata(opCtx, request.body, command->requiresAuth());
+    rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
 
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, invocation.get());
     bool startTransaction = false;

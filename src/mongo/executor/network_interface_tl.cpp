@@ -34,6 +34,7 @@
 #include "mongo/executor/network_interface_tl.h"
 
 #include "mongo/config.h"
+#include "mongo/db/auth/security_token.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_tl.h"
@@ -51,7 +52,25 @@ namespace executor {
 
 namespace {
 static inline const std::string kMaxTimeMSOpOnlyField = "maxTimeMSOpOnly";
-}  // unnamed namespace
+
+Status appendMetadata(RemoteCommandRequestOnAny* request,
+                      const std::unique_ptr<rpc::EgressMetadataHook>& hook) {
+    if (hook) {
+        BSONObjBuilder bob(std::move(request->metadata));
+        auto status = hook->writeRequestMetadata(request->opCtx, &bob);
+        if (!status.isOK()) {
+            return status;
+        }
+        request->metadata = bob.obj();
+    }
+
+    if (auto securityToken = auth::getSecurityToken(request->opCtx)) {
+        request->securityToken = securityToken->toBSON();
+    }
+
+    return Status::OK();
+}
+}  // namespace
 
 /**
  * SynchronizedCounters is synchronized bucket of event counts for commands
@@ -466,15 +485,9 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     LOGV2_DEBUG(
         22596, kDiagnosticLogLevel, "startCommand", "request"_attr = redact(request.toString()));
 
-    if (_metadataHook) {
-        BSONObjBuilder newMetadata(std::move(request.metadata));
-
-        auto status = _metadataHook->writeRequestMetadata(request.opCtx, &newMetadata);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        request.metadata = newMetadata.obj();
+    auto status = appendMetadata(&request, _metadataHook);
+    if (!status.isOK()) {
+        return status;
     }
 
     bool targetHostsInAlphabeticalOrder =
@@ -1000,15 +1013,9 @@ Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandl
     LOGV2_DEBUG(
         23909, kDiagnosticLogLevel, "startCommand", "request"_attr = redact(request.toString()));
 
-    if (_metadataHook) {
-        BSONObjBuilder newMetadata(std::move(request.metadata));
-
-        auto status = _metadataHook->writeRequestMetadata(request.opCtx, &newMetadata);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        request.metadata = newMetadata.obj();
+    auto status = appendMetadata(&request, _metadataHook);
+    if (!status.isOK()) {
+        return status;
     }
 
     auto cmdState = ExhaustCommandState::make(this, request, cbHandle, std::move(onReply));

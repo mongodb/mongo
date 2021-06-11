@@ -33,6 +33,7 @@
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/security_token.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_time_validator.h"
@@ -51,9 +52,7 @@ BSONObj makeEmptyMetadata() {
     return BSONObj();
 }
 
-void readRequestMetadata(OperationContext* opCtx,
-                         const BSONObj& metadataObj,
-                         bool cmdRequiresAuth) {
+void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRequiresAuth) {
     BSONElement readPreferenceElem;
     BSONElement configSvrElem;
     BSONElement trackingElem;
@@ -62,7 +61,7 @@ void readRequestMetadata(OperationContext* opCtx,
     BSONElement impersonationElem;
     BSONElement clientOperationKeyElem;
 
-    for (const auto& metadataElem : metadataObj) {
+    for (const auto& metadataElem : opMsg.body) {
         auto fieldName = metadataElem.fieldNameStringData();
         if (fieldName == "$readPreference") {
             readPreferenceElem = metadataElem;
@@ -95,6 +94,7 @@ void readRequestMetadata(OperationContext* opCtx,
     }
 
     readImpersonatedUserMetadata(impersonationElem, opCtx);
+    auth::readSecurityTokenMetadata(opCtx, opMsg.securityToken);
 
     // We check for "$client" but not "client" here, because currentOp can filter on "client" as
     // a top-level field.
@@ -110,7 +110,7 @@ void readRequestMetadata(OperationContext* opCtx,
     TrackingMetadata::get(opCtx) =
         uassertStatusOK(TrackingMetadata::readFromMetadata(trackingElem));
 
-    VectorClock::get(opCtx)->gossipIn(opCtx, metadataObj, !cmdRequiresAuth);
+    VectorClock::get(opCtx)->gossipIn(opCtx, opMsg.body, !cmdRequiresAuth);
 }
 
 namespace {

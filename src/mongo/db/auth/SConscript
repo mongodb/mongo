@@ -5,6 +5,22 @@ Import("env")
 env = env.Clone()
 
 env.Library(
+    target='security_token',
+    source=[
+        'security_token.cpp',
+        'security_token.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_feature_flags',
+        '$BUILD_DIR/mongo/idl/feature_flag',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='authentication_restriction',
     source=[
         'restriction_environment.cpp',

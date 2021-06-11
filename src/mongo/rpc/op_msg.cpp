@@ -38,6 +38,7 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/config.h"
+#include "mongo/db/auth/security_token_gen.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/object_check.h"
@@ -61,6 +62,7 @@ bool containsUnknownRequiredFlags(uint32_t flags) {
 enum class Section : uint8_t {
     kBody = 0,
     kDocSequence = 1,
+    kSecurityToken = 2,
 };
 
 constexpr int kCrc32Size = 4;
@@ -188,6 +190,14 @@ OpMsg OpMsg::parse(const Message& message) try {
                 break;
             }
 
+            case Section::kSecurityToken: {
+                uassert(ErrorCodes::Unauthorized,
+                        "Unsupported Security Token provided",
+                        auth::gAcceptOpMsgSecurityToken);
+                msg.securityToken = sectionsBuf.read<Validated<BSONObj>>();
+                break;
+            }
+
             default:
                 // Using uint32_t so we append as a decimal number rather than as a char.
                 uasserted(40432, str::stream() << "Unknown section kind " << uint32_t(sectionKind));
@@ -232,7 +242,11 @@ OpMsg OpMsg::parse(const Message& message) try {
 namespace {
 void serializeHelper(const std::vector<OpMsg::DocumentSequence>& sequences,
                      const BSONObj& body,
+                     const BSONObj& securityToken,
                      OpMsgBuilder* output) {
+    if (securityToken.nFields() > 0) {
+        output->setSecurityToken(securityToken);
+    }
     for (auto&& seq : sequences) {
         auto docSeq = output->beginDocSequence(seq.name);
         for (auto&& obj : seq.objs) {
@@ -245,13 +259,13 @@ void serializeHelper(const std::vector<OpMsg::DocumentSequence>& sequences,
 
 Message OpMsg::serialize() const {
     OpMsgBuilder builder;
-    serializeHelper(sequences, body, &builder);
+    serializeHelper(sequences, body, securityToken, &builder);
     return builder.finish();
 }
 
 Message OpMsg::serializeWithoutSizeChecking() const {
     OpMsgBuilder builder;
-    serializeHelper(sequences, body, &builder);
+    serializeHelper(sequences, body, securityToken, &builder);
     return builder.finishWithoutSizeChecking();
 }
 
@@ -266,10 +280,20 @@ void OpMsg::shareOwnershipWith(const ConstSharedBuffer& buffer) {
             }
         }
     }
+    if (!securityToken.isOwned()) {
+        securityToken.shareOwnershipWith(buffer);
+    }
+}
+
+BSONObjBuilder OpMsgBuilder::beginSecurityToken() {
+    invariant(_state == kEmpty);
+    _state = kSecurityToken;
+    _buf.appendStruct(Section::kSecurityToken);
+    return BSONObjBuilder(_buf);
 }
 
 auto OpMsgBuilder::beginDocSequence(StringData name) -> DocSequenceBuilder {
-    invariant(_state == kEmpty || _state == kDocSequence);
+    invariant((_state == kEmpty) || (_state == kSecurityToken) || (_state == kDocSequence));
     invariant(!_openBuilder);
     _openBuilder = true;
     _state = kDocSequence;
@@ -290,7 +314,7 @@ void OpMsgBuilder::finishDocumentStream(DocSequenceBuilder* docSequenceBuilder) 
 }
 
 BSONObjBuilder OpMsgBuilder::beginBody() {
-    invariant(_state == kEmpty || _state == kDocSequence);
+    invariant((_state == kEmpty) || (_state == kSecurityToken) || (_state == kDocSequence));
     _state = kBody;
     _buf.appendStruct(Section::kBody);
     invariant(_bodyStart == 0);
