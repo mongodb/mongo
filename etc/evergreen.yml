@@ -97,6 +97,16 @@ variables:
       resmoke_args: --help
       resmoke_jobs_max: 0  # No cap on number of jobs.
 
+- &gen_task_template
+  name: gen_task_template
+  depends_on:
+    - name: build_variant_gen
+    - name: archive_dist_test
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        resmoke_args: --help
+
 - &benchmark_template
   name: benchmark_template
   depends_on:
@@ -150,7 +160,9 @@ variables:
 - &jstestfuzz_template
   name: jstestfuzz_template
   exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
-  depends_on: []
+  depends_on:
+  - build_variant_gen
+  - archive_dist_test
   commands:
   - func: "generate fuzzer tasks"
 
@@ -263,6 +275,7 @@ variables:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
+  - name: build_variant_gen
   - name: burn_in_tests_gen
   - name: .aggfuzzer .common
   - name: audit
@@ -1017,6 +1030,38 @@ functions:
         files:
           - src/generated_resmoke_config/*.json
 
+  "generate build variant":
+    - *f_expansions_write
+    - *configure_evergreen_api_credentials
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/generate_build_variant.sh"
+    - command: archive.targz_pack
+      params:
+        target: generate_tasks_config.tgz
+        source_dir: src/generated_resmoke_config
+        include:
+          - "*"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: generate_tasks_config.tgz
+        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: Generated Task Config - Execution ${execution}
+        optional: true
+    - command: generate.tasks
+      params:
+        optional: true
+        files:
+          - src/generated_resmoke_config/*.json
+
   "generate burn in tags":
     - *f_expansions_write
     - *configure_evergreen_api_credentials
@@ -1048,66 +1093,25 @@ functions:
           - src/generated_burn_in_tags_config/burn_in_tags_gen.json
 
   "generate randomized multiversion tasks":
-    - command: manifest.load
-    - *git_get_project
+    - *fetch_artifacts
     - *f_expansions_write
     - *add_git_tag
     - *kill_processes
     - *cleanup_environment
     - *set_up_venv
     - *upload_pip_requirements
-    - *configure_evergreen_api_credentials
     - *f_expansions_write
+    - *configure_evergreen_api_credentials
 
     - command: subprocess.exec
       type: test
       params:
         binary: bash
         args:
-          - "./src/evergreen/randomized_multiversion_tasks_generate.sh"
-
-    - *do_multiversion_setup
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "./src/evergreen/randomized_multiversion_tasks_generate_exclude_tags.sh"
-    - command: archive.targz_pack
-      params:
-        target: generate_tasks_config.tgz
-        source_dir: src/generated_resmoke_config
-        optional: true
-        include:
-          - "*"
-
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: generate_tasks_config.tgz
-        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/gzip
-        display_name: Generated Task Config - Execution ${execution}
-        optional: true
-
-    - command: timeout.update
-      params:
-        exec_timeout_secs: 10800  # 3 hours
-        timeout_secs: 10800  # 3 hours
-
-    - *f_expansions_write
-
-    - command: generate.tasks
-      params:
-        optional: true
-        files:
-          - src/generated_resmoke_config/*.json
+          - "./src/evergreen/gen_tasks_activate.sh"
 
   "generate resmoke tasks":
-    - command: manifest.load
-    - *git_get_project
+    - *fetch_artifacts
     - *f_expansions_write
     - *add_git_tag
     - *kill_processes
@@ -1122,39 +1126,7 @@ functions:
       params:
         binary: bash
         args:
-          - "./src/evergreen/resmoke_tasks_generate.sh"
-
-    - command: archive.targz_pack
-      params:
-        target: generate_tasks_config.tgz
-        source_dir: src/generated_resmoke_config
-        include:
-          - "*"
-
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: generate_tasks_config.tgz
-        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/gzip
-        display_name: Generated Task Config - Execution ${execution}
-        optional: true
-
-    - command: timeout.update
-      params:
-        exec_timeout_secs: 10800  # 3 hours
-        timeout_secs: 10800  # 3 hours
-
-    - *f_expansions_write
-
-    - command: generate.tasks
-      params:
-        optional: true
-        files:
-          - src/generated_resmoke_config/*.json
+          - "./src/evergreen/gen_tasks_activate.sh"
 
   # Used by generator
   "run generated tests":
@@ -1177,6 +1149,11 @@ functions:
   - *determine_resmoke_jobs
   - *update_resmoke_jobs_expansions
   - *f_expansions_write
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "./src/evergreen/implicit_multiversions_tasks_generate.sh"
   - *execute_resmoke_tests
     # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
     # directly actionable. We use type=setup rather than type=system or type=test for this command
@@ -1305,8 +1282,7 @@ functions:
 
 
   "generate explicit multiversion tasks":
-    - command: manifest.load
-    - *git_get_project
+    - *fetch_artifacts
     - *f_expansions_write
     - *add_git_tag
     - *kill_processes
@@ -1315,148 +1291,49 @@ functions:
     - *upload_pip_requirements
     - *f_expansions_write
     - *configure_evergreen_api_credentials
-    - *do_multiversion_setup
 
     - command: subprocess.exec
       type: test
       params:
         binary: bash
         args:
-          - "./src/evergreen/explicit_multiversion_tasks_generate.sh"
-
-    - command: archive.targz_pack
-      params:
-        target: generate_tasks_config.tgz
-        source_dir: src/generated_resmoke_config
-        include:
-          - "*"
-
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: generate_tasks_config.tgz
-        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/gzip
-        display_name: Generated Task Config - Execution ${execution}
-        optional: true
-
-    - command: timeout.update
-      params:
-        exec_timeout_secs: 10800  # 3 hours
-        timeout_secs: 10800  # 3 hours
-
-    - *f_expansions_write
-
-    - command: generate.tasks
-      params:
-        optional: true
-        files:
-          - src/generated_resmoke_config/*.json
+          - "./src/evergreen/gen_tasks_activate.sh"
 
   "generate implicit multiversion tasks":
-    - command: manifest.load
-    - *git_get_project
-    - *f_expansions_write
-    - *add_git_tag
-    - *kill_processes
-    - *cleanup_environment
-    - *set_up_venv
-    - *configure_evergreen_api_credentials
-    - *f_expansions_write
-    - *do_multiversion_setup
-
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "./src/evergreen/implicit_multiversions_tasks_generate.sh"
-
-    - command: archive.targz_pack
-      params:
-        target: generate_tasks_config.tgz
-        source_dir: src/generated_resmoke_config
-        include:
-          - "*"
-
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: generate_tasks_config.tgz
-        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/gzip
-        display_name: Generated Task Config - Execution ${execution}
-        optional: true
-
-    - command: timeout.update
-      params:
-        exec_timeout_secs: 10800  # 3 hours
-        timeout_secs: 10800  # 3 hours
-
-    - *f_expansions_write
-
-    - command: generate.tasks
-      params:
-        # Optional b/c reruns of this task will produce no JSON files to avoid
-        # generate.tasks failing
-        optional: true
-        files:
-          - src/generated_resmoke_config/*.json
-
-  "generate fuzzer tasks":
-    - command: manifest.load
-    - *git_get_project
+    - *fetch_artifacts
     - *f_expansions_write
     - *add_git_tag
     - *kill_processes
     - *cleanup_environment
     - *set_up_venv
     - *upload_pip_requirements
-
-    - *configure_evergreen_api_credentials
     - *f_expansions_write
+    - *configure_evergreen_api_credentials
+
     - command: subprocess.exec
+      type: test
       params:
         binary: bash
         args:
-          - "./src/evergreen/fuzzer_tasks_generate.sh"
+          - "./src/evergreen/gen_tasks_activate.sh"
 
-    - command: archive.targz_pack
-      params:
-        target: generate_tasks_config.tgz
-        source_dir: src/generated_resmoke_config
-        include:
-          - "*"
-
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: generate_tasks_config.tgz
-        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${name}_gen-${build_id}.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/gzip
-        display_name: Generated Task Config - Execution ${execution}
-        optional: true
-
-    - command: timeout.update
-      params:
-        exec_timeout_secs: 10800  # 3 hours
-        timeout_secs: 10800  # 3 hours
+  "generate fuzzer tasks":
+    - *fetch_artifacts
     - *f_expansions_write
+    - *add_git_tag
+    - *kill_processes
+    - *cleanup_environment
+    - *set_up_venv
+    - *upload_pip_requirements
+    - *f_expansions_write
+    - *configure_evergreen_api_credentials
 
-    - command: generate.tasks
+    - command: subprocess.exec
+      type: test
       params:
-        optional: true
-        files:
-          - src/generated_resmoke_config/${name}.json
+        binary: bash
+        args:
+          - "./src/evergreen/gen_tasks_activate.sh"
 
   "setup jstestfuzz":
     - *f_expansions_write
@@ -2176,6 +2053,7 @@ tasks:
           - "patch_test_tags.tgz"
           - "./build/**.gcno"
           - "./etc/*san.suppressions"
+          - "./etc/backports_required_for_multiversion_tests.yml"
           - "./etc/expansions.default.yml"
           - "./etc/pip/**"
           - "./etc/repo_config.yaml"
@@ -3895,7 +3773,8 @@ tasks:
       name: resharding_fuzzer_idempotency
 
 ## Tests that the multiversion test generation logic is not broken.
-- name: multiversion_sanity_check_passthrough_gen
+- <<: *gen_task_template
+  name: multiversion_sanity_check_passthrough_gen
   tags: []
   commands:
   - func: "generate implicit multiversion tasks"
@@ -3904,7 +3783,8 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger --includeWithAnyTags=multiversion_sanity_check
       require_multiversion: true
 
-- name: replica_sets_jscore_multiversion_passthrough_gen
+- <<: *gen_task_template
+  name: replica_sets_jscore_multiversion_passthrough_gen
   tags: ["multiversion_passthrough"]
   commands:
   - func: "generate implicit multiversion tasks"
@@ -4041,10 +3921,9 @@ tasks:
       resmoke_args: --suites=aggregation_read_concern_majority_passthrough --storageEngine=wiredTiger
       resmoke_jobs_factor: 0.5
 
-- name: aggregation_secondary_reads_gen
+- <<: *gen_task_template
+  name: aggregation_secondary_reads_gen
   tags: ["aggregation", "secondary_reads"]
-  depends_on:
-  - name: aggregation
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4083,7 +3962,8 @@ tasks:
     vars:
       resmoke_args: --suites=audit --storageEngine=wiredTiger
 
-- name: auth_gen
+- <<: *gen_task_template
+  name: auth_gen
   tags: ["auth"]
   commands:
   - func: "generate resmoke tasks"
@@ -4111,6 +3991,17 @@ tasks:
       repeat_tests_min: 2
       repeat_tests_max: 1000
 
+- name: build_variant_gen
+  commands:
+    - command: manifest.load
+    - *git_get_project
+    - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
+    - func: "set up venv"
+    - func: "upload pip requirements"
+    - func: "generate build variant"
+
 - name: selected_tests_gen
   tags: []
   commands:
@@ -4123,7 +4014,8 @@ tasks:
   - func: "upload pip requirements"
   - func: "generate selected tests"
 
-- name: auth_audit_gen
+- <<: *gen_task_template
+  name: auth_audit_gen
   tags: ["auth", "audit"]
   commands:
   - func: "generate resmoke tasks"
@@ -4139,7 +4031,7 @@ tasks:
     vars:
       resmoke_args: --suites=change_streams --storageEngine=wiredTiger
 
-- <<: *task_template
+- <<: *gen_task_template
   name: change_streams_multiversion_passthrough_gen
   tags: ["multiversion_passthrough"]
   commands:
@@ -4202,11 +4094,9 @@ tasks:
     vars:
       resmoke_args: --suites=change_streams_sharded_collections_passthrough --storageEngine=wiredTiger
 
-- <<: *task_template
+- <<: *gen_task_template
   name: change_streams_sharded_collections_multiversion_passthrough_gen
   tags: ["multiversion_passthrough"]
-  depends_on:
-  - name: change_streams_multiversion_passthrough_gen
   commands:
   - func: "generate implicit multiversion tasks"
     vars:
@@ -4668,14 +4558,16 @@ tasks:
     vars:
       resmoke_args: --suites=causally_consistent_jscore_txns_passthrough --storageEngine=wiredTiger
 
-- name: sharded_causally_consistent_jscore_txns_passthrough_gen
+- <<: *gen_task_template
+  name: sharded_causally_consistent_jscore_txns_passthrough_gen
   tags: ["sharding", "jscore", "causally_consistent", "txns"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
+- <<: *gen_task_template
+  name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
   tags: ["sharding", "wo_snapshot", "causally_consistent", "jscore"]
   commands:
   - func: "generate resmoke tasks"
@@ -4683,7 +4575,8 @@ tasks:
       suite: sharded_causally_consistent_jscore_txns_passthrough
       resmoke_args: --storageEngine=wiredTiger --excludeWithAnyTags=uses_snapshot_read_concern
 
-- name: causally_consistent_hedged_reads_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: causally_consistent_hedged_reads_jscore_passthrough_gen
   tags: ["causally_consistent", "sharding", "jscore"]
   commands:
   - func: "generate resmoke tasks"
@@ -4708,7 +4601,8 @@ tasks:
     vars:
       resmoke_args: --suites=replica_sets_jscore_passthrough --storageEngine=wiredTiger
 
-- name: replica_sets_reconfig_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: replica_sets_reconfig_jscore_passthrough_gen
   tags: []
   commands:
   - func: "generate resmoke tasks"
@@ -4716,7 +4610,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+- <<: *gen_task_template
+  name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
   tags: []
   commands:
   - func: "generate resmoke tasks"
@@ -4732,7 +4627,8 @@ tasks:
     vars:
       resmoke_args: --suites=replica_sets_reconfig_kill_primary_jscore_passthrough --storageEngine=wiredTiger
 
-- name: replica_sets_api_version_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: replica_sets_api_version_jscore_passthrough_gen
   tags: []
   commands:
   - func: "generate resmoke tasks"
@@ -4740,7 +4636,8 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 5
 
-- name: replica_sets_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: replica_sets_jscore_passthrough_gen
   tags: []
   commands:
   - func: "generate resmoke tasks"
@@ -4766,7 +4663,8 @@ tasks:
     vars:
       resmoke_args: --suites=replica_sets_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
 
-- name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
   tags: ["replica_sets", "non_maj_read"]
   commands:
   - func: "generate resmoke tasks"
@@ -4792,14 +4690,16 @@ tasks:
     vars:
       resmoke_args: --suites=replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough --storageEngine=wiredTiger
 
-- name: replica_sets_update_v1_oplog_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: replica_sets_update_v1_oplog_jscore_passthrough_gen
   tags: ["replica_sets", "non_maj_read"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: replica_sets_initsync_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: replica_sets_initsync_jscore_passthrough_gen
   tags: ["replica_sets", "san", "large"]
   commands:
   - func: "generate resmoke tasks"
@@ -4851,7 +4751,8 @@ tasks:
     vars:
       resmoke_args: --suites=mongos_test
 
-- name: multiversion_auth_gen
+- <<: *gen_task_template
+  name: multiversion_auth_gen
   tags: ["auth", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
@@ -4859,7 +4760,8 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       require_multiversion: true
 
-- name: multiversion_gen
+- <<: *gen_task_template
+  name: multiversion_gen
   tags: []
   commands:
   - func: "generate resmoke tasks"
@@ -4870,7 +4772,8 @@ tasks:
 # Tests the runFeatureFlagMultiversionTest helper.
 # This requires the 'featureFlagToaster' and 'featureFlagSpoon' parameters to be set to true on
 # build variants that enable this task.
-- name: feature_flag_multiversion_gen
+- <<: *gen_task_template
+  name: feature_flag_multiversion_gen
   tags: []
   commands:
   - func: "generate resmoke tasks"
@@ -4878,7 +4781,8 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       require_multiversion: true
 
-- name: unittest_shell_hang_analyzer_gen
+- <<: *gen_task_template
+  name: unittest_shell_hang_analyzer_gen
   tags: []
   commands:
   - func: "generate resmoke tasks"
@@ -4886,7 +4790,8 @@ tasks:
       suite: unittest_shell_hang_analyzer
       resmoke_args: --storageEngine=wiredTiger
 
-- name: noPassthrough_gen
+- <<: *gen_task_template
+  name: noPassthrough_gen
   tags: ["misc_js"]
   commands:
   - func: "generate resmoke tasks"
@@ -4896,7 +4801,8 @@ tasks:
       use_large_distro: "true"
 
 # Only run hot_backups tests for hot_backups variant.
-- name: noPassthroughHotBackups_gen
+- <<: *gen_task_template
+  name: noPassthroughHotBackups_gen
   tags: []
   commands:
     - func: "generate resmoke tasks"
@@ -4905,7 +4811,8 @@ tasks:
         resmoke_args: --storageEngine=wiredTiger src/mongo/db/modules/*/jstests/hot_backups/*.js
         use_large_distro: "true"
 
-- name: noPassthroughWithMongod_gen
+- <<: *gen_task_template
+  name: noPassthroughWithMongod_gen
   tags: ["misc_js"]
   commands:
   - func: "generate resmoke tasks"
@@ -4914,7 +4821,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: slow1_gen
+- <<: *gen_task_template
+  name: slow1_gen
   tags: ["misc_js", "non_win_dbg"]
   commands:
   - func: "generate resmoke tasks"
@@ -4941,7 +4849,7 @@ tasks:
     vars:
       resmoke_args: --suites=sharded_collections_jscore_passthrough --storageEngine=wiredTiger
 
-- <<: *task_template
+- <<: *gen_task_template
   name: sharded_collections_jscore_multiversion_passthrough_gen
   tags: ["multiversion_passthrough"]
   commands:
@@ -4960,7 +4868,7 @@ tasks:
     vars:
       resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger
 
-- <<: *task_template
+- <<: *gen_task_template
   name: sharding_jscore_multiversion_passthrough_gen
   tags: ["multiversion_passthrough"]
   commands:
@@ -4970,7 +4878,8 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       require_multiversion: true
 
-- name: sharding_api_version_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: sharding_api_version_jscore_passthrough_gen
   tags: ["sharding", "jscore"]
   commands:
   - func: "generate resmoke tasks"
@@ -4996,7 +4905,8 @@ tasks:
     vars:
       resmoke_args: --suites=sharded_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
 
-- name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   tags: ["multi_shard", "multi_stmt", "common"]
   commands:
   - func: "generate resmoke tasks"
@@ -5005,14 +4915,16 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 0  # No cap on number of jobs.
 
-- name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
   tags: ["multi_shard", "common"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+- <<: *gen_task_template
+  name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   tags: ["multi_stmt"]
   commands:
   - func: "generate resmoke tasks"
@@ -5020,7 +4932,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
   tags: ["multi_shard"]
   commands:
   - func: "generate resmoke tasks"
@@ -5028,7 +4941,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough_gen
   tags: ["multi_shard"]
   commands:
   - func: "generate resmoke tasks"
@@ -5036,7 +4950,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: tenant_migration_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: tenant_migration_jscore_passthrough_gen
   tags: ["tenant_migration"]
   commands:
   - func: "generate resmoke tasks"
@@ -5044,7 +4959,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: tenant_migration_causally_consistent_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: tenant_migration_causally_consistent_jscore_passthrough_gen
   tags: ["tenant_migration"]
   commands:
   - func: "generate resmoke tasks"
@@ -5052,7 +4968,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
   tags: ["tenant_migration", "txn"]
   commands:
   - func: "generate resmoke tasks"
@@ -5060,7 +4977,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: tenant_migration_stepdown_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: tenant_migration_stepdown_jscore_passthrough_gen
   tags: ["tenant_migration"]
   commands:
   - func: "generate resmoke tasks"
@@ -5068,16 +4986,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: tenant_migration_terminate_primary_jscore_passthrough_gen
-  tags: ["tenant_migration"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
-      fallback_num_sub_suites: 10
-
-- name: tenant_migration_kill_primary_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: tenant_migration_terminate_primary_jscore_passthrough_gen
   tags: ["tenant_migration"]
   commands:
   - func: "generate resmoke tasks"
@@ -5086,7 +4996,18 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 10
 
-- name: parallel_gen
+- <<: *gen_task_template
+  name: tenant_migration_kill_primary_jscore_passthrough_gen
+  tags: ["tenant_migration"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 10
+
+- <<: *gen_task_template
+  name: parallel_gen
   tags: ["misc_js"]
   commands:
   - func: "generate resmoke tasks"
@@ -5124,7 +5045,8 @@ tasks:
       resmoke_args: --suites=concurrency_replication_metrics --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
-- name: concurrency_replication_gen
+- <<: *gen_task_template
+  name: concurrency_replication_gen
   tags: ["concurrency", "common", "repl"]
   commands:
   - func: "generate resmoke tasks"
@@ -5132,7 +5054,7 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
-- <<: *task_template
+- <<: *gen_task_template
   name: concurrency_replication_multiversion_passthrough_gen
   tags: [multiversion_passthrough]
   commands:
@@ -5142,7 +5064,8 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       require_multiversion: true
 
-- name: concurrency_replication_causal_consistency_gen
+- <<: *gen_task_template
+  name: concurrency_replication_causal_consistency_gen
   tags: ["concurrency", "repl", "large", "non_live_record"]
   commands:
   - func: "generate resmoke tasks"
@@ -5191,7 +5114,8 @@ tasks:
       resmoke_args: --suites=concurrency_replication_multi_stmt_txn_ubsan --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
-- name: concurrency_replication_wiredtiger_cursor_sweeps_gen
+- <<: *gen_task_template
+  name: concurrency_replication_wiredtiger_cursor_sweeps_gen
   tags: ["concurrency", "repl"]
   commands:
   - func: "generate resmoke tasks"
@@ -5199,7 +5123,8 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
-- name: concurrency_replication_wiredtiger_eviction_debug_gen
+- <<: *gen_task_template
+  name: concurrency_replication_wiredtiger_eviction_debug_gen
   tags: ["concurrency", "repl", "debug_only"]
   commands:
   - func: "generate resmoke tasks"
@@ -5207,7 +5132,8 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_replication_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_replication_gen
   tags: ["concurrency", "common", "read_concern_maj", "large", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5216,7 +5142,8 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_replication_multiversion_passthrough_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_replication_multiversion_passthrough_gen
   tags: ["multiversion_passthrough", "sharded"]
   commands:
   - func: "generate implicit multiversion tasks"
@@ -5225,7 +5152,8 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       require_multiversion: true
 
-- name: concurrency_sharded_replication_with_balancer_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_replication_with_balancer_gen
   tags: ["concurrency", "common", "read_concern_maj", "large", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5234,7 +5162,8 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_replication_no_txns_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_replication_no_txns_gen
   tags: ["concurrency", "no_txns", "large", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5244,7 +5173,8 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_replication_no_txns_with_balancer_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_replication_no_txns_with_balancer_gen
   tags: ["concurrency", "no_txns", "large", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5254,7 +5184,8 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
   tags: ["concurrency", "common", "read_concern_maj", "large", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5263,7 +5194,8 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_causal_consistency_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_causal_consistency_gen
   tags: ["concurrency", "non_live_record", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5272,7 +5204,8 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_causal_consistency_and_balancer_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_causal_consistency_and_balancer_gen
   tags: ["concurrency", "large", "non_live_record", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5281,7 +5214,8 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_with_stepdowns_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_with_stepdowns_gen
   tags: ["concurrency", "stepdowns", "large", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5290,7 +5224,8 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_with_stepdowns_and_balancer_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_with_stepdowns_and_balancer_gen
   tags: ["concurrency", "stepdowns", "large", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5299,7 +5234,8 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_terminate_primary_with_balancer_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_terminate_primary_with_balancer_gen
   tags: ["concurrency", "stepdowns", "kill_terminate", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5308,7 +5244,8 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_kill_primary_with_balancer_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_kill_primary_with_balancer_gen
   tags: ["concurrency", "stepdowns", "kill_terminate", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5317,7 +5254,8 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_multi_stmt_txn_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_multi_stmt_txn_gen
   tags: ["concurrency", "large", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5326,7 +5264,8 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_multi_stmt_txn_with_balancer_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_multi_stmt_txn_with_balancer_gen
   tags: ["concurrency", "large", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5335,7 +5274,8 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_local_read_write_multi_stmt_txn_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_local_read_write_multi_stmt_txn_gen
   tags: ["concurrency", "large", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5344,7 +5284,8 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer_gen
   tags: ["concurrency", "large", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5353,7 +5294,8 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_multi_stmt_txn_with_stepdowns_gen
+- <<: *gen_task_template
+  name: concurrency_sharded_multi_stmt_txn_with_stepdowns_gen
   tags: ["concurrency", "stepdowns", "large", "sharded"]
   commands:
   - func: "generate resmoke tasks"
@@ -5362,7 +5304,7 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
-- <<: *task_template
+- <<: *gen_task_template
   name: concurrency_sharded_multi_stmt_txn_terminate_primary_gen
   tags: ["concurrency", "stepdowns", "kill_terminate", "sharded"]
   commands:
@@ -5372,7 +5314,7 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
-- <<: *task_template
+- <<: *gen_task_template
   name: concurrency_sharded_multi_stmt_txn_kill_primary_gen
   tags: ["concurrency", "stepdowns", "kill_terminate", "sharded"]
   commands:
@@ -5382,7 +5324,8 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
-- name: concurrency_simultaneous_gen
+- <<: *gen_task_template
+  name: concurrency_simultaneous_gen
   tags: ["concurrency", "common"]
   commands:
   - func: "generate resmoke tasks"
@@ -5429,7 +5372,8 @@ tasks:
     vars:
       resmoke_args: --suites=read_concern_linearizable_passthrough --storageEngine=wiredTiger
 
-- name: read_concern_majority_passthrough_gen
+- <<: *gen_task_template
+  name: read_concern_majority_passthrough_gen
   tags: ["read_write_concern"]
   commands:
   - func: "generate resmoke tasks"
@@ -5455,7 +5399,8 @@ tasks:
     vars:
       resmoke_args: --suites=cwrwc_passthrough --storageEngine=wiredTiger
 
-- name: cwrwc_rc_majority_passthrough_gen
+- <<: *gen_task_template
+  name: cwrwc_rc_majority_passthrough_gen
   tags: ["read_write_concern"]
   commands:
   - func: "generate resmoke tasks"
@@ -5472,7 +5417,8 @@ tasks:
     vars:
       resmoke_args: --suites=cwrwc_wc_majority_passthrough --storageEngine=wiredTiger
 
-- name: secondary_reads_passthrough_gen
+- <<: *gen_task_template
+  name: secondary_reads_passthrough_gen
   tags: []
   commands:
   - func: "generate resmoke tasks"
@@ -5480,14 +5426,16 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: replica_sets_gen
+- <<: *gen_task_template
+  name: replica_sets_gen
   tags: ["replica_sets", "san", "large"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: replica_sets_ese_gen
+- <<: *gen_task_template
+  name: replica_sets_ese_gen
   tags: ["replica_sets", "encrypt", "san"]
   commands:
   - func: "generate resmoke tasks"
@@ -5495,7 +5443,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: replica_sets_ese_gcm_gen
+- <<: *gen_task_template
+  name: replica_sets_ese_gcm_gen
   tags: ["replica_sets", "encrypt", "san", "gcm"]
   commands:
   - func: "generate resmoke tasks"
@@ -5503,7 +5452,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: replica_sets_auth_gen
+- <<: *gen_task_template
+  name: replica_sets_auth_gen
   tags: ["replica_sets", "common", "san", "auth"]
   commands:
   - func: "generate resmoke tasks"
@@ -5511,28 +5461,31 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: replica_sets_large_txns_format_gen
+- <<: *gen_task_template
+  name: replica_sets_large_txns_format_gen
   tags: ["replica_sets", "multi_oplog", "san"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: replica_sets_max_mirroring_gen
+- <<: *gen_task_template
+  name: replica_sets_max_mirroring_gen
   tags: ["replica_sets", "san"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: replica_sets_update_v1_oplog_gen
+- <<: *gen_task_template
+  name: replica_sets_update_v1_oplog_gen
   tags: ["replica_sets", "san"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- <<: *task_template
+- <<: *gen_task_template
   name: replica_sets_multiversion_gen
   tags: ["random_multiversion_ds"]
   commands:
@@ -5551,7 +5504,8 @@ tasks:
     vars:
       resmoke_args: --suites=sasl --storageEngine=wiredTiger
 
-- name: sharding_gen
+- <<: *gen_task_template
+  name: sharding_gen
   tags: ["sharding", "common"]
   commands:
   - func: "generate resmoke tasks"
@@ -5559,7 +5513,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: sharding_multiversion_gen
+- <<: *gen_task_template
+  name: sharding_multiversion_gen
   tags: ["random_multiversion_ds"]
   commands:
   - func: "generate randomized multiversion tasks"
@@ -5569,7 +5524,8 @@ tasks:
       require_multiversion: true
       suite: sharding_multiversion
 
-- name: sharding_max_mirroring_gen
+- <<: *gen_task_template
+  name: sharding_max_mirroring_gen
   tags: ["sharding", "common"]
   commands:
   - func: "generate resmoke tasks"
@@ -5577,7 +5533,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: sharding_csrs_continuous_config_stepdown_gen
+- <<: *gen_task_template
+  name: sharding_csrs_continuous_config_stepdown_gen
   tags: ["sharding", "common", "csrs", "non_live_record"]
   commands:
   - func: "generate resmoke tasks"
@@ -5586,7 +5543,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: sharding_ese_gen
+- <<: *gen_task_template
+  name: sharding_ese_gen
   tags: ["sharding", "encrypt"]
   commands:
   - func: "generate resmoke tasks"
@@ -5594,7 +5552,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: sharding_ese_gcm_gen
+- <<: *gen_task_template
+  name: sharding_ese_gcm_gen
   tags: ["sharding", "encrypt", "gcm"]
   commands:
   - func: "generate resmoke tasks"
@@ -5602,7 +5561,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: sharding_auth_gen
+- <<: *gen_task_template
+  name: sharding_auth_gen
   tags: ["sharding", "auth"]
   commands:
   - func: "generate resmoke tasks"
@@ -5610,7 +5570,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: sharding_auth_audit_gen
+- <<: *gen_task_template
+  name: sharding_auth_audit_gen
   tags: ["auth", "audit", "non_live_record"]
   commands:
   - func: "generate resmoke tasks"
@@ -5618,7 +5579,8 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: sharding_last_lts_mongos_and_mixed_shards_gen
+- <<: *gen_task_template
+  name: sharding_last_lts_mongos_and_mixed_shards_gen
   tags: ["sharding", "common", "multiversion"]
   commands:
   - func: "generate explicit multiversion tasks"
@@ -5627,7 +5589,8 @@ tasks:
       require_multiversion: true
       resmoke_args: --tagFile=generated_resmoke_config/multiversion_exclude_tags.yml
 
-- name: sharding_update_v1_oplog_gen
+- <<: *gen_task_template
+  name: sharding_update_v1_oplog_gen
   tags: ["sharding", "common"]
   commands:
   - func: "generate resmoke tasks"
@@ -5647,14 +5610,16 @@ tasks:
       snmp_config_path: SNMPCONFPATH=snmpconf
       resmoke_args: --suites=snmp --storageEngine=wiredTiger
 
-- name: ssl_gen
+- <<: *gen_task_template
+  name: ssl_gen
   tags: ["encrypt", "ssl"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {network: 2, replication: {heartbeats: 2}}}'"
 
-- name: sslSpecial_gen
+- <<: *gen_task_template
+  name: sslSpecial_gen
   tags: ["encrypt", "ssl"]
   commands:
   - func: "generate resmoke tasks"
@@ -5662,7 +5627,8 @@ tasks:
       suite: ssl_special
       resmoke_args: --storageEngine=wiredTiger
 
-- name: ssl_x509_gen
+- <<: *gen_task_template
+  name: ssl_x509_gen
   tags: ["encrypt", "ssl"]
   commands:
   - func: "generate resmoke tasks"
@@ -5706,42 +5672,48 @@ tasks:
     vars:
       resmoke_args: --suites=session_jscore_passthrough --storageEngine=wiredTiger
 
-- name: causally_consistent_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: causally_consistent_jscore_passthrough_gen
   tags: ["causally_consistent"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: causally_consistent_jscore_passthrough_auth_gen
+- <<: *gen_task_template
+  name: causally_consistent_jscore_passthrough_auth_gen
   tags: ["causally_consistent"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: causally_consistent_read_concern_snapshot_passthrough_gen
+- <<: *gen_task_template
+  name: causally_consistent_read_concern_snapshot_passthrough_gen
   tags: ["causally_consistent", "read_write_concern", "durable_history"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
+- <<: *gen_task_template
+  name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
   tags: ["causally_consistent", "read_write_concern", "durable_history"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: sharded_causally_consistent_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: sharded_causally_consistent_jscore_passthrough_gen
   tags: ["causally_consistent"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: retryable_writes_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: retryable_writes_jscore_passthrough_gen
   tags: ["retry"]
   commands:
   - func: "generate resmoke tasks"
@@ -5749,91 +5721,104 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "repl"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "repl"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "one_sec", "repl"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "repl"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: logical_session_cache_sharding_100ms_refresh_jscore_txns_passthrough_gen
+- <<: *gen_task_template
+  name: logical_session_cache_sharding_100ms_refresh_jscore_txns_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "one_sec"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "one_sec"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
+- <<: *gen_task_template
+  name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
@@ -7307,6 +7292,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-large
+  - name: build_variant_gen
   - name: .integration !.audit
     distros:
     - rhel80-medium
@@ -7345,6 +7331,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
+  - name: build_variant_gen
   - name: .aggregation !.encrypt
   - name: .auth !.audit !.multiversion
   - name: .causally_consistent !.wo_snapshot
@@ -7410,6 +7397,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-xlarge
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: aggregation_auth
@@ -7446,6 +7434,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -7518,6 +7507,7 @@ buildvariants:
   - name: compile_ninja_TG
     distros:
     - ubuntu1804-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -7587,6 +7577,7 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
@@ -7636,6 +7627,7 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -7669,6 +7661,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu2004-large
+  - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -7723,6 +7716,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu2004-large
+  - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -7773,6 +7767,7 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
@@ -7821,6 +7816,7 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -7858,6 +7854,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon1-2018-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.multiversion
@@ -7911,6 +7908,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon1-2018-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -7966,6 +7964,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: audit
@@ -8018,6 +8017,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -8070,6 +8070,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-arm64-large
+  - name: build_variant_gen
   - name: .aggfuzzer !.multiversion
   - name: audit
   - name: auth_audit_gen
@@ -8122,6 +8123,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-arm64-large
+  - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -8210,6 +8212,7 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - windows-vsCurrent-xlarge
+  - name: build_variant_gen
   - name: .aggregation !.auth !.encrypt
   - name: aggregation_expression_multiversion_fuzzer_gen
   - name: aggregation_expression_optimization_fuzzer_gen
@@ -8288,6 +8291,7 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - windows-vsCurrent-xlarge
+  - name: build_variant_gen
   - name: burn_in_tests_gen
   - name: buildscripts_test
   - name: noPassthrough_gen
@@ -8330,6 +8334,7 @@ buildvariants:
     - name: compile_build_tools_next_TG
       distros:
         - windows-vsCurrent-xlarge
+    - name: build_variant_gen
     - name: burn_in_tests_gen
     - name: noPassthrough_gen
 # Disabling as the following tests are not aware of feature flags.
@@ -8373,6 +8378,7 @@ buildvariants:
     - name: compile_test_and_package_serial_TG
       distros:
         - windows-vsCurrent-xlarge
+    - name: build_variant_gen
     - name: audit
     - name: auth_audit_gen
     - name: buildscripts_test
@@ -8434,6 +8440,7 @@ buildvariants:
     - name: compile_and_archive_dist_test_then_package_TG
       distros:
         - windows-vsCurrent-xlarge
+    - name: build_variant_gen
     - name: audit
     - name: auth_audit_gen
     - name: causally_consistent_jscore_txns_passthrough
@@ -8511,6 +8518,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
   - name: auth_audit_gen
@@ -8561,6 +8569,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
+  - name: build_variant_gen
   - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
@@ -8624,6 +8633,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
+  - name: build_variant_gen
   - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
@@ -8708,6 +8718,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
+  - name: build_variant_gen
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
   - name: .causally_consistent !.sharding
@@ -8757,6 +8768,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
+  - name: build_variant_gen
   - name: aggregation
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -8792,6 +8804,7 @@ buildvariants:
   - name: compile_ninja_next_TG
   - name: compile_build_tools_next_TG
   - name: libdeps_graph_linting_TG
+  - name: build_variant_gen
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -8821,6 +8834,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -8847,6 +8861,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -8960,6 +8975,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-large
+  - name: build_variant_gen
   - name: .aggfuzzer
   - name: .aggregation
   - name: audit
@@ -9073,6 +9089,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
+  - name: build_variant_gen
   - name: lint_pylinters
   - name: lint_clang_format
   - name: lint_eslint
@@ -9205,6 +9222,7 @@ buildvariants:
   - name: libdeps_graph_linting_TG
     distros:
       - rhel80-large
+  - name: build_variant_gen
   - name: burn_in_tests_gen
   - name: .aggfuzzer
   - name: .aggregation
@@ -9320,6 +9338,7 @@ buildvariants:
 #  - name: compile_test_and_package_parallel_dbtest_stream_TG
 #    distros:
 #    - rhel80-medium
+  - name: build_variant_gen
   - name: .aggfuzzer
   - name: .aggregation !.no_async !.secondary_reads !.sharded !.unwind !aggregation_disabled_optimization
   - name: .change_streams
@@ -9392,6 +9411,7 @@ buildvariants:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - rhel80-large
+  - name: build_variant_gen
   - name: auth_gen
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -9464,6 +9484,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-xlarge
+  - name: build_variant_gen
   - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
   - name: .random_multiversion_ds
@@ -9517,6 +9538,7 @@ buildvariants:
     use_scons_cache: false
   tasks:
     - name: compile_test_and_package_serial_TG
+    - name: build_variant_gen
     - name: .aggregation !.unwind
     - name: audit
     - name: .auth
@@ -9571,6 +9593,7 @@ buildvariants:
     - name: compile_test_and_package_serial_TG
       distros:
         - rhel80-medium
+    - name: build_variant_gen
     - name: .aggregation
     - name: .auth
     - name: unittest_shell_hang_analyzer_gen
@@ -9626,6 +9649,7 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - rhel70
+  - name: build_variant_gen
   - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
@@ -9683,6 +9707,7 @@ buildvariants:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - rhel80-large
+  - name: build_variant_gen
   - name: jsCore
   - name: sharding_gen
   - name: replica_sets_gen
@@ -9715,6 +9740,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-xlarge
+  - name: build_variant_gen
   - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
@@ -9769,6 +9795,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel82-arm64-large
+  - name: build_variant_gen
   - name: .aggfuzzer !.multiversion
   - name: audit
   - name: auth_audit_gen
@@ -9826,6 +9853,7 @@ buildvariants:
     has_packages: false
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
   - name: jsCore
   - name: noPassthroughHotBackups_gen
 
@@ -9845,6 +9873,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel70
+  - name: build_variant_gen
   - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
@@ -9894,6 +9923,7 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - ubuntu1804-xlarge
+  - name: build_variant_gen
   - name: jsCore
   - name: .read_write_concern !.write !.aggregation
   - name: replica_sets_jscore_passthrough
@@ -9920,6 +9950,7 @@ buildvariants:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - ubuntu1804-build
+  - name: build_variant_gen
   - name: jsCore
   - name: sharding_gen
   - name: replica_sets_gen
@@ -9947,6 +9978,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel70
+  - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -9997,6 +10029,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-build
+  - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -10045,6 +10078,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel82-arm64-large
+  - name: build_variant_gen
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -10082,6 +10116,7 @@ buildvariants:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - rhel70
+  - name: build_variant_gen
   - name: .ssl
   - name: jsCore
   - name: external_auth
@@ -10115,6 +10150,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel81-power8-large
+  - name: build_variant_gen
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
@@ -10195,6 +10231,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
+  - name: build_variant_gen
   - name: .aggregation .common
   - name: audit
   - name: .auth !.multiversion !.jscore
@@ -10245,6 +10282,7 @@ buildvariants:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - rhel72-zseries-build
+  - name: build_variant_gen
   - name: jsCore
   - name: replica_sets_jscore_passthrough
 
@@ -10268,6 +10306,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
+  - name: build_variant_gen
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: ssl_gen
@@ -10330,6 +10369,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - suse12-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -10373,6 +10413,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - suse12-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -10422,6 +10463,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - suse15-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -10462,6 +10504,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - suse15-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common !.multiversion
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -10515,6 +10558,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - debian92-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -10558,6 +10602,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - debian92-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: aggregation_auth
@@ -10611,6 +10656,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - debian10-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -10654,6 +10700,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - debian10-build
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
   - name: aggregation_auth
@@ -10715,6 +10762,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-xlarge
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: .aggregation !.unwind !.encrypt
   - name: audit
@@ -10779,6 +10827,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     # TODO (SERVER-58125): Re-enable the timeseries fuzzer for EFT
+  - name: build_variant_gen
   - name: .aggfuzzer .common !.timeseries
   - name: aggregation
   - name: .auth !.multiversion !.audit !.sharding
@@ -10818,6 +10867,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
+  - name: build_variant_gen
   - name: .aggregation .common
   - name: .auth !.multiversion
   - name: audit
@@ -10866,6 +10916,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
+  - name: build_variant_gen
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -10942,6 +10993,7 @@ buildvariants:
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
   - name: compile_benchmarks
+  - name: build_variant_gen
   - name: .aggregation
 #  - name: .auth
   - name: audit
@@ -11012,6 +11064,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
+  - name: build_variant_gen
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -11073,6 +11126,7 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: free_monitoring
   - name: .jstestfuzz !.initsync
@@ -11100,6 +11154,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
+  - name: build_variant_gen
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -11171,6 +11226,7 @@ buildvariants:
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
   - name: compile_benchmarks
+  - name: build_variant_gen
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -11237,6 +11293,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
+  - name: build_variant_gen
   - name: .aggregation
   - name: .auth
   - name: audit
@@ -11310,6 +11367,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
       - ubuntu1804-xlarge
+  - name: build_variant_gen
   - name: jsCore
   - name: jsCore_txns
   - name: unittest_shell_hang_analyzer_gen
@@ -11340,6 +11398,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - ubuntu1804-xlarge
+  - name: build_variant_gen
   - name: jsCore
   - name: jsCore_txns
 # Disabling these tests as they are not aware of feature flags.
@@ -11451,6 +11510,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
+  - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -11484,6 +11544,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
+  - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -11513,6 +11574,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
+  - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -11543,6 +11605,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
+  - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -11573,6 +11636,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
+  - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -11603,6 +11667,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
+  - name: build_variant_gen
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -11681,6 +11746,7 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_fast_memory,live_record_incompatible
   tasks:
   - name: compile_and_archive_dist_test_TG
+  - name: build_variant_gen
   - name: .aggfuzzer
   - name: .aggregation
 #  - name: audit

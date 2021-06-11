@@ -43,15 +43,12 @@ from buildscripts.ciconfig.evergreen import (
     parse_evergreen_file,
     Variant,
 )
-from buildscripts.evergreen_generate_resmoke_tasks import (
-    DEFAULT_TEST_SUITE_DIR,
-    GENERATE_CONFIG_FILE,
-)
 from buildscripts.patch_builds.selected_tests.selected_tests_service import SelectedTestsService
 
 structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.getLogger(__name__)
 
+DEFAULT_TEST_SUITE_DIR = os.path.join("buildscripts", "resmokeconfig", "suites")
 TASK_ID_EXPANSION = "task_id"
 EVERGREEN_FILE = "etc/evergreen.yml"
 EVG_CONFIG_FILE = ".evergreen.yml"
@@ -505,8 +502,7 @@ def main(
         binder.bind(SplitStrategy, greedy_division)
         binder.bind(FallbackStrategy, round_robin_fallback)
         binder.bind(GenTaskOptions, evg_expansions.build_gen_task_options())
-        binder.bind(GenerationConfiguration,
-                    GenerationConfiguration.from_yaml_file(GENERATE_CONFIG_FILE))
+        binder.bind(GenerationConfiguration, GenerationConfiguration.from_yaml_file())
         binder.bind(ResmokeProxyConfig,
                     ResmokeProxyConfig(resmoke_suite_dir=DEFAULT_TEST_SUITE_DIR))
 

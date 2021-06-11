@@ -10,17 +10,16 @@ import unittest
 from mock import MagicMock, patch
 
 import inject
-from shrub.v2 import BuildVariant, ShrubProject
 from evergreen import EvergreenApi
 
 import buildscripts.burn_in_tests_multiversion as under_test
 from buildscripts.burn_in_tests import TaskInfo
 from buildscripts.ciconfig.evergreen import parse_evergreen_file, EvergreenProjectConfig
 import buildscripts.resmokelib.parser as _parser
-import buildscripts.evergreen_gen_multiversion_tests as gen_multiversion
-from buildscripts.evergreen_burn_in_tests import GenerateBurnInExecutor, EvergreenFileChangeDetector
-from buildscripts.evergreen_generate_resmoke_tasks import GENERATE_CONFIG_FILE
+from buildscripts.evergreen_burn_in_tests import EvergreenFileChangeDetector
 from buildscripts.task_generation.gen_config import GenerationConfiguration
+from buildscripts.task_generation.multiversion_util import REPL_MIXED_VERSION_CONFIGS, \
+    SHARDED_MIXED_VERSION_CONFIGS
 from buildscripts.task_generation.resmoke_proxy import ResmokeProxyConfig
 from buildscripts.task_generation.suite_split import SuiteSplitConfig
 from buildscripts.task_generation.suite_split_strategies import greedy_division, SplitStrategy, \
@@ -84,8 +83,8 @@ def create_multiversion_tests_by_task_mock(n_tasks, n_tests):
 
 _DATE = datetime(2018, 7, 15)
 BURN_IN_TESTS = "buildscripts.burn_in_tests"
-NUM_REPL_MIXED_VERSION_CONFIGS = len(gen_multiversion.REPL_MIXED_VERSION_CONFIGS)
-NUM_SHARDED_MIXED_VERSION_CONFIGS = len(gen_multiversion.SHARDED_MIXED_VERSION_CONFIGS)
+NUM_REPL_MIXED_VERSION_CONFIGS = len(REPL_MIXED_VERSION_CONFIGS)
+NUM_SHARDED_MIXED_VERSION_CONFIGS = len(SHARDED_MIXED_VERSION_CONFIGS)
 
 NS = "buildscripts.burn_in_tests_multiversion"
 
@@ -165,8 +164,7 @@ def configure_dependencies(evg_api, split_config):
         binder.bind(FallbackStrategy, round_robin_fallback)
         binder.bind(GenTaskOptions, gen_task_options)
         binder.bind(EvergreenApi, evg_api)
-        binder.bind(GenerationConfiguration,
-                    GenerationConfiguration.from_yaml_file(GENERATE_CONFIG_FILE))
+        binder.bind(GenerationConfiguration, GenerationConfiguration.from_yaml_file())
         binder.bind(ResmokeProxyConfig,
                     ResmokeProxyConfig(resmoke_suite_dir=under_test.DEFAULT_TEST_SUITE_DIR))
         binder.bind(EvergreenFileChangeDetector, None)

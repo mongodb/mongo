@@ -13,8 +13,6 @@ import structlog
 from structlog.stdlib import LoggerFactory
 from evergreen.api import EvergreenApi, RetryingEvergreenApi
 
-import buildscripts.evergreen_gen_multiversion_tests as gen_multiversion
-import buildscripts.evergreen_generate_resmoke_tasks as gen_resmoke
 from buildscripts.burn_in_tests import EVERGREEN_FILE, \
     DEFAULT_REPO_LOCATIONS, create_tests_by_task, TaskInfo
 from buildscripts.ciconfig.evergreen import parse_evergreen_file, EvergreenProjectConfig
@@ -36,9 +34,9 @@ from buildscripts.util.cmdutils import enable_logging
 structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.getLogger(__name__)
 
-MULTIVERSION_CONFIG_KEY = gen_multiversion.MULTIVERSION_CONFIG_KEY
-MULTIVERSION_PASSTHROUGH_TAG = gen_multiversion.PASSTHROUGH_TAG
-BURN_IN_MULTIVERSION_TASK = gen_multiversion.BURN_IN_TASK
+MULTIVERSION_CONFIG_KEY = "use_in_multiversion"
+MULTIVERSION_PASSTHROUGH_TAG = "multiversion_passthrough"
+BURN_IN_MULTIVERSION_TASK = "burn_in_tests_multiversion"
 DEFAULT_CONFIG_DIR = "generated_resmoke_config"
 DEFAULT_TEST_SUITE_DIR = os.path.join("buildscripts", "resmokeconfig", "suites")
 
@@ -282,8 +280,7 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
         binder.bind(EvergreenProjectConfig, evg_conf)
         binder.bind(GenTaskOptions, gen_task_options)
         binder.bind(EvergreenApi, evg_api)
-        binder.bind(GenerationConfiguration,
-                    GenerationConfiguration.from_yaml_file(gen_resmoke.GENERATE_CONFIG_FILE))
+        binder.bind(GenerationConfiguration, GenerationConfiguration.from_yaml_file())
         binder.bind(ResmokeProxyConfig,
                     ResmokeProxyConfig(resmoke_suite_dir=DEFAULT_TEST_SUITE_DIR))
         binder.bind(EvergreenFileChangeDetector, EvergreenFileChangeDetector(task_id, evg_api))

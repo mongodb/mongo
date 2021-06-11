@@ -7,5 +7,7 @@ set -o errexit
 
 activate_venv
 PATH="$PATH:/data/multiversion"
-$python buildscripts/evergreen_gen_multiversion_tests.py run --expansion-file ../expansions.yml
-$python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags
+
+if [ -n "${require_multiversion}" ]; then
+  $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags
+fi

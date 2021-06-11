@@ -1,9 +1,16 @@
 """Task generation for fuzzer tasks."""
-from typing import NamedTuple, Set, Optional, Dict
+from typing import NamedTuple, Set, Optional, Dict, List
 
 from shrub.v2 import Task, FunctionCall, TaskDependency
 
 from buildscripts.util import taskname
+
+
+def get_multiversion_resmoke_args(is_sharded: bool) -> str:
+    """Return resmoke args used to configure a cluster for multiversion testing."""
+    if is_sharded:
+        return "--numShards=2 --numReplSetNodes=2 "
+    return "--numReplSetNodes=3 --linearChain=on "
 
 
 class FuzzerTask(NamedTuple):
@@ -56,6 +63,8 @@ class FuzzerGenTaskParams(NamedTuple):
     large_distro_name: Optional[str]
     config_location: str
     add_to_display_task: bool = True
+    version_config: Optional[List[str]] = None
+    is_sharded: Optional[bool] = None
 
     def jstestfuzz_params(self) -> Dict[str, str]:
         """Build a dictionary of parameters to pass to jstestfuzz."""
@@ -63,6 +72,19 @@ class FuzzerGenTaskParams(NamedTuple):
             "jstestfuzz_vars": f"--numGeneratedFiles {self.num_files} {self.jstestfuzz_vars or ''}",
             "npm_command": self.npm_command,
         }
+
+    def get_task_name(self, version: str) -> str:
+        """Get the name to use for generated tasks."""
+        if version:
+            return f"{self.suite}_multiversion_{version}"
+        return self.task_name
+
+    def get_resmoke_args(self) -> str:
+        """Get the resmoke arguments to use for generated tasks."""
+        if self.is_sharded is not None:
+            mv_args = get_multiversion_resmoke_args(self.is_sharded)
+            return f"{self.resmoke_args or ''} --mixedBinVersions={self.version_config} {mv_args}"
+        return self.resmoke_args
 
 
 class FuzzerGenTaskService:
@@ -75,30 +97,41 @@ class FuzzerGenTaskService:
         :param params: Parameters for how task should be generated.
         :return: Set of shrub tasks.
         """
-        sub_tasks = {self.build_fuzzer_sub_task(index, params) for index in range(params.num_tasks)}
-        return FuzzerTask(task_name=params.task_name, sub_tasks=sub_tasks)
+        version_list = params.version_config
+        if version_list is None:
+            version_list = [""]
+
+        sub_tasks = set()
+        for version in version_list:
+            sub_tasks = sub_tasks.union({
+                self.build_fuzzer_sub_task(index, params, version)
+                for index in range(params.num_tasks)
+            })
+
+        return FuzzerTask(task_name=params.get_task_name(""), sub_tasks=sub_tasks)
 
     @staticmethod
-    def build_fuzzer_sub_task(task_index: int, params: FuzzerGenTaskParams) -> Task:
+    def build_fuzzer_sub_task(task_index: int, params: FuzzerGenTaskParams, version: str) -> Task:
         """
         Build a shrub task to run the fuzzer.
 
         :param task_index: Index of sub task being generated.
         :param params: Parameters describing how tasks should be generated.
+        :param version: Multiversion version to generate against.
         :return: Shrub task to run the fuzzer.
         """
-        sub_task_name = taskname.name_generated_task(params.task_name, task_index, params.num_tasks,
-                                                     params.variant)
+        sub_task_name = taskname.name_generated_task(
+            params.get_task_name(version), task_index, params.num_tasks, params.variant)
 
         suite_arg = f"--suites={params.suite}"
         run_tests_vars = {
             "continue_on_failure": params.continue_on_failure,
-            "resmoke_args": f"{suite_arg} {params.resmoke_args}",
+            "resmoke_args": f"{suite_arg} {params.get_resmoke_args()}",
             "resmoke_jobs_max": params.resmoke_jobs_max,
             "should_shuffle": params.should_shuffle,
             "require_multiversion": params.require_multiversion,
             "timeout_secs": params.timeout_secs,
-            "task": params.task_name,
+            "task": params.get_task_name(version),
             "gen_task_config_location": params.config_location,
         }  # yapf: disable
 

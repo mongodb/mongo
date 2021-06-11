@@ -58,8 +58,7 @@ def configure_dependencies(evg_api, evg_expansions, evg_project_config, selected
         binder.bind(FallbackStrategy, round_robin_fallback)
         binder.bind(GenTaskOptions, evg_expansions.build_gen_task_options())
         binder.bind(EvergreenApi, evg_api)
-        binder.bind(GenerationConfiguration,
-                    GenerationConfiguration.from_yaml_file(under_test.GENERATE_CONFIG_FILE))
+        binder.bind(GenerationConfiguration, GenerationConfiguration.from_yaml_file())
         binder.bind(ResmokeProxyConfig, ResmokeProxyConfig(resmoke_suite_dir=test_suites_dir))
         binder.bind(SelectedTestsClient, selected_test_client)
 

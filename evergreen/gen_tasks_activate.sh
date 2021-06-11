@@ -4,7 +4,6 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 cd src
 
 set -o errexit
-set -o verbose
 
 activate_venv
-$python buildscripts/evergreen_gen_fuzzer_tests.py --expansion-file ../expansions.yml
+$python buildscripts/evergreen_activate_gen_tasks.py --expansion-file ../expansions.yml --verbose

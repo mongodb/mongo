@@ -56,7 +56,7 @@ class EvgConfigBuilder:
         :return: BuildVariant object being created.
         """
         if build_variant not in self.build_variants:
-            self.build_variants[build_variant] = BuildVariant(build_variant)
+            self.build_variants[build_variant] = BuildVariant(build_variant, activate=False)
         return self.build_variants[build_variant]
 
     def _generate_suites_config(self, generated_suite: GeneratedSuite) -> List[GeneratedFile]:

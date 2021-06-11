@@ -148,6 +148,15 @@ class Task(object):
         """Return True if 'generate fuzzer tasks' command is found."""
         return self.generate_fuzzer_tasks_command() is not None
 
+    def generate_implicit_multiversion_command(self):
+        """Return the 'generate implicit multiversion tasks' command if found, or None."""
+        func = self.find_func_command("generate implicit multiversion tasks")
+        return func
+
+    def is_generate_implicit_multiversion_task(self) -> bool:
+        """Return True if 'generate implicit multiverion tasks' command is found."""
+        return self.generate_implicit_multiversion_command() is not None
+
     @property
     def run_tests_command(self):
         """Return the 'run tests' command if found, or None."""
