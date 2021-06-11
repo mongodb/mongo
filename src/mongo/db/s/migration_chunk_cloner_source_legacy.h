@@ -219,7 +219,7 @@ private:
      * Synchronously invokes the recipient shard with the specified command and either returns the
      * command response (if succeeded) or the status, if the command failed.
      */
-    StatusWith<BSONObj> _callRecipient(const BSONObj& cmdObj);
+    StatusWith<BSONObj> _callRecipient(OperationContext* opCtx, const BSONObj& cmdObj);
 
     StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getIndexScanExecutor(
         OperationContext* opCtx,
