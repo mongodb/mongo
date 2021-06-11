@@ -1,5 +1,8 @@
 /**
  * Test that a query containing an AND with a lot of clauses can be answered.
+ *
+ * The explain for this can take long enough to make tests with stepdowns fail.
+ * @tags: [operations_longer_than_stepdown_interval]
  */
 (function() {
 "use strict";
