@@ -65,14 +65,15 @@ class timestamp_manager : public component {
         wt_timestamp_t latest_ts_s;
 
         /* Timestamps are checked periodically. */
-        latest_ts_s = (_latest_ts >> 32);
+        latest_ts_s = (get_next_ts() >> 32);
         /*
          * Keep a time window between the latest and stable ts less than the max defined in the
          * configuration.
          */
         testutil_assert(latest_ts_s >= _stable_ts);
         if ((latest_ts_s - _stable_ts) > _stable_lag) {
-            _stable_ts = latest_ts_s - _stable_lag;
+            debug_print("Timestamp_manager: Stable timestamp expired.", DEBUG_INFO);
+            _stable_ts = latest_ts_s;
             config += std::string(STABLE_TS) + "=" + decimal_to_hex(_stable_ts);
         }
 
@@ -82,6 +83,7 @@ class timestamp_manager : public component {
          */
         testutil_assert(_stable_ts >= _oldest_ts);
         if ((_stable_ts - _oldest_ts) > _oldest_lag) {
+            debug_print("Timestamp_manager: Oldest timestamp expired.", DEBUG_INFO);
             _oldest_ts = _stable_ts - _oldest_lag;
             if (!config.empty())
                 config += ",";
@@ -131,7 +133,7 @@ class timestamp_manager : public component {
     }
 
     private:
-    std::atomic<wt_timestamp_t> _increment_ts;
+    std::atomic<wt_timestamp_t> _increment_ts{0};
     wt_timestamp_t _latest_ts = 0U, _oldest_ts = 0U, _stable_ts = 0U;
     /*
      * _oldest_lag is the time window between the stable and oldest timestamps.

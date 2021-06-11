@@ -26,33 +26,33 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef DEBUG_UTILS_H
-#define DEBUG_UTILS_H
+#include "test_harness/test.h"
 
-#include <iostream>
+/*
+ * Class that defines operations that do nothing as an example.
+ * This shows how database operations can be overriden and customized.
+ */
+class hs_cleanup : public test_harness::test {
+    public:
+    hs_cleanup(const std::string &config, const std::string &name) : test(config, name) {}
 
-/* Define helpful functions related to debugging. */
-namespace test_harness {
-
-#define DEBUG_ERROR 0
-#define DEBUG_WARN 1
-#define DEBUG_INFO 2
-#define DEBUG_TRACE 3
-
-static int64_t _trace_level = DEBUG_WARN;
-
-/* Used to print out traces for debugging purpose. */
-static void
-debug_print(const std::string &str, int64_t trace_type)
-{
-    if (_trace_level >= trace_type) {
-        if (trace_type >= DEBUG_ERROR)
-            std::cerr << str << std::endl;
-        else
-            std::cout << str << std::endl;
+    void
+    populate(test_harness::database &database, test_harness::timestamp_manager *_timestamp_manager,
+      test_harness::configuration *_config, test_harness::workload_tracking *tracking)
+       override final
+    {
+        std::cout << "populate: nothing done." << std::endl;
     }
-}
 
-} // namespace test_harness
+    void
+    read_operation(test_harness::thread_context *context) override final
+    {
+        std::cout << "read_operation: nothing done." << std::endl;
+    }
 
-#endif
+    void
+    update_operation(test_harness::thread_context *context) override final
+    {
+        std::cout << "update_operation: nothing done." << std::endl;
+    }
+};
