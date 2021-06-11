@@ -1,8 +1,8 @@
 /**
  * Tests that resource consumption metrics are reported in the profiler.
  *
+ * // TODO SERVER-57474: enable this test.
  * @tags: [
- *   // TODO SERVER-57474: enable this test.
  *   __TEMPORARILY_DISABLED__,
  *   requires_capped,
  *   requires_fcv_47,
