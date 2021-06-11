@@ -2,13 +2,12 @@
 
 import os
 import unittest
-from tempfile import TemporaryDirectory, NamedTemporaryFile
+from tempfile import TemporaryDirectory
 
 from mock import patch, MagicMock
 from click.testing import CliRunner
 
 from buildscripts import evergreen_gen_multiversion_tests as under_test
-import buildscripts.evergreen_generate_resmoke_tasks as generate_resmoke
 from buildscripts.util.fileops import read_yaml_file
 
 # pylint: disable=missing-docstring, no-self-use

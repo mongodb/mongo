@@ -3,5 +3,5 @@ dataclasses; python_version < "3.7"
 inject ~= 4.3.1
 GitPython ~= 3.1.7
 psutil
-pydantic ~= 1.7.3
+pydantic ~= 1.8.2
 structlog ~= 19.2.0
