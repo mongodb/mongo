@@ -480,9 +480,19 @@ repl::OpTime MigrationDestinationManager::cloneDocumentsFromDonor(
     repl::OpTime lastOpApplied;
 
     stdx::thread inserterThread{[&] {
-        Client::initKillableThread("chunkInserter", opCtx->getServiceContext());
+        Client::initThread("chunkInserter", opCtx->getServiceContext(), nullptr);
+        auto newClient = Client::getCurrent();
+        {
+            stdx::lock_guard lk(*newClient);
+            newClient->setSystemOperationKillable(lk);
+        }
+        auto inserterOpCtx = cc().makeOperationContext();
+        inserterOpCtx->setAlwaysInterruptAtStepDownOrUp();
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            opCtx->checkForInterrupt();
+        }
 
-        auto inserterOpCtx = Client::getCurrent()->makeOperationContext();
         auto consumerGuard = makeGuard([&] {
             batches.closeConsumerEnd();
             lastOpApplied = repl::ReplClientInfo::forClient(inserterOpCtx->getClient()).getLastOp();
@@ -1051,6 +1061,11 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
     AlternativeClientRegion acr(newClient);
     auto newOpCtxPtr = cc().makeOperationContext();
+    newOpCtxPtr->setAlwaysInterruptAtStepDownOrUp();
+    {
+        stdx::lock_guard<Client> lk(*outerOpCtx->getClient());
+        outerOpCtx->checkForInterrupt();
+    }
     auto opCtx = newOpCtxPtr.get();
 
     {
