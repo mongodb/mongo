@@ -280,9 +280,8 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
         if not isinstance(value, ALLOWED_TYPES):
             raise ValueError(f"HistoryDict cannot store type {type(value)}."
                              " Please use a different type or create a Historic wrapper.")
-
-        self._value_store[key] = value
         self._record_write(key, value)
+        self._value_store[key] = value
         if isinstance(value, HistoryDict):
             value.subscribe(self, key)
 
@@ -313,9 +312,12 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
         return "{" + ", ".join(pairs) + "}"
 
     def _record_write(self, key, value):
-        history_value = storable_dict_from_historic(value)
-        cur_access = Access(type=AccessType.WRITE, location=_get_location(),
-                            value_written=copy.deepcopy(history_value), time=self._global_time)
+        written = None
+        if type(value) in ALLOWED_TYPES and value is not Historic:
+            written = value
+
+        cur_access = Access(type=AccessType.WRITE, location=_get_location(), value_written=written,
+                            time=self._global_time)
         self._history_store[key].append(cur_access)
         self._global_time += 1
 

@@ -56,23 +56,13 @@ History:
   innerDict:
   - time: 0
     type: WRITE
-    value_written:
-      object_class: dict
-      object_value:
-        foo: bar
+    value_written: null
   - time: 1
     type: WRITE
-    value_written:
-      object_class: dict
-      object_value:
-        foo: za
+    value_written: null
   - time: 2
     type: WRITE
-    value_written:
-      object_class: dict
-      object_value:
-        another_added: another_val
-        foo: za"""
+    value_written: null"""
 
         test_dict_dumped = test_dict.dump_history()
         self.assertEqual(test_dict_dumped, expected_test_dict)
@@ -115,16 +105,10 @@ History:
   innerdict:
   - time: 2
     type: WRITE
-    value_written:
-      object_class: dict
-      object_value:
-        innerkey: innerval
+    value_written: null
   - time: 4
     type: WRITE
-    value_written:
-      object_class: dict
-      object_value:
-        innerkey: secondinnerval"""
+    value_written: null"""
 
         self.assertEqual(test_dict.dump_history(), expected_test_dict)
 
