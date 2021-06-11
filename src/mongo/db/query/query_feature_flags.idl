@@ -47,3 +47,7 @@ feature_flags:
       default: true
       version: 5.0
 
+    featureFlagShardedTimeSeries:
+      description: "Feature flag for allowing sharding a Time Series collection"
+      cpp_varname: gFeatureFlagShardedTimeSeries
+      default: false

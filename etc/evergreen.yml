@@ -8839,6 +8839,7 @@ buildvariants:
     <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
     test_flags: >-
       --additionalFeatureFlags=featureFlagTimeseriesUpdatesAndDeletes
+      --additionalFeatureFlags=featureFlagShardedTimeSeries
   tasks:
     - name: compile_test_and_package_parallel_core_stream_TG
       distros:
