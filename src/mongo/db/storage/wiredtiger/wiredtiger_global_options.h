@@ -60,7 +60,6 @@ public:
     std::string engineConfig;
 
     std::string collectionBlockCompressor;
-    std::string indexBlockCompressor;
     bool useCollectionPrefixCompression;
     bool useIndexPrefixCompression;
     std::string collectionConfig;
