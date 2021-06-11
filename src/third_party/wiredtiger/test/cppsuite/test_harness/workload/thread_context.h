@@ -52,6 +52,22 @@ class transaction_context {
         return (_in_txn);
     }
 
+    /* Begin a transaction. */
+    void
+    begin(WT_SESSION *session, const std::string &config)
+    {
+        if (!_in_txn) {
+            testutil_check(
+              session->begin_transaction(session, config.empty() ? nullptr : config.c_str()));
+            /* This randomizes the number of operations to be executed in one transaction. */
+            _target_op_count =
+              random_generator::instance().generate_integer<int64_t>(_min_op_count, _max_op_count);
+            op_count = 0;
+            _in_txn = true;
+        } else
+            testutil_die(EINVAL, "Begin called on a currently running transaction.");
+    }
+
     /*
      * The current transaction can be committed if: A transaction has started and the number of
      * operations executed in the current transaction has exceeded the threshold.
@@ -69,21 +85,18 @@ class transaction_context {
         testutil_assert(_in_txn);
         testutil_check(
           session->commit_transaction(session, config.empty() ? nullptr : config.c_str()));
+        op_count = 0;
         _in_txn = false;
     }
 
     void
-    begin(WT_SESSION *session, const std::string &config)
+    rollback(WT_SESSION *session, const std::string &config)
     {
-        if (!_in_txn) {
-            testutil_check(
-              session->begin_transaction(session, config.empty() ? nullptr : config.c_str()));
-            /* This randomizes the number of operations to be executed in one transaction. */
-            _target_op_count =
-              random_generator::instance().generate_integer(_min_op_count, _max_op_count);
-            op_count = 0;
-            _in_txn = true;
-        }
+        testutil_assert(_in_txn);
+        testutil_check(
+          session->rollback_transaction(session, config.empty() ? nullptr : config.c_str()));
+        op_count = 0;
+        _in_txn = false;
     }
 
     /*
@@ -114,13 +127,30 @@ class transaction_context {
     bool _in_txn = false;
 };
 
+enum thread_type { READ, INSERT, UPDATE };
+
+static std::string
+type_string(thread_type type)
+{
+    switch (type) {
+    case thread_type::INSERT:
+        return ("insert");
+    case thread_type::READ:
+        return ("read");
+    case thread_type::UPDATE:
+        return ("update");
+    default:
+        testutil_die(EINVAL, "unexpected thread_type: %d", static_cast<int>(type));
+    }
+}
+
 /* Container class for a thread and any data types it may need to interact with the database. */
 class thread_context {
     public:
-    thread_context(configuration *config, timestamp_manager *timestamp_manager,
-      workload_tracking *tracking, database &db)
-        : database(db), timestamp_manager(timestamp_manager), tracking(tracking),
-          transaction(transaction_context(config))
+    thread_context(uint64_t id, thread_type type, configuration *config,
+      timestamp_manager *timestamp_manager, workload_tracking *tracking, database &db)
+        : id(id), type(type), database(db), timestamp_manager(timestamp_manager),
+          tracking(tracking), transaction(transaction_context(config))
     {
         session = connection_manager::instance().create_session();
         _throttle = throttle(config);
@@ -157,6 +187,8 @@ class thread_context {
     test_harness::database &database;
     int64_t key_size = 0;
     int64_t value_size = 0;
+    const uint64_t id;
+    const thread_type type;
 
     private:
     throttle _throttle;

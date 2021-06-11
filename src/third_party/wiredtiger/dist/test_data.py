@@ -66,8 +66,10 @@ record_config = [
 populate_config = record_config + [
     Config('collection_count', 1, r'''
         The number of collections the workload generator operates over''', min=0, max=200000),
-    Config('key_count', 0, r'''
+    Config('key_count_per_collection', 0, r'''
         The number of keys to be operated on per collection''', min=0, max=1000000),
+    Config('thread_count', 1, r'''
+        The number of worker threads to use while populating the database.''')
 ]
 
 #
@@ -153,7 +155,10 @@ workload_tracking = enabled_config_true + component_config
 #
 # Configuration that applies to the workload_generator component.
 #
-workload_generator = enabled_config_true + component_config + populate_config + [
+workload_generator = enabled_config_true + component_config + [
+    Config('populate_config', '', r'''
+        Config that specifies how the database will be populated initially.''',
+        type='category', subconfig=populate_config),
     Config('read_config', '', r'''
         Config that specifies the number of read threads and their behaviour.''',
         type='category', subconfig=read_thread_config),
@@ -190,9 +195,20 @@ test_config = [
         The duration that the test run will last''', min=0, max=1000000),
     Config('enable_logging', 'false', r'''
         Enables write ahead logs''', type='boolean'),
+    Config('statistics_config', '', r'''
+        Statistic configuration that is passed into wiredtiger on open.''',
+        type='category', subconfig=[
+            Config('type', 'fast', r'''
+            The configuration that will get passed to wiredtiger to determine the style of
+            statistics gathering'''),
+            Config('enable_logging', 'false', r'''
+            Configuration enabling or disabling statistics logging in the form of json logging.''',
+            type='boolean')
+        ]),
 ]
 
 methods = {
     'example_test' : Method(test_config),
+    'hs_cleanup' : Method(test_config),
     'poc_test' : Method(test_config),
 }

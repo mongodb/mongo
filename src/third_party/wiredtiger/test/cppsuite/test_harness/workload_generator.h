@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <functional>
 #include <map>
 
 #include "core/throttle.h"
@@ -40,6 +41,37 @@
 #include "workload/workload_tracking.h"
 
 namespace test_harness {
+/*
+ * Helper class to enable scalable operation types in the database_operation.
+ */
+class operation_config {
+    public:
+    operation_config(configuration *config, thread_type type)
+        : config(config), type(type), thread_count(config->get_int(THREAD_COUNT))
+    {
+    }
+
+    /* Returns a function pointer to the member function of the supplied database operation. */
+    std::function<void(test_harness::thread_context *)>
+    get_func(database_operation *dbo)
+    {
+        switch (type) {
+        case thread_type::INSERT:
+            return (std::bind(&database_operation::insert_operation, dbo, std::placeholders::_1));
+        case thread_type::READ:
+            return (std::bind(&database_operation::read_operation, dbo, std::placeholders::_1));
+        case thread_type::UPDATE:
+            return (std::bind(&database_operation::update_operation, dbo, std::placeholders::_1));
+        default:
+            /* This may cause a separate testutil_die in type_string but that should be okay. */
+            testutil_die(EINVAL, "unexpected thread_type: %s", type_string(type).c_str());
+        }
+    }
+    configuration *config;
+    const thread_type type;
+    const int64_t thread_count;
+};
+
 /*
  * Class that can execute operations based on a given configuration.
  */
@@ -67,38 +99,41 @@ class workload_generator : public component {
     void
     run() override final
     {
-        configuration *read_config, *update_config, *insert_config;
-
-        /* Populate the database. */
-        _database_operation->populate(_database, _timestamp_manager, _config, _tracking);
-        _db_populated = true;
+        configuration *populate_config;
+        std::vector<operation_config> operation_configs;
+        uint64_t thread_id = 0;
 
         /* Retrieve useful parameters from the test configuration. */
-        update_config = _config->get_subconfig(UPDATE_CONFIG);
-        insert_config = _config->get_subconfig(INSERT_CONFIG);
-        read_config = _config->get_subconfig(READ_CONFIG);
+        operation_configs.push_back(
+          operation_config(_config->get_subconfig(INSERT_CONFIG), thread_type::INSERT));
+        operation_configs.push_back(
+          operation_config(_config->get_subconfig(READ_CONFIG), thread_type::READ));
+        operation_configs.push_back(
+          operation_config(_config->get_subconfig(UPDATE_CONFIG), thread_type::UPDATE));
+        populate_config = _config->get_subconfig(POPULATE_CONFIG);
+
+        /* Populate the database. */
+        _database_operation->populate(_database, _timestamp_manager, populate_config, _tracking);
+        _db_populated = true;
+        delete populate_config;
 
         /* Generate threads to execute read operations on the collections. */
-        for (size_t i = 0; i < read_config->get_int(THREAD_COUNT) && _running; ++i) {
-            thread_context *tc =
-              new thread_context(read_config, _timestamp_manager, _tracking, _database);
-            _workers.push_back(tc);
-            _thread_manager.add_thread(
-              &database_operation::read_operation, _database_operation, tc);
+        for (auto &it : operation_configs) {
+            debug_print("Workload_generator: Creating " + std::to_string(it.thread_count) + " " +
+                type_string(it.type) + " threads.",
+              DEBUG_INFO);
+            for (size_t i = 0; i < it.thread_count && _running; ++i) {
+                thread_context *tc = new thread_context(
+                  thread_id++, it.type, it.config, _timestamp_manager, _tracking, _database);
+                _workers.push_back(tc);
+                _thread_manager.add_thread(it.get_func(_database_operation), tc);
+            }
+            /*
+             * Don't forget to delete the config we created earlier. While we do pass the config
+             * into the thread context it is not saved, so we are safe to do this.
+             */
+            delete it.config;
         }
-
-        /* Generate threads to execute update operations on the collections. */
-        for (size_t i = 0; i < update_config->get_int(THREAD_COUNT) && _running; ++i) {
-            thread_context *tc =
-              new thread_context(update_config, _timestamp_manager, _tracking, _database);
-            _workers.push_back(tc);
-            _thread_manager.add_thread(
-              &database_operation::update_operation, _database_operation, tc);
-        }
-
-        delete read_config;
-        delete update_config;
-        delete insert_config;
     }
 
     void

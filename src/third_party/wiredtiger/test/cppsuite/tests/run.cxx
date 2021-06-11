@@ -34,6 +34,7 @@
 #include "test_harness/test.h"
 
 #include "example_test.cxx"
+#include "hs_cleanup.cxx"
 #include "poc_test.cxx"
 
 std::string
@@ -87,7 +88,8 @@ print_help()
     std::cout << "\t-h Output a usage message and exit." << std::endl;
     std::cout << "\t-C Configuration. Cannot be used with -f." << std::endl;
     std::cout << "\t-f File that contains the configuration. Cannot be used with -C." << std::endl;
-    std::cout << "\t-l Trace level from 0 (default) to 2." << std::endl;
+    std::cout << "\t-l Trace level from 0 to 3. "
+        "1 is the default level, all warnings and errors are logged." << std::endl;
     std::cout << "\t-t Test name to be executed." << std::endl;
 }
 
@@ -114,6 +116,8 @@ run_test(const std::string &test_name, const std::string &config)
         poc_test(config, test_name).run();
     else if (test_name == "example_test")
         example_test(config, test_name).run();
+    else if (test_name == "hs_cleanup")
+        hs_cleanup(config, test_name).run();
     else {
         test_harness::debug_print("Test not found: " + test_name, DEBUG_ERROR);
         error_code = -1;
@@ -130,7 +134,7 @@ main(int argc, char *argv[])
 {
     std::string cfg, config_filename, test_name, current_test_name;
     int64_t error_code = 0;
-    const std::vector<std::string> all_tests = {"example_test", "poc_test"};
+    const std::vector<std::string> all_tests = {"example_test", "hs_cleanup", "poc_test"};
 
     /* Set the program name for error messages. */
     (void)testutil_set_progname(argv);

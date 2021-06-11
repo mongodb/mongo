@@ -60,10 +60,11 @@ class random_generator {
     }
 
     /* Generate a random integer between min and max. */
-    int64_t
-    generate_integer(int64_t min, int64_t max)
+    template <typename T>
+    T
+    generate_integer(T min, T max)
     {
-        std::uniform_int_distribution<> dis(min, max);
+        std::uniform_int_distribution<T> dis(min, max);
         return dis(_generator);
     }
 
