@@ -310,7 +310,7 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
         }
     }
 
-    auto startChunkCloneResponseStatus = _callRecipient(cmdBuilder.obj());
+    auto startChunkCloneResponseStatus = _callRecipient(opCtx, cmdBuilder.obj());
     if (!startChunkCloneResponseStatus.isOK()) {
         return startChunkCloneResponseStatus.getStatus();
     }
@@ -391,7 +391,7 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
         }
     }
 
-    auto startChunkCloneResponseStatus = _callRecipient(cmdBuilder.obj());
+    auto startChunkCloneResponseStatus = _callRecipient(opCtx, cmdBuilder.obj());
     if (!startChunkCloneResponseStatus.isOK()) {
         return startChunkCloneResponseStatus.getStatus();
     }
@@ -441,8 +441,8 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::commitClone(OperationConte
         _sessionCatalogSource->onCommitCloneStarted();
     }
 
-    auto responseStatus =
-        _callRecipient(createRequestWithSessionId(kRecvChunkCommit, _args.getNss(), _sessionId));
+    auto responseStatus = _callRecipient(
+        opCtx, createRequestWithSessionId(kRecvChunkCommit, _args.getNss(), _sessionId));
 
     if (responseStatus.isOK()) {
         _cleanup(opCtx);
@@ -471,9 +471,10 @@ void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* opCtx) {
         case kDone:
             break;
         case kCloning: {
-            const auto status = _callRecipient(createRequestWithSessionId(
-                                                   kRecvChunkAbort, _args.getNss(), _sessionId))
-                                    .getStatus();
+            const auto status =
+                _callRecipient(
+                    opCtx, createRequestWithSessionId(kRecvChunkAbort, _args.getNss(), _sessionId))
+                    .getStatus();
             if (!status.isOK()) {
                 LOGV2(21991,
                       "Failed to cancel migration: {error}",
@@ -848,7 +849,8 @@ void MigrationChunkClonerSourceLegacy::_cleanup(OperationContext* opCtx) {
     _untransferredDeletesCounter = 0;
 }
 
-StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(const BSONObj& cmdObj) {
+StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(OperationContext* opCtx,
+                                                                     const BSONObj& cmdObj) {
     executor::RemoteCommandResponse responseStatus(
         Status{ErrorCodes::InternalError, "Uninitialized value"});
 
@@ -864,7 +866,20 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(const BSONO
         return scheduleStatus.getStatus();
     }
 
-    executor->wait(scheduleStatus.getValue());
+    auto cbHandle = scheduleStatus.getValue();
+
+    try {
+        executor->wait(cbHandle, opCtx);
+    } catch (const DBException& ex) {
+        // If waiting for the response is interrupted, then we still have a callback out and
+        // registered with the TaskExecutor to run when the response finally does come back.
+        // Since the callback references local state, cbResponse, it would be invalid for the
+        // callback to run after leaving the this function. Therefore, we cancel the callback
+        // and wait uninterruptably for the callback to be run.
+        executor->cancel(cbHandle);
+        executor->wait(cbHandle);
+        return ex.toStatus();
+    }
 
     if (!responseStatus.isOK()) {
         return responseStatus.status;
@@ -1082,7 +1097,7 @@ Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationC
     int iteration = 0;
     while ((Date_t::now() - startTime) < maxTimeToWait) {
         auto responseStatus = _callRecipient(
-            createRequestWithSessionId(kRecvChunkStatus, _args.getNss(), _sessionId, true));
+            opCtx, createRequestWithSessionId(kRecvChunkStatus, _args.getNss(), _sessionId, true));
         if (!responseStatus.isOK()) {
             return responseStatus.getStatus().withContext(
                 "Failed to contact recipient shard to monitor data transfer");
