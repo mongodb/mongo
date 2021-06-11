@@ -1457,12 +1457,6 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/jstestfuzz_run.sh"
-    # TODO SERVER-57161 remove this touch command
-    - command: subprocess.exec
-      params:
-        binary: touch
-        args:
-          - "./src/jstestfuzz/out/placeholder.js"
     - command: archive.targz_pack
       params:
         target: "jstests.tgz"
@@ -3079,11 +3073,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      # TODO SERVER-57161 re-enable original fuzzer settings
-      # num_files: 5
-      # num_tasks: 5
-      num_files: 0
-      num_tasks: 1
+      num_files: 5
+      num_tasks: 5
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: agg-fuzzer
@@ -3098,11 +3089,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      # TODO SERVER-57161 re-enable original fuzzer settings
-      # num_files: 5
-      # num_tasks: 5
-      num_files: 0
-      num_tasks: 1
+      num_files: 5
+      num_tasks: 5
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: agg-expr-fuzzer
@@ -3117,11 +3105,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      # TODO SERVER-57161 re-enable original fuzzer settings
-      # num_files: 5
-      # num_tasks: 5
-      num_files: 0
-      num_tasks: 1
+      num_files: 5
+      num_tasks: 5
       jstestfuzz_vars: --diffTestingMode optimization
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -3136,11 +3121,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      # TODO SERVER-57161 re-enable original fuzzer settings
-      # num_files: 5
-      # num_tasks: 5
-      num_files: 0
-      num_tasks: 1
+      num_files: 5
+      num_tasks: 5
       jstestfuzz_vars: --diffTestingMode optimization
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -3155,11 +3137,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      # TODO SERVER-57161 re-enable original fuzzer settings
-      # num_files: 5
-      # num_tasks: 5
-      num_files: 0
-      num_tasks: 1
+      num_files: 5
+      num_tasks: 5
       jstestfuzz_vars: --diffTestingMode wildcard
       npm_command: agg-fuzzer
       suite: generational_fuzzer
@@ -3174,11 +3153,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      # TODO SERVER-57161 re-enable original fuzzer settings
-      # num_files: 5
-      # num_tasks: 5
-      num_files: 0
-      num_tasks: 1
+      num_files: 5
+      num_tasks: 5
       jstestfuzz_vars: --diffTestingMode timeseries
       npm_command: agg-fuzzer
       suite: generational_fuzzer
@@ -3193,11 +3169,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      # TODO SERVER-57161 re-enable original fuzzer settings
-      # num_files: 5
-      # num_tasks: 5
-      num_files: 0
-      num_tasks: 1
+      num_files: 5
+      num_tasks: 5
       jstestfuzz_vars: --diffTestingMode standalone
       npm_command: query-fuzzer
       suite: generational_fuzzer
@@ -3212,11 +3185,8 @@ tasks:
   - func: "generate fuzzer tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      # TODO SERVER-57161 re-enable original fuzzer settings
-      # num_files: 5
-      # num_tasks: 5
-      num_files: 0
-      num_tasks: 1
+      num_files: 5
+      num_tasks: 5
       jstestfuzz_vars: --diffTestingMode sharded
       npm_command: query-fuzzer
       suite: generational_fuzzer
