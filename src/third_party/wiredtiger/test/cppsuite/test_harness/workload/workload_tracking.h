@@ -76,7 +76,7 @@ class workload_tracking : public component {
     }
 
     void
-    load()
+    load() override final
     {
         WT_SESSION *session;
 
@@ -102,7 +102,7 @@ class workload_tracking : public component {
     }
 
     void
-    run()
+    run() override final
     {
         /* Does not do anything. */
     }

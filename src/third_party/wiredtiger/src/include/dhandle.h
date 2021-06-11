@@ -94,8 +94,8 @@ struct __wt_data_handle {
         WT_DHANDLE_TYPE_TIERED_TREE
     } type;
 
-    /* This will include the tiered type soon. */
-#define WT_DHANDLE_BTREE(dhandle) ((dhandle)->type == WT_DHANDLE_TYPE_BTREE)
+#define WT_DHANDLE_BTREE(dhandle) \
+    ((dhandle)->type == WT_DHANDLE_TYPE_BTREE || (dhandle)->type == WT_DHANDLE_TYPE_TIERED)
 
     bool compact_skip; /* If the handle failed to compact */
 

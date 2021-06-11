@@ -70,6 +70,7 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
     WT_ERR(__wt_calloc_def(session, 3, &dhandle->cfg));
     switch (dhandle->type) {
     case WT_DHANDLE_TYPE_BTREE:
+    case WT_DHANDLE_TYPE_TIERED:
         /*
          * We are stripping out all checkpoint related information from the config string. We save
          * the rest of the metadata string, that is essentially static and unchanging and then
@@ -104,9 +105,6 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
         break;
     case WT_DHANDLE_TYPE_TABLE:
         WT_ERR(__wt_strdup(session, WT_CONFIG_BASE(session, table_meta), &dhandle->cfg[0]));
-        break;
-    case WT_DHANDLE_TYPE_TIERED:
-        WT_ERR(__wt_strdup(session, WT_CONFIG_BASE(session, tiered_meta), &dhandle->cfg[0]));
         break;
     case WT_DHANDLE_TYPE_TIERED_TREE:
         WT_ERR(__wt_strdup(session, WT_CONFIG_BASE(session, tier_meta), &dhandle->cfg[0]));
@@ -148,6 +146,7 @@ __conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
         ret = __wt_schema_close_table(session, (WT_TABLE *)dhandle);
         break;
     case WT_DHANDLE_TYPE_TIERED:
+        WT_WITH_DHANDLE(session, dhandle, ret = __wt_btree_discard(session));
         ret = __wt_tiered_close(session, (WT_TIERED *)dhandle);
         break;
     case WT_DHANDLE_TYPE_TIERED_TREE:
@@ -401,6 +400,8 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead)
         WT_TRET(__wt_schema_close_table(session, (WT_TABLE *)dhandle));
         break;
     case WT_DHANDLE_TYPE_TIERED:
+        WT_TRET(__wt_btree_close(session));
+        F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
         WT_TRET(__wt_tiered_close(session, (WT_TIERED *)dhandle));
         break;
     case WT_DHANDLE_TYPE_TIERED_TREE:
@@ -562,6 +563,18 @@ __wt_conn_dhandle_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t fla
         WT_ERR(__wt_schema_open_table(session));
         break;
     case WT_DHANDLE_TYPE_TIERED:
+        /* Set any special flags on the btree handle. */
+        F_SET(btree, LF_MASK(WT_BTREE_SPECIAL_FLAGS));
+
+        /*
+         * Allocate data-source statistics memory. We don't allocate that memory when allocating the
+         * data handle because not all data handles need statistics (for example, handles used for
+         * checkpoint locking). If we are reopening the handle, then it may already have statistics
+         * memory, check to avoid the leak.
+         */
+        if (dhandle->stat_array == NULL)
+            WT_ERR(__wt_stat_dsrc_init(session, dhandle));
+
         WT_ERR(__wt_tiered_open(session, cfg));
         break;
     case WT_DHANDLE_TYPE_TIERED_TREE:

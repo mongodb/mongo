@@ -245,25 +245,6 @@ if test "$wt_cv_enable_diagnostic" = "yes"; then
 	    [DIAGNOSTIC BUILDS ARE NOT RECOMMENDED FOR PRODUCTION DEPLOYMENT.])
 fi
 
-# If we are building in a tree without documentation, check if doxygen is
-# available.
-if test -f "$srcdir/docs/index.html" ; then
-	wt_cv_docs_exist=yes
-else
-	wt_cv_docs_exist=no
-fi
-
-if test "$wt_cv_docs_exist" = "no"; then
-	AC_CHECK_PROG([DOXYGEN], [doxygen], [doxygen], [false])
-fi
-
-if test "$wt_cv_docs_exist" = "yes" -o "$DOXYGEN" = "doxygen" ; then
-	MAN1_PAGES="$srcdir/docs/man/man1/wt.1"
-	AC_SUBST(MAN1_PAGES)
-	MAN3_PAGES="$srcdir/docs/man/man3/wiredtiger.3"
-	AC_SUBST(MAN3_PAGES)
-fi
-
 # Output files
 AC_CONFIG_HEADERS([wiredtiger_config.h:build_posix/config.hin])
 

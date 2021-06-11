@@ -1,5 +1,4 @@
 # Building WiredTiger with CMake
-> *CMake support for building wiredtiger is an active work-in-progress. As of this time CMake can **only** build the WiredTiger library for POSIX platforms (Linux & Darwin). We suggest you continue using the SCons buildsystem when compiling for Windows.*
 
 ### Build Dependencies
 
@@ -36,6 +35,16 @@ brew install ccache
 brew install cmake
 brew install python
 brew install swig
+```
+
+###### Install commands for Windows (using Chocolatey)
+
+```bash
+choco install cmake
+choco install ninja
+choco install ccache --version=3.7.9
+choco install swig
+choco install python --pre
 ```
 
 ### Building the WiredTiger Library
@@ -105,7 +114,7 @@ $ ccmake .
 
 *The configuration options can also be viewed in `build_cmake/configs/base.cmake`*.
 
-###### Switching between GCC and Clang
+###### Switching between GCC and Clang (POSIX only)
 
 By default CMake will use your default system compiler (`cc`). If you want to use a specific toolchain you can pass a toolchain file! We have provided a toolchain file for both GCC (`build_cmake/toolchains/gcc.cmake`) and Clang (`build_cmake/toolchains/clang.cmake`). To use either toolchain you can pass the `-DCMAKE_TOOLCHAIN_FILE=` to the CMake configuration step. For example:
 

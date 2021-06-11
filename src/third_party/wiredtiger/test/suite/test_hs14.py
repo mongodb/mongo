@@ -75,6 +75,9 @@ class test_hs14(wttest.WiredTigerTestCase):
             cursor[self.create_key(i)] = value4
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(4))
 
+        # A checkpoint will ensure that older values are written to the history store.
+        self.session.checkpoint()
+
         start = time.time()
         self.session.begin_transaction('read_timestamp=' + timestamp_str(3))
         for i in range(1, 10000):
@@ -93,6 +96,9 @@ class test_hs14(wttest.WiredTigerTestCase):
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value5
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+
+        # A checkpoint will ensure that older values are written to the history store.
+        self.session.checkpoint()
 
         start = time.time()
         self.session.begin_transaction('read_timestamp=' + timestamp_str(9))

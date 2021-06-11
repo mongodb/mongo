@@ -30,34 +30,45 @@
 #define THROTTLE_H
 
 #include <thread>
+#include <string>
 
 #include "configuration.h"
 
 namespace test_harness {
 class throttle {
     public:
-    throttle(const int64_t op_count, const char interval)
+    explicit throttle(const std::string &throttle_rate)
     {
-        testutil_assert(op_count > 0);
-        /* Lazily compute the ms for every type. */
-        if (interval == 's')
-            _ms = 1000 / op_count;
-        else if (interval == 'm')
-            _ms = (60 * 1000) / op_count;
-        else if (interval == 'h')
-            _ms = (60 * 60 * 1000) / op_count;
-        else
-            testutil_die(-1, "Specified throttle interval not supported.");
+        std::string magnitude;
+        uint64_t multiplier = 0;
+        /*
+         * Find the ms, s, or m in the string. Searching for "ms" first as the following two
+         * searches would match as well.
+         */
+        size_t pos = throttle_rate.find("ms");
+        if (pos != std::string::npos)
+            multiplier = 1;
+        else {
+            pos = throttle_rate.find("s");
+            if (pos != std::string::npos)
+                multiplier = 1000;
+            else {
+                pos = throttle_rate.find("m");
+                if (pos != std::string::npos)
+                    multiplier = 60 * 1000;
+                else
+                    testutil_die(-1, "no rate specifier given");
+            }
+        }
+        magnitude = throttle_rate.substr(0, pos);
+        /* This will throw if it can't cast, which is fine. */
+        _ms = std::stoi(magnitude) * multiplier;
     }
 
-    throttle(configuration *config)
-        : throttle(
-            config->get_optional_int(OP_COUNT, 1), config->get_optional_string(INTERVAL, "s")[0])
-    {
-    }
+    explicit throttle(configuration *config) : throttle(config->get_string(OP_RATE)) {}
 
     /* Default to a second per operation. */
-    throttle() : throttle(1, 's') {}
+    throttle() : throttle("1s") {}
 
     void
     sleep()

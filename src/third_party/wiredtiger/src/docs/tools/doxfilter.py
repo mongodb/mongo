@@ -79,6 +79,7 @@ def process_arch(source):
             result += '@arch_page_table{' + \
                 data_structures_str + ',' + \
                 files_str + '}\n'
+            result += '@arch_page_caution\n'
         else:
             result += line + '\n'
     return result

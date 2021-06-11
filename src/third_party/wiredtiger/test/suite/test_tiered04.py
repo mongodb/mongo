@@ -88,13 +88,19 @@ class test_tiered04(wttest.WiredTigerTestCase):
         stat_cursor.close()
         return val
 
+    def check(self, tc, n):
+        for i in range(0, n):
+            self.assertEqual(tc[str(i)], str(i))
+        tc.set_key(str(n))
+        self.assertEquals(tc.search(), wiredtiger.WT_NOTFOUND)
+
     # Test calling the flush_tier API.
     def test_tiered(self):
         # Create three tables. One using the system tiered storage, one
         # specifying its own bucket and object size and one using no
         # tiered storage. Use stats to verify correct setup.
         intl_page = 'internal_page_max=16K'
-        base_create = 'key_format=S,' + intl_page
+        base_create = 'key_format=S,value_format=S,' + intl_page
         self.pr("create sys")
         self.session.create(self.uri, base_create)
         conf = \
@@ -110,13 +116,34 @@ class test_tiered04(wttest.WiredTigerTestCase):
         self.pr("create non tiered/local")
         self.session.create(self.uri_none, base_create + conf)
 
-        #self.pr("open cursor")
-        #c = self.session.open_cursor(self.uri)
         self.pr("flush tier")
+        c = self.session.open_cursor(self.uri)
+        c["0"] = "0"
+        self.check(c, 1)
+        c.close()
         self.session.flush_tier(None)
 
-        self.pr("flush tier again")
+        c = self.session.open_cursor(self.uri)
+        c["1"] = "1"
+        self.check(c, 2)
+        c.close()
+
+        c = self.session.open_cursor(self.uri)
+        c["2"] = "2"
+        self.check(c, 3)
+
+        self.pr("flush tier again, holding open cursor")
+        # FIXME-WT-7591 Remove the extra cursor close and open surrounding the flush_tier call.
+        # Having a cursor open during a flush_tier does not yet work, so the test closes it,
+        # and reopens after the flush_tier.
+        c.close()
         self.session.flush_tier(None)
+        c = self.session.open_cursor(self.uri)
+
+        c["3"] = "3"
+        self.check(c, 4)
+        c.close()
+
         calls = self.get_stat(stat.conn.flush_tier, None)
         flush = 2
         self.assertEqual(calls, flush)

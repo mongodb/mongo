@@ -27,6 +27,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
+from wtscenario import make_scenarios
+
 def timestamp_str(t):
     return '%x' % t
 
@@ -35,6 +37,13 @@ def timestamp_str(t):
 class test_prepare11(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB,statistics=(all)'
     session_config = 'isolation=snapshot'
+
+    commit_values = [
+        ('commit', dict(commit=True)),
+        ('rollback', dict(commit=False)),
+    ]
+
+    scenarios = make_scenarios(commit_values)
 
     def test_prepare_update_rollback(self):
         uri = "table:test_prepare11"
@@ -49,4 +58,9 @@ class test_prepare11(wttest.WiredTigerTestCase):
         c.reserve()
         c['key1'] = 'yyyy'
         self.session.prepare_transaction('prepare_timestamp=10')
-        self.session.rollback_transaction()
+        if self.commit:
+            self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(20))
+            self.session.timestamp_transaction('durable_timestamp=' + timestamp_str(30))
+            self.session.commit_transaction()
+        else:
+            self.session.rollback_transaction()

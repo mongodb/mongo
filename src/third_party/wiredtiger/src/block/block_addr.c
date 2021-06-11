@@ -40,6 +40,8 @@ __block_buffer_to_addr(WT_BLOCK *block, const uint8_t **pp, uint32_t *objectidp,
         *offsetp = 0;
         *objectidp = *sizep = *checksump = 0;
     } else {
+        if (block->has_objects && l == 0 && o != WT_BLOCK_INVALID_OFFSET)
+            WT_RET_MSG(NULL, EINVAL, "address cookie decoding for Btree with objects has object 0");
         *objectidp = (uint32_t)l;
         *offsetp = (wt_off_t)(o + 1) * block->allocsize;
         *sizep = (uint32_t)s * block->allocsize;
@@ -68,8 +70,11 @@ __wt_block_addr_to_buffer(WT_BLOCK *block, uint8_t **pp, uint32_t objectid, wt_o
         s = size / block->allocsize;
         c = checksum;
     }
-    if (block->has_objects)
+    if (block->has_objects) {
+        if (l == 0 && o != WT_BLOCK_INVALID_OFFSET)
+            WT_RET_MSG(NULL, EINVAL, "address cookie encoding for Btree with objects has object 0");
         WT_RET(__wt_vpack_uint(pp, 0, l));
+    }
     WT_RET(__wt_vpack_uint(pp, 0, o));
     WT_RET(__wt_vpack_uint(pp, 0, s));
     WT_RET(__wt_vpack_uint(pp, 0, c));

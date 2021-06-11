@@ -1,9 +1,9 @@
 personal_ws-1.1 en 200
 ACM
 APIs
+ASAN
 ActiveState
 Adler's
-ASAN
 Atomicity
 autoconf
 BLOBs
@@ -14,18 +14,18 @@ cmake
 CMake
 COV
 CPPFLAGS
+CPPSuite
 CPUs
 CRC
 CSV
+CSuite
+CURSTD
 CXX
 Cheng
 Christoph
 Collet's
 Coverity
 Coverity's
-CPPSuite
-CSuite
-CURSTD
 Cyclomatic
 DB's
 DBTs
@@ -59,6 +59,7 @@ FlexeLint
 FreeBSD
 FreeBSD's
 GCC
+GPL
 Gawlick
 Gimpel
 GitHub
@@ -75,7 +76,6 @@ JavaScript
 KMS
 LD
 LDFLAGS
-LibFuzzer
 LIBS
 LINKFLAGS
 LLC
@@ -91,14 +91,15 @@ LZ
 Lameter
 LevelDB
 Levyx
+LibFuzzer
 MERCHANTABILITY
+MSAN
 MVCC's
 Makefiles
 Mewhort
 MongoDB
 MongoDB's
 Multithreaded
-MSAN
 NOTFOUND
 NSEC
 NUMA
@@ -294,8 +295,8 @@ fieldname
 fileBackgroundColor
 fileBorderColor
 fileFontColor
-fileShadowing
 fileID
+fileShadowing
 fileformats
 fileid
 filename
@@ -386,6 +387,7 @@ llvm
 lmin
 ln
 loadtext
+loc
 logc
 lookup
 lookups
@@ -633,8 +635,8 @@ warmup
 wget
 whitespace
 wiredtiger
-workgen
 workQ
+workgen
 writelock
 writelocks
 wrlock
@@ -654,4 +656,3 @@ yieldcpu
 zlib
 zseries
 zstd
-loc

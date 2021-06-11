@@ -22,11 +22,11 @@ while :
 	-A)	# Reconfigure the library build.
 		reconf=1
 		shift;;
-	-f)	# Force versions to be updated
-		force="-f"
-		shift;;
 	-E)	# Return an error code on failure
 		errmode=1
+		shift;;
+	-f)	# Force versions to be updated
+		force="-f"
 		shift;;
 	*)
 		break;;
@@ -52,15 +52,12 @@ errchk()
 	sed -e 's/^/    /' $2
 	echo "#######################"
 
-	rm -f $2
+	# If the test was skipped, ignore the failure.
+	if ! `grep "$1.*skipped" $2 > /dev/null`; then
+	    errfound=1;
+	fi
 
-	# Some tests shouldn't return an error, we exclude them here.
-	case "$1" in
-	*s_export|*s_tags)
-		;;
-	*)
-		errfound=1;;
-	esac
+	rm -f $2
 }
 
 run()

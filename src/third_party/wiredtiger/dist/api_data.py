@@ -272,6 +272,10 @@ file_runtime_config = common_runtime_config + [
         the file is read-only. All methods that may modify a file are
         disabled. See @ref readonly for more information''',
         type='boolean'),
+    Config('tiered_object', 'false', r'''
+        this file is a tiered object. When opened on its own, it is marked as
+        readonly and may be restricted in other ways''',
+        type='boolean', undoc=True),
 ]
 
 # Per-file configuration
@@ -451,7 +455,7 @@ lsm_meta = file_config + lsm_config + [
         obsolete chunks in the LSM tree'''),
 ]
 
-tiered_meta = common_meta + tiered_config + [
+tiered_meta = file_config + tiered_config + [
     Config('last', '0', r'''
         the last allocated object ID'''),
     Config('tiers', '', r'''
@@ -1557,6 +1561,18 @@ methods = {
     Config('force', 'false', r'''
         force sharing of all data''',
         type='boolean'),
+    Config('lock_wait', 'true', r'''
+        wait for locks, if \c lock_wait=false, fail if any required locks are
+        not available immediately''',
+        type='boolean'),
+    Config('sync', 'on', r'''
+        wait for all objects to be flushed to the shared storage to the level
+        specified. The \c off setting does not wait for any
+        objects to be written to the tiered storage system but returns immediately after
+        generating the objects and work units for an internal thread.  The
+        \c on setting causes the caller to wait until all work queued for this call to
+        be completely processed before returning''',
+        choices=['off', 'on']),
 ]),
 
 'WT_SESSION.strerror' : Method([]),

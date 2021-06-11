@@ -2583,14 +2583,10 @@ stop_threads(u_int num, WTPERF_THREAD *threads)
 static void
 recreate_dir(const char *name)
 {
-    char *buf;
-    size_t len;
-
-    len = strlen(name) * 2 + 100;
-    buf = dmalloc(len);
-    testutil_check(__wt_snprintf(buf, len, "rm -rf %s && mkdir %s", name, name));
-    testutil_checkfmt(system(buf), "system: %s", buf);
-    free(buf);
+    /* Clean the directory if it already exists. */
+    testutil_clean_work_dir(name);
+    /* Recreate the directory. */
+    testutil_make_work_dir(name);
 }
 
 static int

@@ -225,6 +225,7 @@ struct __wt_connection_impl {
     WT_SPINLOCK api_lock;        /* Connection API spinlock */
     WT_SPINLOCK checkpoint_lock; /* Checkpoint spinlock */
     WT_SPINLOCK fh_lock;         /* File handle queue spinlock */
+    WT_SPINLOCK flush_tier_lock; /* Flush tier spinlock */
     WT_SPINLOCK metadata_lock;   /* Metadata update spinlock */
     WT_SPINLOCK reconfig_lock;   /* Single thread reconfigure */
     WT_SPINLOCK schema_lock;     /* Schema operation spinlock */
@@ -420,8 +421,10 @@ struct __wt_connection_impl {
     WT_SESSION_IMPL *tiered_session; /* Tiered thread session */
     wt_thread_t tiered_tid;          /* Tiered thread */
     bool tiered_tid_set;             /* Tiered thread set */
+    WT_CONDVAR *flush_cond;          /* Flush wait mutex */
     WT_CONDVAR *tiered_cond;         /* Tiered wait mutex */
     bool tiered_server_running;      /* Internal tiered server operating */
+    uint32_t flush_state;            /* State of last flush tier */
 
     WT_TIERED_MANAGER tiered_mgr;        /* Tiered manager thread information */
     WT_SESSION_IMPL *tiered_mgr_session; /* Tiered manager thread session */

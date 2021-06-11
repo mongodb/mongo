@@ -26,33 +26,48 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_harness/test.h"
+#ifndef CHECKPOINT_MANAGER_H
+#define CHECKPOINT_MANAGER_H
 
-/*
- * Class that defines operations that do nothing as an example.
- * This shows how database operations can be overriden and customized.
- */
-class example_test : public test_harness::test {
+#include "util/api_const.h"
+#include "connection_manager.h"
+
+namespace test_harness {
+
+class checkpoint_manager : public component {
     public:
-    example_test(const std::string &config, const std::string &name) : test(config, name) {}
+    explicit checkpoint_manager(configuration *configuration)
+        : component(CHECKPOINT_MANAGER, configuration)
+    {
+    }
+    virtual ~checkpoint_manager() = default;
+
+    /* Delete the copy constructor and the assignment operator. */
+    checkpoint_manager(const checkpoint_manager &) = delete;
+    checkpoint_manager &operator=(const checkpoint_manager &) = delete;
 
     void
-    populate(test_harness::database &database, test_harness::timestamp_manager *_timestamp_manager,
-      test_harness::configuration *_config, test_harness::workload_tracking *tracking)
-       override final
+    load() override final
     {
-        std::cout << "populate: nothing done." << std::endl;
+        /* Load the general component things. */
+        component::load();
+
+        /* Create session that we'll use for checkpointing. */
+        if (_enabled)
+            _session = connection_manager::instance().create_session();
     }
 
     void
-    read_operation(test_harness::thread_context *context) override final
+    do_work() override final
     {
-        std::cout << "read_operation: nothing done." << std::endl;
+        debug_print("Running checkpoint", DEBUG_INFO);
+        testutil_check(_session->checkpoint(_session, nullptr));
     }
 
-    void
-    update_operation(test_harness::thread_context *context) override final
-    {
-        std::cout << "update_operation: nothing done." << std::endl;
-    }
+    private:
+    WT_SESSION *_session = nullptr;
 };
+
+} // namespace test_harness
+
+#endif

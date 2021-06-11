@@ -213,43 +213,12 @@ err:
 int
 __wt_block_fh(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t objectid, WT_FH **fhp)
 {
-    WT_DECL_ITEM(tmp);
-    WT_DECL_RET;
-    const char *filename;
-
-    if (!block->has_objects || objectid == block->objectid) {
+    if (!block->has_objects)
         *fhp = block->fh;
-        return (0);
-    }
+    else
+        WT_RET(__wt_block_tiered_fh(session, block, objectid, fhp));
 
-    /* TODO: tiered: fh readlock; we may want a reference count on each file handle given out. */
-    if (objectid * sizeof(WT_FILE_HANDLE *) < block->ofh_alloc &&
-      (*fhp = block->ofh[objectid]) != NULL)
-        return (0);
-
-    /* TODO: tiered: fh writelock */
-    /* Ensure the array goes far enough. */
-    WT_RET(__wt_realloc_def(session, &block->ofh_alloc, objectid + 1, &block->ofh));
-    if (objectid >= block->max_objectid)
-        block->max_objectid = objectid + 1;
-    if ((*fhp = block->ofh[objectid]) != NULL)
-        return (0);
-
-    WT_RET(__wt_scr_alloc(session, 0, &tmp));
-    if (objectid == 0)
-        filename = block->name;
-    else {
-        WT_ERR(__wt_buf_fmt(session, tmp, "%s.%08" PRIu32, block->name, objectid));
-        filename = tmp->data;
-    }
-    WT_ERR(__wt_open(session, filename, WT_FS_OPEN_FILE_TYPE_DATA,
-      WT_FS_OPEN_READONLY | block->file_flags, &block->ofh[objectid]));
-    *fhp = block->ofh[objectid];
-    WT_ASSERT(session, *fhp != NULL);
-
-err:
-    __wt_scr_free(session, &tmp);
-    return (ret);
+    return (0);
 }
 
 /*

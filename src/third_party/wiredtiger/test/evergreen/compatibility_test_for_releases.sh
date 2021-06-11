@@ -69,6 +69,7 @@ run_format()
 
         args=""
         args+="runs.type=row "                  # Temporarily disable column store tests
+        args+="btree.prefix=0 "                 # Prefix testing isn't portable between releases
         args+="cache=80 "                       # Medium cache so there's eviction
         args+="checkpoints=1 "                  # Force periodic writes
         args+="compression=snappy "             # We only built with snappy, force the choice
@@ -81,8 +82,8 @@ run_format()
         args+="rows=1000000 "
         args+="salvage=0 "                      # Faster runs
         args+="timer=4 "
-        args+="transaction.isolation=snapshot "
-        args+="transaction.timestamps=1 "
+        args+="transaction.isolation=snapshot " # Older releases can't do lower isolation levels
+        args+="transaction.timestamps=1 "       # Older releases can't do non-timestamp transactions
         args+="verify=0 "                       # Faster runs
 
         for am in $2; do

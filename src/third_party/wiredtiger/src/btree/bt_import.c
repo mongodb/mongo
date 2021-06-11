@@ -46,7 +46,7 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
      * size, but 512B allows us to read the descriptor block and that's all we care about.
      */
     F_SET(session, WT_SESSION_IMPORT_REPAIR);
-    WT_ERR(__wt_block_manager_open(session, filename, cfg, false, true, 512, &bm));
+    WT_ERR(__wt_block_manager_open(session, filename, NULL, cfg, false, true, 512, &bm));
     ret = bm->checkpoint_last(bm, session, &metadata, &checkpoint_list, checkpoint);
     WT_TRET(bm->close(bm, session));
     F_CLR(session, WT_SESSION_IMPORT_REPAIR);
@@ -118,7 +118,7 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
      * size. When we did this earlier, we were able to read the descriptor block properly but the
      * checkpoint's byte representation was wrong because it was using the wrong allocation size.
      */
-    WT_ERR(__wt_block_manager_open(session, filename, cfg, false, true, allocsize, &bm));
+    WT_ERR(__wt_block_manager_open(session, filename, NULL, cfg, false, true, allocsize, &bm));
     __wt_free(session, checkpoint_list);
     __wt_free(session, metadata);
     ret = bm->checkpoint_last(bm, session, &metadata, &checkpoint_list, checkpoint);

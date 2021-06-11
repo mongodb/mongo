@@ -1016,6 +1016,14 @@ done:
         WT_ERR(__wt_rollback_to_stable(session, NULL, true));
     }
 
+    /*
+     * Sometimes eviction is triggered after doing a checkpoint. However, we don't want eviction to
+     * make the tree dirty after checkpoint as this will interfere with WT_SESSION alter which
+     * expects a clean tree.
+     */
+    if (eviction_started)
+        WT_TRET(__wt_evict_destroy(session));
+
     if (do_checkpoint || rts_executed)
         /*
          * Forcibly log a checkpoint so the next open is fast and keep the metadata up to date with

@@ -63,10 +63,13 @@ def show_one(label, value):
     l = l if l > 1 else 1
     print('    {0}{1}{2:10d}  (0x{2:x})'.format(label, (' ' * l), value, value))
     
-def show_triple(triple, name, allocsize):
-    off = triple[0]
-    size = triple[1]
-    csum = triple[2]
+def show_ref(ref, name, allocsize):
+    if len(ref) == 4:
+        show_one(name + ' object', ref[0])
+        ref = ref[1:]
+    off = ref[0]
+    size = ref[1]
+    csum = ref[2]
     if size == 0:
         off = -1
         csum = 0
@@ -82,19 +85,49 @@ def decode_arg(arg, allocsize):
     if version != 1:
         print('**** ERROR: unknown version ' + str(version))
     addr = bytes(addr[1:])
-    result = unpack('iiiiiiiiiiiiii',addr)
-    if len(result) != 14:
-        print('**** ERROR: result len unexpected: ' + str(len(result)))
-    show_triple(result[0:3], 'root', allocsize)
-    show_triple(result[3:6], 'alloc', allocsize)
-    show_triple(result[6:9], 'avail', allocsize)
-    show_triple(result[9:12], 'discard', allocsize)
-    file_size = result[12]
-    ckpt_size = result[13]
+
+    # The number of values in a checkpoint may be 14 or 18. In the latter case, the checkpoint is
+    # for a tiered Btree, and contains object ids for each of the four references in the checkpoint.
+    # In the former case, the checkpoint is for a regular (local, single file) Btree, and there are
+    # no objects. Based on what is present, we show them slightly appropriately.
+
+    # First, we get the largest number of ints that can be decoded.
+    result = []
+    iformat = 'iiiiiiiiiiiiii'
+    result_len = 0
+    while True:
+        try:
+            result = unpack(iformat, addr)
+            result_len = len(result)
+        except:
+            break
+        iformat += 'i'
+
+    # Then we check the number of results against what we expect.
+    if result_len == 14:
+        ref_cnt = 3   # no object ids
+    elif result_len == 18:
+        ref_cnt = 4   # has object ids
+    else:
+        if result_len == 0:
+            result_len = 'unknown'
+        print('**** ERROR: number of integers to decode ({}) '.format(result_len) +
+              'does not match expected checkpoint format')
+        return
+    pos = 0
+
+    # Now that we know whether the references have object ids, we can show them.
+    for refname in [ 'root', 'alloc', 'avail', 'discard' ]:
+        show_ref(result[pos : pos + ref_cnt], refname, allocsize)
+        pos += ref_cnt
+    file_size = result[pos]
+    ckpt_size = result[pos+1]
     show_one('file size', file_size)
     show_one('checkpoint size', ckpt_size)
 
-#decode_arg('018281e420f2fa4a8381e40c5855ca808080808080e22fc0e20fc0', 4096)
+#decode_arg('018281e420f2fa4a8381e40c5855ca808080808080e22fc0e20fc0', 4096)  # regular Btree
+#decode_arg('01818181e412e4fd01818281e41546bd16818381e4f2dbec3980808080e22fc0cfc0', 4096) # tiered
+#decode_arg('01818181e412e4fd01818281e41546bd16818381e4f2dbec39808080e22fc0cfc0', 4096) # bad
     
 allocsize = 4096
 try:
