@@ -387,9 +387,15 @@ class GDBDumper(Dumper):
 
             for pid in pinfo.pidv:
                 if not logger.mongo_process_filename:
+                    set_logging_on_commands = []
+                    set_logging_off_commands = []
                     raw_stacks_commands = []
                 else:
                     base, ext = os.path.splitext(logger.mongo_process_filename)
+                    set_logging_on_commands = [
+                        'set logging file %s_%d%s' % (base, pid, ext), 'set logging on'
+                    ]
+                    set_logging_off_commands = ['set logging off']
                     raw_stacks_filename = "%s_%d_raw_stacks%s" % (base, pid, ext)
                     raw_stacks_commands = [
                         'echo \\nWriting raw stacks to %s.\\n' % raw_stacks_filename,
@@ -399,17 +405,18 @@ class GDBDumper(Dumper):
                         'set logging on',
                         'thread apply all bt',
                         'set logging off',
+                        'set logging redirect off',
                     ]
 
                 mongodb_waitsfor_graph = "mongodb-waitsfor-graph debugger_waitsfor_%s_%d.gv" % \
                     (pinfo.name, pid)
 
-                cmds += [
+                cmds += set_logging_on_commands + [
                     "attach %d" % pid,
                     "handle SIGSTOP ignore noprint",
                     "info sharedlibrary",
                     "info threads",  # Dump a simple list of commands to get the thread name
-                ] + raw_stacks_commands + [
+                ] + set_logging_off_commands + raw_stacks_commands + set_logging_on_commands + [
                     mongodb_uniqstack,
                     # Lock the scheduler, before running commands, which execute code in the attached process.
                     "set scheduler-locking on",
@@ -421,7 +428,7 @@ class GDBDumper(Dumper):
                     mongodb_dump_mutexes,
                     mongodb_dump_recovery_units,
                     "detach",
-                ]
+                ] + set_logging_off_commands
 
         return cmds
 
