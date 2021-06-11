@@ -619,7 +619,7 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
     auto prevState = RecipientStateEnum::kUnused;
 
     auto reshardedDoc = BSON("_id" << 0 << "x" << 2 << "y" << 10);
-    long oplogEntriesAppliedOnEachDonor = 10L;
+    int64_t oplogEntriesAppliedOnEachDonor = 10;
 
     for (const auto state : recipientStates) {
         auto recipient = [&] {
