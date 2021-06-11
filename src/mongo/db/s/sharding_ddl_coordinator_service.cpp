@@ -45,6 +45,7 @@
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/drop_database_coordinator.h"
+#include "mongo/db/s/refine_collection_shard_key_coordinator.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
 
 namespace mongo {
@@ -66,6 +67,10 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             return std::make_shared<RenameCollectionCoordinator>(service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kCreateCollection:
             return std::make_shared<CreateCollectionCoordinator>(service, std::move(initialState));
+            break;
+        case DDLCoordinatorTypeEnum::kRefineCollectionShardKey:
+            return std::make_shared<RefineCollectionShardKeyCoordinator>(service,
+                                                                         std::move(initialState));
             break;
         default:
             uasserted(ErrorCodes::BadValue,

@@ -61,6 +61,26 @@ let getCurrentOpOfDDL = (ddlOpThread, desc) => {
 }
 
 {
+    jsTestLog('Check refine collection shard key shows in current op');
+
+    let newShardKey = {_id: 1, x: 1};
+    st.s.getCollection(nss).createIndex(newShardKey);
+    let ddlOpThread = new Thread((mongosConnString, nss, newShardKey) => {
+        let mongos = new Mongo(mongosConnString);
+        mongos.adminCommand({refineCollectionShardKey: nss, key: newShardKey});
+    }, st.s0.host, nss, newShardKey);
+
+    let currOp = getCurrentOpOfDDL(ddlOpThread, 'RefineCollectionShardKeyCoordinator');
+
+    // There must be one operation running with the appropiate ns.
+    assert.eq(1, currOp.length);
+    assert.eq(nss, currOp[0].ns);
+    assert(currOp[0].hasOwnProperty('command'));
+    assert(currOp[0].command.hasOwnProperty('newShardKey'));
+    assert.eq(newShardKey, currOp[0].command.newShardKey);
+}
+
+{
     jsTestLog('Check rename collection shows in current op');
 
     let ddlOpThread = new Thread((mongosConnString, fromNss, toNss) => {

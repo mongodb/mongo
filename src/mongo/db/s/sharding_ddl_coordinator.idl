@@ -46,6 +46,7 @@ enums:
             kDropCollection: "dropCollection"
             kRenameCollection: "renameCollection"
             kCreateCollection: "createCollection"
+            kRefineCollectionShardKey: "refineCollectionShardKey"
 
 types:
     ForwardableOperationMetadata:

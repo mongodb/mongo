@@ -125,6 +125,15 @@ structs:
                 description: "Latest version of the collection"
                 optional: false
 
+    RefineCollectionShardKeyRequest:
+        description: "Parameters sent by the router"
+        strict: false
+        fields:
+            newShardKey:
+                type: KeyPattern
+                description: "The index specification document to use as the new shard key."
+                optional: false
+
 commands:
 
     _shardsvrCreateCollection:
@@ -243,11 +252,8 @@ commands:
         namespace: concatenate_with_db
         api_version: ""
         strict: false
-        fields:
-            newShardKey:
-                type: KeyPattern
-                description: "The index specification document to use as the new shard key."
-                optional: false
+        chained_structs: 
+            RefineCollectionShardKeyRequest: RefineCollectionShardKeyRequest
 
     _configsvrCreateDatabase:
         description: "The internal createDatabase command on the config server"

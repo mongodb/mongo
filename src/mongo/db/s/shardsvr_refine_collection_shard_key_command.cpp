@@ -61,9 +61,16 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            auto refineCoordinator = std::make_shared<RefineCollectionShardKeyCoordinator>(
-                opCtx, ns(), request().getNewShardKey());
-            refineCoordinator->run(opCtx).get(opCtx);
+            auto coordinatorDoc = RefineCollectionShardKeyCoordinatorDocument();
+            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                {{ns(), DDLCoordinatorTypeEnum::kRefineCollectionShardKey}});
+            coordinatorDoc.setRefineCollectionShardKeyRequest(
+                request().getRefineCollectionShardKeyRequest());
+
+            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto refineCoordinator = checked_pointer_cast<RefineCollectionShardKeyCoordinator>(
+                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            refineCoordinator->getCompletionFuture().get(opCtx);
         }
 
         bool supportsWriteConcern() const override {

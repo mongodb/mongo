@@ -342,6 +342,7 @@ env.Library(
         'sharded_rename_collection.idl',
         'rename_collection_participant_service.cpp',
         'refine_collection_shard_key_coordinator.cpp',
+        'refine_collection_shard_key_coordinator_document.idl',
         'reshard_collection_coordinator.cpp',
         'resharding_test_commands.cpp',
         'resharding_test_commands.idl',

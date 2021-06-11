@@ -348,7 +348,7 @@ boost::optional<BSONObj> CreateCollectionCoordinator::reportForCurrentOp(
 void CreateCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     // If we have two shard collections on the same namespace, then the arguments must be the same.
     const auto otherDoc = CreateCollectionCoordinatorDocument::parse(
-        IDLParserErrorContext("RenameCollectionCoordinatorDocument"), doc);
+        IDLParserErrorContext("CreateCollectionCoordinatorDocument"), doc);
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Another create collection with different arguments is already running for the same "

@@ -66,8 +66,10 @@ public:
             }
 
             // Send it to the primary shard
-            ShardsvrRefineCollectionShardKey refineCollectionShardKeyCommand(nss,
-                                                                             request().getKey());
+            RefineCollectionShardKeyRequest requestParamObj;
+            requestParamObj.setNewShardKey(request().getKey());
+            ShardsvrRefineCollectionShardKey refineCollectionShardKeyCommand(nss);
+            refineCollectionShardKeyCommand.setRefineCollectionShardKeyRequest(requestParamObj);
 
             auto cmdResponse = executeCommandAgainstDatabasePrimary(
                 opCtx,

@@ -30,23 +30,27 @@
 #pragma once
 
 #include "mongo/db/keypattern.h"
+#include "mongo/db/s/refine_collection_shard_key_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 
 namespace mongo {
 
-class RefineCollectionShardKeyCoordinator final
-    : public ShardingDDLCoordinator_NORESILIENT,
-      public std::enable_shared_from_this<RefineCollectionShardKeyCoordinator> {
+class RefineCollectionShardKeyCoordinator final : public ShardingDDLCoordinator {
 public:
-    RefineCollectionShardKeyCoordinator(OperationContext* opCtx,
-                                        const NamespaceString& nss,
-                                        const KeyPattern newShardKey);
+    RefineCollectionShardKeyCoordinator(ShardingDDLCoordinatorService* service,
+                                        const BSONObj& initialState);
+
+    void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
+
+    boost::optional<BSONObj> reportForCurrentOp(
+        MongoProcessInterface::CurrentOpConnectionsMode connMode,
+        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
 private:
-    SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancellationToken& token) noexcept override;
 
-    ServiceContext* _serviceContext;
-
+    RefineCollectionShardKeyCoordinatorDocument _doc;
     const KeyPattern _newShardKey;
 };
 

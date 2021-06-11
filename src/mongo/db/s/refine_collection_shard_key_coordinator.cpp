@@ -41,61 +41,88 @@
 namespace mongo {
 
 RefineCollectionShardKeyCoordinator::RefineCollectionShardKeyCoordinator(
-    OperationContext* opCtx, const NamespaceString& nss, const KeyPattern newShardKey)
-    : ShardingDDLCoordinator_NORESILIENT(opCtx, nss),
-      _serviceContext(opCtx->getServiceContext()),
-      _newShardKey(std::move(newShardKey)){};
+    ShardingDDLCoordinatorService* service, const BSONObj& initialState)
+    : ShardingDDLCoordinator(service, initialState),
+      _doc(RefineCollectionShardKeyCoordinatorDocument::parse(
+          IDLParserErrorContext("RefineCollectionShardKeyCoordinatorDocument"), initialState)),
+      _newShardKey(_doc.getNewShardKey()) {}
 
-SemiFuture<void> RefineCollectionShardKeyCoordinator::runImpl(
-    std::shared_ptr<executor::TaskExecutor> executor) {
-    return ExecutorFuture<void>(executor, Status::OK())
-        .then([this, anchor = shared_from_this()]() {
-            ThreadClient tc{"RefineCollectionShardKeyCoordinator", _serviceContext};
-            auto opCtxHolder = tc->makeOperationContext();
+
+void RefineCollectionShardKeyCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
+    // If we have two shard collections on the same namespace, then the arguments must be the same.
+    const auto otherDoc = RefineCollectionShardKeyCoordinatorDocument::parse(
+        IDLParserErrorContext("RefineCollectionShardKeyCoordinatorDocument"), doc);
+
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Another create collection with different arguments is already running for the same "
+            "namespace",
+            SimpleBSONObjComparator::kInstance.evaluate(
+                _doc.getRefineCollectionShardKeyRequest().toBSON() ==
+                otherDoc.getRefineCollectionShardKeyRequest().toBSON()));
+}
+
+boost::optional<BSONObj> RefineCollectionShardKeyCoordinator::reportForCurrentOp(
+    MongoProcessInterface::CurrentOpConnectionsMode connMode,
+    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
+    BSONObjBuilder cmdBob;
+    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
+        cmdBob.append(optComment.get().firstElement());
+    }
+    cmdBob.appendElements(_doc.getRefineCollectionShardKeyRequest().toBSON());
+
+    BSONObjBuilder bob;
+    bob.append("type", "op");
+    bob.append("desc", "RefineCollectionShardKeyCoordinator");
+    bob.append("op", "command");
+    bob.append("ns", nss().toString());
+    bob.append("command", cmdBob.obj());
+    bob.append("active", true);
+    return bob.obj();
+}
+
+ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) noexcept {
+    return ExecutorFuture<void>(**executor)
+        .then([this, anchor = shared_from_this()] {
+            auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            _forwardableOpMetadata.setOn(opCtx);
-
-            auto distLockManager = DistLockManager::get(opCtx->getServiceContext());
-            const auto dbDistLock =
-                uassertStatusOK(distLockManager->lock(opCtx,
-                                                      _nss.db(),
-                                                      "RefineCollectionShardKey",
-                                                      DistLockManager::kDefaultLockTimeout));
-            const auto collDistLock =
-                uassertStatusOK(distLockManager->lock(opCtx,
-                                                      _nss.ns(),
-                                                      "RefineCollectionShardKey",
-                                                      DistLockManager::kDefaultLockTimeout));
+            getForwardableOpMetadata().setOn(opCtx);
 
             const auto cm = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                             _nss));
+                Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+                    opCtx, nss()));
             ConfigsvrRefineCollectionShardKey configsvrRefineCollShardKey(
-                _nss, _newShardKey.toBSON(), cm.getVersion().epoch());
-            configsvrRefineCollShardKey.setDbName(_nss.db().toString());
+                nss(), _newShardKey.toBSON(), cm.getVersion().epoch());
+            configsvrRefineCollShardKey.setDbName(nss().db().toString());
             // TODO SERVER-54810 don't set `setIsFromPrimaryShard` once 5.0 becomes last-LTS
             configsvrRefineCollShardKey.setIsFromPrimaryShard(true);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                "admin",
-                CommandHelpers::appendMajorityWriteConcern(configsvrRefineCollShardKey.toBSON({}),
-                                                           opCtx->getWriteConcern()),
-                Shard::RetryPolicy::kIdempotent));
 
-            uassertStatusOK(cmdResponse.commandStatus);
-            uassertStatusOK(cmdResponse.writeConcernStatus);
+            try {
+                auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+                    opCtx,
+                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                    NamespaceString::kAdminDb.toString(),
+                    CommandHelpers::appendMajorityWriteConcern(
+                        configsvrRefineCollShardKey.toBSON({}), opCtx->getWriteConcern()),
+                    Shard::RetryPolicy::kIdempotent));
+
+                uassertStatusOK(cmdResponse.commandStatus);
+                uassertStatusOK(cmdResponse.writeConcernStatus);
+            } catch (const DBException&) {
+                _completeOnError = true;
+                throw;
+            }
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             LOGV2_ERROR(5277700,
                         "Error running refine collection shard key",
-                        "namespace"_attr = _nss,
+                        "namespace"_attr = nss(),
                         "error"_attr = redact(status));
             return status;
-        })
-        .semi();
+        });
 }
 
 }  // namespace mongo
