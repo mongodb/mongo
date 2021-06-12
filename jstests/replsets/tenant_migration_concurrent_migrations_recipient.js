@@ -62,6 +62,11 @@ migrationOptsArray.forEach((migrationOpts) => {
     jsTestLog("Waiting for migration for tenant: " + migrationOpts.tenantId + " to complete");
     TenantMigrationTest.assertCommitted(
         tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+
+    // Forget migrations first before shutting down the test to prevent unnecessary failover
+    // retries.
+    jsTestLog("Forgetting migration for tenant: " + migrationOpts.tenantId);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 });
 
 tenantMigrationTest.stop();
