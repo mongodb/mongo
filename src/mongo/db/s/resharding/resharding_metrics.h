@@ -51,13 +51,13 @@ class ReshardingMetrics final {
 public:
     enum Role { kCoordinator, kDonor, kRecipient };
 
-    ReshardingMetrics(const ReshardingMetrics&) = delete;
-    ReshardingMetrics(ReshardingMetrics&&) = delete;
-
-    explicit ReshardingMetrics(ServiceContext* svcCtx)
-        : _svcCtx(svcCtx), _cumulativeOp(svcCtx->getFastClockSource()) {}
-
     static ReshardingMetrics* get(ServiceContext*) noexcept;
+
+    explicit ReshardingMetrics(ServiceContext* svcCtx);
+    ~ReshardingMetrics();
+
+    ReshardingMetrics(const ReshardingMetrics&) = delete;
+    ReshardingMetrics& operator=(const ReshardingMetrics&) = delete;
 
     // Marks the beginning of a resharding operation for a particular role. Note that:
     // * Only one resharding operation may run at any time.
@@ -146,12 +146,16 @@ public:
     boost::optional<Milliseconds> getOperationRemainingTime() const;
 
 private:
+    class OperationMetrics;
+
     ServiceContext* const _svcCtx;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ReshardingMetrics::_mutex");
 
     void _emplaceCurrentOpForRole(Role role,
                                   boost::optional<Date_t> runningOperationStartTime) noexcept;
+
+    Date_t _now() const;
 
     // The following maintain the number of resharding operations that have started, succeeded,
     // failed with an unrecoverable error, and canceled by the user, respectively.
@@ -160,63 +164,8 @@ private:
     int64_t _failed = 0;
     int64_t _canceled = 0;
 
-    // Metrics for resharding operation. Accesses must be serialized using `_mutex`.
-    struct OperationMetrics {
-        // Allows tracking elapsed time for the resharding operation and its sub operations (e.g.,
-        // applying oplog entries).
-        class TimeInterval {
-        public:
-            explicit TimeInterval(ClockSource* clockSource) : _clockSource(clockSource) {}
-
-            void start(Date_t start) noexcept;
-
-            void end(Date_t end) noexcept;
-
-            // TODO Remove this function once all metrics classes can start from stepup.
-            void forceEnd(Date_t end) noexcept;
-
-            Milliseconds duration() const noexcept;
-
-        private:
-            ClockSource* const _clockSource;
-            boost::optional<Date_t> _start;
-            boost::optional<Date_t> _end;
-        };
-
-        explicit OperationMetrics(ClockSource* clockSource)
-            : runningOperation(clockSource),
-              copyingDocuments(clockSource),
-              applyingOplogEntries(clockSource),
-              inCriticalSection(clockSource) {}
-
-        void appendCurrentOpMetrics(BSONObjBuilder*, Role) const;
-
-        void appendCumulativeOpMetrics(BSONObjBuilder*) const;
-
-        boost::optional<Milliseconds> remainingOperationTime() const;
-
-        TimeInterval runningOperation;
-        ReshardingOperationStatusEnum opStatus = ReshardingOperationStatusEnum::kInactive;
-
-        TimeInterval copyingDocuments;
-        int64_t documentsToCopy = 0;
-        int64_t documentsCopied = 0;
-        int64_t bytesToCopy = 0;
-        int64_t bytesCopied = 0;
-
-        TimeInterval applyingOplogEntries;
-        int64_t oplogEntriesFetched = 0;
-        int64_t oplogEntriesApplied = 0;
-
-        TimeInterval inCriticalSection;
-        int64_t writesDuringCriticalSection = 0;
-
-        boost::optional<DonorStateEnum> donorState;
-        boost::optional<RecipientStateEnum> recipientState;
-        boost::optional<CoordinatorStateEnum> coordinatorState;
-    };
-    boost::optional<OperationMetrics> _currentOp;
-    OperationMetrics _cumulativeOp;
+    std::unique_ptr<OperationMetrics> _currentOp;
+    std::unique_ptr<OperationMetrics> _cumulativeOp;
 };
 
 }  // namespace mongo
