@@ -6202,6 +6202,7 @@ tasks:
     - func: "cleanup environment"
     - func: "set up venv"
     - func: "fetch packages"
+    - func: "generate compile expansions"
     - func: "apply compile expansions"
     - func: "set up remote credentials"
       vars:
@@ -6268,6 +6269,7 @@ tasks:
         bucket: mciuploads
         local_file: src/distsrc.${ext|tgz}
         build_variants: [rhel70, windows]
+    - func: "generate compile expansions"
     - func: "apply compile expansions"
     - func: "fetch dist debugsymbols"
     - func: "set up remote credentials"
