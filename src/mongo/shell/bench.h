@@ -63,6 +63,14 @@ enum class OpType {
     CPULOAD
 };
 
+inline bool isReadOp(OpType opType) {
+    return opType == OpType::FINDONE || opType == OpType::FIND;
+}
+
+inline bool isWriteOp(OpType opType) {
+    return opType == OpType::UPDATE || opType == OpType::INSERT || opType == OpType::REMOVE;
+}
+
 class BenchRunConfig;
 struct BenchRunStats;
 class BsonTemplateEvaluator;

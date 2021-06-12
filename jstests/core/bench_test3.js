@@ -3,16 +3,20 @@
  *   uses_multiple_connections,
  * ]
  */
-t = db.bench_test3;
+(function() {
+"use strict";
+
+const t = db.bench_test3;
 t.drop();
 
-benchArgs = {
+const benchArgs = {
     ops: [{
         ns: t.getFullName(),
         op: "update",
         upsert: true,
         query: {_id: {"#RAND_INT": [0, 5, 4]}},
-        update: {$inc: {x: 1}}
+        update: {$inc: {x: 1}},
+        writeCmd: true
     }],
     parallel: 2,
     seconds: 10,
@@ -25,14 +29,15 @@ if (jsTest.options().auth) {
     benchArgs['password'] = jsTest.options().authPassword;
 }
 
-res = benchRun(benchArgs);
+const res = benchRun(benchArgs);
 printjson(res);
 
-var keys = [];
-var totals = {};
+let keys = [];
+let totals = {};
 db.bench_test3.find().sort({_id: 1}).forEach(function(z) {
     keys.push(z._id);
     totals[z._id] = z.x;
 });
 printjson(totals);
 assert.eq([0, 4, 8, 12, 16], keys);
+})();

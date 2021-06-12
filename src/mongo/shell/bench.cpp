@@ -132,16 +132,6 @@ BSONObj fixQuery(const BSONObj& obj, BsonTemplateEvaluator& btl) {
     return b.obj();
 }
 
-/**
- * Adds a '$orderby' to the query document. Useful when running on the legacy reads path.
- */
-BSONObj makeQueryLegacyCompatible(const BSONObj& query, const BSONObj& sortSpec) {
-    BSONObjBuilder bob;
-    bob.append("$query", query);
-    bob.append("$orderby", sortSpec);
-    return bob.obj();
-}
-
 bool runCommandWithSession(DBClientBase* conn,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
@@ -386,9 +376,9 @@ void BenchRunConfig::initializeToDefaults() {
 }
 
 BenchRunConfig* BenchRunConfig::createFromBson(const BSONObj& args) {
-    BenchRunConfig* config = new BenchRunConfig();
+    auto config = std::make_unique<BenchRunConfig>();
     config->initializeFromBson(args);
-    return config;
+    return config.release();
 }
 
 BenchRunOp opFromBson(const BSONObj& op) {
@@ -641,8 +631,17 @@ BenchRunOp opFromBson(const BSONObj& op) {
         }
     }
 
+    uassert(5751400,
+            "readCmd: true must be specified for read ops",
+            !isReadOp(myOp.op) || myOp.useReadCmd);
+    uassert(5751401,
+            "writeCmd: true must be specified for write ops",
+            !isWriteOp(myOp.op) || myOp.useWriteCmd);
+    uassert(5751402, "Exhaust queries are not supported", !(myOp.options & QueryOption_Exhaust));
+
     uassert(34395, "Benchrun op has an zero length ns", !myOp.ns.empty());
     uassert(34396, "Benchrun op doesn't have an optype set", myOp.op != OpType::NONE);
+
     return myOp;
 }
 
@@ -972,16 +971,10 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                 ++opState.stats->errCount;
             }
 
-            if (++count % 100 == 0 && !op.useWriteCmd) {
-                conn->getLastError();
-            }
-
             if (op.delay > 0)
                 sleepmillis(op.delay);
         }
     }
-
-    conn->getLastError();
 }
 
 void BenchRunOp::executeOnce(DBClientBase* conn,
@@ -1008,35 +1001,26 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
         case OpType::FINDONE: {
             BSONObj fixedQuery = fixQuery(this->query, *state->bsonTemplateEvaluator);
             BSONObj result;
-            if (this->useReadCmd) {
-                auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString(this->ns));
-                findCommand->setFilter(fixedQuery);
-                findCommand->setProjection(this->projection);
-                findCommand->setLimit(1LL);
-                findCommand->setSingleBatch(true);
-                findCommand->setSort(this->sort);
-                if (config.useSnapshotReads) {
-                    findCommand->setReadConcern(readConcernSnapshot);
-                }
-                invariant(query_request_helper::validateFindCommandRequest(*findCommand));
-
-                BenchRunEventTrace _bret(&state->stats->findOneCounter);
-                boost::optional<TxnNumber> txnNumberForOp;
-                if (config.useSnapshotReads) {
-                    ++state->txnNumber;
-                    txnNumberForOp = state->txnNumber;
-                    state->inProgressMultiStatementTxn = true;
-                }
-                runQueryWithReadCommands(
-                    conn, lsid, txnNumberForOp, std::move(findCommand), Milliseconds(0), &result);
-            } else {
-                if (!this->sort.isEmpty()) {
-                    fixedQuery = makeQueryLegacyCompatible(std::move(fixedQuery), this->sort);
-                }
-                BenchRunEventTrace _bret(&state->stats->findOneCounter);
-                result = conn->findOne(
-                    this->ns, fixedQuery, nullptr, DBClientCursor::QueryOptionLocal_forceOpQuery);
+            auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString(this->ns));
+            findCommand->setFilter(fixedQuery);
+            findCommand->setProjection(this->projection);
+            findCommand->setLimit(1LL);
+            findCommand->setSingleBatch(true);
+            findCommand->setSort(this->sort);
+            if (config.useSnapshotReads) {
+                findCommand->setReadConcern(readConcernSnapshot);
             }
+            invariant(query_request_helper::validateFindCommandRequest(*findCommand));
+
+            BenchRunEventTrace _bret(&state->stats->findOneCounter);
+            boost::optional<TxnNumber> txnNumberForOp;
+            if (config.useSnapshotReads) {
+                ++state->txnNumber;
+                txnNumberForOp = state->txnNumber;
+                state->inProgressMultiStatementTxn = true;
+            }
+            runQueryWithReadCommands(
+                conn, lsid, txnNumberForOp, std::move(findCommand), Milliseconds(0), &result);
 
             if (!config.hideResults || this->showResult)
                 LOGV2_INFO(22796, "Result from benchRun thread [findOne]", "result"_attr = result);
@@ -1087,87 +1071,58 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
 
             BSONObj fixedQuery = fixQuery(this->query, *state->bsonTemplateEvaluator);
 
-            if (this->useReadCmd) {
-                uassert(28824,
-                        "cannot use 'options' in combination with read commands",
-                        !this->options);
+            uassert(
+                28824, "cannot use 'options' in combination with read commands", !this->options);
 
-                auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString(this->ns));
-                findCommand->setFilter(fixedQuery);
-                findCommand->setProjection(this->projection);
-                if (this->skip) {
-                    findCommand->setSkip(this->skip);
-                }
-                if (this->limit) {
-                    findCommand->setLimit(this->limit);
-                }
-                if (this->batchSize) {
-                    findCommand->setBatchSize(this->batchSize);
-                }
-                if (!this->sort.isEmpty()) {
-                    findCommand->setSort(this->sort);
-                }
-                BSONObjBuilder readConcernBuilder;
-                if (config.useSnapshotReads) {
-                    readConcernBuilder.append("level", "snapshot");
-                }
-                if (this->useAClusterTimeWithinPastSeconds > 0) {
-                    invariant(config.useSnapshotReads);
-                    // Get a random cluster time between the latest time and
-                    // 'useAClusterTimeWithinPastSeconds' in the past.
-                    Timestamp atClusterTime = getAClusterTimeSecondsInThePast(
-                        conn, state->rng->nextInt32(this->useAClusterTimeWithinPastSeconds));
-                    readConcernBuilder.append("atClusterTime", atClusterTime);
-                }
-                findCommand->setReadConcern(readConcernBuilder.obj());
-
-                invariant(query_request_helper::validateFindCommandRequest(*findCommand));
-
-                BenchRunEventTrace _bret(&state->stats->queryCounter);
-                boost::optional<TxnNumber> txnNumberForOp;
-                if (config.useSnapshotReads) {
-                    ++state->txnNumber;
-                    txnNumberForOp = state->txnNumber;
-                    state->inProgressMultiStatementTxn = true;
-                }
-
-                int delayBeforeGetMore = this->maxRandomMillisecondDelayBeforeGetMore
-                    ? state->rng->nextInt32(this->maxRandomMillisecondDelayBeforeGetMore)
-                    : 0;
-
-                count = runQueryWithReadCommands(conn,
-                                                 lsid,
-                                                 txnNumberForOp,
-                                                 std::move(findCommand),
-                                                 Milliseconds(delayBeforeGetMore),
-                                                 nullptr);
-            } else {
-                if (!this->sort.isEmpty()) {
-                    fixedQuery = makeQueryLegacyCompatible(std::move(fixedQuery), this->sort);
-                }
-                // Use special query function for exhaust query option.
-                if (this->options & QueryOption_Exhaust) {
-                    BenchRunEventTrace _bret(&state->stats->queryCounter);
-                    std::function<void(const BSONObj&)> castedDoNothing(doNothing);
-                    count =
-                        conn->query(castedDoNothing,
-                                    NamespaceString(this->ns),
-                                    fixedQuery,
-                                    &this->projection,
-                                    this->options | DBClientCursor::QueryOptionLocal_forceOpQuery);
-                } else {
-                    BenchRunEventTrace _bret(&state->stats->queryCounter);
-                    std::unique_ptr<DBClientCursor> cursor(
-                        conn->query(NamespaceString(this->ns),
-                                    fixedQuery,
-                                    this->limit,
-                                    this->skip,
-                                    &this->projection,
-                                    this->options | DBClientCursor::QueryOptionLocal_forceOpQuery,
-                                    this->batchSize));
-                    count = cursor->itcount();
-                }
+            auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString(this->ns));
+            findCommand->setFilter(fixedQuery);
+            findCommand->setProjection(this->projection);
+            if (this->skip) {
+                findCommand->setSkip(this->skip);
             }
+            if (this->limit) {
+                findCommand->setLimit(this->limit);
+            }
+            if (this->batchSize) {
+                findCommand->setBatchSize(this->batchSize);
+            }
+            if (!this->sort.isEmpty()) {
+                findCommand->setSort(this->sort);
+            }
+            BSONObjBuilder readConcernBuilder;
+            if (config.useSnapshotReads) {
+                readConcernBuilder.append("level", "snapshot");
+            }
+            if (this->useAClusterTimeWithinPastSeconds > 0) {
+                invariant(config.useSnapshotReads);
+                // Get a random cluster time between the latest time and
+                // 'useAClusterTimeWithinPastSeconds' in the past.
+                Timestamp atClusterTime = getAClusterTimeSecondsInThePast(
+                    conn, state->rng->nextInt32(this->useAClusterTimeWithinPastSeconds));
+                readConcernBuilder.append("atClusterTime", atClusterTime);
+            }
+            findCommand->setReadConcern(readConcernBuilder.obj());
+
+            invariant(query_request_helper::validateFindCommandRequest(*findCommand));
+
+            BenchRunEventTrace _bret(&state->stats->queryCounter);
+            boost::optional<TxnNumber> txnNumberForOp;
+            if (config.useSnapshotReads) {
+                ++state->txnNumber;
+                txnNumberForOp = state->txnNumber;
+                state->inProgressMultiStatementTxn = true;
+            }
+
+            int delayBeforeGetMore = this->maxRandomMillisecondDelayBeforeGetMore
+                ? state->rng->nextInt32(this->maxRandomMillisecondDelayBeforeGetMore)
+                : 0;
+
+            count = runQueryWithReadCommands(conn,
+                                             lsid,
+                                             txnNumberForOp,
+                                             std::move(findCommand),
+                                             Milliseconds(delayBeforeGetMore),
+                                             nullptr);
 
             if (this->expected >= 0 && count != this->expected) {
                 LOGV2_INFO(22797,
@@ -1188,69 +1143,53 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 BenchRunEventTrace _bret(&state->stats->updateCounter);
                 BSONObj query = fixQuery(this->query, *state->bsonTemplateEvaluator);
 
-                if (this->useWriteCmd) {
-                    BSONObjBuilder builder;
-                    builder.append("update", nsToCollectionSubstring(this->ns));
-                    BSONArrayBuilder updateArray(builder.subarrayStart("updates"));
-                    {
-                        BSONObjBuilder singleUpdate;
-                        singleUpdate.append("q", query);
-                        switch (this->update.type()) {
-                            case write_ops::UpdateModification::Type::kClassic: {
-                                singleUpdate.append("u",
-                                                    fixQuery(this->update.getUpdateClassic(),
-                                                             *state->bsonTemplateEvaluator));
-                                break;
-                            }
-                            case write_ops::UpdateModification::Type::kPipeline: {
-                                BSONArrayBuilder pipelineBuilder(singleUpdate.subarrayStart("u"));
-                                for (auto&& stage : this->update.getUpdatePipeline()) {
-                                    pipelineBuilder.append(
-                                        fixQuery(stage, *state->bsonTemplateEvaluator));
-                                }
-                                pipelineBuilder.doneFast();
-                                break;
-                            }
-                            case write_ops::UpdateModification::Type::kDelta:
-                                // It is not possible to run a delta update directly from a client.
-                                // Delta updates are only executed on secondaries as part of oplog
-                                // application.
-                                MONGO_UNREACHABLE;
+                BSONObjBuilder builder;
+                builder.append("update", nsToCollectionSubstring(this->ns));
+                BSONArrayBuilder updateArray(builder.subarrayStart("updates"));
+                {
+                    BSONObjBuilder singleUpdate;
+                    singleUpdate.append("q", query);
+                    switch (this->update.type()) {
+                        case write_ops::UpdateModification::Type::kClassic: {
+                            singleUpdate.append("u",
+                                                fixQuery(this->update.getUpdateClassic(),
+                                                         *state->bsonTemplateEvaluator));
+                            break;
                         }
-                        singleUpdate.append("multi", this->multi);
-                        singleUpdate.append("upsert", this->upsert);
-                        updateArray.append(singleUpdate.done());
+                        case write_ops::UpdateModification::Type::kPipeline: {
+                            BSONArrayBuilder pipelineBuilder(singleUpdate.subarrayStart("u"));
+                            for (auto&& stage : this->update.getUpdatePipeline()) {
+                                pipelineBuilder.append(
+                                    fixQuery(stage, *state->bsonTemplateEvaluator));
+                            }
+                            pipelineBuilder.doneFast();
+                            break;
+                        }
+                        case write_ops::UpdateModification::Type::kDelta:
+                            // It is not possible to run a delta update directly from a client.
+                            // Delta updates are only executed on secondaries as part of oplog
+                            // application.
+                            MONGO_UNREACHABLE;
                     }
-                    updateArray.doneFast();
-                    builder.append("writeConcern", this->writeConcern);
-
-                    boost::optional<TxnNumber> txnNumberForOp;
-                    if (config.useIdempotentWrites) {
-                        ++state->txnNumber;
-                        txnNumberForOp = state->txnNumber;
-                    }
-                    runCommandWithSession(conn,
-                                          nsToDatabaseSubstring(this->ns).toString(),
-                                          builder.done(),
-                                          kNoOptions,
-                                          lsid,
-                                          txnNumberForOp,
-                                          &result);
-                } else {
-                    uassert(
-                        30015,
-                        "cannot use legacy write protocol for anything but classic style updates",
-                        this->update.type() == write_ops::UpdateModification::Type::kClassic);
-                    auto toSend = makeUpdateMessage(
-                        this->ns,
-                        query,
-                        fixQuery(this->update.getUpdateClassic(), *state->bsonTemplateEvaluator),
-                        (this->upsert ? UpdateOption_Upsert : 0) |
-                            (this->multi ? UpdateOption_Multi : 0));
-                    conn->say(toSend);
-                    if (this->safe)
-                        result = conn->getLastErrorDetailed();
+                    singleUpdate.append("multi", this->multi);
+                    singleUpdate.append("upsert", this->upsert);
+                    updateArray.append(singleUpdate.done());
                 }
+                updateArray.doneFast();
+                builder.append("writeConcern", this->writeConcern);
+
+                boost::optional<TxnNumber> txnNumberForOp;
+                if (config.useIdempotentWrites) {
+                    ++state->txnNumber;
+                    txnNumberForOp = state->txnNumber;
+                }
+                runCommandWithSession(conn,
+                                      nsToDatabaseSubstring(this->ns).toString(),
+                                      builder.done(),
+                                      kNoOptions,
+                                      lsid,
+                                      txnNumberForOp,
+                                      &result);
             }
 
             if (this->safe) {
@@ -1270,52 +1209,33 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 BenchRunEventTrace _bret(&state->stats->insertCounter);
 
                 BSONObj insertDoc;
-                if (this->useWriteCmd) {
-                    BSONObjBuilder builder;
-                    builder.append("insert", nsToCollectionSubstring(this->ns));
-                    BSONArrayBuilder docBuilder(builder.subarrayStart("documents"));
-                    if (this->isDocAnArray) {
-                        for (const auto& element : this->doc) {
-                            insertDoc = fixQuery(element.Obj(), *state->bsonTemplateEvaluator);
-                            docBuilder.append(insertDoc);
-                        }
-                    } else {
-                        insertDoc = fixQuery(this->doc, *state->bsonTemplateEvaluator);
+                BSONObjBuilder builder;
+                builder.append("insert", nsToCollectionSubstring(this->ns));
+                BSONArrayBuilder docBuilder(builder.subarrayStart("documents"));
+                if (this->isDocAnArray) {
+                    for (const auto& element : this->doc) {
+                        insertDoc = fixQuery(element.Obj(), *state->bsonTemplateEvaluator);
                         docBuilder.append(insertDoc);
                     }
-                    docBuilder.done();
-                    builder.append("writeConcern", this->writeConcern);
-
-                    boost::optional<TxnNumber> txnNumberForOp;
-                    if (config.useIdempotentWrites) {
-                        ++state->txnNumber;
-                        txnNumberForOp = state->txnNumber;
-                    }
-                    runCommandWithSession(conn,
-                                          nsToDatabaseSubstring(this->ns).toString(),
-                                          builder.done(),
-                                          kNoOptions,
-                                          lsid,
-                                          txnNumberForOp,
-                                          &result);
                 } else {
-                    std::vector<BSONObj> insertArray;
-                    if (this->isDocAnArray) {
-                        for (const auto& element : this->doc) {
-                            BSONObj e = fixQuery(element.Obj(), *state->bsonTemplateEvaluator);
-                            insertArray.push_back(e);
-                        }
-                    } else {
-                        insertArray.push_back(fixQuery(this->doc, *state->bsonTemplateEvaluator));
-                    }
-
-                    auto toSend =
-                        makeInsertMessage(this->ns, insertArray.data(), insertArray.size());
-                    conn->say(toSend);
-
-                    if (this->safe)
-                        result = conn->getLastErrorDetailed();
+                    insertDoc = fixQuery(this->doc, *state->bsonTemplateEvaluator);
+                    docBuilder.append(insertDoc);
                 }
+                docBuilder.done();
+                builder.append("writeConcern", this->writeConcern);
+
+                boost::optional<TxnNumber> txnNumberForOp;
+                if (config.useIdempotentWrites) {
+                    ++state->txnNumber;
+                    txnNumberForOp = state->txnNumber;
+                }
+                runCommandWithSession(conn,
+                                      nsToDatabaseSubstring(this->ns).toString(),
+                                      builder.done(),
+                                      kNoOptions,
+                                      lsid,
+                                      txnNumberForOp,
+                                      &result);
             }
 
             if (this->safe) {
