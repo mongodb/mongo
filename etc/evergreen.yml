@@ -224,6 +224,7 @@ variables:
   timeout:
   - func: "f_expansions_write"
   - func: "run hang analyzer"
+  - func: "wait for resmoke to shutdown"
 
 # Use this template for enterprise Windows testing coverage on non-pushing
 # variants
