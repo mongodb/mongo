@@ -6494,6 +6494,11 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime lastOpTimeAppliedSecondary = OpTime(Timestamp(300, 0), 0);
     OpTime lastOpTimeAppliedPrimary = OpTime(Timestamp(200, 0), 0);
 
+    // Set a higher term to accompany the new primary.
+    ASSERT(TopologyCoordinator::UpdateTermResult::kUpdatedTerm ==
+           getTopoCoord().updateTerm(1, now()));
+    ASSERT_EQUALS(1, getTopoCoord().getTerm());
+
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
     topoCoordSetMyLastAppliedOpTime(lastOpTimeAppliedSecondary, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
@@ -6526,11 +6531,48 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime lastOpTimeAppliedSecondary = OpTime(Timestamp(300, 0), 0);
     OpTime lastOpTimeAppliedPrimary = OpTime(Timestamp(200, 0), 0);
 
+    // Set a higher term to accompany the new primary.
+    ASSERT(TopologyCoordinator::UpdateTermResult::kUpdatedTerm ==
+           getTopoCoord().updateTerm(1, now()));
+    ASSERT_EQUALS(1, getTopoCoord().getTerm());
+
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
     topoCoordSetMyLastAppliedOpTime(lastOpTimeAppliedSecondary, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, lastOpTimeAppliedPrimary);
     ASSERT_EQUALS(HeartbeatResponseAction::CatchupTakeover, nextAction.getAction());
+    ASSERT_EQUALS(1, getCurrentPrimaryIndex());
+}
+
+TEST_F(HeartbeatResponseTestV1, DoNotScheduleACatchupTakeoverIfLastAppliedIsInCurrentTerm) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "members"
+                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 3 << "host"
+                                                  << "host3:27017"))),
+                 0);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    // Set a higher term to accompany the new primary.
+    ASSERT(TopologyCoordinator::UpdateTermResult::kUpdatedTerm ==
+           getTopoCoord().updateTerm(1, now()));
+    ASSERT_EQUALS(1, getTopoCoord().getTerm());
+
+    // Make sure our lastApplied is in the new term.
+    OpTime election = OpTime();
+    OpTime lastOpTimeAppliedSecondary = OpTime(Timestamp(300, 0), 1);
+    OpTime lastOpTimeAppliedPrimary = OpTime(Timestamp(200, 0), 1);
+
+    ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+    topoCoordSetMyLastAppliedOpTime(lastOpTimeAppliedSecondary, Date_t(), false);
+    HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, lastOpTimeAppliedPrimary);
+    ASSERT_EQUALS(HeartbeatResponseAction::NoAction, nextAction.getAction());
     ASSERT_EQUALS(1, getCurrentPrimaryIndex());
 }
 

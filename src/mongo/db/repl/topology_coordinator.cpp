@@ -1514,14 +1514,22 @@ HeartbeatResponseAction TopologyCoordinator::_shouldTakeOverPrimary(int updatedC
     }
 
     // Don't schedule catchup takeover if catchup takeover or primary catchup is disabled.
-    bool catchupTakeoverDisabled =
+    const bool catchupTakeoverDisabled =
         ReplSetConfig::kCatchUpDisabled == _rsConfig.getCatchUpTimeoutPeriod() ||
         ReplSetConfig::kCatchUpTakeoverDisabled == _rsConfig.getCatchUpTakeoverDelay();
 
     bool scheduleCatchupTakeover = false;
     bool schedulePriorityTakeover = false;
 
-    if (!catchupTakeoverDisabled &&
+    // If we have a stale view of the new primary's opTime and believe its opTime to be
+    // less than our own, we may end up scheduling an unecessary takeover. Primaries
+    // increment the term as soon as they start a real election, but they do not write
+    // anything in that new term until they have finished their full state transition.
+    // Thus, if we have applied anything in the new term, it means that the primary is
+    // already past the catchup phase and we should not be attempting a catchup takeover.
+    const bool primaryAlreadyCaughtUp = (getMyLastAppliedOpTime().getTerm() == getTerm());
+
+    if (!catchupTakeoverDisabled && !primaryAlreadyCaughtUp &&
         (_memberData.at(primaryIndex).getLastAppliedOpTime() <
          _memberData.at(_selfIndex).getLastAppliedOpTime())) {
         LOGV2_FOR_ELECTION(23975,
@@ -1550,7 +1558,7 @@ HeartbeatResponseAction TopologyCoordinator::_shouldTakeOverPrimary(int updatedC
     }
 
     // Calculate rank of current node. A rank of 0 indicates that it has the highest priority.
-    auto currentNodePriority = _rsConfig.getMemberAt(_selfIndex).getPriority();
+    const auto currentNodePriority = _rsConfig.getMemberAt(_selfIndex).getPriority();
 
     // Schedule a priority takeover early only if we know that the current node has the highest
     // priority in the replica set, has a higher priority than the primary, and is the most
