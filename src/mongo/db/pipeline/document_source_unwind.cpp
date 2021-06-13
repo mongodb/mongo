@@ -37,12 +37,26 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
+#include "mongo/db/pipeline/document_source_limit.h"
+
 namespace mongo {
 
 using boost::intrusive_ptr;
 using std::string;
 using std::vector;
 
+Pipeline::SourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
+
+    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
+    if (_preserveNullAndEmptyArrays && nextLimit && !_hasSwappedLimit) {
+        container->insert(itr, DocumentSourceLimit::create(pExpCtx, nextLimit->getLimit()));
+        _hasSwappedLimit = true;
+    }
+    
+    return std::prev(std::prev(itr));
+}
 /** Helper class to unwind array from a single document. */
 class DocumentSourceUnwind::Unwinder {
 public:

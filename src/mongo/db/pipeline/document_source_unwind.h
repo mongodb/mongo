@@ -91,7 +91,9 @@ public:
     const boost::optional<FieldPath>& indexPath() const {
         return _indexPath;
     }
-
+    
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
 private:
     DocumentSourceUnwind(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          const FieldPath& fieldPath,
@@ -108,6 +110,7 @@ private:
     // If set, the $unwind stage will include the array index in the specified path, overwriting any
     // existing value, setting to null when the value was a non-array or empty array.
     const boost::optional<FieldPath> _indexPath;
+    bool _hasSwappedLimit = false;
 
     // Iteration state.
     class Unwinder;
