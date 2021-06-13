@@ -466,7 +466,6 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
 
 std::vector<DatabaseType> ShardingCatalogClientImpl::getAllDBs(OperationContext* opCtx,
                                                                repl::ReadConcernLevel readConcern) {
-    std::vector<DatabaseType> databases;
     auto dbs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
                                                        kConfigReadSelector,
                                                        readConcern,
@@ -475,6 +474,9 @@ std::vector<DatabaseType> ShardingCatalogClientImpl::getAllDBs(OperationContext*
                                                        BSONObj(),
                                                        boost::none))
                    .value;
+
+    std::vector<DatabaseType> databases;
+    databases.reserve(dbs.size());
     for (const BSONObj& doc : dbs) {
         auto db = uassertStatusOKWithContext(
             DatabaseType::fromBSON(doc), stream() << "Failed to parse database document " << doc);
@@ -560,6 +562,7 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
                                                             boost::none))
                         .value;
     std::vector<CollectionType> collections;
+    collections.reserve(collDocs.size());
     for (const BSONObj& obj : collDocs)
         collections.emplace_back(obj);
 
@@ -571,6 +574,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllShardedCollections
     auto collectionsOnConfig = getCollections(opCtx, dbName, readConcern);
 
     std::vector<NamespaceString> collectionsToReturn;
+    collectionsToReturn.reserve(collectionsOnConfig.size());
     for (const auto& coll : collectionsOnConfig) {
         if (coll.getDropped()) {
             continue;
@@ -663,15 +667,17 @@ StatusWith<std::vector<std::string>> ShardingCatalogClientImpl::getDatabasesForS
         return findStatus.getStatus();
     }
 
+    const std::vector<BSONObj>& values = findStatus.getValue().value;
     std::vector<std::string> dbs;
-    for (const BSONObj& obj : findStatus.getValue().value) {
+    dbs.reserve(values.size());
+    for (const BSONObj& obj : values) {
         string dbName;
         Status status = bsonExtractStringField(obj, DatabaseType::name(), &dbName);
         if (!status.isOK()) {
             return status;
         }
 
-        dbs.push_back(dbName);
+        dbs.push_back(std::move(dbName));
     }
 
     return dbs;
@@ -701,6 +707,7 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
     const auto& chunkDocsOpTimePair = findStatus.getValue();
 
     std::vector<ChunkType> chunks;
+    chunks.reserve(chunkDocsOpTimePair.value.size());
     for (const BSONObj& obj : chunkDocsOpTimePair.value) {
         auto chunkRes = ChunkType::fromConfigBSON(obj, epoch, timestamp);
         if (!chunkRes.isOK()) {
@@ -708,7 +715,7 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
                                                              << obj[ChunkType::name()]);
         }
 
-        chunks.push_back(chunkRes.getValue());
+        chunks.push_back(std::move(chunkRes.getValue()));
     }
 
     if (opTime) {
@@ -821,7 +828,7 @@ StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollectio
     const auto& tagDocsOpTimePair = findStatus.getValue();
 
     std::vector<TagsType> tags;
-
+    tags.reserve(tagDocsOpTimePair.value.size());
     for (const BSONObj& obj : tagDocsOpTimePair.value) {
         auto tagRes = TagsType::fromBSON(obj);
         if (!tagRes.isOK()) {
@@ -837,7 +844,6 @@ StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollectio
 
 StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::getAllShards(
     OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
-    std::vector<ShardType> shards;
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               kConfigReadSelector,
                                               readConcern,
@@ -849,6 +855,8 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::
         return findStatus.getStatus();
     }
 
+    std::vector<ShardType> shards;
+    shards.reserve(findStatus.getValue().value.size());
     for (const BSONObj& doc : findStatus.getValue().value) {
         auto shardRes = ShardType::fromBSON(doc);
         if (!shardRes.isOK()) {
@@ -1299,14 +1307,13 @@ StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNe
 
     const auto& keyDocs = findStatus.getValue().docs;
     std::vector<KeysCollectionDocument> keys;
+    keys.reserve(keyDocs.size());
     for (auto&& keyDoc : keyDocs) {
-        KeysCollectionDocument key;
         try {
-            key = KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), keyDoc);
+            keys.push_back(KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), keyDoc));
         } catch (...) {
             return exceptionToStatus();
         }
-        keys.push_back(std::move(key));
     }
 
     return keys;
