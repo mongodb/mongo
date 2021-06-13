@@ -113,5 +113,13 @@ assert.commandWorked(db.runCommand({
     apiDeprecationErrors: false,
     apiVersion: "1"
 }));
+
+// Create a view with {apiStrict: true}.
+db.view.drop();
+assert.commandWorked(db.runCommand(
+    {create: "view", viewOn: collName, pipeline: [], apiStrict: true, apiVersion: "1"}));
+// find() on views should work normally if 'apiStrict' is true.
+assert.commandWorked(db.runCommand({find: "view", apiStrict: true, apiVersion: "1"}));
+
 st.stop();
 })();
