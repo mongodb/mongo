@@ -78,7 +78,6 @@ std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(Operation
     uassert(51202,
             "Cannot specify runtime constants option to a mongos",
             !findCommand->getLegacyRuntimeConstants());
-    findCommand->setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
     return findCommand;
 }
 

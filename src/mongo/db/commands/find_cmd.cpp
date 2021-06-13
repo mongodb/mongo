@@ -74,9 +74,6 @@ std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(Operation
         std::move(cmdObj),
         std::move(nss),
         APIParameters::get(opCtx).getAPIStrict().value_or(false));
-    if (!findCommand->getLegacyRuntimeConstants()) {
-        findCommand->setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-    }
     return findCommand;
 }
 

@@ -525,6 +525,30 @@ let MongosAPIParametersUtil = (function() {
             }
         },
         {
+            commandName: "find",
+            run: {
+                inAPIVersion1: true,
+                shardCommandName: "find",
+                setUp: function() {
+                    st.s.getDB("db")["view"].drop();
+                    assert.commandWorked(st.s.getDB("db").runCommand(
+                        {create: "view", viewOn: "collection", pipeline: []}));
+                },
+                command: () => ({find: "view", filter: {x: 1}})
+            },
+            explain: {
+                inAPIVersion1: true,
+                shardCommandName: "explain",
+                permittedInTxn: false,
+                setUp: function() {
+                    st.s.getDB("db")["view"].drop();
+                    assert.commandWorked(st.s.getDB("db").runCommand(
+                        {create: "view", viewOn: "collection", pipeline: []}));
+                },
+                command: () => ({explain: {find: "view", filter: {x: 1}}})
+            }
+        },
+        {
             commandName: "findAndModify",
             run: {
                 inAPIVersion1: true,
