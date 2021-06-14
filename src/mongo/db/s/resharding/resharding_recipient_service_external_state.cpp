@@ -153,13 +153,23 @@ void RecipientStateMachineExternalStateImpl::updateCoordinatorDocument(Operation
                                                                        const BSONObj& query,
                                                                        const BSONObj& update) {
     auto catalogClient = Grid::get(opCtx)->catalogClient();
-    uassertStatusOK(
+    auto docWasModified = uassertStatusOK(
         catalogClient->updateConfigDocument(opCtx,
                                             NamespaceString::kConfigReshardingOperationsNamespace,
                                             query,
                                             update,
                                             false, /* upsert */
                                             ShardingCatalogClient::kMajorityWriteConcern));
+
+    if (!docWasModified) {
+        LOGV2_DEBUG(
+            5543401,
+            1,
+            "Resharding coordinator document was not modified by the recipient's update; this is "
+            "expected when the update had previously been interrupted due to a stepdown",
+            "query"_attr = query,
+            "update"_attr = update);
+    }
 }
 
 }  // namespace mongo
