@@ -980,6 +980,23 @@ buildvariants:
       - name: retryable_writes_workloads
       - name: smoke_test
 
+  - name: linux-shard-single
+    display_name: Linux Shard Single
+    batchtime: 5760  # 4 days
+    modules: *modules
+    expansions:
+      mongodb_setup: shard-single
+      infrastructure_provisioning: shard-single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on: *_compile_amazon2
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
 
   - name: linux-3-node-replSet
     display_name: Linux 3-Node ReplSet
