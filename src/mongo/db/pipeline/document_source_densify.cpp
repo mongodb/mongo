@@ -141,4 +141,8 @@ bool DocumentSourceInternalDensify::DocGenerator::done() const {
     return _state == GeneratorState::kDone;
 }
 
+DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
+    return pSource->getNext();
+}
+
 }  // namespace mongo
