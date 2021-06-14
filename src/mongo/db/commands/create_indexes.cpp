@@ -337,7 +337,7 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot create new indexes on non-empty collection " << ns
                           << " in a multi-document transaction.",
-            collection->numRecords(opCtx) == 0);
+            collection->isEmpty(opCtx));
 
     const int numIndexesBefore =
         IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection.get());
