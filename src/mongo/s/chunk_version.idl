@@ -34,8 +34,6 @@ global:
         - "mongo/s/chunk_version.h"
 
 types:
-    # serializes as { 0: <major/minor>, 1: <epoch>, 2: <timestamp> }
-    # equivalent to using ChunkVersion::toBSON / ChunkVersion::fromBSON
     ChunkVersion:
         bson_serialization_type: object
         description: An object representing a chunk version for a collection.

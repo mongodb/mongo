@@ -48,7 +48,8 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/merge_chunk_request_gen.h"
+#include "mongo/s/request_types/merge_chunk_request_type.h"
+#include "mongo/s/request_types/merge_chunks_request_type.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -82,17 +83,20 @@ Shard::CommandResponse commitUsingChunkRange(OperationContext* opCtx,
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     auto collUUID = metadata.getUUID();
     invariant(collUUID);
+    MergeChunksRequest request{nss,
+                               shardingState->shardId(),
+                               *collUUID,
+                               chunkRange,
+                               currentTime.clusterTime().asTimestamp()};
 
-    ConfigSvrMergeChunks request{nss, shardingState->shardId(), *collUUID, chunkRange};
-    request.setValidAfter(currentTime.clusterTime().asTimestamp());
-    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
-
+    auto configCmdObj =
+        request.toConfigCommandBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
     auto cmdResponse =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            NamespaceString::kAdminDb.toString(),
-            request.toBSON(BSONObj()),
+            "admin",
+            configCmdObj,
             Shard::RetryPolicy::kIdempotent));
 
     return cmdResponse;
@@ -187,19 +191,20 @@ Shard::CommandResponse commitUsingChunksList(OperationContext* opCtx,
     // Run _configsvrCommitChunkMerge.
     //
     const auto currentTime = VectorClock::get(opCtx)->getTime();
-    ConfigSvrMergeChunk request{nss,
-                                shardingState->shardId().toString(),
-                                metadata.getShardVersion().epoch(),
-                                chunkBoundaries};
-    request.setValidAfter(currentTime.clusterTime().asTimestamp());
-    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+    MergeChunkRequest request{nss,
+                              shardingState->shardId().toString(),
+                              metadata.getShardVersion().epoch(),
+                              chunkBoundaries,
+                              currentTime.clusterTime().asTimestamp()};
 
+    auto configCmdObj =
+        request.toConfigCommandBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
     auto cmdResponse =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            NamespaceString::kAdminDb.toString(),
-            request.toBSON(BSONObj()),
+            "admin",
+            configCmdObj,
             Shard::RetryPolicy::kIdempotent));
 
     return cmdResponse;

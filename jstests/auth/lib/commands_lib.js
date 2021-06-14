@@ -2934,7 +2934,7 @@ var authCommandsLib = {
         },
         {
           testname: "_configsvrCommitChunkMerge",
-          command: {_configsvrCommitChunkMerge: "x.y", shard: "shard0000", collEpoch: ObjectId(), chunkBoundaries:[{a:1}, {a:5}, {a:10}]},
+          command: {_configsvrCommitChunkMerge: "x.y"},
           skipSharded: true,
           expectFail: true,
           testcases: [
@@ -2962,7 +2962,7 @@ var authCommandsLib = {
         },
         {
           testname: "_configsvrCommitChunksMerge",
-          command: {_configsvrCommitChunksMerge: "x.y", shard: "shard0000", collUUID: {uuid: UUID()}, chunkRange: {min:{a:1}, max:{a:10}}},
+          command: {_configsvrCommitChunksMerge: "x.y"},
           skipSharded: true,
           expectFail: true,
           testcases: [
