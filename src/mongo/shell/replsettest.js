@@ -2940,7 +2940,10 @@ var ReplSetTest = function(opts) {
 
         var started = this.start(n, options, true, wait);
 
-        if (jsTestOptions().keyFile) {
+        // We should not attempt to reauthenticate the connection if we did not wait for it
+        // to be reestablished in the first place.
+        const skipWaitForConnection = (options && options.waitForConnect === false);
+        if (jsTestOptions().keyFile && !skipWaitForConnection) {
             if (started.length) {
                 // if n was an array of conns, start will return an array of connections
                 for (var i = 0; i < started.length; i++) {
