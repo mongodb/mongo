@@ -271,6 +271,100 @@ TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
     }
 }
 
+TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
+    auto result1 = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1))),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    auto result2 = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("b" << 1 << "a" << 0))),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+
+    ASSERT_EQ(result1.getValue(), result2.getValue());
+
+    // Check metadata in buckets.
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1))),
+                      _bucketCatalog->getMetadata(result1.getValue()->bucket()));
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1))),
+                      _bucketCatalog->getMetadata(result2.getValue()->bucket()));
+}
+
+TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
+    auto result1 = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        BSON(_timeField << Date_t::now() << _metaField
+                        << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
+                                                          << BSON("f" << 1 << "g" << 0))))),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    auto result2 = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        BSON(_timeField << Date_t::now() << _metaField
+                        << BSONObj(BSON("c" << BSON_ARRAY(BSON("b" << 1 << "a" << 0)
+                                                          << BSON("g" << 0 << "f" << 1))))),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+
+    ASSERT_EQ(result1.getValue(), result2.getValue());
+
+    // Check metadata in buckets.
+    ASSERT_BSONOBJ_EQ(
+        BSON(_metaField << BSONObj(BSON(
+                 "c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1) << BSON("f" << 1 << "g" << 0))))),
+        _bucketCatalog->getMetadata(result1.getValue()->bucket()));
+    ASSERT_BSONOBJ_EQ(
+        BSON(_metaField << BSONObj(BSON(
+                 "c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1) << BSON("f" << 1 << "g" << 0))))),
+        _bucketCatalog->getMetadata(result2.getValue()->bucket()));
+}
+
+
+TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
+    auto result1 = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        BSON(_timeField << Date_t::now() << _metaField
+                        << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
+                                                          << BSON_ARRAY("123"
+                                                                        << "456"))))),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    auto result2 = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        BSON(_timeField << Date_t::now() << _metaField
+                        << BSONObj(BSON("c" << BSON_ARRAY(BSON("b" << 1 << "a" << 0)
+                                                          << BSON_ARRAY("123"
+                                                                        << "456"))))),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+
+    ASSERT_EQ(result1.getValue(), result2.getValue());
+
+    // Check metadata in buckets.
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
+                                                                        << BSON_ARRAY("123"
+                                                                                      << "456"))))),
+                      _bucketCatalog->getMetadata(result1.getValue()->bucket()));
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
+                                                                        << BSON_ARRAY("123"
+                                                                                      << "456"))))),
+                      _bucketCatalog->getMetadata(result2.getValue()->bucket()));
+}
+
 TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
     auto result1 =
         _bucketCatalog->insert(_opCtx,

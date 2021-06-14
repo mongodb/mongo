@@ -46,6 +46,10 @@
 
 namespace mongo {
 namespace {
+
+void normalizeArray(BSONArrayBuilder* builder, const BSONObj& obj);
+void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj);
+
 const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeWriteConflict);
 
@@ -56,6 +60,20 @@ uint8_t numDigits(uint32_t num) {
         ++numDigits;
     }
     return numDigits;
+}
+
+void normalizeArray(BSONArrayBuilder* builder, const BSONObj& obj) {
+    for (auto& arrayElem : obj) {
+        if (arrayElem.type() == BSONType::Array) {
+            BSONArrayBuilder subArray = builder->subarrayStart();
+            normalizeArray(&subArray, arrayElem.Obj());
+        } else if (arrayElem.type() == BSONType::Object) {
+            BSONObjBuilder subObject = builder->subobjStart();
+            normalizeObject(&subObject, arrayElem.Obj());
+        } else {
+            builder->append(arrayElem);
+        }
+    }
 }
 
 void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
@@ -96,21 +114,27 @@ void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
     std::sort(it, end);
     for (; it != end; ++it) {
         auto elem = it->element();
-        if (elem.type() != BSONType::Object) {
-            builder->append(elem);
-        } else {
+        if (elem.type() == BSONType::Array) {
+            BSONArrayBuilder subArray(builder->subarrayStart(elem.fieldNameStringData()));
+            normalizeArray(&subArray, elem.Obj());
+        } else if (elem.type() == BSONType::Object) {
             BSONObjBuilder subObject(builder->subobjStart(elem.fieldNameStringData()));
             normalizeObject(&subObject, elem.Obj());
+        } else {
+            builder->append(elem);
         }
     }
 }
 
 void normalizeTopLevel(BSONObjBuilder* builder, const BSONElement& elem) {
-    if (elem.type() != BSONType::Object) {
-        builder->append(elem);
-    } else {
+    if (elem.type() == BSONType::Array) {
+        BSONArrayBuilder subArray(builder->subarrayStart(elem.fieldNameStringData()));
+        normalizeArray(&subArray, elem.Obj());
+    } else if (elem.type() == BSONType::Object) {
         BSONObjBuilder subObject(builder->subobjStart(elem.fieldNameStringData()));
         normalizeObject(&subObject, elem.Obj());
+    } else {
+        builder->append(elem);
     }
 }
 

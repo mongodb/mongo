@@ -140,5 +140,38 @@ TimeseriesTest.run((insert) => {
         [
             {_id: 3, time: t[3], meta: {a: 1}, x: 30},
         ]);
+
+    runTest(
+        // Metadata field contains an array within an object.
+        [
+            {_id: 0, time: t[0], meta: {a: [{b: 1, c: 0}]}, x: 0},
+            {_id: 1, time: t[1], meta: {a: [{c: 0, b: 1}]}, x: 10},
+        ],
+        [
+            {_id: 2, time: t[2], meta: {a: [{b: 2, c: 0}]}, x: 20},
+            {_id: 3, time: t[3], meta: {a: [{c: 0, b: 2}]}, x: 30},
+        ]);
+
+    runTest(
+        // Metadata field contains a nested array.
+        [
+            {_id: 0, time: t[0], meta: {a: [{b: 1, c: 0}, [{e: 1, f: 0}]]}, x: 0},
+            {_id: 1, time: t[1], meta: {a: [{c: 0, b: 1}, [{f: 0, e: 1}]]}, x: 10},
+        ],
+        [
+            {_id: 2, time: t[2], meta: {a: [[{e: 1, f: 0}], {b: 1, c: 0}]}, x: 20},
+            {_id: 3, time: t[3], meta: {a: [[{f: 0, e: 1}], {c: 0, b: 1}]}, x: 30},
+        ]);
+
+    runTest(
+        // Metadata field contains an array.
+        [
+            {_id: 0, time: t[0], meta: {a: [1, 2, 3]}, x: 0},
+            {_id: 1, time: t[1], meta: {a: [1, 2, 3]}, x: 10},
+        ],
+        [
+            {_id: 2, time: t[2], meta: {a: [2, 1, 3]}, x: 20},
+            {_id: 3, time: t[3], meta: {a: [2, 1, 3]}, x: 30},
+        ]);
 });
 })();
