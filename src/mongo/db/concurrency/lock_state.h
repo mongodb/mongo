@@ -317,6 +317,11 @@ private:
 
     void _setWaitingResource(ResourceId resId);
 
+    /**
+     * Calls dump() on this locker instance and the lock manager.
+     */
+    void _dumpLockerAndLockManagerRequests();
+
     // Used to disambiguate different lockers
     const LockerId _id;
 
