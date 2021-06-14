@@ -205,6 +205,8 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
 
     auto batch = [&] {
         auto opCtx = factory.makeOperationContext(&cc());
+        auto guard = makeGuard([&] { dispose(opCtx.get()); });
+
         if (_pipeline) {
             _pipeline->reattachToOperationContext(opCtx.get());
         } else {
@@ -214,17 +216,10 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
                                 pipeline.release());
             _pipeline.get_deleter().dismissDisposal();
         }
-        ON_BLOCK_EXIT([this] {
-            if (_pipeline) {
-                _pipeline->detachFromOperationContext();
-            }
-        });
 
         auto batch = _fillBatch(*_pipeline);
 
-        if (batch.empty()) {
-            dispose(opCtx.get());
-        } else {
+        if (!batch.empty()) {
             const auto& lastEntryInBatch = batch.back();
             _resumeToken = getId(lastEntryInBatch);
 
@@ -232,7 +227,9 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
                 _hasSeenFinalOplogEntry = true;
                 // Skip returning the final oplog entry because it is known to be a no-op.
                 batch.pop_back();
-                dispose(opCtx.get());
+            } else {
+                _pipeline->detachFromOperationContext();
+                guard.dismiss();
             }
         }
 
