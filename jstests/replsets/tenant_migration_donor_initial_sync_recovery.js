@@ -69,6 +69,9 @@ donorRst.waitForState(initialSyncNode, ReplSetTest.State.STARTUP_2);
 // the various migration states.
 hangInDonorAfterReplicatingKeys.off();
 sleep(Math.random() * kMaxSleepTimeMS);
+if (fp) {
+    fp.wait();
+}
 
 jsTestLog("Waiting for initial sync to finish: " + initialSyncNode.port);
 initialSyncNode.getDB('admin').adminCommand(
@@ -143,7 +146,13 @@ if (fp) {
 
 restartServerReplication(initialSyncNode);
 
-TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+if (kMigrationFpNames[index] === "abortTenantMigrationBeforeLeavingBlockingState") {
+    TenantMigrationTest.assertAborted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+} else {
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+}
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 tenantMigrationTest.stop();
 })();
