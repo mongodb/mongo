@@ -201,7 +201,7 @@ function validateConfigChunksAfterRefine(oldEpoch) {
     assert.eq({a: MaxKey, b: MaxKey, c: MaxKey, d: MaxKey}, chunkArr[2].max);
     assert.eq(chunkArr[0].lastmodEpoch, chunkArr[1].lastmodEpoch);
     assert.eq(chunkArr[1].lastmodEpoch, chunkArr[2].lastmodEpoch);
-    assert.neq(oldEpoch, chunkArr[0].lastmodEpoch);
+    assert(!oldEpoch && !chunkArr[0].lastmodEpoch || oldEpoch != chunkArr[0].lastmodEpoch);
 }
 
 function setupConfigTagsBeforeRefine() {
