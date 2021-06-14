@@ -205,6 +205,21 @@ void LockerImpl::dump() const {
     log() << ss.str();
 }
 
+void LockerImpl::_dumpLockerAndLockManagerRequests() {
+    // Log the _requests that this locker holds. This will provide identifying information to cross
+    // reference with the LockManager dump below for extra information.
+    dump();
+
+    // Log the LockManager's lock information. Given the locker 'dump()' above, we should be able to
+    // easily cross reference to find the lock info matching this operation. The LockManager can
+    // safely access (under internal locks) the LockRequest data that the locker cannot.
+    BSONObjBuilder builder;
+    auto lockToClientMap = LockManager::getLockToClientMap(getGlobalServiceContext());
+    getGlobalLockManager()->getLockInfoBSON(lockToClientMap, &builder);
+    auto lockInfo = builder.done();
+    LOG(0) << "Operation ending while holding locks. LockInfo" << redact(lockInfo.toString());
+}
+
 
 //
 // CondVarLockGrantNotification
@@ -286,7 +301,12 @@ LockerImpl::~LockerImpl() {
     // to delete with unaccounted locks anyways.
     invariant(!inAWriteUnitOfWork());
     invariant(_numResourcesToUnlockAtEndUnitOfWork == 0);
+
+    if (!_requests.empty()) {
+        _dumpLockerAndLockManagerRequests();
+    }
     invariant(_requests.empty());
+
     invariant(_modeForTicket == MODE_NONE);
 
     // Reset the locking statistics so the object can be reused

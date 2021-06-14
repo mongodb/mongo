@@ -39,6 +39,7 @@
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -1141,6 +1142,22 @@ TEST_F(LockerImplTest, ConvertLockPendingUnlockAndUnlock) {
     ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_NONE));
 
     locker.unlockGlobal();
+}
+
+// This test exercises the lock dumping code in ~LockerImpl in case locks are held on destruction.
+DEATH_TEST_F(LockerImplTest,
+             LocksHeldOnDestructionCausesALocksDump,
+             "Operation ending while holding locks.") {
+    const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+
+    LockerImpl locker;
+    locker.lockGlobal(MODE_IX);
+    locker.lock(resId, MODE_X);
+
+    ASSERT(locker.isLockHeldForMode(resId, MODE_X));
+    ASSERT(locker.isLockHeldForMode(resId, MODE_S));
+
+    // 'locker' destructor should invariant because locks are still held.
 }
 
 }  // namespace mongo
