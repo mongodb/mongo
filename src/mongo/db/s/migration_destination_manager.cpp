@@ -818,7 +818,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
                             << "aborting, shard is missing " << indexSpecs.size() << " indexes and "
                             << "collection is not empty. Non-trivial "
                             << "index creation should be scheduled manually",
-                        collection->numRecords(opCtx) == 0);
+                        collection->isEmpty(opCtx));
             }
             return indexSpecs;
         };
