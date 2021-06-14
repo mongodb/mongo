@@ -151,13 +151,23 @@ public:
                                    const BSONObj& query,
                                    const BSONObj& update) override {
         auto catalogClient = Grid::get(opCtx)->catalogClient();
-        uassertStatusOK(catalogClient->updateConfigDocument(
+        auto docWasModified = uassertStatusOK(catalogClient->updateConfigDocument(
             opCtx,
             NamespaceString::kConfigReshardingOperationsNamespace,
             query,
             update,
             false, /* upsert */
             ShardingCatalogClient::kMajorityWriteConcern));
+
+        if (!docWasModified) {
+            LOGV2_DEBUG(
+                5543400,
+                1,
+                "Resharding coordinator document was not modified by the donor's update; this is "
+                "expected when the update had previously been interrupted due to a stepdown",
+                "query"_attr = query,
+                "update"_attr = update);
+        }
     }
 };
 
