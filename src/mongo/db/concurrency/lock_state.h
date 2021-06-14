@@ -318,6 +318,11 @@ private:
      */
     bool _acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline);
 
+    /**
+     * Calls dump() on this locker instance and the lock manager.
+     */
+    void _dumpLockerAndLockManagerRequests();
+
     // Used to disambiguate different lockers
     const LockerId _id;
 

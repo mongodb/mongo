@@ -51,7 +51,8 @@ public:
     }
 
     virtual LockerId getId() const {
-        MONGO_UNREACHABLE;
+        // For unit testing.
+        return -7;
     }
 
     stdx::thread::id getThreadId() const override {
