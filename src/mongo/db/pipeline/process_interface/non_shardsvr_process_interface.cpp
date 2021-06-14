@@ -123,7 +123,7 @@ void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
                                   << ns << ": " << BSON("indexes" << indexSpecs),
                     collection.get());
 
-            invariant(0U == collection->numRecords(opCtx),
+            invariant(collection->isEmpty(opCtx),
                       str::stream() << "Expected empty collection for index creation: " << ns
                                     << ": numRecords: " << collection->numRecords(opCtx) << ": "
                                     << BSON("indexes" << indexSpecs));
