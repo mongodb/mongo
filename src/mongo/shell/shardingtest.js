@@ -702,7 +702,7 @@ var ShardingTest = function(params) {
         }
 
         var result;
-        for (var i = 0; i < 5; i++) {
+        for (var i = 0; i < 10; i++) {
             var otherShard = this.getOther(this.getPrimaryShard(dbName)).name;
             result = this.s.adminCommand(
                 {movechunk: c, find: move, to: otherShard, _waitForDelete: waitForDelete});

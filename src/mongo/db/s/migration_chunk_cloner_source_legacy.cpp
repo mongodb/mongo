@@ -579,19 +579,39 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(const BSONO
             responseStatus = args.response;
         });
 
-    // TODO: Update RemoteCommandTargeter on NotMaster errors.
     if (!scheduleStatus.isOK()) {
         return scheduleStatus.getStatus();
     }
 
     executor->wait(scheduleStatus.getValue());
 
+    auto checkNotMasterOrNetwork = [](const Status& status) {
+        return ErrorCodes::isNotMasterError(status.code()) ||
+            ErrorCodes::isNetworkError(status.code()) ||
+            status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit;
+    };
+
     if (!responseStatus.isOK()) {
+        if (checkNotMasterOrNetwork(responseStatus.status)) {
+            // Convert the error before it's returned to load balancer's MigrationManager
+            // to avoid it marking this host as having network issues.
+            warning() << "Migration chunk received error from " << _recipientHost << ": "
+                      << responseStatus.status << ", converting to OperationFailed";
+            responseStatus.status =
+                Status(ErrorCodes::OperationFailed, responseStatus.status.toString());
+        }
         return responseStatus.status;
     }
 
     Status commandStatus = getStatusFromCommandResult(responseStatus.data);
     if (!commandStatus.isOK()) {
+        if (checkNotMasterOrNetwork(commandStatus)) {
+            // Convert the error before it's returned to load balancer's MigrationManager
+            // to avoid it marking this host as no longer primary.
+            warning() << "Migration chunk received error from " << _recipientHost << ": "
+                      << commandStatus << ", converting to OperationFailed";
+            commandStatus = Status(ErrorCodes::OperationFailed, commandStatus.toString());
+        }
         return commandStatus;
     }
 
