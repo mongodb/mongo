@@ -3615,7 +3615,7 @@ def doConfigure(myenv):
             )
 
         symbolizer_option = ""
-        if env['LLVM_SYMBOLIZER']:
+        if env.get('LLVM_SYMBOLIZER', False):
             llvm_symbolizer = env['LLVM_SYMBOLIZER']
 
             if not os.path.isabs(llvm_symbolizer):
@@ -3627,7 +3627,7 @@ def doConfigure(myenv):
             symbolizer_option = f":external_symbolizer_path=\"{llvm_symbolizer}\""
 
         elif using_asan or using_tsan or using_ubsan:
-            myenv.FatalError("The address, thread, and undefined behavior sanitizers require llvm-symbolizer for meaningful reports")
+            myenv.FatalError("The address, thread, and undefined behavior sanitizers require llvm-symbolizer for meaningful reports. Please set LLVM_SYMBOLIZER to the path to llvm-symbolizer in your SCons invocation")
 
         if using_asan:
             # Unfortunately, abseil requires that we make these macros
