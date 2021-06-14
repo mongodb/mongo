@@ -984,6 +984,36 @@ TEST_F(TenantCollectionClonerTest, ResumeFromNonEmptyCollection) {
     ASSERT_EQ(1, cloner->getStats().documentsCopied);
 }
 
+TEST_F(TenantCollectionClonerTest, ResumeFromRecreatedCollection) {
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
+
+    // Simulate that the namespace already exists under a different uuid.
+    CollectionOptions oldOptions;
+    oldOptions.uuid = UUID::gen();  // A different uuid.
+    ASSERT_OK(createCollection(_nss, oldOptions));
+
+    _mockServer->setCommandReply("count", createCountResponse(3));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+    _mockServer->setCommandReply("find", createFindResponse());  // majority read after listIndexes
+
+    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
+
+    ASSERT_EQUALS(Status::OK(), cloner->run());
+
+    // Test that the cloner correctly skips cloning this collection as it must have been dropped and
+    // re-created on the donor. And the drop and the re-create will be covered by the oplog
+    // application phase.
+    ASSERT_EQUALS(_nss.ns(), _opObserver->nssToCapture.ns());
+    ASSERT_EQUALS(0, _opObserver->numDocsInserted);
+    auto stats = cloner->getStats();
+    ASSERT_EQUALS(0, stats.documentsCopied);
+    ASSERT_EQUALS(0, stats.receivedBatches);
+}
+
 TEST_F(TenantCollectionClonerTest, ResumeFromRenamedCollection) {
     // TODO (SERVER-57194): enable lock-free reads.
     bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;

@@ -384,14 +384,27 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
         }
     } else {
         // No collection with the same UUID exists. But if this still fails with NamespaceExists, it
-        // means that we have a collection with the same namespace but a different UUID, in which
-        // case we should also fail the migration.
+        // means that we have a collection with the same namespace but a different UUID.
         auto status =
             getStorageInterface()->createCollection(opCtx.get(),
                                                     _sourceNss,
                                                     _collectionOptions,
                                                     !_idIndexSpec.isEmpty() /* createIdIndex */,
                                                     _idIndexSpec);
+        if (status == ErrorCodes::NamespaceExists && getSharedData()->isResuming()) {
+            // If we are resuming from a recipient failover and we have a collection on disk with
+            // the same namespace but a different uuid, it means this collection must have been
+            // dropped and re-created under a different uuid on the donor during the recipient
+            // failover. And the drop and the re-create will be covered by the oplog application
+            // phase.
+            LOGV2(5767200,
+                  "TenantCollectionCloner found same namespace with different uuid locally on "
+                  "resume, skipping cloning this collection.",
+                  "namespace"_attr = getSourceNss(),
+                  "migrationId"_attr = getSharedData()->getMigrationId(),
+                  "tenantId"_attr = getTenantId());
+            return kSkipRemainingStages;
+        }
         uassertStatusOKWithContext(status, "Tenant collection cloner: create collection");
     }
 
