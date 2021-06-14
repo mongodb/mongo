@@ -85,17 +85,9 @@ void RenameCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) con
             SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
 }
 
-std::vector<DistLockManager::ScopedDistLock> RenameCollectionCoordinator::_acquireAdditionalLocks(
+std::vector<StringData> RenameCollectionCoordinator::_acquireAdditionalLocks(
     OperationContext* opCtx) {
-    const auto coorName = DDLCoordinatorType_serializer(_coorMetadata.getId().getOperationType());
-
-    auto distLockManager = DistLockManager::get(opCtx);
-    auto targetCollDistLock = uassertStatusOK(distLockManager->lock(
-        opCtx, _doc.getTo().ns(), coorName, DistLockManager::kDefaultLockTimeout));
-
-    std::vector<DistLockManager::ScopedDistLock> vec;
-    vec.push_back(targetCollDistLock.moveToAnotherThread());
-    return vec;
+    return {_doc.getTo().ns()};
 }
 
 boost::optional<BSONObj> RenameCollectionCoordinator::reportForCurrentOp(

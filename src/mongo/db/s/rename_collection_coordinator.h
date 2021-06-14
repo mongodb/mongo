@@ -62,8 +62,7 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    std::vector<DistLockManager::ScopedDistLock> _acquireAdditionalLocks(
-        OperationContext* opCtx) override;
+    std::vector<StringData> _acquireAdditionalLocks(OperationContext* opCtx) override;
 
     template <typename Func>
     auto _executePhase(const Phase& newPhase, Func&& func) {

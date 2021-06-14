@@ -90,13 +90,14 @@ public:
     }
 
 protected:
-    virtual std::vector<DistLockManager::ScopedDistLock> _acquireAdditionalLocks(
-        OperationContext* opCtx) {
+    virtual std::vector<StringData> _acquireAdditionalLocks(OperationContext* opCtx) {
         return {};
     };
 
     ShardingDDLCoordinatorService* _service;
     ShardingDDLCoordinatorMetadata _coorMetadata;
+    StringData _coorName;
+
     bool _recoveredFromDisk;
     bool _completeOnError{false};
 
@@ -110,6 +111,9 @@ private:
     void interrupt(Status status) override final;
 
     bool _removeDocument(OperationContext* opCtx);
+    ExecutorFuture<void> _acquireLockAsync(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                           const CancellationToken& token,
+                                           StringData resource);
 
     Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinator::_mutex");
     SharedPromise<void> _constructionCompletionPromise;
