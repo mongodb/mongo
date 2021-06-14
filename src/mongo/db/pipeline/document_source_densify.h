@@ -90,7 +90,9 @@ public:
         GeneratorState _state = GeneratorState::kGeneratingDocuments;
     };
 
-    static boost::intrusive_ptr<DocumentSourceInternalDensify> create(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    static boost::intrusive_ptr<DocumentSourceInternalDensify> create(
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -109,8 +111,6 @@ public:
     const char* getSourceName() const final {
         return kStageName.rawData();
     }
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
@@ -126,5 +126,6 @@ public:
 
     DocumentSourceInternalDensify(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
     GetNextResult doGetNext() final;
-};
-};  
+
+}; 
+} // namespace mongo
