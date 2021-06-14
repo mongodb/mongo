@@ -42,7 +42,6 @@ namespace document_source_densify {
 // TODO SERVER-57334 Translation logic goes here.
 }
 
-// TODO SERVER-57332 This should inherit from DocumentSource.
 class DocumentSourceInternalDensify final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalDensify"_sd;
@@ -126,6 +125,5 @@ public:
 
     DocumentSourceInternalDensify(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
     GetNextResult doGetNext() final;
-
-}; 
-} // namespace mongo
+};
+}  // namespace mongo

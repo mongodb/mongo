@@ -142,7 +142,12 @@ bool DocumentSourceInternalDensify::DocGenerator::done() const {
 }
 
 DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
+<<<<<<< HEAD
     return pSource->getNext();
+=======
+    auto nextInput = pSource->getNext();
+    return nextInput;
+>>>>>>> 5d323a58c9... bracket changes
 }
 
 }  // namespace mongo
