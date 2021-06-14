@@ -961,13 +961,15 @@ void ShardingCatalogManager::_upgradeCollectionsAndChunksEntriesTo50Phase2(
     // migrations.
     Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
-    // Unset ns for all chunks on config.chunks
-    updateConfigDocumentDBDirect(opCtx,
-                                 ChunkType::ConfigNS,
-                                 {} /* query */,
-                                 BSON("$unset" << BSON(ChunkType::ns(""))) /* update */,
-                                 false /* upsert */,
-                                 true /* multi */);
+    // Unset ns, epoch and timestamp for all chunks on config.chunks
+    updateConfigDocumentDBDirect(
+        opCtx,
+        ChunkType::ConfigNS,
+        {} /* query */,
+        BSON("$unset" << BSON(ChunkType::ns("") << ChunkType::epoch() << ""
+                                                << ChunkType::timestamp() << "")) /* update */,
+        false /* upsert */,
+        true /* multi */);
 
     LOGV2(5276707, "Successfully upgraded config.chunks (phase 2)");
 }
@@ -1006,12 +1008,14 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksEntriesToPre50Phase1(
                               << " collection must be true",
                 coll.getAllowMigrations());
 
-        updateConfigDocumentDBDirect(opCtx,
-                                     ChunkType::ConfigNS,
-                                     BSON(ChunkType::collectionUUID << uuid) /* query */,
-                                     BSON("$set" << BSON(ChunkType::ns(nss.ns()))) /* update */,
-                                     false /* upsert */,
-                                     true /* multi */);
+        updateConfigDocumentDBDirect(
+            opCtx,
+            ChunkType::ConfigNS,
+            BSON(ChunkType::collectionUUID << uuid) /* query */,
+            BSON("$set" << BSON(ChunkType::ns(nss.ns())
+                                << ChunkType::epoch() << coll.getEpoch())) /* update */,
+            false /* upsert */,
+            true /* multi */);
     }
 
     removeIncompleteChunks(opCtx, false /* isOnUpgrade */);
@@ -1107,13 +1111,12 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksEntriesToPre50Phase2(
     // migrations.
     Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
-    // Unset the timestamp and the uuid for all chunks on config.chunks
+    // Unset the uuid for all chunks on config.chunks
     updateConfigDocumentDBDirect(
         opCtx,
         ChunkType::ConfigNS,
         {} /* query */,
-        BSON("$unset" << BSON(ChunkType::timestamp.name()
-                              << "" << ChunkType::collectionUUID() << "")) /* update */,
+        BSON("$unset" << BSON(ChunkType::collectionUUID() << "")) /* update */,
         false /* upsert */,
         true /* multi */);
 

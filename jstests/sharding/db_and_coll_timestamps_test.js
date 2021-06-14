@@ -33,11 +33,6 @@ function checkTimestampConsistencyInPersistentMetadata(
         st.shard0.getDB('config').cache.collections.findOne({_id: nss}).timestamp;
     assert.neq(null, collTimestampInShard);
     assert.eq(timestampCmp(collTimestampInConfig, collTimestampInShard), 0);
-
-    // Checking consistency on config server collection: config.chunks
-    var cursor = findChunksUtil.findChunksByNs(st.config, nss);
-    assert(cursor.hasNext());
-    assert.eq(collTimestampInConfig, cursor.next().lastmodTimestamp);
 }
 
 const kDbName = 'testdb';

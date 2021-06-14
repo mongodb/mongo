@@ -41,7 +41,7 @@ assert.commandFailed(a.runCommand({
 }),
                      "should have failed because version is config is 1|0");
 
-var epoch = findChunksUtil.findOneChunkByNs(s.getDB('config'), "alleyinsider.foo").lastmodEpoch;
+var epoch = s.getDB('config').collections.findOne({_id: "alleyinsider.foo"}).lastmodEpoch;
 assert.commandWorked(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: s._configDB,
