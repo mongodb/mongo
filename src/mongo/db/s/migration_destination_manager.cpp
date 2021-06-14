@@ -464,8 +464,11 @@ repl::OpTime MigrationDestinationManager::cloneDocumentsFromDonor(
             stdx::lock_guard lk(*client);
             client->setSystemOperationKillableByStepdown(lk);
         }
+        auto executor =
+            Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
+        auto inserterOpCtx = CancelableOperationContext(
+            cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
 
-        auto inserterOpCtx = client->makeOperationContext();
         auto consumerGuard = makeGuard([&] {
             batches.closeConsumerEnd();
             lastOpApplied = repl::ReplClientInfo::forClient(inserterOpCtx->getClient()).getLastOp();
