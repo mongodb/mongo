@@ -354,15 +354,19 @@ StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source,
     ChunkType chunk = chunkStatus.getValue();
 
     if (!chunk._id) {
-        {
-            OID chunkID;
-            Status status = bsonExtractOIDField(source, name.name(), &chunkID);
-            if (status.isOK()) {
-                chunk._id = chunkID;
-            } else {
-                return status;
-            }
+        OID chunkID;
+        Status status = bsonExtractOIDField(source, name.name(), &chunkID);
+        if (status.isOK()) {
+            chunk._id = chunkID;
+        } else {
+            return status;
         }
+    }
+
+    const ChunkVersion& version = chunk.getVersion();
+    if (version.epoch() == OID()) {
+        chunk.setVersion(
+            ChunkVersion(version.majorVersion(), version.minorVersion(), epoch, timestamp));
     }
 
     return chunk;
@@ -382,8 +386,12 @@ BSONObj ChunkType::toConfigBSON() const {
         builder.append(max.name(), getMax());
     if (_shard)
         builder.append(shard.name(), getShard().toString());
-    if (_version)
-        _version->appendLegacyWithField(&builder, ChunkType::lastmod());
+    if (_version) {
+        if (_collectionUUID && !_nss)
+            builder.appendTimestamp(lastmod.name(), _version->toLong());
+        else
+            _version->appendLegacyWithField(&builder, ChunkType::lastmod());
+    }
     if (_jumbo)
         builder.append(jumbo.name(), getJumbo());
     addHistoryToBSON(builder);

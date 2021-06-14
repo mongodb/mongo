@@ -136,11 +136,13 @@ function testTimestampFieldChecksAfterUpgrade() {
         collTimestampInConfigSvr,
         primaryShard.getDB('config').cache.collections.findOne({_id: 'sharded.test3'}).timestamp);
 
-    // Check that 'timestamp' has been created in config.chunks
+    // Check that config.chunks doesn't have epochs neither timestamps
     var cursor = findChunksUtil.findChunksByNs(st.config, 'sharded.test3');
     assert(cursor.hasNext());
     do {
-        assert.eq(collTimestampInConfigSvr, cursor.next().lastmodTimestamp);
+        var chunk = cursor.next();
+        assert.eq(null, chunk.lastmodEpoch);
+        assert.eq(null, chunk.lastmodTimestamp);
     } while (cursor.hasNext());
 }
 
@@ -169,7 +171,9 @@ function testTimestampFieldChecksAfterFCVDowngrade() {
     var cursor = findChunksUtil.findChunksByNs(st.config, 'sharded.test3');
     assert(cursor.hasNext());
     do {
-        assert.eq(null, cursor.next().lastmodTimestamp);
+        var chunk = cursor.next();
+        assert.eq(collAfterUpgrade.lastmodEpoch, chunk.lastmodEpoch);
+        assert.eq(null, chunk.lastmodTimestamp);
     } while (cursor.hasNext());
 }
 

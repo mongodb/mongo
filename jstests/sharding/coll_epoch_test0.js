@@ -21,32 +21,19 @@ config.shards.find().forEach(function(doc) {
         notPrimary = doc._id;
 });
 
-var createdEpoch = null;
-var checkEpochs = function() {
-    findChunksUtil.findChunksByNs(config, coll + "").forEach(function(chunk) {
-        // Make sure the epochs exist, are non-zero, and are consistent
-        assert(chunk.lastmodEpoch);
-        print(chunk.lastmodEpoch + "");
-        assert.neq(chunk.lastmodEpoch + "", "000000000000000000000000");
-        if (createdEpoch == null)
-            createdEpoch = chunk.lastmodEpoch;
-        else
-            assert.eq(createdEpoch, chunk.lastmodEpoch);
-    });
-};
-
-checkEpochs();
+var originalUuid = config.collections.findOne({_id: coll + ""}).uuid;
+var originalEpoch = config.collections.findOne({_id: coll + ""}).lastmodEpoch;
 
 // Now do a split
 printjson(admin.runCommand({split: coll + "", middle: {_id: 0}}));
 
-// Check all the chunks for epochs
-checkEpochs();
+assert.eq(originalUuid, config.collections.findOne({_id: coll + ""}).uuid);
+assert.eq(originalEpoch, config.collections.findOne({_id: coll + ""}).lastmodEpoch);
 
 // Now do a migrate
 printjson(admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: notPrimary}));
 
-// Check all the chunks for epochs
-checkEpochs();
+assert.eq(originalUuid, config.collections.findOne({_id: coll + ""}).uuid);
+assert.eq(originalEpoch, config.collections.findOne({_id: coll + ""}).lastmodEpoch);
 
 st.stop();
