@@ -1607,4 +1607,25 @@ TEST_F(ReplicationRecoveryTest, RecoverStartFromClosestLTEEntryIfRecoveryTsNotIn
     recovery.recoverFromOplog(opCtx, recoveryTs);
 }
 
+TEST_F(ReplicationRecoveryTest, RecoverySetsValidateFeaturesAsPrimaryToFalseWhileApplyingOplog) {
+    FailPointEnableBlock failpoint(
+        "skipResettingValidateFeaturesAsPrimaryAfterRecoveryOplogApplication");
+
+    // The reset will be skipped due to the failpoint so we make the test do it instead.
+    auto validateValue = serverGlobalParams.validateFeaturesAsPrimary.load();
+    ON_BLOCK_EXIT(
+        [validateValue] { serverGlobalParams.validateFeaturesAsPrimary.store(validateValue); });
+
+    serverGlobalParams.validateFeaturesAsPrimary.store(true);
+    ASSERT(serverGlobalParams.validateFeaturesAsPrimary.load());
+
+    auto opCtx = getOperationContext();
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(3, 3), 1));
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
+    recovery.recoverFromOplog(opCtx, boost::none /* recoveryTs */);
+
+    ASSERT_FALSE(serverGlobalParams.validateFeaturesAsPrimary.load());
+}
+
 }  // namespace

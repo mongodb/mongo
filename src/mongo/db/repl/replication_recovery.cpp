@@ -61,6 +61,7 @@ namespace mongo {
 namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterOplogTruncationInRollback);
+MONGO_FAIL_POINT_DEFINE(skipResettingValidateFeaturesAsPrimaryAfterRecoveryOplogApplication);
 
 namespace {
 
@@ -631,6 +632,21 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
                                                          const Timestamp& startPoint,
                                                          const Timestamp& endPoint,
                                                          RecoveryMode recoveryMode) {
+
+    // Make sure we skip validation checks that are only intended for primaries while recovering.
+    auto validateValue = serverGlobalParams.validateFeaturesAsPrimary.load();
+    ON_BLOCK_EXIT([validateValue] {
+        if (MONGO_unlikely(
+                skipResettingValidateFeaturesAsPrimaryAfterRecoveryOplogApplication.shouldFail())) {
+            LOGV2(5717600,
+                  "Hit skipResettingValidateFeaturesAsPrimaryAfterRecoveryOplogApplication "
+                  "failpoint");
+            return;
+        }
+        serverGlobalParams.validateFeaturesAsPrimary.store(validateValue);
+    });
+    serverGlobalParams.validateFeaturesAsPrimary.store(false);
+
     // The oplog buffer will fetch all entries >= the startPoint timestamp, but it skips the first
     // op on startup, which is why the startPoint is described as "exclusive".
     LOGV2(21550,

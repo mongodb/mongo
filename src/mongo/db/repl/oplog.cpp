@@ -1430,10 +1430,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             if (updateMod.type() == write_ops::UpdateModification::Type::kDelta) {
                 // If we are validating features as primary, only allow $v:2 delta entries if we are
                 // at FCV 4.7 or newer to prevent them from being written to the oplog.
-                //
-                // TODO SERVER-57176: Remove the check on 'kRecovering'.
-                if (serverGlobalParams.validateFeaturesAsPrimary.load() &&
-                    mode != OplogApplication::Mode::kRecovering) {
+                if (serverGlobalParams.validateFeaturesAsPrimary.load()) {
                     uassert(4773100,
                             "Delta oplog entries may not be used in FCV below 4.7",
                             serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
