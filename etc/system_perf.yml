@@ -993,7 +993,7 @@ buildvariants:
       storageEngine: wiredTiger
     run_on:
       - "rhel70-perf-shard-lite"
-    depends_on: *_compile_amazon2
+    depends_on: *_compile_amazon-64
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
