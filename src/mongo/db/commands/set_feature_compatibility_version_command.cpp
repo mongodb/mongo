@@ -146,7 +146,7 @@ void waitForCurrentConfigCommitment(OperationContext* opCtx) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     // Skip the waiting if the current config is from a force reconfig.
-    auto oplogWait = replCoord->getConfig().getConfigTerm() != repl::OpTime::kUninitializedTerm;
+    auto oplogWait = replCoord->getConfigTerm() != repl::OpTime::kUninitializedTerm;
     auto status = replCoord->awaitConfigCommitment(opCtx, oplogWait);
     status.addContext("New feature compatibility version is rejected");
     if (status == ErrorCodes::MaxTimeMSExpired) {

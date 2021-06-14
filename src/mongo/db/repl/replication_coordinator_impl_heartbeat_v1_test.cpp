@@ -471,8 +471,8 @@ TEST_F(ReplCoordHBV1ReconfigTest,
     getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(origResObj));
     getNet()->runReadyNetworkOperations();
 
-    ASSERT_EQ(getReplCoord()->getConfig().getConfigVersion(), initConfigVersion + 1);
-    ASSERT_EQ(getReplCoord()->getConfig().getConfigTerm(), initConfigTerm);
+    ASSERT_EQ(getReplCoord()->getConfigVersion(), initConfigVersion + 1);
+    ASSERT_EQ(getReplCoord()->getConfigTerm(), initConfigTerm);
 }
 
 TEST_F(ReplCoordHBV1ReconfigTest,
@@ -515,7 +515,7 @@ TEST_F(ReplCoordHBV1ReconfigTest,
     getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(origResObj));
     getNet()->runReadyNetworkOperations();
 
-    ASSERT_EQ(getReplCoord()->getConfig().getConfigTerm(), initConfigTerm + 1);
+    ASSERT_EQ(getReplCoord()->getConfigTerm(), initConfigTerm + 1);
 }
 
 TEST_F(ReplCoordHBV1ReconfigTest,
@@ -568,8 +568,8 @@ TEST_F(
     getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(origResObj));
     getNet()->runReadyNetworkOperations();
 
-    ASSERT_EQ(getReplCoord()->getConfig().getConfigVersion(), (initConfigVersion - 1));
-    ASSERT_EQ(getReplCoord()->getConfig().getConfigTerm(), (initConfigTerm + 1));
+    ASSERT_EQ(getReplCoord()->getConfigVersion(), (initConfigVersion - 1));
+    ASSERT_EQ(getReplCoord()->getConfigTerm(), (initConfigTerm + 1));
 }
 
 TEST_F(
@@ -614,8 +614,8 @@ TEST_F(
     getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(origResObj));
     getNet()->runReadyNetworkOperations();
 
-    ASSERT_EQ(getReplCoord()->getConfig().getConfigVersion(), (initConfigVersion + 1));
-    ASSERT_EQ(getReplCoord()->getConfig().getConfigTerm(), UninitializedTerm);
+    ASSERT_EQ(getReplCoord()->getConfigVersion(), (initConfigVersion + 1));
+    ASSERT_EQ(getReplCoord()->getConfigTerm(), UninitializedTerm);
 }
 
 TEST_F(ReplCoordHBV1ReconfigTest,
@@ -1527,11 +1527,10 @@ void HBStepdownAndReconfigTest::assertSteppedDown() {
 void HBStepdownAndReconfigTest::assertConfigStored() {
     LOGV2(463812, "Waiting for config to be stored");
     // Wait for new config since it may be installed asynchronously.
-    while (getReplCoord()->getConfig().getConfigVersionAndTerm() < ConfigVersionAndTerm(3, 1)) {
+    while (getReplCoord()->getConfigVersionAndTerm() < ConfigVersionAndTerm(3, 1)) {
         sleepFor(Milliseconds(10));
     }
-    ASSERT_EQUALS(ConfigVersionAndTerm(3, 1),
-                  getReplCoord()->getConfig().getConfigVersionAndTerm());
+    ASSERT_EQUALS(ConfigVersionAndTerm(3, 1), getReplCoord()->getConfigVersionAndTerm());
 }
 
 TEST_F(HBStepdownAndReconfigTest, HBStepdownThenHBReconfig) {

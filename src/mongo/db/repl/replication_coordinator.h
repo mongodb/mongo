@@ -44,6 +44,7 @@
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/topology_version_gen.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -621,8 +622,77 @@ public:
 
     /**
      * Returns a copy of the current ReplSetConfig.
+     *
+     * To avoid unnecessarily copying the ReplSetConfig through this method, please use the
+     * getConfig* methods below if you are only accessing a specific field of the ReplSetConfig,
+     * i.e. replCoord->getConfigNumMembers() instead of replCoord->getConfig().getNumMembers(). See
+     * SERVER-47828.
      */
     virtual ReplSetConfig getConfig() const = 0;
+
+    /**
+     * Returns the current ReplSetConfig's connection string.
+     */
+    virtual ConnectionString getConfigConnectionString() const = 0;
+
+    /**
+     * Returns the current ReplSetConfig's election timeout period.
+     */
+    virtual Milliseconds getConfigElectionTimeoutPeriod() const = 0;
+
+    /**
+     * Returns the current ReplSetConfig's voting members.
+     */
+    virtual std::vector<MemberConfig> getConfigVotingMembers() const = 0;
+
+    /**
+     * Returns the current ReplSetConfig's term.
+     */
+    virtual std::int64_t getConfigTerm() const = 0;
+
+    /**
+     * Returns the current ReplSetConfig's version.
+     */
+    virtual std::int64_t getConfigVersion() const = 0;
+
+    /**
+     * Returns the (version, term) pair of the current ReplSetConfig.
+     */
+    virtual ConfigVersionAndTerm getConfigVersionAndTerm() const = 0;
+
+    /**
+     * Returns the number of members in the current ReplSetConfig.
+     */
+    virtual int getConfigNumMembers() const = 0;
+
+    /**
+     * Returns the amount of time to wait for a response to heartbeats sent to other
+     * nodes in the current ReplSetConfig.
+     */
+    virtual Milliseconds getConfigHeartbeatTimeoutPeriodMillis() const = 0;
+
+    /**
+     * Returns the BSON of the current ReplSetConfig.
+     */
+    virtual BSONObj getConfigBSON() const = 0;
+
+    /**
+     * Returns a pointer to the MemberConfig corresponding to the member with the given
+     * HostAndPort in the current ReplSetConfig, or NULL if there is no member with that address.
+     */
+    virtual const MemberConfig* findConfigMemberByHostAndPort(const HostAndPort& hap) const = 0;
+
+    /**
+     * Returns whether all members of the current ReplSetConfig set have hostname localhost.
+     */
+    virtual bool isConfigLocalHostAllowed() const = 0;
+
+    /**
+     * Returns the interval between the time the last heartbeat from a node was received
+     * successfully, or the time when we gave up retrying, and when the next heartbeat should be
+     * sent to a target, for the current ReplSetConfig.
+     */
+    virtual Milliseconds getConfigHeartbeatInterval() const = 0;
 
     /**
      * Handles an incoming replSetGetConfig command. Adds BSON to 'result'.

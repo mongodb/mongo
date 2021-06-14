@@ -338,23 +338,23 @@ protected:
 TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
     std::string shardName = "shardName";
 
-    BSONObj expectedBSON = BSON(
-        "update"
-        << "system.version"
-        << "bypassDocumentValidation" << false << "ordered" << true << "updates"
-        << BSON_ARRAY(BSON(
-               "q" << BSON("_id"
-                           << "shardIdentity")
-                   << "u"
-                   << BSON(
-                          "shardName"
-                          << shardName << "clusterId" << _clusterId << "configsvrConnectionString"
-                          << replicationCoordinator()->getConfig().getConnectionString().toString())
-                   << "multi" << false << "upsert" << true))
-        << "writeConcern"
-        << BSON("w"
-                << "majority"
-                << "wtimeout" << 60000));
+    BSONObj expectedBSON =
+        BSON("update"
+             << "system.version"
+             << "bypassDocumentValidation" << false << "ordered" << true << "updates"
+             << BSON_ARRAY(BSON(
+                    "q" << BSON("_id"
+                                << "shardIdentity")
+                        << "u"
+                        << BSON("shardName"
+                                << shardName << "clusterId" << _clusterId
+                                << "configsvrConnectionString"
+                                << replicationCoordinator()->getConfigConnectionString().toString())
+                        << "multi" << false << "upsert" << true))
+             << "writeConcern"
+             << BSON("w"
+                     << "majority"
+                     << "wtimeout" << 60000));
     auto addShardCmd = add_shard_util::createAddShardCmd(operationContext(), shardName);
     auto actualBSON = add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
     ASSERT_BSONOBJ_EQ(expectedBSON, actualBSON);

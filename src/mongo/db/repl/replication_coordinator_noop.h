@@ -173,6 +173,30 @@ public:
 
     ReplSetConfig getConfig() const final;
 
+    ConnectionString getConfigConnectionString() const final;
+
+    Milliseconds getConfigElectionTimeoutPeriod() const final;
+
+    std::vector<MemberConfig> getConfigVotingMembers() const final;
+
+    std::int64_t getConfigTerm() const final;
+
+    std::int64_t getConfigVersion() const final;
+
+    ConfigVersionAndTerm getConfigVersionAndTerm() const final;
+
+    int getConfigNumMembers() const final;
+
+    Milliseconds getConfigHeartbeatTimeoutPeriodMillis() const final;
+
+    BSONObj getConfigBSON() const final;
+
+    const MemberConfig* findConfigMemberByHostAndPort(const HostAndPort& hap) const final;
+
+    bool isConfigLocalHostAllowed() const final;
+
+    Milliseconds getConfigHeartbeatInterval() const final;
+
     void processReplSetGetConfig(BSONObjBuilder*,
                                  bool commitmentStatus = false,
                                  bool includeNewlyAdded = false) final;

@@ -471,7 +471,7 @@ std::shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule
         &builder,
         nss,
         migrateInfo.version,
-        repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString(),
+        repl::ReplicationCoordinator::get(opCtx)->getConfigConnectionString(),
         migrateInfo.from,
         migrateInfo.to,
         ChunkRange(migrateInfo.minKey, migrateInfo.maxKey),

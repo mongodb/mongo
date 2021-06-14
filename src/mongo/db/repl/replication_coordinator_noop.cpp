@@ -298,6 +298,55 @@ ReplSetConfig ReplicationCoordinatorNoOp::getConfig() const {
     MONGO_UNREACHABLE;
 }
 
+ConnectionString ReplicationCoordinatorNoOp::getConfigConnectionString() const {
+    MONGO_UNREACHABLE;
+}
+
+Milliseconds ReplicationCoordinatorNoOp::getConfigElectionTimeoutPeriod() const {
+    MONGO_UNREACHABLE;
+}
+
+std::vector<MemberConfig> ReplicationCoordinatorNoOp::getConfigVotingMembers() const {
+    MONGO_UNREACHABLE;
+}
+
+std::int64_t ReplicationCoordinatorNoOp::getConfigTerm() const {
+    MONGO_UNREACHABLE;
+}
+
+std::int64_t ReplicationCoordinatorNoOp::getConfigVersion() const {
+    MONGO_UNREACHABLE;
+}
+
+ConfigVersionAndTerm ReplicationCoordinatorNoOp::getConfigVersionAndTerm() const {
+    MONGO_UNREACHABLE;
+}
+
+int ReplicationCoordinatorNoOp::getConfigNumMembers() const {
+    MONGO_UNREACHABLE;
+}
+
+Milliseconds ReplicationCoordinatorNoOp::getConfigHeartbeatTimeoutPeriodMillis() const {
+    MONGO_UNREACHABLE;
+}
+
+BSONObj ReplicationCoordinatorNoOp::getConfigBSON() const {
+    MONGO_UNREACHABLE;
+}
+
+const MemberConfig* ReplicationCoordinatorNoOp::findConfigMemberByHostAndPort(
+    const HostAndPort& hap) const {
+    MONGO_UNREACHABLE;
+}
+
+bool ReplicationCoordinatorNoOp::isConfigLocalHostAllowed() const {
+    MONGO_UNREACHABLE;
+}
+
+Milliseconds ReplicationCoordinatorNoOp::getConfigHeartbeatInterval() const {
+    MONGO_UNREACHABLE;
+}
+
 void ReplicationCoordinatorNoOp::processReplSetGetConfig(BSONObjBuilder* result,
                                                          bool commitmentStatus,
                                                          bool includeNewlyAdded) {

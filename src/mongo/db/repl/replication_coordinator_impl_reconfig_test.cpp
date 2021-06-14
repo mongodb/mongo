@@ -642,8 +642,7 @@ TEST_F(ReplCoordTest, OverrideReconfigBsonTermSoReconfigSucceeds) {
     ASSERT_OK(status);
 
     // After the reconfig, the config term should be 1, not 50.
-    const auto config = getReplCoord()->getConfig();
-    ASSERT_EQUALS(config.getConfigTerm(), 1);
+    ASSERT_EQUALS(getReplCoord()->getConfigTerm(), 1);
 }
 
 TEST_F(
@@ -1155,8 +1154,8 @@ public:
             hbResp.setState(MemberState::RS_SECONDARY);
         }
         // Secondaries learn of the config version and term immediately.
-        hbResp.setConfigVersion(getReplCoord()->getConfig().getConfigVersion());
-        hbResp.setConfigTerm(getReplCoord()->getConfig().getConfigTerm());
+        hbResp.setConfigVersion(getReplCoord()->getConfigVersion());
+        hbResp.setConfigTerm(getReplCoord()->getConfigTerm());
         BSONObjBuilder respObj;
         hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
         hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
@@ -1228,7 +1227,7 @@ public:
         Status status(ErrorCodes::InternalError, "Not Set");
         args.force = false;
         args.newConfigObj =
-            configWithMembers(configVersion, getReplCoord()->getConfig().getConfigTerm(), members);
+            configWithMembers(configVersion, getReplCoord()->getConfigTerm(), members);
         stdx::thread reconfigThread = stdx::thread(
             [&] { status = getReplCoord()->processReplSetReconfig(opCtx, args, &result); });
         // Satisfy quorum check with heartbeats.
@@ -1245,7 +1244,7 @@ public:
     }
 
     void replicateOpTo(int nodeId, OpTime op) {
-        auto configVersion = getReplCoord()->getConfig().getConfigVersion();
+        auto configVersion = getReplCoord()->getConfigVersion();
         ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(configVersion, nodeId, op));
         ASSERT_OK(getReplCoord()->setLastDurableOptime_forTest(configVersion, nodeId, op));
     }
@@ -2425,7 +2424,7 @@ TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithHeartbeatReconfig) {
 
     // We should have moved to a new term in the election, and our config should have the same term.
     ASSERT_EQUALS(getReplCoord()->getTerm(), 1);
-    ASSERT_EQUALS(getReplCoord()->getConfig().getConfigTerm(), 1);
+    ASSERT_EQUALS(getReplCoord()->getConfigTerm(), 1);
 }
 
 TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithForceHeartbeatReconfig) {
@@ -2522,7 +2521,7 @@ TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithForceHeartbeatReconfig) {
     // We should have moved to a new term in the election, but our config should have the term from
     // the force config.
     ASSERT_EQUALS(getReplCoord()->getTerm(), 1);
-    ASSERT_EQUALS(getReplCoord()->getConfig().getConfigTerm(), OpTime::kUninitializedTerm);
+    ASSERT_EQUALS(getReplCoord()->getConfigTerm(), OpTime::kUninitializedTerm);
 }
 
 }  // anonymous namespace

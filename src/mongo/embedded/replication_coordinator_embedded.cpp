@@ -322,6 +322,55 @@ ReplSetConfig ReplicationCoordinatorEmbedded::getConfig() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
+ConnectionString ReplicationCoordinatorEmbedded::getConfigConnectionString() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+Milliseconds ReplicationCoordinatorEmbedded::getConfigElectionTimeoutPeriod() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+std::vector<MemberConfig> ReplicationCoordinatorEmbedded::getConfigVotingMembers() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+std::int64_t ReplicationCoordinatorEmbedded::getConfigTerm() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+std::int64_t ReplicationCoordinatorEmbedded::getConfigVersion() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+ConfigVersionAndTerm ReplicationCoordinatorEmbedded::getConfigVersionAndTerm() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+int ReplicationCoordinatorEmbedded::getConfigNumMembers() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+Milliseconds ReplicationCoordinatorEmbedded::getConfigHeartbeatTimeoutPeriodMillis() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+BSONObj ReplicationCoordinatorEmbedded::getConfigBSON() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+const MemberConfig* ReplicationCoordinatorEmbedded::findConfigMemberByHostAndPort(
+    const HostAndPort& hap) const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+bool ReplicationCoordinatorEmbedded::isConfigLocalHostAllowed() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+Milliseconds ReplicationCoordinatorEmbedded::getConfigHeartbeatInterval() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 void ReplicationCoordinatorEmbedded::processReplSetGetConfig(BSONObjBuilder*,
                                                              bool commitmentStatus,
                                                              bool includeNewlyAdded) {

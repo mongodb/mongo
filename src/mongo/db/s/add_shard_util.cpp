@@ -53,7 +53,7 @@ AddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName) {
     shardIdentity.setShardName(shardName.toString());
     shardIdentity.setClusterId(ClusterIdentityLoader::get(opCtx)->getClusterId());
     shardIdentity.setConfigsvrConnectionString(
-        repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString());
+        repl::ReplicationCoordinator::get(opCtx)->getConfigConnectionString());
 
     addShardCmd.setShardIdentity(shardIdentity);
     return addShardCmd;

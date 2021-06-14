@@ -182,6 +182,30 @@ public:
 
     repl::ReplSetConfig getConfig() const override;
 
+    ConnectionString getConfigConnectionString() const override;
+
+    Milliseconds getConfigElectionTimeoutPeriod() const override;
+
+    std::vector<repl::MemberConfig> getConfigVotingMembers() const override;
+
+    std::int64_t getConfigTerm() const override;
+
+    std::int64_t getConfigVersion() const override;
+
+    repl::ConfigVersionAndTerm getConfigVersionAndTerm() const override;
+
+    int getConfigNumMembers() const override;
+
+    Milliseconds getConfigHeartbeatTimeoutPeriodMillis() const override;
+
+    BSONObj getConfigBSON() const override;
+
+    const repl::MemberConfig* findConfigMemberByHostAndPort(const HostAndPort& hap) const override;
+
+    bool isConfigLocalHostAllowed() const override;
+
+    Milliseconds getConfigHeartbeatInterval() const override;
+
     void processReplSetGetConfig(BSONObjBuilder*,
                                  bool commitmentStatus = false,
                                  bool includeNewlyAdded = false) override;

@@ -57,8 +57,7 @@ ShardLocal::ShardLocal(const ShardId& id) : Shard(id) {
 
 const ConnectionString ShardLocal::getConnString() const {
     return repl::ReplicationCoordinator::get(getGlobalServiceContext())
-        ->getConfig()
-        .getConnectionString();
+        ->getConfigConnectionString();
 }
 
 std::shared_ptr<RemoteCommandTargeter> ShardLocal::getTargeter() const {

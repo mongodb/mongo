@@ -90,8 +90,7 @@ inline Status validateConnectionString(const StringData& donorOrRecipientConnect
 
     // Sanity check to make sure that donor and recipient do not share any hosts.
     const auto servers = repl::ReplicationCoordinator::get(cc().getServiceContext())
-                             ->getConfig()
-                             .getConnectionString()
+                             ->getConfigConnectionString()
                              .getServers();
 
     for (auto&& server : servers) {

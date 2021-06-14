@@ -424,7 +424,7 @@ public:
         // of concurrent reconfigs.
         if (!parsedArgs.force) {
             // Skip the waiting if the current config is from a force reconfig.
-            auto oplogWait = replCoord->getConfig().getConfigTerm() != OpTime::kUninitializedTerm;
+            auto oplogWait = replCoord->getConfigTerm() != OpTime::kUninitializedTerm;
             auto status = replCoord->awaitConfigCommitment(opCtx, oplogWait);
             status.addContext("New config is rejected");
             if (status == ErrorCodes::MaxTimeMSExpired) {

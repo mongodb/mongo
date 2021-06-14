@@ -108,9 +108,8 @@ public:
         auto parsedRequest = std::move(swParsedRequest.getValue());
 
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        auto rsConfig = replCoord->getConfig();
 
-        auto validationStatus = parsedRequest.validate(rsConfig.isLocalHostAllowed());
+        auto validationStatus = parsedRequest.validate(replCoord->isConfigLocalHostAllowed());
         uassertStatusOK(validationStatus);
 
         audit::logAddShard(Client::getCurrent(),

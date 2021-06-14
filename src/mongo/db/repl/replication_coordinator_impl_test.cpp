@@ -1497,8 +1497,7 @@ protected:
 
     // Makes it so enough secondaries are caught up that a stepdown command can succeed.
     void catchUpSecondaries(const OpTime& desiredOpTime, Date_t desiredWallTime = Date_t()) {
-        auto config = getReplCoord()->getConfig();
-        auto heartbeatInterval = config.getHeartbeatInterval();
+        auto heartbeatInterval = getReplCoord()->getConfigHeartbeatInterval();
         if (desiredWallTime == Date_t() && !desiredOpTime.isNull()) {
             desiredWallTime = Date_t() + Seconds(desiredOpTime.getSecs());
         }
@@ -1606,15 +1605,13 @@ TEST_F(ReplCoordTest, UpdatePositionArgsAdvancesWallTimes) {
         << 1 << UpdatePositionArgs::kUpdateArrayFieldName
         << BSON_ARRAY(
                BSON(UpdatePositionArgs::kConfigVersionFieldName
-                    << repl->getConfig().getConfigVersion()
-                    << UpdatePositionArgs::kMemberIdFieldName << 1
+                    << repl->getConfigVersion() << UpdatePositionArgs::kMemberIdFieldName << 1
                     << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
                     << UpdatePositionArgs::kAppliedWallTimeFieldName << memberOneAppliedWallTime
                     << UpdatePositionArgs::kDurableOpTimeFieldName << opTime2.asOpTime().toBSON()
                     << UpdatePositionArgs::kDurableWallTimeFieldName << memberOneDurableWallTime)
                << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                       << repl->getConfig().getConfigVersion()
-                       << UpdatePositionArgs::kMemberIdFieldName << 2
+                       << repl->getConfigVersion() << UpdatePositionArgs::kMemberIdFieldName << 2
                        << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
                        << UpdatePositionArgs::kAppliedWallTimeFieldName << memberTwoAppliedWallTime
                        << UpdatePositionArgs::kDurableOpTimeFieldName << opTime2.asOpTime().toBSON()
@@ -1891,8 +1888,7 @@ TEST_F(StepDownTest, StepDownCanCompleteBasedOnReplSetUpdatePositionAlone) {
         << 1 << UpdatePositionArgs::kUpdateArrayFieldName
         << BSON_ARRAY(
                BSON(UpdatePositionArgs::kConfigVersionFieldName
-                    << repl->getConfig().getConfigVersion()
-                    << UpdatePositionArgs::kMemberIdFieldName << 1
+                    << repl->getConfigVersion() << UpdatePositionArgs::kMemberIdFieldName << 1
                     << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
                     << UpdatePositionArgs::kAppliedWallTimeFieldName
                     << Date_t() + Seconds(opTime2.asOpTime().getSecs())
@@ -1900,8 +1896,7 @@ TEST_F(StepDownTest, StepDownCanCompleteBasedOnReplSetUpdatePositionAlone) {
                     << UpdatePositionArgs::kDurableWallTimeFieldName
                     << Date_t() + Seconds(opTime2.asOpTime().getSecs()))
                << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                       << repl->getConfig().getConfigVersion()
-                       << UpdatePositionArgs::kMemberIdFieldName << 2
+                       << repl->getConfigVersion() << UpdatePositionArgs::kMemberIdFieldName << 2
                        << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime1.asOpTime().toBSON()
                        << UpdatePositionArgs::kAppliedWallTimeFieldName
                        << Date_t() + Seconds(opTime1.asOpTime().getSecs())
@@ -2028,8 +2023,7 @@ TEST_F(StepDownTestWithUnelectableNode,
         << 1 << UpdatePositionArgs::kUpdateArrayFieldName
         << BSON_ARRAY(
                BSON(UpdatePositionArgs::kConfigVersionFieldName
-                    << repl->getConfig().getConfigVersion()
-                    << UpdatePositionArgs::kMemberIdFieldName << 1
+                    << repl->getConfigVersion() << UpdatePositionArgs::kMemberIdFieldName << 1
                     << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
                     << UpdatePositionArgs::kAppliedWallTimeFieldName
                     << Date_t() + Seconds(opTime2.asOpTime().getSecs())
@@ -2037,8 +2031,7 @@ TEST_F(StepDownTestWithUnelectableNode,
                     << UpdatePositionArgs::kDurableWallTimeFieldName
                     << Date_t() + Seconds(opTime2.asOpTime().getSecs()))
                << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                       << repl->getConfig().getConfigVersion()
-                       << UpdatePositionArgs::kMemberIdFieldName << 2
+                       << repl->getConfigVersion() << UpdatePositionArgs::kMemberIdFieldName << 2
                        << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime1.asOpTime().toBSON()
                        << UpdatePositionArgs::kAppliedWallTimeFieldName
                        << Date_t() + Seconds(opTime1.asOpTime().getSecs())
@@ -2060,8 +2053,7 @@ TEST_F(StepDownTestWithUnelectableNode,
         << 1 << UpdatePositionArgs::kUpdateArrayFieldName
         << BSON_ARRAY(
                BSON(UpdatePositionArgs::kConfigVersionFieldName
-                    << repl->getConfig().getConfigVersion()
-                    << UpdatePositionArgs::kMemberIdFieldName << 1
+                    << repl->getConfigVersion() << UpdatePositionArgs::kMemberIdFieldName << 1
                     << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
                     << UpdatePositionArgs::kAppliedWallTimeFieldName
                     << Date_t() + Seconds(opTime2.asOpTime().getSecs())
@@ -2069,8 +2061,7 @@ TEST_F(StepDownTestWithUnelectableNode,
                     << UpdatePositionArgs::kDurableWallTimeFieldName
                     << Date_t() + Seconds(opTime2.asOpTime().getSecs()))
                << BSON(UpdatePositionArgs::kConfigVersionFieldName
-                       << repl->getConfig().getConfigVersion()
-                       << UpdatePositionArgs::kMemberIdFieldName << 2
+                       << repl->getConfigVersion() << UpdatePositionArgs::kMemberIdFieldName << 2
                        << UpdatePositionArgs::kAppliedOpTimeFieldName << opTime2.asOpTime().toBSON()
                        << UpdatePositionArgs::kAppliedWallTimeFieldName
                        << Date_t() + Seconds(opTime2.asOpTime().getSecs())
@@ -3742,8 +3733,7 @@ TEST_F(ReplCoordTest, HelloReturnsErrorInQuiesceModeWhenNodeIsRemoved) {
 
     // Wait for the node to be removed. Test that we increment the topology version.
     ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_REMOVED, Seconds(1)));
-    ASSERT_EQUALS(removedFromConfig.getConfigVersion(),
-                  getReplCoord()->getConfig().getConfigVersion());
+    ASSERT_EQUALS(removedFromConfig.getConfigVersion(), getReplCoord()->getConfigVersion());
     auto topologyVersionAfterRemoved = getTopoCoord().getTopologyVersion();
     ASSERT_EQUALS(topologyVersionAfterQuiesceMode.getCounter() + 1,
                   topologyVersionAfterRemoved.getCounter());
@@ -4396,8 +4386,7 @@ TEST_F(ReplCoordTest, HelloOnRemovedNode) {
 
     // node1 no longer exists in the replica set config.
     ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_REMOVED, Seconds(1)));
-    ASSERT_EQUALS(removedFromConfig.getConfigVersion(),
-                  getReplCoord()->getConfig().getConfigVersion());
+    ASSERT_EQUALS(removedFromConfig.getConfigVersion(), getReplCoord()->getConfigVersion());
 
     const auto maxAwaitTime = Milliseconds(5000);
     auto deadline = net->now() + maxAwaitTime;
@@ -4558,8 +4547,7 @@ TEST_F(ReplCoordTest, AwaitHelloRespondsCorrectlyWhenNodeRemovedAndReadded) {
 
     // node1 no longer exists in the replica set config.
     ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_REMOVED, Seconds(1)));
-    ASSERT_EQUALS(removedFromConfig.getConfigVersion(),
-                  getReplCoord()->getConfig().getConfigVersion());
+    ASSERT_EQUALS(removedFromConfig.getConfigVersion(), getReplCoord()->getConfigVersion());
     getHelloWaitingForRemovedNodeThread.join();
     const std::string newHorizonSniName = "newhorizon.com";
     auto newHorizon = SplitHorizon::Parameters(newHorizonSniName);
@@ -4644,7 +4632,7 @@ TEST_F(ReplCoordTest, AwaitHelloResponseReturnsOnElectionTimeout) {
     ASSERT(getReplCoord()->getMemberState().primary());
 
     // Wait for a hello with deadline past the election timeout.
-    auto electionTimeout = getReplCoord()->getConfig().getElectionTimeoutPeriod();
+    auto electionTimeout = getReplCoord()->getConfigElectionTimeoutPeriod();
     auto maxAwaitTime = electionTimeout + Milliseconds(5000);
     auto deadline = getNet()->now() + maxAwaitTime;
     auto electionTimeoutDate = getNet()->now() + electionTimeout;
@@ -6513,7 +6501,7 @@ TEST_F(ReplCoordTest,
 
     getReplCoord()->cancelAndRescheduleElectionTimeout();
 
-    ASSERT_LESS_THAN_OR_EQUALS(until + replCoord->getConfig().getElectionTimeoutPeriod(),
+    ASSERT_LESS_THAN_OR_EQUALS(until + replCoord->getConfigElectionTimeoutPeriod(),
                                replCoord->getElectionTimeout_forTest());
 }
 
@@ -6611,7 +6599,7 @@ TEST_F(ReplCoordTest,
     net->exitNetwork();
 
     ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_REMOVED, Seconds(1)));
-    ASSERT_EQUALS(config.getConfigVersion(), getReplCoord()->getConfig().getConfigVersion());
+    ASSERT_EQUALS(config.getConfigVersion(), getReplCoord()->getConfigVersion());
 
     getReplCoord()->cancelAndRescheduleElectionTimeout();
 
@@ -6665,7 +6653,7 @@ TEST_F(ReplCoordTest,
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
-    ASSERT_LESS_THAN_OR_EQUALS(heartbeatWhen + replCoord->getConfig().getElectionTimeoutPeriod(),
+    ASSERT_LESS_THAN_OR_EQUALS(heartbeatWhen + replCoord->getConfigElectionTimeoutPeriod(),
                                replCoord->getElectionTimeout_forTest());
 }
 
@@ -6715,7 +6703,7 @@ TEST_F(ReplCoordTest,
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
-    ASSERT_GREATER_THAN(heartbeatWhen + replCoord->getConfig().getElectionTimeoutPeriod(),
+    ASSERT_GREATER_THAN(heartbeatWhen + replCoord->getConfigElectionTimeoutPeriod(),
                         replCoord->getElectionTimeout_forTest());
 }
 

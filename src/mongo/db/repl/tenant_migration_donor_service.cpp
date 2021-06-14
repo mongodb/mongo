@@ -685,7 +685,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
 
     const auto cmdObj = [&] {
         auto donorConnString =
-            repl::ReplicationCoordinator::get(_serviceContext)->getConfig().getConnectionString();
+            repl::ReplicationCoordinator::get(_serviceContext)->getConfigConnectionString();
 
         RecipientSyncData request;
         request.setDbName(NamespaceString::kAdminDb);
@@ -712,7 +712,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
     const CancellationToken& token) {
 
     auto donorConnString =
-        repl::ReplicationCoordinator::get(_serviceContext)->getConfig().getConnectionString();
+        repl::ReplicationCoordinator::get(_serviceContext)->getConfigConnectionString();
 
     RecipientForgetMigration request;
     request.setDbName(NamespaceString::kAdminDb);

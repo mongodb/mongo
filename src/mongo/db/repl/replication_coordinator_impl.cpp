@@ -3041,6 +3041,67 @@ ReplSetConfig ReplicationCoordinatorImpl::getConfig() const {
     return _rsConfig;
 }
 
+ConnectionString ReplicationCoordinatorImpl::getConfigConnectionString() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.getConnectionString();
+}
+
+Milliseconds ReplicationCoordinatorImpl::getConfigElectionTimeoutPeriod() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.getElectionTimeoutPeriod();
+}
+
+std::vector<MemberConfig> ReplicationCoordinatorImpl::getConfigVotingMembers() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.votingMembers();
+}
+
+std::int64_t ReplicationCoordinatorImpl::getConfigTerm() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.getConfigTerm();
+}
+
+std::int64_t ReplicationCoordinatorImpl::getConfigVersion() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.getConfigVersion();
+}
+
+ConfigVersionAndTerm ReplicationCoordinatorImpl::getConfigVersionAndTerm() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.getConfigVersionAndTerm();
+}
+
+int ReplicationCoordinatorImpl::getConfigNumMembers() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.getNumMembers();
+}
+
+Milliseconds ReplicationCoordinatorImpl::getConfigHeartbeatTimeoutPeriodMillis() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.getHeartbeatTimeoutPeriodMillis();
+}
+
+BSONObj ReplicationCoordinatorImpl::getConfigBSON() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.toBSON();
+}
+
+const MemberConfig* ReplicationCoordinatorImpl::findConfigMemberByHostAndPort(
+    const HostAndPort& hap) const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.findMemberByHostAndPort(hap);
+}
+
+bool ReplicationCoordinatorImpl::isConfigLocalHostAllowed() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.isLocalHostAllowed();
+}
+
+Milliseconds ReplicationCoordinatorImpl::getConfigHeartbeatInterval() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.getHeartbeatInterval();
+}
+
 WriteConcernOptions ReplicationCoordinatorImpl::_getOplogCommitmentWriteConcern(WithLock lk) {
     auto syncMode = getWriteConcernMajorityShouldJournal_inlock()
         ? WriteConcernOptions::SyncMode::JOURNAL
