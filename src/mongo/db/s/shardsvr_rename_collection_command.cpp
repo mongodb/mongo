@@ -52,10 +52,14 @@ namespace mongo {
 namespace {
 
 bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForRead lock(opCtx, nss);
-    return opCtx->writesAreReplicated() &&
-        CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx).isSharded();
-}
+    try {
+        Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+        return true;
+    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // The collection is unsharded or doesn't exist
+        return false;
+    }
+}  // namespace
 
 bool renameIsAllowedOnNS(const NamespaceString& nss) {
     if (nss.isSystem()) {
