@@ -90,9 +90,9 @@ function restartNodeAndCheckState(tenantId, tenantMigrationTest, checkMtab) {
     return initialSyncNode;
 }
 
-// Restarts a node for before tenant oplog application. Ensures its state matches up with the
+// Restarts a node without tenant oplog application. Ensures its state matches up with the
 // primary's, and then steps it up.
-function restartNodeAndCheckStateBeforeOplogApplication(
+function restartNodeAndCheckStateWithoutOplogApplication(
     tenantId, tenantMigrationTest, checkMtab, fpOnRecipient) {
     fpOnRecipient.wait();
 
@@ -111,18 +111,17 @@ function restartNodeAndCheckStateDuringOplogApplication(
     tenantId, tenantMigrationTest, checkMtab, fpOnRecipient) {
     fpOnRecipient.wait();
 
+    // Pause the tenant oplog applier before applying a batch.
+    const originalRecipientPrimary = tenantMigrationTest.getRecipientPrimary();
+    const fpPauseOplogApplierOnBatch =
+        configureFailPoint(originalRecipientPrimary, "fpBeforeTenantOplogApplyingBatch");
+
     // Insert documents into the donor after data cloning but before tenant oplog application, so
     // that the recipient has entries to apply during tenant oplog application.
     tenantMigrationTest.insertDonorDB(
         tenantMigrationTest.tenantDB(tenantId, testDBName),
         testCollName,
         [...Array(30).keys()].map((i) => ({a: i, b: "George Harrison - All Things Must Pass"})));
-
-    // Pause the tenant oplog applier before applying a batch.
-    const originalRecipientPrimary = tenantMigrationTest.getRecipientPrimary();
-    const fpPauseOplogApplierOnBatch =
-        configureFailPoint(originalRecipientPrimary, "fpBeforeTenantOplogApplyingBatch");
-    fpOnRecipient.off();
 
     // Wait until the oplog applier has started and is trying to apply a batch. Then restart a node.
     fpPauseOplogApplierOnBatch.wait();
@@ -132,6 +131,7 @@ function restartNodeAndCheckStateDuringOplogApplication(
     // Now step up the new node
     assert.commandWorked(initialSyncNode.adminCommand({"replSetStepUp": 1}));
     fpPauseOplogApplierOnBatch.off();
+    fpOnRecipient.off();
 }
 
 // This function does the following:
@@ -174,20 +174,29 @@ function runTestCase(tenantId, recipientFailpoint, checkMtab, restartNodeAndChec
     tenantMigrationTest.stop();
 }
 
+// These two test cases are for before the mtab is created, and before the oplog applier has been
+// started.
 runTestCase('tenantId1',
             "fpAfterStartingOplogFetcherMigrationRecipientInstance",
             false /* checkMtab */,
-            restartNodeAndCheckStateBeforeOplogApplication);
+            restartNodeAndCheckStateWithoutOplogApplication);
 runTestCase('tenantId2',
-            "fpAfterDataConsistentMigrationRecipientInstance",
-            true /* checkMtab */,
-            restartNodeAndCheckStateBeforeOplogApplication);
+            "tenantCollectionClonerHangAfterCreateCollection",
+            false /* checkMtab */,
+            restartNodeAndCheckStateWithoutOplogApplication);
 
 // Test case to initial sync a node while the recipient is in the oplog application phase.
 runTestCase('tenantId3',
-            "fpAfterFetchingCommittedTransactions",
+            "fpBeforeFulfillingDataConsistentPromise",
             true /* checkMtab */,
             restartNodeAndCheckStateDuringOplogApplication);
+
+// A case after data consistency so that the mtab exists. We do not care about the oplog applier in
+// this case.
+runTestCase('tenantId4',
+            "fpAfterWaitForRejectReadsBeforeTimestamp",
+            true /* checkMtab */,
+            restartNodeAndCheckStateWithoutOplogApplication);
 
 donorRst.stopSet();
 })();
