@@ -63,6 +63,7 @@ ShardingDDLCoordinator::ShardingDDLCoordinator(ShardingDDLCoordinatorService* se
                                                const BSONObj& coorDoc)
     : _service(service),
       _coorMetadata(extractShardingDDLCoordinatorMetadata(coorDoc)),
+      _coorName(DDLCoordinatorType_serializer(_coorMetadata.getId().getOperationType())),
       _recoveredFromDisk(_coorMetadata.getRecoveredFromDisk()) {}
 
 ShardingDDLCoordinator::~ShardingDDLCoordinator() {
@@ -105,6 +106,25 @@ bool ShardingDDLCoordinator::_removeDocument(OperationContext* opCtx) {
     return batchedResponse.getN() > 0;
 }
 
+
+ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    StringData resource) {
+    return AsyncTry([this, resource = resource.toString()] {
+               auto opCtxHolder = cc().makeOperationContext();
+               auto* opCtx = opCtxHolder.get();
+               auto distLockManager = DistLockManager::get(opCtx);
+
+               auto dbDistLock = uassertStatusOK(distLockManager->lock(
+                   opCtx, resource, _coorName, DistLockManager::kDefaultLockTimeout));
+               _scopedLocks.emplace(dbDistLock.moveToAnotherThread());
+           })
+        .until([this](Status status) { return (!_recoveredFromDisk) || status.isOK(); })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(**executor, token);
+}
+
 void ShardingDDLCoordinator::interrupt(Status status) {
     LOGV2_DEBUG(5390535,
                 1,
@@ -127,17 +147,12 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
 
     return ExecutorFuture<void>(**executor)
         .then([this, executor, token, anchor = shared_from_this()] {
-            auto opCtxHolder = cc().makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
-            const auto coorName =
-                DDLCoordinatorType_serializer(_coorMetadata.getId().getOperationType());
-
-            auto distLockManager = DistLockManager::get(opCtx);
-            auto dbDistLock = uassertStatusOK(distLockManager->lock(
-                opCtx, nss().db(), coorName, DistLockManager::kDefaultLockTimeout));
-            _scopedLocks.emplace(dbDistLock.moveToAnotherThread());
-
-            if (!nss().isConfigDB() && !_coorMetadata.getRecoveredFromDisk()) {
+            return _acquireLockAsync(executor, token, nss().db());
+        })
+        .then([this, executor, token, anchor = shared_from_this()] {
+            if (!nss().isConfigDB() && !_recoveredFromDisk) {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
                 invariant(_coorMetadata.getDatabaseVersion());
 
                 OperationShardingState::get(opCtx).initializeClientRoutingVersions(
@@ -145,22 +160,27 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 // Check under the dbLock if this is still the primary shard for the database
                 DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, nss().db());
             };
-
+        })
+        .then([this, executor, token, anchor = shared_from_this()] {
             if (!nss().coll().empty()) {
-                auto collDistLock = uassertStatusOK(distLockManager->lock(
-                    opCtx, nss().ns(), coorName, DistLockManager::kDefaultLockTimeout));
-                _scopedLocks.emplace(collDistLock.moveToAnotherThread());
+                return _acquireLockAsync(executor, token, nss().ns());
             }
-
-            for (auto& lock : _acquireAdditionalLocks(opCtx)) {
-                _scopedLocks.emplace(lock.moveToAnotherThread());
+            return ExecutorFuture<void>(**executor);
+        })
+        .then([this, executor, token, anchor = shared_from_this()] {
+            auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            auto additionalLocks = _acquireAdditionalLocks(opCtx);
+            if (!additionalLocks.empty()) {
+                invariant(additionalLocks.size() == 1);
+                return _acquireLockAsync(executor, token, additionalLocks.front());
             }
-
-            {
-                stdx::lock_guard<Latch> lg(_mutex);
-                if (!_constructionCompletionPromise.getFuture().isReady()) {
-                    _constructionCompletionPromise.emplaceValue();
-                }
+            return ExecutorFuture<void>(**executor);
+        })
+        .then([this, anchor = shared_from_this()] {
+            stdx::lock_guard<Latch> lg(_mutex);
+            if (!_constructionCompletionPromise.getFuture().isReady()) {
+                _constructionCompletionPromise.emplaceValue();
             }
 
             hangBeforeRunningCoordinatorInstance.pauseWhileSet();
