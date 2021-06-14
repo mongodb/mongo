@@ -111,8 +111,11 @@ protected:
             shardKey = _oldShardKey.toBSON();
         }
 
-        CollectionType collType(
-            coordinatorDoc.getSourceNss(), std::move(epoch), lastUpdated, std::move(uuid));
+        CollectionType collType(coordinatorDoc.getSourceNss(),
+                                std::move(epoch),
+                                Timestamp(1, 2),
+                                lastUpdated,
+                                std::move(uuid));
         collType.setKeyPattern(shardKey);
         collType.setUnique(false);
         if (reshardingFields)
@@ -130,11 +133,11 @@ protected:
     }
 
     // Returns the chunk for the donor shard.
-    ChunkType makeAndInsertChunksForDonorShard(const NamespaceString& nss,
+    ChunkType makeAndInsertChunksForDonorShard(const UUID& uuid,
                                                OID epoch,
                                                const ShardKeyPattern& shardKey,
                                                std::vector<OID> ids) {
-        auto chunks = makeChunks(nss, epoch, shardKey, ids);
+        auto chunks = makeChunks(uuid, epoch, shardKey, ids);
 
         // Only the chunk corresponding to shard0000 is stored as a donor in the coordinator state
         // document constructed.
@@ -144,11 +147,11 @@ protected:
     }
 
     // Returns the chunk for the recipient shard.
-    ChunkType makeAndInsertChunksForRecipientShard(const NamespaceString& nss,
+    ChunkType makeAndInsertChunksForRecipientShard(const UUID& uuid,
                                                    OID epoch,
                                                    const ShardKeyPattern& shardKey,
                                                    std::vector<OID> ids) {
-        auto chunks = makeChunks(nss, epoch, shardKey, ids);
+        auto chunks = makeChunks(uuid, epoch, shardKey, ids);
 
         // Only the chunk corresponding to shard0001 is stored as a recipient in the coordinator
         // state document constructed.
@@ -157,7 +160,7 @@ protected:
         return recipientChunk;
     }
 
-    std::vector<ChunkType> makeChunks(const NamespaceString& nss,
+    std::vector<ChunkType> makeChunks(const UUID& uuid,
                                       OID epoch,
                                       const ShardKeyPattern& shardKey,
                                       std::vector<OID> ids) {
@@ -165,11 +168,11 @@ protected:
             _newShardKey.isShardKey(shardKey.toBSON()) ? _newChunkRanges : _oldChunkRanges;
 
         // Create two chunks, one on each shard with the given namespace and epoch
-        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
-        ChunkType chunk1(nss, chunkRanges[0], version, ShardId("shard0000"));
+        ChunkVersion version(1, 0, epoch, Timestamp(1, 2));
+        ChunkType chunk1(uuid, chunkRanges[0], version, ShardId("shard0000"));
         chunk1.setName(ids[0]);
         version.incMinor();
-        ChunkType chunk2(nss, chunkRanges[1], version, ShardId("shard0001"));
+        ChunkType chunk2(uuid, chunkRanges[1], version, ShardId("shard0001"));
         chunk2.setName(ids[1]);
 
         return std::vector<ChunkType>{chunk1, chunk2};
@@ -212,10 +215,7 @@ protected:
         client.insert(CollectionType::ConfigNS.ns(), originalNssCatalogEntry.toBSON());
 
         auto tempNssCatalogEntry = createTempReshardingCollectionType(
-            opCtx,
-            coordinatorDoc,
-            ChunkVersion(1, 1, OID::gen(), boost::none /* timestamp */),
-            BSONObj());
+            opCtx, coordinatorDoc, ChunkVersion(1, 1, OID::gen(), Timestamp(1, 2)), BSONObj());
         client.insert(CollectionType::ConfigNS.ns(), tempNssCatalogEntry.toBSON());
 
         return coordinatorDoc;
@@ -419,14 +419,13 @@ protected:
 
     void readChunkCatalogEntriesAndAssertMatchExpected(
         OperationContext* opCtx,
+        const UUID& uuid,
         std::vector<ChunkType> expectedChunks,
         const OID& collEpoch,
         const boost::optional<Timestamp>& collTimestamp) {
-        auto nss = expectedChunks[0].getNS();
-
         DBDirectClient client(opCtx);
         std::vector<ChunkType> foundChunks;
-        auto cursor = client.query(ChunkType::ConfigNS, Query(BSON("ns" << nss.ns())));
+        auto cursor = client.query(ChunkType::ConfigNS, Query(BSON("uuid" << uuid)));
         while (cursor->more()) {
             auto d = uassertStatusOK(
                 ChunkType::fromConfigBSON(cursor->nextSafe().getOwned(), collEpoch, collTimestamp));
@@ -440,7 +439,9 @@ protected:
                 return c.getName() == id;
             });
             ASSERT(onDiskIt != foundChunks.end());
-            ASSERT_EQUALS(onDiskIt->toConfigBSON().woCompare(it->toConfigBSON()), 0);
+            auto expectedBSON = it->toConfigBSON().removeField(ChunkType::collectionUUID());
+            auto onDiskBSON = onDiskIt->toConfigBSON().removeField(ChunkType::collectionUUID());
+            ASSERT_BSONOBJ_EQ(expectedBSON, onDiskBSON);
         }
     }
 
@@ -502,11 +503,11 @@ protected:
         // collection should have been removed.
         boost::optional<CollectionType> expectedTempCollType = boost::none;
         if (expectedCoordinatorDoc.getState() < CoordinatorStateEnum::kCommitting) {
-            expectedTempCollType = createTempReshardingCollectionType(
-                opCtx,
-                expectedCoordinatorDoc,
-                ChunkVersion(1, 1, OID::gen(), boost::none /* timestamp */),
-                BSONObj());
+            expectedTempCollType =
+                createTempReshardingCollectionType(opCtx,
+                                                   expectedCoordinatorDoc,
+                                                   ChunkVersion(1, 1, OID::gen(), Timestamp(1, 2)),
+                                                   BSONObj());
 
             // It's necessary to add the userCanceled field because the call into
             // createTempReshardingCollectionType assumes that the collection entry is
@@ -591,7 +592,7 @@ protected:
 
         // Check that chunks and tags entries have been correctly created
         readChunkCatalogEntriesAndAssertMatchExpected(
-            opCtx, initialChunks, _originalEpoch, _originalTimestamp);
+            opCtx, _reshardingUUID, initialChunks, _originalEpoch, _originalTimestamp);
         readTagCatalogEntriesAndAssertMatchExpected(opCtx, newZones);
     }
 
@@ -629,7 +630,7 @@ protected:
         // Check that chunks and tags entries previously under the temporary namespace have been
         // correctly updated to the original namespace
         readChunkCatalogEntriesAndAssertMatchExpected(
-            opCtx, expectedChunks, _finalEpoch, _finalTimestamp);
+            opCtx, _reshardingUUID, expectedChunks, _finalEpoch, _finalTimestamp);
         readTagCatalogEntriesAndAssertMatchExpected(opCtx, expectedZones);
     }
 
@@ -662,12 +663,14 @@ protected:
             insertStateAndCatalogEntries(CoordinatorStateEnum::kPreparingToDonate, _originalEpoch);
         auto initialChunksIds = std::vector{OID::gen(), OID::gen()};
 
-        auto tempNssChunks = makeChunks(_tempNss, _tempEpoch, _newShardKey, initialChunksIds);
+        auto tempNssChunks =
+            makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, initialChunksIds);
         auto recipientChunk = tempNssChunks[1];
         insertChunkAndZoneEntries(tempNssChunks, makeZones(_tempNss, _newShardKey));
 
         insertChunkAndZoneEntries(
-            makeChunks(_originalNss, OID::gen(), _oldShardKey, std::vector{OID::gen(), OID::gen()}),
+            makeChunks(
+                _originalUUID, OID::gen(), _oldShardKey, std::vector{OID::gen(), OID::gen()}),
             makeZones(_originalNss, _oldShardKey));
 
         // Persist the updates on disk
@@ -736,11 +739,11 @@ TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoSucceeds) {
     // Ensure the chunks for the original namespace exist since they will be bumped as a product of
     // the state transition to kPreparingToDonate.
     auto donorChunk = makeAndInsertChunksForDonorShard(
-        _originalNss, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
     auto collectionVersion = donorChunk.getVersion();
 
     auto initialChunks =
-        makeChunks(_tempNss, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
 
     auto newZones = makeZones(_tempNss, _newShardKey);
     std::vector<BSONObj> zonesBSON;
@@ -784,11 +787,11 @@ TEST_F(ReshardingCoordinatorPersistenceTest, BasicStateTransitionSucceeds) {
     // Ensure the chunks for the original and temporary namespaces exist since they will be bumped
     // as a product of the state transition to kBlockingWrites.
     auto donorChunk = makeAndInsertChunksForDonorShard(
-        _originalNss, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
     auto donorCollectionVersion = donorChunk.getVersion();
 
     auto recipientChunk = makeAndInsertChunksForRecipientShard(
-        _tempNss, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+        _reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
     auto recipientCollectionVersion = donorChunk.getVersion();
 
     // Persist the updates on disk
@@ -809,11 +812,11 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWithFetchTimestampSu
     // Ensure the chunks for the original and temporary namespaces exist since they will be bumped
     // as a product of the state transition to kCloning.
     auto donorChunk = makeAndInsertChunksForDonorShard(
-        _originalNss, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
     auto donorCollectionVersion = donorChunk.getVersion();
 
     auto recipientChunk = makeAndInsertChunksForRecipientShard(
-        _tempNss, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+        _reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
     auto recipientCollectionVersion = recipientChunk.getVersion();
 
     // Persist the updates on disk
@@ -840,12 +843,12 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTranstionToDecisionPersistedSu
         CoordinatorStateEnum::kBlockingWrites, _originalEpoch, fetchTimestamp);
     auto initialChunksIds = std::vector{OID::gen(), OID::gen()};
 
-    auto tempNssChunks = makeChunks(_tempNss, _tempEpoch, _newShardKey, initialChunksIds);
+    auto tempNssChunks = makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, initialChunksIds);
     auto recipientChunk = tempNssChunks[1];
     insertChunkAndZoneEntries(tempNssChunks, makeZones(_tempNss, _newShardKey));
 
     insertChunkAndZoneEntries(
-        makeChunks(_originalNss, OID::gen(), _oldShardKey, std::vector{OID::gen(), OID::gen()}),
+        makeChunks(_originalUUID, OID::gen(), _oldShardKey, std::vector{OID::gen(), OID::gen()}),
         makeZones(_originalNss, _oldShardKey));
 
     // Persist the updates on disk
@@ -854,7 +857,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTranstionToDecisionPersistedSu
 
     // The new epoch to use for the resharded collection to indicate that the collection is a
     // new incarnation of the namespace
-    auto updatedChunks = makeChunks(_originalNss, _finalEpoch, _newShardKey, initialChunksIds);
+    auto updatedChunks = makeChunks(_originalUUID, _finalEpoch, _newShardKey, initialChunksIds);
     auto updatedZones = makeZones(_originalNss, _newShardKey);
 
     writeDecisionPersistedStateExpectSuccess(
@@ -880,7 +883,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToDoneSucceeds) {
     // Ensure the chunks for the original namespace exist since they will be bumped as a product of
     // the state transition to kDone.
     auto finalChunk = makeAndInsertChunksForRecipientShard(
-        _originalNss, _finalEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+        _reshardingUUID, _finalEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
     auto collectionVersion = finalChunk.getVersion();
 
     removeCoordinatorDocAndReshardingFieldsExpectSuccess(operationContext(), coordinatorDoc);

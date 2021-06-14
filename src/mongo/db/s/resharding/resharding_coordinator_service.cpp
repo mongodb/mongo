@@ -542,35 +542,23 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
                                       OID newCollectionEpoch,
                                       boost::optional<Timestamp> newCollectionTimestamp,
                                       TxnNumber txnNumber) {
-    // Update all chunk documents that currently have 'ns' as the temporary collection namespace
-    // such that 'ns' is now the original collection namespace and 'lastmodEpoch' is
-    // newCollectionEpoch.
-    const auto chunksQuery = [&]() {
-        if (newCollectionTimestamp) {
-            return BSON(ChunkType::collectionUUID() << coordinatorDoc.getReshardingUUID());
-        } else {
-            return BSON(ChunkType::ns(coordinatorDoc.getTempReshardingNss().ns()));
-        }
-    }();
-    const auto chunksUpdate = [&]() {
-        if (newCollectionTimestamp) {
-            return BSON("$set" << BSON(ChunkType::epoch << newCollectionEpoch
-                                                        << ChunkType::timestamp
-                                                        << *newCollectionTimestamp));
-        } else {
-            return BSON("$set" << BSON(ChunkType::ns << coordinatorDoc.getSourceNss().ns()
-                                                     << ChunkType::epoch << newCollectionEpoch));
-        }
-    }();
-    auto chunksRequest = BatchedCommandRequest::buildUpdateOp(ChunkType::ConfigNS,
-                                                              chunksQuery,   // query
-                                                              chunksUpdate,  // update
-                                                              false,         // upsert
-                                                              true           // multi
-    );
+    // If the collection entry has a timestamp, this means the metadata has been upgraded to the 5.0
+    // format in which case chunks are indexed by UUID and do not contain Epochs. Therefore, only
+    // the update to config.collections is sufficient.
+    if (!newCollectionTimestamp) {
+        auto chunksRequest = BatchedCommandRequest::buildUpdateOp(
+            ChunkType::ConfigNS,
+            BSON(ChunkType::ns(coordinatorDoc.getTempReshardingNss().ns())),  // query
+            BSON("$set" << BSON(ChunkType::ns << coordinatorDoc.getSourceNss().ns()
+                                              << ChunkType::epoch
+                                              << newCollectionEpoch)),  // update
+            false,                                                      // upsert
+            true                                                        // multi
+        );
 
-    auto chunksRes = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-        opCtx, ChunkType::ConfigNS, chunksRequest, txnNumber);
+        auto chunksRes = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+            opCtx, ChunkType::ConfigNS, chunksRequest, txnNumber);
+    }
 
     auto tagsRequest = BatchedCommandRequest::buildUpdateOp(
         TagsType::ConfigNS,
@@ -609,12 +597,12 @@ CollectionType createTempReshardingCollectionType(
     const BSONObj& collation) {
     CollectionType collType(coordinatorDoc.getTempReshardingNss(),
                             chunkVersion.epoch(),
+                            chunkVersion.getTimestamp(),
                             opCtx->getServiceContext()->getPreciseClockSource()->now(),
                             coordinatorDoc.getReshardingUUID());
     collType.setKeyPattern(coordinatorDoc.getReshardingKey());
     collType.setDefaultCollation(collation);
     collType.setUnique(false);
-    collType.setTimestamp(chunkVersion.getTimestamp());
 
     TypeCollectionReshardingFields tempEntryReshardingFields(coordinatorDoc.getReshardingUUID());
     tempEntryReshardingFields.setState(coordinatorDoc.getState());

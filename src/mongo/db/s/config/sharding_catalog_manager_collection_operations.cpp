@@ -278,16 +278,12 @@ std::pair<std::vector<BSONObj>, std::vector<BSONObj>> makeChunkAndTagUpdatesForR
                                                      << "then" << literalMaxObject << "else"
                                                      << literalMinObject))))))));
 
-    // The chunk updates change the min and max fields, and additionally set the new epoch and the
-    // new timestamp and unset the jumbo field.
+    // The chunk updates change the min and max fields and unset the jumbo field. If the collection
+    // is in the old (pre-5.0 format, it also sets the new epoch).
     std::vector<BSONObj> chunkUpdates;
-    chunkUpdates.emplace_back(
-        BSON("$set" << extendMinAndMaxModifier.addFields(BSON(ChunkType::epoch(newEpoch)))));
-
-    if (newTimestamp) {
-        chunkUpdates.emplace_back(BSON("$set" << extendMinAndMaxModifier.addFields(
-                                           BSON(ChunkType::timestamp(*newTimestamp)))));
-    }
+    chunkUpdates.emplace_back(BSON("$set" << (newTimestamp ? extendMinAndMaxModifier.getOwned()
+                                                           : extendMinAndMaxModifier.addFields(BSON(
+                                                                 ChunkType::epoch(newEpoch))))));
     chunkUpdates.emplace_back(BSON("$unset" << ChunkType::jumbo()));
 
     // The tag updates only change the min and max fields.

@@ -431,13 +431,7 @@ void bumpMajorVersionOneChunkPerShard(OperationContext* opCtx,
     const CollectionType coll(findCollResponse.docs[0]);
 
     for (const auto& shardId : shardIds) {
-        BSONObjBuilder updateBuilder;
-        BSONObjBuilder updateVersionClause(updateBuilder.subobjStart("$set"));
-        targetChunkVersion.appendLegacyWithField(&updateVersionClause, ChunkType::lastmod());
-        updateVersionClause.doneFast();
-        auto chunkUpdate = updateBuilder.obj();
-
-        const auto query = [&]() {
+        const auto query = [&] {
             if (coll.getTimestamp()) {
                 return BSON(ChunkType::collectionUUID << coll.getUuid()
                                                       << ChunkType::shard(shardId.toString()));
@@ -446,11 +440,16 @@ void bumpMajorVersionOneChunkPerShard(OperationContext* opCtx,
                             << ChunkType::shard(shardId.toString()));
             }
         }();
-        auto request = BatchedCommandRequest::buildUpdateOp(ChunkType::ConfigNS,
-                                                            query,        // query
-                                                            chunkUpdate,  // update
-                                                            false,        // upsert
-                                                            false         // multi
+
+        BSONObjBuilder updateVersionClause;
+        updateVersionClause.appendTimestamp(ChunkType::lastmod(), targetChunkVersion.toLong());
+
+        auto request = BatchedCommandRequest::buildUpdateOp(
+            ChunkType::ConfigNS,
+            query,
+            BSON("$set" << updateVersionClause.obj()),  // update
+            false,                                      // upsert
+            false                                       // multi
         );
 
         auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(

@@ -34,6 +34,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/dist_lock_manager.h"
@@ -62,8 +63,15 @@ public:
                     "_configsvrRefineCollectionShardKey can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
             uassert(ErrorCodes::InvalidOptions,
-                    "refineCollectionShardKey must be called with majority writeConcern",
+                    "_configsvrRefineCollectionShardKey must be called with majority writeConcern",
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+            // TODO (SERVER-53283): Delete this code when FCV 5.1 becomes the official one
+            FixedFCVRegion fcvRegion(opCtx);
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    "Cannot refine collection shard key while the node is being upgraded or "
+                    "downgraded",
+                    !fcvRegion->isUpgradingOrDowngrading());
 
             const boost::optional<bool>& isFromPrimaryShard = request().getIsFromPrimaryShard();
             if (isFromPrimaryShard && *isFromPrimaryShard) {
