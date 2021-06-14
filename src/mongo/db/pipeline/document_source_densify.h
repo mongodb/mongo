@@ -117,9 +117,6 @@ public:
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        // Running this stage on the shards is an optimization, but is not strictly necessary in
-        // order to produce correct pipeline output.
-        // {shardsStage, mergingStage, sortPattern}
         return DistributedPlanLogic{nullptr, this, boost::none};
     }
 
