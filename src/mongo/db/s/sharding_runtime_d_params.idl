@@ -84,14 +84,14 @@ server_parameters:
         cpp_varname: migrationLockAcquisitionMaxWaitMS
         default: 500
 
-    minCatchUpPercentageBeforeBlockingWrites:
+    maxCatchUpPercentageBeforeBlockingWrites:
         description: >-
           The maximum percentage of untrasferred chunk mods at the end of a catch up iteration
           that may be deferred to the next phase of the migration protocol
           (where new writes get blocked).
         set_at: [startup]
         cpp_vartype: int
-        cpp_varname: minCatchUpPercentageBeforeBlockingWrites
+        cpp_varname: maxCatchUpPercentageBeforeBlockingWrites
         validator:
           gte: 0
           lte: 100
