@@ -20,6 +20,8 @@
  *  ]
  */
 
+load("jstests/libs/uuid_util.js");
+
 var $config = (function() {
     function threadCollectionName(prefix, tid) {
         return prefix + tid;
@@ -111,10 +113,11 @@ var $config = (function() {
             const srcCollName = threadCollectionName(collName, tid);
             const srcColl = db[srcCollName];
             // Rename collection
-            const destCollName = threadCollectionName(collName, tid + '_' + new Date().getTime());
+            const destCollName =
+                threadCollectionName(collName, tid + '_' + extractUUIDFromObject(UUID()));
             try {
                 jsTestLog('rename state tid:' + tid + ' currentTid:' + this.tid +
-                          ' collection:' + srcCollName);
+                          ' collection:' + srcCollName + ' dst:' + destCollName);
                 assertAlways.commandWorked(srcColl.renameCollection(destCollName));
             } catch (e) {
                 const exceptionCode = e.code;
