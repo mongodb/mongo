@@ -66,6 +66,21 @@ class test_tiered02(wttest.WiredTigerTestCase):
         got = sorted(list(os.listdir(self.bucket)))
         self.pr('Flushed objects: ' + str(got))
         if increase:
+            # WT-7639: we know that this assertion sometimes fails,
+            # we are collecting more data - we still want it to fail
+            # so it is noticed.
+            if len(got) <= self.flushed_objects:
+                from time import sleep
+                self.prout('directory items: {} is not greater than {}!'.
+                  format(got, self.flushed_objects))
+                self.prout('waiting to see if it resolves')
+                for i in range(0, 10):
+                    self.prout('checking again')
+                    newgot = sorted(list(os.listdir(self.bucket)))
+                    if len(newgot) > self.flushed_objects:
+                        self.prout('resolved, now see: {}'.format(newgot))
+                        break
+                    sleep(i)
             self.assertGreater(len(got), self.flushed_objects)
         else:
             self.assertEqual(len(got), self.flushed_objects)
