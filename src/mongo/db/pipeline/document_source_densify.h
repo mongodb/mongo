@@ -46,8 +46,9 @@ class DocumentSourceInternalDensify {
 public:
     using DensifyValueType = stdx::variant<double, Date_t>;
     struct StepSpec {
-        DensifyValueType step;
+        double step;
         boost::optional<TimeUnit> unit;
+        boost::optional<TimeZone> tz;
     };
     class DocGenerator {
     public:
@@ -62,8 +63,7 @@ public:
 
     private:
         StepSpec _step;
-        // The field to add to 'includeFields' to generate a document. Store as a string since we
-        // don't need to manipulate it at all.
+        // The field to add to 'includeFields' to generate a document.
         FieldPath _path;
         Document _includeFields;
         // The document that is equal to or larger than '_max' that prompted the creation of this

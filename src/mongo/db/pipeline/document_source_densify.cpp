@@ -70,23 +70,32 @@ DocumentSourceInternalDensify::DocGenerator::DocGenerator(
         }
     }
 
+    tassert(5733305, "DocGenerator step must be positive", _step.step > 0);
     stdx::visit(
         visit_helper::Overloaded{
             [&](const double doubleMin) {
                 tassert(5733304,
                         "DocGenerator all values must be same type",
-                        stdx::holds_alternative<double>(_max) &&
-                            stdx::holds_alternative<double>(_step.step));
+                        stdx::holds_alternative<double>(_max));
                 tassert(5733303,
                         "DocGenerator min must be lower or equal to max",
                         stdx::get<double>(_max) >= doubleMin);
-                tassert(5733305,
-                        "DocGenerator step must be positive",
-                        stdx::get<double>(_step.step) > 0);
+                tassert(5733506,
+                        "Unit and tz must not be specified with non-date values",
+                        !_step.unit && !_step.tz);
             },
             [&](const Date_t dateMin) {
-                // TODO SERVER-57335 Support dates and check date min/max values.
-                tasserted(5733300, "DocGenerator does not currently support dates");
+                tassert(5733500,
+                        "DocGenerator all values must be same type",
+                        stdx::holds_alternative<Date_t>(_max));
+                tassert(5733501, "Unit must be specified with a date step", _step.unit);
+                tassert(5733505,
+                        "Step must be an integer for date densification",
+                        floor(_step.step) == _step.step);
+                tassert(5733502,
+                        "DocGenerator min must be lower or equal to max",
+                        stdx::get<Date_t>(_max) >= dateMin);
+                tassert(5733504, "DocGenerator with dates requires a time zone", _step.tz);
             },
         },
         _min);
@@ -106,15 +115,19 @@ Document DocumentSourceInternalDensify::DocGenerator::getNextDocument() {
         visit_helper::Overloaded{
             [&](double doubleVal) {
                 valueToAdd = Value(doubleVal);
-                doubleVal += stdx::get<double>(_step.step);
+                doubleVal += _step.step;
                 if (doubleVal > stdx::get<double>(_max)) {
                     _state = GeneratorState::kReturningFinalDocument;
                 }
                 _min = doubleVal;
             },
-            [&](Date_t dateMin) {
-                // TODO SERVER-57335 Support dates and check date min/max values.
-                tasserted(5733302, "DocGenerator date support not yet implemented");
+            [&](Date_t dateVal) {
+                valueToAdd = Value(dateVal);
+                dateVal = dateAdd(dateVal, _step.unit.get(), _step.step, _step.tz.get());
+                if (dateVal > stdx::get<Date_t>(_max)) {
+                    _state = GeneratorState::kReturningFinalDocument;
+                }
+                _min = dateVal;
             },
         },
         _min);
