@@ -42,6 +42,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_data_replication.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
@@ -215,10 +216,15 @@ public:
 
         _controller = std::make_shared<RecipientStateTransitionController>();
         _opObserverRegistry->addObserver(std::make_unique<RecipientOpObserverForTest>(_controller));
+        _metrics = ReshardingMetrics::get(serviceContext);
     }
 
     RecipientStateTransitionController* controller() {
         return _controller.get();
+    }
+
+    ReshardingMetrics* metrics() {
+        return _metrics;
     }
 
     ReshardingRecipientDocument makeStateDocument(bool isAlsoDonor) {
@@ -309,6 +315,7 @@ private:
     }
 
     std::shared_ptr<RecipientStateTransitionController> _controller;
+    ReshardingMetrics* _metrics;
 };
 
 TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion) {
@@ -434,6 +441,7 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
 }
 
 TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort) {
+    auto metrics = ReshardingRecipientServiceTest::metrics();
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5551107,
               "Running case",
@@ -493,6 +501,11 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
             ASSERT_FALSE(bool(coll));
         }
     }
+
+    BSONObjBuilder result;
+    metrics->serializeCumulativeOpMetrics(&result);
+
+    ASSERT_EQ(result.obj().getField("countReshardingFailures").numberLong(), 2);
 }
 
 TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenDone) {
@@ -540,6 +553,7 @@ TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenD
 
 TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
     // TODO (SERVER-57194): enable lock-free reads.
+    auto metrics = ReshardingRecipientServiceTest::metrics();
     bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
     storageGlobalParams.disableLockFreeReads = true;
     ON_BLOCK_EXIT(
@@ -597,6 +611,38 @@ TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
         recipient->abort(false);
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
     }
+    BSONObjBuilder result;
+    metrics->serializeCumulativeOpMetrics(&result);
+
+    ASSERT_EQ(result.obj().getField("countReshardingFailures").numberLong(), 2);
+}
+
+TEST_F(ReshardingRecipientServiceTest, MetricsSuccessfullyShutDownOnUserCancelation) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    auto metrics = ReshardingRecipientServiceTest::metrics();
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
+
+    auto doc = makeStateDocument(false);
+    auto opCtx = makeOperationContext();
+    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    notifyToStartCloning(opCtx.get(), *recipient, doc);
+
+    auto localTransitionToErrorFuture = recipient->awaitInStrictConsistencyOrError();
+    ASSERT_OK(localTransitionToErrorFuture.getNoThrow());
+
+    recipient->abort(true);
+    ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+    BSONObjBuilder result;
+    metrics->serializeCumulativeOpMetrics(&result);
+    BSONObj obj = result.obj();
+    ASSERT_EQ(obj.getField("countReshardingCanceled").numberLong(), 1);
+    ASSERT_EQ(obj.getField("countReshardingFailures").numberLong(), 0);
 }
 
 TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {

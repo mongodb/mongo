@@ -443,7 +443,6 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
 
     stdx::lock_guard<Latch> lk(_mutex);
     auto coordinatorState = reshardingFields.getState();
-
     if (coordinatorState >= CoordinatorStateEnum::kCloning) {
         auto recipientFields = *reshardingFields.getRecipientFields();
         invariant(recipientFields.getCloneTimestamp());
@@ -923,7 +922,9 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
                     stdx::lock_guard<Latch> lk(_mutex);
                     if (aborted) {
                         _metrics()->onCompletion(ReshardingMetrics::Role::kRecipient,
-                                                 ReshardingOperationStatusEnum::kFailure,
+                                                 _userCanceled.get() == true
+                                                     ? ReshardingOperationStatusEnum::kCanceled
+                                                     : ReshardingOperationStatusEnum::kFailure,
                                                  getCurrentTime());
                     } else {
                         _metrics()->onCompletion(ReshardingMetrics::Role::kRecipient,
@@ -1034,7 +1035,7 @@ CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortS
 void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancelled) {
     auto abortSource = [&]() -> boost::optional<CancellationSource> {
         stdx::lock_guard<Latch> lk(_mutex);
-
+        _userCanceled.emplace(isUserCancelled);
         if (_dataReplication) {
             _dataReplication->shutdown();
         }

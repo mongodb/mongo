@@ -280,6 +280,9 @@ private:
     // It states whether the current node has also the donor role.
     const bool _isAlsoDonor;
 
+    // It states whether or not the user has aborted the resharding operation.
+    boost::optional<bool> _userCanceled;
+
     // Each promise below corresponds to a state on the recipient state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.
     SharedPromise<CloneDetails> _allDonorsPreparedToDonate;
