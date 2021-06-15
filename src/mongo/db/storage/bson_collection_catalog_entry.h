@@ -125,6 +125,11 @@ public:
         int findIndexOffset(StringData name) const;
 
         /**
+         * Inserts information about an index into the MetaData.
+         */
+        void insertIndex(IndexMetaData indexMetaData);
+
+        /**
          * Removes information about an index from the MetaData. Returns true if an index
          * called name existed and was deleted, and false otherwise.
          */

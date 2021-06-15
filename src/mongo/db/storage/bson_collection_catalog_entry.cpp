@@ -146,6 +146,10 @@ int BSONCollectionCatalogEntry::MetaData::findIndexOffset(StringData name) const
     return -1;
 }
 
+void BSONCollectionCatalogEntry::MetaData::insertIndex(IndexMetaData indexMetaData) {
+    indexes.push_back(std::move(indexMetaData));
+}
+
 bool BSONCollectionCatalogEntry::MetaData::eraseIndex(StringData name) {
     int indexOffset = findIndexOffset(name);
 

@@ -1746,7 +1746,9 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
                             << " is already in current metadata: " << _metadata->toBSON());
 
     _writeMetadata(opCtx,
-                   [&](BSONCollectionCatalogEntry::MetaData& md) { md.indexes.push_back(imd); });
+                   [indexMetaData = std::move(imd)](BSONCollectionCatalogEntry::MetaData& md) {
+                       md.insertIndex(std::move(indexMetaData));
+                   });
 
     return durableCatalog->createIndex(opCtx, getCatalogId(), getCollectionOptions(), spec);
 }
