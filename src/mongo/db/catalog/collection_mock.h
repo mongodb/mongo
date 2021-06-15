@@ -398,13 +398,15 @@ public:
 
     bool isIndexMultikey(OperationContext* opCtx,
                          StringData indexName,
-                         MultikeyPaths* multikeyPaths) const {
+                         MultikeyPaths* multikeyPaths,
+                         int indexOffset) const {
         std::abort();
     }
 
     bool setIndexIsMultikey(OperationContext* opCtx,
                             StringData indexName,
-                            const MultikeyPaths& multikeyPaths) const {
+                            const MultikeyPaths& multikeyPaths,
+                            int indexOffset) const {
         std::abort();
     }
 

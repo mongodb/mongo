@@ -599,7 +599,8 @@ public:
      */
     virtual bool isIndexMultikey(OperationContext* opCtx,
                                  StringData indexName,
-                                 MultikeyPaths* multikeyPaths) const = 0;
+                                 MultikeyPaths* multikeyPaths,
+                                 int indexOffset = -1) const = 0;
 
     /**
      * Sets the index identified by 'indexName' to be multikey.
@@ -612,7 +613,8 @@ public:
      */
     virtual bool setIndexIsMultikey(OperationContext* opCtx,
                                     StringData indexName,
-                                    const MultikeyPaths& multikeyPaths) const = 0;
+                                    const MultikeyPaths& multikeyPaths,
+                                    int indexOffset = -1) const = 0;
 
     /**
      * Sets the index to be multikey with the provided paths. This performs minimal validation of
