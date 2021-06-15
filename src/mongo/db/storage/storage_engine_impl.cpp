@@ -565,8 +565,8 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         // Batch up the indexes to remove them from `metaData` outside of the iterator.
         std::vector<std::string> indexesToDrop;
         for (const auto& indexMetaData : metaData->indexes) {
-            const std::string& indexName = indexMetaData.name();
-            std::string indexIdent = _catalog->getIndexIdent(opCtx, entry.catalogId, indexName);
+            auto indexName = indexMetaData.nameStringData();
+            auto indexIdent = _catalog->getIndexIdent(opCtx, entry.catalogId, indexName);
 
             // Warn in case of incorrect "multikeyPath" information in catalog documents. This is
             // the result of a concurrency bug which has since been fixed, but may persist in
@@ -651,7 +651,8 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                       "- see SERVER-43097",
                       "namespace"_attr = coll,
                       "index"_attr = indexName);
-                reconcileResult.indexesToRebuild.push_back({entry.catalogId, coll, indexName});
+                reconcileResult.indexesToRebuild.push_back(
+                    {entry.catalogId, coll, indexName.toString()});
                 continue;
             }
 
@@ -668,7 +669,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                       "index"_attr = indexName);
                 // Ensure the `ident` is dropped while we have the `indexIdent` value.
                 fassert(50713, _engine->dropIdent(opCtx->recoveryUnit(), indexIdent));
-                indexesToDrop.push_back(indexName);
+                indexesToDrop.push_back(indexName.toString());
                 continue;
             }
         }

@@ -43,9 +43,6 @@ namespace mongo {
  */
 class BSONCollectionCatalogEntry {
 public:
-    static const StringData kIndexBuildScanning;
-    static const StringData kIndexBuildDraining;
-
     /**
      * Incremented when breaking changes are made to the index build procedure so that other servers
      * know whether or not to resume or discard unfinished index builds.
@@ -93,6 +90,10 @@ public:
 
         std::string name() const {
             return spec["name"].String();
+        }
+
+        StringData nameStringData() const {
+            return spec["name"].valueStringDataSafe();
         }
 
         BSONObj spec;

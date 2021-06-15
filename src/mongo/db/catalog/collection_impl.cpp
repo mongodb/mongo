@@ -1741,7 +1741,9 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
         opCtx, spec, buildUUID, isBackgroundSecondaryBuild);
 
     // Confirm that our index is not already in the current metadata.
-    invariant(-1 == _metadata->findIndexOffset(imd.name()));
+    invariant(-1 == _metadata->findIndexOffset(imd.nameStringData()),
+              str::stream() << "index " << imd.nameStringData()
+                            << " is already in current metadata: " << _metadata->toBSON());
 
     _writeMetadata(opCtx,
                    [&](BSONCollectionCatalogEntry::MetaData& md) { md.indexes.push_back(imd); });

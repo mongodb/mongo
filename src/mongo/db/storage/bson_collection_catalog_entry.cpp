@@ -101,9 +101,6 @@ void parseMultikeyPathsFromBytes(BSONObj multikeyPathsObj, MultikeyPaths* multik
 
 }  // namespace
 
-const StringData BSONCollectionCatalogEntry::kIndexBuildScanning = "scanning"_sd;
-const StringData BSONCollectionCatalogEntry::kIndexBuildDraining = "draining"_sd;
-
 // --------------------------
 
 void BSONCollectionCatalogEntry::IndexMetaData::updateTTLSetting(long long newExpireSeconds) {
@@ -144,7 +141,7 @@ void BSONCollectionCatalogEntry::IndexMetaData::updateHiddenSetting(bool hidden)
 
 int BSONCollectionCatalogEntry::MetaData::findIndexOffset(StringData name) const {
     for (unsigned i = 0; i < indexes.size(); i++)
-        if (indexes[i].name() == name)
+        if (indexes[i].nameStringData() == name)
             return i;
     return -1;
 }
