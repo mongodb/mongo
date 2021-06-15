@@ -172,23 +172,23 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
                              Doc{{"$expr",
                                   Doc{{"$eq",
                                        Arr{V{"$shard"_sd}, V{_recipientShard.toString()}}}}}}}}},
-                      V{Doc(fromjson("{$match: {$expr: {$let: {\
-                            vars: {\
-                                min: {$map: {input: {$objectToArray: '$_id'}, in: '$$this.v'}},\
-                                max: {$map: {input: {$objectToArray: '$max'}, in: '$$this.v'}}\
-                            },\
-                            in: {$and: [\
-                                {$gte: ['$$sk', '$$min']},\
-                                {$cond: {\
-                                    if: {$allElementsTrue: [{$map: {\
-                                        input: '$$max',\
-                                        in: {$eq: [{$type: '$$this'}, 'maxKey']}\
-                                    }}]},\
-                                    then: {$lte: ['$$sk', '$$max']},\
-                                    else: {$lt:  ['$$sk', '$$max']}\
-                                }}\
+                      V{Doc{fromjson("{$replaceWith: {\
+                            min: {$map: {input: {$objectToArray: '$_id'}, in: '$$this.v'}},\
+                            max: {$map: {input: {$objectToArray: '$max'}, in: '$$this.v'}}\
+                        }}")}},
+                      V{Doc{fromjson("{$addFields: {\
+                            isGlobalMax: {$allElementsTrue: [{$map: {\
+                                input: '$max',\
+                                in: {$eq: [{$type: '$$this'}, 'maxKey']}\
+                            }}]}\
+                        }}")}},
+                      V{Doc{fromjson("{$match: {$expr: {$and: [\
+                            {$gte: ['$$sk', '$min']},\
+                            {$or: [\
+                                {$lt:  ['$$sk', '$max']},\
+                                '$isGlobalMax'\
                             ]}\
-                        }}}}"))}}},
+                        ]}}}")}}}},
                  {"as", "intersectingChunk"_sd}}}}
             .toBson()
             .firstElement(),
