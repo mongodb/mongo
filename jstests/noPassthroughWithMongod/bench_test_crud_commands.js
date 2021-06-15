@@ -30,60 +30,65 @@ function executeBenchRun(benchOps) {
     return benchRun(benchArgs);
 }
 
-function testInsert(docs, wc) {
+function testInsert(docs, writeCmd, wc) {
     coll.drop();
 
     var res = executeBenchRun(
-        [{ns: coll.getFullName(), op: "insert", doc: docs, writeCmd: true, writeConcern: wc}]);
+        [{ns: coll.getFullName(), op: "insert", doc: docs, writeCmd: writeCmd, writeConcern: wc}]);
 
     assert.gt(coll.count(), 0);
     assert.eq(coll.findOne({}, {_id: 0}), docs[0]);
 }
 
-function testFind() {
+function testFind(readCmd) {
     coll.drop();
     for (var i = 0; i < 100; i++) {
         assert.commandWorked(coll.insert({}));
     }
 
-    var res = executeBenchRun(
-        [{ns: coll.getFullName(), op: "find", query: {}, batchSize: NumberInt(10), readCmd: true}]);
+    var res = executeBenchRun([
+        {ns: coll.getFullName(), op: "find", query: {}, batchSize: NumberInt(10), readCmd: readCmd}
+    ]);
     assert.gt(res.query, 0, tojson(res));
 }
 
-function testFindOne() {
+function testFindOne(readCmd) {
     coll.drop();
     for (var i = 0; i < 100; i++) {
         assert.commandWorked(coll.insert({}));
     }
 
-    var res = executeBenchRun([{ns: coll.getFullName(), op: "findOne", query: {}, readCmd: true}]);
+    var res =
+        executeBenchRun([{ns: coll.getFullName(), op: "findOne", query: {}, readCmd: readCmd}]);
     assert.gt(res.findOne, 0, tojson(res));
 }
 
-function testWriteConcern() {
+function testWriteConcern(writeCmd) {
     var bigDoc = makeDocument(260 * 1024);
     var docs = [];
     for (var i = 0; i < 100; i++) {
         docs.push({x: 1});
     }
 
-    testInsert([bigDoc], {});
-    testInsert(docs, {});
-    testInsert(docs, {"w": "majority"});
-    testInsert(docs, {"w": 1, "j": false});
+    testInsert([bigDoc], writeCmd, {});
+    testInsert(docs, writeCmd, {});
+    testInsert(docs, writeCmd, {"w": "majority"});
+    testInsert(docs, writeCmd, {"w": 1, "j": false});
 
     var storageEnginesWithoutJournaling = new Set(["ephemeralForTest", "inMemory"]);
     var runningWithoutJournaling = TestData.noJournal ||
         storageEnginesWithoutJournaling.has(db.serverStatus().storageEngine.name);
     if (!runningWithoutJournaling) {
         // Only test journaled writes if the server actually supports them.
-        testInsert(docs, {"j": true});
+        testInsert(docs, writeCmd, {"j": true});
     }
 }
 
-testWriteConcern();
+testWriteConcern(false);
+testWriteConcern(true);
 
-testFind();
-testFindOne();
+testFind(false);
+testFind(true);
+testFindOne(false);
+testFindOne(true);
 })();

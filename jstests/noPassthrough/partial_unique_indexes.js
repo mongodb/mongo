@@ -14,32 +14,16 @@ let testDB = conn.getDB("test");
 let t = testDB.jstests_parallel_allops;
 t.drop();
 
-assert.commandWorked(
-    t.createIndex({x: 1, _id: 1}, {partialFilterExpression: {_id: {$lt: 500}}, unique: true}));
-assert.commandWorked(t.createIndex({y: -1, _id: 1}, {unique: true}));
-assert.commandWorked(
-    t.createIndex({x: -1}, {partialFilterExpression: {_id: {$gte: 500}}, unique: false}));
-assert.commandWorked(t.createIndex({y: 1}, {unique: false}));
+t.createIndex({x: 1, _id: 1}, {partialFilterExpression: {_id: {$lt: 500}}, unique: true});
+t.createIndex({y: -1, _id: 1}, {unique: true});
+t.createIndex({x: -1}, {partialFilterExpression: {_id: {$gte: 500}}, unique: false});
+t.createIndex({y: 1}, {unique: false});
 
 let _id = {"#RAND_INT": [0, 1000]};
 let ops = [
-    {op: "remove", ns: t.getFullName(), query: {_id}, writeCmd: true},
-    {
-        op: "update",
-        ns: t.getFullName(),
-        query: {_id},
-        update: {$inc: {x: 1}},
-        upsert: true,
-        writeCmd: true
-    },
-    {
-        op: "update",
-        ns: t.getFullName(),
-        query: {_id},
-        update: {$inc: {y: 1}},
-        upsert: true,
-        writeCmd: true
-    },
+    {op: "remove", ns: t.getFullName(), query: {_id}},
+    {op: "update", ns: t.getFullName(), query: {_id}, update: {$inc: {x: 1}}, upsert: true},
+    {op: "update", ns: t.getFullName(), query: {_id}, update: {$inc: {y: 1}}, upsert: true},
 ];
 
 let seconds = 5;

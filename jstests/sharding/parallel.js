@@ -29,14 +29,14 @@ assert.commandWorked(bulk.execute());
 
 var doCommand = function(dbname, cmd) {
     x = benchRun({
-        ops: [{op: "findOne", ns: dbname + ".$cmd", query: cmd, readCmd: true}],
+        ops: [{op: "findOne", ns: dbname + ".$cmd", query: cmd}],
         host: db.getMongo().host,
         parallel: 2,
         seconds: 2
     });
     printjson(x);
     x = benchRun({
-        ops: [{op: "findOne", ns: dbname + ".$cmd", query: cmd, readCmd: true}],
+        ops: [{op: "findOne", ns: dbname + ".$cmd", query: cmd}],
         host: s._mongos[1].host,
         parallel: 2,
         seconds: 2

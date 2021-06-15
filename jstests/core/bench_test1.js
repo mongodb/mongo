@@ -10,12 +10,12 @@
 const t = db.bench_test1;
 t.drop();
 
-assert.commandWorked(t.insert({_id: 1, x: 1}));
-assert.commandWorked(t.insert({_id: 2, x: 1}));
+t.insert({_id: 1, x: 1});
+t.insert({_id: 2, x: 1});
 
 const ops = [
-    {op: "findOne", ns: t.getFullName(), query: {_id: 1}, readCmd: true},
-    {op: "update", ns: t.getFullName(), query: {_id: 1}, update: {$inc: {x: 1}}, writeCmd: true}
+    {op: "findOne", ns: t.getFullName(), query: {_id: 1}},
+    {op: "update", ns: t.getFullName(), query: {_id: 1}, update: {$inc: {x: 1}}}
 ];
 
 const seconds = 10;

@@ -18,27 +18,13 @@ assert.commandWorked(
     t.createIndex({y: 1}, {partialFilterExpression: {_id: {$gte: 500}}, unique: true}));
 let rand = {"#RAND_INT": [0, 1000]};
 let ops = [
-    {op: "remove", ns: t.getFullName(), query: {_id: rand}, writeCmd: true},
-    {op: "findOne", ns: t.getFullName(), query: {_id: rand}, readCmd: true},
-    {
-        op: "update",
-        ns: t.getFullName(),
-        query: {_id: rand},
-        update: {$inc: {x: 1}},
-        upsert: true,
-        writeCmd: true
-    },
-    {op: "findOne", ns: t.getFullName(), query: {x: rand}, readCmd: true},
-    {
-        op: "update",
-        ns: t.getFullName(),
-        query: {_id: rand},
-        update: {$inc: {y: 1}},
-        upsert: true,
-        writeCmd: true
-    },
-    {op: "findOne", ns: t.getFullName(), query: {y: rand}, readCmd: true},
-    {op: "findOne", ns: t.getFullName(), query: {_id: rand}, readCmd: true},
+    {op: "remove", ns: t.getFullName(), query: {_id: rand}},
+    {op: "findOne", ns: t.getFullName(), query: {_id: rand}},
+    {op: "update", ns: t.getFullName(), query: {_id: rand}, update: {$inc: {x: 1}}, upsert: true},
+    {op: "findOne", ns: t.getFullName(), query: {x: rand}},
+    {op: "update", ns: t.getFullName(), query: {_id: rand}, update: {$inc: {y: 1}}, upsert: true},
+    {op: "findOne", ns: t.getFullName(), query: {y: rand}},
+    {op: "findOne", ns: t.getFullName(), query: {_id: rand}},
 ];
 
 let seconds = 5;
