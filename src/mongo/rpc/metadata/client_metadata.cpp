@@ -471,15 +471,19 @@ void ClientMetadata::setAndFinalize(Client* client, boost::optional<ClientMetada
 }
 
 void ClientMetadata::setFromMetadataForOperation(OperationContext* opCtx, BSONElement& elem) {
+    if (MONGO_unlikely(elem.eoo())) {
+        return;
+    }
     auto lk = stdx::lock_guard(*opCtx->getClient());
 
     auto& state = getOperationState(opCtx);
-    auto wasFinalized = std::exchange(state.isFinalized, true);
     uassert(ErrorCodes::ClientMetadataCannotBeMutated,
             "The client metadata document may only be set once per operation",
-            !state.meta && !wasFinalized);
+            !state.meta && !state.isFinalized);
+    auto inputMetadata = ClientMetadata::readFromMetadata(elem);
 
-    state.meta = ClientMetadata::readFromMetadata(elem);
+    state.isFinalized = true;
+    state.meta = std::move(inputMetadata);
 }
 
 void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem) {
