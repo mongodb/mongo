@@ -2082,6 +2082,7 @@ tasks:
 
 ## compile - build all scons targets except unittests ##
 - name: compile_dist_test
+  tags: []
   depends_on: []
   commands:
     - func: "scons compile"
@@ -2094,6 +2095,7 @@ tasks:
           PREFIX=dist-test
 
 - name: archive_dist_test
+  tags: []
   depends_on:
     - name: compile_dist_test
   commands:
@@ -2180,6 +2182,7 @@ tasks:
 
 
 - name: archive_dist_test_debug
+  tags: []
   depends_on:
     - name: archive_dist_test
   commands:
@@ -2194,6 +2197,7 @@ tasks:
     - func: "upload debugsymbols"
 
 - name: compile_ninja
+  tags: []
   commands:
     - func: "scons compile"
       vars:
@@ -2212,6 +2216,7 @@ tasks:
           - "./src/evergreen/ninja_compile.sh"
 
 - name: compile_ninja_next
+  tags: []
   commands:
     - func: "scons compile"
       vars:
@@ -2231,6 +2236,7 @@ tasks:
           - "./src/evergreen/ninja_compile.sh"
 
 - name: compile_build_tools_next
+  tags: []
   commands:
     - func: "scons compile"
       vars:
@@ -2240,6 +2246,7 @@ tasks:
           install-core
 
 - name: libdeps_graph_linting
+  tags: []
   commands:
     - *f_expansions_write
     - command: subprocess.exec
@@ -2286,6 +2293,7 @@ tasks:
 
 ## compile_all - build all scons targets ##
 - name: compile_all
+  tags: []
   depends_on:
     - name: compile_dist_test
   commands:
@@ -2298,6 +2306,7 @@ tasks:
 
 ## clang_tidy - run clang_tidy
 - name: clang_tidy
+  tags: []
   exec_timeout_secs: 3600 # 1 hour timeout for the task overall
   commands:
     - *f_expansions_write
@@ -2327,6 +2336,7 @@ tasks:
 
 ## run_unittests ##
 - name: run_unittests
+  tags: []
   depends_on:
     - name: compile_unittests
   commands:
@@ -2341,6 +2351,7 @@ tasks:
 
 ##compile_and_archive_libfuzzertests - build libfuzzertests ##
 - name: compile_and_archive_libfuzzertests
+  tags: []
   commands:
     - func: "scons compile"
       vars:
@@ -2361,6 +2372,7 @@ tasks:
 
 ## fetch_and_run_libfuzzertests - get input corpora from s3 and run libfuzzertests ##
 - name: fetch_and_run_libfuzzertests
+  tags: []
   commands:
     - func: "fetch corpus"
     - func: "fetch legacy corpus"
@@ -2369,6 +2381,7 @@ tasks:
         resmoke_args: --suites=libfuzzer
 
 - name: server_discovery_and_monitoring_json_test
+  tags: []
   commands:
     - func: "scons compile"
       vars:
@@ -2379,6 +2392,7 @@ tasks:
         resmoke_args: --suites=sdam_json_test
 
 - name: server_selection_json_test
+  tags: []
   commands:
     - func: "scons compile"
       vars:
@@ -2390,6 +2404,7 @@ tasks:
 
 ## compile_dbtest ##
 - name: compile_dbtest
+  tags: []
   depends_on:
     - name: compile_dist_test
   commands:
@@ -2402,6 +2417,7 @@ tasks:
 
 ## run_dbtest ##
 - name: run_dbtest
+  tags: []
   depends_on:
     - name: compile_dbtest
   commands:
@@ -2416,6 +2432,7 @@ tasks:
         install_dir: build/install/bin
 
 - name: archive_dbtest
+  tags: []
   depends_on:
     - name: compile_dbtest
   commands:
@@ -2427,6 +2444,7 @@ tasks:
         compiling_for_test: true
 
 - name: compile_visibility_test
+  tags: []
   commands:
     - func: "scons compile"
       vars:
@@ -2454,6 +2472,7 @@ tasks:
 ## embedded_sdk_build_and_test_* - build the embedded-dev and embedded-test targets only ##
 
 - name: embedded_sdk_build_cdriver
+  tags: []
   commands:
     - func: f_expansions_write
     - command: subprocess.exec
@@ -2463,6 +2482,7 @@ tasks:
           - "src/evergreen/embedded_sdk_build_cdriver.sh"
 
 - name: embedded_sdk_install_dev
+  tags: []
   depends_on:
     - name: embedded_sdk_build_cdriver
   commands:
@@ -2485,6 +2505,7 @@ tasks:
           --link-model=dynamic-sdk
 
 - name: embedded_sdk_s3_put
+  tags: []
   depends_on:
     - name: embedded_sdk_install_dev
   commands:
@@ -2509,6 +2530,7 @@ tasks:
         display_name: "Embedded SDK Tar Archive"
 
 - name: embedded_sdk_install_tests
+  tags: []
   depends_on:
     - name: embedded_sdk_install_dev
   commands:
@@ -2526,6 +2548,7 @@ tasks:
         num_scons_link_jobs_available: 0.99
 
 - name: embedded_sdk_tests_s3_put
+  tags: []
   depends_on:
     - name: embedded_sdk_install_tests
   commands:
@@ -2551,6 +2574,7 @@ tasks:
         display_name: "Embedded SDK Tests Tar Archive"
 
 - name: embedded_sdk_run_tests
+  tags: []
   depends_on:
     - name: embedded_sdk_install_tests
   commands:
@@ -2568,6 +2592,7 @@ tasks:
           - "src/evergreen/embedded_sdk_run_tests_post.sh"
 
 - name: embedded_sdk_s3_put_latest
+  tags: []
   depends_on:
     - name: embedded_sdk_run_tests
   commands:
@@ -2586,6 +2611,7 @@ tasks:
         content_type: ${content_type|application/x-gzip}
 
 - name: embedded_sdk_tests_s3_put_latest
+  tags: []
   depends_on:
     - name: embedded_sdk_run_tests
   commands:
@@ -2604,6 +2630,7 @@ tasks:
         content_type: ${content_type|application/x-gzip}
 
 - name: stitch_support_create_lib
+  tags: []
   commands:
     - *f_expansions_write
     - func: "scons compile"
@@ -2636,6 +2663,7 @@ tasks:
         display_name: "Stitch Support Library"
 
 - name: stitch_support_install_tests
+  tags: []
   depends_on:
     - name: stitch_support_create_lib
   commands:
@@ -2653,6 +2681,7 @@ tasks:
           DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
 
 - name: stitch_support_run_tests
+  tags: []
   depends_on:
     - name: stitch_support_install_tests
   commands:
@@ -2665,6 +2694,7 @@ tasks:
           - "src/evergreen/stitch_support_run_tests.sh"
 
 - name: compile_benchmarks
+  tags: []
   depends_on: []
   commands:
     - command: manifest.load
@@ -2710,6 +2740,7 @@ tasks:
 
 ## lint ##
 - name: lint_pylinters
+  tags: []
   commands:
     - command: timeout.update
       params:
@@ -2728,6 +2759,7 @@ tasks:
         targets: lint-pylinters
 
 - name: lint_clang_format
+  tags: []
   commands:
     - command: timeout.update
       params:
@@ -2746,6 +2778,7 @@ tasks:
         targets: lint-clang-format
 
 - name: lint_eslint
+  tags: []
   commands:
     - command: timeout.update
       params:
@@ -2764,6 +2797,7 @@ tasks:
         targets: lint-eslint
 
 - name: lint_cpplint
+  tags: []
   commands:
     - command: timeout.update
       params:
@@ -2782,6 +2816,7 @@ tasks:
         targets: lint-lint.py
 
 - name: lint_yaml
+  tags: []
   depends_on: []
   commands:
   - command: manifest.load
@@ -2800,6 +2835,7 @@ tasks:
         - "src/evergreen/lint_yaml.sh"
 
 - name: lint_shellscripts
+  tags: []
   commands:
   - command: manifest.load
   - *git_get_project
@@ -2814,6 +2850,7 @@ tasks:
         - "src/evergreen/lint_shellscripts.sh"
 
 - name: lint_errorcodes
+  tags: []
   commands:
     - command: manifest.load
     - *git_get_project
@@ -2827,6 +2864,7 @@ tasks:
         targets: lint-errorcodes
 
 - name: test_api_version_compatibility
+  tags: []
   depends_on:
     - name: archive_dist_test_debug
   commands:
@@ -2847,6 +2885,7 @@ tasks:
           - "src/evergreen/check_idl_compat.sh"
 
 - name: burn_in_tests_gen
+  tags: []
   commands:
   - command: manifest.load
   - *git_get_project
@@ -2886,6 +2925,7 @@ tasks:
         - src/burn_in_tests_gen.json
 
 - name: burn_in_tests_multiversion_gen
+  tags: []
   commands:
   - command: manifest.load
   - *git_get_project
@@ -3034,6 +3074,7 @@ tasks:
 # Smoke test to ensure the Server still works with Jepsen
 - <<: *run_jepsen_template
   name: jepsen-smoke
+  tags: []
   commands:
     - func: "do setup"
     - func: "do jepsen setup"
@@ -3076,6 +3117,7 @@ tasks:
 ## initial sync generational fuzzer ##
 - <<: *jstestfuzz_template
   name: initial_sync_fuzzer_gen
+  tags: []
   commands:
   - func: "generate fuzzer tasks"
     vars:
@@ -3806,6 +3848,7 @@ tasks:
 
 ## Tests that the multiversion test generation logic is not broken.
 - name: multiversion_sanity_check_gen
+  tags: []
   commands:
   - func: "generate implicit multiversion tasks"
     vars:
@@ -3824,6 +3867,7 @@ tasks:
 
 # Check that the mutational fuzzer can parse JS files modified in a patch build.
 - name: lint_fuzzer_sanity_patch
+  tags: []
   patch_only: true
   commands:
   - command: manifest.load
@@ -3838,6 +3882,7 @@ tasks:
 
 # Check that the mutational fuzzer can parse all JS filess.
 - name: lint_fuzzer_sanity_all
+  tags: []
   commands:
   - command: manifest.load
   - *git_get_project
@@ -3983,6 +4028,7 @@ tasks:
 
 - <<: *task_template
   name: audit
+  tags: []
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -3997,6 +4043,7 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
 
 - name: burn_in_tags_gen
+  tags: []
   depends_on:
     - name: archive_dist_test_debug
   commands:
@@ -4017,6 +4064,7 @@ tasks:
       repeat_tests_max: 1000
 
 - name: selected_tests_gen
+  tags: []
   commands:
   - command: manifest.load
   - *git_get_project
@@ -4373,6 +4421,7 @@ tasks:
 
 - <<: *task_template
   name: external_auth
+  tags: []
   commands:
   - *f_expansions_write
   - func: "do setup"
@@ -4388,6 +4437,7 @@ tasks:
 
 - <<: *task_template
   name: external_auth_aws
+  tags: []
   commands:
   - *f_expansions_write
   - func: "do setup"
@@ -4410,6 +4460,7 @@ tasks:
 
 - <<: *task_template
   name: external_auth_windows
+  tags: []
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -4610,6 +4661,7 @@ tasks:
       resmoke_args: --suites=replica_sets_jscore_passthrough --storageEngine=wiredTiger
 
 - name: replica_sets_reconfig_jscore_passthrough_gen
+  tags: []
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4617,6 +4669,7 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
 
 - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+  tags: []
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4624,6 +4677,7 @@ tasks:
 
 - <<: *task_template
   name: replica_sets_reconfig_kill_primary_jscore_passthrough
+  tags: []
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -4631,6 +4685,7 @@ tasks:
       resmoke_args: --suites=replica_sets_reconfig_kill_primary_jscore_passthrough --storageEngine=wiredTiger
 
 - name: replica_sets_api_version_jscore_passthrough_gen
+  tags: []
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4638,6 +4693,7 @@ tasks:
       fallback_num_sub_suites: 5
 
 - name: replica_sets_jscore_passthrough_gen
+  tags: []
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4756,6 +4812,7 @@ tasks:
       use_multiversion: /data/multiversion
 
 - name: multiversion_gen
+  tags: []
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4766,6 +4823,7 @@ tasks:
 # This requires the 'featureFlagToaster' and 'featureFlagSpoon' parameters to be set to true on
 # build variants that enable this task.
 - name: feature_flag_multiversion_gen
+  tags: []
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4773,6 +4831,7 @@ tasks:
       use_multiversion: /data/multiversion
 
 - name: unittest_shell_hang_analyzer_gen
+  tags: []
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4790,6 +4849,7 @@ tasks:
 
 # Only run hot_backups tests for hot_backups variant.
 - name: noPassthroughHotBackups_gen
+  tags: []
   commands:
     - func: "generate resmoke tasks"
       vars:
@@ -5365,6 +5425,7 @@ tasks:
       resmoke_args: --suites=cwrwc_wc_majority_passthrough --storageEngine=wiredTiger
 
 - name: secondary_reads_passthrough_gen
+  tags: []
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -5435,6 +5496,7 @@ tasks:
 
 - <<: *task_template
   name: sasl
+  tags: []
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5527,6 +5589,7 @@ tasks:
 
 - <<: *task_template
   name: snmp
+  tags: []
   commands:
   - *f_expansions_write
   - func: "do setup"
@@ -5588,6 +5651,7 @@ tasks:
 
 - <<: *task_template
   name: session_jscore_passthrough
+  tags: []
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5764,6 +5828,7 @@ tasks:
 
 - <<: *task_template
   name: free_monitoring
+  tags: []
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5804,6 +5869,7 @@ tasks:
 
 - <<: *task_template
   name: jsonSchema
+  tags: []
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5812,6 +5878,7 @@ tasks:
       resmoke_jobs_max: 1
 
 - name: powercycle_gen
+  tags: []
   commands:
     - func: "generate powercycle tasks"
       vars:
@@ -5823,6 +5890,7 @@ tasks:
         num_tasks: 1
 
 - name: powercycle_smoke_skip_compile_gen
+  tags: []
   commands:
     - func: "generate powercycle tasks"
       vars:
@@ -5835,6 +5903,7 @@ tasks:
         run_powercycle_args: --sshAccessRetryCount=1000000
 
 - name: powercycle_sentinel
+  tags: []
   exec_timeout_secs: 604800 # 7 days
   commands:
     - func: "run powercycle sentinel"
@@ -5842,6 +5911,7 @@ tasks:
         gen_task: powercycle_smoke_skip_compile_gen
 
 - name: powercycle_smoke
+  tags: []
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
@@ -5953,6 +6023,7 @@ tasks:
   - func: "run powercycle test"
 
 - name: idl_tests
+  tags: []
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -5966,6 +6037,7 @@ tasks:
   - func: "run idl tests"
 
 - name: blackduck_scanner
+  tags: []
   patchable: false
   commands:
   - *f_expansions_write
@@ -5985,6 +6057,7 @@ tasks:
         - "src/evergreen/blackduck_hub.sh"
 
 - name: tla_plus
+  tags: []
   commands:
   - *f_expansions_write
   - func: "do non-compile setup"
@@ -6000,6 +6073,7 @@ tasks:
       resmoke_jobs_max: 1
 
 - name: buildscripts_test
+  tags: []
   depends_on: []
   commands:
   - *f_expansions_write
@@ -6015,6 +6089,7 @@ tasks:
 
 - <<: *task_template
   name: resmoke_end2end_tests
+  tags: []
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6022,6 +6097,7 @@ tasks:
       resmoke_args: --suites=resmoke_end2end_tests
 
 - name: test_packages
+  tags: []
   depends_on:
   - name: package
   commands:
@@ -6041,6 +6117,7 @@ tasks:
     - func: "run kitchen"
 
 - name: package
+  tags: []
   depends_on:
     - name: compile_dist_test
   commands:
@@ -6788,6 +6865,7 @@ tasks:
 
 - <<: *task_template
   name: search
+  tags: []
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6797,6 +6875,7 @@ tasks:
 
 - <<: *task_template
   name: search_auth
+  tags: []
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6806,6 +6885,7 @@ tasks:
 
 - <<: *task_template
   name: search_ssl
+  tags: []
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6814,6 +6894,7 @@ tasks:
       resmoke_jobs_max: 1
 
 - name: shared_scons_cache_pruning
+  tags: []
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on: []
   commands:
@@ -6826,6 +6907,7 @@ tasks:
   - func: "shared scons cache pruning"
 
 - name: win_shared_scons_cache_pruning
+  tags: []
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on: []
   commands:
@@ -6839,6 +6921,7 @@ tasks:
   - func: "shared scons cache pruning"
 
 - name: validate_commit_message
+  tags: []
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
   - command: manifest.load
@@ -6855,6 +6938,7 @@ tasks:
         - "./src/evergreen/commit_message_validate.sh"
 
 - name: check_for_todos
+  tags: []
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
     - command: manifest.load
@@ -6873,6 +6957,7 @@ tasks:
 
 - <<: *task_template
   name: mqlrun
+  tags: []
   commands:
   - func: "do setup"
   - func: "run tests"
