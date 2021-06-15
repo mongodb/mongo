@@ -43,78 +43,99 @@ void assertVectorsEqual(const std::vector<uint64_t>& actualVector,
     }
 }
 
-TEST(Simple8b, EncodeOneValue) {
-    uint8_t selector = 14;
-    std::vector<uint64_t> values = {1};
-    uint64_t simple8bWord = Simple8b::encodeSimple8b(selector, values);
-    ASSERT_EQUALS(simple8bWord, 0x0000000000000001E);
+TEST(Simple8b, NoValues) {
+    Simple8b s8b;
+
+    std::vector<uint64_t> values = s8b.getAllInts();
+    std::vector<uint64_t> expectedValues = {};
+
+    assertVectorsEqual(values, expectedValues);
 }
 
-TEST(Simple8b, DecodeOneValue) {
-    uint64_t simple8bWord = 0x0000000000000001E;
-    std::vector<uint64_t> values = Simple8b::decodeSimple8b(simple8bWord);
+TEST(Simple8b, OneValueTemporaryVector) {
+    Simple8b s8b;
+
+    ASSERT_TRUE(s8b.append(1));
+    std::vector<uint64_t> values = s8b.getAllInts();
     std::vector<uint64_t> expectedValues = {1};
+
     assertVectorsEqual(values, expectedValues);
 }
 
-TEST(Simple8b, EncodeMultipleValues) {
-    uint8_t selector = 12;
-    std::vector<uint64_t> values = {1, 2, 3};
-    uint64_t simple8bWord = Simple8b::encodeSimple8b(selector, values);
-    ASSERT_EQUALS(simple8bWord, 0x000030000200001C);
-}
+TEST(Simple8b, MultipleValuesTemporaryVector) {
+    Simple8b s8b;
 
-TEST(Simple8b, DecodeMultipleValues) {
-    uint64_t simple8bWord = 0x000030000200001C;
-    std::vector<uint64_t> values = Simple8b::decodeSimple8b(simple8bWord);
     std::vector<uint64_t> expectedValues = {1, 2, 3};
+    for (size_t i = 0; i < expectedValues.size(); ++i) {
+        ASSERT_TRUE(s8b.append(expectedValues[i]));
+    }
+    std::vector<uint64_t> values = s8b.getAllInts();
+
     assertVectorsEqual(values, expectedValues);
 }
 
-TEST(Simple8b, EncodeMaxValues) {
-    uint8_t selector = 1;
-    std::vector<uint64_t> values(60, 1);
-    uint64_t simple8bWord = Simple8b::encodeSimple8b(selector, values);
-    ASSERT_EQUALS(simple8bWord, 0xFFFFFFFFFFFFFFF1);
-}
+TEST(Simple8b, MaxValuesTemporaryVector) {
+    Simple8b s8b;
 
-TEST(Simple8b, DecodeMaxValues) {
-    uint64_t simple8bWord = 0xFFFFFFFFFFFFFFF1;
-    std::vector<uint64_t> values = Simple8b::decodeSimple8b(simple8bWord);
     std::vector<uint64_t> expectedValues(60, 1);
+    for (size_t i = 0; i < expectedValues.size(); ++i) {
+        ASSERT_TRUE(s8b.append(expectedValues[i]));
+    }
+    std::vector<uint64_t> values = s8b.getAllInts();
+
     assertVectorsEqual(values, expectedValues);
 }
 
 TEST(Simple8b, EncodeWithTrailingDirtyBits) {
-    uint8_t selector = 8;
-    std::vector<uint64_t> values(7, 1);
-    uint64_t simple8bWord = Simple8b::encodeSimple8b(selector, values);
-    ASSERT_EQUALS(simple8bWord, 0x0010101010101018);
-}
+    Simple8b s8b;
 
-TEST(Simple8b, DecodeWithTrailingDirtyBits) {
-    uint64_t simple8bWord = 0x0010101010101018;
-    std::vector<uint64_t> values = Simple8b::decodeSimple8b(simple8bWord);
     std::vector<uint64_t> expectedValues(7, 1);
+    for (size_t i = 0; i < expectedValues.size(); ++i) {
+        ASSERT_TRUE(s8b.append(expectedValues[i]));
+    }
+    std::vector<uint64_t> values = s8b.getAllInts();
+
     assertVectorsEqual(values, expectedValues);
 }
 
-TEST(Simple8b, InvalidEncodeZeroSelector) {
-    uint8_t selector = 0;
-    std::vector<uint64_t> values = {};
-    uint64_t simple8bWord = Simple8b::encodeSimple8b(selector, values);
-    ASSERT_EQUALS(simple8bWord, 0x0000000000000000);
+TEST(Simple8b, FullBufferAndVector) {
+    Simple8b s8b;
+
+    std::vector<uint64_t> expectedValues(120, 1);
+    for (size_t i = 0; i < expectedValues.size(); ++i) {
+        ASSERT_TRUE(s8b.append(expectedValues[i]));
+    }
+    std::vector<uint64_t> values = s8b.getAllInts();
+
+    assertVectorsEqual(values, expectedValues);
 }
 
-TEST(Simple8b, InvalidEncodeFifteenSelector) {
-    uint8_t selector = 15;
-    std::vector<uint64_t> values = {};
-    uint64_t simple8bWord = Simple8b::encodeSimple8b(selector, values);
-    ASSERT_EQUALS(simple8bWord, 0x0000000000000000);
+TEST(Simple8b, TwoFullBuffersAndVector) {
+    Simple8b s8b;
+
+    std::vector<uint64_t> expectedValues(180, 1);
+    for (size_t i = 0; i < expectedValues.size(); ++i) {
+        ASSERT_TRUE(s8b.append(expectedValues[i]));
+    }
+    std::vector<uint64_t> values = s8b.getAllInts();
+
+    assertVectorsEqual(values, expectedValues);
 }
 
-TEST(Simple8b, InvalidDecodeZeroSelector) {
-    uint64_t simple8bWord = 0x0000000000000000;
-    std::vector<uint64_t> values = Simple8b::decodeSimple8b(simple8bWord);
-    ASSERT_EQUALS(values.size(), 0);
+TEST(Simple8b, BreakVectorIntoMultipleSimple8bBlocks) {
+    Simple8b s8b;
+
+    std::vector<uint64_t> expectedValues(58, 1);
+    // 7 is 0b111 and can not be added to the current word because it would overflow.
+    // We can not form a 58 bit word because we would be unable to determine
+    // if the last 2 bits are empty or unused.
+    // Therefore, we must form a word with 30 integers of 1's, 20 integers of 1's
+    // and the current vector would have eight 1's and one 7.
+    expectedValues.push_back(7);
+    for (size_t i = 0; i < expectedValues.size(); ++i) {
+        ASSERT_TRUE(s8b.append(expectedValues[i]));
+    }
+
+    std::vector<uint64_t> values = s8b.getAllInts();
+    assertVectorsEqual(values, expectedValues);
 }
