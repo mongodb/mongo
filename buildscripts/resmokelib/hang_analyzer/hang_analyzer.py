@@ -71,15 +71,21 @@ class HangAnalyzer(Subcommand):
         processes = process_list.get_processes(self.process_ids, self.interesting_processes,
                                                self.options.process_match, self.root_logger)
 
+        def is_python_process(pname: str):
+            # "live-record*" and "python*" are Python processes. Sending SIGUSR1 causes resmoke.py
+            # to dump its stack and run the hang analyzer on its child processes.
+            # Sending SIGUSR1 causes live-record to save its recording and terminate.
+            return pname.startswith("python") or pname.startswith("live-record")
+
         # Suspending all processes, except python, to prevent them from getting unstuck when
         # the hang analyzer attaches to them.
-        for pinfo in [pinfo for pinfo in processes if not pinfo.name.startswith("python")]:
+        for pinfo in [pinfo for pinfo in processes if not is_python_process(pinfo.name)]:
             for pid in pinfo.pidv:
                 process.pause_process(self.root_logger, pinfo.name, pid)
 
         # Dump python processes by signalling them. The resmoke.py process will generate
         # the report.json, when signalled, so we do this before attaching to other processes.
-        for pinfo in [pinfo for pinfo in processes if pinfo.name.startswith("python")]:
+        for pinfo in [pinfo for pinfo in processes if is_python_process(pinfo.name)]:
             for pid in pinfo.pidv:
                 process.signal_python(self.root_logger, pinfo.name, pid)
 

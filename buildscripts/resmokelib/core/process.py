@@ -117,13 +117,26 @@ class Process(object):
         close_fds = (sys.platform != "win32")
 
         with _POPEN_LOCK:
-            self._process = subprocess.Popen(
-                self.args, bufsize=buffer_size, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                close_fds=close_fds, env=self.env, creationflags=creation_flags, cwd=self._cwd)
+
+            # Record unittests directly since resmoke doesn't not interact with them and they can finish
+            # too quickly for the recorder to have a chance at attaching.
+            recorder_args = []
+            if _config.UNDO_RECORDER_PATH is not None and self.args[0].endswith("_test"):
+                now_str = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+                # Only use the process name since we have to be able to correlate the recording name
+                # with the binary name easily.
+                recorder_output_file = "{process}-{t}.undo".format(
+                    process=os.path.basename(self.args[0]), t=now_str)
+                recorder_args = [_config.UNDO_RECORDER_PATH, "-o", recorder_output_file]
+
+            self._process = subprocess.Popen(recorder_args + self.args, bufsize=buffer_size,
+                                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                             close_fds=close_fds, env=self.env,
+                                             creationflags=creation_flags, cwd=self._cwd)
             self.pid = self._process.pid
 
-            if _config.UNDO_RECORDER_PATH is not None and ("mongod" in self.args[0]
-                                                           or "mongos" in self.args[0]):
+            if _config.UNDO_RECORDER_PATH is not None and (not self.args[0].endswith("_test")) and (
+                    "mongod" in self.args[0] or "mongos" in self.args[0]):
                 now_str = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
                 recorder_output_file = "{logger}-{process}-{pid}-{t}.undo".format(
                     logger=self.logger.name.replace('/', '-'),
@@ -236,7 +249,7 @@ class Process(object):
             if recorder_return != 0:
                 raise errors.ServerFailure(
                     "UndoDB live-record did not terminate correctly. This is likely a bug with UndoDB. "
-                    "Please record the logs and notify the #server-tig Slack channel")
+                    "Please record the logs and notify the #server-testing Slack channel")
 
         if self._stdout_pipe:
             self._stdout_pipe.wait_until_finished()

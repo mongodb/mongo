@@ -130,10 +130,11 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
   set -o errexit
 
   if [[ -n "${record_with}" ]]; then
-    recording_size=$(du -ch *.undo | grep total)
+    recording_size=$( (du -ch ./*.undo ./*.undo.tokeep || true) | grep total)
     echo "UndoDB produced recordings that were $recording_size (uncompressed) on disk"
-    if [[ $resmoke_exit_code = 0 ]]; then
-      echo "Resmoke exited successfully. UndoDB recordings will not be saved."
+    # Unittests recordings are renamed so there's never a need to store any .undo files.
+    if [[ $resmoke_exit_code = 0 || "${task_name}" == "run_unittests_with_recording" ]]; then
+      echo "Removing UndoDB recordings of successful tests."
       rm *.undo || true
     fi
   fi
@@ -154,5 +155,6 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     core_files=$(/usr/bin/find -H .. \( -name "*.core" -o -name "*.mdmp" \) 2>/dev/null)
     rm -rf $core_files
   fi
+
   exit $resmoke_exit_code
 fi # end if [[ ${disable_unit_tests} && ! -f ${skip_tests|/dev/null} ]]

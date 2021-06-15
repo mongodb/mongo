@@ -6,7 +6,7 @@ cd src
 set -eou pipefail
 
 # Only run on unit test tasks so we don't target mongod binaries from cores.
-if [ "${task_name}" != "run_unittests" ] && [ "${task_name}" != "run_dbtest" ]; then
+if [ "${task_name}" != "run_unittests" ] && [ "${task_name}" != "run_dbtest" ] && [ "${task_name}" != "run_unittests_with_recording" ]; then
   exit 0
 fi
 
@@ -31,9 +31,11 @@ for core_file in $core_files; do
     # may return more than 1 file.
     binary_file_locations=$(/usr/bin/find -H . -executable -name "$binary_file*${exe}" 2>/dev/null)
   fi
+
   if [ -z "$binary_file_locations" ]; then
     echo "Cannot locate the unittest binary file ($binary_file) that generated the core file $core_file"
   fi
+
   for binary_file_location in $binary_file_locations; do
     new_binary_file=$unittest_bin_dir/$(echo "$binary_file_location" | sed "s/.*\///")
     if [ -f "$binary_file_location" ] && [ ! -f "$new_binary_file" ]; then
@@ -63,8 +65,18 @@ for core_file in $core_files; do
   done
 done
 
+# For recorded tests, use the text file to copy them over instead of relying on core dumps.
+has_recorded_failures=""
+if [[ -f "failed_recorded_tests.txt" ]]; then
+  while read -r line; do
+    cp "$line" .
+  done <"failed_recorded_tests.txt"
+
+  has_recorded_failures="true"
+fi
+
 # Copy debug symbols for dynamic builds
 lib_dir=build/install/lib
-if [ -d "$lib_dir" ] && [[ -n "$core_files" ]]; then
+if [ -d "$lib_dir" ] && [[ -n "$core_files" || -n "$has_recorded_failures" ]]; then
   cp -r "$lib_dir" dist-unittests
 fi

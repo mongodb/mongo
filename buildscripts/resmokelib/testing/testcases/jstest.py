@@ -230,10 +230,17 @@ class JSTestCase(interface.ProcessTestCase):
 
     def run_test(self):
         """Execute the test."""
-        if self.num_clients == 1:
-            self._run_single_copy()
-        else:
-            self._run_multiple_copies()
+        try:
+            if self.num_clients == 1:
+                self._run_single_copy()
+            else:
+                self._run_multiple_copies()
+        except:
+            # Archive any available recordings if there's any failure. It's possible a problem
+            # with the recorder will cause no recordings to be generated. There will also be
+            # recordings of other processes, we keep them to avoid complicating this code.
+            self._cull_recordings("mongo")
+            raise
 
     def _raise_if_unsafe_exit(self, return_code):
         """Determine if a return code represents and unsafe exit."""

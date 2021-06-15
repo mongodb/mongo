@@ -1462,7 +1462,7 @@ var _stopUndoLiveRecord = function(undoLiveRecordPid) {
     if (undoReturnCode !== 0) {
         throw new Error(
             "Undo live-record failed to terminate correctly. This is likely a bug in Undo. " +
-            "Please record any logs and send them to the #server-tig Slack channel");
+            "Please record any logs and send them to the #server-testing Slack channel");
     }
 };
 

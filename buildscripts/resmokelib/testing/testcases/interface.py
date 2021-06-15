@@ -2,12 +2,13 @@
 
 This is used to perform the actual test case.
 """
-
+import glob
 import os
 import os.path
 import unittest
 import uuid
 
+from buildscripts.resmokelib import config
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.utils import registry
 
@@ -116,8 +117,8 @@ class ProcessTestCase(TestCase):  # pylint: disable=abstract-method
     def run_test(self):
         """Run the test."""
         try:
-            shell = self._make_process()
-            self._execute(shell)
+            proc = self._make_process()
+            self._execute(proc)
         except self.failureException:
             raise
         except:
@@ -145,3 +146,12 @@ class ProcessTestCase(TestCase):  # pylint: disable=abstract-method
     def _make_process(self):
         """Return a new Process instance that could be used to run the test or log the command."""
         raise NotImplementedError("_make_process must be implemented by TestCase subclasses")
+
+    def _cull_recordings(self, program_executable):
+        """Move recordings if test fails so it doesn't get deleted."""
+        # Only store my recordings. Concurrent processes may generate their own recordings that we
+        # should ignore. There's a problem with duplicate program names under different directories
+        # But that should be rare and there's no harm in having more recordings stored.
+        for recording in glob.glob(program_executable + "*.undo"):
+            self.logger.info("Keeping recording %s", recording)
+            os.rename(recording, recording + '.tokeep')
