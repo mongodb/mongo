@@ -45,7 +45,8 @@ const runReconfigForPSASet = (memberIndex, config, shouldSucceed, endPriority = 
     if (shouldSucceed) {
         assert.eq(0, result, 'expected reconfigToPSASet to succeed, but it failed');
 
-        // Wait for the new config to be committed.
+        // Wait for all 'newlyAdded' fields to be removed and for the new config to be committed.
+        rst.waitForAllNewlyAddedRemovals();
         assert.soonNoExcept(() => isConfigCommitted(primary));
 
         const replSetGetConfig =
