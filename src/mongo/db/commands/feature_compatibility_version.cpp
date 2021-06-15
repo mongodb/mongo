@@ -577,6 +577,7 @@ Status FeatureCompatibilityVersionParameter::setFromString(const std::string&) {
 FixedFCVRegion::FixedFCVRegion(OperationContext* opCtx)
     : _lk([&] {
           invariant(!opCtx->lockState()->isLocked());
+          invariant(!opCtx->lockState()->isRSTLLocked());
           return Lock::SharedLock(opCtx->lockState(), fcvLock);
       }()) {}
 

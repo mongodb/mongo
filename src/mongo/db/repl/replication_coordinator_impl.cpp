@@ -3425,7 +3425,13 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
     // So, acquire FCV mutex lock in shared mode to block writers from modifying the fcv document
     // to make sure fcv is not changed between getNewConfig() and storing the new config
     // document locally.
-    boost::optional<FixedFCVRegion> fixedFcvRegion(opCtx);
+    // Since 'skipSafetyChecks' is only true when this reconfig is invoked as part of
+    // 'signalDrainComplete', we can skip taking the FCV lock here because:
+    // 1. 'signalDrainComplete' acquires the RSTL in X mode prior to this reconfig, which will block
+    //    all external writers. This is also important because we must not acquire the FCV lock
+    //    while holding the RSTL to avoid deadlocking.
+    // 2. We are not able to accept replicated writes as primary until we fully exit drain mode.
+    auto fixedFcvRegion = skipSafetyChecks ? nullptr : std::make_unique<FixedFCVRegion>(opCtx);
 
     // Call the callback to get the new config given the old one.
     auto newConfigStatus = getNewConfig(oldConfig, topCoordTerm);
@@ -3519,7 +3525,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
     // 1) For fcv 4.4, addition of new voter nodes.
     // 2) For fcv 4.7+, only if the current config doesn't contain the 'newlyAdded' field but the
     // new config got mutated to append 'newlyAdded' field.
-    if (force || !needsFcvLock()) {
+    if (fixedFcvRegion && (force || !needsFcvLock())) {
         fixedFcvRegion.reset();
     }
 
