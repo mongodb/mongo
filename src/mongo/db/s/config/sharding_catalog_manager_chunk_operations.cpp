@@ -1537,13 +1537,15 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(
     // Get the chunk with the current collectionVersion for this epoch.
     ChunkType highestChunk;
     {
+        const auto query = coll.getTimestamp() ? BSON(ChunkType::collectionUUID() << *collUuid)
+                                               : BSON(ChunkType::epoch(version.epoch()));
         const auto highestChunksVector =
             uassertStatusOK(configShard->exhaustiveFindOnConfig(
                                 opCtx,
                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                 repl::ReadConcernLevel::kLocalReadConcern,
                                 ChunkType::ConfigNS,
-                                BSON(ChunkType::epoch(version.epoch())) /* query */,
+                                query,
                                 BSON(ChunkType::lastmod << -1) /* sort */,
                                 1 /* limit */))
                 .docs;
