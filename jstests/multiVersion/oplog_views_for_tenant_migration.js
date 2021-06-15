@@ -6,14 +6,10 @@
 "use strict";
 load("jstests/multiVersion/libs/multi_rs.js");  // For 'upgradeSet()'
 
-const kReshardingOplogViewName = "system.resharding.slimOplogForGraphLookup";
 const kTenantMigrationOplogViewName = "system.tenantMigration.oplogView";
 
 function assertOplogViewsNotExist(node) {
     const localDb = node.getDB("local");
-    const reshardingViewRes = localDb.runCommand(
-        {listCollections: 1, filter: {type: "view", name: kReshardingOplogViewName}});
-    assert.eq(0, reshardingViewRes.cursor.firstBatch.length);
     const tenantMigrationRes = localDb.runCommand(
         {listCollections: 1, filter: {type: "view", name: kTenantMigrationOplogViewName}});
     assert.eq(0, tenantMigrationRes.cursor.firstBatch.length);
@@ -21,9 +17,6 @@ function assertOplogViewsNotExist(node) {
 
 function assertOplogViewsExist(node) {
     const localDb = node.getDB("local");
-    const reshardingViewRes = localDb.runCommand(
-        {listCollections: 1, filter: {type: "view", name: kReshardingOplogViewName}});
-    assert.eq(1, reshardingViewRes.cursor.firstBatch.length);
     const tenantMigrationRes = localDb.runCommand(
         {listCollections: 1, filter: {type: "view", name: kTenantMigrationOplogViewName}});
     assert.eq(1, tenantMigrationRes.cursor.firstBatch.length);
