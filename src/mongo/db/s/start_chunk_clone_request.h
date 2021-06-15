@@ -48,9 +48,6 @@ class StatusWith;
  */
 class StartChunkCloneRequest {
 public:
-    static constexpr auto kSupportsCriticalSectionDuringCatchUp =
-        "supportsCriticalSectionDuringCatchUp"_sd;
-
     /**
      * Parses the input command and produces a request corresponding to its arguments.
      */

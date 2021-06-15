@@ -70,9 +70,6 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
-
-constexpr StringData StartChunkCloneRequest::kSupportsCriticalSectionDuringCatchUp;
-
 namespace {
 
 const auto getMigrationDestinationManager =
@@ -299,7 +296,6 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
     b.append("min", _min);
     b.append("max", _max);
     b.append("shardKeyPattern", _shardKeyPattern);
-    b.append(StartChunkCloneRequest::kSupportsCriticalSectionDuringCatchUp, true);
 
     b.append("state", stateToString(_state));
 
@@ -475,24 +471,6 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
 
     stdx::unique_lock<Latch> lock(_mutex);
 
-    const auto convergenceTimeout =
-        Shard::kDefaultConfigCommandTimeout + Shard::kDefaultConfigCommandTimeout / 4;
-
-    // The donor may have started the commit while the recipient is still busy processing
-    // the last batch of mods sent in the catch up phase. Allow some time for synching up.
-    auto deadline = Date_t::now() + convergenceTimeout;
-
-    while (_state == CATCHUP) {
-        if (stdx::cv_status::timeout ==
-            _stateChangedCV.wait_until(lock, deadline.toSystemTimePoint())) {
-            return {ErrorCodes::CommandFailed,
-                    str::stream() << "startCommit timed out waiting for the catch up completion. "
-                                  << "Sender's session is " << sessionId.toString()
-                                  << ". Current session is "
-                                  << (_sessionId ? _sessionId->toString() : "none.")};
-        }
-    }
-
     if (_state != STEADY) {
         return {ErrorCodes::CommandFailed,
                 str::stream() << "Migration startCommit attempted when not in STEADY state."
@@ -518,9 +496,7 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
     _state = COMMIT_START;
     _stateChangedCV.notify_all();
 
-    // Assigning a timeout slightly higher than the one used for network requests to the config
-    // server. Enough time to retry at least once in case of network failures (SERVER-51397).
-    deadline = Date_t::now() + convergenceTimeout;
+    auto const deadline = Date_t::now() + Seconds(30);
     while (_sessionId) {
         if (stdx::cv_status::timeout ==
             _isActiveCV.wait_until(lock, deadline.toSystemTimePoint())) {
@@ -925,7 +901,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
             const auto& mods = res.response;
 
             if (mods["size"].number() == 0) {
-                // There are no more pending modifications to be applied. End the catchup phase
                 break;
             }
 

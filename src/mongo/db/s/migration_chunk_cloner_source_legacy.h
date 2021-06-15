@@ -347,9 +347,6 @@ private:
     // Indicates whether new requests to track an operation are accepted.
     bool _acceptingNewOperationTrackRequests{true};
 
-    // The estimated average object _id size during the clone phase.
-    uint64_t _averageObjectIdSize{0};
-
     // List of _id of documents that were modified that must be re-cloned (xfer mods)
     std::list<BSONObj> _reload;
 
