@@ -142,12 +142,15 @@ void OpObserverForTest<StateEnum, ReshardingDocument>::onUpdate(OperationContext
 
 template class StateTransitionController<DonorStateEnum>;
 template class StateTransitionController<RecipientStateEnum>;
+template class StateTransitionController<CoordinatorStateEnum>;
 
 template class PauseDuringStateTransitions<DonorStateEnum>;
 template class PauseDuringStateTransitions<RecipientStateEnum>;
+template class PauseDuringStateTransitions<CoordinatorStateEnum>;
 
 template class OpObserverForTest<DonorStateEnum, ReshardingDonorDocument>;
 template class OpObserverForTest<RecipientStateEnum, ReshardingRecipientDocument>;
+template class OpObserverForTest<CoordinatorStateEnum, ReshardingCoordinatorDocument>;
 
 }  // namespace resharding_service_test_helpers
 }  // namespace mongo

@@ -42,7 +42,9 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
+#include "mongo/db/s/resharding/resharding_op_observer.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -55,107 +57,23 @@
 namespace mongo {
 namespace {
 
-class OpObserverForTest;
-class PauseDuringStateTransitions;
+using CoordinatorStateTransitionController =
+    resharding_service_test_helpers::StateTransitionController<CoordinatorStateEnum>;
+using OpObserverForTest =
+    resharding_service_test_helpers::OpObserverForTest<CoordinatorStateEnum,
+                                                       ReshardingCoordinatorDocument>;
+using PauseDuringStateTransitions =
+    resharding_service_test_helpers::PauseDuringStateTransitions<CoordinatorStateEnum>;
 
-class CoordinatorStateTransitionController {
+class CoordinatorOpObserverForTest : public OpObserverForTest {
 public:
-    CoordinatorStateTransitionController() = default;
+    CoordinatorOpObserverForTest(std::shared_ptr<CoordinatorStateTransitionController> controller)
+        : OpObserverForTest(std::move(controller),
+                            NamespaceString::kConfigReshardingOperationsNamespace) {}
 
-    void waitUntilStateIsReached(CoordinatorStateEnum state) {
-        stdx::unique_lock lk(_mutex);
-        _waitUntilUnpausedCond.wait(lk, [this, state] { return _state == state; });
+    CoordinatorStateEnum getState(const ReshardingCoordinatorDocument& coordinatorDoc) override {
+        return coordinatorDoc.getState();
     }
-
-private:
-    friend OpObserverForTest;
-    friend PauseDuringStateTransitions;
-
-    void setPauseDuringTransition(CoordinatorStateEnum state) {
-        stdx::lock_guard lk(_mutex);
-        _pauseDuringTransition.insert(state);
-    }
-
-    void unsetPauseDuringTransition(CoordinatorStateEnum state) {
-        stdx::lock_guard lk(_mutex);
-        _pauseDuringTransition.erase(state);
-        _pauseDuringTransitionCond.notify_all();
-    }
-
-    void notifyNewStateAndWaitUntilUnpaused(OperationContext* opCtx,
-                                            CoordinatorStateEnum newState) {
-        stdx::unique_lock lk(_mutex);
-        _state = newState;
-        _waitUntilUnpausedCond.notify_all();
-        opCtx->waitForConditionOrInterrupt(_pauseDuringTransitionCond, lk, [this, newState] {
-            return _pauseDuringTransition.count(newState) == 0;
-        });
-    }
-
-    Mutex _mutex = MONGO_MAKE_LATCH("CoordinatorStateTransitionController::_mutex");
-    stdx::condition_variable _pauseDuringTransitionCond;
-    stdx::condition_variable _waitUntilUnpausedCond;
-
-    std::set<CoordinatorStateEnum> _pauseDuringTransition;
-    CoordinatorStateEnum _state = CoordinatorStateEnum::kUnused;
-};
-
-class PauseDuringStateTransitions {
-public:
-    PauseDuringStateTransitions(CoordinatorStateTransitionController* controller,
-                                CoordinatorStateEnum state)
-        : PauseDuringStateTransitions(controller, std::vector<CoordinatorStateEnum>{state}) {}
-
-    PauseDuringStateTransitions(CoordinatorStateTransitionController* controller,
-                                std::vector<CoordinatorStateEnum> states)
-        : _controller{controller}, _states{std::move(states)} {
-        for (auto state : _states) {
-            _controller->setPauseDuringTransition(state);
-        }
-    }
-
-    ~PauseDuringStateTransitions() {
-        for (auto state : _states) {
-            _controller->unsetPauseDuringTransition(state);
-        }
-    }
-
-    PauseDuringStateTransitions(const PauseDuringStateTransitions&) = delete;
-    PauseDuringStateTransitions& operator=(const PauseDuringStateTransitions&) = delete;
-
-    PauseDuringStateTransitions(PauseDuringStateTransitions&&) = delete;
-    PauseDuringStateTransitions& operator=(PauseDuringStateTransitions&&) = delete;
-
-    void wait(CoordinatorStateEnum state) {
-        _controller->waitUntilStateIsReached(state);
-    }
-
-    void unset(CoordinatorStateEnum state) {
-        _controller->unsetPauseDuringTransition(state);
-    }
-
-private:
-    CoordinatorStateTransitionController* const _controller;
-    const std::vector<CoordinatorStateEnum> _states;
-};
-
-class OpObserverForTest : public OpObserverNoop {
-public:
-    OpObserverForTest(std::shared_ptr<CoordinatorStateTransitionController> controller)
-        : _controller{std::move(controller)} {}
-
-    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override {
-        if (args.nss != NamespaceString::kConfigReshardingOperationsNamespace) {
-            return;
-        }
-        auto doc =
-            ReshardingCoordinatorDocument::parse({"OpObserverForTest"}, args.updateArgs.updatedDoc);
-
-        _controller->notifyNewStateAndWaitUntilUnpaused(opCtx, doc.getState());
-    }
-
-private:
-    std::shared_ptr<CoordinatorStateTransitionController> _controller;
 };
 
 class ExternalStateForTest : public ReshardingCoordinatorExternalState {
@@ -184,7 +102,8 @@ class ExternalStateForTest : public ReshardingCoordinatorExternalState {
                 version.incMinor();
             }
         }
-        return ParticipantShardsAndChunks({{}, {}, initialChunks});
+        return ParticipantShardsAndChunks(
+            {coordinatorDoc.getDonorShards(), coordinatorDoc.getRecipientShards(), initialChunks});
     }
 
     void sendCommandToShards(OperationContext* opCtx,
@@ -247,7 +166,9 @@ public:
         invariant(_opObserverRegistry);
 
         _opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
-        _opObserverRegistry->addObserver(std::make_unique<OpObserverForTest>(_controller));
+        _opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
+        _opObserverRegistry->addObserver(
+            std::make_unique<CoordinatorOpObserverForTest>(_controller));
 
         _registry = repl::PrimaryOnlyServiceRegistry::get(getServiceContext());
         auto service = makeService(getServiceContext());
@@ -284,8 +205,61 @@ public:
         return doc;
     }
 
-    void notifyDonorsReadyToDonate(ReshardingCoordinator& coordinator,
-                                   ReshardingCoordinatorDocument& coordDoc) {
+    std::shared_ptr<ReshardingCoordinatorService::ReshardingCoordinator> getCoordinator(
+        OperationContext* opCtx, repl::PrimaryOnlyService::InstanceID instanceId) {
+        auto coordinator = getCoordinatorIfExists(opCtx, instanceId);
+        ASSERT_TRUE(bool(coordinator));
+        return coordinator;
+    }
+
+    std::shared_ptr<ReshardingCoordinatorService::ReshardingCoordinator> getCoordinatorIfExists(
+        OperationContext* opCtx, repl::PrimaryOnlyService::InstanceID instanceId) {
+        auto coordinatorOpt = ReshardingCoordinatorService::ReshardingCoordinator::lookup(
+            opCtx, _service, instanceId);
+        if (!coordinatorOpt) {
+            return nullptr;
+        }
+
+        auto coordinator = *coordinatorOpt;
+        return coordinator ? coordinator : nullptr;
+    }
+
+    ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx) {
+        DBDirectClient client(opCtx);
+
+        auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace.ns(), {});
+        IDLParserErrorContext errCtx("reshardingCoordFromTest");
+        return ReshardingCoordinatorDocument::parse(errCtx, doc);
+    }
+
+    void replaceCoordinatorDoc(OperationContext* opCtx,
+                               const ReshardingCoordinatorDocument& newDoc) {
+        DBDirectClient client(opCtx);
+
+        const BSONObj query(BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName
+                                 << newDoc.getReshardingUUID()));
+        client.update(
+            NamespaceString::kConfigReshardingOperationsNamespace.ns(), {}, newDoc.toBSON());
+    }
+
+    void waitUntilCommittedCoordinatorDocReach(OperationContext* opCtx,
+                                               CoordinatorStateEnum state) {
+        DBDirectClient client(opCtx);
+
+        while (true) {
+            auto coordinatorDoc = getCoordinatorDoc(opCtx);
+
+            if (coordinatorDoc.getState() == state) {
+                break;
+            }
+
+            sleepmillis(50);
+        }
+    }
+
+    void makeDonorsReadyToDonate(OperationContext* opCtx) {
+        auto coordDoc = getCoordinatorDoc(opCtx);
+
         auto donorShards = coordDoc.getDonorShards();
         DonorShardContext donorCtx;
         donorCtx.setState(DonorStateEnum::kDonatingInitialData);
@@ -295,11 +269,12 @@ public:
         }
         coordDoc.setDonorShards(donorShards);
 
-        coordinator.getObserver()->onReshardingParticipantTransition(coordDoc);
+        replaceCoordinatorDoc(opCtx, coordDoc);
     }
 
-    void notifyRecipientsFinishedCloning(ReshardingCoordinator& coordinator,
-                                         ReshardingCoordinatorDocument& coordDoc) {
+    void makeRecipientsFinishedCloning(OperationContext* opCtx) {
+        auto coordDoc = getCoordinatorDoc(opCtx);
+
         auto shards = coordDoc.getRecipientShards();
         RecipientShardContext ctx;
         ctx.setState(RecipientStateEnum::kApplying);
@@ -308,11 +283,12 @@ public:
         }
         coordDoc.setRecipientShards(shards);
 
-        coordinator.getObserver()->onReshardingParticipantTransition(coordDoc);
+        replaceCoordinatorDoc(opCtx, coordDoc);
     }
 
-    void notifyRecipientsInStrictConsistency(ReshardingCoordinator& coordinator,
-                                             ReshardingCoordinatorDocument& coordDoc) {
+    void makeRecipientsBeInStrictConsistency(OperationContext* opCtx) {
+        auto coordDoc = getCoordinatorDoc(opCtx);
+
         auto shards = coordDoc.getRecipientShards();
         RecipientShardContext ctx;
         ctx.setState(RecipientStateEnum::kStrictConsistency);
@@ -321,11 +297,11 @@ public:
         }
         coordDoc.setRecipientShards(shards);
 
-        coordinator.getObserver()->onReshardingParticipantTransition(coordDoc);
+        replaceCoordinatorDoc(opCtx, coordDoc);
     }
 
-    void notifyDonorsDone(ReshardingCoordinator& coordinator,
-                          ReshardingCoordinatorDocument& coordDoc) {
+    void makeDonorsProceedToDone(OperationContext* opCtx) {
+        auto coordDoc = getCoordinatorDoc(opCtx);
         auto donorShards = coordDoc.getDonorShards();
         DonorShardContext donorCtx;
         donorCtx.setState(DonorStateEnum::kDone);
@@ -333,13 +309,12 @@ public:
             shard.setMutableState(donorCtx);
         }
         coordDoc.setDonorShards(donorShards);
-        coordDoc.setState(CoordinatorStateEnum::kCommitting);
 
-        coordinator.getObserver()->onReshardingParticipantTransition(coordDoc);
+        replaceCoordinatorDoc(opCtx, coordDoc);
     }
 
-    void notifyRecipientsDone(ReshardingCoordinator& coordinator,
-                              ReshardingCoordinatorDocument& coordDoc) {
+    void makeRecipientsProceedToDone(OperationContext* opCtx) {
+        auto coordDoc = getCoordinatorDoc(opCtx);
         auto shards = coordDoc.getRecipientShards();
         RecipientShardContext ctx;
         ctx.setState(RecipientStateEnum::kDone);
@@ -347,9 +322,8 @@ public:
             shard.setMutableState(ctx);
         }
         coordDoc.setRecipientShards(shards);
-        coordDoc.setState(CoordinatorStateEnum::kCommitting);
 
-        coordinator.getObserver()->onReshardingParticipantTransition(coordDoc);
+        replaceCoordinatorDoc(opCtx, coordDoc);
     }
 
     CollectionType makeOriginalCollectionCatalogEntry(
@@ -465,6 +439,51 @@ public:
         return donorChunk;
     }
 
+    void stepUp(OperationContext* opCtx) {
+        auto replCoord = repl::ReplicationCoordinator::get(getServiceContext());
+        auto currOpTime = replCoord->getMyLastAppliedOpTime();
+
+        // Advance the term and last applied opTime. We retain the timestamp component of the
+        // current last applied opTime to avoid log messages from
+        // ReplClientInfo::setLastOpToSystemLastOpTime() about the opTime having moved backwards.
+        ++_term;
+        auto newOpTime = repl::OpTime{currOpTime.getTimestamp(), _term};
+
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+        ASSERT_OK(replCoord->updateTerm(opCtx, _term));
+        replCoord->setMyLastAppliedOpTimeAndWallTime({newOpTime, {}});
+
+        _registry->onStepUpComplete(opCtx, _term);
+    }
+
+    void stepDown(OperationContext* opCtx) {
+        ASSERT_OK(repl::ReplicationCoordinator::get(getServiceContext())
+                      ->setFollowerMode(repl::MemberState::RS_SECONDARY));
+        _registry->onStepDown();
+
+        // Some opCtx can be created via AlternativeClientRegion and not tied to any resharding
+        // cancellation token, so we also need to simulate the repl step down killOp thread.
+
+        auto serviceCtx = opCtx->getServiceContext();
+        for (ServiceContext::LockedClientsCursor cursor(serviceCtx);
+             Client* client = cursor.next();) {
+            stdx::lock_guard<Client> lk(*client);
+            if (client->isFromSystemConnection() && !client->canKillSystemOperationInStepdown(lk)) {
+                continue;
+            }
+
+            OperationContext* toKill = client->getOperationContext();
+
+            if (toKill && !toKill->isKillPending() && toKill->getOpID() != opCtx->getOpID()) {
+                auto locker = toKill->lockState();
+                if (toKill->shouldAlwaysInterruptAtStepDownOrUp() ||
+                    locker->wasGlobalLockTakenInModeConflictingWithWrites()) {
+                    serviceCtx->killOperation(lk, toKill);
+                }
+            }
+        }
+    }
+
     repl::PrimaryOnlyService* _service = nullptr;
 
     std::shared_ptr<CoordinatorStateTransitionController> _controller;
@@ -498,6 +517,8 @@ public:
         "reshardingMinimumOperationDurationMillis", 0};
 
     const std::vector<ShardId> _recipientShards = {{"shard0001"}};
+
+    long long _term = 0;
 };
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransitionsTokDone) {
@@ -525,30 +546,143 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransi
     doc.setPresetReshardedChunks(presetReshardedChunks);
 
     auto coordinator = ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON());
+
     stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
     stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
-    notifyDonorsReadyToDonate(*coordinator, doc);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+    makeDonorsReadyToDonate(opCtx);
 
     stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
     stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
 
-    notifyRecipientsFinishedCloning(*coordinator, doc);
+    makeRecipientsFinishedCloning(opCtx);
     stateTransitionsGuard.wait(CoordinatorStateEnum::kApplying);
     stateTransitionsGuard.unset(CoordinatorStateEnum::kApplying);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
 
     coordinator->onOkayToEnterCritical();
     stateTransitionsGuard.wait(CoordinatorStateEnum::kBlockingWrites);
     stateTransitionsGuard.unset(CoordinatorStateEnum::kBlockingWrites);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
 
-    notifyRecipientsInStrictConsistency(*coordinator, doc);
+    makeRecipientsBeInStrictConsistency(opCtx);
 
     stateTransitionsGuard.wait(CoordinatorStateEnum::kCommitting);
     stateTransitionsGuard.unset(CoordinatorStateEnum::kCommitting);
 
-    notifyDonorsDone(*coordinator, doc);
-    notifyRecipientsDone(*coordinator, doc);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCommitting);
+
+    makeDonorsProceedToDone(opCtx);
+    makeRecipientsProceedToDone(opCtx);
 
     coordinator->getCompletionFuture().get(opCtx);
+}
+
+/**
+ * Test stepping down right when coordinator doc is being updated. Causing the change to be
+ * rolled back and redo the work again on step up.
+ */
+TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
+    const std::vector<CoordinatorStateEnum> coordinatorStates{
+        // Skip kInitializing, as we don't write that state transition to storage.
+        CoordinatorStateEnum::kPreparingToDonate,
+        CoordinatorStateEnum::kCloning,
+        CoordinatorStateEnum::kApplying,
+        CoordinatorStateEnum::kBlockingWrites,
+        CoordinatorStateEnum::kCommitting,
+        CoordinatorStateEnum::kDone};
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), coordinatorStates};
+
+    auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
+    auto opCtx = operationContext();
+    auto donorChunk = makeAndInsertChunksForDonorShard(
+        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+
+    auto initialChunks =
+        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+
+    std::vector<ReshardedChunk> presetReshardedChunks;
+    for (const auto& chunk : initialChunks) {
+        presetReshardedChunks.emplace_back(chunk.getShard(), chunk.getMin(), chunk.getMax());
+    }
+
+    doc.setPresetReshardedChunks(presetReshardedChunks);
+
+    (void)ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON());
+    auto instanceId =
+        BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+    for (const auto state : coordinatorStates) {
+        auto coordinator = getCoordinator(opCtx, instanceId);
+
+        LOGV2(5093701,
+              "Running step down test case",
+              "stepDownAfter"_attr = (CoordinatorState_serializer(state).toString()));
+
+        switch (state) {
+            case CoordinatorStateEnum::kCloning: {
+                makeDonorsReadyToDonate(opCtx);
+                break;
+            }
+
+            case CoordinatorStateEnum::kApplying: {
+                makeRecipientsFinishedCloning(opCtx);
+                break;
+            }
+
+            case CoordinatorStateEnum::kBlockingWrites: {
+                // Pretend that the recipients are already ready to commit.
+                coordinator->onOkayToEnterCritical();
+                break;
+            }
+
+            case CoordinatorStateEnum::kCommitting: {
+                makeRecipientsBeInStrictConsistency(opCtx);
+                break;
+            }
+
+            case CoordinatorStateEnum::kDone: {
+                makeDonorsProceedToDone(opCtx);
+                makeRecipientsProceedToDone(opCtx);
+                break;
+            }
+
+            default:
+                break;
+        }
+
+        if (state != CoordinatorStateEnum::kDone) {
+            // 'done' state is never written to storage so don't wait for it
+            stateTransitionsGuard.wait(state);
+        }
+
+        stepDown(opCtx);
+
+        ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(),
+                  ErrorCodes::InterruptedDueToReplStateChange);
+
+        coordinator.reset();
+        stepUp(opCtx);
+
+        stateTransitionsGuard.unset(state);
+
+        if (state == CoordinatorStateEnum::kBlockingWrites) {
+            // We have to fake this again as the effects are not persistent.
+            coordinator = getCoordinator(opCtx, instanceId);
+            coordinator->onOkayToEnterCritical();
+        }
+
+        if (state != CoordinatorStateEnum::kDone) {
+            // 'done' state is never written to storage so don't wait for it.
+            waitUntilCommittedCoordinatorDocReach(opCtx, state);
+        }
+    }
+
+    // Join the coordinator if it has not yet been cleaned up.
+    if (auto coordinator = getCoordinatorIfExists(opCtx, instanceId)) {
+        coordinator->getCompletionFuture().get(opCtx);
+    }
 }
 
 }  // namespace
