@@ -295,6 +295,7 @@ enum class Builtin : uint8_t {
     datePartsWeekYear,
     dropFields,
     newArray,
+    newArrayFromRange,
     newObj,
     ksToString,  // KeyString to string
     newKs,       // new KeyString
@@ -707,6 +708,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinReplaceOne(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDropFields(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinNewArray(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinNewArrayFromRange(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinNewObj(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinKeyStringToString(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinNewKeyString(ArityType arity);

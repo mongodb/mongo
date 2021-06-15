@@ -2473,9 +2473,7 @@ private:
 class ExpressionRange final : public ExpressionRangedArity<ExpressionRange, 2, 3> {
 public:
     explicit ExpressionRange(ExpressionContext* const expCtx)
-        : ExpressionRangedArity<ExpressionRange, 2, 3>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionRangedArity<ExpressionRange, 2, 3>(expCtx) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;

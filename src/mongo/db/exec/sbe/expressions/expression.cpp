@@ -372,6 +372,8 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"replaceOne", BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::replaceOne, false}},
     {"dropFields", BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::dropFields, false}},
     {"newArray", BuiltinFn{kAnyNumberOfArgs, vm::Builtin::newArray, false}},
+    {"newArrayFromRange",
+     BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::newArrayFromRange, false}},
     {"newObj", BuiltinFn{[](size_t n) { return n % 2 == 0; }, vm::Builtin::newObj, false}},
     {"ksToString", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::ksToString, false}},
     {"ks", BuiltinFn{[](size_t n) { return n > 2; }, vm::Builtin::newKs, false}},

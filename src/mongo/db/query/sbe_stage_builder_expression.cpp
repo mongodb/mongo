@@ -2226,7 +2226,75 @@ public:
         unsupportedExpression("$pow");
     }
     void visit(const ExpressionRange* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto outerFrameId = _context->state.frameId();
+        auto innerFrameId = _context->state.frameId();
+
+        sbe::EVariable startRef(outerFrameId, 0);
+        sbe::EVariable endRef(outerFrameId, 1);
+        sbe::EVariable stepRef(outerFrameId, 2);
+
+        sbe::EVariable convertedStartRef(innerFrameId, 0);
+        sbe::EVariable convertedEndRef(innerFrameId, 1);
+        sbe::EVariable convertedStepRef(innerFrameId, 2);
+
+        auto step = expr->getChildren().size() == 3
+            ? _context->popExpr()
+            : sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 1);
+        auto end = _context->popExpr();
+        auto start = _context->popExpr();
+
+        auto rangeExpr = sbe::makeE<sbe::ELocalBind>(
+            outerFrameId,
+            sbe::makeEs(std::move(start), std::move(end), std::move(step)),
+            buildMultiBranchConditional(
+                CaseValuePair{
+                    generateNonNumericCheck(startRef),
+                    sbe::makeE<sbe::EFail>(ErrorCodes::Error{5154300},
+                                           "$range only supports numeric types for start")},
+                CaseValuePair{generateNonNumericCheck(endRef),
+                              sbe::makeE<sbe::EFail>(ErrorCodes::Error{5154301},
+                                                     "$range only supports numeric types for end")},
+                CaseValuePair{
+                    generateNonNumericCheck(stepRef),
+                    sbe::makeE<sbe::EFail>(ErrorCodes::Error{5154302},
+                                           "$range only supports numeric types for step")},
+                sbe::makeE<sbe::ELocalBind>(
+                    innerFrameId,
+                    sbe::makeEs(sbe::makeE<sbe::ENumericConvert>(startRef.clone(),
+                                                                 sbe::value::TypeTags::NumberInt32),
+                                sbe::makeE<sbe::ENumericConvert>(endRef.clone(),
+                                                                 sbe::value::TypeTags::NumberInt32),
+                                sbe::makeE<sbe::ENumericConvert>(
+                                    stepRef.clone(), sbe::value::TypeTags::NumberInt32)),
+                    buildMultiBranchConditional(
+                        CaseValuePair{
+                            makeNot(makeFunction("exists", convertedStartRef.clone())),
+                            sbe::makeE<sbe::EFail>(
+                                ErrorCodes::Error{5154303},
+                                "$range start argument cannot be represented as a 32-bit integer")},
+                        CaseValuePair{
+                            makeNot(makeFunction("exists", convertedEndRef.clone())),
+                            sbe::makeE<sbe::EFail>(
+                                ErrorCodes::Error{5154304},
+                                "$range end argument cannot be represented as a 32-bit integer")},
+                        CaseValuePair{
+                            makeNot(makeFunction("exists", convertedStepRef.clone())),
+                            sbe::makeE<sbe::EFail>(
+                                ErrorCodes::Error{5154305},
+                                "$range step argument cannot be represented as a 32-bit integer")},
+                        CaseValuePair{
+                            makeBinaryOp(
+                                sbe::EPrimBinary::eq,
+                                convertedStepRef.clone(),
+                                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 0)),
+                            sbe::makeE<sbe::EFail>(ErrorCodes::Error{5154306},
+                                                   "$range requires a non-zero step value")},
+                        makeFunction("newArrayFromRange",
+                                     convertedStartRef.clone(),
+                                     convertedEndRef.clone(),
+                                     convertedStepRef.clone())))));
+
+        _context->pushExpr(std::move(rangeExpr));
     }
     void visit(const ExpressionReduce* expr) final {
         unsupportedExpression("$reduce");

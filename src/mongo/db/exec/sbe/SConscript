@@ -134,6 +134,7 @@ env.CppUnitTest(
         'expressions/sbe_get_element_builtin_test.cpp',
         'expressions/sbe_index_of_test.cpp',
         'expressions/sbe_is_array_empty_builtin_test.cpp',
+        'expressions/sbe_new_array_from_range_builtin_test.cpp',
         'expressions/sbe_is_member_builtin_test.cpp',
         'expressions/sbe_iso_date_to_parts_test.cpp',
         'expressions/sbe_mod_expression_test.cpp',

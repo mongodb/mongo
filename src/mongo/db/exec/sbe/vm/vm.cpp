@@ -884,6 +884,48 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArray(ArityT
     return {true, tag, val};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArrayFromRange(
+    ArityType arity) {
+    auto [tag, val] = value::makeNewArray();
+    value::ValueGuard guard{tag, val};
+
+    auto arr = value::getArrayView(val);
+
+    auto [startOwned, startTag, start] = getFromStack(0);
+    auto [endOwned, endTag, end] = getFromStack(1);
+    auto [stepOwned, stepTag, step] = getFromStack(2);
+
+    for (auto& tag : {startTag, endTag, stepTag}) {
+        if (value::TypeTags::NumberInt32 != tag) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+    }
+
+    // Cast to broader type 'int64_t' to prevent overflow during loop.
+    auto startVal = value::numericCast<int64_t>(startTag, start);
+    auto endVal = value::numericCast<int64_t>(endTag, end);
+    auto stepVal = value::numericCast<int64_t>(stepTag, step);
+
+    if (stepVal == 0) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto isPositiveStep = stepVal > 0;
+
+    if (isPositiveStep) {
+        for (auto i = startVal; i < endVal; i += stepVal) {
+            arr->push_back(value::TypeTags::NumberInt32, value::bitcastTo<int32_t>(i));
+        }
+    } else {
+        for (auto i = startVal; i > endVal; i += stepVal) {
+            arr->push_back(value::TypeTags::NumberInt32, value::bitcastTo<int32_t>(i));
+        }
+    }
+
+    guard.reset();
+    return {true, tag, val};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewObj(ArityType arity) {
     std::vector<value::TypeTags> typeTags;
     std::vector<value::Value> values;
@@ -3069,6 +3111,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinDropFields(arity);
         case Builtin::newArray:
             return builtinNewArray(arity);
+        case Builtin::newArrayFromRange:
+            return builtinNewArrayFromRange(arity);
         case Builtin::newObj:
             return builtinNewObj(arity);
         case Builtin::ksToString:
