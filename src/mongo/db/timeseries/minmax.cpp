@@ -167,47 +167,9 @@ bool MinMaxStore::ConstIterator::operator!=(const MinMaxStore::ConstIterator& rh
     return !operator==(rhs);
 }
 
-MinMaxStore::ObjView::ObjView(const MinMaxStore::Entries& entries,
-                              MinMaxStore::Entries::const_iterator pos)
-    : _entries(entries), _pos(pos) {}
-
-MinMaxStore::ObjView& MinMaxStore::ObjView::operator=(const MinMaxStore::ObjView& rhs) {
-    if (this != &rhs) {
-        _pos = rhs._pos;
-    }
-    return *this;
-}
-
-MinMaxStore::ObjView MinMaxStore::ObjView::object(MinMaxStore::ConstIterator pos) const {
-    return {_entries, pos._pos};
-}
-
-MinMaxStore::ObjView MinMaxStore::ObjView::parent() const {
-    return {_entries, _pos - _pos->_offsetParent};
-}
-
-const MinMaxStore::Element& MinMaxStore::ObjView::element() const {
-    return _pos->_element;
-}
-
-MinMaxStore::ConstIterator MinMaxStore::ObjView::iterator() const {
-    return {_pos};
-}
-
-MinMaxStore::ConstIterator MinMaxStore::ObjView::begin() const {
-    return {_pos + 1};
-}
-
-MinMaxStore::ConstIterator MinMaxStore::ObjView::end() const {
-    return {_pos + _pos->_offsetEnd};
-}
-
 MinMaxStore::Obj::Obj(MinMaxStore::Entries& entries, MinMaxStore::Entries::iterator pos)
     : _entries(entries), _pos(pos) {}
 
-MinMaxStore::Obj::operator MinMaxStore::ObjView() {
-    return {_entries, _pos};
-}
 
 MinMaxStore::Obj& MinMaxStore::Obj::operator=(const MinMaxStore::Obj& rhs) {
     if (this != &rhs) {
@@ -543,20 +505,20 @@ std::pair<MinMaxStore::Iterator, MinMaxStore::Iterator> MinMax::_update(
     return {obj.iterator(), obj.parent().end()};
 }
 
-BSONObj MinMax::min() const {
+BSONObj MinMax::min() {
     BSONObjBuilder builder;
     _append(_store.root(), &builder, GetMin());
     return builder.obj();
 }
 
-BSONObj MinMax::max() const {
+BSONObj MinMax::max() {
     BSONObjBuilder builder;
     _append(_store.root(), &builder, GetMax());
     return builder.obj();
 }
 
 template <typename GetDataFn>
-void MinMax::_append(MinMaxStore::ObjView obj, BSONObjBuilder* builder, GetDataFn getData) const {
+void MinMax::_append(MinMaxStore::Obj obj, BSONObjBuilder* builder, GetDataFn getData) {
     for (auto it = obj.begin(); it != obj.end(); ++it) {
         const auto& data = getData(*it);
         if (data.type() == MinMaxStore::Type::kValue) {
@@ -568,11 +530,13 @@ void MinMax::_append(MinMaxStore::ObjView obj, BSONObjBuilder* builder, GetDataF
             BSONArrayBuilder subArr(builder->subarrayStart(it->fieldName()));
             _append(obj.object(it), &subArr, getData);
         }
+        if (data.updated())
+            _clearUpdated(it, getData);
     }
 }
 
 template <typename GetDataFn>
-void MinMax::_append(MinMaxStore::ObjView obj, BSONArrayBuilder* builder, GetDataFn getData) const {
+void MinMax::_append(MinMaxStore::Obj obj, BSONArrayBuilder* builder, GetDataFn getData) {
     for (auto it = obj.begin(); it != obj.end(); ++it) {
         const auto& data = getData(*it);
         if (data.type() == MinMaxStore::Type::kValue) {
@@ -584,6 +548,8 @@ void MinMax::_append(MinMaxStore::ObjView obj, BSONArrayBuilder* builder, GetDat
             BSONArrayBuilder subArr(builder->subarrayStart());
             _append(obj.object(it), &subArr, getData);
         }
+        if (data.updated())
+            _clearUpdated(it, getData);
     }
 }
 
@@ -662,7 +628,8 @@ bool MinMax::_appendUpdates(MinMaxStore::Obj obj, BSONObjBuilder* builder, GetDa
                 }
                 _clearUpdated(it, getData);
                 appended = true;
-            } else if (subdata.type() != MinMaxStore::Type::kValue) {
+            } else if (subdata.type() != MinMaxStore::Type::kValue &&
+                       subdata.type() != MinMaxStore::Type::kUnset) {
                 BSONObjBuilder subDiff;
                 if (_appendUpdates(obj.object(it), &subDiff, getData)) {
                     // An update occurred at a lower level, so append the sub diff.

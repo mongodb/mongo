@@ -110,7 +110,6 @@ public:
     };
 
     class Obj;
-    class ObjView;
 
     /**
      * Element stored in this MinMaxStore.
@@ -201,7 +200,6 @@ public:
     class ConstIterator {
     public:
         friend class MinMaxStore::Obj;
-        friend class MinMaxStore::ObjView;
 
         using iterator_category = std::forward_iterator_tag;
         using difference_type = ptrdiff_t;
@@ -223,51 +221,6 @@ public:
         Entries::const_iterator _pos;
     };
 
-    /**
-     * Like Obj below but only provides const access.
-     */
-    class ObjView {
-    public:
-        friend class MinMaxStore;
-
-        /**
-         * Copying an ObjView copies the internal position. It is not allowed to copy to an ObjView
-         * owned by a different MinMaxStore.
-         */
-        ObjView& operator=(const ObjView& rhs);
-
-        /**
-         * Access to the element containing user-data such as field names and min/max values.
-         */
-        const Element& element() const;
-
-        /**
-         * Creates an ObjView to the parent of this ObjView.
-         */
-        ObjView parent() const;
-
-        /**
-         * Creates an ObjView for a subelement of this ObjView.
-         */
-        ObjView object(ConstIterator pos) const;
-
-        /**
-         * Returns the iterator position of this ObjView.
-         */
-        ConstIterator iterator() const;
-
-        /**
-         * Iteration for subelements of this ObjView.
-         */
-        ConstIterator begin() const;
-        ConstIterator end() const;
-
-    private:
-        ObjView(const Entries& entries, std::vector<Entry>::const_iterator pos);
-
-        const Entries& _entries;
-        Entries::const_iterator _pos;
-    };
 
     /**
      * Represents an 'Object' within the MinMaxStore. Analogous BSONObj for BSON. Provides
@@ -276,8 +229,6 @@ public:
     class Obj {
     public:
         friend class MinMaxStore;
-
-        operator ObjView();
 
         /**
          * Copying an Obj copies the internal position. It is not allowed to copy to an Obj owned by
@@ -323,7 +274,7 @@ public:
 
         /**
          * Insert a new element before the position 'pos'. Invalidates all previously returned
-         * Iterators, Obj and ObjView. This Obj remain valid.
+         * Iterators and Obj. This Obj remain valid.
          *
          * Returns an iterator to the newly inserted element together with the end iterator for this
          * Obj.
@@ -353,9 +304,6 @@ public:
     Obj root() {
         return {entries, entries.begin()};
     }
-    ObjView root() const {
-        return {entries, entries.begin()};
-    }
 
 private:
     Entries entries;
@@ -376,12 +324,12 @@ public:
     /**
      * Returns the full min/max object.
      */
-    BSONObj min() const;
-    BSONObj max() const;
+    BSONObj min();
+    BSONObj max();
 
     /**
-     * Returns the updates since the previous time this function was called in the format for
-     * an update op.
+     * Returns the updates since the previous time this function or the min/max functions were
+     * called in the format for an update op.
      */
     BSONObj minUpdates();
     BSONObj maxUpdates();
@@ -408,9 +356,9 @@ private:
      * Appends the MinMax, to the builder.
      */
     template <typename GetDataFn>
-    void _append(MinMaxStore::ObjView obj, BSONObjBuilder* builder, GetDataFn getData) const;
+    void _append(MinMaxStore::Obj obj, BSONObjBuilder* builder, GetDataFn getData);
     template <typename GetDataFn>
-    void _append(MinMaxStore::ObjView obj, BSONArrayBuilder* builder, GetDataFn getData) const;
+    void _append(MinMaxStore::Obj obj, BSONArrayBuilder* builder, GetDataFn getData);
 
     /**
      * Appends updates, if any, to the builder. Returns whether any updates were appended.
