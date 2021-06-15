@@ -6930,7 +6930,7 @@ tasks:
 
 - name: win_shared_scons_cache_pruning
   tags: []
-  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  exec_timeout_secs: 21600 # 2 hour timeout for the task overall
   depends_on: []
   commands:
   - command: manifest.load

@@ -27,7 +27,7 @@ CacheItem = collections.namedtuple("CacheContents", ["path", "time", "size"])
 def get_cachefile_size(file_path):
     """Get the size of the cachefile."""
 
-    if file_path.endswith('.cksum'):
+    if file_path.lower().endswith('.cksum') or file_path.lower().endswith('.cksum.del'):
         size = 0
         for cksum_path in os.listdir(file_path):
             cksum_path = os.path.join(file_path, cksum_path)
@@ -53,7 +53,8 @@ def collect_cache_contents(cache_path):
                 # Cache prune script is allowing only directories with this extension
                 # which comes from the validate_cache_dir.py tool in scons, it must match
                 # the extension set in that file.
-                if os.path.isdir(file_path) and not file_path.endswith('.cksum'):
+                if os.path.isdir(file_path) and not file_path.lower().endswith(
+                        '.cksum') and not file_path.lower().endswith('.cksum.del'):
                     LOGGER.warning(
                         "cache item %s is a directory and not a file. "
                         "The cache may be corrupt.", file_path)
