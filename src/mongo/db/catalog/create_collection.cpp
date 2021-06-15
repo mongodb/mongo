@@ -194,14 +194,33 @@ Status _createTimeseries(OperationContext* opCtx,
             AutoGetDb autoDb(opCtx, bucketsNs.db(), MODE_IX);
             Lock::CollectionLock bucketsCollLock(opCtx, bucketsNs, MODE_IX);
 
+            // Check if there already exist a Collection on the namespace we will later create a
+            // view on. We're not holding a Collection lock for this Collection so we may only check
+            // if the pointer is null or not. The answer may also change at any point after this
+            // call which is fine as we properly handle an orphaned bucket collection. This check is
+            // just here to prevent it from being created in the common case.
+            if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, ns)) {
+                return Status(ErrorCodes::NamespaceExists,
+                              str::stream() << "Collection already exists. NS: " << ns);
+            }
+
+            auto db = autoDb.ensureDbExists();
+            if (auto view = ViewCatalog::get(db)->lookup(opCtx, ns.ns()); view) {
+                if (view->timeseries()) {
+                    return Status(ErrorCodes::NamespaceExists,
+                                  str::stream()
+                                      << "A timeseries collection already exists. NS: " << ns);
+                }
+                return Status(ErrorCodes::NamespaceExists,
+                              str::stream() << "A view already exists. NS: " << ns);
+            }
+
             if (opCtx->writesAreReplicated() &&
                 !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, bucketsNs)) {
                 // Report the error with the user provided namespace
                 return Status(ErrorCodes::NotWritablePrimary,
                               str::stream() << "Not primary while creating collection " << ns);
             }
-
-            auto db = autoDb.ensureDbExists();
 
             WriteUnitOfWork wuow(opCtx);
             AutoStatsTracker bucketsStatsTracker(
