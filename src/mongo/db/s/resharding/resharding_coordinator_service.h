@@ -277,17 +277,29 @@ private:
     };
 
     /**
+     * Construct the initial chunks splits and write down the initial coordinator state to storage.
+     */
+    ExecutorFuture<void> _initializeCoordinator(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
      * Runs resharding up through preparing to persist the decision.
      */
-    ExecutorFuture<ReshardingCoordinatorDocument> _runUntilReadyToPersistDecision(
+    ExecutorFuture<ReshardingCoordinatorDocument> _runUntilReadyToCommit(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor) noexcept;
 
     /**
      * Runs resharding through persisting the decision until cleanup.
      */
-    ExecutorFuture<void> _persistDecisionAndFinishReshardOperation(
+    ExecutorFuture<void> _commitAndFinishReshardOperation(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const ReshardingCoordinatorDocument& updatedCoordinatorDoc) noexcept;
+
+    /**
+     * Inform all of the donors and recipients of this resharding operation to begin.
+     */
+    ExecutorFuture<void> _tellAllParticipantsReshardingStarted(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
      * Runs abort cleanup logic when only the coordinator is aware of the resharding operation.
@@ -373,7 +385,7 @@ private:
      *
      * Transitions to 'kCommitting'.
      */
-    Future<void> _persistDecision(const ReshardingCoordinatorDocument& updatedDoc);
+    Future<void> _commit(const ReshardingCoordinatorDocument& updatedDoc);
 
     /**
      * Waits on _reshardingCoordinatorObserver to notify that:
@@ -459,8 +471,7 @@ private:
     boost::optional<CancelableOperationContextFactory> _cancelableOpCtxFactory;
 
     /**
-     * Must be locked while the `_canEnterCritical` or `_completionPromise`
-     * promises are fulfilled.
+     * Must be locked while the `_canEnterCritical` promise is being fulfilled.
      */
     mutable Mutex _fulfillmentMutex =
         MONGO_MAKE_LATCH("ReshardingCoordinatorService::_fulfillmentMutex");
