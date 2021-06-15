@@ -715,7 +715,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         if (replSettings.usingReplSets()) {
             Lock::GlobalWrite lk(startupOpCtx.get());
             OldClientContext ctx(startupOpCtx.get(), NamespaceString::kRsOplogNamespace.ns());
-            createSlimOplogView(startupOpCtx.get(), ctx.db());
             tenant_migration_util::createOplogViewForTenantMigrations(startupOpCtx.get(), ctx.db());
         }
     }

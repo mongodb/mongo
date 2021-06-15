@@ -187,15 +187,10 @@ protected:
     }
 
     boost::intrusive_ptr<ExpressionContextForTest> createExpressionContext() {
-        NamespaceString slimNss =
-            NamespaceString("local.system.resharding.slimOplogForGraphLookup");
-
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(
             new ExpressionContextForTest(getOpCtx(), _localOplogBufferNss));
         expCtx->setResolvedNamespace(_localOplogBufferNss, {_localOplogBufferNss, {}});
         expCtx->setResolvedNamespace(_remoteOplogNss, {_remoteOplogNss, {}});
-        expCtx->setResolvedNamespace(slimNss,
-                                     {slimNss, std::vector<BSONObj>{getSlimOplogPipeline()}});
         return expCtx;
     }
 

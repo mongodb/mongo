@@ -93,7 +93,6 @@ public:
         {
             Lock::GlobalWrite lk(_opCtx);
             OldClientContext ctx(_opCtx, NamespaceString::kRsOplogNamespace.ns());
-            createSlimOplogView(_opCtx, ctx.db());
         }
 
         // Initialize ReshardingMetrics to a recipient state compatible with fetching.
@@ -189,15 +188,10 @@ public:
     }
 
     boost::intrusive_ptr<ExpressionContextForTest> createExpressionContext() {
-        NamespaceString slimNss =
-            NamespaceString("local.system.resharding.slimOplogForGraphLookup");
-
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(
             new ExpressionContextForTest(_opCtx, NamespaceString::kRsOplogNamespace));
         expCtx->setResolvedNamespace(NamespaceString::kRsOplogNamespace,
                                      {NamespaceString::kRsOplogNamespace, {}});
-        expCtx->setResolvedNamespace(slimNss,
-                                     {slimNss, std::vector<BSONObj>{getSlimOplogPipeline()}});
         return expCtx;
     }
 

@@ -57,8 +57,6 @@ namespace mongo {
 namespace {
 boost::intrusive_ptr<ExpressionContext> _makeExpressionContext(OperationContext* opCtx) {
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    const NamespaceString slimOplogNs("local.system.resharding.slimOplogForGraphLookup");
-    resolvedNamespaces[slimOplogNs.coll()] = {slimOplogNs, std::vector<BSONObj>()};
     resolvedNamespaces[NamespaceString::kRsOplogNamespace.coll()] = {
         NamespaceString::kRsOplogNamespace, std::vector<BSONObj>()};
     return make_intrusive<ExpressionContext>(opCtx,

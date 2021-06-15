@@ -270,14 +270,6 @@ std::vector<BSONObj> buildTagsDocsFromZones(const NamespaceString& tempNss,
                                             const std::vector<ReshardingZoneType>& zones);
 
 /**
- * Creates a view on the oplog that facilitates the specialized oplog tailing a resharding
- * recipient performs on a donor.
- */
-void createSlimOplogView(OperationContext* opCtx, Database* db);
-
-BSONObj getSlimOplogPipeline();
-
-/**
  * Creates a pipeline that can be serialized into a query for fetching oplog entries. `startAfter`
  * may be `Timestamp::isNull()` to fetch from the beginning of the oplog.
  */

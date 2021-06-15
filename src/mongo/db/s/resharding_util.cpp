@@ -250,58 +250,6 @@ std::vector<BSONObj> buildTagsDocsFromZones(const NamespaceString& tempNss,
     return tags;
 }
 
-void createSlimOplogView(OperationContext* opCtx, Database* db) {
-    writeConflictRetry(
-        opCtx, "createReshardingSlimOplog", NamespaceString::kReshardingOplogView.ns(), [&] {
-            {
-                // Create 'system.views' in a separate WUOW if it does not exist.
-                WriteUnitOfWork wuow(opCtx);
-                CollectionPtr coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-                    opCtx, NamespaceString(db->getSystemViewsName()));
-                if (!coll) {
-                    coll = db->createCollection(opCtx, NamespaceString(db->getSystemViewsName()));
-                }
-                invariant(coll);
-                wuow.commit();
-            }
-
-            // Resharding uses the `prevOpTime` to link oplog related entries via a
-            // $graphLookup. Large transactions and prepared transaction use prevOpTime to identify
-            // earlier oplog entries from the same transaction. Retryable writes (identified via the
-            // presence of `stmtId`) use prevOpTime to identify earlier run statements from the same
-            // retryable write.  This view will unlink oplog entries from the same retryable write
-            // by zeroing out their `prevOpTime`.
-            CollectionOptions options;
-            options.viewOn = NamespaceString::kRsOplogNamespace.coll().toString();
-            options.pipeline = BSON_ARRAY(getSlimOplogPipeline());
-            WriteUnitOfWork wuow(opCtx);
-            auto status = db->createView(opCtx, NamespaceString::kReshardingOplogView, options);
-            if (status == ErrorCodes::NamespaceExists) {
-                return;
-            }
-            uassertStatusOK(status);
-            wuow.commit();
-        });
-}
-
-BSONObj getSlimOplogPipeline() {
-    return fromjson(
-        "{$project: {\
-            _id: '$ts',\
-            op: 1,\
-            o: {\
-                applyOps: {ui: 1, destinedRecipient: 1},\
-                abortTransaction: 1\
-            },\
-            ts: 1,\
-            'prevOpTime.ts': {$cond: {\
-                if: {$eq: [{$type: '$stmtId'}, 'missing']},\
-                then: '$prevOpTime.ts',\
-                else: Timestamp(0, 0)\
-            }}\
-        }}");
-}
-
 std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForResharding(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ReshardingDonorOplogId& startAfter,
