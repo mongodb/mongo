@@ -431,6 +431,13 @@ var TenantMigrationUtil = (function() {
      * Checks if an error gotten while doing a tenant dbhash check is retriable.
      */
     function checkIfRetriableErrorForTenantDbHashCheck(error) {
+        // Due to the shell not propagating error codes correctly, if we get any of the following
+        // error messages, we can retry the operation.
+        const retryableErrorMessages = [
+            "The server is in quiesce mode and will shut down",
+            "can't connect to new replica set primary"
+        ];
+
         return isRetryableError(error) || isNetworkError(error) ||
             // If there's a failover while we're running a dbhash check, the elected secondary might
             // not have set the tenantMigrationDonorAllowsNonTimestampedReads failpoint, which means
@@ -443,7 +450,7 @@ var TenantMigrationUtil = (function() {
             error.code == ErrorCodes.NotYetInitialized ||
             // TODO (SERVER-54026): Remove check for error message once the shell correctly
             // propagates the error code.
-            error.message.includes("The server is in quiesce mode and will shut down");
+            retryableErrorMessages.some(msg => error.message.includes(msg));
     }
 
     /**
