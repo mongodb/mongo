@@ -245,7 +245,9 @@ Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexB
         });
 }
 
-Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
+Status removeIndexBuildEntry(OperationContext* opCtx,
+                             const CollectionPtr& collectionUnused,
+                             UUID indexBuildUUID) {
     return writeConflictRetry(
         opCtx,
         "removeIndexBuildEntry",

@@ -591,10 +591,12 @@ protected:
      */
     void _completeAbort(OperationContext* opCtx,
                         std::shared_ptr<ReplIndexBuildState> replState,
+                        const CollectionPtr& indexBuildEntryCollection,
                         IndexBuildAction signalAction,
                         Status reason);
     void _completeSelfAbort(OperationContext* opCtx,
                             std::shared_ptr<ReplIndexBuildState> replState,
+                            const CollectionPtr& indexBuildEntryCollection,
                             Status reason);
     void _completeAbortForShutdown(OperationContext* opCtx,
                                    std::shared_ptr<ReplIndexBuildState> replState,

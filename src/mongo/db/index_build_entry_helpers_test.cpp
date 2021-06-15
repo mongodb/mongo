@@ -89,6 +89,10 @@ void checkIfEqual(IndexBuildEntry lhs, IndexBuildEntry rhs) {
     }
 }
 
+Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
+    return indexbuildentryhelpers::removeIndexBuildEntry(opCtx, {}, indexBuildUUID);
+}
+
 class IndexBuildEntryHelpersTest : public CatalogTestFixture {
 public:
     void setUp() {

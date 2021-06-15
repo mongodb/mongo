@@ -34,6 +34,7 @@
 namespace mongo {
 
 class IndexBuildEntry;
+class CollectionPtr;
 class CommitQuorumOptions;
 class OperationContext;
 class Status;
@@ -105,7 +106,9 @@ Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexB
  *
  * Returns 'NoMatchingDocument' error code if no document with 'indexBuildUUID' is found.
  */
-Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID);
+Status removeIndexBuildEntry(OperationContext* opCtx,
+                             const CollectionPtr& collection,
+                             UUID indexBuildUUID);
 
 /**
  * Returns the IndexBuildEntry matching the document with 'indexBuildUUID' from the disk if it
