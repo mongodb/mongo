@@ -1055,7 +1055,7 @@ Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationC
             auto estimatedUntransferredChunkPercentage =
                 (std::min(_args.getMaxChunkSizeBytes(), estimatedUntransferredModsSize) * 100) /
                 _args.getMaxChunkSizeBytes();
-            if (estimatedUntransferredChunkPercentage < maxCatchUpPercentageBeforeBlockingWrites) {
+            if (estimatedUntransferredChunkPercentage < minCatchUpPercentageBeforeBlockingWrites) {
                 // The recipient is sufficiently caught-up with the writes on the donor.
                 // Block writes, so that it can drain everything.
                 return Status::OK();
