@@ -715,8 +715,9 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     }
 
     if (maxLoaderVersion.isSet() &&
-        (maxLoaderVersion.getTimestamp().is_initialized() !=
-         collAndChunks.creationTime.is_initialized())) {
+        maxLoaderVersion.getTimestamp().is_initialized() !=
+            collAndChunks.creationTime.is_initialized() &&
+        maxLoaderVersion.epoch() == collAndChunks.epoch) {
         // This task will update the metadata format of the collection and all its chunks.
         // It doesn't apply the changes of the ChangedChunks, we will do that in the next task
         _ensureMajorityPrimaryAndScheduleCollAndChunksTask(
