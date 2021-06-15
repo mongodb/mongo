@@ -660,7 +660,7 @@ public:
 
         // Do a duplicate check, but only if dups aren't allowed.
         if (!_dupsAllowed) {
-            const int cmp = newKeyString.compareWithoutRecordId(_previousKeyString);
+            const int cmp = newKeyString.compareWithoutRecordIdLong(_previousKeyString);
             if (cmp == 0) {
                 // Duplicate found!
                 auto newKey = KeyString::toBson(newKeyString, _idx->_ordering);
@@ -719,7 +719,7 @@ public:
     Status addKey(const KeyString::Value& newKeyString) override {
         dassertRecordIdAtEnd(newKeyString, KeyFormat::Long);
 
-        const int cmp = newKeyString.compareWithoutRecordId(_previousKeyString);
+        const int cmp = newKeyString.compareWithoutRecordIdLong(_previousKeyString);
         // _previousKeyString.isEmpty() is only true on the first call to addKey().
         invariant(_previousKeyString.isEmpty() || cmp > 0);
 
@@ -735,8 +735,8 @@ public:
             value.appendTypeBits(typeBits);
         }
 
-        auto sizeWithoutRecordId =
-            KeyString::sizeWithoutRecordIdAtEnd(newKeyString.getBuffer(), newKeyString.getSize());
+        auto sizeWithoutRecordId = KeyString::sizeWithoutRecordIdLongAtEnd(newKeyString.getBuffer(),
+                                                                           newKeyString.getSize());
         WiredTigerItem keyItem(newKeyString.getBuffer(), sizeWithoutRecordId);
         WiredTigerItem valueItem(value.getBuffer(), value.getSize());
 
@@ -869,8 +869,8 @@ public:
 
         if (KeyString::compare(ksEntry->keyString.getBuffer(),
                                key.getBuffer(),
-                               KeyString::sizeWithoutRecordIdAtEnd(ksEntry->keyString.getBuffer(),
-                                                                   ksEntry->keyString.getSize()),
+                               KeyString::sizeWithoutRecordIdLongAtEnd(
+                                   ksEntry->keyString.getBuffer(), ksEntry->keyString.getSize()),
                                key.getSize()) == 0) {
             return KeyStringEntry(ksEntry->keyString, ksEntry->loc);
         }
@@ -1496,7 +1496,7 @@ Status WiredTigerIdIndex::_insert(OperationContext* opCtx,
     invariant(id.isValid());
 
     auto sizeWithoutRecordId =
-        KeyString::sizeWithoutRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
+        KeyString::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
 
     KeyString::Builder value(getKeyStringVersion(), id);
@@ -1535,7 +1535,7 @@ Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
         // A prefix key is KeyString of index key. It is the component of the index entry that
         // should be unique.
         auto sizeWithoutRecordId =
-            KeyString::sizeWithoutRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
+            KeyString::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
         WiredTigerItem prefixKeyItem(keyString.getBuffer(), sizeWithoutRecordId);
 
         // First phase inserts the prefix key to prohibit concurrent insertions of same key
@@ -1614,7 +1614,7 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
     invariant(id.isValid());
 
     auto sizeWithoutRecordId =
-        KeyString::sizeWithoutRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
+        KeyString::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
     setKey(c, keyItem.Get());
 
@@ -1704,7 +1704,7 @@ void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
     // format key has index key + Record id. WT_NOTFOUND is possible if index key is in old format.
     // Retry removal of key using old format.
     auto sizeWithoutRecordId =
-        KeyString::sizeWithoutRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
+        KeyString::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
     setKey(c, keyItem.Get());
 

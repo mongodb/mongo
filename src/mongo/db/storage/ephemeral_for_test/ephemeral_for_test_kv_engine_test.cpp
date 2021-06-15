@@ -329,7 +329,7 @@ TEST_F(EphemeralForTestKVEngineTest, ReadOlderSnapshotsSimple) {
 
     // Pin oldest timestamp with a read transaction.
     OperationContextFromKVEngine pinningOldest(_engine);
-    ASSERT(!rs->findRecord(&pinningOldest, RecordId(), nullptr));
+    ASSERT(!rs->findRecord(&pinningOldest, RecordId(1), nullptr));
 
     // Set readFrom to timestamp with no committed transactions.
     Timestamp readFrom = _engine->getHistory_forTest().rbegin()->first;

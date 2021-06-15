@@ -44,9 +44,7 @@ TimeseriesTest.run((insert) => {
     function checkRecordId(documents) {
         for (const document of documents) {
             assert(document.hasOwnProperty("$recordId"));
-            if (TimeseriesTest.supportsClusteredIndexes(db.getMongo())) {
-                assert(isString(document["$recordId"]));
-            }
+            assert(isString(document["$recordId"]));
         }
     }
 

@@ -70,11 +70,6 @@ public:
     std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique,
                                                                        bool partial,
                                                                        KeyFormat keyFormat) final {
-        if (keyFormat == KeyFormat::String) {
-            // not supported
-            return nullptr;
-        }
-
         std::string ns = "test.ephemeral_for_test";
         OperationContextNoop opCtx(newRecoveryUnit().release());
 
@@ -91,8 +86,7 @@ public:
 
         auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
         _descs.emplace_back("", spec);
-        return _kvEngine.getSortedDataInterface(
-            &opCtx, CollectionOptions(), "ident"_sd, &_descs.back());
+        return _kvEngine.getSortedDataInterface(&opCtx, keyFormat, "ident"_sd, &_descs.back());
     }
 
     std::unique_ptr<mongo::RecoveryUnit> newRecoveryUnit() final {

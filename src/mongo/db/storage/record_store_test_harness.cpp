@@ -409,11 +409,6 @@ TEST(RecordStoreTestHarness, Cursor1) {
 
 TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     const auto harnessHelper = newRecordStoreHarnessHelper();
-    if (!harnessHelper->getEngine()->supportsClusteredIdIndex()) {
-        // Only WiredTiger supports clustered indexes on _id.
-        return;
-    }
-
     const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
     options.clusteredIndex = true;
@@ -453,9 +448,8 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
         ASSERT_EQ(numRecords, currRecord);
     }
 
-    {
+    if (auto cursor = rs->getRandomCursor(opCtx.get())) {
         // Verify random cursors work on ObjectId's.
-        auto cursor = rs->getRandomCursor(opCtx.get());
         auto record = cursor->next();
         ASSERT(record);
 
@@ -520,11 +514,6 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
 
 TEST(RecordStoreTestHarness, ClusteredRecordStoreSeekNear) {
     const auto harnessHelper = newRecordStoreHarnessHelper();
-    if (!harnessHelper->getEngine()->supportsClusteredIdIndex()) {
-        // Only WiredTiger supports clustered indexes on _id.
-        return;
-    }
-
     const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
     options.clusteredIndex = true;

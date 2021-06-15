@@ -57,31 +57,45 @@ BSONObj const sample = BSON(""
                             << "s"
                             << "" << (int64_t)0);
 
-std::string createKey(StringData ident, int64_t recordId) {
-    KeyString::Builder ks(version, BSON("" << ident << "" << recordId), allAscending);
+std::string createKey(StringData ident, RecordId recordId) {
+    KeyString::Builder ks(version, BSON("" << ident), allAscending, recordId);
     return std::string(ks.getBuffer(), ks.getSize());
 }
 
-RecordId extractRecordId(const std::string& keyStr) {
-    KeyString::Builder ks(version, sample, allAscending);
-    ks.resetFromBuffer(keyStr.c_str(), keyStr.size());
-    BSONObj obj = KeyString::toBson(keyStr.c_str(), keyStr.size(), allAscending, ks.getTypeBits());
-    auto it = BSONObjIterator(obj);
-    ++it;
-    return RecordId((*it).Long());
+std::string createPrefix(StringData ident) {
+    KeyString::Builder ks(
+        version, BSON("" << ident), allAscending, KeyString::Discriminator::kExclusiveBefore);
+    return std::string(ks.getBuffer(), ks.getSize());
+}
+
+std::string createPostfix(StringData ident) {
+    KeyString::Builder ks(
+        version, BSON("" << ident), allAscending, KeyString::Discriminator::kExclusiveAfter);
+    return std::string(ks.getBuffer(), ks.getSize());
+}
+
+RecordId extractRecordId(const std::string& keyStr, KeyFormat keyFormat) {
+    if (KeyFormat::Long == keyFormat) {
+        return KeyString::decodeRecordIdLongAtEnd(keyStr.c_str(), keyStr.size());
+    } else {
+        invariant(KeyFormat::String == keyFormat);
+        return KeyString::decodeRecordIdStrAtEnd(keyStr.c_str(), keyStr.size());
+    }
 }
 }  // namespace
 
 RecordStore::RecordStore(StringData ns,
                          StringData ident,
+                         KeyFormat keyFormat,
                          bool isCapped,
                          CappedCallback* cappedCallback,
                          VisibilityManager* visibilityManager)
     : mongo::RecordStore(ns, ident),
+      _keyFormat(keyFormat),
       _isCapped(isCapped),
       _ident(getIdent().data(), getIdent().size()),
-      _prefix(createKey(_ident, std::numeric_limits<int64_t>::min())),
-      _postfix(createKey(_ident, std::numeric_limits<int64_t>::max())),
+      _prefix(createPrefix(_ident)),
+      _postfix(createPostfix(_ident)),
       _cappedCallback(cappedCallback),
       _isOplog(NamespaceString::oplog(ns)),
       _visibilityManager(visibilityManager) {}
@@ -111,7 +125,7 @@ int64_t RecordStore::storageSize(OperationContext* opCtx,
 
 bool RecordStore::findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    auto it = workingCopy->find(createKey(_ident, loc.getLong()));
+    auto it = workingCopy->find(createKey(_ident, loc));
     if (it == workingCopy->end()) {
         return false;
     }
@@ -120,11 +134,13 @@ bool RecordStore::findRecord(OperationContext* opCtx, const RecordId& loc, Recor
 }
 
 void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
-    _initHighestIdIfNeeded(opCtx);
+    if (KeyFormat::Long == _keyFormat) {
+        _initHighestIdIfNeeded(opCtx);
+    }
     auto ru = RecoveryUnit::get(opCtx);
     StringStore* workingCopy(ru->getHead());
     SizeAdjuster adjuster(opCtx, this);
-    invariant(workingCopy->erase(createKey(_ident, dl.getLong())));
+    invariant(workingCopy->erase(createKey(_ident, dl)));
     ru->makeDirty();
 }
 
@@ -136,23 +152,36 @@ Status RecordStore::insertRecords(OperationContext* opCtx,
     {
         SizeAdjuster adjuster(opCtx, this);
         for (auto& record : *inOutRecords) {
-            int64_t thisRecordId = record.id.getLong();
+            auto thisRecordId = record.id;
             if (_isOplog) {
                 StatusWith<RecordId> status =
                     record_id_helpers::extractKeyOptime(record.data.data(), record.data.size());
                 if (!status.isOK())
                     return status.getStatus();
-                thisRecordId = status.getValue().getLong();
-                _visibilityManager->addUncommittedRecord(opCtx, this, RecordId(thisRecordId));
+                thisRecordId = status.getValue();
+                _visibilityManager->addUncommittedRecord(opCtx, this, thisRecordId);
             } else {
                 // If the record had an id already, keep it.
-                if (thisRecordId == 0) {
-                    thisRecordId = _nextRecordId(opCtx);
+                if (KeyFormat::Long == _keyFormat && thisRecordId.isNull()) {
+                    thisRecordId = RecordId(_nextRecordId(opCtx));
                 }
             }
+            auto key = createKey(_ident, thisRecordId);
+            auto it = workingCopy->find(key);
+            if (keyFormat() == KeyFormat::String && it != workingCopy->end()) {
+                // RecordStores with the string KeyFormat implicitly expect enforcement of _id
+                // uniqueness. Generate a useful error message that is consistent with duplicate key
+                // error messages on indexes.
+                BSONObj obj = record_id_helpers::toBSONAs(thisRecordId, "");
+                return buildDupKeyErrorStatus(obj,
+                                              NamespaceString(ns()),
+                                              "" /* indexName */,
+                                              BSON("_id" << 1),
+                                              BSONObj() /* collation */);
+            }
+
             workingCopy->insert(
-                StringStore::value_type{createKey(_ident, thisRecordId),
-                                        std::string(record.data.data(), record.data.size())});
+                StringStore::value_type{key, std::string(record.data.data(), record.data.size())});
             record.id = RecordId(thisRecordId);
         }
     }
@@ -167,7 +196,7 @@ Status RecordStore::updateRecord(OperationContext* opCtx,
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     SizeAdjuster adjuster(opCtx, this);
     {
-        std::string key = createKey(_ident, oldLocation.getLong());
+        std::string key = createKey(_ident, oldLocation);
         StringStore::const_iterator it = workingCopy->find(key);
         invariant(it != workingCopy->end());
         workingCopy->update(StringStore::value_type{key, std::string(data, len)});
@@ -232,7 +261,7 @@ void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, boo
     auto ru = RecoveryUnit::get(opCtx);
     StringStore* workingCopy(ru->getHead());
     WriteUnitOfWork wuow(opCtx);
-    const auto recordKey = createKey(_ident, end.getLong());
+    const auto recordKey = createKey(_ident, end);
     auto recordIt =
         inclusive ? workingCopy->lower_bound(recordKey) : workingCopy->upper_bound(recordKey);
     auto endIt = workingCopy->upper_bound(_postfix);
@@ -242,7 +271,7 @@ void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, boo
         if (_cappedCallback) {
             // Documents are guaranteed to have a RecordId at the end of the KeyString, unlike
             // unique indexes.
-            RecordId rid = extractRecordId(recordIt->first);
+            RecordId rid = extractRecordId(recordIt->first, _keyFormat);
             RecordData rd = RecordData(recordIt->second.c_str(), recordIt->second.length());
             uassertStatusOK(_cappedCallback->aboutToDeleteCapped(opCtx, rid, rd));
         }
@@ -342,7 +371,7 @@ boost::optional<Record> RecordStore::Cursor::next() {
     if (it != workingCopy->end() && inPrefix(it->first)) {
         _savedPosition = it->first;
         Record nextRecord;
-        nextRecord.id = RecordId(extractRecordId(it->first));
+        nextRecord.id = RecordId(extractRecordId(it->first, _rs._keyFormat));
         nextRecord.data = RecordData(it->second.c_str(), it->second.length());
 
         if (_rs._isOplog && nextRecord.id > _oplogVisibility) {
@@ -358,7 +387,7 @@ boost::optional<Record> RecordStore::Cursor::seekExact(const RecordId& id) {
     _savedPosition = boost::none;
     _lastMoveWasRestore = false;
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    std::string key = createKey(_rs._ident, id.getLong());
+    std::string key = createKey(_rs._ident, id);
     it = workingCopy->find(key);
 
     if (it == workingCopy->end() || !inPrefix(it->first))
@@ -387,7 +416,7 @@ boost::optional<Record> RecordStore::Cursor::seekNear(const RecordId& id) {
         return boost::none;
 
     StringStore* workingCopy{RecoveryUnit::get(opCtx)->getHead()};
-    std::string key = createKey(_rs._ident, search.getLong());
+    std::string key = createKey(_rs._ident, search);
     // We may land higher and that is fine per the API contract.
     it = workingCopy->lower_bound(key);
 
@@ -403,13 +432,13 @@ boost::optional<Record> RecordStore::Cursor::seekNear(const RecordId& id) {
     }
 
     // If we landed one higher, then per the API contract, we need to return the previous record.
-    RecordId rid = extractRecordId(it->first);
+    RecordId rid = extractRecordId(it->first, _rs._keyFormat);
     if (rid > search) {
         StringStore::const_reverse_iterator revIt(it);
         // The reverse iterator constructor positions on the next record automatically.
         if (revIt != workingCopy->rend() && inPrefix(revIt->first)) {
             it = workingCopy->lower_bound(revIt->first);
-            rid = RecordId(extractRecordId(it->first));
+            rid = RecordId(extractRecordId(it->first, _rs._keyFormat));
         }
         // Otherwise, we hit the beginning of this record store, then there is only one record and
         // we should return that.
@@ -490,7 +519,7 @@ boost::optional<Record> RecordStore::ReverseCursor::next() {
     if (it != workingCopy->rend() && inPrefix(it->first)) {
         _savedPosition = it->first;
         Record nextRecord;
-        nextRecord.id = RecordId(extractRecordId(it->first));
+        nextRecord.id = RecordId(extractRecordId(it->first, _rs._keyFormat));
         nextRecord.data = RecordData(it->second.c_str(), it->second.length());
 
         return nextRecord;
@@ -502,7 +531,7 @@ boost::optional<Record> RecordStore::ReverseCursor::seekExact(const RecordId& id
     _needFirstSeek = false;
     _savedPosition = boost::none;
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    std::string key = createKey(_rs._ident, id.getLong());
+    std::string key = createKey(_rs._ident, id);
     StringStore::const_iterator canFind = workingCopy->find(key);
     if (canFind == workingCopy->end() || !inPrefix(canFind->first)) {
         it = workingCopy->rend();
@@ -523,7 +552,7 @@ boost::optional<Record> RecordStore::ReverseCursor::seekNear(const RecordId& id)
         return boost::none;
 
     StringStore* workingCopy{RecoveryUnit::get(opCtx)->getHead()};
-    std::string key = createKey(_rs._ident, id.getLong());
+    std::string key = createKey(_rs._ident, id);
     it = StringStore::const_reverse_iterator(workingCopy->upper_bound(key));
 
     // Since there is at least 1 record, if we hit the beginning we need to return the only record.
@@ -537,7 +566,7 @@ boost::optional<Record> RecordStore::ReverseCursor::seekNear(const RecordId& id)
     }
 
     // If we landed lower, then per the API contract, we need to return the previous record.
-    RecordId rid = extractRecordId(it->first);
+    RecordId rid = extractRecordId(it->first, _rs._keyFormat);
     if (rid < id) {
         // This lands on the next key.
         auto fwdIt = workingCopy->upper_bound(key);
@@ -548,7 +577,7 @@ boost::optional<Record> RecordStore::ReverseCursor::seekNear(const RecordId& id)
         // we should return that.
     }
 
-    rid = RecordId(extractRecordId(it->first));
+    rid = RecordId(extractRecordId(it->first, _rs._keyFormat));
     _needFirstSeek = false;
     _savedPosition = it->first;
     return Record{rid, RecordData(it->second.c_str(), it->second.length())};

@@ -10,23 +10,6 @@ var TimeseriesTest = class {
             .featureFlagTimeseriesCollection.value;
     }
 
-    static supportsClusteredIndexes(conn) {
-        if (!assert
-                 .commandWorked(conn.adminCommand(
-                     {getParameter: 1, timeseriesBucketsCollectionClusterById: 1}))
-                 .timeseriesBucketsCollectionClusterById) {
-            jsTestLog('Time-series buckets collection not clustered by _id');
-            return false;
-        }
-        if (jsTest.options().storageEngine && jsTest.options().storageEngine !== 'wiredTiger' &&
-            jsTest.options().storageEngine !== 'inMemory') {
-            jsTestLog('Time-series test running on non-WT storage engine: ' +
-                      jsTest.options().storageEngine);
-            return false;
-        }
-        return true;
-    }
-
     /**
      * Adjusts the values in 'fields' by a random amount.
      * Ensures that the new values stay in the range [0, 100].

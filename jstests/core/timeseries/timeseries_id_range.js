@@ -8,7 +8,6 @@
  *     requires_fcv_49,
  *     requires_find_command,
  *     requires_getmore,
- *     requires_wiredtiger,
  * ]
  */
 (function() {
@@ -16,12 +15,6 @@
 
 load('jstests/libs/analyze_plan.js');
 load("jstests/core/timeseries/libs/timeseries.js");
-
-// Although this test is tagged with 'requires_wiredtiger', this is not sufficient for ensuring that
-// the parallel suite runs this test only on WT configurations.
-if (!TimeseriesTest.supportsClusteredIndexes(db.getMongo())) {
-    return;
-}
 
 TimeseriesTest.run((insert) => {
     // These dates will all be inserted into individual buckets.

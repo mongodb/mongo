@@ -226,12 +226,7 @@ TimeseriesTest.run((insert) => {
     const testCreateIndex = function(spec, options = {}) {
         const indexName = 'testCreateIndex';
         const res = coll.createIndex(spec, Object.extend({name: indexName}, options));
-        if (TimeseriesTest.supportsClusteredIndexes(db.getMongo())) {
-            assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
-        } else {
-            assert.commandWorked(res);
-            assert.commandWorked(coll.dropIndex(indexName));
-        }
+        assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
     };
 
     // Partial indexes are not supported on clustered time-series bucket collections.
@@ -252,9 +247,7 @@ TimeseriesTest.run((insert) => {
     const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     assert.commandWorked(bucketsColl.createIndex({not_metadata: 1}),
                          'failed to create index: ' + tojson({not_metadata: 1}));
-    assert.eq(TimeseriesTest.supportsClusteredIndexes(db.getMongo()) ? 1 : 2,
-              bucketsColl.getIndexes().length,
-              tojson(bucketsColl.getIndexes()));
+    assert.eq(1, bucketsColl.getIndexes().length, tojson(bucketsColl.getIndexes()));
     assert.eq(0, coll.getIndexes().length, tojson(coll.getIndexes()));
 });
 })();

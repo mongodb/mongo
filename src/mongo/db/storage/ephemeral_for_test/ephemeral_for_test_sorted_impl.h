@@ -42,6 +42,7 @@ public:
     SortedDataBuilderBase(OperationContext* opCtx,
                           bool dupsAllowed,
                           Ordering order,
+                          KeyFormat rsKeyFormat,
                           const std::string& prefix,
                           const std::string& identEnd,
                           const IndexDescriptor* desc,
@@ -54,6 +55,8 @@ protected:
     bool _dupsAllowed;
     // Order of the keys.
     Ordering _order;
+    // RecordId format of the related record store
+    KeyFormat _rsKeyFormat;
     // Prefix and identEnd for the ident.
     std::string _prefix;
     std::string _identEnd;
@@ -75,7 +78,10 @@ public:
     // Truncate is not required at the time of writing but will be when the truncate command is
     // created
     Status truncate(RecoveryUnit* ru);
-    SortedDataInterfaceBase(OperationContext* opCtx, StringData ident, const IndexDescriptor* desc);
+    SortedDataInterfaceBase(OperationContext* opCtx,
+                            StringData ident,
+                            KeyFormat rsKeyFormat,
+                            const IndexDescriptor* desc);
     SortedDataInterfaceBase(const Ordering& ordering, StringData ident);
     bool appendCustomStats(OperationContext* opCtx,
                            BSONObjBuilder* output,
@@ -107,6 +113,7 @@ class SortedDataInterfaceUnique : public SortedDataInterfaceBase {
 public:
     SortedDataInterfaceUnique(OperationContext* opCtx,
                               StringData ident,
+                              KeyFormat rsKeyFormat,
                               const IndexDescriptor* desc);
     SortedDataInterfaceUnique(const Ordering& ordering, StringData ident);
     std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
@@ -135,6 +142,7 @@ class SortedDataInterfaceStandard : public SortedDataInterfaceBase {
 public:
     SortedDataInterfaceStandard(OperationContext* opCtx,
                                 StringData ident,
+                                KeyFormat rsKeyFormat,
                                 const IndexDescriptor* desc);
     SortedDataInterfaceStandard(const Ordering& ordering, StringData ident);
     std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,

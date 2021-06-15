@@ -7,7 +7,6 @@
  *     does_not_support_stepdowns,
  *     requires_fcv_49,
  *     requires_find_command,
- *     requires_wiredtiger,
  * ]
  */
 
@@ -15,12 +14,6 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
-
-// Although this test is tagged with 'requires_wiredtiger', this is not sufficient for ensuring that
-// the parallel suite runs this test only on WT configurations.
-if (!TimeseriesTest.supportsClusteredIndexes(db.getMongo())) {
-    return;
-}
 
 const collName = 'system.buckets.test';
 const coll = db[collName];

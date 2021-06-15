@@ -234,7 +234,7 @@ void _validateKeyOrder(OperationContext* opCtx,
 
     if (unique) {
         // Unique indexes must not have duplicate keys.
-        int cmp = currKey.compareWithoutRecordId(prevKey);
+        int cmp = currKey.compareWithoutRecordIdLong(prevKey);
         if (cmp != 0) {
             return;
         }

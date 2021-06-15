@@ -2492,13 +2492,29 @@ RecordId decodeRecordIdLongAtEnd(const void* bufferRaw, size_t bufSize) {
     return decodeRecordIdLong(&reader);
 }
 
-size_t sizeWithoutRecordIdAtEnd(const void* bufferRaw, size_t bufSize) {
+size_t sizeWithoutRecordIdLongAtEnd(const void* bufferRaw, size_t bufSize) {
     invariant(bufSize >= 2);  // smallest possible encoding of a RecordId.
     const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
     const unsigned char lastByte = *(buffer + bufSize - 1);
     const size_t ridSize = 2 + (lastByte & 0x7);  // stored in low 3 bits.
     invariant(bufSize >= ridSize);
     return bufSize - ridSize;
+}
+
+size_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize) {
+    invariant(bufSize > 0);
+    const uint8_t* buffer = static_cast<const uint8_t*>(bufferRaw);
+
+    // The current encoding for strings supports strings up to 128 bytes. The high bit is reserved
+    // for future usage.
+    uint8_t len = buffer[bufSize - 1];
+    keyStringAssert(5566400,
+                    fmt::format("Cannot decode record id string longer than {} bytes; size is {}",
+                                kMaxRecordIdStrLen,
+                                len),
+                    len <= kMaxRecordIdStrLen);
+    invariant(bufSize > static_cast<size_t>(len + 1));
+    return bufSize - len - 1;
 }
 
 RecordId decodeRecordIdLong(BufReader* reader) {
@@ -2615,10 +2631,10 @@ void appendToBSONArray(const char* buf, int len, BSONArrayBuilder* builder, Vers
     toBsonValue(ctype, &reader, &typeBitsReader, inverted, version, builder, depth);
 }
 
-void Value::serializeWithoutRecordId(BufBuilder& buf) const {
+void Value::serializeWithoutRecordIdLong(BufBuilder& buf) const {
     dassert(decodeRecordIdLongAtEnd(_buffer.get(), _ksSize).isValid());
 
-    const int32_t sizeWithoutRecordId = sizeWithoutRecordIdAtEnd(_buffer.get(), _ksSize);
+    const int32_t sizeWithoutRecordId = sizeWithoutRecordIdLongAtEnd(_buffer.get(), _ksSize);
     buf.appendNum(sizeWithoutRecordId);                 // Serialize size of KeyString
     buf.appendBuf(_buffer.get(), sizeWithoutRecordId);  // Serialize KeyString
     buf.appendBuf(_buffer.get() + _ksSize, _buffer.size() - _ksSize);  // Serialize TypeBits

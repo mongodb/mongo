@@ -54,22 +54,11 @@ const testOptions = function(allowed,
         const bucketsColl = collections.find(coll => coll.name == bucketsCollName);
         assert(bucketsColl, collections);
         assert.eq(bucketsColl.type, "collection", bucketsColl);
-        if (TimeseriesTest.supportsClusteredIndexes(conn)) {
-            assert(bucketsColl.options.clusteredIndex, bucketsColl);
-        }
+        assert(bucketsColl.options.clusteredIndex, bucketsColl);
         if (createOptions.expireAfterSeconds) {
-            if (TimeseriesTest.supportsClusteredIndexes(conn)) {
-                assert.eq(bucketsColl.options.expireAfterSeconds,
-                          createOptions.expireAfterSeconds,
-                          bucketsColl);
-            } else {
-                assert.docEq(testDB[collName].getIndexes(), [{
-                                 v: 2,
-                                 key: {time: 1},
-                                 name: 'control.min.time_1',
-                                 expireAfterSeconds: createOptions.expireAfterSeconds.valueOf(),
-                             }]);
-            }
+            assert.eq(bucketsColl.options.expireAfterSeconds,
+                      createOptions.expireAfterSeconds,
+                      bucketsColl);
         }
 
         assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: {w: "majority"}}));
@@ -153,13 +142,9 @@ testCompatibleCreateOptions({collation: {locale: "ja"}});
 testCompatibleCreateOptions({writeConcern: {}});
 testCompatibleCreateOptions({comment: ""});
 
-const errorCodeForInvalidExpireAfterSecondsValue = TimeseriesTest.supportsClusteredIndexes(conn)
-    ? ErrorCodes.InvalidOptions
-    : ErrorCodes.CannotCreateIndex;
-testIncompatibleCreateOptions({expireAfterSeconds: NumberLong(-10)},
-                              errorCodeForInvalidExpireAfterSecondsValue);
+testIncompatibleCreateOptions({expireAfterSeconds: NumberLong(-10)}, ErrorCodes.InvalidOptions);
 testIncompatibleCreateOptions({expireAfterSeconds: NumberLong("4611686018427387904")},
-                              errorCodeForInvalidExpireAfterSecondsValue);
+                              ErrorCodes.InvalidOptions);
 testIncompatibleCreateOptions({expireAfterSeconds: ""}, ErrorCodes.TypeMismatch);
 testIncompatibleCreateOptions({capped: true, size: 100});
 testIncompatibleCreateOptions({capped: true, max: 100});

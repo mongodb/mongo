@@ -70,7 +70,6 @@ Status KVEngine::createRecordStore(OperationContext* opCtx,
                                    StringData ns,
                                    StringData ident,
                                    const CollectionOptions& options) {
-    uassert(5555900, "The 'clusteredIndex' option is not supported", !options.clusteredIndex);
     stdx::lock_guard lock(_identsLock);
     _idents[ident.toString()] = true;
     return Status::OK();
@@ -87,7 +86,7 @@ Status KVEngine::importRecordStore(OperationContext* opCtx,
 std::unique_ptr<mongo::RecordStore> KVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
                                                                        StringData ident) {
     std::unique_ptr<mongo::RecordStore> recordStore =
-        std::make_unique<RecordStore>("", ident, false);
+        std::make_unique<RecordStore>("", ident, KeyFormat::Long, false);
     stdx::lock_guard lock(_identsLock);
     _idents[ident.toString()] = true;
     return recordStore;
@@ -99,14 +98,16 @@ std::unique_ptr<mongo::RecordStore> KVEngine::getRecordStore(OperationContext* u
                                                              StringData ident,
                                                              const CollectionOptions& options) {
     std::unique_ptr<mongo::RecordStore> recordStore;
+    const auto keyFormat = options.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
     if (options.capped) {
         recordStore = std::make_unique<RecordStore>(ns,
                                                     ident,
+                                                    keyFormat,
                                                     options.capped,
                                                     /*cappedCallback*/ nullptr,
                                                     _visibilityManager.get());
     } else {
-        recordStore = std::make_unique<RecordStore>(ns, ident, options.capped);
+        recordStore = std::make_unique<RecordStore>(ns, ident, keyFormat, options.capped);
     }
     stdx::lock_guard lock(_identsLock);
     _idents[ident.toString()] = true;
@@ -150,15 +151,20 @@ std::unique_ptr<mongo::SortedDataInterface> KVEngine::getSortedDataInterface(
     const CollectionOptions& collOptions,
     StringData ident,
     const IndexDescriptor* desc) {
-    invariant(!collOptions.clusteredIndex);
+    auto rsKeyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
+    return getSortedDataInterface(opCtx, rsKeyFormat, ident, desc);
+}
+
+std::unique_ptr<mongo::SortedDataInterface> KVEngine::getSortedDataInterface(
+    OperationContext* opCtx, KeyFormat rsKeyFormat, StringData ident, const IndexDescriptor* desc) {
     {
         stdx::lock_guard lock(_identsLock);
         _idents[ident.toString()] = false;
     }
     if (desc->unique())
-        return std::make_unique<SortedDataInterfaceUnique>(opCtx, ident, desc);
+        return std::make_unique<SortedDataInterfaceUnique>(opCtx, ident, rsKeyFormat, desc);
     else
-        return std::make_unique<SortedDataInterfaceStandard>(opCtx, ident, desc);
+        return std::make_unique<SortedDataInterfaceStandard>(opCtx, ident, rsKeyFormat, desc);
 }
 
 Status KVEngine::dropIdent(mongo::RecoveryUnit* ru,

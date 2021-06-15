@@ -59,9 +59,9 @@ namespace {
 // Helper to interpret index data buffer
 class IndexDataEntry {
 public:
-    IndexDataEntry() : _buffer(nullptr) {}
-    IndexDataEntry(const uint8_t* buffer);
-    IndexDataEntry(const std::string& indexDataEntry);
+    IndexDataEntry() : _buffer(nullptr), _keyFormat(KeyFormat::Long) {}
+    IndexDataEntry(const uint8_t* buffer, KeyFormat keyFormat);
+    IndexDataEntry(const std::string& indexDataEntry, KeyFormat keyFormat);
 
     static std::string create(RecordId loc, const KeyString::TypeBits& typeBits);
 
@@ -69,9 +69,11 @@ public:
     size_t size() const;  // returns buffer size
     RecordId loc() const;
     KeyString::TypeBits typeBits() const;
+    KeyFormat keyFormat() const;
 
 private:
     const uint8_t* _buffer;
+    KeyFormat _keyFormat;
 };
 
 // Forward iterator for IndexDataEntry with contigous memory layout
@@ -80,7 +82,7 @@ class IndexDataEntryIterator : public boost::iterator_facade<IndexDataEntryItera
                                                              boost::forward_traversal_tag> {
 public:
     IndexDataEntryIterator() = default;
-    IndexDataEntryIterator(const uint8_t* entryData);
+    IndexDataEntryIterator(const uint8_t* entryData, KeyFormat keyFormat);
 
 private:
     friend class boost::iterator_core_access;
@@ -96,10 +98,11 @@ private:
 class UniqueIndexData {
 public:
     UniqueIndexData() : _size(0), _begin(nullptr), _end(nullptr) {}
-    UniqueIndexData(const std::string& indexData) {
+    UniqueIndexData(const std::string& indexData, KeyFormat keyFormat) {
         std::memcpy(&_size, indexData.data(), sizeof(uint64_t));
         _begin = reinterpret_cast<const uint8_t*>(indexData.data() + sizeof(uint64_t));
         _end = reinterpret_cast<const uint8_t*>(indexData.data() + indexData.size());
+        _keyFormat = keyFormat;
     }
 
     using const_iterator = IndexDataEntryIterator;
@@ -111,10 +114,10 @@ public:
         return _size == 0;
     }
     const_iterator begin() const {
-        return IndexDataEntryIterator(_begin);
+        return IndexDataEntryIterator(_begin, _keyFormat);
     }
     const_iterator end() const {
-        return IndexDataEntryIterator(_end);
+        return IndexDataEntryIterator(_end, _keyFormat);
     }
     const_iterator lower_bound(RecordId loc) const;
     const_iterator upper_bound(RecordId loc) const;
@@ -133,60 +136,84 @@ private:
     size_t _size;
     const uint8_t* _begin;
     const uint8_t* _end;
+    KeyFormat _keyFormat;
 };
 
-IndexDataEntry::IndexDataEntry(const uint8_t* buffer) : _buffer(buffer) {}
-IndexDataEntry::IndexDataEntry(const std::string& indexDataEntry)
-    : _buffer(reinterpret_cast<const uint8_t*>(indexDataEntry.data())) {}
+IndexDataEntry::IndexDataEntry(const uint8_t* buffer, KeyFormat keyFormat)
+    : _buffer(buffer), _keyFormat(keyFormat) {}
+IndexDataEntry::IndexDataEntry(const std::string& indexDataEntry, KeyFormat keyFormat)
+    : _buffer(reinterpret_cast<const uint8_t*>(indexDataEntry.data())), _keyFormat(keyFormat) {}
 
 std::string IndexDataEntry::create(RecordId loc, const KeyString::TypeBits& typeBits) {
-    uint64_t repr = loc.getLong();
-    uint64_t typebitsSize = typeBits.getSize();
-    std::string output(sizeof(repr) + sizeof(typebitsSize) + typebitsSize, '\0');
-
-    // RecordId
-    std::memcpy(output.data(), &repr, sizeof(repr));
-
-    // TypeBits size
-    std::memcpy(output.data() + sizeof(repr), &typebitsSize, sizeof(typebitsSize));
-
-    // TypeBits data
-    std::memcpy(
-        output.data() + sizeof(repr) + sizeof(typebitsSize), typeBits.getBuffer(), typebitsSize);
-
-    return output;
+    // [RecordId size, RecordId, TypeBits size, TypeBits]
+    StackBufBuilder builder;
+    if (loc.isLong()) {
+        builder.appendNum(sizeof(int64_t));
+        builder.appendNum(loc.getLong());
+    } else {
+        auto str = loc.getStr();
+        builder.appendNum(str.size());
+        builder.appendBuf(str.rawData(), str.size());
+    }
+    builder.appendNum(typeBits.getSize());
+    builder.appendBuf(typeBits.getBuffer(), typeBits.getSize());
+    return std::string(builder.buf(), builder.len());
 }
 
 const uint8_t* IndexDataEntry::buffer() const {
     return _buffer;
 }
 
-size_t IndexDataEntry::size() const {
-    uint64_t typeBitsSize;
-    std::memcpy(&typeBitsSize, _buffer + sizeof(uint64_t), sizeof(uint64_t));
+KeyFormat IndexDataEntry::keyFormat() const {
+    return _keyFormat;
+}
 
-    // RecordId + TypeBits size + TypeBits buffer
-    return sizeof(uint64_t) * 2 + typeBitsSize;
+size_t IndexDataEntry::size() const {
+    // [RecordId size, RecordId, TypeBits size, TypeBits]
+    size_t ridSize;
+    std::memcpy(&ridSize, _buffer, sizeof(size_t));
+
+    int len = sizeof(size_t) + ridSize;
+    size_t typeBitsSize;
+    std::memcpy(&typeBitsSize, _buffer + len, sizeof(size_t));
+
+    len += sizeof(size_t) + typeBitsSize;
+    return len;
 }
 
 RecordId IndexDataEntry::loc() const {
-    uint64_t repr;
-    std::memcpy(&repr, _buffer, sizeof(uint64_t));
-    return RecordId(repr);
+    // [RecordId size, RecordId, TypeBits size, TypeBits]
+    size_t ridSize;
+    std::memcpy(&ridSize, _buffer, sizeof(size_t));
+    const uint8_t* ridStart = _buffer + sizeof(size_t);
+    if (KeyFormat::Long == _keyFormat) {
+        int64_t repr;
+        std::memcpy(&repr, ridStart, ridSize);
+        return RecordId(repr);
+    } else {
+        return RecordId(reinterpret_cast<const char*>(ridStart), ridSize);
+    }
 }
 
 KeyString::TypeBits IndexDataEntry::typeBits() const {
-    uint64_t size;
-    std::memcpy(&size, _buffer + sizeof(uint64_t), sizeof(uint64_t));
+    // [RecordId size, RecordId, TypeBits size, TypeBits]
+    size_t ridSize;
+    std::memcpy(&ridSize, _buffer, sizeof(size_t));
 
-    BufReader reader(_buffer + sizeof(uint64_t) * 2, size);
+    int len = sizeof(size_t) + ridSize;
+    size_t typeBitsSize;
+    std::memcpy(&typeBitsSize, _buffer + len, sizeof(size_t));
+
+    len += sizeof(size_t);
+
+    BufReader reader(_buffer + len, typeBitsSize);
     return KeyString::TypeBits::fromBuffer(KeyString::Version::kLatestVersion, &reader);
 }
 
-IndexDataEntryIterator::IndexDataEntryIterator(const uint8_t* entryData)
-    : _entry(IndexDataEntry(entryData)) {}
+IndexDataEntryIterator::IndexDataEntryIterator(const uint8_t* entryData, KeyFormat keyFormat)
+    : _entry(IndexDataEntry(entryData, keyFormat)) {}
 void IndexDataEntryIterator::increment() {
-    _entry = IndexDataEntry(_entry.buffer() + _entry.size());
+    _entry = IndexDataEntry(_entry.buffer() + _entry.size(), _entry.keyFormat());
 }
 bool IndexDataEntryIterator::equal(IndexDataEntryIterator const& other) const {
     return _entry.buffer() == other._entry.buffer();
@@ -293,6 +320,22 @@ void prefixKeyStringWithLoc(KeyString::Builder* keyString,
     keyString->resetToKey(b.obj(), allAscending, loc);
 }
 
+void prefixMinKeyString(KeyString::Builder* keyString, const std::string& prefixToUse) {
+    BSONObjBuilder b;
+    b.append("", prefixToUse);                                               // prefix
+    b.append("", StringData(keyString->getBuffer(), keyString->getSize()));  // key
+
+    keyString->resetToKey(b.obj(), allAscending, KeyString::Discriminator::kExclusiveBefore);
+}
+
+void prefixMaxKeyString(KeyString::Builder* keyString, const std::string& prefixToUse) {
+    BSONObjBuilder b;
+    b.append("", prefixToUse);                                               // prefix
+    b.append("", StringData(keyString->getBuffer(), keyString->getSize()));  // key
+
+    keyString->resetToKey(b.obj(), allAscending, KeyString::Discriminator::kExclusiveAfter);
+}
+
 std::string createRadixKeyWithoutLocFromObj(const BSONObj& key,
                                             const std::string& prefixToUse,
                                             Ordering order) {
@@ -304,12 +347,19 @@ std::string createRadixKeyWithoutLocFromObj(const BSONObj& key,
 }
 
 std::string createRadixKeyWithoutLocFromKS(const KeyString::Value& keyString,
-                                           const std::string& prefixToUse) {
+                                           const std::string& prefixToUse,
+                                           KeyFormat keyFormat) {
     KeyString::Builder ks(KeyString::Version::kLatestVersion);
     auto ksBuffer = keyString.getBuffer();
-    if (ksBuffer)
-        ks.resetFromBuffer(ksBuffer,
-                           KeyString::sizeWithoutRecordIdAtEnd(ksBuffer, keyString.getSize()));
+    if (ksBuffer) {
+        if (KeyFormat::Long == keyFormat) {
+            ks.resetFromBuffer(
+                ksBuffer, KeyString::sizeWithoutRecordIdLongAtEnd(ksBuffer, keyString.getSize()));
+        } else {
+            ks.resetFromBuffer(
+                ksBuffer, KeyString::sizeWithoutRecordIdStrAtEnd(ksBuffer, keyString.getSize()));
+        }
+    }
     prefixKeyStringWithoutLoc(&ks, prefixToUse);
     return std::string(ks.getBuffer(), ks.getSize());
 }
@@ -324,37 +374,62 @@ std::string createRadixKeyWithoutLocFromKSWithoutRecordId(const KeyString::Value
     return std::string(ks.getBuffer(), ks.getSize());
 }
 
-std::string createRadixKeyWithLocFromObj(const BSONObj& key,
-                                         RecordId loc,
-                                         const std::string& prefixToUse,
-                                         Ordering order) {
+std::string createMinRadixKeyFromObj(const BSONObj& key,
+                                     const std::string& prefixToUse,
+                                     Ordering order) {
     KeyString::Version version = KeyString::Version::kLatestVersion;
     KeyString::Builder ks(version, BSONObj::stripFieldNames(key), order);
 
-    prefixKeyStringWithLoc(&ks, loc, prefixToUse);
+    prefixMinKeyString(&ks, prefixToUse);
     return std::string(ks.getBuffer(), ks.getSize());
 }
+
+std::string createMaxRadixKeyFromObj(const BSONObj& key,
+                                     const std::string& prefixToUse,
+                                     Ordering order) {
+    KeyString::Version version = KeyString::Version::kLatestVersion;
+    KeyString::Builder ks(version, BSONObj::stripFieldNames(key), order);
+
+    prefixMaxKeyString(&ks, prefixToUse);
+    return std::string(ks.getBuffer(), ks.getSize());
+}
+
 
 std::string createRadixKeyWithLocFromKS(const KeyString::Value& keyString,
                                         RecordId loc,
                                         const std::string& prefixToUse) {
     KeyString::Builder ks(KeyString::Version::kLatestVersion);
     auto ksBuffer = keyString.getBuffer();
-    if (ksBuffer)
-        ks.resetFromBuffer(ksBuffer,
-                           KeyString::sizeWithoutRecordIdAtEnd(ksBuffer, keyString.getSize()));
+    if (ksBuffer) {
+        if (loc.isLong()) {
+            ks.resetFromBuffer(
+                ksBuffer, KeyString::sizeWithoutRecordIdLongAtEnd(ksBuffer, keyString.getSize()));
+        } else {
+            ks.resetFromBuffer(
+                ksBuffer, KeyString::sizeWithoutRecordIdStrAtEnd(ksBuffer, keyString.getSize()));
+        }
+    }
     prefixKeyStringWithLoc(&ks, loc, prefixToUse);
     return std::string(ks.getBuffer(), ks.getSize());
 }
 
-std::string createRadixKeyWithLocFromKSWithoutRecordId(const KeyString::Value& keyString,
-                                                       RecordId loc,
-                                                       const std::string& prefixToUse) {
+std::string createMinRadixKeyFromKSWithoutRecordId(const KeyString::Value& keyString,
+                                                   const std::string& prefixToUse) {
     KeyString::Builder ks(KeyString::Version::kLatestVersion);
     auto ksBuffer = keyString.getBuffer();
     if (ksBuffer)
         ks.resetFromBuffer(ksBuffer, keyString.getSize());
-    prefixKeyStringWithLoc(&ks, loc, prefixToUse);
+    prefixMinKeyString(&ks, prefixToUse);
+    return std::string(ks.getBuffer(), ks.getSize());
+}
+
+std::string createMaxRadixKeyFromKSWithoutRecordId(const KeyString::Value& keyString,
+                                                   const std::string& prefixToUse) {
+    KeyString::Builder ks(KeyString::Version::kLatestVersion);
+    auto ksBuffer = keyString.getBuffer();
+    if (ksBuffer)
+        ks.resetFromBuffer(ksBuffer, keyString.getSize());
+    prefixMaxKeyString(&ks, prefixToUse);
     return std::string(ks.getBuffer(), ks.getSize());
 }
 
@@ -384,8 +459,9 @@ IndexKeyEntry createIndexKeyEntryFromRadixKey(const std::string& radixKey,
 
 IndexKeyEntry createIndexKeyEntryFromRadixKey(const std::string& radixKey,
                                               const std::string& indexDataEntry,
-                                              const Ordering order) {
-    IndexDataEntry data(indexDataEntry);
+                                              const Ordering order,
+                                              KeyFormat keyFormat) {
+    IndexDataEntry data(indexDataEntry, keyFormat);
     return IndexKeyEntry(createObjFromRadixKey(radixKey, data.typeBits(), order), data.loc());
 }
 
@@ -402,8 +478,9 @@ boost::optional<KeyStringEntry> createKeyStringEntryFromRadixKey(
 
 boost::optional<KeyStringEntry> createKeyStringEntryFromRadixKey(const std::string& radixKey,
                                                                  const std::string& indexDataEntry,
-                                                                 const Ordering& order) {
-    IndexDataEntry data(indexDataEntry);
+                                                                 const Ordering& order,
+                                                                 KeyFormat keyFormat) {
+    IndexDataEntry data(indexDataEntry, keyFormat);
     RecordId loc = data.loc();
     auto key = createObjFromRadixKey(radixKey, data.typeBits(), order);
     KeyString::Builder ksFinal(KeyString::Version::kLatestVersion, key, order);
@@ -428,6 +505,7 @@ public:
                std::string _identEnd,
                StringStore* workingCopy,
                Ordering order,
+               KeyFormat keyFormat,
                std::string prefixBSON,
                std::string KSForIdentEnd);
     virtual void setEndPosition(const BSONObj& key, bool inclusive) override;
@@ -446,18 +524,6 @@ public:
 
 private:
     // CRTP Interface
-    std::string createRadixKeyFromObj(const BSONObj& key,
-                                      RecordId loc,
-                                      const std::string& prefixToUse,
-                                      Ordering order) {
-        return static_cast<CursorImpl*>(this)->createRadixKeyFromObj(key, loc, prefixToUse, order);
-    }
-    std::string createRadixKeyFromKSWithoutRecordId(const KeyString::Value& keyString,
-                                                    RecordId loc,
-                                                    const std::string& prefixToUse) {
-        return static_cast<CursorImpl*>(this)->createRadixKeyFromKSWithoutRecordId(
-            keyString, loc, prefixToUse);
-    }
     boost::optional<KeyStringEntry> finishSeekAfterProcessing() {
         return static_cast<CursorImpl*>(this)->finishSeekAfterProcessing();
     }
@@ -514,6 +580,7 @@ protected:
     StringStore::const_reverse_iterator _reverseIt;
     // This is the ordering for the key's values for multi-field keys.
     Ordering _order;
+    KeyFormat _keyFormat;
     // This stores whether or not the end position is inclusive for restore.
     bool _endPosIncl;
     // This stores the key for the end position.
@@ -531,6 +598,7 @@ CursorBase<CursorImpl>::CursorBase(OperationContext* opCtx,
                                    std::string _identEnd,
                                    StringStore* workingCopy,
                                    Ordering order,
+                                   KeyFormat keyFormat,
                                    std::string _KSForIdentStart,
                                    std::string identEndBSON)
     : _opCtx(opCtx),
@@ -545,6 +613,7 @@ CursorBase<CursorImpl>::CursorBase(OperationContext* opCtx,
       _forwardIt(workingCopy->begin()),
       _reverseIt(workingCopy->rbegin()),
       _order(order),
+      _keyFormat(keyFormat),
       _endPosIncl(false),
       _KSForIdentStart(_KSForIdentStart),
       _KSForIdentEnd(identEndBSON) {}
@@ -605,11 +674,9 @@ void CursorBase<CursorImpl>::setEndPosition(const BSONObj& key, bool inclusive) 
     // If forward and inclusive or reverse and not inclusive, then we use the last element in this
     // ident. Otherwise, we use the first as our bound.
     if (_forward == inclusive)
-        it = workingCopy->upper_bound(
-            createRadixKeyFromObj(key, RecordId::maxLong(), _prefix, _order));
+        it = workingCopy->upper_bound(createMaxRadixKeyFromObj(key, _prefix, _order));
     else
-        it = workingCopy->lower_bound(
-            createRadixKeyFromObj(key, RecordId::minLong(), _prefix, _order));
+        it = workingCopy->lower_bound(createMinRadixKeyFromObj(key, _prefix, _order));
     if (_forward)
         _endPos = it;
     else
@@ -661,10 +728,10 @@ boost::optional<KeyStringEntry> CursorBase<CursorImpl>::seekAfterProcessing(
     // is also reversed.
     if (_forward == inclusive)
         it = _workingCopy->lower_bound(
-            createRadixKeyFromKSWithoutRecordId(keyStringVal, RecordId::minLong(), _prefix));
+            createMinRadixKeyFromKSWithoutRecordId(keyStringVal, _prefix));
     else
         it = _workingCopy->upper_bound(
-            createRadixKeyFromKSWithoutRecordId(keyStringVal, RecordId::maxLong(), _prefix));
+            createMaxRadixKeyFromKSWithoutRecordId(keyStringVal, _prefix));
     if (_forward)
         _forwardIt = it;
     else
@@ -715,10 +782,14 @@ boost::optional<KeyStringEntry> CursorBase<CursorImpl>::seekExactForKeyString(
     if (!ksEntry) {
         return {};
     }
+    auto sizeWithoutRecordId = KeyFormat::Long == _keyFormat
+        ? KeyString::sizeWithoutRecordIdLongAtEnd(ksEntry->keyString.getBuffer(),
+                                                  ksEntry->keyString.getSize())
+        : KeyString::sizeWithoutRecordIdStrAtEnd(ksEntry->keyString.getBuffer(),
+                                                 ksEntry->keyString.getSize());
     if (KeyString::compare(ksEntry->keyString.getBuffer(),
                            keyStringValue.getBuffer(),
-                           KeyString::sizeWithoutRecordIdAtEnd(ksEntry->keyString.getBuffer(),
-                                                               ksEntry->keyString.getSize()),
+                           sizeWithoutRecordId,
                            keyStringValue.getSize()) == 0) {
         return KeyStringEntry(ksEntry->keyString, ksEntry->loc);
     }
@@ -818,17 +889,6 @@ private:
 
     bool advanceNextInternal();
     void finishAdvanceNext();
-    std::string createRadixKeyFromObj(const BSONObj& key,
-                                      RecordId loc,
-                                      const std::string& prefixToUse,
-                                      Ordering order) {
-        return createRadixKeyWithoutLocFromObj(key, prefixToUse, order);
-    }
-    std::string createRadixKeyFromKSWithoutRecordId(const KeyString::Value& keyString,
-                                                    RecordId loc,
-                                                    const std::string& prefixToUse) {
-        return createRadixKeyWithoutLocFromKSWithoutRecordId(keyString, prefixToUse);
-    }
     boost::optional<KeyStringEntry> finishSeekAfterProcessing();
 
     void saveForward();
@@ -869,11 +929,11 @@ void CursorUnique::finishAdvanceNext() {
     // We have moved to a new position in the tree, initialize index data for iterating over
     // duplicates
     if (_forward) {
-        _indexData = UniqueIndexData(_forwardIt->second);
+        _indexData = UniqueIndexData(_forwardIt->second, _keyFormat);
         _indexDataIt = _indexData.begin();
         _indexDataEnd = _indexData.end();
     } else {
-        _indexData = UniqueIndexData(_reverseIt->second);
+        _indexData = UniqueIndexData(_reverseIt->second, _keyFormat);
         _reversePos = 0;
         initReverseDataIterators();
     }
@@ -901,7 +961,7 @@ bool CursorUnique::checkCursorValid() {
                 // check the equal side of things. This assumption doesn't hold for unique index
                 // KeyStrings.
                 std::string endPosKeyString =
-                    createRadixKeyFromObj(*_endPosKey, RecordId::minLong(), _prefix, _order);
+                    createMaxRadixKeyFromObj(*_endPosKey, _prefix, _order);
 
                 if (_forwardIt->first.compare(endPosKeyString) <= 0)
                     return true;
@@ -923,7 +983,7 @@ bool CursorUnique::checkCursorValid() {
                     return true;
 
                 std::string endPosKeyString =
-                    createRadixKeyFromObj(*_endPosKey, RecordId::minLong(), _prefix, _order);
+                    createMinRadixKeyFromObj(*_endPosKey, _prefix, _order);
 
                 if (_reverseIt->first.compare(endPosKeyString) >= 0)
                     return true;
@@ -974,13 +1034,13 @@ boost::optional<KeyStringEntry> CursorUnique::finishSeekAfterProcessing() {
     // We have seeked to an entry in the tree. Now unpack the data and initialize iterators to point
     // to the first entry if this index contains duplicates
     if (_forward) {
-        _indexData = UniqueIndexData(_forwardIt->second);
+        _indexData = UniqueIndexData(_forwardIt->second, _keyFormat);
         _indexDataIt = _indexData.begin();
         _indexDataEnd = _indexData.end();
         return createKeyStringEntryFromRadixKey(
             _forwardIt->first, _indexDataIt->loc(), _indexDataIt->typeBits(), _order);
     } else {
-        _indexData = UniqueIndexData(_reverseIt->second);
+        _indexData = UniqueIndexData(_reverseIt->second, _keyFormat);
         _reversePos = 0;
         initReverseDataIterators();
         return createKeyStringEntryFromRadixKey(
@@ -1004,7 +1064,7 @@ void CursorUnique::restoreForward() {
     _lastMoveWasRestore = true;
     if (_saveLoc != RecordId() && _forwardIt != _workingCopy->end() &&
         _forwardIt->first == _saveKey) {
-        _indexData = UniqueIndexData(_forwardIt->second);
+        _indexData = UniqueIndexData(_forwardIt->second, _keyFormat);
         _indexDataIt = _indexData.lower_bound(_saveLoc);
         _indexDataEnd = _indexData.end();
         if (_indexDataIt == _indexDataEnd) {
@@ -1012,7 +1072,7 @@ void CursorUnique::restoreForward() {
             // radix tree to be positioned on a valid item
             ++_forwardIt;
             if (checkCursorValid()) {
-                _indexData = UniqueIndexData(_forwardIt->second);
+                _indexData = UniqueIndexData(_forwardIt->second, _keyFormat);
                 _indexDataIt = _indexData.begin();
                 _indexDataEnd = _indexData.end();
             }
@@ -1031,13 +1091,13 @@ void CursorUnique::restoreReverse() {
     _lastMoveWasRestore = true;
     if (_saveLoc != RecordId() && _reverseIt != _workingCopy->rend() &&
         _reverseIt->first == _saveKey) {
-        _indexData = UniqueIndexData(_reverseIt->second);
+        _indexData = UniqueIndexData(_reverseIt->second, _keyFormat);
         _indexDataIt = _indexData.upper_bound(_saveLoc);
         _indexDataEnd = _indexData.end();
         if (_indexDataIt == _indexDataEnd) {
             ++_reverseIt;
             if (checkCursorValid()) {
-                _indexData = UniqueIndexData(_reverseIt->second);
+                _indexData = UniqueIndexData(_reverseIt->second, _keyFormat);
                 _reversePos = 0;
                 initReverseDataIterators();
             }
@@ -1069,17 +1129,6 @@ protected:
         return false;
     }
     void finishAdvanceNext() {}
-    std::string createRadixKeyFromObj(const BSONObj& key,
-                                      RecordId loc,
-                                      const std::string& prefixToUse,
-                                      Ordering order) {
-        return createRadixKeyWithLocFromObj(key, loc, prefixToUse, order);
-    }
-    std::string createRadixKeyFromKSWithoutRecordId(const KeyString::Value& keyString,
-                                                    RecordId loc,
-                                                    const std::string& prefixToUse) {
-        return createRadixKeyWithLocFromKSWithoutRecordId(keyString, loc, prefixToUse);
-    }
     boost::optional<KeyStringEntry> finishSeekAfterProcessing();
     void saveForward() {}
     void saveReverse() {}
@@ -1124,9 +1173,11 @@ boost::optional<IndexKeyEntry> CursorStandard::next(RequestedInfo parts) {
     }
 
     if (_forward) {
-        return createIndexKeyEntryFromRadixKey(_forwardIt->first, _forwardIt->second, _order);
+        return createIndexKeyEntryFromRadixKey(
+            _forwardIt->first, _forwardIt->second, _order, _keyFormat);
     }
-    return createIndexKeyEntryFromRadixKey(_reverseIt->first, _reverseIt->second, _order);
+    return createIndexKeyEntryFromRadixKey(
+        _reverseIt->first, _reverseIt->second, _order, _keyFormat);
 }
 
 boost::optional<KeyStringEntry> CursorStandard::nextKeyString() {
@@ -1135,17 +1186,21 @@ boost::optional<KeyStringEntry> CursorStandard::nextKeyString() {
     }
 
     if (_forward) {
-        return createKeyStringEntryFromRadixKey(_forwardIt->first, _forwardIt->second, _order);
+        return createKeyStringEntryFromRadixKey(
+            _forwardIt->first, _forwardIt->second, _order, _keyFormat);
     }
-    return createKeyStringEntryFromRadixKey(_reverseIt->first, _reverseIt->second, _order);
+    return createKeyStringEntryFromRadixKey(
+        _reverseIt->first, _reverseIt->second, _order, _keyFormat);
 }
 
 boost::optional<KeyStringEntry> CursorStandard::finishSeekAfterProcessing() {
     // We have seeked to an entry in the tree.
     if (_forward) {
-        return createKeyStringEntryFromRadixKey(_forwardIt->first, _forwardIt->second, _order);
+        return createKeyStringEntryFromRadixKey(
+            _forwardIt->first, _forwardIt->second, _order, _keyFormat);
     } else {
-        return createKeyStringEntryFromRadixKey(_reverseIt->first, _reverseIt->second, _order);
+        return createKeyStringEntryFromRadixKey(
+            _reverseIt->first, _reverseIt->second, _order, _keyFormat);
     }
 }
 
@@ -1166,11 +1221,23 @@ void CursorStandard::restoreReverse() {
     _lastMoveWasRestore = (_reverseIt->first.compare(_saveKey) != 0);
 }
 
+RecordId decodeRecordId(const KeyString::Value& keyString, KeyFormat keyFormat) {
+    RecordId loc;
+    if (keyFormat == KeyFormat::Long) {
+        loc = KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+    } else {
+        loc = KeyString::decodeRecordIdStrAtEnd(keyString.getBuffer(), keyString.getSize());
+    }
+    invariant(loc.isValid(), loc.toString());
+    return loc;
+}
+
 }  // namespace
 
 SortedDataBuilderBase::SortedDataBuilderBase(OperationContext* opCtx,
                                              bool dupsAllowed,
                                              Ordering order,
+                                             KeyFormat rsKeyFormat,
                                              const std::string& prefix,
                                              const std::string& identEnd,
                                              const IndexDescriptor* desc,
@@ -1180,6 +1247,7 @@ SortedDataBuilderBase::SortedDataBuilderBase(OperationContext* opCtx,
     : _opCtx(opCtx),
       _dupsAllowed(dupsAllowed),
       _order(order),
+      _rsKeyFormat(rsKeyFormat),
       _prefix(prefix),
       _identEnd(identEnd),
       _desc(desc),
@@ -1188,12 +1256,10 @@ SortedDataBuilderBase::SortedDataBuilderBase(OperationContext* opCtx,
       _collation(collation) {}
 
 Status SortedDataBuilderUnique::addKey(const KeyString::Value& keyString) {
-    dassert(
-        KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
+    RecordId loc = decodeRecordId(keyString, _rsKeyFormat);
     StringStore* workingCopy(RecoveryUnit::get(_opCtx)->getHead());
-    RecordId loc = KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
 
-    std::string key = createRadixKeyWithoutLocFromKS(keyString, _prefix);
+    std::string key = createRadixKeyWithoutLocFromKS(keyString, _prefix, _rsKeyFormat);
     auto it = workingCopy->find(key);
     if (it != workingCopy->end()) {
         if (!_dupsAllowed) {
@@ -1203,7 +1269,7 @@ Status SortedDataBuilderUnique::addKey(const KeyString::Value& keyString) {
             return buildDupKeyErrorStatus(_opCtx, keyString, _order, _desc);
         }
 
-        UniqueIndexData data(it->second);
+        UniqueIndexData data(it->second, _rsKeyFormat);
         // Bulk builder add keys in ascending order so we should insert at the end
         auto added = data.add(loc, keyString.getTypeBits());
         if (!added) {
@@ -1226,11 +1292,12 @@ Status SortedDataBuilderUnique::addKey(const KeyString::Value& keyString) {
 // this ident.
 SortedDataInterfaceBase::SortedDataInterfaceBase(OperationContext* opCtx,
                                                  StringData ident,
+                                                 KeyFormat rsKeyFormat,
                                                  const IndexDescriptor* desc)
     : ::mongo::SortedDataInterface(ident,
                                    KeyString::Version::kLatestVersion,
                                    Ordering::make(desc->keyPattern()),
-                                   KeyFormat::Long),
+                                   rsKeyFormat),
       // All entries in this ident will have a prefix of ident + \1.
       _prefix(ident.toString().append(1, '\1')),
       // Therefore, the string ident + \2 will be greater than all elements in this ident.
@@ -1254,6 +1321,7 @@ std::unique_ptr<SortedDataBuilderInterface> SortedDataInterfaceUnique::makeBulkB
     return std::make_unique<SortedDataBuilderUnique>(opCtx,
                                                      dupsAllowed,
                                                      _ordering,
+                                                     _rsKeyFormat,
                                                      _prefix,
                                                      _identEnd,
                                                      _desc,
@@ -1267,8 +1335,9 @@ std::unique_ptr<SortedDataBuilderInterface> SortedDataInterfaceUnique::makeBulkB
 // this ident.
 SortedDataInterfaceUnique::SortedDataInterfaceUnique(OperationContext* opCtx,
                                                      StringData ident,
+                                                     KeyFormat rsKeyFormat,
                                                      const IndexDescriptor* desc)
-    : SortedDataInterfaceBase(opCtx, ident, desc) {
+    : SortedDataInterfaceBase(opCtx, ident, rsKeyFormat, desc) {
     // This is the string representation of the KeyString before elements in this ident, which is
     // ident + \0. This is before all elements in this ident.
     _KSForIdentStart =
@@ -1289,9 +1358,9 @@ Status SortedDataInterfaceUnique::insert(OperationContext* opCtx,
                                          const KeyString::Value& keyString,
                                          bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    RecordId loc = KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId loc = decodeRecordId(keyString, rsKeyFormat());
 
-    std::string key = createRadixKeyWithoutLocFromKS(keyString, _prefix);
+    std::string key = createRadixKeyWithoutLocFromKS(keyString, _prefix, _rsKeyFormat);
     auto it = workingCopy->find(key);
     if (it != workingCopy->end()) {
         if (!dupsAllowed) {
@@ -1300,7 +1369,7 @@ Status SortedDataInterfaceUnique::insert(OperationContext* opCtx,
             return buildDupKeyErrorStatus(opCtx, keyString, _ordering, _desc);
         }
 
-        UniqueIndexData data(it->second);
+        UniqueIndexData data(it->second, _rsKeyFormat);
         auto added = data.add(loc, keyString.getTypeBits());
         if (!added) {
             // Already indexed
@@ -1320,17 +1389,17 @@ void SortedDataInterfaceUnique::unindex(OperationContext* opCtx,
                                         const KeyString::Value& keyString,
                                         bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    RecordId loc = KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId loc = decodeRecordId(keyString, rsKeyFormat());
 
-    auto key = createRadixKeyWithoutLocFromKS(keyString, _prefix);
+    auto key = createRadixKeyWithoutLocFromKS(keyString, _prefix, _rsKeyFormat);
     auto it = workingCopy->find(key);
     if (it != workingCopy->end()) {
-        UniqueIndexData data(it->second);
+        UniqueIndexData data(it->second, _rsKeyFormat);
         auto removed = data.remove(loc);
         if (!removed)
             return;  // loc not found, nothing to unindex
 
-        if (UniqueIndexData(*removed).empty()) {
+        if (UniqueIndexData(*removed, _rsKeyFormat).empty()) {
             workingCopy->erase(key);
         } else {
             workingCopy->update({std::move(key), *removed});
@@ -1367,7 +1436,7 @@ Status SortedDataInterfaceUnique::dupKeyCheck(OperationContext* opCtx,
     if (it == workingCopy->end())
         return Status::OK();
 
-    UniqueIndexData data(it->second);
+    UniqueIndexData data(it->second, _rsKeyFormat);
     if (data.size() > 1) {
         return buildDupKeyErrorStatus(opCtx, key, _ordering, _desc);
     }
@@ -1382,7 +1451,7 @@ void SortedDataInterfaceUnique::fullValidate(OperationContext* opCtx,
     long long numKeys = 0;
     auto it = workingCopy->lower_bound(_KSForIdentStart);
     while (it != workingCopy->end() && it->first.compare(_KSForIdentEnd) < 0) {
-        numKeys += UniqueIndexData(it->second).size();
+        numKeys += UniqueIndexData(it->second, _rsKeyFormat).size();
         ++it;
     }
     *numKeysOut = numKeys;
@@ -1423,6 +1492,7 @@ std::unique_ptr<mongo::SortedDataInterface::Cursor> SortedDataInterfaceUnique::n
                                           _identEnd,
                                           workingCopy,
                                           _ordering,
+                                          _rsKeyFormat,
                                           _KSForIdentStart,
                                           _KSForIdentEnd);
 }
@@ -1432,10 +1502,8 @@ Status SortedDataInterfaceBase::initAsEmpty(OperationContext* opCtx) {
 }
 
 Status SortedDataBuilderStandard::addKey(const KeyString::Value& keyString) {
-    dassert(
-        KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
     StringStore* workingCopy(RecoveryUnit::get(_opCtx)->getHead());
-    RecordId loc = KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId loc = decodeRecordId(keyString, _rsKeyFormat);
 
     std::string key = createRadixKeyWithLocFromKS(keyString, loc, _prefix);
     bool inserted =
@@ -1451,6 +1519,7 @@ std::unique_ptr<SortedDataBuilderInterface> SortedDataInterfaceStandard::makeBul
     return std::make_unique<SortedDataBuilderStandard>(opCtx,
                                                        dupsAllowed,
                                                        _ordering,
+                                                       _rsKeyFormat,
                                                        _prefix,
                                                        _identEnd,
                                                        _desc,
@@ -1464,31 +1533,30 @@ std::unique_ptr<SortedDataBuilderInterface> SortedDataInterfaceStandard::makeBul
 // this ident.
 SortedDataInterfaceStandard::SortedDataInterfaceStandard(OperationContext* opCtx,
                                                          StringData ident,
+                                                         KeyFormat rsKeyFormat,
                                                          const IndexDescriptor* desc)
-    : SortedDataInterfaceBase(opCtx, ident, desc) {
+    : SortedDataInterfaceBase(opCtx, ident, rsKeyFormat, desc) {
     // This is the string representation of the KeyString before elements in this ident, which is
     // ident + \0. This is before all elements in this ident.
-    _KSForIdentStart = createRadixKeyWithLocFromObj(
-        BSONObj(), RecordId::minLong(), ident.toString().append(1, '\0'), _ordering);
+    _KSForIdentStart =
+        createMinRadixKeyFromObj(BSONObj(), ident.toString().append(1, '\0'), _ordering);
     // Similarly, this is the string representation of the KeyString for something greater than
     // all other elements in this ident.
-    _KSForIdentEnd =
-        createRadixKeyWithLocFromObj(BSONObj(), RecordId::minLong(), _identEnd, _ordering);
+    _KSForIdentEnd = createMinRadixKeyFromObj(BSONObj(), _identEnd, _ordering);
 }
 
 SortedDataInterfaceStandard::SortedDataInterfaceStandard(const Ordering& ordering, StringData ident)
     : SortedDataInterfaceBase(ordering, ident) {
-    _KSForIdentStart = createRadixKeyWithLocFromObj(
-        BSONObj(), RecordId::minLong(), ident.toString().append(1, '\0'), _ordering);
-    _KSForIdentEnd =
-        createRadixKeyWithLocFromObj(BSONObj(), RecordId::minLong(), _identEnd, _ordering);
+    _KSForIdentStart =
+        createMinRadixKeyFromObj(BSONObj(), ident.toString().append(1, '\0'), _ordering);
+    _KSForIdentEnd = createMinRadixKeyFromObj(BSONObj(), _identEnd, _ordering);
 }
 
 Status SortedDataInterfaceStandard::insert(OperationContext* opCtx,
                                            const KeyString::Value& keyString,
                                            bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    RecordId loc = KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId loc = decodeRecordId(keyString, rsKeyFormat());
 
     std::string key = createRadixKeyWithLocFromKS(keyString, loc, _prefix);
     bool inserted =
@@ -1503,7 +1571,7 @@ void SortedDataInterfaceStandard::unindex(OperationContext* opCtx,
                                           const KeyString::Value& keyString,
                                           bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    RecordId loc = KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId loc = decodeRecordId(keyString, rsKeyFormat());
 
     auto key = createRadixKeyWithLocFromKS(keyString, loc, _prefix);
     if (workingCopy->erase(key))
@@ -1539,6 +1607,7 @@ std::unique_ptr<mongo::SortedDataInterface::Cursor> SortedDataInterfaceStandard:
                                             _identEnd,
                                             workingCopy,
                                             _ordering,
+                                            _rsKeyFormat,
                                             _KSForIdentStart,
                                             _KSForIdentEnd);
 }

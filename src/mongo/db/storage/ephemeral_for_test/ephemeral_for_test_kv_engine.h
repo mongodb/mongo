@@ -86,6 +86,12 @@ public:
 
     virtual std::unique_ptr<mongo::SortedDataInterface> getSortedDataInterface(
         OperationContext* opCtx,
+        KeyFormat rsKeyFormat,
+        StringData ident,
+        const IndexDescriptor* desc);
+
+    virtual std::unique_ptr<mongo::SortedDataInterface> getSortedDataInterface(
+        OperationContext* opCtx,
         const CollectionOptions& collOptions,
         StringData ident,
         const IndexDescriptor* desc);

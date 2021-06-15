@@ -59,6 +59,8 @@ public:
         const std::string& ns, const CollectionOptions& collOptions) {
         return std::make_unique<RecordStore>(ns,
                                              "ident"_sd /* ident */,
+                                             collOptions.clusteredIndex ? KeyFormat::String
+                                                                        : KeyFormat::Long,
                                              false /* isCapped */,
                                              nullptr /* cappedCallback */,
                                              nullptr /* visibilityManager */);
@@ -67,6 +69,7 @@ public:
     virtual std::unique_ptr<mongo::RecordStore> newOplogRecordStore() final {
         return std::make_unique<RecordStore>(NamespaceString::kRsOplogNamespace.toString(),
                                              "ident"_sd,
+                                             KeyFormat::Long,
                                              /*isCapped*/ true,
                                              /*cappedCallback*/ nullptr,
                                              &_visibilityManager);
