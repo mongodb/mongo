@@ -37,12 +37,12 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/rename_collection_participant_service.h"
 #include "mongo/db/s/shard_metadata_util.h"
-#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
@@ -57,7 +57,7 @@ namespace {
 void dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) {
     bool knownNss = [&]() {
         try {
-            sharding_ddl_util::dropCollectionLocally(opCtx, nss);
+            DropCollectionCoordinator::dropCollectionLocally(opCtx, nss);
             return true;
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
             return false;

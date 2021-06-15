@@ -123,11 +123,6 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
  */
 void stopMigrations(OperationContext* opCtx, const NamespaceString& nss);
 
-/**
- * Locally drops a collection and cleans its CollectionShardingRuntime metadata
- */
-DropReply dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss);
-
 /*
  * Returns the UUID of the collection (if exists) using the catalog. It does not provide any locking
  *guarantees.

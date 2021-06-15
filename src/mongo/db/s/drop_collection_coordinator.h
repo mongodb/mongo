@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/catalog/drop_collection.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/drop_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 
@@ -47,6 +49,29 @@ public:
     boost::optional<BSONObj> reportForCurrentOp(
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
+
+    /**
+     * Locally drops a collection and cleans its CollectionShardingRuntime metadata
+     */
+    static DropReply dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) {
+        DropReply result;
+        uassertStatusOK(
+            dropCollection(opCtx,
+                           nss,
+                           &result,
+                           DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+
+        {
+            // Clear CollectionShardingRuntime entry
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+            Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+            auto* csr = CollectionShardingRuntime::get(opCtx, nss);
+            csr->clearFilteringMetadata(opCtx);
+        }
+
+        return result;
+    }
 
 private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
