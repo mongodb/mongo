@@ -334,6 +334,13 @@ Status dropCollection(OperationContext* opCtx,
                     [opCtx, dropView, &collectionName, &reply](Database* db,
                                                                const NamespaceString& bucketsNs) {
                         if (dropView) {
+                            // Take a MODE_X lock when dropping timeseries view. This is to prevent
+                            // a concurrent create collection on the same namespace that will
+                            // reserve an OpTime before this drop. We already hold a MODE_X lock on
+                            // the bucket collection inside '_abortIndexBuildsAndDrop' above. When
+                            // taking both these locks it needs to happen in this order to prevent a
+                            // deadlock.
+                            Lock::CollectionLock viewLock(opCtx, collectionName, MODE_X);
                             auto status = _dropView(opCtx, db, collectionName, reply);
                             if (!status.isOK()) {
                                 return status;
