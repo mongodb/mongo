@@ -348,24 +348,43 @@ Mongo.prototype.recordRerouteDueToTenantMigration = function() {
     assert.neq(null, this.reroutingMongo);
 
     while (true) {
-        const res = originalRunCommand.apply(this, [
-            "testTenantMigration",
-            {
-                insert: "rerouted",
-                documents: [{_id: this.migrationStateDoc._id}],
-                writeConcern: {w: "majority"}
-            },
-            0
-        ]);
-        if (res.ok) {
-            return;
+        try {
+            const res = originalRunCommand.apply(this, [
+                "testTenantMigration",
+                {
+                    insert: "rerouted",
+                    documents: [{_id: this.migrationStateDoc._id}],
+                    writeConcern: {w: "majority"}
+                },
+                0
+            ]);
+
+            if (res.ok) {
+                break;
+            } else if (ErrorCodes.isNetworkError(res.code) ||
+                       ErrorCodes.isNotPrimaryError(res.code)) {
+                jsTest.log(
+                    "Failed to write to testTenantMigration.rerouted due to a retryable error " +
+                    tojson(res));
+                continue;
+            } else {
+                // Throw non-retryable errors.
+                assert.commandWorked(res);
+            }
+        } catch (e) {
+            // Since the shell can throw custom errors that don't propagate the error code, check
+            // these exceptions for specific network error messages.
+            // TODO SERVER-54026: Remove check for network error messages once the shell reliably
+            // returns error codes.
+            if (ErrorCodes.isNetworkError(e.code) || ErrorCodes.isNotPrimaryError(e.code) ||
+                isNetworkError(e)) {
+                jsTest.log(
+                    "Failed to write to testTenantMigration.rerouted due to a retryable error exception " +
+                    tojson(e));
+                continue;
+            }
+            throw e;
         }
-        if (ErrorCodes.isNetworkError(res.code) || ErrorCodes.isNotPrimaryError(res.code)) {
-            jsTest.log("Failed to write to testTenantMigration.rerouted due to a retryable error " +
-                       tojson(res));
-            continue;
-        }
-        assert.commandWorked(res);
     }
 };
 
