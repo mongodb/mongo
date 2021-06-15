@@ -35,7 +35,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/sharding_ddl_util.h"
+#include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -74,7 +74,7 @@ public:
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
             try {
-                sharding_ddl_util::dropCollectionLocally(opCtx, ns());
+                DropCollectionCoordinator::dropCollectionLocally(opCtx, ns());
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 LOGV2_DEBUG(5280920,
                             1,
