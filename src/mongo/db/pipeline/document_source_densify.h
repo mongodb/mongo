@@ -52,7 +52,6 @@ public:
         boost::optional<TimeUnit> unit;
         boost::optional<TimeZone> tz;
     };
-
     class DocGenerator {
     public:
         DocGenerator(DensifyValueType min,
@@ -89,7 +88,6 @@ public:
         GeneratorState _state = GeneratorState::kGeneratingDocuments;
     };
 
-
     static boost::intrusive_ptr<DocumentSourceInternalDensify> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
@@ -113,7 +111,7 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
-        return DepsTracker::State::SEE_NEXT;  // This doesn't affect needed fields
+        return DepsTracker::State::SEE_NEXT;  
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
