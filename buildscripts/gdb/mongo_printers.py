@@ -188,6 +188,37 @@ class UUIDPrinter(object):
         return str(uuid.UUID("".join(uuid_hex_bytes)))
 
 
+class RecordIdPrinter(object):
+    """Pretty-printer for mongo::RecordId."""
+
+    def __init__(self, val):
+        """Initialize RecordIdPrinter."""
+        self.val = val
+
+    @staticmethod
+    def display_hint():
+        """Display hint."""
+        return 'string'
+
+    def to_string(self):
+        """Return RecordId for printing."""
+        buf_size = 16
+        rid_format = self.val["_buffer"][buf_size - 1]
+        if rid_format == 0:
+            return "null"
+        elif rid_format == 1:
+            hex_bytes = [int(self.val['_buffer'][i]) for i in range(8)]
+            raw_bytes = bytes(hex_bytes)
+            return struct.unpack('l', raw_bytes)[0]
+        elif rid_format == 2:
+            str_len = int(self.val["_buffer"][0])
+            raw_bytes = [int(self.val['_buffer'][i]) for i in range(1, str_len + 1)]
+            hex_bytes = [hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes]
+            return str("".join(hex_bytes))
+        else:
+            return "invalid RecordId format"
+
+
 class DecorablePrinter(object):
     """Pretty-printer for mongo::Decorable<>."""
 
@@ -612,6 +643,7 @@ def build_pretty_printer():
     pp.add('node_hash_set', 'absl::node_hash_set', True, AbslNodeHashSetPrinter)
     pp.add('flat_hash_map', 'absl::flat_hash_map', True, AbslFlatHashMapPrinter)
     pp.add('flat_hash_set', 'absl::flat_hash_set', True, AbslFlatHashSetPrinter)
+    pp.add('RecordId', 'mongo::RecordId', False, RecordIdPrinter)
     pp.add('UUID', 'mongo::UUID', False, UUIDPrinter)
     pp.add('__wt_cursor', '__wt_cursor', False, WtCursorPrinter)
     pp.add('__wt_session_impl', '__wt_session_impl', False, WtSessionImplPrinter)
