@@ -410,7 +410,8 @@ public:
     void establishOplogCollectionForLogging(OperationContext* opCtx) final;
     void onDeregisterFromCatalog(OperationContext* opCtx) final;
 
-    Status checkMetaDataForIndex(const std::string& indexName, const BSONObj& spec) const final;
+    StatusWith<int> checkMetaDataForIndex(const std::string& indexName,
+                                          const BSONObj& spec) const final;
 
     void updateTTLSetting(OperationContext* opCtx,
                           StringData idxName,

@@ -540,9 +540,10 @@ public:
 
     /**
      * Checks that the metadata for the index exists and matches the given spec.
+     * Returns offset in metadata on success.
      */
-    virtual Status checkMetaDataForIndex(const std::string& indexName,
-                                         const BSONObj& spec) const = 0;
+    virtual StatusWith<int> checkMetaDataForIndex(const std::string& indexName,
+                                                  const BSONObj& spec) const = 0;
 
     /*
      * Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.

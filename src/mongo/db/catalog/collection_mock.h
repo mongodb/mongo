@@ -365,7 +365,7 @@ public:
         std::abort();
     }
 
-    Status checkMetaDataForIndex(const std::string& indexName, const BSONObj& spec) const {
+    StatusWith<int> checkMetaDataForIndex(const std::string& indexName, const BSONObj& spec) const {
         std::abort();
     }
 

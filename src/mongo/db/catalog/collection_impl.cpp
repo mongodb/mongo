@@ -1677,8 +1677,8 @@ void CollectionImpl::establishOplogCollectionForLogging(OperationContext* opCtx)
     repl::establishOplogCollectionForLogging(opCtx, this);
 }
 
-Status CollectionImpl::checkMetaDataForIndex(const std::string& indexName,
-                                             const BSONObj& spec) const {
+StatusWith<int> CollectionImpl::checkMetaDataForIndex(const std::string& indexName,
+                                                      const BSONObj& spec) const {
     int offset = _metadata->findIndexOffset(indexName);
     if (offset < 0) {
         return {ErrorCodes::IndexNotFound,
@@ -1694,7 +1694,7 @@ Status CollectionImpl::checkMetaDataForIndex(const std::string& indexName,
                               << " metadata's spec: " << _metadata->indexes[offset].spec};
     }
 
-    return Status::OK();
+    return offset;
 }
 
 void CollectionImpl::updateTTLSetting(OperationContext* opCtx,
