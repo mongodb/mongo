@@ -281,9 +281,7 @@ executor:
         enableElectionHandoff: 0
         failpoint.abortTenantMigrationBeforeLeavingBlockingState:
             mode:
-              # TODO (SERVER-52713): Allow tenant migration stepdown/kill/terminate suites to commit
-              # migrations and interrupt all replica sets.
-              activationProbability: 1
+              activationProbability: .5
         failpoint.pauseTenantMigrationBeforeLeavingBlockingState:
             mode: alwaysOn
             data:
