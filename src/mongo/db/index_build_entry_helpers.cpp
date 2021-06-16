@@ -261,10 +261,8 @@ Status removeIndexBuildEntry(OperationContext* opCtx,
                 return Status(ErrorCodes::NamespaceNotFound, ss);
             }
 
-            RecordId rid = Helpers::findOne(opCtx,
-                                            collection.getCollection(),
-                                            BSON("_id" << indexBuildUUID),
-                                            /*requireIndex=*/true);
+            RecordId rid =
+                Helpers::findById(opCtx, collection.getCollection(), BSON("_id" << indexBuildUUID));
             if (rid.isNull()) {
                 str::stream ss;
                 ss << "No matching IndexBuildEntry found with indexBuildUUID: " << indexBuildUUID;
