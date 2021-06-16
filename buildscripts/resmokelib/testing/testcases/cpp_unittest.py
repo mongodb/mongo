@@ -35,7 +35,7 @@ class CPPUnitTestCase(interface.ProcessTestCase):
                     "*** Failed test run was recorded. ***\n"
                     "For instructions on using the recording instead of core dumps, see\n"
                     "https://wiki.corp.mongodb.com/display/COREENG/Time+Travel+Debugging+in+MongoDB\n"
-                    "For questions or bug reports, please reach our in #server-testing")
+                    "For questions or bug reports, please reach out in #server-testing")
 
                 # Archive any available recordings if there's any failure. It's possible a problem
                 # with the recorder will cause no recordings to be generated.
