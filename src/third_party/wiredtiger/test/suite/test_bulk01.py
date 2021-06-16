@@ -211,8 +211,9 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri, None)
         cursor[simple_key(cursor, 1)] = simple_value(cursor, 1)
         # Don't close the insert cursor, we want EBUSY.
-        self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: self.session.open_cursor(uri, None, "bulk"))
+        msg = '/bulk-load is only supported on newly created objects/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor(uri, None, "bulk"), msg)
 
 if __name__ == '__main__':
     wttest.run()
