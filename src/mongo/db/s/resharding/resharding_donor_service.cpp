@@ -48,6 +48,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/recoverable_critical_section_service.h"
+#include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
@@ -540,6 +541,41 @@ void ReshardingDonorService::DonorStateMachine::
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         return generateMinFetchTimestamp(opCtx.get(), _metadata.getSourceNss());
     }();
+
+    {
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        auto rawOpCtx = opCtx.get();
+
+        auto generateOplogEntry = [&]() {
+            ReshardingChangeEventO2Field changeEvent{_metadata.getReshardingUUID(),
+                                                     ReshardingChangeEventEnum::kReshardBegin};
+
+            repl::MutableOplogEntry oplog;
+            oplog.setNss(_metadata.getSourceNss());
+            oplog.setOpType(repl::OpTypeEnum::kNoop);
+            oplog.setUuid(_metadata.getSourceUUID());
+            oplog.setObject(BSON("msg"
+                                 << "Created temporary resharding collection"));
+            oplog.setObject2(changeEvent.toBSON());
+            oplog.setOpTime(OplogSlot());
+            oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+            return oplog;
+        };
+
+        auto oplog = generateOplogEntry();
+        writeConflictRetry(
+            rawOpCtx, "ReshardingBeginOplog", NamespaceString::kRsOplogNamespace.ns(), [&] {
+                AutoGetOplog oplogWrite(rawOpCtx, OplogAccessMode::kWrite);
+                WriteUnitOfWork wunit(rawOpCtx);
+                const auto& oplogOpTime = repl::logOp(rawOpCtx, &oplog);
+                uassert(5052101,
+                        str::stream()
+                            << "Failed to create new oplog entry for oplog with opTime: "
+                            << oplog.getOpTime().toString() << ": " << redact(oplog.toBSON()),
+                        !oplogOpTime.isNull());
+                wunit.commit();
+            });
+    }
 
     LOGV2_DEBUG(5390702,
                 2,
