@@ -1167,9 +1167,6 @@ __rollback_to_stable_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollbac
     WT_DECL_RET;
     WT_REF *child_ref, *ref;
 
-    /* Set this flag to return error instead of panic if file is corrupted. */
-    F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
-
     /* Walk the tree, marking commits aborted where appropriate. */
     ref = NULL;
     while ((ret = __wt_tree_walk_custom_skip(session, &ref, __wt_rts_page_skip, &rollback_timestamp,
@@ -1183,7 +1180,6 @@ __rollback_to_stable_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollbac
         } else
             WT_RET(__rollback_abort_updates(session, ref, rollback_timestamp));
 
-    F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
     return (ret);
 }
 
@@ -1400,211 +1396,191 @@ __rollback_progress_msg(WT_SESSION_IMPL *session, struct timespec rollback_start
 
 /*
  * __rollback_to_stable_btree_apply --
+ *     Perform rollback to stable on a single file.
+ */
+static int
+__rollback_to_stable_btree_apply(
+  WT_SESSION_IMPL *session, const char *uri, const char *config, wt_timestamp_t rollback_timestamp)
+{
+    WT_CONFIG ckptconf;
+    WT_CONFIG_ITEM cval, value, key;
+    WT_DECL_RET;
+    WT_TXN_GLOBAL *txn_global;
+    wt_timestamp_t max_durable_ts, newest_start_durable_ts, newest_stop_durable_ts;
+    size_t addr_size;
+    uint64_t rollback_txnid;
+    uint32_t btree_id;
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
+    bool dhandle_allocated, durable_ts_found, has_txn_updates_gt_than_ckpt_snap, perform_rts;
+    bool prepared_updates;
+
+    txn_global = &S2C(session)->txn_global;
+    rollback_txnid = 0;
+    addr_size = 0;
+    dhandle_allocated = false;
+
+    /* Find out the max durable timestamp of the object from checkpoint. */
+    newest_start_durable_ts = newest_stop_durable_ts = WT_TS_NONE;
+    durable_ts_found = prepared_updates = has_txn_updates_gt_than_ckpt_snap = false;
+
+    WT_RET(__wt_config_getones(session, config, "checkpoint", &cval));
+    __wt_config_subinit(session, &ckptconf, &cval);
+    for (; __wt_config_next(&ckptconf, &key, &cval) == 0;) {
+        ret = __wt_config_subgets(session, &cval, "newest_start_durable_ts", &value);
+        if (ret == 0) {
+            newest_start_durable_ts = WT_MAX(newest_start_durable_ts, (wt_timestamp_t)value.val);
+            durable_ts_found = true;
+        }
+        WT_RET_NOTFOUND_OK(ret);
+        ret = __wt_config_subgets(session, &cval, "newest_stop_durable_ts", &value);
+        if (ret == 0) {
+            newest_stop_durable_ts = WT_MAX(newest_stop_durable_ts, (wt_timestamp_t)value.val);
+            durable_ts_found = true;
+        }
+        WT_RET_NOTFOUND_OK(ret);
+        ret = __wt_config_subgets(session, &cval, "prepare", &value);
+        if (ret == 0) {
+            if (value.val)
+                prepared_updates = true;
+        }
+        WT_RET_NOTFOUND_OK(ret);
+        ret = __wt_config_subgets(session, &cval, "newest_txn", &value);
+        if (value.len != 0)
+            rollback_txnid = (uint64_t)value.val;
+        WT_RET_NOTFOUND_OK(ret);
+        ret = __wt_config_subgets(session, &cval, "addr", &value);
+        if (ret == 0)
+            addr_size = value.len;
+        WT_RET_NOTFOUND_OK(ret);
+    }
+    max_durable_ts = WT_MAX(newest_start_durable_ts, newest_stop_durable_ts);
+    has_txn_updates_gt_than_ckpt_snap =
+      WT_CHECK_RECOVERY_FLAG_TS_TXNID(session, rollback_txnid, max_durable_ts);
+
+    /* Increment the inconsistent checkpoint stats counter. */
+    if (has_txn_updates_gt_than_ckpt_snap)
+        WT_STAT_CONN_DATA_INCR(session, txn_rts_inconsistent_ckpt);
+
+    /*
+     * The rollback to stable will skip the tables during recovery and shutdown in the following
+     * conditions.
+     * 1. Empty table.
+     * 2. Table has timestamped updates without a stable timestamp.
+     */
+    if ((F_ISSET(S2C(session), WT_CONN_RECOVERING) ||
+          F_ISSET(S2C(session), WT_CONN_CLOSING_TIMESTAMP)) &&
+      (addr_size == 0 ||
+        (txn_global->stable_timestamp == WT_TS_NONE && max_durable_ts != WT_TS_NONE))) {
+        __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
+          "skip rollback to stable on file %s because %s", uri,
+          addr_size == 0 ? "its checkpoint address length is 0" :
+                           "it has timestamped updates and the stable timestamp is 0");
+        return (0);
+    }
+
+    /*
+     * The rollback operation should be performed on this file based on the following:
+     * 1. The dhandle is present in the cache and tree is modified.
+     * 2. The checkpoint durable start/stop timestamp is greater than the rollback timestamp.
+     * 3. The checkpoint has prepared updates written to disk.
+     * 4. There is no durable timestamp in any checkpoint.
+     * 5. The checkpoint newest txn is greater than snapshot min txn id.
+     */
+    WT_WITH_HANDLE_LIST_READ_LOCK(session, (ret = __wt_conn_dhandle_find(session, uri, NULL)));
+
+    perform_rts = ret == 0 && S2BT(session)->modified;
+
+    WT_ERR_NOTFOUND_OK(ret, false);
+
+    if (perform_rts || max_durable_ts > rollback_timestamp || prepared_updates ||
+      !durable_ts_found || has_txn_updates_gt_than_ckpt_snap) {
+        WT_ERR(__wt_session_get_dhandle(session, uri, NULL, NULL, 0));
+        dhandle_allocated = true;
+
+        __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
+          "tree rolled back with durable timestamp: %s, or when tree is modified: %s or "
+          "prepared updates: %s or when durable time is not found: %s or txnid: %" PRIu64
+          " is greater than recovery checkpoint snap min: %s",
+          __wt_timestamp_to_string(max_durable_ts, ts_string[0]),
+          S2BT(session)->modified ? "true" : "false", prepared_updates ? "true" : "false",
+          !durable_ts_found ? "true" : "false", rollback_txnid,
+          has_txn_updates_gt_than_ckpt_snap ? "true" : "false");
+        WT_ERR(__rollback_to_stable_btree(session, rollback_timestamp));
+    } else
+        __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
+          "%s: tree skipped with durable timestamp: %s and stable timestamp: %s or txnid: %" PRIu64,
+          uri, __wt_timestamp_to_string(max_durable_ts, ts_string[0]),
+          __wt_timestamp_to_string(rollback_timestamp, ts_string[1]), rollback_txnid);
+
+    /*
+     * Truncate history store entries for the non-timestamped table.
+     * Exceptions:
+     * 1. Modified tree - Scenarios where the tree is never checkpointed lead to zero
+     * durable timestamp even they are timestamped tables. Until we have a special
+     * indication of letting to know the table type other than checking checkpointed durable
+     * timestamp to WT_TS_NONE, we need this exception.
+     * 2. In-memory database - In this scenario, there is no history store to truncate.
+     */
+    if ((!dhandle_allocated || !S2BT(session)->modified) && max_durable_ts == WT_TS_NONE &&
+      !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
+        WT_ERR(__wt_config_getones(session, config, "id", &cval));
+        btree_id = (uint32_t)cval.val;
+        WT_ERR(__rollback_to_stable_btree_hs_truncate(session, btree_id));
+    }
+
+err:
+    if (dhandle_allocated)
+        WT_TRET(__wt_session_release_dhandle(session));
+    return (ret);
+}
+
+/*
+ * __rollback_to_stable_btree_apply_all --
  *     Perform rollback to stable to all files listed in the metadata, apart from the metadata and
  *     history store files.
  */
 static int
-__rollback_to_stable_btree_apply(WT_SESSION_IMPL *session)
+__rollback_to_stable_btree_apply_all(WT_SESSION_IMPL *session, uint64_t rollback_timestamp)
 {
-    WT_CONFIG ckptconf;
-    WT_CONFIG_ITEM cval, value, key;
+    struct timespec rollback_timer;
     WT_CURSOR *cursor;
     WT_DECL_RET;
-    WT_TXN_GLOBAL *txn_global;
-    wt_timestamp_t max_durable_ts, newest_start_durable_ts, newest_stop_durable_ts,
-      rollback_timestamp;
-    struct timespec rollback_timer;
     uint64_t rollback_count, rollback_msg_count, rollback_txnid;
-    uint32_t btree_id;
-    size_t addr_size;
-    char ts_string[2][WT_TS_INT_STRING_SIZE];
     const char *config, *uri;
-    bool durable_ts_found, prepared_updates, has_txn_updates_gt_than_ckpt_snap;
-    bool dhandle_allocated, perform_rts;
-
-    txn_global = &S2C(session)->txn_global;
-    rollback_count = rollback_msg_count = rollback_txnid = 0;
-    addr_size = 0;
 
     /* Initialize the verbose tracking timer. */
     __wt_epoch(session, &rollback_timer);
+    rollback_count = rollback_msg_count = rollback_txnid = 0;
 
-    /*
-     * Copy the stable timestamp, otherwise we'd need to lock it each time it's accessed. Even
-     * though the stable timestamp isn't supposed to be updated while rolling back, accessing it
-     * without a lock would violate protocol.
-     */
-    WT_ORDERED_READ(rollback_timestamp, txn_global->stable_timestamp);
-    __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
-      "performing rollback to stable with stable timestamp: %s and oldest timestamp: %s",
-      __wt_timestamp_to_string(rollback_timestamp, ts_string[0]),
-      __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[1]));
-
-    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA));
     WT_RET(__wt_metadata_cursor(session, &cursor));
-
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
-        __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
-          "recovered checkpoint snapshot min:  %" PRIu64 ", snapshot max: %" PRIu64
-          ", snapshot count: %" PRIu32,
-          S2C(session)->recovery_ckpt_snap_min, S2C(session)->recovery_ckpt_snap_max,
-          S2C(session)->recovery_ckpt_snapshot_count);
-
     while ((ret = cursor->next(cursor)) == 0) {
         /* Log a progress message. */
         __rollback_progress_msg(session, rollback_timer, rollback_count, &rollback_msg_count);
         ++rollback_count;
 
         WT_ERR(cursor->get_key(cursor, &uri));
-        dhandle_allocated = perform_rts = false;
 
-        /* Ignore metadata and history store files. */
-        if (strcmp(uri, WT_METAFILE_URI) == 0 || strcmp(uri, WT_HS_URI) == 0)
-            continue;
-
-        if (!WT_PREFIX_MATCH(uri, "file:"))
+        /* Ignore non-file objects as well as the metadata and history store files. */
+        if (!WT_PREFIX_MATCH(uri, "file:") || strcmp(uri, WT_HS_URI) == 0 ||
+          strcmp(uri, WT_METAFILE_URI) == 0)
             continue;
 
         WT_ERR(cursor->get_value(cursor, &config));
 
-        /* Find out the max durable timestamp of the object from checkpoint. */
-        newest_start_durable_ts = newest_stop_durable_ts = WT_TS_NONE;
-        durable_ts_found = prepared_updates = has_txn_updates_gt_than_ckpt_snap = false;
-
-        /* Get the btree ID. */
-        WT_ERR(__wt_config_getones(session, config, "id", &cval));
-        btree_id = (uint32_t)cval.val;
-
-        WT_ERR(__wt_config_getones(session, config, "checkpoint", &cval));
-        __wt_config_subinit(session, &ckptconf, &cval);
-        for (; __wt_config_next(&ckptconf, &key, &cval) == 0;) {
-            ret = __wt_config_subgets(session, &cval, "newest_start_durable_ts", &value);
-            if (ret == 0) {
-                newest_start_durable_ts =
-                  WT_MAX(newest_start_durable_ts, (wt_timestamp_t)value.val);
-                durable_ts_found = true;
-            }
-            WT_ERR_NOTFOUND_OK(ret, false);
-            ret = __wt_config_subgets(session, &cval, "newest_stop_durable_ts", &value);
-            if (ret == 0) {
-                newest_stop_durable_ts = WT_MAX(newest_stop_durable_ts, (wt_timestamp_t)value.val);
-                durable_ts_found = true;
-            }
-            WT_ERR_NOTFOUND_OK(ret, false);
-            ret = __wt_config_subgets(session, &cval, "prepare", &value);
-            if (ret == 0) {
-                if (value.val)
-                    prepared_updates = true;
-            }
-            WT_ERR_NOTFOUND_OK(ret, false);
-            ret = __wt_config_subgets(session, &cval, "newest_txn", &value);
-            if (value.len != 0)
-                rollback_txnid = (uint64_t)value.val;
-            WT_ERR_NOTFOUND_OK(ret, false);
-            ret = __wt_config_subgets(session, &cval, "addr", &value);
-            if (ret == 0)
-                addr_size = value.len;
-            WT_ERR_NOTFOUND_OK(ret, false);
-        }
-        max_durable_ts = WT_MAX(newest_start_durable_ts, newest_stop_durable_ts);
-        has_txn_updates_gt_than_ckpt_snap =
-          WT_CHECK_RECOVERY_FLAG_TS_TXNID(session, rollback_txnid, max_durable_ts);
-
-        /* Increment the inconsistent checkpoint stats counter. */
-        if (has_txn_updates_gt_than_ckpt_snap)
-            WT_STAT_CONN_DATA_INCR(session, txn_rts_inconsistent_ckpt);
+        F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
+        ret = __rollback_to_stable_btree_apply(session, uri, config, rollback_timestamp);
+        F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
 
         /*
-         * The rollback to stable will skip the tables during recovery and shutdown in the following
-         * conditions.
-         * 1. Empty table.
-         * 2. Table has timestamped updates without a stable timestamp.
+         * Ignore rollback to stable failures on files that don't exist or files where corruption is
+         * detected.
          */
-        if ((F_ISSET(S2C(session), WT_CONN_RECOVERING) ||
-              F_ISSET(S2C(session), WT_CONN_CLOSING_TIMESTAMP)) &&
-          (addr_size == 0 ||
-            (txn_global->stable_timestamp == WT_TS_NONE && max_durable_ts != WT_TS_NONE))) {
+        if (ret == ENOENT || (ret == WT_ERROR && F_ISSET(S2C(session), WT_CONN_DATA_CORRUPTION))) {
             __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
-              "skip rollback to stable on file %s because %s", uri,
-              addr_size == 0 ? "its checkpoint address length is 0" :
-                               "it has timestamped updates and the stable timestamp is 0");
+              "%s: skipped performing rollback to stable because the file %s", uri,
+              ret == ENOENT ? "does not exist" : "is corrupted.");
             continue;
         }
-
-        /*
-         * The rollback operation should be performed on this file based on the following:
-         * 1. The dhandle is present in the cache and tree is modified.
-         * 2. The checkpoint durable start/stop timestamp is greater than the rollback timestamp.
-         * 3. There is no durable timestamp in any checkpoint.
-         * 4. The checkpoint newest txn is greater than snapshot min txn id
-         */
-        WT_WITH_HANDLE_LIST_READ_LOCK(session, (ret = __wt_conn_dhandle_find(session, uri, NULL)));
-
-        if (ret == 0 && S2BT(session)->modified)
-            perform_rts = true;
-
-        WT_ERR_NOTFOUND_OK(ret, false);
-
-        if (perform_rts || max_durable_ts > rollback_timestamp || prepared_updates ||
-          !durable_ts_found || has_txn_updates_gt_than_ckpt_snap) {
-            /* Set this flag to return error instead of panic if file is corrupted. */
-            F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
-            ret = __wt_session_get_dhandle(session, uri, NULL, NULL, 0);
-            F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
-
-            /*
-             * Ignore performing rollback to stable on files that does not exist or the files where
-             * corruption is detected.
-             */
-            if ((ret == ENOENT) ||
-              (ret == WT_ERROR && F_ISSET(S2C(session), WT_CONN_DATA_CORRUPTION))) {
-                __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
-                  "ignore performing rollback to stable on %s because the file %s", uri,
-                  ret == ENOENT ? "does not exist" : "is corrupted.");
-                continue;
-            }
-            WT_ERR(ret);
-
-            dhandle_allocated = true;
-            __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
-              "tree rolled back with durable timestamp: %s, or when tree is modified: %s or "
-              "prepared updates: %s or when durable time is not found: %s or txnid: %" PRIu64
-              " is greater than recovery checkpoint snap min: %s",
-              __wt_timestamp_to_string(max_durable_ts, ts_string[0]),
-              S2BT(session)->modified ? "true" : "false", prepared_updates ? "true" : "false",
-              !durable_ts_found ? "true" : "false", rollback_txnid,
-              has_txn_updates_gt_than_ckpt_snap ? "true" : "false");
-            WT_TRET(__rollback_to_stable_btree(session, rollback_timestamp));
-        } else
-            __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
-              "tree skipped with durable timestamp: %s and stable timestamp: %s or txnid: %" PRIu64,
-              __wt_timestamp_to_string(max_durable_ts, ts_string[0]),
-              __wt_timestamp_to_string(rollback_timestamp, ts_string[1]), rollback_txnid);
-
-        /*
-         * Truncate history store entries for the non-timestamped table.
-         * Exceptions:
-         * 1. Modified tree - Scenarios where the tree is never checkpointed lead to zero
-         * durable timestamp even they are timestamped tables. Until we have a special
-         * indication of letting to know the table type other than checking checkpointed durable
-         * timestamp to WT_TS_NONE, We need this exception.
-         * 2. In-memory database - In this scenario, there is no history store to truncate.
-         */
-
-        if ((!dhandle_allocated || !S2BT(session)->modified) && max_durable_ts == WT_TS_NONE &&
-          !F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-            WT_TRET(__rollback_to_stable_btree_hs_truncate(session, btree_id));
-
-        if (dhandle_allocated)
-            WT_TRET(__wt_session_release_dhandle(session));
-
-        /*
-         * Continue when the table is corrupted and proceed to perform rollback to stable on other
-         * tables.
-         */
-        if (ret == WT_ERROR && F_ISSET(S2C(session), WT_CONN_DATA_CORRUPTION))
-            continue;
-
         WT_ERR(ret);
     }
     WT_ERR_NOTFOUND_OK(ret, false);
@@ -1627,6 +1603,8 @@ __rollback_to_stable(WT_SESSION_IMPL *session, bool no_ckpt)
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_TXN_GLOBAL *txn_global;
+    wt_timestamp_t rollback_timestamp;
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
 
     conn = S2C(session);
     txn_global = &conn->txn_global;
@@ -1640,11 +1618,29 @@ __rollback_to_stable(WT_SESSION_IMPL *session, bool no_ckpt)
     WT_ERR(__rollback_to_stable_check(session));
 
     /*
+     * Copy the stable timestamp, otherwise we'd need to lock it each time it's accessed. Even
+     * though the stable timestamp isn't supposed to be updated while rolling back, accessing it
+     * without a lock would violate protocol.
+     */
+    WT_ORDERED_READ(rollback_timestamp, txn_global->stable_timestamp);
+    __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
+      "performing rollback to stable with stable timestamp: %s and oldest timestamp: %s",
+      __wt_timestamp_to_string(rollback_timestamp, ts_string[0]),
+      __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[1]));
+
+    if (F_ISSET(conn, WT_CONN_RECOVERING))
+        __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
+          "recovered checkpoint snapshot min:  %" PRIu64 ", snapshot max: %" PRIu64
+          ", snapshot count: %" PRIu32,
+          conn->recovery_ckpt_snap_min, conn->recovery_ckpt_snap_max,
+          conn->recovery_ckpt_snapshot_count);
+
+    /*
      * Allocate a non-durable btree bitstring. We increment the global value before using it, so the
      * current value is already in use, and hence we need to add one here.
      */
     conn->stable_rollback_maxfile = conn->next_file_id + 1;
-    WT_ERR(__rollback_to_stable_btree_apply(session));
+    WT_ERR(__rollback_to_stable_btree_apply_all(session, rollback_timestamp));
 
     /* Rollback the global durable timestamp to the stable timestamp. */
     txn_global->has_durable_timestamp = txn_global->has_stable_timestamp;
