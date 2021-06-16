@@ -13,7 +13,14 @@ load('jstests/libs/profiler.js');
 load('jstests/sharding/libs/shard_versioning_util.js');
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
-const st = new ShardingTest({mongos: 2, shards: 2, rs: {nodes: 3}});
+const st = new ShardingTest({
+    mongos: 2,
+    shards: 2,
+    rs: {nodes: 3},
+    configOptions:
+        {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}}
+});
+
 const mongos = st.s0;
 const staleMongos = st.s1;
 const primaryShard = st.shard0.shardName;
