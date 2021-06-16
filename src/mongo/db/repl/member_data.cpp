@@ -102,8 +102,8 @@ void MemberData::setDownValues(Date_t now, const std::string& heartbeatMessage) 
 
     if (_lastResponse.getState() != MemberState::RS_DOWN) {
         LOGV2(21216,
-              "Member {hostAndPort} is now in state RS_DOWN - {heartbeatMessage}",
-              "Member is now in state RS_DOWN",
+              "Member {hostAndPort} is now in state DOWN - {heartbeatMessage}",
+              "Member is now in state DOWN",
               "hostAndPort"_attr = _hostAndPort.toString(),
               "heartbeatMessage"_attr = redact(heartbeatMessage));
     }
@@ -128,8 +128,8 @@ void MemberData::setAuthIssue(Date_t now) {
 
     if (_lastResponse.getState() != MemberState::RS_UNKNOWN) {
         LOGV2(21217,
-              "Member {hostAndPort} is now in state RS_UNKNOWN due to authentication issue.",
-              "Member is now in state RS_UNKNOWN due to authentication issue",
+              "Member {hostAndPort} is now in state UNKNOWN due to authentication issue.",
+              "Member is now in state UNKNOWN due to authentication issue",
               "hostAndPort"_attr = _hostAndPort.toString());
     }
 
