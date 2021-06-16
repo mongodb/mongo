@@ -31,6 +31,7 @@ var ReshardingTest = class {
         criticalSectionTimeoutMS: criticalSectionTimeoutMS = 24 * 60 * 60 * 1000 /* 1 day */,
         periodicNoopIntervalSecs: periodicNoopIntervalSecs = undefined,
         writePeriodicNoops: writePeriodicNoops = undefined,
+        enableElections: enableElections = false,
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -53,6 +54,8 @@ var ReshardingTest = class {
         this._periodicNoopIntervalSecs = periodicNoopIntervalSecs;
         /** @private */
         this._writePeriodicNoops = writePeriodicNoops;
+        /** @private */
+        this._enableElections = enableElections;
 
         // Properties set by setup().
         /** @private */
@@ -91,6 +94,23 @@ var ReshardingTest = class {
         const mongosOptions = {setParameter: {}};
         const configOptions = {setParameter: {}};
         const rsOptions = {setParameter: {}};
+        const configReplSetTestOptions = {};
+
+        let nodesPerShard = 2;
+        let nodesPerConfigRs = 1;
+
+        if (this._enableElections) {
+            nodesPerShard = 3;
+            nodesPerConfigRs = 3;
+
+            // Increase the likelihood that writes which aren't yet majority-committed end up
+            // getting rolled back.
+            rsOptions.settings = {catchUpTimeoutMillis: 0};
+            configReplSetTestOptions.settings = {catchUpTimeoutMillis: 0};
+
+            rsOptions.setParameter.enableElectionHandoff = 0;
+            configOptions.setParameter.enableElectionHandoff = 0;
+        }
 
         if (this._minimumOperationDurationMS !== undefined) {
             configOptions.setParameter.reshardingMinimumOperationDurationMillis =
@@ -113,11 +133,12 @@ var ReshardingTest = class {
         this._st = new ShardingTest({
             mongos: 1,
             mongosOptions,
-            config: 1,
+            config: nodesPerConfigRs,
             configOptions,
             shards: this._numShards,
-            rs: {nodes: 2},
+            rs: {nodes: nodesPerShard},
             rsOptions,
+            configReplSetTestOptions,
             manualAddShard: true,
         });
 
@@ -145,6 +166,12 @@ var ReshardingTest = class {
                 this._st.s.adminCommand({addShard: shard.host, name: shardName}));
             shard.shardName = res.shardAdded;
         }
+
+        // In order to enable random failovers, initialize Random's seed if it has not already been
+        // done.
+        if (!Random.isInitialized()) {
+            Random.setRandomSeed();
+        }
     }
 
     /** @private */
@@ -166,6 +193,24 @@ var ReshardingTest = class {
 
     get recipientShardNames() {
         return this._recipientShards().map(shard => shard.shardName);
+    }
+
+    get configShardName() {
+        return "config";
+    }
+
+    /** @private */
+    _allReplSetTests() {
+        return [
+            {shardName: this.configShardName, rs: this._st.configRS},
+            ...Array.from({length: this._numShards}, (_, i) => this._st[`shard${i}`])
+        ];
+    }
+
+    /** @private */
+    _getReplSetForShard(shardName) {
+        const res = this._allReplSetTests().find(shardInfo => shardInfo.shardName === shardName);
+        return res.rs;
     }
 
     /**
@@ -694,6 +739,65 @@ var ReshardingTest = class {
         }
 
         this._st.stop();
+    }
+
+    /**
+     * Given the shardName, steps up a secondary (chosen at random) to become the new primary of the
+     * shard replica set. To force an election on the configsvr rather than a participant shard, use
+     * shardName = this.configShardName;
+     */
+    stepUpNewPrimaryOnShard(shardName) {
+        jsTestLog(`ReshardingTestFixture stepping up new primary on shard ${shardName}`);
+
+        const replSet = this._getReplSetForShard(shardName);
+        let originalPrimary = replSet.getPrimary();
+        let secondaries = replSet.getSecondaries();
+
+        while (secondaries.length > 0) {
+            // Once the primary is terminated/killed/stepped down, write availability is lost. Avoid
+            // long periods where the replica set doesn't have write availability by trying to step
+            // up secondaries until one succeeds.
+            const newPrimaryIdx = Random.randInt(secondaries.length);
+            const newPrimary = secondaries[newPrimaryIdx];
+
+            const res = newPrimary.adminCommand({replSetStepUp: 1});
+            if (res.ok === 1) {
+                replSet.awaitNodesAgreeOnPrimary();
+                assert.eq(newPrimary, replSet.getPrimary());
+                return;
+            }
+
+            jsTest.log(`ReshardingTestFixture failed to step up secondary ${newPrimary.host} and` +
+                       ` got error ${tojson(res)}. Will retry on another secondary until all` +
+                       ` secondaries have been exhaused`);
+            secondaries.splice(newPrimaryIdx, 1);
+        }
+
+        jsTest.log(`ReshardingTestFixture failed to step up secondaries, trying to step` +
+                   ` original primary back up`);
+        replSet.stepUp(originalPrimary, {awaitReplicationBeforeStepUp: false});
+    }
+
+    killAndRestartPrimaryOnShard(shardName) {
+        jsTestLog(`ReshardingTestFixture killing and restarting primary on shard ${shardName}`);
+
+        const replSet = this._getReplSetForShard(shardName);
+        const originalPrimaryConn = replSet.getPrimary();
+
+        const SIGKILL = 9;
+        const opts = {allowedExitCode: MongoRunner.EXIT_SIGKILL};
+        replSet.restart(originalPrimaryConn, opts, SIGKILL);
+    }
+
+    shutdownAndRestartPrimaryOnShard(shardName) {
+        jsTestLog(
+            `ReshardingTestFixture shutting down and restarting primary on shard ${shardName}`);
+
+        const replSet = this._getReplSetForShard(shardName);
+        const originalPrimaryConn = replSet.getPrimary();
+
+        const SIGTERM = 15;
+        replSet.restart(originalPrimaryConn, {}, SIGTERM);
     }
 
     /**

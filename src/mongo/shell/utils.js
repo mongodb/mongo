@@ -1211,6 +1211,10 @@ var Random = (function() {
     var errorMsg = "The random number generator hasn't been seeded yet; " +
         "call Random.setRandomSeed()";
 
+    function isInitialized() {
+        return initialized;
+    }
+
     // Set the random generator seed.
     function srand(s) {
         initialized = true;
@@ -1278,6 +1282,7 @@ var Random = (function() {
     return {
         genExp: genExp,
         genNormal: genNormal,
+        isInitialized: isInitialized,
         rand: rand,
         randInt: randInt,
         setRandomSeed: setRandomSeed,
