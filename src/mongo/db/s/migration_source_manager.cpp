@@ -271,7 +271,8 @@ Status MigrationSourceManager::startClone() {
         auto const readConcernArgs = repl::ReadConcernArgs(
             replCoord->getMyLastAppliedOpTime(), repl::ReadConcernLevel::kLocalReadConcern);
 
-        auto waitForReadConcernStatus = waitForReadConcern(_opCtx, readConcernArgs, false);
+        auto waitForReadConcernStatus =
+            waitForReadConcern(_opCtx, readConcernArgs, StringData(), false);
         if (!waitForReadConcernStatus.isOK()) {
             return waitForReadConcernStatus;
         }
