@@ -369,7 +369,7 @@ __wt_flush_tier(WT_SESSION_IMPL *session, const char *config)
     WT_RET(__wt_config_gets(session, cfg, "force", &cval));
     if (cval.val)
         LF_SET(WT_FLUSH_TIER_FORCE);
-    WT_RET(__wt_config_gets_def(session, cfg, "sync", 0, &cval));
+    WT_RET(__wt_config_gets(session, cfg, "sync", &cval));
     if (WT_STRING_MATCH("off", cval.str, cval.len))
         LF_SET(WT_FLUSH_TIER_OFF);
     else if (WT_STRING_MATCH("on", cval.str, cval.len))
