@@ -47,7 +47,7 @@ from typing import Dict, List, Set, Optional, Tuple, Union
 
 from idl import parser, syntax, errors, common
 from idl.compiler import CompilerImportResolver
-from idl_compatibility_errors import IDLCompatibilityContext, IDLCompatibilityErrorCollection
+from idl_compatibility_errors import IDLCompatibilityContext, IDLCompatibilityErrorCollection, dump_errors
 
 ALLOW_ANY_TYPE_LIST: List[str] = [
     # This list if only used in unit-tests.
@@ -875,7 +875,9 @@ def check_error_reply(old_basic_types_path: str, new_basic_types_path: str,
                                        old_idl_file, new_idl_file, old_basic_types_path,
                                        new_basic_types_path)
 
-    ctxt.errors.dump_errors()
+    # TODO (SERVER-55203): Remove error_skipped logic.
+    ctxt.errors.remove_skipped_errors_and_dump_all_errors("ErrorReply", old_basic_types_path,
+                                                          new_basic_types_path)
     return ctxt.errors
 
 
@@ -1028,7 +1030,9 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str,
                     check_security_access_checks(ctxt, old_cmd.access_check, new_cmd.access_check,
                                                  old_cmd, new_idl_file_path)
 
-    ctxt.errors.dump_errors()
+    # TODO (SERVER-55203): Remove error_skipped logic.
+    ctxt.errors.remove_skipped_errors_and_dump_all_errors("Commands", old_idl_dir, new_idl_dir)
+
     return ctxt.errors
 
 
