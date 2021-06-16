@@ -2219,7 +2219,7 @@ var ReplSetTest = function(opts) {
             if (readAtClusterTime !== undefined) {
                 // TODO (SERVER-48959): Remove 4.4 version check to see which point-in-time read
                 // behavior to use.
-                const version = db.runCommand({buildinfo: 1}).versionArray;
+                const version = assert.commandWorked(db.runCommand({buildinfo: 1})).versionArray;
                 if (jsTest.options().enableMajorityReadConcern !== false &&
                     ((version[0] > 4) || ((version[0] == 4) && (version[1] > 4)))) {
                     commandObj.readConcern = {level: "snapshot", atClusterTime: readAtClusterTime};
