@@ -1,4 +1,5 @@
 load('jstests/libs/check_orphans_are_deleted_helpers.js');  // For CheckOrphansAreDeletedHelpers.
+load('jstests/sharding/autosplit_include.js');              // For waitForOngoingChunkSplits
 
 /**
  * Asserts that all shards in the sharded cluster doesn't own any orphan documents.
