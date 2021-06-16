@@ -190,7 +190,7 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
     }
 #endif
 
-    const int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
+    const auto clusterAuthMode = serverGlobalParams.startupClusterAuthMode;
     if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled) {
         bool usingCertifiateSelectors = params.count("net.tls.certificateSelector");
         if (sslGlobalParams.sslPEMKeyFile.size() == 0 && !usingCertifiateSelectors) {
@@ -209,7 +209,7 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
         // When using cetificate selectors, we use the local system certificate store for verifying
         // X.509 certificates for auth instead of relying on a CA file.
         if (sslGlobalParams.sslCAFile.empty() && !usingCertifiateSelectors &&
-            clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
+            clusterAuthMode.allowsX509()) {
             uasserted(ErrorCodes::BadValue, sslCANotFoundError);
         }
     } else if (sslGlobalParams.sslPEMKeyFile.size() || sslGlobalParams.sslPEMKeyPassword.size() ||
@@ -227,9 +227,7 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
                   "using TLS configuration parameters");
     }
 
-    if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile ||
-        clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509 ||
-        clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
+    if (clusterAuthMode.allowsX509()) {
         if (sslGlobalParams.sslMode.load() == SSLParams::SSLMode_disabled) {
             uasserted(ErrorCodes::BadValue, "need to enable TLS via the tlsMode flag");
         }
@@ -243,9 +241,7 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
 
     if (sslGlobalParams.sslMode.load() == SSLParams::SSLMode_allowSSL) {
         // allowSSL and x509 is valid only when we are transitioning to auth.
-        if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509 ||
-            (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509 &&
-             !serverGlobalParams.transitionToAuth)) {
+        if (clusterAuthMode.sendsX509() && !serverGlobalParams.transitionToAuth) {
             uasserted(ErrorCodes::BadValue,
                       "cannot have x.509 cluster authentication in allowTLS mode");
         }

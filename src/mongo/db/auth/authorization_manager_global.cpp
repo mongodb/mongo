@@ -29,13 +29,19 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/authenticate.h"
+#include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/db/auth/cluster_auth_mode.h"
+#include "mongo/db/auth/sasl_command_constants.h"
+#include "mongo/db/auth/security_key.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
 namespace {
@@ -44,11 +50,40 @@ ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
     "CreateAuthorizationManager",
     {"OIDGeneration", "EndStartupOptionStorage"},
     [](ServiceContext* service) {
+        // Officially set the ClusterAuthMode for this ServiceContext
+        ClusterAuthMode::set(service, serverGlobalParams.startupClusterAuthMode);
+
+        const auto clusterAuthMode = serverGlobalParams.startupClusterAuthMode;
+        const auto authIsEnabled =
+            serverGlobalParams.authState == ServerGlobalParams::AuthState::kEnabled;
+
         auto authzManager = AuthorizationManager::create(service);
-        authzManager->setAuthEnabled(serverGlobalParams.authState ==
-                                     ServerGlobalParams::AuthState::kEnabled);
+        authzManager->setAuthEnabled(authIsEnabled);
         authzManager->setShouldValidateAuthSchemaOnStartup(gStartupAuthSchemaValidation);
+
+        // Auto-enable auth unless we are in mixed auth/no-auth or clusterAuthMode was not provided.
+        // clusterAuthMode defaults to "keyFile" if a --keyFile parameter is provided.
+        if (clusterAuthMode.isDefined() && !serverGlobalParams.transitionToAuth) {
+            authzManager->setAuthEnabled(true);
+        }
         AuthorizationManager::set(service, std::move(authzManager));
+
+        if (clusterAuthMode.allowsKeyFile()) {
+            // Load up the keys if we allow key files authentication.
+            const auto gotKeys = setUpSecurityKey(serverGlobalParams.keyFile, clusterAuthMode);
+            uassert(5579201, "Unable to acquire security key[s]", gotKeys);
+        }
+
+        if (clusterAuthMode.sendsX509()) {
+        // Send x509 authentication if we can.
+#ifdef MONGO_CONFIG_SSL
+            auth::setInternalUserAuthParams(auth::createInternalX509AuthDocument(
+                boost::optional<StringData>{SSLManagerCoordinator::get()
+                                                ->getSSLManager()
+                                                ->getSSLConfiguration()
+                                                .clientSubjectName.toString()}));
+#endif
+        }
     });
 
 }  // namespace

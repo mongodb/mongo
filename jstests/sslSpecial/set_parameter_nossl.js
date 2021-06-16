@@ -5,7 +5,7 @@
 // cannot be used to transition from disabled/keyFile modes
 function testTransition(newSSLMode, newClusterAuthMode) {
     // If no parameters are given sslMode defaults to disabled
-    var conn = MongoRunner.runMongod({clusterAuthMode: "keyFile"});
+    var conn = MongoRunner.runMongod({clusterAuthMode: "keyFile", keyFile: 'jstests/libs/key1'});
     var adminDB = conn.getDB("admin");
     adminDB.createUser({user: "root", pwd: "pwd", roles: ["root"]});
     adminDB.auth("root", "pwd");

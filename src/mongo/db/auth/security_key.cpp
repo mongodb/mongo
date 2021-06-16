@@ -34,21 +34,15 @@
 #include "mongo/db/auth/security_key.h"
 
 #include <string>
-#include <sys/stat.h>
 #include <vector>
 
 #include "mongo/base/status_with.h"
-#include "mongo/client/authenticate.h"
+#include "mongo/client/internal_auth.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/auth/sasl_scram_server_conversation.h"
 #include "mongo/db/auth/security_file.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/server_options.h"
@@ -135,7 +129,7 @@ private:
 
 using std::string;
 
-bool setUpSecurityKey(const string& filename) {
+bool setUpSecurityKey(const string& filename, ClusterAuthMode mode) {
     auto swKeyStrings = mongo::readSecurityFile(filename);
     if (!swKeyStrings.isOK()) {
         LOGV2(20254, "Read security file failed", "error"_attr = swKeyStrings.getStatus());
@@ -171,9 +165,7 @@ bool setUpSecurityKey(const string& filename) {
         internalSecurity.alternateCredentials = std::move(*credentials);
     }
 
-    int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
-    if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile ||
-        clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile) {
+    if (mode.sendsKeyFile()) {
         auth::setInternalAuthKeys(keyStrings);
     }
 

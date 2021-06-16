@@ -41,6 +41,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
+#include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/cluster_auth_mode_option_gen.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/keyfile_option_gen.h"
@@ -515,8 +516,8 @@ Status storeMongodOptions(const moe::Environment& params) {
     if (!replSettings.getReplSetString().empty() &&
         (params.count("security.authorization") &&
          params["security.authorization"].as<std::string>() == "enabled") &&
-        serverGlobalParams.clusterAuthMode.load() != ServerGlobalParams::ClusterAuthMode_x509 &&
-        !params.count("security.keyFile")) {
+        !serverGlobalParams.startupClusterAuthMode.x509Only() &&
+        serverGlobalParams.keyFile.empty()) {
         return Status(
             ErrorCodes::BadValue,
             str::stream()

@@ -54,7 +54,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/initialize_server_global_state.h"
-#include "mongo/db/initialize_server_security_state.h"
 #include "mongo/db/kill_sessions.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
@@ -937,9 +936,6 @@ ExitCode mongos_main(int argc, char* argv[]) {
     try {
         if (!initializeServerGlobalState(service))
             return EXIT_ABRUPT;
-
-        if (!initializeServerSecurityGlobalState(service))
-            quickExit(EXIT_FAILURE);
 
         startSignalProcessingThread();
 

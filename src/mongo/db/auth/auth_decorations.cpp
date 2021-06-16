@@ -34,6 +34,7 @@
 
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/authentication_commands.h"
@@ -55,6 +56,9 @@ struct DisabledAuthMechanisms {
 };
 
 const auto getDisabledAuthMechanisms = ServiceContext::declareDecoration<DisabledAuthMechanisms>();
+
+const auto getClusterAuthMode =
+    ServiceContext::declareDecoration<synchronized_value<ClusterAuthMode>>();
 
 class AuthzClientObserver final : public ServiceContext::ClientObserver {
 public:
@@ -131,6 +135,21 @@ void AuthorizationSession::set(Client* client,
     invariant(authorizationSession);
     invariant(!authzSession);
     authzSession = std::move(authorizationSession);
+}
+
+ClusterAuthMode ClusterAuthMode::get(ServiceContext* svcCtx) {
+    return getClusterAuthMode(svcCtx).get();
+}
+
+ClusterAuthMode ClusterAuthMode::set(ServiceContext* svcCtx, const ClusterAuthMode& mode) {
+    auto sv = getClusterAuthMode(svcCtx).synchronize();
+    if (!sv->canTransitionTo(mode)) {
+        uasserted(5579202,
+                  fmt::format("Illegal state transition for clusterAuthMode from '{}' to '{}'",
+                              sv->toString(),
+                              mode.toString()));
+    }
+    return std::exchange(*sv, mode);
 }
 
 void disableX509Auth(ServiceContext* svcCtx) {

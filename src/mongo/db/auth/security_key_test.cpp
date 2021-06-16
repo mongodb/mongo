@@ -33,6 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/auth/security_file.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/unittest/unittest.h"
@@ -164,9 +165,9 @@ TEST(SecurityKey, Test) {
         TestFile file(testCase.fileContents, testCase.mode != TestCase::FailureMode::Permissions);
 
         if (testCase.mode == TestCase::FailureMode::Success) {
-            ASSERT_TRUE(setUpSecurityKey(file.path().string()));
+            ASSERT_TRUE(setUpSecurityKey(file.path().string(), ClusterAuthMode::keyFile()));
         } else {
-            ASSERT_FALSE(setUpSecurityKey(file.path().string()));
+            ASSERT_FALSE(setUpSecurityKey(file.path().string(), ClusterAuthMode::keyFile()));
         }
     }
 }

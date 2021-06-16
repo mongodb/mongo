@@ -30,6 +30,7 @@
 #include "mongo/db/server_options_base.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/server_options_base_gen.h"
 #include "mongo/db/server_options_general_gen.h"
 #include "mongo/logv2/log_component.h"
@@ -108,14 +109,7 @@ Status validateSystemLogDestinationSetting(const std::string& value) {
 }
 
 Status validateSecurityClusterAuthModeSetting(const std::string& value) {
-    // keyFile|sendKeyFile|sendX509|x509
-    constexpr auto kKeyFile = "keyFile"_sd;
-    constexpr auto kSendKeyFile = "sendKeyFile"_sd;
-    constexpr auto kSendX509 = "sendX509"_sd;
-    constexpr auto kX509 = "X509"_sd;
-
-    if (!kKeyFile.equalCaseInsensitive(value) && !kSendKeyFile.equalCaseInsensitive(value) &&
-        !kSendX509.equalCaseInsensitive(value) && !kX509.equalCaseInsensitive(value)) {
+    if (!ClusterAuthMode::parse(value).isOK()) {
         return {ErrorCodes::BadValue,
                 "security.clusterAuthMode expects one of 'keyFile', 'sendKeyFile', 'sendX509', or "
                 "'X509'"};

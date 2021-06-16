@@ -39,6 +39,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
+#include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_mechanism_policies.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
@@ -177,14 +178,26 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     UserName user(ServerMechanismBase::ServerMechanismBase::_principalName,
                   ServerMechanismBase::getAuthenticationDatabase());
 
+    const auto isInternalUser = (user == internalSecurity.user->getName());
+    const auto clusterAuthMode = ClusterAuthMode::get(opCtx->getServiceContext());
+
     // SERVER-16534, some mechanisms must be enabled for authenticating the internal user, so that
     // cluster members may communicate with each other. Hence ignore disabled auth mechanism
     // for the internal user.
-    if (Policy::isInternalAuthMech() &&
-        !sequenceContains(saslGlobalParams.authenticationMechanisms, Policy::getName()) &&
-        user != internalSecurity.user->getName()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << Policy::getName() << " authentication is disabled");
+    if (Policy::isInternalAuthMech()) {
+        if (isInternalUser) {
+            if (!clusterAuthMode.allowsKeyFile()) {
+                // We can no longer accept keyfiles.
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << Policy::getName()
+                                            << " is disallowed for cluster authentication");
+            }
+        } else {
+            if (!sequenceContains(saslGlobalParams.authenticationMechanisms, Policy::getName())) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << Policy::getName() << " authentication is disabled");
+            }
+        }
     }
 
     // The authentication database is also the source database for the user.
@@ -204,7 +217,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     if (!scramCredentials.isValid()) {
         // Check for authentication attempts of the __system user on
         // systems started without a keyfile.
-        if (userName == internalSecurity.user->getName()) {
+        if (isInternalUser) {
             return Status(ErrorCodes::AuthenticationFailed,
                           "It is not possible to authenticate as the __system user "
                           "on servers started without a --keyFile parameter");

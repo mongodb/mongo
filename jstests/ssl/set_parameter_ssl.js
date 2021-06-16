@@ -51,19 +51,46 @@ function testTransportTransition(scheme, oldMode, newMode, shouldSucceed) {
 }
 
 function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
-    var conn = MongoRunner.runMongod({
+    const keyFile = 'jstests/libs/key1';
+
+    let config = {
         sslMode: sslMode,
         sslPEMKeyFile: SERVER_CERT,
         sslCAFile: CA_CERT,
         clusterAuthMode: oldMode
-    });
+    };
 
-    var adminDB = conn.getDB("admin");
-    adminDB.createUser({user: "root", pwd: "pwd", roles: ['root']});
-    adminDB.auth("root", "pwd");
+    if (oldMode != 'x509') {
+        config.keyFile = keyFile;
+    }
+
+    const conn = MongoRunner.runMongod(config);
+    const adminDB = conn.getDB("admin");
+    let authAsKeyFileCluster = function() {
+        const authParams = {
+            user: '__system',
+            mechanism: 'SCRAM-SHA-1',
+            pwd: cat(keyFile).replace(/[\011-\015\040]/g, '')
+        };
+
+        return adminDB.auth(authParams);
+    };
+
+    if (oldMode != 'x509') {
+        assert(authAsKeyFileCluster());
+    }
+
     var res = adminDB.runCommand({"setParameter": 1, "clusterAuthMode": newMode});
-
     assert(res["ok"] == shouldSucceed, tojson(res));
+
+    if (shouldSucceed && oldMode != 'x509') {
+        if (newMode == 'x509') {
+            assert(!authAsKeyFileCluster(), "Key file cluster auth should no longer work");
+        } else {
+            assert(authAsKeyFileCluster(), "Key file cluster auth should still work");
+        }
+    }
+
     MongoRunner.stopMongod(conn);
 }
 
