@@ -4,7 +4,8 @@
  *
  * This test creates unique indexes on various combinations of fields, so it cannot be run in suites
  * that implicitly shard the collection with a hashed shard key.
- * @tags: [cannot_create_unique_index_when_using_hashed_shard_key]
+ * @tags: [cannot_create_unique_index_when_using_hashed_shard_key,
+ *         requires_fcv_50]
  */
 (function() {
 "use strict";
@@ -137,36 +138,28 @@ assert.commandWorked(source.update({_id: 0}, {_id: 0, address: {street: "1633 Br
 assert.doesNotThrow(() => source.aggregate(pipelineAddressDotStreet));
 assert.eq(target.find().toArray(), [{_id: 0, address: {street: "1633 Broadway"}}]);
 
-// Test that the 'on' field can contain dots and dollars when the appropriate feature flag is on.
-const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-if (isDotsAndDollarsEnabled) {
-    // '$'-prefixed fields are not allowed here because $merge's 'on' field must be indexed, but we
-    // cannot build indexes on $-prefixed fields. Field names containing dots also cannot be used
-    // here, because the "on" field of $merge does implicit path traversal, so "a.b" always refers
-    // to the path {a: {b: ...}} here. These tests just make sure we can still merge on fields
-    // containing $s in arbitrary non-prefix places.
-    ["add$ress", "address$", "add$$ress", "address$"].forEach((onField) => {
-        assert.commandWorked(target.remove({}));
+// Test that the 'on' field can contain dots and dollars.
+// '$'-prefixed fields are not allowed here because $merge's 'on' field must be indexed, but we
+// cannot build indexes on $-prefixed fields. Field names containing dots also cannot be used
+// here, because the "on" field of $merge does implicit path traversal, so "a.b" always refers
+// to the path {a: {b: ...}} here. These tests just make sure we can still merge on fields
+// containing $s in arbitrary non-prefix places.
+["add$ress", "address$", "add$$ress", "address$"].forEach((onField) => {
+    assert.commandWorked(target.remove({}));
 
-        // Create index on given fieldname.
-        assert.commandWorked(target.createIndex({[onField]: 1}, {unique: 1}));
+    // Create index on given fieldname.
+    assert.commandWorked(target.createIndex({[onField]: 1}, {unique: 1}));
 
-        // Update object to use fieldname.
-        const obj = {_id: 0, [onField]: "something or other"};
-        assert.commandWorked(source.update({_id: 0}, obj));
+    // Update object to use fieldname.
+    const obj = {_id: 0, [onField]: "something or other"};
+    assert.commandWorked(source.update({_id: 0}, obj));
 
-        // Test $merge on fieldname.
-        assert.doesNotThrow(() => source.aggregate([{
-            $merge: {
-                into: target.getName(),
-                whenMatched: "replace",
-                whenNotMatched: "insert",
-                on: onField
-            }
-        }]));
+    // Test $merge on fieldname.
+    assert.doesNotThrow(() => source.aggregate([{
+        $merge:
+            {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert", on: onField}
+    }]));
 
-        assert.eq(target.find().toArray(), [obj]);
-    });
-}
+    assert.eq(target.find().toArray(), [obj]);
+});
 }());

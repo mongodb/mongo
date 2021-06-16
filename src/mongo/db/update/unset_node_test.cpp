@@ -370,43 +370,24 @@ TEST_F(UnsetNodeTest, ApplyFieldWithDot) {
 }
 
 TEST_F(UnsetNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
-    {
-        RAIIServerParameterControllerForTest controller("featureFlagDotsAndDollars", false);
-        auto update = fromjson("{$unset: {'a.$id': true}}");
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        UnsetNode node;
-        ASSERT_OK(node.init(update["$unset"]["a.$id"], expCtx));
+    auto update = fromjson("{$unset: {'a.$id': true}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    UnsetNode node;
+    ASSERT_OK(node.init(update["$unset"]["a.$id"], expCtx));
 
-        mutablebson::Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
-        setPathTaken(makeRuntimeUpdatePathForTest("a.$id"));
-        ASSERT_THROWS_CODE_AND_WHAT(
-            node.apply(getApplyParams(doc.root()["a"]["$id"]), getUpdateNodeApplyParams()),
-            AssertionException,
-            ErrorCodes::InvalidDBRef,
-            "The DBRef $ref field must be followed by a $id field");
-    }
-    {
-        RAIIServerParameterControllerForTest controller("featureFlagDotsAndDollars", true);
-        auto update = fromjson("{$unset: {'a.$id': true}}");
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        UnsetNode node;
-        ASSERT_OK(node.init(update["$unset"]["a.$id"], expCtx));
+    mutablebson::Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("a.$id"));
+    auto result = node.apply(getApplyParams(doc.root()["a"]["$id"]), getUpdateNodeApplyParams());
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
+    auto updated = BSON("a" << BSON("$ref"
+                                    << "c"));
+    ASSERT_EQUALS(updated, doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-        mutablebson::Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
-        setPathTaken(makeRuntimeUpdatePathForTest("a.$id"));
-        auto result =
-            node.apply(getApplyParams(doc.root()["a"]["$id"]), getUpdateNodeApplyParams());
-        ASSERT_FALSE(result.noop);
-        ASSERT_FALSE(result.indexesAffected);
-        auto updated = BSON("a" << BSON("$ref"
-                                        << "c"));
-        ASSERT_EQUALS(updated, doc);
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
-
-        assertOplogEntry(fromjson("{$unset: {'a.$id': true}}"),
-                         fromjson("{$v: 2, diff: {sa: {d: {$id: false}}}}"));
-        ASSERT_EQUALS(getModifiedPaths(), "{a.$id}");
-    }
+    assertOplogEntry(fromjson("{$unset: {'a.$id': true}}"),
+                     fromjson("{$v: 2, diff: {sa: {d: {$id: false}}}}"));
+    ASSERT_EQUALS(getModifiedPaths(), "{a.$id}");
 }
 
 TEST_F(UnsetNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFalse) {

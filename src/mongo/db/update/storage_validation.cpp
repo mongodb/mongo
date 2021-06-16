@@ -113,7 +113,9 @@ void validateDollarPrefixElement(mutablebson::ConstElement elem) {
     } else {
         // Not an okay, $ prefixed field name.
         const auto replaceWithHint =
-            feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV()
+            serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                    FeatureCompatibilityParams::Version::kVersion50)
             ? "' is not allowed in the context of an update's replacement document. Consider using "
               "an aggregation pipeline with $replaceWith."
             : "' is not valid for storage.";
@@ -136,7 +138,9 @@ Status storageValidIdField(const mongo::BSONElement& element) {
         case BSONType::Object: {
             auto status = element.Obj().storageValidEmbedded();
             if (!status.isOK() && status.code() == ErrorCodes::DollarPrefixedFieldName &&
-                feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV()) {
+                serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                    FeatureCompatibilityParams::Version::kVersion50)) {
                 return Status(status.code(),
                               str::stream() << "_id fields may not contain '$'-prefixed fields: "
                                             << status.reason());
@@ -193,12 +197,13 @@ void storageValid(mutablebson::ConstElement elem,
     const mutablebson::ConstElement& parent = elem.parent();
     const bool childOfArray = parent.ok() ? (parent.getType() == BSONType::Array) : false;
 
-    // If the feature flag is disabled, always validate fields for '$'-prefixes. Otherwise, only
-    // check top-level fields if 'allowTopLevelDollarPrefixes' is false, and don't validate any
+    // Only check top-level fields if 'allowTopLevelDollarPrefixes' is false, and don't validate any
     // fields for '$'-prefixes if 'allowTopLevelDollarPrefixes' is true.
     const bool checkTopLevelFields = !allowTopLevelDollarPrefixes && (recursionLevel == 1);
     const bool dotsAndDollarsFeatureEnabled =
-        feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV();
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+            FeatureCompatibilityParams::Version::kVersion50);
     const bool checkFields = !dotsAndDollarsFeatureEnabled || checkTopLevelFields;
 
     auto fieldName = elem.getFieldName();

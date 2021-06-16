@@ -29,12 +29,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bson_depth.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
@@ -98,7 +98,9 @@ void FieldPath::uassertValidFieldName(StringData fieldName) {
     uassert(15998, "FieldPath field names may not be empty strings.", !fieldName.empty());
 
     const auto dotsAndDollarsHint =
-        feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV()
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                FeatureCompatibilityParams::Version::kVersion50)
         ? " Consider using $getField or $setField."
         : "";
 

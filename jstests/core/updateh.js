@@ -20,27 +20,12 @@ assert.writeError(res);
 res = t.update({x: 1}, {$inc: {$z: 1}});  // not ok
 assert.writeError(res);
 
-var isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                  .featureFlagDotsAndDollars.value;
-if (isDotsAndDollarsEnabled) {
-    // Allow $ in nested field names.
-    res = t.update({x: 1}, {$set: {'a.$b': 1}});
-    assert.commandWorked(res);
+// Allow $ in nested field names.
+res = t.update({x: 1}, {$set: {'a.$b': 1}});
+assert.commandWorked(res);
 
-    res = t.update({x: 1}, {$set: {a: {$z: 1}}});
-    assert.commandWorked(res);
-
-} else {
-    // Disallow $ in nested field names.
-    res = t.update({x: 1}, {$set: {'a.$b': 1}});  // not ok
-    assert.writeError(res);
-
-    res = t.update({x: 1}, {$set: {a: {$z: 1}}});  // not ok
-    assert.writeError(res);
-
-    res = t.update({x: 1}, {$inc: {c: {$z: 1}}});  // not ok
-    assert.writeError(res);
-}
+res = t.update({x: 1}, {$set: {a: {$z: 1}}});
+assert.commandWorked(res);
 
 // Second section
 t.drop();
@@ -58,27 +43,15 @@ assert.writeError(res);
 res = t.update({n: 0}, {$set: {"$secret.agent.x": 1}});
 assert.writeError(res);
 
-if (isDotsAndDollarsEnabled) {
-    // Fields that are not at the top-level are allowed to have $-prefixes.
-    res = t.update({n: 0}, {$set: {"sneaky.$x": 1}});
-    assert.commandWorked(res);
+// Fields that are not at the top-level are allowed to have $-prefixes.
+res = t.update({n: 0}, {$set: {"sneaky.$x": 1}});
+assert.commandWorked(res);
 
-    res = t.update({n: 0}, {$set: {"secret.agent$.$x": 1}});
-    assert.commandWorked(res);
+res = t.update({n: 0}, {$set: {"secret.agent$.$x": 1}});
+assert.commandWorked(res);
 
-    res = t.update({n: 0}, {$set: {"secret.agent$": 1}});
-    assert.commandWorked(res);
-
-} else {
-    res = t.update({n: 0}, {$set: {"sneaky.$x": 1}});
-    assert.writeError(res);
-
-    res = t.update({n: 0}, {$set: {"secret.agent$.$x": 1}});
-    assert.writeError(res);
-
-    res = t.update({n: 0}, {$set: {"secret.agent$": 1}});
-    assert.commandWorked(res);
-}
+res = t.update({n: 0}, {$set: {"secret.agent$": 1}});
+assert.commandWorked(res);
 
 t.save({_id: 0, n: 0});
 

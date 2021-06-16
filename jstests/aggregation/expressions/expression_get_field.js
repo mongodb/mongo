@@ -1,5 +1,8 @@
 /**
  * Tests basic functionality of the $getField expression.
+ * @tags: [
+ *   requires_fcv_50
+ * ]
  */
 (function() {
 "use strict";
@@ -25,16 +28,6 @@ function assertGetFieldResultsEq(getFieldArgs, expected) {
 function assertPipelineResultsEq(pipeline, expected) {
     const actual = coll.aggregate(pipeline).toArray();
     assertArrayEq({actual, expected});
-}
-
-const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-
-if (!isDotsAndDollarsEnabled) {
-    // Verify that $getField is not available if the feature flag is set to false and don't
-    // run the rest of the test.
-    assertGetFieldFailedWithCode({field: "a", from: {a: "b"}}, 31325);
-    return;
 }
 
 for (let i = 0; i < 2; i++) {

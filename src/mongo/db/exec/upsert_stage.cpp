@@ -276,11 +276,14 @@ void UpsertStage::_assertDocumentToBeInsertedIsValid(const mb::Document& documen
         // should always have an _id here, since we generated one earlier if not already present.
         invariant(document.root().ok() && document.root()[idFieldName].ok());
         bool containsDotsAndDollarsField = false;
-        storage_validation::storageValid(
-            document,
-            feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV(),
-            true, /* Should validate for storage */
-            &containsDotsAndDollarsField);
+        bool allowTopLevelDollarPrefixes =
+            serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                FeatureCompatibilityParams::Version::kVersion50);
+        storage_validation::storageValid(document,
+                                         allowTopLevelDollarPrefixes,
+                                         true, /* Should validate for storage */
+                                         &containsDotsAndDollarsField);
         if (containsDotsAndDollarsField)
             _params.driver->setContainsDotsAndDollarsField(true);
 

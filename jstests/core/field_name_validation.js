@@ -43,49 +43,29 @@ assert.commandWorked(coll.insert({a: {_id: [9]}}));
 assert.commandWorked(coll.insert({a: {_id: /a/}}));
 assert.commandWorked(coll.insert({a: {_id: {$b: 1}}}));
 
-const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-if (isDotsAndDollarsEnabled) {
-    // Test that $-prefixed field names are allowed generally.
-    assert.commandWorked(coll.insert({$a: 1}));
-    assert.commandWorked(coll.insert({valid: 1, $a: 1}));
-    assert.commandWorked(coll.insert({$a: {$b: 1}}));
+// Test that $-prefixed field names are allowed generally.
+assert.commandWorked(coll.insert({$a: 1}));
+assert.commandWorked(coll.insert({valid: 1, $a: 1}));
+assert.commandWorked(coll.insert({$a: {$b: 1}}));
 
-    // Test that reserved $-prefixed field names are allowed.
-    assert.commandWorked(coll.insert({$ref: 1}));
-    assert.commandWorked(coll.insert({$id: 1}));
-    assert.commandWorked(coll.insert({$db: 1}));
+// Test that reserved $-prefixed field names are allowed.
+assert.commandWorked(coll.insert({$ref: 1}));
+assert.commandWorked(coll.insert({$id: 1}));
+assert.commandWorked(coll.insert({$db: 1}));
 
-    // Test that _id cannot be an object with an element that has a $-prefixed field name.
-    assert.writeErrorWithCode(coll.insert({_id: {$b: 1}}), ErrorCodes.DollarPrefixedFieldName);
-    assert.writeErrorWithCode(coll.insert({_id: {a: 1, $b: 1}}),
-                              ErrorCodes.DollarPrefixedFieldName);
+// Test that _id cannot be an object with an element that has a $-prefixed field name.
+assert.writeErrorWithCode(coll.insert({_id: {$b: 1}}), ErrorCodes.DollarPrefixedFieldName);
+assert.writeErrorWithCode(coll.insert({_id: {a: 1, $b: 1}}), ErrorCodes.DollarPrefixedFieldName);
 
-    // Test that inserting an object with a $-prefixed field name is properly validated.
-    assert.commandWorked(coll.insert({_id: 0, $valid: 1, "a": 1}));
-    assert.eq([{_id: 0, $valid: 1, "a": 1}], coll.find({_id: 0}).toArray());
+// Test that inserting an object with a $-prefixed field name is properly validated.
+assert.commandWorked(coll.insert({_id: 0, $valid: 1, "a": 1}));
+assert.eq([{_id: 0, $valid: 1, "a": 1}], coll.find({_id: 0}).toArray());
 
-    // Test that previously reserved fieldnames may be inserted when the feature flag is enabled.
-    assert.commandWorked(coll.insert({_id: 1, $valid: 1, $id: 1}));
-    assert.commandWorked(coll.insert({_id: 2, $valid: 1, $db: 1}));
-    assert.commandWorked(coll.insert({_id: 3, $valid: 1, $ref: 1}));
-    assert.commandWorked(coll.insert({_id: 4, $valid: 1, $alsoValid: 1}));
-
-} else {
-    // Test that $-prefixed field names are not allowed at the top level.
-    assert.writeErrorWithCode(coll.insert({$a: 1}), ErrorCodes.BadValue);
-    assert.writeErrorWithCode(coll.insert({valid: 1, $a: 1}), ErrorCodes.BadValue);
-
-    // Test that reserved $-prefixed field names are not allowed.
-    assert.writeErrorWithCode(coll.insert({$ref: 1}), ErrorCodes.BadValue);
-    assert.writeErrorWithCode(coll.insert({$id: 1}), ErrorCodes.BadValue);
-    assert.writeErrorWithCode(coll.insert({$db: 1}), ErrorCodes.BadValue);
-
-    // Test that _id cannot be an object with an element that has a $-prefixed field name.
-    assert.writeErrorWithCode(coll.insert({_id: {$b: 1}}), ErrorCodes.DollarPrefixedFieldName);
-    assert.writeErrorWithCode(coll.insert({_id: {a: 1, $b: 1}}),
-                              ErrorCodes.DollarPrefixedFieldName);
-}
+// Test that previously reserved fieldnames may be inserted when the feature flag is enabled.
+assert.commandWorked(coll.insert({_id: 1, $valid: 1, $id: 1}));
+assert.commandWorked(coll.insert({_id: 2, $valid: 1, $db: 1}));
+assert.commandWorked(coll.insert({_id: 3, $valid: 1, $ref: 1}));
+assert.commandWorked(coll.insert({_id: 4, $valid: 1, $alsoValid: 1}));
 
 //
 // Update command field name validation.
@@ -118,54 +98,38 @@ assert.writeErrorWithCode(
     coll.update({"a.b": 1}, {$setOnInsert: {_id: {$invalid: 1}}}, {upsert: true}),
     ErrorCodes.DollarPrefixedFieldName);
 
-if (isDotsAndDollarsEnabled) {
-    // Replacement-style updates can contain nested $-prefixed fields.
-    assert.commandWorked(coll.update({"a.b": 1}, {a: {$c: 1}}));
-    assert.commandWorked(coll.update({"a.b": 2}, {a: {$c: 1}}, {upsert: true}));
-    assert.commandWorked(coll.update({"a.b": 1}, {foo: {$c: 1, bar: {$d: 4}}}));
+// Replacement-style updates can contain nested $-prefixed fields.
+assert.commandWorked(coll.update({"a.b": 1}, {a: {$c: 1}}));
+assert.commandWorked(coll.update({"a.b": 2}, {a: {$c: 1}}, {upsert: true}));
+assert.commandWorked(coll.update({"a.b": 1}, {foo: {$c: 1, bar: {$d: 4}}}));
 
-    // Pipeline-style updates are allowed to contain $-prefixed fields.
-    assert.commandWorked(coll.update({"a.b": 1}, [{$replaceWith: {$literal: {$a: 1}}}]));
-    assert.commandWorked(
-        coll.update({"a.b": 3}, [{$replaceWith: {$literal: {a: {$a: 1}}}}], {upsert: true}));
-    assert.commandWorked(coll.update({"a.b": 1}, [{$replaceWith: {$literal: {a: {$a: 1}}}}]));
+// Pipeline-style updates are allowed to contain $-prefixed fields.
+assert.commandWorked(coll.update({"a.b": 1}, [{$replaceWith: {$literal: {$a: 1}}}]));
+assert.commandWorked(
+    coll.update({"a.b": 3}, [{$replaceWith: {$literal: {a: {$a: 1}}}}], {upsert: true}));
+assert.commandWorked(coll.update({"a.b": 1}, [{$replaceWith: {$literal: {a: {$a: 1}}}}]));
 
-    // Pipeline-style updates are allowed to contain reserved $-prefixed fields.
-    assert.commandWorked(coll.update({"a.b": 1}, [{$replaceWith: {$literal: {$ref: 1}}}]));
-    assert.commandWorked(
-        coll.update({"a.b": 4}, [{$replaceWith: {$literal: {$ref: 1}}}], {upsert: true}));
-    assert.commandWorked(
-        coll.update({"a.b": 5}, [{$replaceWith: {$literal: {$id: 1}}}], {upsert: true}));
-    assert.commandWorked(
-        coll.update({"a.b": 6}, [{$replaceWith: {$literal: {$db: 1}}}], {upsert: true}));
+// Pipeline-style updates are allowed to contain reserved $-prefixed fields.
+assert.commandWorked(coll.update({"a.b": 1}, [{$replaceWith: {$literal: {$ref: 1}}}]));
+assert.commandWorked(
+    coll.update({"a.b": 4}, [{$replaceWith: {$literal: {$ref: 1}}}], {upsert: true}));
+assert.commandWorked(
+    coll.update({"a.b": 5}, [{$replaceWith: {$literal: {$id: 1}}}], {upsert: true}));
+assert.commandWorked(
+    coll.update({"a.b": 6}, [{$replaceWith: {$literal: {$db: 1}}}], {upsert: true}));
 
-    // $-prefixed field names are not allowed at the top-level in replacement-style updates.
-    assert.writeErrorWithCode(coll.update({"a.b": 1}, {$c: 1}), ErrorCodes.FailedToParse);
+// $-prefixed field names are not allowed at the top-level in replacement-style updates.
+assert.writeErrorWithCode(coll.update({"a.b": 1}, {$c: 1}), ErrorCodes.FailedToParse);
 
-    // Top-level reserved $-prefixed field names are not allowed in replacement-style updates.
-    assert.writeErrorWithCode(coll.update({"a.b": 1}, {$ref: 1}), ErrorCodes.FailedToParse);
-    assert.writeErrorWithCode(coll.update({"a.b": 1}, {$id: 1}), ErrorCodes.FailedToParse);
-    assert.writeErrorWithCode(coll.update({"a.b": 1}, {$db: 1}), ErrorCodes.FailedToParse);
+// Top-level reserved $-prefixed field names are not allowed in replacement-style updates.
+assert.writeErrorWithCode(coll.update({"a.b": 1}, {$ref: 1}), ErrorCodes.FailedToParse);
+assert.writeErrorWithCode(coll.update({"a.b": 1}, {$id: 1}), ErrorCodes.FailedToParse);
+assert.writeErrorWithCode(coll.update({"a.b": 1}, {$db: 1}), ErrorCodes.FailedToParse);
 
-    // Nested reserved $-prefixed field names are not allowed in replacement-style updates.
-    assert.commandWorked(coll.update({"a.b": 1}, {a: {$ref: 1}}));
-    assert.commandWorked(coll.update({"a.b": 1}, {b: {$id: 1}}));
-    assert.commandWorked(coll.update({"a.b": 1}, {c: {$db: 1}}));
-
-} else {
-    // $-prefixed field names are not allowed.
-    assert.writeErrorWithCode(coll.update({"a.b": 1}, {$c: 1}, {upsert: true}),
-                              ErrorCodes.FailedToParse);
-    assert.writeErrorWithCode(coll.update({"a.b": 1}, {$set: {$c: 1}}, {upsert: true}),
-                              ErrorCodes.DollarPrefixedFieldName);
-    assert.writeErrorWithCode(coll.update({"a.b": 1}, {$set: {c: {$d: 1}}}, {upsert: true}),
-                              ErrorCodes.DollarPrefixedFieldName);
-
-    // Reserved $-prefixed field names are also not allowed.
-    assert.writeErrorWithCode(coll.update({"a.b": 1}, {$ref: 1}), ErrorCodes.FailedToParse);
-    assert.writeErrorWithCode(coll.update({"a.b": 1}, {$id: 1}), ErrorCodes.FailedToParse);
-    assert.writeErrorWithCode(coll.update({"a.b": 1}, {$db: 1}), ErrorCodes.FailedToParse);
-}
+// Nested reserved $-prefixed field names are not allowed in replacement-style updates.
+assert.commandWorked(coll.update({"a.b": 1}, {a: {$ref: 1}}));
+assert.commandWorked(coll.update({"a.b": 1}, {b: {$id: 1}}));
+assert.commandWorked(coll.update({"a.b": 1}, {c: {$db: 1}}));
 
 //
 // FindAndModify field name validation.
@@ -203,92 +167,46 @@ assert.throws(function() {
     coll.findAndModify({query: {_id: 1}, update: [{$replaceWith: {_id: 1, "a.b.c": 3}}]});
 });
 
-if (isDotsAndDollarsEnabled) {
-    // Top-level $-prefixed field names are not allowed in a replacement-style update.
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {_id: 1, $invalid: 1}});
-    });
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {$set: {_id: 1, $invalid: 1}}});
-    });
+// Top-level $-prefixed field names are not allowed in a replacement-style update.
+assert.throws(function() {
+    coll.findAndModify({query: {_id: 1}, update: {_id: 1, $invalid: 1}});
+});
+assert.throws(function() {
+    coll.findAndModify({query: {_id: 1}, update: {$set: {_id: 1, $invalid: 1}}});
+});
 
-    // Reserved $-prefixed field names are not allowed in a replacement-style update.
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {_id: 1, $ref: 1}});
-    });
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {_id: 1, $id: 1}});
-    });
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {_id: 1, $db: 1}});
-    });
+// Reserved $-prefixed field names are not allowed in a replacement-style update.
+assert.throws(function() {
+    coll.findAndModify({query: {_id: 1}, update: {_id: 1, $ref: 1}});
+});
+assert.throws(function() {
+    coll.findAndModify({query: {_id: 1}, update: {_id: 1, $id: 1}});
+});
+assert.throws(function() {
+    coll.findAndModify({query: {_id: 1}, update: {_id: 1, $db: 1}});
+});
 
-    // Test that $-prefixed fields are allowed when they are not at the top-level.
-    coll.findAndModify({query: {_id: 2}, update: {_id: 2, out: {$in: 1, "x": 2}}, upsert: true});
-    assert([{_id: 2, out: {$in: 1, "x": 2}}], coll.find({_id: 2}).toArray());
+// Test that $-prefixed fields are allowed when they are not at the top-level.
+coll.findAndModify({query: {_id: 2}, update: {_id: 2, out: {$in: 1, "x": 2}}, upsert: true});
+assert([{_id: 2, out: {$in: 1, "x": 2}}], coll.find({_id: 2}).toArray());
 
-    // Test that $-prefixed fields are allowed when a pipeline is used.
-    coll.findAndModify({
-        query: {_id: 2},
-        update: [{$replaceWith: {$literal: {_id: 2, $in: 2, "x": 3}}}],
-        upsert: true
-    });
-    assert([{_id: 2, $in: 2, "x": 3}], coll.find({_id: 2}).toArray());
+// Test that $-prefixed fields are allowed when a pipeline is used.
+coll.findAndModify({
+    query: {_id: 2},
+    update: [{$replaceWith: {$literal: {_id: 2, $in: 2, "x": 3}}}],
+    upsert: true
+});
+assert([{_id: 2, $in: 2, "x": 3}], coll.find({_id: 2}).toArray());
 
-    // Reserved $-prefixed field names are allowed when they are nested.
-    coll.findAndModify({query: {_id: 1}, update: {_id: 1, a: {$ref: 1}}});
-    assert.eq([{_id: 1, a: {$ref: 1}}], coll.find({_id: 1}).toArray());
+// Reserved $-prefixed field names are allowed when they are nested.
+coll.findAndModify({query: {_id: 1}, update: {_id: 1, a: {$ref: 1}}});
+assert.eq([{_id: 1, a: {$ref: 1}}], coll.find({_id: 1}).toArray());
 
-    coll.findAndModify({query: {_id: 1}, update: {_id: 1, a: {$id: 1}}});
-    assert.eq([{_id: 1, a: {$id: 1}}], coll.find({_id: 1}).toArray());
+coll.findAndModify({query: {_id: 1}, update: {_id: 1, a: {$id: 1}}});
+assert.eq([{_id: 1, a: {$id: 1}}], coll.find({_id: 1}).toArray());
 
-    coll.findAndModify({query: {_id: 1}, update: {_id: 1, a: {$db: 1}}});
-    assert.eq([{_id: 1, a: {$db: 1}}], coll.find({_id: 1}).toArray());
-
-} else {
-    // Top-level $-prefixed field names are not allowed.
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {_id: 1, $invalid: 1}});
-    });
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {$set: {_id: 1, $invalid: 1}}});
-    });
-
-    // Reserved $-prefixed field names are not allowed.
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {_id: 1, $ref: 1}});
-    });
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {_id: 1, $id: 1}});
-    });
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {_id: 1, $db: 1}});
-    });
-
-    // $-prefixed field names are not allowed when nested.
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {_id: 1, a: {$invalid: 1}}});
-    });
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {$set: {_id: 1, a: {$invalid: 1}}}});
-    });
-
-    // $-prefixed field names are not allowed in a pipeline-style update.
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: [{$replaceWith: {_id: 1, $invalid: 1}}]});
-    });
-
-    // Reserved $-prefixed field names are not allowed when they are nested.
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {_id: 1, a: {$ref: 1}}});
-    });
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {_id: 1, a: {$id: 1}}});
-    });
-    assert.throws(function() {
-        coll.findAndModify({query: {_id: 1}, update: {_id: 1, a: {$db: 1}}});
-    });
-}
+coll.findAndModify({query: {_id: 1}, update: {_id: 1, a: {$db: 1}}});
+assert.eq([{_id: 1, a: {$db: 1}}], coll.find({_id: 1}).toArray());
 
 //
 // Aggregation field name validation.

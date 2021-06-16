@@ -1,6 +1,7 @@
 /**
  * Tests aggregate expression counters.
  * Initially limited to $getField and $setField.
+ * @tags: [requires_fcv_50]
  */
 
 (function() {
@@ -20,15 +21,6 @@ for (let i = 0; i < 3; i++) {
         "a$b": "foo",
         "a.b": "bar",
     }));
-}
-
-const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-
-if (!isDotsAndDollarsEnabled) {
-    jsTestLog("Skipping test because the featureFlagDotsAndDollars is disabled");
-    MongoRunner.stopMongod(mongod);
-    return;
 }
 
 function checkCounterIncrement(command, exprCounter) {

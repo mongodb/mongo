@@ -1,5 +1,6 @@
 /**
  * Tests for serverStatus metrics.dotsAndDollarsFields stats.
+ * @tags: [requires_fcv_50]
  */
 (function() {
 "use strict";
@@ -10,14 +11,6 @@ const db = mongod.getDB(dbName);
 const collName = "server_status_metrics_dots_and_dollars_fields";
 const coll = db[collName];
 let serverStatusMetrics = db.serverStatus().metrics.dotsAndDollarsFields;
-
-const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-if (!isDotsAndDollarsEnabled) {
-    jsTestLog("Skipping test because the dots and dollars feature flag is disabled");
-    MongoRunner.stopMongod(mongod);
-    return;
-}
 
 //
 // Test that "metrics.dotsAndDollarsField.inserts" is being updated correctly.

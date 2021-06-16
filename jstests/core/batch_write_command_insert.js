@@ -96,22 +96,6 @@ assert(resultOK(result), tojson(result));
 assert.eq(1, result.n);
 assert.eq(coll.count(), 1);
 
-var isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                  .featureFlagDotsAndDollars.value;
-if (!isDotsAndDollarsEnabled) {
-    //
-    // Document with illegal key should fail
-    coll.drop();
-    request =
-        {insert: coll.getName(), documents: [{$set: {a: 1}}], writeConcern: {w: 1}, ordered: false};
-    result = coll.runCommand(request);
-    assert(result.ok, tojson(result));
-    assert(result.writeErrors != null);
-    assert.eq(1, result.writeErrors.length);
-    assert.eq(0, result.n);
-    assert.eq(coll.count(), 0);
-}
-
 //
 // Document with valid nested key should insert (op log format)
 coll.drop();

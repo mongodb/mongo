@@ -51,10 +51,10 @@ public:
      * If 'replacementDocContainsIdField' is false then the _id field from the original document
      * will be preserved.
      *
-     * If 'allowTopLevelDollarPrefixedFields' is true, then when the dots and dollars feature flag
-     * is enabled, top-level dollar-prefixed fields will be permitted in document updates. This is
-     * only set to true in pipeline-style updates, when we can be sure that there are no collisions
-     * between '$'-prefixed fieldnames and update modifiers like $set.
+     * If 'allowTopLevelDollarPrefixedFields' is true, top-level dollar-prefixed fields will be
+     * permitted in document updates. This is only set to true in pipeline-style updates, when we
+     * can be sure that there are no collisions between '$'-prefixed fieldnames and update modifiers
+     * like $set.
      *
      * This function will ignore the log mode provided in 'applyParams'. The 'oplogEntry' field
      * of the returned ApplyResult is always empty.

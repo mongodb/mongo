@@ -71,47 +71,27 @@ assert.commandWorked(coll.update({_id: 1}, {$addToSet: {a: {$each: [3, 2, 2, 3, 
 doc.a.push(3);
 assert.eq(doc, coll.findOne());
 
-var isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                  .featureFlagDotsAndDollars.value;
-if (!isDotsAndDollarsEnabled) {
-    // Test that dotted and '$' prefixed field names fail.
-    assert(coll.drop());
-    doc = {_id: 1, a: [1, 2]};
-    assert.commandWorked(coll.insert(doc));
+// Test that dotted and '$' prefixed field names work when nested.
+assert(coll.drop());
+doc = {
+    _id: 1,
+    a: [1, 2]
+};
+assert.commandWorked(coll.insert(doc));
 
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
 
-    assert.commandFailed(coll.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
-    assert.commandFailed(coll.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
 
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
 
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
 
-    assert.commandFailed(coll.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
-    assert.commandFailed(coll.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
-} else {
-    // Test that dotted and '$' prefixed field names work when nested.
-    assert(coll.drop());
-    doc = {_id: 1, a: [1, 2]};
-    assert.commandWorked(coll.insert(doc));
-
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
-
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
-
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
-
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
-
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
-    assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
-}
+assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
 
 // Test that nested _id fields are allowed.
 assert(coll.drop());

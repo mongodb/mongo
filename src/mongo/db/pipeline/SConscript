@@ -34,6 +34,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/idl/feature_flag',
         ]
     )

@@ -35,12 +35,6 @@ feature_flags:
       cpp_varname: gFeatureFlagChangeStreamsOptimization
       default: false
 
-    featureFlagDotsAndDollars:
-      description: "Feature flag for allowing use of field names containing dots and dollars"
-      cpp_varname: gFeatureFlagDotsAndDollars
-      default: true
-      version: 5.0
-
     featureFlagDensify:
       description: "Feature flag for allowing a $densify stage in an aggregation pipeline"
       cpp_varname: gFeatureFlagDensify

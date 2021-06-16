@@ -46,10 +46,9 @@ Status storageValidIdField(const mongo::BSONElement& element);
  * check is performed recursively on subdocuments. Uasserts if the validation fails or if the depth
  * exceeds the maximum allowable depth.
  *
- * When the dots and dollars feature flag is off, always reject $-prefixed fields. Otherwise, reject
- * only $-prefixed fields at the top-level of a document. If 'allowTopLevelDollarPrefixes' is set to
- * true, do not reject $-prefixed fields at the top-level of a document.
- *
+ * If 'allowTopLevelDollarPrefixes' is set to false, reject $-prefixed fields at the top-level of a
+ document.
+
  * 'shouldValidate' is true if the caller wants to validate for storage, otherwise this helper will
  * only check top-level $-prefixed field names skipping all the validations.
  *
@@ -66,9 +65,8 @@ void storageValid(const mutablebson::Document& doc,
  * 'deep' is true, the check is performed recursively on subdocuments. Uasserts if the validation
  * fails or if 'recursionLevel' exceeds the maximum allowable depth.
  *
- * When the dots and dollars feature flag is off, always reject $-prefixed fields. Otherwise, reject
- * only $-prefixed fields at the top-level of a document. If 'allowTopLevelDollarPrefixes' is set to
- * true, do not reject $-prefixed fields at the top-level of a document.
+ * If 'allowTopLevelDollarPrefixes' is set to false, reject $-prefixed fields at the top-level of a
+ * document.
  *
  * 'shouldValidate' is true if the caller wants to validate for storage, otherwise this helper will
  * only check top-level $-prefixed field names skipping all the validations.

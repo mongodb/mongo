@@ -110,7 +110,9 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
             auto fieldName = e.fieldNameStringData();
 
             if (fieldName[0] == '$') {
-                if (!feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV()) {
+                if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
+                    !serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                        FeatureCompatibilityParams::Version::kVersion50)) {
                     return StatusWith<BSONObj>(ErrorCodes::BadValue,
                                                str::stream()
                                                    << "Document can't have $ prefixed field names: "

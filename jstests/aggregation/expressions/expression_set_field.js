@@ -1,6 +1,7 @@
 /**
  * Tests basic functionality of the $setField expression and the $unsetField alias.
- * @tags: [assumes_unsharded_collection]
+ * @tags: [assumes_unsharded_collection,
+ *         requires_fcv_50]
  */
 (function() {
 "use strict";
@@ -103,16 +104,6 @@ function assertUnsetFieldInRootDoc(field) {
 function assertPipelineResultsEq(pipeline, expected) {
     const actual = coll.aggregate(pipeline).toArray();
     assertArrayEq({actual, expected});
-}
-
-const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-
-if (!isDotsAndDollarsEnabled) {
-    // Verify that $setField is not available if the feature flag is set to false and don't
-    // run the rest of the test.
-    assertSetFieldFailedWithCode({field: "a", input: {a: "b"}, value: "foo"}, 31325);
-    return;
 }
 
 for (let i = 0; i < 2; i++) {
