@@ -79,7 +79,6 @@ let runTest = function(mongodOptions) {
     // Corrupt the .turtle file in a very specific way such that the log sequence numbers are
     // invalid.
     if (mongodOptions.hasOwnProperty('journal')) {
-        // TODO: This return can be removed once WT-4459 is completed.
         if (_isAddressSanitizerActive()) {
             jsTestLog("Skipping log file corruption because the address sanitizer is active.");
             return;
