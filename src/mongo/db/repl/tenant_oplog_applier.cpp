@@ -411,6 +411,10 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
     // All other oplog entries.
     std::vector<TenantNoOpEntry> nonSessionOps;
 
+    // Prevent the node from being able to change state when reserving oplog slots and writing
+    // entries.
+    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+
     // We start WriteUnitOfWork only to reserve oplog slots. So, it's ok to abort the
     // WriteUnitOfWork when it goes out of scope.
     WriteUnitOfWork wuow(opCtx);
