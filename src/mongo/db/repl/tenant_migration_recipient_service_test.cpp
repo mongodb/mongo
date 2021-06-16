@@ -2050,7 +2050,14 @@ TEST_F(TenantMigrationRecipientServiceTest,
     auto opCtx = makeOperationContext();
     std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
 
-    // Hang before starting the oplog applier.
+    // Hang before creating the oplog applier.
+    const auto hangBeforeCreatingOplogApplier =
+        globalFailPointRegistry().find("fpAfterStartingOplogFetcherMigrationRecipientInstance");
+    hangBeforeCreatingOplogApplier->setMode(FailPoint::alwaysOn,
+                                            0,
+                                            BSON("action"
+                                                 << "hang"));
+    // Hang after starting the oplog applier.
     const auto hangAfterStartingOplogApplier =
         globalFailPointRegistry().find("fpAfterStartingOplogApplierMigrationRecipientInstance");
     auto initialTimesEntered = hangAfterStartingOplogApplier->setMode(FailPoint::alwaysOn,
@@ -2145,7 +2152,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         ASSERT_OK(storage->insertDocument(
             opCtx.get(), oplogNss, {entry.toBSON(), opTime.getTimestamp()}, opTime.getTerm()));
     }
-
+    // Move on to the next failpoint to hang after starting the oplog applier.
+    hangBeforeCreatingOplogApplier->setMode(FailPoint::off);
     hangAfterStartingOplogApplier->waitForTimesEntered(initialTimesEntered + 1);
 
     auto dataConsistentOplogEntry = makeOplogEntry(dataConsistentOpTime,
