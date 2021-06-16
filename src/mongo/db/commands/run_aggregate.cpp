@@ -362,7 +362,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
                 // that the inverse scenario (mistaking a view for a collection) is not an issue
                 // because $merge/$out cannot target a view.
                 auto nssToCheck = NamespaceString(request.getNamespace().db(), involvedNs.coll());
-                if (viewCatalog && viewCatalog->lookup(opCtx, nssToCheck.ns())) {
+                if (viewCatalog && viewCatalog->lookup(opCtx, nssToCheck)) {
                     auto status = resolveViewDefinition(nssToCheck, viewCatalog);
                     if (!status.isOK()) {
                         return status;
@@ -379,7 +379,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             // pipeline because 'involvedNs' doesn't refer to a view namespace in our consistent
             // snapshot of the view catalog.
             resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
-        } else if (viewCatalog->lookup(opCtx, involvedNs.ns())) {
+        } else if (viewCatalog->lookup(opCtx, involvedNs)) {
             auto status = resolveViewDefinition(involvedNs, viewCatalog);
             if (!status.isOK()) {
                 return status;
@@ -412,7 +412,7 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
             continue;
         }
 
-        auto view = viewCatalog->lookup(opCtx, potentialViewNs.ns());
+        auto view = viewCatalog->lookup(opCtx, potentialViewNs);
         if (!view) {
             continue;
         }
@@ -625,7 +625,7 @@ Status runAggregate(OperationContext* opCtx,
             if (!origNss.isCollectionlessAggregateNS()) {
                 auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, origNss.db());
                 if (viewCatalog) {
-                    auto view = viewCatalog->lookup(opCtx, origNss.ns());
+                    auto view = viewCatalog->lookup(opCtx, origNss);
                     uassert(ErrorCodes::CommandNotSupportedOnView,
                             str::stream()
                                 << "Namespace " << origNss.ns() << " is a timeseries collection",

@@ -501,7 +501,7 @@ Status _collModInternal(OperationContext* opCtx,
     // May also modify a view instead of a collection.
     boost::optional<ViewDefinition> view;
     if (db && !coll) {
-        const auto sharedView = ViewCatalog::get(db)->lookup(opCtx, nss.ns());
+        const auto sharedView = ViewCatalog::get(db)->lookup(opCtx, nss);
         if (sharedView) {
             // We copy the ViewDefinition as it is modified below to represent the requested state.
             view = {*sharedView};

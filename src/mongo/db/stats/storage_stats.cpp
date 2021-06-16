@@ -55,7 +55,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
 
     bool isTimeseries = false;
     if (auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, nss.db())) {
-        if (auto viewDef = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, nss.ns())) {
+        if (auto viewDef = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, nss)) {
             isTimeseries = viewDef->timeseries();
         }
     }

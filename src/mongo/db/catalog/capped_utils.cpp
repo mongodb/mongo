@@ -74,7 +74,7 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
     CollectionWriter collection(opCtx, collectionName);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "emptycapped not supported on view: " << collectionName.ns(),
-            collection || !ViewCatalog::get(db)->lookup(opCtx, collectionName.ns()));
+            collection || !ViewCatalog::get(db)->lookup(opCtx, collectionName));
     uassert(ErrorCodes::NamespaceNotFound, "no such collection", collection);
 
     if (collectionName.isSystem() && !collectionName.isSystemDotProfile()) {
@@ -126,7 +126,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     if (!fromCollection) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "cloneCollectionAsCapped not supported for views: " << fromNss,
-                !ViewCatalog::get(db)->lookup(opCtx, fromNss.ns()));
+                !ViewCatalog::get(db)->lookup(opCtx, fromNss));
 
         uasserted(ErrorCodes::NamespaceNotFound,
                   str::stream() << "source collection " << fromNss << " does not exist");

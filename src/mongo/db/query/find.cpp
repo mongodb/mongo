@@ -288,8 +288,8 @@ Message getMore(OperationContext* opCtx,
                                  Top::LockType::NotLocked,
                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                                  CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.db()));
-            auto view = autoDb.getDb() ? ViewCatalog::get(autoDb.getDb())->lookup(opCtx, nss.ns())
-                                       : nullptr;
+            auto view =
+                autoDb.getDb() ? ViewCatalog::get(autoDb.getDb())->lookup(opCtx, nss) : nullptr;
             uassert(
                 ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "Namespace " << nss.ns()

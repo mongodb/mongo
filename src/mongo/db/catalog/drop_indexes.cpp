@@ -65,7 +65,7 @@ Status checkView(OperationContext* opCtx,
                  Database* db,
                  const CollectionPtr& collection) {
     if (!collection) {
-        if (db && ViewCatalog::get(db)->lookup(opCtx, nss.ns())) {
+        if (db && ViewCatalog::get(db)->lookup(opCtx, nss)) {
             return Status(ErrorCodes::CommandNotSupportedOnView,
                           str::stream() << "Cannot drop indexes on view " << nss);
         }

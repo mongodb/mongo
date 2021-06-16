@@ -170,7 +170,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         return;
     }
 
-    _view = ViewCatalog::get(db)->lookup(opCtx, _resolvedNss.ns());
+    _view = ViewCatalog::get(db)->lookup(opCtx, _resolvedNss);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
             !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted ||
@@ -282,7 +282,7 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
         return;
     }
 
-    _view = viewCatalog->lookup(opCtx, _resolvedNss.ns());
+    _view = viewCatalog->lookup(opCtx, _resolvedNss);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
             !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted ||

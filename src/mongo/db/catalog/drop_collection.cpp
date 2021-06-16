@@ -77,8 +77,7 @@ Status _dropView(OperationContext* opCtx,
         audit::logDropView(opCtx->getClient(), collectionName, "", {}, status.code());
         return status;
     }
-    auto view =
-        ViewCatalog::get(db)->lookupWithoutValidatingDurableViews(opCtx, collectionName.ns());
+    auto view = ViewCatalog::get(db)->lookupWithoutValidatingDurableViews(opCtx, collectionName);
     if (!view) {
         Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
         audit::logDropView(opCtx->getClient(), collectionName, "", {}, status.code());
@@ -86,7 +85,7 @@ Status _dropView(OperationContext* opCtx,
     }
 
     // Validates the view or throws an "invalid view" error.
-    ViewCatalog::get(db)->lookup(opCtx, collectionName.ns());
+    ViewCatalog::get(db)->lookup(opCtx, collectionName);
 
     Lock::CollectionLock collLock(opCtx, collectionName, MODE_IX);
     // Operations all lock system.views in the end to prevent deadlock.
@@ -361,8 +360,8 @@ Status dropCollection(OperationContext* opCtx,
                     false /* appendNs */);
             };
 
-            auto view = ViewCatalog::get(db)->lookupWithoutValidatingDurableViews(
-                opCtx, collectionName.ns());
+            auto view =
+                ViewCatalog::get(db)->lookupWithoutValidatingDurableViews(opCtx, collectionName);
             if (!view) {
                 // Timeseries bucket collection may exist even without the view. If that is the case
                 // delete it.

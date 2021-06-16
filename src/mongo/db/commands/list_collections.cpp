@@ -370,8 +370,8 @@ public:
                                         opCtx, collection, includePendingDrops, nameOnly);
                                 }
 
-                                auto view = viewCatalog->lookupWithoutValidatingDurableViews(
-                                    opCtx, nss.ns());
+                                auto view =
+                                    viewCatalog->lookupWithoutValidatingDurableViews(opCtx, nss);
                                 if (view && view->timeseries()) {
                                     if (auto bucketsCollection = CollectionCatalog::get(opCtx)
                                                                      ->lookupCollectionByNamespace(
@@ -398,7 +398,7 @@ public:
                             if (collection && collection->getTimeseriesOptions() &&
                                 !collection->ns().isDropPendingNamespace() &&
                                 viewCatalog->lookupWithoutValidatingDurableViews(
-                                    opCtx, collection->ns().getTimeseriesViewNamespace().ns()) &&
+                                    opCtx, collection->ns().getTimeseriesViewNamespace()) &&
                                 (!authorizedCollections ||
                                  as->isAuthorizedForAnyActionOnResource(
                                      ResourcePattern::forExactNamespace(

@@ -511,7 +511,7 @@ Status ViewCatalog::_validateCollation(OperationContext* opCtx,
                                        const std::vector<NamespaceString>& refs) const {
     for (auto&& potentialViewNss : refs) {
         auto otherView =
-            _lookup(opCtx, potentialViewNss.ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
+            _lookup(opCtx, potentialViewNss, ViewCatalogLookupBehavior::kValidateDurableViews);
         if (otherView &&
             !CollatorInterface::collatorsMatch(view.defaultCollator(),
                                                otherView->defaultCollator())) {
@@ -542,8 +542,7 @@ Status ViewCatalog::createView(OperationContext* opCtx,
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
-    if (catalog->_lookup(
-            opCtx, StringData(viewName.ns()), ViewCatalogLookupBehavior::kValidateDurableViews))
+    if (catalog->_lookup(opCtx, viewName, ViewCatalogLookupBehavior::kValidateDurableViews))
         return Status(ErrorCodes::NamespaceExists, "Namespace already exists");
 
     if (!NamespaceString::validCollectionName(viewOn.coll()))
@@ -585,7 +584,7 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
                       "View must be created on a view or collection in the same database");
 
     auto viewPtr =
-        catalog->_lookup(opCtx, viewName.ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
+        catalog->_lookup(opCtx, viewName, ViewCatalogLookupBehavior::kValidateDurableViews);
     if (!viewPtr)
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "cannot modify missing view " << viewName.ns());
@@ -642,8 +641,8 @@ Status ViewCatalog::dropView(OperationContext* opCtx,
         catalogStorage.setIgnoreExternalChange(true);
 
         // Save a copy of the view definition in case we need to roll back.
-        auto viewPtr = catalog->_lookup(
-            opCtx, viewName.ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
+        auto viewPtr =
+            catalog->_lookup(opCtx, viewName, ViewCatalogLookupBehavior::kValidateDurableViews);
         if (!viewPtr) {
             return {ErrorCodes::NamespaceNotFound,
                     str::stream() << "cannot drop missing view: " << viewName.ns()};
@@ -679,8 +678,10 @@ Status ViewCatalog::dropView(OperationContext* opCtx,
 }
 
 std::shared_ptr<const ViewDefinition> ViewCatalog::_lookup(
-    OperationContext* opCtx, StringData ns, ViewCatalogLookupBehavior lookupBehavior) const {
-    ViewMap::const_iterator it = _viewMap.find(ns);
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    ViewCatalogLookupBehavior lookupBehavior) const {
+    ViewMap::const_iterator it = _viewMap.find(ns.ns());
     if (it != _viewMap.end()) {
         return it->second;
     }
@@ -688,17 +689,17 @@ std::shared_ptr<const ViewDefinition> ViewCatalog::_lookup(
 }
 
 std::shared_ptr<ViewDefinition> ViewCatalog::_lookup(OperationContext* opCtx,
-                                                     StringData ns,
+                                                     const NamespaceString& ns,
                                                      ViewCatalogLookupBehavior lookupBehavior) {
     return std::const_pointer_cast<ViewDefinition>(
         std::as_const(*this)._lookup(opCtx, ns, lookupBehavior));
 }
 
 std::shared_ptr<const ViewDefinition> ViewCatalog::lookup(OperationContext* opCtx,
-                                                          StringData ns) const {
+                                                          const NamespaceString& ns) const {
     if (!_valid && opCtx->getClient()->isFromUserConnection()) {
         // We want to avoid lookups on invalid collection names.
-        if (!NamespaceString::validCollectionName(ns)) {
+        if (!NamespaceString::validCollectionName(ns.ns())) {
             return nullptr;
         }
 
@@ -712,7 +713,7 @@ std::shared_ptr<const ViewDefinition> ViewCatalog::lookup(OperationContext* opCt
 }
 
 std::shared_ptr<const ViewDefinition> ViewCatalog::lookupWithoutValidatingDurableViews(
-    OperationContext* opCtx, StringData ns) const {
+    OperationContext* opCtx, const NamespaceString& ns) const {
     return _lookup(opCtx, ns, ViewCatalogLookupBehavior::kAllowInvalidDurableViews);
 }
 
@@ -742,7 +743,7 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
         int depth = 0;
         for (; depth < ViewGraph::kMaxViewDepth; depth++) {
             auto view =
-                _lookup(opCtx, resolvedNss->ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
+                _lookup(opCtx, *resolvedNss, ViewCatalogLookupBehavior::kValidateDurableViews);
             if (!view) {
                 // Return error status if pipeline is too large.
                 int pipelineSize = 0;

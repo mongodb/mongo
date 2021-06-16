@@ -152,7 +152,7 @@ public:
             if (autoDb->getDb() &&
                 !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss) &&
                 ViewCatalog::get(autoDb->getDb())
-                    ->lookupWithoutValidatingDurableViews(opCtx, nss.ns())) {
+                    ->lookupWithoutValidatingDurableViews(opCtx, nss)) {
                 return true;
             }
 

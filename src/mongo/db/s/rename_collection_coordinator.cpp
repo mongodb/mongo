@@ -186,7 +186,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             uassert(ErrorCodes::CommandNotSupportedOnView,
                                     str::stream() << "Can't rename to target collection `" << toNss
                                                   << "` because it is a view.",
-                                    !ViewCatalog::get(db)->lookup(opCtx, toNss.ns()));
+                                    !ViewCatalog::get(db)->lookup(opCtx, toNss));
                         }
                     }
 

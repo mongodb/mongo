@@ -122,14 +122,15 @@ public:
      * Look up the 'nss' in the view catalog, returning a shared pointer to a View definition, or
      * nullptr if it doesn't exist.
      */
-    std::shared_ptr<const ViewDefinition> lookup(OperationContext* opCtx, StringData nss) const;
+    std::shared_ptr<const ViewDefinition> lookup(OperationContext* opCtx,
+                                                 const NamespaceString& nss) const;
 
     /**
      * Same functionality as above, except this function skips validating durable views in the view
      * catalog.
      */
     std::shared_ptr<const ViewDefinition> lookupWithoutValidatingDurableViews(
-        OperationContext* opCtx, StringData nss) const;
+        OperationContext* opCtx, const NamespaceString& nss) const;
 
     /**
      * Resolve the views on 'nss', transforming the pipeline appropriately. This function returns a
@@ -206,10 +207,10 @@ private:
                               const std::vector<NamespaceString>& refs) const;
 
     std::shared_ptr<const ViewDefinition> _lookup(OperationContext* opCtx,
-                                                  StringData ns,
+                                                  const NamespaceString& ns,
                                                   ViewCatalogLookupBehavior lookupBehavior) const;
     std::shared_ptr<ViewDefinition> _lookup(OperationContext* opCtx,
-                                            StringData ns,
+                                            const NamespaceString& ns,
                                             ViewCatalogLookupBehavior lookupBehavior);
 
     Status _reload(OperationContext* opCtx,
