@@ -21,16 +21,38 @@
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 load("jstests/libs/discover_topology.js");    // For findNonConfigNodes.
 load("jstests/libs/profiler.js");             // For profilerHasSingleMatchingEntryOrThrow.
+load("jstests/libs/uuid_util.js");            // For extractUUIDFromObject.
 // For flushRoutersAndRefreshShardMetadata.
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
 const st = new ShardingTest({shards: 2});
 const dbName = jsTestName();
 const collName = "foo";
+var chunksCollName;
 
 const shard0DB = st.shard0.getDB(dbName);
 const shard1DB = st.shard1.getDB(dbName);
 const sourceCollection = st.s0.getDB(dbName)[collName];
+
+// Sets up the data for $lookup on config.cache.chunks.* namespaces.
+const setUp = () => {
+    sourceCollection.drop();
+    // Set up sourceCollection to be sharded on {x:1} and to have the following distribution:
+    //      shard0: [MinKey, 0)
+    //      shard1: [0, MaxKey)
+    st.shardColl(sourceCollection, {x: 1}, {x: 0}, {x: 0}, dbName);
+
+    // Insert a corresponding entry in sourceCollection for each document in
+    // config.cache.chunks.collUuid.
+    assert.commandWorked(sourceCollection.insert({x: MinKey}));
+    assert.commandWorked(sourceCollection.insert({x: 0}));
+
+    const collNs = dbName + "." + collName;
+    const collEntry = st.config.collections.findOne({_id: collNs});
+    chunksCollName = "cache.chunks." +
+        (collEntry.hasOwnProperty("timestamp") ? extractUUIDFromObject(collEntry.uuid) : collNs);
+    flushRoutersAndRefreshShardMetadata(st, {collNs});
+};
 
 // $lookup alternative syntax only supports reading 'from' config.cache.chunks.* namespaces.
 const invalidLookups = [
@@ -44,7 +66,7 @@ const invalidLookups = [
     },
     {
         $lookup: {
-            from: {db: "wrongDB", coll: "cache.chunks.test.foo"},
+            from: {db: "wrongDB", coll: `${chunksCollName}`},
             localField: "x",
             foreignField: "_id.x",
             as: "results",
@@ -62,7 +84,7 @@ const invalidLookups = [
     },
     {
         $lookup: {
-            from: {db: "wrongDBWithLet", coll: "cache.chunks.test.foo"}, 
+            from: {db: "wrongDBWithLet", coll: `${chunksCollName}`}, 
             let: {x_field: "$x"},
             pipeline: [
                 {$match: {$expr: { $eq: ["$_id.x", "$$x_field"]}}}
@@ -78,23 +100,6 @@ invalidLookups.forEach((testCase) => {
                     ErrorCodes.FailedToParse,
                     `Expected $lookup to fail. Original command: ${tojson(testCase)}`);
 });
-
-// Sets up the data for $lookup on config.cache.chunks* namespaces.
-const setUp = () => {
-    sourceCollection.drop();
-    // Set up sourceCollection to be sharded on {x:1} and to have the following distribution:
-    //      shard0: [MinKey, 0)
-    //      shard1: [0, MaxKey)
-    st.shardColl(sourceCollection, {x: 1}, {x: 0}, {x: 0}, dbName);
-
-    // Insert a corresponding entry in sourceCollection for each document in
-    // config.cache.chunks.dbName.collName.
-    assert.commandWorked(sourceCollection.insert({x: MinKey}));
-    assert.commandWorked(sourceCollection.insert({x: 0}));
-
-    const ns = dbName + "." + collName;
-    flushRoutersAndRefreshShardMetadata(st, {ns});
-};
 
 const nodeList = DiscoverTopology.findNonConfigNodes(st.s);
 
@@ -115,7 +120,7 @@ const testLookupFromConfigCacheChunks = (lookupAgg) => {
 setUp();
 const lookupBasic = {
     $lookup: {
-        from: {db: "config", coll: `cache.chunks.${dbName}.${collName}`},
+        from: {db: "config", coll: `${chunksCollName}`},
         localField: "x",
         foreignField: "_id.x",
         as: "results",
@@ -125,7 +130,7 @@ testLookupFromConfigCacheChunks(lookupBasic);
 
 const lookupLet = {
     $lookup: {
-        from: {db: "config", coll: `cache.chunks.${dbName}.${collName}`},
+        from: {db: "config", coll: `${chunksCollName}`},
         let: {x_field: "$x"},
         pipeline: [
             {$match: {$expr: { $eq: ["$_id.x", "$$x_field"]}}}

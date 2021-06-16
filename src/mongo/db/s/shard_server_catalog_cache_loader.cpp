@@ -39,6 +39,7 @@
 
 #include <memory>
 
+#include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
@@ -69,18 +70,25 @@ AtomicWord<unsigned long long> taskIdGenerator{0};
 
 void dropChunksIfEpochChanged(OperationContext* opCtx,
                               const NamespaceString& nss,
+                              const boost::optional<UUID>& uuid,
                               const CollectionAndChangedChunks& collAndChunks,
                               const ChunkVersion& maxLoaderVersion) {
     if (collAndChunks.epoch != maxLoaderVersion.epoch() &&
         maxLoaderVersion != ChunkVersion::UNSHARDED()) {
         // If the collection has a new epoch, delete all existing chunks in the persisted routing
         // table cache.
-        dropChunks(opCtx, nss);
+        dropChunks(opCtx, nss, uuid);
 
         if (MONGO_unlikely(hangPersistCollectionAndChangedChunksAfterDropChunks.shouldFail())) {
             LOGV2(22093, "Hit hangPersistCollectionAndChangedChunksAfterDropChunks failpoint");
             hangPersistCollectionAndChangedChunksAfterDropChunks.pauseWhileSet(opCtx);
         }
+
+        LOGV2(3463203,
+              "Dropped chunks cache due to epoch change",
+              "collectionNamespace"_attr = nss,
+              "collectionEpoch"_attr = collAndChunks.epoch,
+              "maxLoaderVersionEpoch"_attr = maxLoaderVersion.epoch());
     }
 }
 
@@ -94,6 +102,16 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          const CollectionAndChangedChunks& collAndChunks,
                                          const ChunkVersion& maxLoaderVersion) {
+    const auto localUuid = [&] {
+        const auto statusWithCollectionEntry = readShardCollectionsEntry(opCtx, nss);
+        if (!statusWithCollectionEntry.isOK()) {
+            return boost::optional<UUID>(boost::none);
+        }
+        const auto collectionEntry = statusWithCollectionEntry.getValue();
+        return collectionEntry.getTimestamp() ? collectionEntry.getUuid()
+                                              : boost::optional<UUID>(boost::none);
+    }();
+
     // Update the collections collection entry for 'nss' in case there are any new updates.
     ShardCollectionType update(nss,
                                collAndChunks.epoch,
@@ -120,12 +138,16 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
 
     // Update the chunks.
     try {
-        dropChunksIfEpochChanged(opCtx, nss, collAndChunks, maxLoaderVersion);
+        dropChunksIfEpochChanged(opCtx, nss, localUuid, collAndChunks, maxLoaderVersion);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
 
-    status = updateShardChunks(opCtx, nss, collAndChunks.changedChunks, collAndChunks.epoch);
+    status = updateShardChunks(opCtx,
+                               nss,
+                               collAndChunks.creationTime ? collAndChunks.uuid : boost::none,
+                               collAndChunks.changedChunks,
+                               collAndChunks.epoch);
     if (!status.isOK()) {
         return status;
     }
@@ -136,6 +158,8 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
     if (!status.isOK()) {
         return status;
     }
+
+    LOGV2(3463204, "Persisted collection and chunks caches", "namespace"_attr = nss);
 
     return Status::OK();
 }
@@ -195,13 +219,16 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
         return ChunkVersion::UNSHARDED();
     }
 
-    auto statusWithChunk = shardmetadatautil::readShardChunks(opCtx,
-                                                              nss,
-                                                              BSONObj(),
-                                                              BSON(ChunkType::lastmod() << -1),
-                                                              1LL,
-                                                              cachedCollection.getEpoch(),
-                                                              cachedCollection.getTimestamp());
+    auto statusWithChunk = shardmetadatautil::readShardChunks(
+        opCtx,
+        nss,
+        cachedCollection.getTimestamp() ? boost::optional<UUID>(cachedCollection.getUuid())
+                                        : boost::none,
+        BSONObj(),
+        BSON(ChunkType::lastmod() << -1),
+        1LL,
+        cachedCollection.getEpoch(),
+        cachedCollection.getTimestamp());
     uassertStatusOKWithContext(
         statusWithChunk,
         str::stream() << "Failed to read highest version persisted chunk for collection '"
@@ -238,13 +265,16 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
 
     QueryAndSort diff = createShardChunkDiffQuery(startingVersion);
 
-    auto changedChunks = uassertStatusOK(readShardChunks(opCtx,
-                                                         nss,
-                                                         diff.query,
-                                                         diff.sort,
-                                                         boost::none,
-                                                         startingVersion.epoch(),
-                                                         startingVersion.getTimestamp()));
+    auto changedChunks = uassertStatusOK(readShardChunks(
+        opCtx,
+        nss,
+        shardCollectionEntry.getTimestamp() ? boost::optional<UUID>(shardCollectionEntry.getUuid())
+                                            : boost::none,
+        diff.query,
+        diff.sort,
+        boost::none,
+        startingVersion.epoch(),
+        startingVersion.getTimestamp()));
 
     return CollectionAndChangedChunks{shardCollectionEntry.getEpoch(),
                                       shardCollectionEntry.getTimestamp(),
@@ -652,6 +682,50 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
         opCtx, nss, catalogCacheSinceVersion);
 }
 
+void ShardServerCatalogCacheLoader::_waitForTasksToCompleteAndRenameChunks(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& uuid,
+    const boost::optional<Timestamp>& timestamp) {
+
+    LOGV2_DEBUG(3463205,
+                1,
+                "Waiting for tasks to be complete and renaming the chunks cache collection",
+                "namespace"_attr = nss);
+
+    if (nss.isTemporaryReshardingCollection()) {
+        return;
+    }
+
+    waitForCollectionFlush(opCtx, nss);
+
+    // Update the timestamp on the specific shard collection according to the current FCV. This is
+    // necessary to allow access to the shards cache using the correct namespace, i.e. based on
+    // collection namespace or UUID.
+    updateTimestampOnShardCollections(opCtx, nss, timestamp);
+
+    // Determine the renaming logic according to the current FCV. Namely:
+    //  - FCV 5.0 (or higher): NS-based chunks collection to be converted to UUID-based one
+    //  - FCV 4.4 (or lower): UUID-based chunks collection to be converted to NS-based one
+    const auto [fromChunksNss, toChunksNss] = [&] {
+        if (timestamp) {
+            return std::make_tuple(NamespaceString{ChunkType::ShardNSPrefix + nss.toString()},
+                                   NamespaceString{ChunkType::ShardNSPrefix + uuid.toString()});
+        } else {
+            return std::make_tuple(NamespaceString{ChunkType::ShardNSPrefix + uuid.toString()},
+                                   NamespaceString{ChunkType::ShardNSPrefix + nss.toString()});
+        }
+    }();
+
+    uassertStatusOK(renameCollection(opCtx, fromChunksNss, toChunksNss, {}));
+
+    LOGV2(3463206,
+          "Renamed chunks cache",
+          "collectionNamespace"_attr = nss,
+          "fromChunksNamespace"_attr = fromChunksNss,
+          "toChunksNamespace"_attr = toChunksNss);
+}
+
 StatusWith<CollectionAndChangedChunks>
 ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     OperationContext* opCtx,
@@ -718,6 +792,9 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
         maxLoaderVersion.getTimestamp().is_initialized() !=
             collAndChunks.creationTime.is_initialized() &&
         maxLoaderVersion.epoch() == collAndChunks.epoch) {
+        _waitForTasksToCompleteAndRenameChunks(
+            opCtx, nss, *collAndChunks.uuid, collAndChunks.creationTime);
+
         // This task will update the metadata format of the collection and all its chunks.
         // It doesn't apply the changes of the ChangedChunks, we will do that in the next task
         _ensureMajorityPrimaryAndScheduleCollAndChunksTask(

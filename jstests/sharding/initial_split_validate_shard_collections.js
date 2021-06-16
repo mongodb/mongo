@@ -46,11 +46,11 @@ checkMetadata(assert
                   .metadata);
 
 // Check that the shards' catalogs have the correct UUIDs
-const configUUID = getUUIDFromConfigCollections(mongos, 'test.user');
+const collEntry = mongos.getDB("config").collections.findOne({_id: 'test.user'});
 const shard0UUID = getUUIDFromListCollections(st.shard0.getDB('test'), 'user');
 const shard1UUID = getUUIDFromListCollections(st.shard1.getDB('test'), 'user');
-assert.eq(configUUID, shard0UUID);
-assert.eq(configUUID, shard1UUID);
+assert.eq(collEntry.uuid, shard0UUID);
+assert.eq(collEntry.uuid, shard1UUID);
 
 // Check that the shards' on-disk caches have the correct number of chunks
 assert.commandWorked(
@@ -61,13 +61,13 @@ assert.commandWorked(
 const chunksOnConfigCount = findChunksUtil.countChunksForNs(st.config, 'test.user');
 assert.eq(2, chunksOnConfigCount);
 
-const cacheChunksOnShard0 =
-    st.shard0.getDB("config").getCollection("cache.chunks.test.user").find().toArray();
-const cacheChunksOnShard1 =
-    st.shard1.getDB("config").getCollection("cache.chunks.test.user").find().toArray();
-assert.eq(chunksOnConfigCount, cacheChunksOnShard0.length);
-assert.eq(chunksOnConfigCount, cacheChunksOnShard1.length);
-assert.eq(cacheChunksOnShard0, cacheChunksOnShard1);
+const chunksCollName = "cache.chunks." +
+    (collEntry.hasOwnProperty("timestamp") ? extractUUIDFromObject(collEntry.uuid) : 'test.user');
+const chunksOnShard0 = st.shard0.getDB("config").getCollection(chunksCollName).find().toArray();
+const chunksOnShard1 = st.shard1.getDB("config").getCollection(chunksCollName).find().toArray();
+assert.eq(chunksOnConfigCount, chunksOnShard0.length);
+assert.eq(chunksOnConfigCount, chunksOnShard1.length);
+assert.eq(chunksOnShard0, chunksOnShard1);
 
 st.stop();
 })();

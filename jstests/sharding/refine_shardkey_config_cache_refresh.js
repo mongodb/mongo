@@ -6,6 +6,9 @@
  *
  * @tags: [requires_fcv_47]
  */
+
+load("jstests/libs/uuid_util.js");
+
 (function() {
 'use strict';
 
@@ -28,7 +31,10 @@ let priConn = st.rs0.getPrimary();
 assert.commandWorked(
     priConn.adminCommand({_flushRoutingTableCacheUpdates: 'test.user', syncFromConfig: true}));
 
-let chunkCache = priConn.getDB('config').cache.chunks.test.user;
+let collEntry = st.config.collections.findOne({_id: 'test.user'});
+let chunksCollName = "cache.chunks." +
+    (collEntry.hasOwnProperty("timestamp") ? extractUUIDFromObject(collEntry.uuid) : 'test.user');
+let chunkCache = priConn.getDB('config').getCollection(chunksCollName);
 let preRefineChunks = chunkCache.find().toArray();
 assert.eq(3, preRefineChunks.length);
 

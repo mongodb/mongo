@@ -51,15 +51,24 @@ function testRename(st, dbName, toNs, dropTarget, mustFail) {
     assert.eq(db.to.find({x: 0}).itcount(), 1, 'Expected exactly one document on the shard');
     assert.eq(toColl.find({x: 2}).itcount(), 1, 'Expected exactly one document on the shard');
 
+    // Infer whether the chunks cache collection names are based by collection UUID or collection
+    // namespace and get the actual chunks cache collection name of the target collection
+    const toConfigCollDoc = mongos.getDB('config').collections.findOne({_id: toNs});
+    const chunksNameByUUID = toConfigCollDoc.hasOwnProperty('timestamp');
+    const toChunksCollName =
+        'cache.chunks.' + (chunksNameByUUID ? extractUUIDFromObject(toConfigCollDoc.uuid) : toNs);
+
     // Validate the correctness of the collections metadata in the catalog cache on shards
     for (let db of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {
         // Validate that the source collection metadata has been cleaned up
         assert.eq(db['cache.collections'].countDocuments({_id: fromNs}), 0);
-        assert(!db['cache.chunks.' + fromNs].exists());
+        if (!chunksNameByUUID) {
+            assert(!db['cache.chunks.' + fromNs].exists());
+        }
 
         // Validate that the target collection metadata has been downloaded
         assert.eq(db['cache.collections'].countDocuments({_id: toNs}), 1);
-        assert(db['cache.chunks.' + toNs].exists());
+        assert(db[toChunksCollName].exists());
     }
 }
 

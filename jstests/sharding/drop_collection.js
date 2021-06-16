@@ -5,6 +5,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/uuid_util.js");
 load("jstests/sharding/libs/find_chunks_util.js");
 
 var st = new ShardingTest({shards: 2});
@@ -342,13 +343,19 @@ jsTest.log("Test that dropping a sharded collection, the cached metadata on shar
     assert.commandWorked(coll.insert({_id: 10}));
     assert.commandWorked(coll.insert({_id: -10}));
 
+    // Get the chunks cache collection name
+    const configCollDoc = st.s0.getDB('config').collections.findOne({_id: coll.getFullName()});
+    const chunksCollName = 'cache.chunks.' +
+        (configCollDoc.hasOwnProperty('timestamp') ? extractUUIDFromObject(configCollDoc.uuid)
+                                                   : coll.getFullName());
+
     // Drop the collection
     assert.commandWorked(db.runCommand({drop: coll.getName()}));
 
     // Verify that the cached metadata on shards is cleaned up
     for (let configDb of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {
         assert.eq(configDb['cache.collections'].countDocuments({_id: coll.getFullName()}), 0);
-        assert(!configDb['cache.chunks.' + coll.getFullName()].exists());
+        assert(!configDb[chunksCollName].exists());
     }
 }
 

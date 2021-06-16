@@ -240,7 +240,7 @@ Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns) {
     if (ns.coll().find(".system.") != std::string::npos) {
         // Writes are permitted to the persisted chunk metadata collections. These collections are
         // named based on the name of the sharded collection, e.g.
-        // 'config.cache.chunks.dbname.collname'. Since there is a sharded collection
+        // 'config.cache.chunks.dbname.collname/colluuid'. Since there is a sharded collection
         // 'config.system.sessions', there will be a corresponding persisted chunk metadata
         // collection 'config.cache.chunks.config.system.sessions'. We wish to allow writes to this
         // collection.

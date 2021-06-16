@@ -6,6 +6,7 @@
 (function() {
 'use strict';
 load('jstests/libs/fail_point_util.js');
+load('jstests/libs/uuid_util.js');
 
 const st = new ShardingTest({shards: 1});
 const mongos = st.s0;
@@ -13,7 +14,6 @@ const shard = st.shard0;
 const kDbName = 'db';
 const kCollName = 'foo';
 const kNsName = kDbName + '.' + kCollName;
-const kConfigCacheChunks = 'config.cache.chunks.' + kNsName;
 const oldKeyDoc = {
     a: 1,
     b: 1
@@ -40,7 +40,11 @@ assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 5, b: 5}})
 // Flush the routing table cache and verify that 'config.cache.chunks.db.foo' is as expected
 // before refineCollectionShardKey.
 assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: kNsName}));
-let chunkArr = shard.getCollection(kConfigCacheChunks).find({}).sort({min: 1}).toArray();
+
+let collEntry = st.config.collections.findOne({_id: kNsName});
+let configCacheChunks = "config.cache.chunks." +
+    (collEntry.hasOwnProperty("timestamp") ? extractUUIDFromObject(collEntry.uuid) : kNsName);
+let chunkArr = shard.getCollection(configCacheChunks).find({}).sort({min: 1}).toArray();
 assert.eq(3, chunkArr.length);
 assert.eq({a: MinKey, b: MinKey}, chunkArr[0]._id);
 assert.eq({a: 0, b: 0}, chunkArr[0].max);
@@ -58,7 +62,7 @@ assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key
 
 // Verify that all chunks belonging to 'db.foo' have been deleted.
 hangAfterDropChunksFailPoint.wait();
-chunkArr = shard.getCollection(kConfigCacheChunks).find({}).sort({min: 1}).toArray();
+chunkArr = shard.getCollection(configCacheChunks).find({}).sort({min: 1}).toArray();
 assert.eq(0, chunkArr.length);
 
 // Disable failpoint 'hangPersistCollectionAndChangedChunksAfterDropChunks' and continue
@@ -68,7 +72,7 @@ hangAfterDropChunksFailPoint.off();
 // Verify that 'config.cache.chunks.db.foo' is as expected after refineCollectionShardKey. NOTE: We
 // use assert.soon here because refineCollectionShardKey doesn't block for each shard to refresh.
 assert.soon(() => {
-    chunkArr = shard.getCollection(kConfigCacheChunks).find({}).sort({min: 1}).toArray();
+    chunkArr = shard.getCollection(configCacheChunks).find({}).sort({min: 1}).toArray();
     return (3 === chunkArr.length);
 });
 assert.eq({a: MinKey, b: MinKey, c: MinKey, d: MinKey}, chunkArr[0]._id);

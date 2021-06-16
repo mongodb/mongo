@@ -42,6 +42,7 @@ namespace mongo {
 class ChunkType;
 class CollectionMetadata;
 class NamespaceString;
+class UUID;
 class OperationContext;
 class ShardCollectionType;
 class ShardDatabaseType;
@@ -160,12 +161,17 @@ Status updateShardDatabasesEntry(OperationContext* opCtx,
                                  const bool upsert);
 
 /**
- * Reads the shard server's chunks collection corresponding to 'nss' for chunks matching 'query',
- * returning at most 'limit' chunks in 'sort' order. 'epoch' populates the returned chunks' version
- * fields, because we do not yet have UUIDs to replace epoches nor UUIDs associated with namespaces.
+ * Reads the shard server's chunks collection corresponding to 'nss' or 'uuid' for chunks matching
+ * 'query', returning at most 'limit' chunks in 'sort' order. 'epoch' populates the returned chunks'
+ * version fields, because we do not yet have UUIDs to replace epochs nor UUIDs associated with
+ * namespaces.
+ *
+ * Starting with FCV 5.0, the collection UUID is used to read chunk metadata. Instead, the
+ * collection namespace is used with previous FCV.
  */
 StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    const NamespaceString& nss,
+                                                   const boost::optional<UUID>& uuid,
                                                    const BSONObj& query,
                                                    const BSONObj& sort,
                                                    boost::optional<long long> limit,
@@ -173,30 +179,35 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    const boost::optional<Timestamp>& timestamp);
 
 /**
- * Takes a vector of 'chunks' and updates the shard's chunks collection for 'nss'. Any chunk
- * documents in config.chunks.ns that overlap with a chunk in 'chunks' is removed as the updated
- * chunk document is inserted. If the epoch of a chunk in 'chunks' does not match 'currEpoch',
- * a ConflictingOperationInProgress error is returned and no more updates are applied.
+ * Takes a vector of 'chunks' and updates the shard's chunks collection for 'nss' or 'uuid'. Any
+ * chunk documents in config.cache.chunks.nssOrUuid that overlap with a chunk in 'chunks' is removed
+ * as the updated chunk document is inserted. If the epoch of a chunk in 'chunks' does not match
+ * 'currEpoch', a ConflictingOperationInProgress error is returned and no more updates are applied.
+ *
+ * Starting with FCV 5.0, the collection UUID is used to update chunk metadata. Insteed, the
+ * collection namespace is used with previous FCV.
  *
  * Note: two threads running this function in parallel for the same collection can corrupt the
  * collection data!
  *
- * nss - the regular collection namespace for which chunk metadata is being updated.
- * chunks - chunks retrieved from the config server, sorted in ascending chunk version order
+ * nss - the collection namespace for which chunk metadata is being updated.
+ * uuid - the collection UUID for which chunk metadata is being updated.
+ * chunks - chunks retrieved from the config server, sorted in ascending chunk version order.
  * currEpoch - what this shard server expects the collection epoch to be.
  *
  * Returns:
  * - ConflictingOperationInProgress if the chunk version epoch of any chunk in 'chunks' is different
- *   than 'currEpoch'
+ *   than 'currEpoch'.
  * - Other errors if unable to do local writes/reads to the config.chunks.ns collection.
  */
 Status updateShardChunks(OperationContext* opCtx,
                          const NamespaceString& nss,
+                         const boost::optional<UUID>& uuid,
                          const std::vector<ChunkType>& chunks,
                          const OID& currEpoch);
 
 /**
- * Adds/removes the timestamp of the  'nss' entry in config.cache.collections
+ * Adds/removes the timestamp of the 'nss' entry in config.cache.collections
  */
 void updateTimestampOnShardCollections(OperationContext* opCtx,
                                        const NamespaceString& nss,
@@ -213,9 +224,12 @@ void updateTimestampOnShardCollections(OperationContext* opCtx,
 Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
- * Drops locally persisted chunk metadata associated with 'nss': only drops the chunks collection.
+ * Drops locally persisted chunk metadata associated with 'nss' or 'uuid': only drops the chunks
+ * collection.
  */
-void dropChunks(OperationContext* opCtx, const NamespaceString& nss);
+void dropChunks(OperationContext* opCtx,
+                const NamespaceString& nss,
+                const boost::optional<UUID>& uuid);
 
 /**
  * Deletes locally persisted database metadata associated with 'dbName': removes the databases
