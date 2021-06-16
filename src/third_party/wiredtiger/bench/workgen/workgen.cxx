@@ -165,7 +165,10 @@ int WorkloadRunner::check_timing(const char *name, uint64_t last_interval) {
         } else {
             str = "WARNING";
         }
-        std::cerr << str << ": Cycling idle table failed because " << name << " took " << last_interval << " seconds which is longer than configured acceptable maximum of " << options->max_idle_table_cycle << std::endl;
+        std::cerr << str << ": Cycling idle table failed because " << name << " took "
+                  << last_interval << " s which is longer than configured acceptable maximum of "
+                  << options->max_idle_table_cycle << " s. Diff is "
+                  << (last_interval - options->max_idle_table_cycle) << " s." << std::endl;
      }
      return (msg_err);
 }
@@ -415,7 +418,7 @@ int Monitor::run() {
     char time_buf[64], version[100];
     Stats prev_totals;
     WorkloadOptions *options = &_wrunner._workload->options;
-    uint64_t latency_max = (uint64_t)options->max_latency;
+    uint64_t latency_max = (uint64_t)options->max_latency * THOUSAND;
     size_t buf_size;
     bool first;
 
@@ -548,18 +551,21 @@ int Monitor::run() {
         }
 
         uint64_t read_max = interval.read.max_latency;
-        uint64_t insert_max = interval.read.max_latency;
-        uint64_t update_max = interval.read.max_latency;
+        uint64_t insert_max = interval.insert.max_latency;
+        uint64_t update_max = interval.update.max_latency;
 
-        if (latency_max != 0 &&
-          (read_max > latency_max || insert_max > latency_max ||
-          update_max > latency_max)) {
-            std::cerr << "WARNING: max latency exceeded:"
-                      << " threshold " << latency_max
-                      << " read max " << read_max
-                      << " insert max " << insert_max
-                      << " update max " << update_max << std::endl;
-        }
+        if (read_max > latency_max)
+            std::cerr << "WARNING: max latency exceeded for read operation. Threshold "
+                      << latency_max << " us, recorded " << read_max << " us, diff "
+                      << (read_max - latency_max) << " us." << std::endl;
+        if (insert_max > latency_max)
+            std::cerr << "WARNING: max latency exceeded for insert operation. Threshold "
+                      << latency_max << " us, recorded " << insert_max << " us, diff "
+                      << (insert_max - latency_max) << " us." << std::endl;
+        if (update_max > latency_max)
+            std::cerr << "WARNING: max latency exceeded for update operation. Threshold "
+                      << latency_max << " us, recorded " << insert_max << " us, diff "
+                      << (update_max - latency_max) << " us." << std::endl;
 
         prev_interval.assign(interval);
         prev_totals.assign(new_totals);
