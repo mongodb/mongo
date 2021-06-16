@@ -1064,19 +1064,11 @@ __rollback_abort_updates(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
 {
     WT_PAGE *page;
 
-    /* Review deleted page saved to the ref. */
-    if (ref->page_del != NULL && rollback_timestamp < ref->page_del->durable_timestamp) {
-        __wt_verbose(
-          session, WT_VERB_RECOVERY_RTS(session), "%p: deleted page rolled back", (void *)ref);
-        WT_RET(__wt_delete_page_rollback(session, ref));
-    }
-
     /*
      * If we have a ref with clean page, find out whether the page has any modifications that are
      * newer than the given timestamp. As eviction writes the newest version to page, even a clean
      * page may also contain modifications that need rollback.
      */
-    WT_ASSERT(session, ref->page != NULL);
     page = ref->page;
     if (!__wt_page_is_modified(page) &&
       !__rollback_page_needs_abort(session, ref, rollback_timestamp)) {
@@ -1122,8 +1114,15 @@ static int
 __rollback_abort_fast_truncate(
   WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t rollback_timestamp)
 {
-    /* Review deleted page saved to the ref. */
-    if (ref->page_del != NULL && rollback_timestamp < ref->page_del->durable_timestamp) {
+    /*
+     * A fast-truncate page is either in the WT_REF_DELETED state (where the WT_PAGE_DELETED
+     * structure has the timestamp information), or in an in-memory state where it started as a
+     * fast-truncate page which was then instantiated and the timestamp information moved to the
+     * individual WT_UPDATE structures. When reviewing internal pages, ignore the second case, an
+     * instantiated page is handled when the leaf page is visited.
+     */
+    if (ref->state == WT_REF_DELETED && ref->page_del != NULL &&
+      rollback_timestamp < ref->page_del->durable_timestamp) {
         __wt_verbose(
           session, WT_VERB_RECOVERY_RTS(session), "%p: deleted page rolled back", (void *)ref);
         WT_RET(__wt_delete_page_rollback(session, ref));
