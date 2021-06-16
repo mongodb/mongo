@@ -167,13 +167,13 @@ all:
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
-  change_streams_multiversion:
+  change_streams_multiversion_passthrough:
 
   change_streams_sharded_collections_multiversion_passthrough:
 
-  concurrency_replication_multiversion:
+  concurrency_replication_multiversion_passthrough:
 
-  concurrency_sharded_replication_multiversion:
+  concurrency_sharded_replication_multiversion_passthrough:
 
   replica_sets_multiversion:
   - ticket: SERVER-35649

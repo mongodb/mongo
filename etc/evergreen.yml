@@ -3656,8 +3656,8 @@ tasks:
 
 ## jstestfuzz replica set ##
 - <<: *jstestfuzz_template
-  name: jstestfuzz_replication_multiversion_gen
-  tags: ["jstestfuzz_multiversion_gen"]
+  name: jstestfuzz_replication_multiversion_passthrough_gen
+  tags: ["jstestfuzz_multiversion_passthrough_gen"]
   commands:
   - func: "generate implicit multiversion tasks"
     vars:
@@ -3712,8 +3712,8 @@ tasks:
 
 ## jstestfuzz sharded multiversion cluster ##
 - <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_multiversion_gen
-  tags: [jstestfuzz_multiversion_gen]
+  name: jstestfuzz_sharded_multiversion_passthrough_gen
+  tags: [jstestfuzz_multiversion_passthrough_gen]
   commands:
   - func: "generate implicit multiversion tasks"
     vars:
@@ -3844,7 +3844,7 @@ tasks:
       name: resharding_fuzzer_idempotency
 
 ## Tests that the multiversion test generation logic is not broken.
-- name: multiversion_sanity_check_gen
+- name: multiversion_sanity_check_passthrough_gen
   tags: []
   commands:
   - func: "generate implicit multiversion tasks"
@@ -4089,7 +4089,7 @@ tasks:
       resmoke_args: --suites=change_streams --storageEngine=wiredTiger
 
 - <<: *task_template
-  name: change_streams_multiversion_gen
+  name: change_streams_multiversion_passthrough_gen
   tags: ["multiversion_passthrough"]
   commands:
   - func: "generate implicit multiversion tasks"
@@ -4155,7 +4155,7 @@ tasks:
   name: change_streams_sharded_collections_multiversion_passthrough_gen
   tags: ["multiversion_passthrough"]
   depends_on:
-  - name: change_streams_multiversion_gen
+  - name: change_streams_multiversion_passthrough_gen
   commands:
   - func: "generate implicit multiversion tasks"
     vars:
@@ -5082,7 +5082,7 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
-  name: concurrency_replication_multiversion_gen
+  name: concurrency_replication_multiversion_passthrough_gen
   tags: [multiversion_passthrough]
   commands:
   - func: "generate implicit multiversion tasks"
@@ -5165,7 +5165,7 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- name: concurrency_sharded_replication_multiversion_gen
+- name: concurrency_sharded_replication_multiversion_passthrough_gen
   tags: ["multiversion_passthrough", "sharded"]
   commands:
   - func: "generate implicit multiversion tasks"
@@ -9036,7 +9036,7 @@ buildvariants:
   - name: jsonSchema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
-  - name: multiversion_sanity_check_gen
+  - name: multiversion_sanity_check_passthrough_gen
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
@@ -11613,7 +11613,7 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
 #  - name: jsonSchema
   - name: .jstestfuzz !.flow_control !.stepdowns !.causal
-#  - name: multiversion_sanity_check_gen
+#  - name: multiversion_sanity_check_passthrough_gen
 #  - name: mqlrun
 #  - name: .multi_shard
 #  - name: .query_fuzzer
