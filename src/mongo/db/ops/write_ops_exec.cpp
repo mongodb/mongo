@@ -382,6 +382,12 @@ Status checkIfTransactionOnCappedColl(OperationContext* opCtx, const CollectionP
     return Status::OK();
 }
 
+void assertTimeseriesBucketsCollectionNotFound(const NamespaceString& ns) {
+    uasserted(ErrorCodes::NamespaceNotFound,
+              str::stream() << "Buckets collection not found for time-series collection "
+                            << ns.getTimeseriesViewNamespace());
+}
+
 /**
  * Returns true if caller should try to insert more documents. Does nothing else if batch is empty.
  */
@@ -421,8 +427,12 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 opCtx,
                 wholeOp.getNamespace(),
                 fixLockModeForSystemDotViewsChanges(wholeOp.getNamespace(), MODE_IX));
-            if (collection->getCollection())
+            if (*collection)
                 break;
+
+            if (source == OperationSource::kTimeseries) {
+                assertTimeseriesBucketsCollectionNotFound(wholeOp.getNamespace());
+            }
 
             collection.reset();  // unlock.
             makeCollection(opCtx, wholeOp.getNamespace());
@@ -723,10 +733,17 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     boost::optional<AutoGetCollection> collection;
     while (true) {
         collection.emplace(opCtx, ns, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
+        if (*collection) {
+            break;
+        }
+
+        if (source == OperationSource::kTimeseries) {
+            assertTimeseriesBucketsCollectionNotFound(ns);
+        }
 
         // If this is an upsert, which is an insert, we must have a collection.
         // An update on a non-existant collection is okay and handled later.
-        if (collection->getCollection() || !updateRequest.isUpsert())
+        if (!updateRequest.isUpsert())
             break;
 
         collection.reset();  // unlock.
@@ -1157,7 +1174,9 @@ Status performAtomicTimeseriesWrites(
     lastOpFixer.startingOp();
 
     AutoGetCollection coll{opCtx, ns, MODE_IX};
-    invariant(coll);
+    if (!coll) {
+        assertTimeseriesBucketsCollectionNotFound(ns);
+    }
 
     auto curOp = CurOp::get(opCtx);
     curOp->raiseDbProfileLevel(CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.db()));
