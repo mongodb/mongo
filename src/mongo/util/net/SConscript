@@ -69,6 +69,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth_options',
+        '$BUILD_DIR/mongo/db/auth/cluster_auth_mode',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ]
@@ -129,6 +130,7 @@ if not get_option('ssl') == 'off':
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/base/secure_allocator',
             '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
+            '$BUILD_DIR/mongo/db/auth/cluster_auth_mode',
             '$BUILD_DIR/mongo/db/server_options_core',
             '$BUILD_DIR/mongo/db/service_context',
             '$BUILD_DIR/mongo/idl/server_parameter',
@@ -147,6 +149,7 @@ if not get_option('ssl') == 'off':
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/client/authentication',
+            '$BUILD_DIR/mongo/db/auth/cluster_auth_mode',
             '$BUILD_DIR/mongo/db/server_options_core',
             '$BUILD_DIR/mongo/idl/server_parameter',
             'ssl_options',

@@ -375,14 +375,14 @@ void SSLManagerCoordinator::rotate() {
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(sslGlobalParams, isSSLServer);
 
-    int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
-    if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509 ||
-        clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509) {
+    auto svcCtx = getGlobalServiceContext();
+    const auto clusterAuthMode = ClusterAuthMode::get(svcCtx);
+    if (clusterAuthMode.sendsX509()) {
         auth::setInternalUserAuthParams(auth::createInternalX509AuthDocument(
             StringData(manager->getSSLConfiguration().clientSubjectName.toString())));
     }
 
-    auto tl = getGlobalServiceContext()->getTransportLayer();
+    auto tl = svcCtx->getTransportLayer();
     invariant(tl != nullptr);
     uassertStatusOK(tl->rotateCertificates(manager, false));
 

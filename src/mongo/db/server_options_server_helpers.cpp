@@ -316,24 +316,10 @@ Status storeServerOptions(const moe::Environment& params) {
     }
 
     if (params.count("security.clusterAuthMode")) {
-        std::string clusterAuthMode = params["security.clusterAuthMode"].as<std::string>();
-
-        if (clusterAuthMode == "keyFile") {
-            serverGlobalParams.clusterAuthMode.store(ServerGlobalParams::ClusterAuthMode_keyFile);
-        } else if (clusterAuthMode == "sendKeyFile") {
-            serverGlobalParams.clusterAuthMode.store(
-                ServerGlobalParams::ClusterAuthMode_sendKeyFile);
-        } else if (clusterAuthMode == "sendX509") {
-            serverGlobalParams.clusterAuthMode.store(ServerGlobalParams::ClusterAuthMode_sendX509);
-        } else if (clusterAuthMode == "x509") {
-            serverGlobalParams.clusterAuthMode.store(ServerGlobalParams::ClusterAuthMode_x509);
-        } else {
-            return Status(ErrorCodes::BadValue,
-                          "unsupported value for clusterAuthMode " + clusterAuthMode);
-        }
+        const auto modeStr = params["security.clusterAuthMode"].as<std::string>();
+        serverGlobalParams.startupClusterAuthMode =
+            uassertStatusOK(ClusterAuthMode::parse(modeStr));
         serverGlobalParams.authState = ServerGlobalParams::AuthState::kEnabled;
-    } else {
-        serverGlobalParams.clusterAuthMode.store(ServerGlobalParams::ClusterAuthMode_undefined);
     }
 
     if (params.count("net.maxIncomingConnections")) {
@@ -432,12 +418,14 @@ Status storeServerOptions(const moe::Environment& params) {
     }
 
     if (!params.count("security.clusterAuthMode") && params.count("security.keyFile")) {
-        serverGlobalParams.clusterAuthMode.store(ServerGlobalParams::ClusterAuthMode_keyFile);
+        serverGlobalParams.startupClusterAuthMode = ClusterAuthMode::keyFile();
     }
-    int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
+
+    const bool hasClusterAuthMode = serverGlobalParams.startupClusterAuthMode.isDefined();
     if (serverGlobalParams.transitionToAuth &&
-        (clusterAuthMode != ServerGlobalParams::ClusterAuthMode_keyFile &&
-         clusterAuthMode != ServerGlobalParams::ClusterAuthMode_x509)) {
+        !(hasClusterAuthMode &&
+          (serverGlobalParams.startupClusterAuthMode.x509Only() ||
+           serverGlobalParams.startupClusterAuthMode.keyFileOnly()))) {
         return Status(ErrorCodes::BadValue,
                       "--transitionToAuth must be used with keyFile or x509 authentication");
     }

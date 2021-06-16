@@ -44,41 +44,6 @@
 namespace mongo {
 namespace {
 
-std::string clusterAuthModeFormat() {
-    switch (serverGlobalParams.clusterAuthMode.load()) {
-        case ServerGlobalParams::ClusterAuthMode_keyFile:
-            return "keyFile";
-        case ServerGlobalParams::ClusterAuthMode_sendKeyFile:
-            return "sendKeyFile";
-        case ServerGlobalParams::ClusterAuthMode_sendX509:
-            return "sendX509";
-        case ServerGlobalParams::ClusterAuthMode_x509:
-            return "x509";
-        default:
-            // Default case because clusterAuthMode is an AtomicWord<int> and not bound by enum
-            // rules.
-            return "undefined";
-    }
-}
-
-StatusWith<ServerGlobalParams::ClusterAuthModes> clusterAuthModeParse(StringData strMode) {
-    if (strMode == "keyFile") {
-        return ServerGlobalParams::ClusterAuthMode_keyFile;
-    } else if (strMode == "sendKeyFile") {
-        return ServerGlobalParams::ClusterAuthMode_sendKeyFile;
-    } else if (strMode == "sendX509") {
-        return ServerGlobalParams::ClusterAuthMode_sendX509;
-    } else if (strMode == "x509") {
-        return ServerGlobalParams::ClusterAuthMode_x509;
-    } else {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Invalid clusterAuthMode '" << strMode
-                          << "', expected one of: 'keyFile', 'sendKeyFile', 'sendX509', or 'x509'");
-    }
-}
-
-
 template <typename T, typename U>
 StatusWith<SSLParams::SSLModes> checkTLSModeTransition(T modeToString,
                                                        U stringToMode,

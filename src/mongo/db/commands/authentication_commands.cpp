@@ -46,6 +46,7 @@
 #include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/auth/user_name.h"
@@ -269,6 +270,8 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
         return opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient;
     };
 
+    const auto clusterAuthMode = ClusterAuthMode::get(opCtx->getServiceContext());
+
     auto authorizeExternalUser = [&] {
         uassert(ErrorCodes::BadValue,
                 kX509AuthenticationDisabledMessage,
@@ -278,31 +281,25 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
     if (sslConfiguration->isClusterMember(clientName)) {
         // Handle internal cluster member auth, only applies to server-server connections
-        switch (serverGlobalParams.clusterAuthMode.load()) {
-            case ServerGlobalParams::ClusterAuthMode_undefined:
-            case ServerGlobalParams::ClusterAuthMode_keyFile: {
-                uassert(ErrorCodes::AuthenticationFailed,
-                        "The provided certificate can only be used for cluster authentication, not "
-                        "client authentication. The current configuration does not allow x.509 "
-                        "cluster authentication, check the --clusterAuthMode flag",
-                        !gEnforceUserClusterSeparation);
+        if (!clusterAuthMode.allowsX509()) {
+            uassert(ErrorCodes::AuthenticationFailed,
+                    "The provided certificate can only be used for cluster authentication, not "
+                    "client authentication. The current configuration does not allow x.509 "
+                    "cluster authentication, check the --clusterAuthMode flag",
+                    !gEnforceUserClusterSeparation);
 
-                authorizeExternalUser();
-            } break;
-            case ServerGlobalParams::ClusterAuthMode_sendKeyFile:
-            case ServerGlobalParams::ClusterAuthMode_sendX509:
-            case ServerGlobalParams::ClusterAuthMode_x509: {
-                if (!isInternalClient()) {
-                    LOGV2_WARNING(
-                        20430,
-                        "Client isn't a mongod or mongos, but is connecting with a certificate "
-                        "with cluster membership");
-                }
+            authorizeExternalUser();
+        } else {
+            if (!isInternalClient()) {
+                LOGV2_WARNING(
+                    20430,
+                    "Client isn't a mongod or mongos, but is connecting with a certificate "
+                    "with cluster membership");
+            }
 
-                session->setAsClusterMember();
-                authorizationSession->grantInternalAuthorization(client);
-            } break;
-        };
+            session->setAsClusterMember();
+            authorizationSession->grantInternalAuthorization(client);
+        }
     } else {
         // Handle normal client authentication, only applies to client-server connections
         authorizeExternalUser();

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logv2/log_format.h"
 #include "mongo/platform/atomic_word.h"
@@ -122,31 +123,9 @@ struct ServerGlobalParams {
 
     AuthState authState = AuthState::kUndefined;
 
-    bool transitionToAuth = false;    // --transitionToAuth, mixed mode for rolling auth upgrade
-    AtomicWord<int> clusterAuthMode;  // --clusterAuthMode, the internal cluster auth mode
+    bool transitionToAuth = false;  // --transitionToAuth, mixed mode for rolling auth upgrade
 
-    enum ClusterAuthModes {
-        ClusterAuthMode_undefined,
-        /**
-         * Authenticate using keyfile, accept only keyfiles
-         */
-        ClusterAuthMode_keyFile,
-
-        /**
-         * Authenticate using keyfile, accept both keyfiles and X.509
-         */
-        ClusterAuthMode_sendKeyFile,
-
-        /**
-         * Authenticate using X.509, accept both keyfiles and X.509
-         */
-        ClusterAuthMode_sendX509,
-
-        /**
-         * Authenticate using X.509, accept only X.509
-         */
-        ClusterAuthMode_x509
-    };
+    ClusterAuthMode startupClusterAuthMode;
 
     // for the YAML config, sharding._overrideShardIdentity. Can only be used when in
     // queryableBackupMode.
