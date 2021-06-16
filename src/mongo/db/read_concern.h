@@ -37,6 +37,7 @@ class Status;
 template <typename T>
 class StatusWith;
 enum class PrepareConflictBehavior;
+class StringData;
 namespace repl {
 class ReadConcernArgs;
 class SpeculativeMajorityReadInfo;
@@ -64,6 +65,7 @@ void setPrepareConflictBehaviorForReadConcern(OperationContext* opCtx,
  */
 Status waitForReadConcern(OperationContext* opCtx,
                           const repl::ReadConcernArgs& readConcernArgs,
+                          StringData dbName,
                           bool allowAfterClusterTime);
 
 /*

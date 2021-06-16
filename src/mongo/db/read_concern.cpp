@@ -42,9 +42,10 @@ void setPrepareConflictBehaviorForReadConcern(OperationContext* opCtx,
 
 Status waitForReadConcern(OperationContext* opCtx,
                           const repl::ReadConcernArgs& readConcernArgs,
+                          StringData dbName,
                           bool allowAfterClusterTime) {
     static auto w = MONGO_WEAK_FUNCTION_DEFINITION(waitForReadConcern);
-    return w(opCtx, readConcernArgs, allowAfterClusterTime);
+    return w(opCtx, readConcernArgs, dbName, allowAfterClusterTime);
 }
 
 Status waitForLinearizableReadConcern(OperationContext* opCtx, int readConcernTimeout) {

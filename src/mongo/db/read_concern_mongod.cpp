@@ -42,6 +42,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -104,10 +105,21 @@ private:
     std::map<Timestamp, std::shared_ptr<Notification<Status>>> _writeRequests;
 };
 
+bool hasActiveTenantMigrationRecipient(OperationContext* opCtx, StringData dbName) {
+    if (dbName.empty()) {
+        return false;
+    }
+
+    auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .getTenantMigrationAccessBlockerForDbName(
+                        dbName, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+    return bool(mtab);
+}
+
 /**
  *  Schedule a write via appendOplogNote command to the primary of this replica set.
  */
-Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
+Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime, StringData dbName) {
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     invariant(replCoord->isReplEnabled());
 
@@ -139,16 +151,12 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
     // one that waits for the notification gets the later clusterTime, so when the request finishes
     // it needs to be repeated with the later time.
     while (clusterTime > lastAppliedOpTime) {
-        // standalone replica set, so there is no need to advance the OpLog on the primary.
-        if (serverGlobalParams.clusterRole == ClusterRole::None) {
+        // Standalone replica set, so there is no need to advance the OpLog on the primary. The only
+        // exception is after a tenant migration because the target time may be from the donor
+        // replica set and is not guaranteed to be in the recipient's oplog.
+        if (serverGlobalParams.clusterRole == ClusterRole::None &&
+            !hasActiveTenantMigrationRecipient(opCtx, dbName)) {
             return Status::OK();
-        }
-
-        bool isConfig = (serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-
-        if (!isConfig && !ShardingState::get(opCtx)->enabled()) {
-            return {ErrorCodes::ShardingStateNotInitialized,
-                    "Failed noop write because sharding state has not been initialized"};
         }
 
         if (!remainingAttempts--) {
@@ -282,6 +290,7 @@ void setPrepareConflictBehaviorForReadConcernImpl(OperationContext* opCtx,
 
 Status waitForReadConcernImpl(OperationContext* opCtx,
                               const repl::ReadConcernArgs& readConcernArgs,
+                              StringData dbName,
                               bool allowAfterClusterTime) {
     // If we are in a direct client within a transaction, then we may be holding locks, so it is
     // illegal to wait for read concern. This is fine, since the outer operation should have handled
@@ -373,7 +382,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
                                       << "; current clusterTime: " << clusterTime.toString()};
             }
 
-            auto status = makeNoopWriteIfNeeded(opCtx, *targetClusterTime);
+            auto status = makeNoopWriteIfNeeded(opCtx, *targetClusterTime, dbName);
             if (!status.isOK()) {
                 LOGV2(20990,
                       "Failed noop write at clusterTime: {targetClusterTime} due to {error}",
