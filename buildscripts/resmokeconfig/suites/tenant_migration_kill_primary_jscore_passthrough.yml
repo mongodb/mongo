@@ -189,6 +189,12 @@ selector:
   - requires_getmore
   # fastcount can product inaccurate counts after unclean shutdowns.
   - requires_fastcount
+  # "Cowardly fail if dbStats is run with a mongod that had an unclean shutdown: ..."
+  - requires_dbstats
+  # "Cowardly fail if collStats is run with a mongod that had an unclean shutdown: ..."
+  - requires_collstats
+  # "Cowardly fail if unbounded dataSize is run with a mongod that had an unclean shutdown: ..."
+  - requires_datasize
   # Due to background tenant migrations, operations in the main test shell are not guaranteed to
   # be causally consistent with operations in a parallel shell. The reason is that
   # TenantMigrationCommitted error is only thrown when the client does a write or a atClusterTime/
@@ -225,9 +231,9 @@ executor:
         load('jstests/libs/override_methods/inject_tenant_prefix.js');
         load("jstests/libs/override_methods/enable_sessions.js");
         load("jstests/libs/override_methods/set_read_and_write_concerns.js");
+        load("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
+        load("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
         jsTest.authenticate(db.getMongo());
-        // TODO SERVER-52713: Add libraries to automatically fail commands incompatible with
-        // unclean shutdowns.
       global_vars:
         TestData: &TestData
           tenantId: "tenantMigrationTenantId"
@@ -286,9 +292,7 @@ executor:
         enableElectionHandoff: 0
         failpoint.abortTenantMigrationBeforeLeavingBlockingState:
             mode:
-              # TODO (SERVER-52713): Allow tenant migration stepdown/kill/terminate suites to commit
-              # migrations and interrupt all replica sets.
-              activationProbability: 1
+              activationProbability: .5
         failpoint.pauseTenantMigrationBeforeLeavingBlockingState:
             mode: alwaysOn
             data:
