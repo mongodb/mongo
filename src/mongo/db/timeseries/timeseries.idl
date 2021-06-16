@@ -54,12 +54,6 @@ server_parameters:
         cpp_varname: "gTimeseriesIdleBucketExpiryMemoryUsageThreshold"
         default:  104857600 # 100MB
         validator: { gte: 1 }
-    "timeseriesBucketsCollectionClusterById":
-        description: "When true, newly-created time-series buckets collections are clustered by _id"
-        set_at: [ startup ]
-        cpp_vartype: bool
-        cpp_varname: gTimeseriesBucketsCollectionClusterById
-        default: true
 
 enums:
     BucketGranularity:

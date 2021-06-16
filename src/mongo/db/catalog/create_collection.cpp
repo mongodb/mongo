@@ -225,33 +225,14 @@ Status _createTimeseries(OperationContext* opCtx,
             CollectionOptions bucketsOptions = options;
             bucketsOptions.validator = validatorObj;
 
-            // If possible, cluster time-series buckets collections by _id.
-            const bool useClusteredIdIndex = gTimeseriesBucketsCollectionClusterById;
+            // Cluster time-series buckets collections by _id.
             auto expireAfterSeconds = options.expireAfterSeconds;
-            if (useClusteredIdIndex) {
-                if (expireAfterSeconds) {
-                    uassertStatusOK(
-                        index_key_validate::validateExpireAfterSeconds(*expireAfterSeconds));
-                    bucketsOptions.expireAfterSeconds = expireAfterSeconds;
-                }
-                bucketsOptions.clusteredIndex = true;
+            if (expireAfterSeconds) {
+                uassertStatusOK(
+                    index_key_validate::validateExpireAfterSeconds(*expireAfterSeconds));
+                bucketsOptions.expireAfterSeconds = expireAfterSeconds;
             }
-
-            // Create a TTL index on 'control.min.[timeField]' if 'expireAfterSeconds' is provided
-            // and the collection is not clustered by _id.
-            BSONObj indexSpec;
-            std::string indexName;
-            if (expireAfterSeconds && !bucketsOptions.clusteredIndex) {
-                const std::string controlMinTimeField = str::stream()
-                    << "control.min." << options.timeseries->getTimeField();
-                indexName = controlMinTimeField + "_1";
-                indexSpec =
-                    BSON(IndexDescriptor::kIndexVersionFieldName
-                         << IndexDescriptor::kLatestIndexVersion
-                         << IndexDescriptor::kKeyPatternFieldName << BSON(controlMinTimeField << 1)
-                         << IndexDescriptor::kIndexNameFieldName << indexName
-                         << IndexDescriptor::kExpireAfterSecondsFieldName << *expireAfterSeconds);
-            }
+            bucketsOptions.clusteredIndex = true;
 
             if (auto coll =
                     CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, bucketsNs)) {
@@ -260,39 +241,14 @@ Status _createTimeseries(OperationContext* opCtx,
                 existingBucketCollectionIsCompatible =
                     coll->getCollectionOptions().matchesStorageOptions(
                         bucketsOptions, CollatorFactoryInterface::get(opCtx->getServiceContext()));
-                if (expireAfterSeconds && !bucketsOptions.clusteredIndex) {
-                    auto indexDescriptor =
-                        coll->getIndexCatalog()->findIndexByName(opCtx, indexName, true);
-                    existingBucketCollectionIsCompatible &=
-                        indexDescriptor && indexDescriptor->infoObj().woCompare(indexSpec) == 0;
-                }
-
                 return Status(ErrorCodes::NamespaceExists,
                               str::stream() << "Bucket Collection already exists. NS: " << bucketsNs
                                             << ". UUID: " << coll->uuid());
             }
 
             // Create the buckets collection that will back the view.
-            const bool createIdIndex = !useClusteredIdIndex;
+            const bool createIdIndex = false;
             uassertStatusOK(db->userCreateNS(opCtx, bucketsNs, bucketsOptions, createIdIndex));
-
-            // Create a TTL index if 'expireAfterSeconds' is provided and the collection is not
-            // clustered by _id.
-            if (expireAfterSeconds && !useClusteredIdIndex) {
-                CollectionWriter collectionWriter(opCtx, bucketsNs);
-                auto indexBuildCoord = IndexBuildsCoordinator::get(opCtx);
-                auto fromMigrate = false;
-                try {
-                    uassertStatusOK(index_key_validate::validateIndexSpecTTL(indexSpec));
-                    indexBuildCoord->createIndexesOnEmptyCollection(
-                        opCtx, collectionWriter, {indexSpec}, fromMigrate);
-                } catch (DBException& ex) {
-                    ex.addContext(str::stream()
-                                  << "failed to create TTL index on bucket collection: "
-                                  << bucketsNs << "; index spec: " << indexSpec);
-                    return ex.toStatus();
-                }
-            }
             wuow.commit();
             return Status::OK();
         });
