@@ -111,7 +111,7 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
-        return DepsTracker::State::SEE_NEXT;  
+        return DepsTracker::State::SEE_NEXT;
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
