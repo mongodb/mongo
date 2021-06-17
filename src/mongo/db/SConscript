@@ -249,6 +249,19 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="server_feature_flags",
+    source=[
+        'server_feature_flags.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/feature_flag',
+    ],
+)
+
 # This library exists because some libraries, such as our networking library, need access to server
 # options, but not to the helpers to set them from the command line.  libserver_options_core.a just
 # has the structure for storing the server options, while libserver_options.a has the code to set
