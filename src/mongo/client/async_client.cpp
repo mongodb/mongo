@@ -50,12 +50,14 @@
 #include "mongo/rpc/legacy_request_builder.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
+MONGO_FAIL_POINT_DEFINE(pauseBeforeMarkKeepOpen);
 
 Future<AsyncDBClient::Handle> AsyncDBClient::connect(
     const HostAndPort& peer,
@@ -127,8 +129,15 @@ void AsyncDBClient::_parseIsMasterResponse(BSONObj request,
     // Tag outgoing connection so it can be kept open on FCV upgrade if it is not to a
     // server with a lower binary version.
     if (protocolSet.version.maxWireVersion >= wireSpec->outgoing.maxWireVersion) {
+        pauseBeforeMarkKeepOpen.pauseWhileSet();
         egressTagManager.mutateTags(
             _peer, [](transport::Session::TagMask tags) { return transport::Session::kKeepOpen; });
+    } else {
+        // The outgoing connection is to a server with a lower binary version, unset the pending
+        // flag if it's set to ensure that connections will be dropped.
+        egressTagManager.mutateTags(_peer, [](transport::Session::TagMask tags) {
+            return tags & ~transport::Session::kPending;
+        });
     }
 
     auto clientProtocols = rpc::computeProtocolSet(wireSpec->outgoing);
