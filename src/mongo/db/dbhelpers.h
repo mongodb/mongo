@@ -66,6 +66,15 @@ struct Helpers {
                         bool requireIndex = false);
 
     /**
+     * If `invariantOnError` is true, an error (e.g: no document found) will crash the
+     * process. Otherwise the empty BSONObj will be returned.
+     */
+    static BSONObj findOneForTesting(OperationContext* opCtx,
+                                     const CollectionPtr& collection,
+                                     const BSONObj& query,
+                                     const bool invariantOnError = true);
+
+    /**
      * Similar to the 'findOne()' overload above, except returns the RecordId of the first matching
      * document, or a null RecordId if no such document exists.
      */

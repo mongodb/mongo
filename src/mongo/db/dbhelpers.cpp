@@ -71,6 +71,21 @@ bool Helpers::findOne(OperationContext* opCtx,
     return true;
 }
 
+BSONObj Helpers::findOneForTesting(OperationContext* opCtx,
+                                   const CollectionPtr& collection,
+                                   const BSONObj& query,
+                                   const bool invariantOnError) {
+    BSONObj ret;
+    const bool requiresIndex = true;
+    bool found = findOne(opCtx, collection, query, ret, requiresIndex);
+    if (invariantOnError) {
+        invariant(found);
+    }
+
+    return ret.getOwned();
+}
+
+
 /* fetch a single object from collection ns that matches query
    set your db SavedContext first
 */

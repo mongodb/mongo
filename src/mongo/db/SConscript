@@ -2429,6 +2429,7 @@ if wiredtiger:
             'range_arithmetic',
             'read_write_concern_defaults_mock',
             'record_id_helpers',
+            'repl/image_collection_entry',
             'repl/mock_repl_coord_server_fixture',
             'repl/oplog_interface_local',
             'repl/repl_coordinator_interface',
