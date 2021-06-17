@@ -939,8 +939,7 @@ __curhs_insert(WT_CURSOR *cursor)
 
     /* Insert doesn't maintain a position across calls, clear resources. */
 err:
-    __wt_free(session, hs_tombstone);
-    __wt_free(session, hs_upd);
+    __wt_free_update_list(session, &hs_upd);
     WT_TRET(cursor->reset(cursor));
     API_END_RET(session, ret);
 }
