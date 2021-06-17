@@ -46,47 +46,57 @@ class transaction_context {
         delete transaction_config;
     }
 
+    /* Begin a transaction if we are not currently in one. */
+    void
+    try_begin(WT_SESSION *session, const std::string &config)
+    {
+        if (!_in_txn)
+            begin(session, config);
+    }
+
+    void
+    begin(WT_SESSION *session, const std::string &config)
+    {
+        testutil_assert(!_in_txn);
+        testutil_check(
+          session->begin_transaction(session, config.empty() ? nullptr : config.c_str()));
+        /* This randomizes the number of operations to be executed in one transaction. */
+        _target_op_count =
+          random_generator::instance().generate_integer<int64_t>(_min_op_count, _max_op_count);
+        op_count = 0;
+        _in_txn = true;
+    }
+
     bool
     active() const
     {
         return (_in_txn);
     }
 
-    /* Begin a transaction. */
+    /* Attempt to commit the transaction given the requirements are met. */
     void
-    begin(WT_SESSION *session, const std::string &config)
+    try_commit(WT_SESSION *session, const std::string &config)
     {
-        if (!_in_txn) {
-            testutil_check(
-              session->begin_transaction(session, config.empty() ? nullptr : config.c_str()));
-            /* This randomizes the number of operations to be executed in one transaction. */
-            _target_op_count =
-              random_generator::instance().generate_integer<int64_t>(_min_op_count, _max_op_count);
-            op_count = 0;
-            _in_txn = true;
-        } else
-            testutil_die(EINVAL, "Begin called on a currently running transaction.");
-    }
-
-    /*
-     * The current transaction can be committed if: A transaction has started and the number of
-     * operations executed in the current transaction has exceeded the threshold.
-     */
-    bool
-    can_commit() const
-    {
-        return (_in_txn && op_count >= _target_op_count);
+        if (can_commit_rollback())
+            commit(session, config);
     }
 
     void
     commit(WT_SESSION *session, const std::string &config)
     {
-        /* A transaction cannot be committed if not started. */
         testutil_assert(_in_txn);
         testutil_check(
           session->commit_transaction(session, config.empty() ? nullptr : config.c_str()));
         op_count = 0;
         _in_txn = false;
+    }
+
+    /* Attempt to rollback the transaction given the requirements are met. */
+    void
+    try_rollback(WT_SESSION *session, const std::string &config)
+    {
+        if (can_commit_rollback())
+            rollback(session, config);
     }
 
     void
@@ -116,6 +126,12 @@ class transaction_context {
     int64_t op_count = 0;
 
     private:
+    bool
+    can_commit_rollback()
+    {
+        return (_in_txn && op_count >= _target_op_count);
+    }
+
     /*
      * _min_op_count and _max_op_count are the minimum and maximum number of operations within one
      * transaction. is the current maximum number of operations that can be executed in the current
@@ -150,14 +166,14 @@ class thread_context {
     thread_context(uint64_t id, thread_type type, configuration *config,
       timestamp_manager *timestamp_manager, workload_tracking *tracking, database &db)
         : id(id), type(type), database(db), timestamp_manager(timestamp_manager),
-          tracking(tracking), transaction(transaction_context(config))
+          tracking(tracking), transaction(transaction_context(config)),
+          /* These won't exist for read threads which is why we use optional here. */
+          key_size(config->get_optional_int(KEY_SIZE, 1)),
+          value_size(config->get_optional_int(VALUE_SIZE, 1)),
+          thread_count(config->get_int(THREAD_COUNT))
     {
         session = connection_manager::instance().create_session();
         _throttle = throttle(config);
-
-        /* These won't exist for read threads which is why we use optional here. */
-        key_size = config->get_optional_int(KEY_SIZE, 1);
-        value_size = config->get_optional_int(VALUE_SIZE, 1);
 
         testutil_assert(key_size > 0 && value_size > 0);
     }
@@ -185,8 +201,9 @@ class thread_context {
     test_harness::timestamp_manager *timestamp_manager;
     test_harness::workload_tracking *tracking;
     test_harness::database &database;
-    int64_t key_size = 0;
-    int64_t value_size = 0;
+    const int64_t key_size;
+    const int64_t value_size;
+    const int64_t thread_count;
     const uint64_t id;
     const thread_type type;
 

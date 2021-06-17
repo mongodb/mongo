@@ -133,6 +133,12 @@ class workload_generator : public component {
              * into the thread context it is not saved, so we are safe to do this.
              */
             delete it.config;
+
+            /*
+             * Reset the thread_id counter to 0 as we're only interested in knowing per operation
+             * type which thread we are.
+             */
+            thread_id = 0;
         }
     }
 

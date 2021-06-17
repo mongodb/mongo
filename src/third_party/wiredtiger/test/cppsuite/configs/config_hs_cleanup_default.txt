@@ -1,4 +1,59 @@
 # Configuration for hs_cleanup.
 # need to be defined.
-duration_seconds=5,
-cache_size_mb=250
+duration_seconds=240,
+cache_size_mb=400,
+statistics_config=
+(
+    type=all,
+    enable_logging=true
+),
+checkpoint_manager=
+(
+    enabled=true,
+    op_rate=20s
+),
+runtime_monitor=
+(
+    stat_cache_size=
+    (
+        enabled=true,
+        limit=100
+    )
+),
+timestamp_manager=
+(
+    enabled=true,
+    oldest_lag=5,
+    op_rate=1s,
+    stable_lag=5
+),
+workload_generator=
+(
+    populate_config=
+    (
+        collection_count=10,
+        key_count_per_collection=5000,
+        key_size=100,
+        thread_count=10,
+        value_size=10000
+    ),
+    read_config=
+    (
+        op_rate=5ms,
+        ops_per_transaction=(max=5000,min=1000),
+        thread_count=10
+    ),
+    update_config=
+    (
+        key_size=100,
+        op_rate=10ms,
+        ops_per_transaction=(max=100,min=20),
+        thread_count=10,
+        value_size=10000
+    )
+),
+# Tracking is currently disabled as verification can't handle rollbacks.
+workload_tracking=
+(
+    enabled=false
+)

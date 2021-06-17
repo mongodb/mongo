@@ -110,7 +110,7 @@ run_test(const std::string &test_name, const std::string &config)
 {
     int error_code = 0;
 
-    test_harness::debug_print("Configuration\t:" + config, DEBUG_INFO);
+    test_harness::debug_print("Configuration\t:" + config, DEBUG_TRACE);
 
     if (test_name == "poc_test")
         poc_test(config, test_name).run();
@@ -190,7 +190,7 @@ main(int argc, char *argv[])
 
     if (error_code == 0) {
         test_harness::debug_print(
-          "Trace level\t:" + std::to_string(test_harness::_trace_level), DEBUG_INFO);
+          "Trace level: " + std::to_string(test_harness::_trace_level), DEBUG_INFO);
         if (test_name.empty()) {
             /* Run all tests. */
             test_harness::debug_print("Running all tests.", DEBUG_INFO);

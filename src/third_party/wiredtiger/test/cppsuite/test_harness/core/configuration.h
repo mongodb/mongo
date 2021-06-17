@@ -50,7 +50,7 @@ class configuration {
         std::string default_config = std::string(config_entry->base);
         /* Merge in the default configuration. */
         _config = merge_default_config(default_config, config);
-        debug_print("Running with enriched config: " + _config, DEBUG_INFO);
+        debug_print("Full config: " + _config, DEBUG_INFO);
 
         int ret = wiredtiger_test_config_validate(
           nullptr, nullptr, test_config_name.c_str(), _config.c_str());

@@ -144,12 +144,20 @@ class database_operation {
 
         while (tc->running()) {
             /* Walk each cursor. */
+            tc->transaction.try_begin(tc->session, "");
+
             for (const auto &it : cursors) {
                 if (it->next(it) != 0)
                     it->reset(it);
+                tc->transaction.op_count++;
             }
+
+            tc->transaction.try_rollback(tc->session, "");
             tc->sleep();
         }
+        /* Make sure the last operation is committed now the work is finished. */
+        if (tc->transaction.active())
+            tc->transaction.rollback(tc->session, "");
     }
 
     /*
@@ -218,9 +226,8 @@ class database_operation {
                   collection_id, collection_cursors{collection_name, random_cursor, update_cursor});
             }
 
-            /* Start a transaction. */
-            if (!tc->transaction.active())
-                tc->transaction.begin(tc->session, "");
+            /* Start a transaction if possible. */
+            tc->transaction.try_begin(tc->session, "");
 
             /* Get the random cursor associated with the collection. */
             auto collection = collections[collection_id];
@@ -275,8 +282,7 @@ class database_operation {
                 tc->transaction.rollback(tc->session, "");
 
             /* Commit the current transaction if we're able to. */
-            if (tc->transaction.can_commit())
-                tc->transaction.commit(tc->session, "");
+            tc->transaction.try_commit(tc->session, "");
         }
 
         /* Make sure the last operation is committed now the work is finished. */
@@ -284,7 +290,7 @@ class database_operation {
             tc->transaction.commit(tc->session, "");
     }
 
-    private:
+    protected:
     /* WiredTiger APIs wrappers for single operations. */
     template <typename K, typename V>
     static int
