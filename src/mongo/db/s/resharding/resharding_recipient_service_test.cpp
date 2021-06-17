@@ -441,6 +441,12 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
 }
 
 TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
     auto metrics = ReshardingRecipientServiceTest::metrics();
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5551107,
