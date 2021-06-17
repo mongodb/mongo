@@ -31,11 +31,23 @@ const startSession = {
 };
 const failPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
 
-function refreshSessionsAndVerifyCount(mongosConfig, shardConfig, expectedCount) {
+/*
+ * Refresh logical session cache on mongos and shard and check that each one of the session IDs in
+ * the 'expectedSessionIDs' array exist. If 'expectToExist' is false, checks that they don't exist.
+ */
+function refreshSessionsAndVerifyExistence(
+    mongosConfig, shardConfig, expectedSessionIDs, expectToExist = true) {
     mongosConfig.runCommand(refresh);
     shardConfig.runCommand(refresh);
 
-    assert.eq(mongosConfig.system.sessions.count(), expectedCount);
+    const sessionIDs = mongosConfig.system.sessions.find().toArray().map(s => s._id.id);
+
+    // Assert that 'expectedSessionIDs' is a subset of 'sessionIDs'
+    assert(expectedSessionIDs.every(expectedId => {
+        return sessionIDs.some(s => {
+            return bsonBinaryEqual(s, expectedId);
+        }) == expectToExist;
+    }));
 }
 
 function verifyOpenCursorCount(db, expectedCount) {
@@ -59,15 +71,17 @@ let mongosConfig = mongos.getDB("config");
 let shardConfig = shardingTest.rs0.getPrimary().getDB("config");
 
 // 1. Verify that sessions expire from config.system.sessions after the timeout has passed.
+let sessionIDs = [];
 for (let i = 0; i < 5; i++) {
     let res = db.runCommand(startSession);
     assert.commandWorked(res, "unable to start session");
+    sessionIDs.push(res.id.id);
 }
-refreshSessionsAndVerifyCount(mongosConfig, shardConfig, 5);
+refreshSessionsAndVerifyExistence(mongosConfig, shardConfig, sessionIDs);
 
 // Manually delete entries in config.system.sessions to simulate TTL expiration.
 assert.commandWorked(mongosConfig.system.sessions.remove({}));
-refreshSessionsAndVerifyCount(mongosConfig, shardConfig, 0);
+refreshSessionsAndVerifyExistence(mongosConfig, shardConfig, sessionIDs, false /* expectToExist */);
 
 // 2. Verify that getMores after finds will update the 'lastUse' field on documents in the
 // config.system.sessions collection.
@@ -76,15 +90,17 @@ for (let i = 0; i < 10; i++) {
 }
 
 let cursors = [];
+sessionIDs = [];
 for (let i = 0; i < 5; i++) {
     let session = mongos.startSession({});
     assert.commandWorked(session.getDatabase("admin").runCommand({usersInfo: 1}),
                          "initialize the session");
     cursors.push(session.getDatabase(dbName)[testCollName].find({b: 1}).batchSize(1));
     assert(cursors[i].hasNext());
+    sessionIDs.push(session.getSessionId().id);
 }
 
-refreshSessionsAndVerifyCount(mongosConfig, shardConfig, 5);
+refreshSessionsAndVerifyExistence(mongosConfig, shardConfig, sessionIDs);
 verifyOpenCursorCount(mongosConfig, 5);
 
 let sessionsCollectionArray;
@@ -94,7 +110,7 @@ for (let i = 0; i < 3; i++) {
         cursors[j].next();
     }
 
-    refreshSessionsAndVerifyCount(mongosConfig, shardConfig, 5);
+    refreshSessionsAndVerifyExistence(mongosConfig, shardConfig, sessionIDs);
     verifyOpenCursorCount(mongosConfig, 5);
 
     sessionsCollectionArray = getSessions(mongosConfig);
@@ -115,7 +131,7 @@ for (let i = 0; i < 3; i++) {
 // cursors.
 assert.commandWorked(mongosConfig.system.sessions.remove({}));
 
-refreshSessionsAndVerifyCount(mongosConfig, shardConfig, 0);
+refreshSessionsAndVerifyExistence(mongosConfig, shardConfig, sessionIDs, false /* expectToExist */);
 verifyOpenCursorCount(mongosConfig, 0);
 
 for (let i = 0; i < cursors.length; i++) {
@@ -128,6 +144,7 @@ for (let i = 0; i < cursors.length; i++) {
 // 4. Verify that an expired session (simulated by manual deletion) that has a currently
 // running operation will be vivified during the logical session cache refresh.
 let pinnedCursorSession = mongos.startSession();
+let pinnedCursorSessionID = pinnedCursorSession.getSessionId().id;
 let pinnedCursorDB = pinnedCursorSession.getDatabase(dbName);
 
 withPinnedCursor({
@@ -138,7 +155,7 @@ withPinnedCursor({
         assert.commandWorked(mongosConfig.system.sessions.remove({}));
         verifyOpenCursorCount(mongosConfig, 1);
 
-        refreshSessionsAndVerifyCount(mongosConfig, shardConfig, 1);
+        refreshSessionsAndVerifyExistence(mongosConfig, shardConfig, [pinnedCursorSessionID]);
 
         let db = coll.getDB();
         assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [cursorId]}));

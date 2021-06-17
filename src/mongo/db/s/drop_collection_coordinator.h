@@ -100,6 +100,9 @@ private:
 
     void _enterPhase(Phase newPhase);
 
+    void _performNoopRetryableWriteOnParticipants(
+        OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor);
+
     DropCollectionCoordinatorDocument _doc;
 };
 

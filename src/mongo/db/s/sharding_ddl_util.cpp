@@ -47,6 +47,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/remove_tags_gen.h"
 #include "mongo/s/request_types/set_allow_migrations_gen.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 
@@ -83,19 +84,8 @@ void updateTags(OperationContext* opCtx,
     uassertStatusOK(response.toStatus());
 }
 
-void deleteChunks(OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) {
+void deleteChunks(OperationContext* opCtx, const UUID& collectionUUID) {
     // Remove config.chunks entries
-    const auto chunksQuery = [&]() {
-        auto optUUID = nssOrUUID.uuid();
-        if (optUUID) {
-            return BSON(ChunkType::collectionUUID << *optUUID);
-        }
-
-        auto optNss = nssOrUUID.nss();
-        invariant(optNss);
-        return BSON(ChunkType::ns(optNss->ns()));
-    }();
-
     // TODO SERVER-57221 don't use hint if not relevant anymore for delete performances
     auto hint = BSON(ChunkType::collectionUUID() << 1 << ChunkType::min() << 1);
 
@@ -103,7 +93,7 @@ void deleteChunks(OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUI
         write_ops::DeleteCommandRequest deleteOp(ChunkType::ConfigNS);
         deleteOp.setDeletes({[&] {
             write_ops::DeleteOpEntry entry;
-            entry.setQ(chunksQuery);
+            entry.setQ(BSON(ChunkType::collectionUUID << collectionUUID));
             entry.setHint(hint);
             entry.setMulti(true);
             return entry;
@@ -120,15 +110,16 @@ void deleteChunks(OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUI
     uassertStatusOK(response.toStatus());
 }
 
-void deleteCollection(OperationContext* opCtx, const NamespaceString& nss) {
+void deleteCollection(OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
-    // Remove config.collection entry
-    uassertStatusOK(
-        catalogClient->removeConfigDocuments(opCtx,
-                                             CollectionType::ConfigNS,
-                                             BSON(CollectionType::kNssFieldName << nss.ns()),
-                                             ShardingCatalogClient::kMajorityWriteConcern));
+    // Remove config.collection entry. Query by 'ns' AND 'uuid' so that the remove can be resolved
+    // with an IXSCAN (thanks to the index on '_id') and is idempotent (thanks to the 'uuid')
+    uassertStatusOK(catalogClient->removeConfigDocuments(
+        opCtx,
+        CollectionType::ConfigNS,
+        BSON(CollectionType::kNssFieldName << nss.ns() << CollectionType::kUuidFieldName << uuid),
+        ShardingCatalogClient::kMajorityWriteConcern));
 }
 
 }  // namespace
@@ -168,7 +159,29 @@ void sendAuthenticatedCommandToShards(OperationContext* opCtx,
     sharding_util::sendCommandToShards(opCtx, dbName, authenticatedCommand, shardIds, executor);
 }
 
-void removeTagsMetadataFromConfig(OperationContext* opCtx, const NamespaceString& nss) {
+void removeTagsMetadataFromConfig(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const OperationSessionInfo& osi) {
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    // Remove config.tags entries
+    ConfigsvrRemoveTags configsvrRemoveTagsCmd(nss);
+    configsvrRemoveTagsCmd.setDbName(NamespaceString::kAdminDb);
+
+    const auto swRemoveTagsResult = configShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        NamespaceString::kAdminDb.toString(),
+        CommandHelpers::appendMajorityWriteConcern(configsvrRemoveTagsCmd.toBSON(osi.toBSON())),
+        Shard::RetryPolicy::kIdempotent);
+
+    uassertStatusOKWithContext(
+        Shard::CommandResponse::getEffectiveStatus(std::move(swRemoveTagsResult)),
+        str::stream() << "Error removing tags for collection " << nss.toString());
+}
+
+void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
+                                                const NamespaceString& nss) {
     // Remove config.tags entries
     const auto query = BSON(TagsType::ns(nss.ns()));
     const auto hint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
@@ -194,25 +207,21 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx, const NamespaceString
     uassertStatusOK(response.toStatus());
 }
 
-void removeCollMetadataFromConfig(OperationContext* opCtx, const CollectionType& coll) {
+void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx, const CollectionType& coll) {
     IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
     const auto& nss = coll.getNss();
+    const auto& uuid = coll.getUuid();
 
     ON_BLOCK_EXIT(
         [&] { Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss); });
 
-    const NamespaceStringOrUUID nssOrUUID = coll.getTimestamp()
-        ? NamespaceStringOrUUID(nss.db().toString(), coll.getUuid())
-        : NamespaceStringOrUUID(nss);
+    deleteCollection(opCtx, nss, uuid);
 
-    deleteCollection(opCtx, nss);
-
-    deleteChunks(opCtx, nssOrUUID);
-
-    removeTagsMetadataFromConfig(opCtx, nss);
+    deleteChunks(opCtx, uuid);
 }
 
-bool removeCollMetadataFromConfig(OperationContext* opCtx, const NamespaceString& nss) {
+bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx,
+                                                         const NamespaceString& nss) {
     IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
@@ -221,11 +230,10 @@ bool removeCollMetadataFromConfig(OperationContext* opCtx, const NamespaceString
 
     try {
         auto coll = catalogClient->getCollection(opCtx, nss);
-        removeCollMetadataFromConfig(opCtx, coll);
+        removeCollAndChunksMetadataFromConfig(opCtx, coll);
         return true;
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The collection is not sharded or doesn't exist, just tags need to be removed
-        removeTagsMetadataFromConfig(opCtx, nss);
+        // The collection is not sharded or doesn't exist
         return false;
     }
 }
@@ -237,6 +245,7 @@ void shardedRenameMetadata(OperationContext* opCtx,
 
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto fromNss = fromCollType.getNss();
+    auto fromUUID = fromCollType.getUuid();
 
     // Delete eventual TO chunk/collection entries referring a dropped collection
     try {
@@ -248,13 +257,16 @@ void shardedRenameMetadata(OperationContext* opCtx,
         }
 
         // Delete TO chunk/collection entries referring a dropped collection
-        removeCollMetadataFromConfig(opCtx, toNss);
+        removeCollAndChunksMetadataFromConfig_notIdempotent(opCtx, toNss);
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // The TO collection is not sharded or doesn't exist
     }
 
+    // Delete TO tags, even if the TO collection is not sharded or doesn't exist
+    removeTagsMetadataFromConfig_notIdempotent(opCtx, toNss);
+
     // Delete FROM collection entry
-    deleteCollection(opCtx, fromNss);
+    deleteCollection(opCtx, fromNss, fromUUID);
 
     // Update FROM tags to TO
     updateTags(opCtx, fromNss, toNss);
@@ -360,9 +372,12 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
     return response;
 }
 
-void stopMigrations(OperationContext* opCtx, const NamespaceString& nss) {
-    const ConfigsvrSetAllowMigrations configsvrSetAllowMigrationsCmd(nss,
-                                                                     false /* allowMigrations */);
+void stopMigrations(OperationContext* opCtx,
+                    const NamespaceString& nss,
+                    const boost::optional<UUID>& expectedCollectionUUID) {
+    ConfigsvrSetAllowMigrations configsvrSetAllowMigrationsCmd(nss, false /* allowMigrations */);
+    configsvrSetAllowMigrationsCmd.setCollectionUUID(expectedCollectionUUID);
+
     const auto swSetAllowMigrationsResult =
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
             opCtx,
@@ -384,5 +399,30 @@ boost::optional<UUID> getCollectionUUID(OperationContext* opCtx, const Namespace
     AutoGetCollection autoColl(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsForbidden);
     return autoColl ? boost::make_optional(autoColl->uuid()) : boost::none;
 }
+
+void performNoopRetryableWriteOnShards(OperationContext* opCtx,
+                                       const std::vector<ShardId>& shardIds,
+                                       const OperationSessionInfo& osi,
+                                       const std::shared_ptr<executor::TaskExecutor>& executor) {
+    write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace);
+    auto queryFilter = BSON("_id"
+                            << "shardingDDLCoordinatorRecoveryDoc");
+    auto updateModification =
+        write_ops::UpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$inc" << BSON("noopWriteCount" << 1))));
+
+    write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
+    updateEntry.setMulti(false);
+    updateEntry.setUpsert(true);
+    updateOp.setUpdates({updateEntry});
+
+    sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx,
+        updateOp.getDbName(),
+        CommandHelpers::appendMajorityWriteConcern(updateOp.toBSON(osi.toBSON())),
+        shardIds,
+        executor);
+}
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo

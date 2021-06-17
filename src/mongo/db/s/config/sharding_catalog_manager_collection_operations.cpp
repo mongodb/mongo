@@ -486,7 +486,8 @@ void ShardingCatalogManager::renameShardedMetadata(
     } else {
         // Remove stale CSRS metadata in case the source collection is unsharded and the
         // target collection was sharded
-        sharding_ddl_util::removeCollMetadataFromConfig(opCtx, to);
+        sharding_ddl_util::removeCollAndChunksMetadataFromConfig_notIdempotent(opCtx, to);
+        sharding_ddl_util::removeTagsMetadataFromConfig_notIdempotent(opCtx, to);
         ShardingLogging::get(opCtx)->logChange(opCtx,
                                                "renameCollection.metadata",
                                                str::stream()

@@ -160,6 +160,18 @@ protected:
         return _updateStateDocument(opCtx, std::move(newDoc));
     }
 
+    template <typename StateDoc>
+    OperationSessionInfo getCurrentSession(StateDoc const& doc) const {
+        invariant(doc.getShardingDDLCoordinatorMetadata().getSession());
+        ShardingDDLSession shardingDDLSession =
+            *doc.getShardingDDLCoordinatorMetadata().getSession();
+
+        OperationSessionInfo osi;
+        osi.setSessionId(shardingDDLSession.getLsid());
+        osi.setTxnNumber(shardingDDLSession.getTxnNumber());
+        return osi;
+    }
+
 protected:
     ShardingDDLCoordinatorService* _service;
     const ShardingDDLCoordinatorId _coordId;
