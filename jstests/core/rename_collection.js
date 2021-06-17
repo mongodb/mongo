@@ -24,7 +24,26 @@ function getNewColl() {
     return coll;
 }
 
-jsTest.log("Rename collection with documents");
+jsTest.log("Rename collection with documents (create SRC and then DST)");
+{
+    const src = getNewColl();
+    const dstName = getNewCollName();
+
+    src.save({x: 1});
+    src.save({x: 2});
+    src.save({x: 3});
+
+    assert.eq(3, src.countDocuments({}));
+
+    assert.commandWorked(src.renameCollection(dstName));
+
+    assert.eq(0, src.countDocuments({}));
+    const dst = db[dstName];
+    assert.eq(3, dst.countDocuments({}));
+    dst.drop();
+}
+
+jsTest.log("Rename collection with documents (create DST and then SRC)");
 {
     const src = getNewColl();
     const dstName = getNewCollName();
@@ -73,8 +92,8 @@ jsTest.log("Rename collection with indexes");
 
 jsTest.log("Rename collection with existing target");
 {
-    const dst = getNewColl();
     const src = getNewColl();
+    const dst = getNewColl();
 
     src.save({x: 1});
     dst.save({x: 2});
