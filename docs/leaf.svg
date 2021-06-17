@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24px" height="38px" viewBox="0 0 12 19" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Hero</title>
+    <desc>MongoDB Leaf</desc>
+    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round">
+        <g transform="translate(-2, 1)" stroke="#13AA52" stroke-width="1.5">
+            <path d="M11.3359084,8.60752857 L4.76827397,15.2602568" transform="translate(8.052091, 11.933893) rotate(-45) translate(-8.052091, -11.933893) "></path>
+            <path d="M13.5541041,2.55 C13.5541041,2.55 13.1102169,17.2285636 3.34112875,12.8924674 C-0.940766072,2.99900921 13.5541041,2.55 13.5541041,2.55 Z" transform="translate(8.052052, 8.121800) rotate(-45) translate(-8.052052, -8.121800) "></path>
+        </g>
+    </g>
+</svg>
