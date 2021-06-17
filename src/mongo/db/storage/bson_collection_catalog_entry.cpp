@@ -173,6 +173,10 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) co
     {
         BSONArrayBuilder arr(b.subarrayStart("indexes"));
         for (unsigned i = 0; i < indexes.size(); i++) {
+            if (!indexes[i].isPresent()) {
+                continue;
+            }
+
             BSONObjBuilder sub(arr.subobjStart());
             sub.append("spec", indexes[i].spec);
             sub.appendBool("ready", indexes[i].ready);
@@ -234,6 +238,14 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
             if (idx["buildUUID"]) {
                 imd.buildUUID = fassert(31353, UUID::parse(idx["buildUUID"]));
             }
+
+            if (!imd.isPresent()) {
+                fassertFailedWithStatus(
+                    5738500,
+                    Status(ErrorCodes::FailedToParse,
+                           str::stream() << "invalid index in collection metadata: " << obj));
+            }
+
             indexes.push_back(imd);
         }
     }

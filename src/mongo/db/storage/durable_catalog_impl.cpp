@@ -632,7 +632,11 @@ void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
             oldIdentMap = obj["idxIdent"].Obj();
 
         for (size_t i = 0; i < md.indexes.size(); i++) {
-            const auto index = md.indexes[i];
+            const auto& index = md.indexes[i];
+            if (!index.isPresent()) {
+                continue;
+            }
+
             auto name = index.nameStringData();
 
             // All indexes with buildUUIDs must be ready:false.
