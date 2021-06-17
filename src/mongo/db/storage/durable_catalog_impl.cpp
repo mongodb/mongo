@@ -1070,7 +1070,7 @@ int DurableCatalogImpl::getTotalIndexCount(OperationContext* opCtx, RecordId cat
     if (!md)
         return 0;
 
-    return static_cast<int>(md->indexes.size());
+    return md->getTotalIndexCount();
 }
 
 bool DurableCatalogImpl::isIndexPresent(OperationContext* opCtx,

@@ -1965,7 +1965,7 @@ void CollectionImpl::forceSetIndexIsMultikey(OperationContext* opCtx,
 }
 
 int CollectionImpl::getTotalIndexCount() const {
-    return static_cast<int>(_metadata->indexes.size());
+    return _metadata->getTotalIndexCount();
 }
 
 int CollectionImpl::getCompletedIndexCount() const {
@@ -1987,8 +1987,12 @@ BSONObj CollectionImpl::getIndexSpec(StringData indexName) const {
 }
 
 void CollectionImpl::getAllIndexes(std::vector<std::string>* names) const {
-    for (unsigned i = 0; i < _metadata->indexes.size(); i++) {
-        names->push_back(_metadata->indexes[i].spec["name"].String());
+    for (const auto& index : _metadata->indexes) {
+        if (!index.isPresent()) {
+            continue;
+        }
+
+        names->push_back(index.nameStringData().toString());
     }
 }
 

@@ -69,6 +69,15 @@ public:
             multikeyPaths = other.multikeyPaths;
         }
 
+        /**
+         * An index is considered present if it has a non-empty 'spec'.
+         * Invalid indexes by this definition include default constructed instances and
+         * and structs zeroed out due to index drops.
+         */
+        bool isPresent() const {
+            return !spec.isEmpty();
+        }
+
         IndexMetaData& operator=(IndexMetaData&& rhs) {
             if (&rhs != this) {
                 spec = std::move(rhs.spec);
@@ -121,6 +130,11 @@ public:
          * hold mutexes when reading internal data.
          */
         BSONObj toBSON(bool hasExclusiveAccess = false) const;
+
+        /**
+         * Returns number of valid indexes.
+         */
+        int getTotalIndexCount() const;
 
         int findIndexOffset(StringData name) const;
 

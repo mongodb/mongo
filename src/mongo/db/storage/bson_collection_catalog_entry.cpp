@@ -139,6 +139,11 @@ void BSONCollectionCatalogEntry::IndexMetaData::updateHiddenSetting(bool hidden)
 
 // --------------------------
 
+int BSONCollectionCatalogEntry::MetaData::getTotalIndexCount() const {
+    return std::count_if(
+        indexes.cbegin(), indexes.cend(), [](const auto& index) { return index.isPresent(); });
+}
+
 int BSONCollectionCatalogEntry::MetaData::findIndexOffset(StringData name) const {
     for (unsigned i = 0; i < indexes.size(); i++)
         if (indexes[i].nameStringData() == name)
