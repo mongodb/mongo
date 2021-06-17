@@ -690,8 +690,9 @@ PlanCacheKey PlanCache::computeKey(const CanonicalQuery& cq) const {
 
     StringBuilder indexabilityKeyBuilder;
     encodeIndexability(cq.root(), _indexabilityState, &indexabilityKeyBuilder);
-    return PlanCacheKey(
-        std::move(shapeString), indexabilityKeyBuilder.str(), cq.getForceClassicEngine());
+    return PlanCacheKey(std::move(shapeString),
+                        indexabilityKeyBuilder.str(),
+                        cq.getEnableSlotBasedExecutionEngine());
 }
 
 StatusWith<std::unique_ptr<PlanCacheEntry>> PlanCache::getEntry(const CanonicalQuery& query) const {

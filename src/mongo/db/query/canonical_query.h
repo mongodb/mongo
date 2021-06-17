@@ -229,8 +229,8 @@ public:
         return _explain;
     }
 
-    bool getForceClassicEngine() const {
-        return _forceClassicEngine;
+    bool getEnableSlotBasedExecutionEngine() const {
+        return _enableSlotBasedExecutionEngine;
     }
 
     void setExplain(bool explain) {
@@ -278,8 +278,8 @@ private:
 
     bool _explain = false;
 
-    // Determines whether the classic engine must be used.
-    bool _forceClassicEngine = false;
+    // Determines whether the SBE engine is enabled.
+    bool _enableSlotBasedExecutionEngine = false;
 };
 
 }  // namespace mongo

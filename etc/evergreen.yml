@@ -9246,15 +9246,15 @@ buildvariants:
 #    distros:
 #      - rhel80-large
 
-- name: enterprise-rhel-80-64-bit-dynamic-classic-engine
-  display_name: "Shared Library Enterprise RHEL 8.0 (Classic Execution Engine)"
+- name: enterprise-rhel-80-64-bit-dynamic-sbe-engine
+  display_name: "Shared Library Enterprise RHEL 8.0 (SBE Engine)"
   batchtime: 1440 # 1 day
   stepback: false
   modules:
   - enterprise
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-dynamic-classic-engine-expansions
+  expansions: &enterprise-rhel-80-64-bit-dynamic-sbe-engine-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: rhel80
@@ -9269,7 +9269,7 @@ buildvariants:
     large_distro_name: rhel80-medium
     num_scons_link_jobs_available: 0.99
     test_flags: >-
-      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
+      --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
       --additionalFeatureFlags=featureFlagTimeseriesCollection
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
@@ -10947,8 +10947,8 @@ buildvariants:
 #  - name: server_selection_json_test_TG
 
 - <<: *ubuntu1804-debug-asan-template
-  name: ubuntu1804-debug-asan-classic-engine
-  display_name: ~ ASAN Enterprise Ubuntu 18.04 DEBUG (Classic Execution Engine)
+  name: ubuntu1804-debug-asan-sbe-engine
+  display_name: ~ ASAN Enterprise Ubuntu 18.04 DEBUG (SBE Engine)
   modules:
   - enterprise
   run_on:
@@ -10962,7 +10962,7 @@ buildvariants:
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
-      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
+      --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -11174,8 +11174,8 @@ buildvariants:
 #  - name: server_selection_json_test_TG
 
 - <<: *ubuntu1804-debug-ubsan-template
-  name: ubuntu1804-debug-ubsan-classic-engine
-  display_name: ~ UBSAN Enterprise Ubuntu 18.04 DEBUG (Classic Execution Engine)
+  name: ubuntu1804-debug-ubsan-sbe-engine
+  display_name: ~ UBSAN Enterprise Ubuntu 18.04 DEBUG (SBE Engine)
   modules:
   - enterprise
   run_on:
@@ -11189,7 +11189,7 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
-      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
+      --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
       --excludeWithAnyTags=requires_ocsp_stapling
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise

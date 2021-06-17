@@ -51,11 +51,11 @@ class PlanCacheKey {
 public:
     PlanCacheKey(CanonicalQuery::QueryShapeString shapeString,
                  std::string indexabilityString,
-                 bool forceClassicQueryEngine) {
+                 bool enableSlotBasedExecution) {
         _lengthOfStablePart = shapeString.size();
         _key = std::move(shapeString);
         _key += indexabilityString;
-        _key += forceClassicQueryEngine ? "t" : "f";
+        _key += enableSlotBasedExecution ? "t" : "f";
     }
 
     CanonicalQuery::QueryShapeString getStableKey() const {
@@ -100,10 +100,10 @@ public:
 
 private:
     // Key is broken into three parts:
-    // <stable key> | <indexability discriminators> | <forceClassicQueryEngine boolean>
-    // This third part can be removed once the classic query engine reaches EOL.
-    // Combined, the three parts make up the plan cache key. We store them in one std::string so
-    // that we can easily/cheaply extract the stable key.
+    // <stable key> | <indexability discriminators> | <enableSlotBasedExecution boolean>
+    // This third part can be removed once the classic query engine reaches EOL and SBE is used
+    // exclusively for all query execution. Combined, the three parts make up the plan cache key.
+    // We store them in one std::string so that we can easily/cheaply extract the stable key.
     std::string _key;
 
     // How long the "stable key" is.
