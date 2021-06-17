@@ -55,6 +55,7 @@
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/member_data.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -213,7 +214,7 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
     // If we are only allowed to sync from the primary, use it as the sync source if possible.
     if (readPreference == ReadPreference::PrimaryOnly ||
         (chainingPreference == ChainingPreference::kUseConfiguration &&
-         !_rsConfig.isChainingAllowed())) {
+         !_rsConfig.isChainingAllowed() && !enableOverrideClusterChainingSetting.load())) {
         if (readPreference == ReadPreference::SecondaryOnly) {
             LOGV2_FATAL(
                 3873102,
@@ -2951,10 +2952,11 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
     bool sourceIsPrimary =
         replMetadata.getIsPrimary().value_or(oqMetadata.getPrimaryIndex() == currentSourceIndex);
 
-    // Change sync source if chaining is disabled, we are not syncing from the primary, and we know
-    // who the new primary is. We do not consider chaining disabled if we are the primary, since
-    // we are in catchup mode.
-    auto chainingDisabled = !_rsConfig.isChainingAllowed() && _currentPrimaryIndex != _selfIndex;
+    // Change sync source if chaining is disabled (without overrides), we are not syncing from the
+    // primary, and we know who the new primary is. We do not consider chaining disabled if we are
+    // the primary, since we are in catchup mode.
+    auto chainingDisabled = !_rsConfig.isChainingAllowed() &&
+        !enableOverrideClusterChainingSetting.load() && _currentPrimaryIndex != _selfIndex;
     auto foundNewPrimary = _currentPrimaryIndex != -1 && _currentPrimaryIndex != currentSourceIndex;
     if (!sourceIsPrimary && chainingDisabled && foundNewPrimary) {
         auto newPrimary = _rsConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort();

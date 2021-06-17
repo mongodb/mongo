@@ -159,6 +159,8 @@ all:
     test_file: jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
   - ticket: SERVER-52906
     test_file: jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
+  - ticket: SERVER-37904
+    test_file: jstests/replsets/cluster_chaining_override.js
 
 suites:
 
