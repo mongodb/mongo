@@ -338,11 +338,16 @@ class VersionInfo:
             # yaml-cpp has this problem where Black Duck sourced the wrong version information
             self.ver_str = self.ver_str.replace("-", ".")
 
+            # If we trimmed the string to nothing, treat it as a beta version
+            if self.ver_str == '':
+                self.production_version = False
+                return
+
             # Versions are generally a multi-part integer tuple
             self.ver_array = [int(part) for part in self.ver_str.split(".")]
 
         except:
-            LOGGER.error("Failed to parse version '%s', exception", ver_str)
+            LOGGER.error("Failed to parse version '%s' as '%s', exception", ver_str, self.ver_str)
             raise
 
     def __repr__(self):
