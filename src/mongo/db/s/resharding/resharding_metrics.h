@@ -83,6 +83,11 @@ public:
     // Allows updating metrics on "documents to copy".
     void onDocumentsCopiedForCurrentOp(int64_t documents, int64_t bytes) noexcept;
 
+    // Allows updating metrics on "opcounters";
+    void gotInsert() noexcept;
+    void gotUpdate() noexcept;
+    void gotDelete() noexcept;
+
     void setMinRemainingOperationTime(Milliseconds minOpTime) noexcept;
     void setMaxRemainingOperationTime(Milliseconds maxOpTime) noexcept;
 

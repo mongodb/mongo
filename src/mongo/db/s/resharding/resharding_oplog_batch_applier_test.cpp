@@ -47,6 +47,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
@@ -103,12 +104,15 @@ public:
                     opCtx.get(), nss, CollectionOptions{});
             }
 
+            _metrics = std::make_unique<ReshardingMetrics>(serviceContext);
+
             _crudApplication = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},
                 0U,
                 _myDonorId,
-                makeChunkManagerForSourceCollection());
+                makeChunkManagerForSourceCollection(),
+                _metrics.get());
 
             _sessionApplication = std::make_unique<ReshardingOplogSessionApplication>();
 
@@ -325,6 +329,8 @@ private:
     const NamespaceString _myStashNss = getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
     const NamespaceString _otherStashNss =
         getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
+
+    std::unique_ptr<ReshardingMetrics> _metrics;
 
     std::unique_ptr<ReshardingOplogApplicationRules> _crudApplication;
     std::unique_ptr<ReshardingOplogSessionApplication> _sessionApplication;

@@ -65,7 +65,8 @@ ReshardingOplogApplier::ReshardingOplogApplier(
                        std::move(allStashNss),
                        myStashIdx,
                        _sourceId.getShardId(),
-                       std::move(sourceChunkMgr)},
+                       std::move(sourceChunkMgr),
+                       _env->metrics()},
       _sessionApplication{},
       _batchApplier{_crudApplication, _sessionApplication},
       _oplogIter(std::move(oplogIterator)) {}
