@@ -55,6 +55,13 @@ void OpCounters::_checkWrap(CacheAligned<AtomicWord<long long>> OpCounters::*cou
         _delete.store(0);
         _getmore.store(0);
         _command.store(0);
+
+        _insertDeprecated.store(0);
+        _queryDeprecated.store(0);
+        _updateDeprecated.store(0);
+        _deleteDeprecated.store(0);
+        _getmoreDeprecated.store(0);
+        _killcursorsDeprecated.store(0);
     }
 }
 
