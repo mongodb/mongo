@@ -342,8 +342,6 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMand
     Status status, const CancellationToken& stepdownToken) {
     if (stepdownToken.isCanceled()) {
         // Interrupt occured, ensure the metrics get shut down.
-        // TODO SERVER-56500: Don't use ReshardingOperationStatusEnum::kCanceled here if it
-        // is not meant for failover cases.
         _metrics()->onStepDown(ReshardingMetrics::Role::kRecipient);
     }
 
