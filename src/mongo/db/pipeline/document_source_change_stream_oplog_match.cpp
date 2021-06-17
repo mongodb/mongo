@@ -212,7 +212,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceChangeStreamOplogMatch::creat
 const char* DocumentSourceChangeStreamOplogMatch::getSourceName() const {
     // This is used in error reporting, particularly if we find this stage in a position other
     // than first, so report the name as $changeStream.
-    return DocumentSourceChangeStream::kStageName.rawData();
+    return kStageName.rawData();
 }
 
 StageConstraints DocumentSourceChangeStreamOplogMatch::constraints(

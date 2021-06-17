@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
@@ -490,6 +491,23 @@ TEST_F(DocumentSourceMatchTest, MultipleMatchStagesShouldCombineIntoOne) {
     ASSERT_BSONOBJ_EQ(match1->getQuery(),
                       fromjson("{'$and': [{'$and': [{a:1}, {b:1}]},"
                                "{c:1}]}"));
+}
+
+TEST_F(DocumentSourceMatchTest, DoesNotPushProjectBeforeSelf) {
+    Pipeline::SourceContainer container;
+    auto match = DocumentSourceMatch::create(BSON("_id" << 1), getExpCtx());
+    auto project =
+        DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"_sd);
+
+    container.push_back(match);
+    container.push_back(project);
+
+    match->optimizeAt(container.begin(), &container);
+
+    ASSERT_EQUALS(2U, container.size());
+    ASSERT(dynamic_cast<DocumentSourceMatch*>(container.begin()->get()));
+    ASSERT(dynamic_cast<DocumentSourceSingleDocumentTransformation*>(
+        std::next(container.begin())->get()));
 }
 
 TEST_F(DocumentSourceMatchTest, ShouldPropagatePauses) {

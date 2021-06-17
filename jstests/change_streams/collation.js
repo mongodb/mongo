@@ -240,9 +240,9 @@ assertDropCollection(db, collName);
 
 // Test that a $changeStream is allowed to resume on the dropped collection with an explicit
 // collation, even if it doesn't match the original collection's default collation.
-changeStream =
-    caseInsensitiveCollection.watch([{$match: {"fullDocument.text": "ABC"}}],
-                                    {resumeAfter: resumeToken, collation: {locale: "simple"}});
+changeStream = caseInsensitiveCollection.watch(
+    [{$match: {$or: [{"_id": resumeToken}, {"fullDocument.text": "ABC"}]}}],
+    {resumeAfter: resumeToken, collation: {locale: "simple"}});
 
 assert.soon(() => changeStream.hasNext());
 assert.docEq(changeStream.next().documentKey, {_id: "dropped_coll"});
@@ -304,9 +304,9 @@ if (!isChangeStreamPassthrough()) {
 
 // Test that a pipeline with an explicit collation is allowed to resume from before the
 // collection is dropped and recreated.
-changeStream =
-    caseInsensitiveCollection.watch([{$match: {"fullDocument.text": "ABC"}}],
-                                    {resumeAfter: resumeToken, collation: {locale: "fr"}});
+changeStream = caseInsensitiveCollection.watch(
+    [{$match: {$or: [{"_id": resumeToken}, {"fullDocument.text": "ABC"}]}}],
+    {resumeAfter: resumeToken, collation: {locale: "fr"}});
 
 assert.soon(() => changeStream.hasNext());
 assert.docEq(changeStream.next().documentKey, {_id: "dropped_coll"});

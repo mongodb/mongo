@@ -328,6 +328,10 @@ struct StageConstraints {
     //   documents because our implementation of $sample shuffles the order
     bool canSwapWithSkippingOrLimitingStage = false;
 
+    // If true, then any stage of kind 'DocumentSourceSingleDocumentTransformation' can be swapped
+    // ahead of this stage.
+    bool canSwapWithSingleDocTransform = false;
+
     // Indicates that a stage is allowed within a pipeline-stlye update.
     bool isAllowedWithinUpdatePipeline = false;
 

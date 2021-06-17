@@ -64,8 +64,8 @@ public:
         return boost::none;
     }
 
-    const char* getSourceName() const {
-        return DocumentSourceChangeStream::kStageName.rawData();
+    const char* getSourceName() const final {
+        return kStageName.rawData();
     }
 
 protected:

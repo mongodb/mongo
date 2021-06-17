@@ -56,20 +56,19 @@ public:
     static boost::intrusive_ptr<DocumentSourceChangeStreamHandleTopologyChange> create(
         const boost::intrusive_ptr<ExpressionContext>&);
 
+    const char* getSourceName() const final {
+        return kStageName.rawData();
+    }
+
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
         return (explain ? Value(Document{{kStageName, Value()}}) : Value());
     }
 
-    virtual StageConstraints constraints(Pipeline::SplitState) const {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                HostTypeRequirement::kMongoS,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kNotAllowed,
-                LookupRequirement::kNotAllowed,
-                UnionRequirement::kNotAllowed,
-                ChangeStreamRequirement::kChangeStreamStage};
+    StageConstraints constraints(Pipeline::SplitState) const final;
+
+    GetModPathsReturn getModifiedPaths() const final {
+        // This stage neither modifies nor renames any field.
+        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {

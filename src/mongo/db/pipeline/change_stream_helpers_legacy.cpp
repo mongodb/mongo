@@ -138,7 +138,7 @@ Value DocumentSourceChangeStreamTransform::serializeLegacy(
         _changeStreamSpec.getResumeAfter() || _changeStreamSpec.getStartAtOperationTime() ||
             _changeStreamSpec.getStartAfter());
 
-    return Value(Document{{getSourceName(), _changeStreamSpec.toBSON()}});
+    return Value(Document{{DocumentSourceChangeStream::kStageName, _changeStreamSpec.toBSON()}});
 }
 
 Value DocumentSourceChangeStreamCheckInvalidate::serializeLegacy(

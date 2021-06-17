@@ -55,8 +55,11 @@ bool isShardConfigEvent(const Document& eventDoc) {
     // with 4.2, even though we no longer rely on them to detect new shards. We swallow the event
     // here. We may wish to remove this mechanism entirely in 4.7+, or retain it for future cases
     // where a change stream is targeted to a subset of shards. See SERVER-44039 for details.
-    if (eventDoc[DocumentSourceChangeStream::kOperationTypeField].getStringData() ==
-        DocumentSourceChangeStream::kNewShardDetectedOpType) {
+
+    auto opType = eventDoc[DocumentSourceChangeStream::kOperationTypeField];
+
+    if (!opType.missing() &&
+        opType.getStringData() == DocumentSourceChangeStream::kNewShardDetectedOpType) {
         // If the failpoint is enabled, throw the 'ChangeStreamToplogyChange' exception to the
         // client. This is used in testing to confirm that the swallowed 'kNewShardDetected' event
         // has reached the mongoS.
@@ -86,6 +89,29 @@ DocumentSourceChangeStreamHandleTopologyChange::create(
 DocumentSourceChangeStreamHandleTopologyChange::DocumentSourceChangeStreamHandleTopologyChange(
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : DocumentSource(kStageName, expCtx) {}
+
+StageConstraints DocumentSourceChangeStreamHandleTopologyChange::constraints(
+    Pipeline::SplitState) const {
+    StageConstraints constraints{StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 HostTypeRequirement::kMongoS,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kNotAllowed,
+                                 TransactionRequirement::kNotAllowed,
+                                 LookupRequirement::kNotAllowed,
+                                 UnionRequirement::kNotAllowed,
+                                 ChangeStreamRequirement::kChangeStreamStage};
+
+    // Can be swapped with the '$match' and 'DocumentSourceSingleDocumentTransformation' stages and
+    // ensures that they get pushed down to the shards, as this stage bisects the change streams
+    // pipeline.
+    if (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
+        constraints.canSwapWithMatch = true;
+        constraints.canSwapWithSingleDocTransform = true;
+    }
+
+    return constraints;
+}
 
 DocumentSource::GetNextResult DocumentSourceChangeStreamHandleTopologyChange::doGetNext() {
     // For the first call to the 'doGetNext', the '_mergeCursors' will be null and must be

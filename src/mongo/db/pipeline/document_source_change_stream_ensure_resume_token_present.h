@@ -39,22 +39,15 @@ namespace mongo {
 class DocumentSourceChangeStreamEnsureResumeTokenPresent final
     : public DocumentSourceChangeStreamCheckResumability {
 public:
-    static constexpr StringData kStageName = "$_internalEnsureResumeTokenPresent"_sd;
+    static constexpr StringData kStageName = "$_internalChangeStreamEnsureResumeTokenPresent"_sd;
 
     const char* getSourceName() const final;
 
-    StageConstraints constraints(Pipeline::SplitState) const final {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                // If this is parsed on mongos it should stay on mongos. If we're not in a sharded
-                // cluster then it's okay to run on mongod.
-                HostTypeRequirement::kLocalOnly,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kNotAllowed,
-                LookupRequirement::kNotAllowed,
-                UnionRequirement::kNotAllowed,
-                ChangeStreamRequirement::kChangeStreamStage};
+    StageConstraints constraints(Pipeline::SplitState) const final;
+
+    GetModPathsReturn getModifiedPaths() const final {
+        // This stage neither modifies nor renames any field.
+        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
     }
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent> create(

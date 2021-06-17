@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/unittest/temp_dir.h"
@@ -161,6 +162,23 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
     ASSERT(sort()->distributedPlanLogic()->shardsStage != nullptr);
     ASSERT(sort()->distributedPlanLogic()->mergingStage != nullptr);
     ASSERT(dynamic_cast<DocumentSourceLimit*>(sort()->distributedPlanLogic()->mergingStage.get()));
+}
+
+TEST_F(DocumentSourceSortTest, DoesNotPushProjectBeforeSelf) {
+    Pipeline::SourceContainer container;
+    createSort(BSON("_id" << 1));
+    auto project =
+        DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"_sd);
+
+    container.push_back(sort());
+    container.push_back(project);
+
+    sort()->optimizeAt(container.begin(), &container);
+
+    ASSERT_EQUALS(2U, container.size());
+    ASSERT(dynamic_cast<DocumentSourceSort*>(container.begin()->get()));
+    ASSERT(dynamic_cast<DocumentSourceSingleDocumentTransformation*>(
+        std::next(container.begin())->get()));
 }
 
 TEST_F(DocumentSourceSortTest, Dependencies) {

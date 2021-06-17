@@ -80,11 +80,12 @@ assert.throwsWithCode(function() {
 // don't trip the validation checks for the existence of the pre-image.
 for (let runOnDB of [testDB, adminDB]) {
     // Open a whole-db or whole-cluster stream that filters for the 'collWithPreImages' namespace.
-    const csCursor = runOnDB.watch([{$match: {"ns.coll": collWithPreImages.getName()}}], {
-        fullDocumentBeforeChange: "required",
-        resumeAfter: resumeToken,
-        allChangesForCluster: (runOnDB === adminDB)
-    });
+    const csCursor = runOnDB.watch(
+        [{$match: {$or: [{_id: resumeToken}, {"ns.coll": collWithPreImages.getName()}]}}], {
+            fullDocumentBeforeChange: "required",
+            resumeAfter: resumeToken,
+            allChangesForCluster: (runOnDB === adminDB)
+        });
 
     // The list of events and pre-images that we expect to see in the stream.
     const expectedPreImageEvents = [

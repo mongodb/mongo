@@ -31,6 +31,8 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 
+#include "mongo/db/query/query_feature_flags_gen.h"
+
 namespace mongo {
 
 DocumentSourceChangeStreamEnsureResumeTokenPresent::
@@ -51,6 +53,34 @@ DocumentSourceChangeStreamEnsureResumeTokenPresent::create(
 
 const char* DocumentSourceChangeStreamEnsureResumeTokenPresent::getSourceName() const {
     return kStageName.rawData();
+}
+
+
+StageConstraints DocumentSourceChangeStreamEnsureResumeTokenPresent::constraints(
+    Pipeline::SplitState) const {
+    StageConstraints constraints{StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 // If this is parsed on mongos it should stay on mongos. If we're
+                                 // not in a sharded cluster then it's okay to run on mongod.
+                                 HostTypeRequirement::kLocalOnly,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kNotAllowed,
+                                 TransactionRequirement::kNotAllowed,
+                                 LookupRequirement::kNotAllowed,
+                                 UnionRequirement::kNotAllowed,
+                                 ChangeStreamRequirement::kChangeStreamStage};
+
+    // The '$match' and 'DocumentSourceSingleDocumentTransformation' stages can swap with this
+    // stage, allowing filtering and reshaping to occur earlier in the pipeline. For sharded cluster
+    // pipelines, swaps can allow $match and 'DocumentSourceSingleDocumentTransformation' stages to
+    // execute on the shards, providing inter-node parallelism and potentially reducing the amount
+    // of data sent form each shard to the mongoS.
+    if (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
+        constraints.canSwapWithMatch = true;
+        constraints.canSwapWithSingleDocTransform = true;
+    }
+
+    return constraints;
 }
 
 DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent::doGetNext() {

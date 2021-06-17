@@ -390,7 +390,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
 Value DocumentSourceChangeStreamTransform::serializeLatest(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {
-        return Value(Document{{getSourceName(),
+        return Value(Document{{DocumentSourceChangeStream::kStageName,
                                Document{{"stage"_sd, "internalTransform"_sd},
                                         {"options"_sd, _changeStreamSpec.toBSON()}}}});
     }

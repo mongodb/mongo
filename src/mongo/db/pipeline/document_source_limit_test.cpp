@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/unittest/unittest.h"
 
@@ -88,6 +89,23 @@ TEST_F(DocumentSourceLimitTest, TwoLimitStagesShouldCombineIntoOne) {
     firstLimit->optimizeAt(container.begin(), &container);
     ASSERT_EQUALS(5, firstLimit->getLimit());
     ASSERT_EQUALS(1U, container.size());
+}
+
+TEST_F(DocumentSourceLimitTest, DoesNotPushProjectBeforeSelf) {
+    Pipeline::SourceContainer container;
+    auto limit = DocumentSourceLimit::create(getExpCtx(), 10);
+    auto project =
+        DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"_sd);
+
+    container.push_back(limit);
+    container.push_back(project);
+
+    limit->optimizeAt(container.begin(), &container);
+
+    ASSERT_EQUALS(2U, container.size());
+    ASSERT(dynamic_cast<DocumentSourceLimit*>(container.begin()->get()));
+    ASSERT(dynamic_cast<DocumentSourceSingleDocumentTransformation*>(
+        std::next(container.begin())->get()));
 }
 
 TEST_F(DocumentSourceLimitTest, DisposeShouldCascadeAllTheWayToSource) {

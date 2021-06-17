@@ -131,8 +131,9 @@ if (!isMongos) {
     }
 
     // Only watch the "update" changes of the specific doc since the beginning.
-    changeStreamCursor = coll.watch([{$match: {documentKey: {_id: 1}, operationType: "update"}}],
-                                    {resumeAfter: resumeToken, batchSize: 2});
+    changeStreamCursor = coll.watch(
+        [{$match: {$or: [{_id: resumeToken}, {documentKey: {_id: 1}, operationType: "update"}]}}],
+        {resumeAfter: resumeToken, batchSize: 2});
 
     // Check the first batch.
     assert.eq(changeStreamCursor.objsLeftInBatch(), 2);

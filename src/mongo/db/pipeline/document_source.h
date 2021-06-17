@@ -442,6 +442,31 @@ private:
     bool pushSampleBefore(Pipeline::SourceContainer::iterator itr,
                           Pipeline::SourceContainer* container);
 
+    /**
+     * Attempts to push any kind of 'DocumentSourceSingleDocumentTransformation' stage directly
+     * ahead of the stage present at the 'itr' position if matches the constraints. Returns true if
+     * optimization was performed, false otherwise.
+     *
+     * Note that this optimization is oblivious to the transform function. The only stages that are
+     * eligible to swap are those that can safely swap with any transform.
+     */
+    bool pushSingleDocumentTransformBefore(Pipeline::SourceContainer::iterator itr,
+                                           Pipeline::SourceContainer* container);
+
+    /**
+     * Wraps various optimization methods and returns the call immediately if any one of them
+     * returns true.
+     */
+    bool attemptToPushStageBefore(Pipeline::SourceContainer::iterator itr,
+                                  Pipeline::SourceContainer* container) {
+        if (std::next(itr) == container->end()) {
+            return false;
+        }
+
+        return pushMatchBefore(itr, container) || pushSampleBefore(itr, container) ||
+            pushSingleDocumentTransformBefore(itr, container);
+    }
+
 public:
     /**
      * The non-virtual public interface for optimization. Attempts to do some generic optimizations

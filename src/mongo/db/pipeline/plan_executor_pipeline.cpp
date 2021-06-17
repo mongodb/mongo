@@ -176,11 +176,6 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
 }
 
 void PlanExecutorPipeline::_validateChangeStreamsResumeToken(const Document& event) const {
-    // If we are producing output to be merged on mongoS, then no stages can have modified the _id.
-    if (_expCtx->needsMerge) {
-        return;
-    }
-
     // Confirm that the document _id field matches the original resume token in the sort key field.
     auto eventBSON = event.toBson();
     auto resumeToken = event.metadata().getSortKey();

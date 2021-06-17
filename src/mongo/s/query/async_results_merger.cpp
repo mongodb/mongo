@@ -489,6 +489,11 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
 
 Status AsyncResultsMerger::scheduleGetMores() {
     stdx::lock_guard<Latch> lk(_mutex);
+
+    if (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
+        _assertNotInvalidated(lk);
+    }
+
     return _scheduleGetMores(lk);
 }
 

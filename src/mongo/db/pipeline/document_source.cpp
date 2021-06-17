@@ -34,9 +34,12 @@
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -239,13 +242,25 @@ bool DocumentSource::pushSampleBefore(Pipeline::SourceContainer::iterator itr,
     return false;
 }
 
+bool DocumentSource::pushSingleDocumentTransformBefore(Pipeline::SourceContainer::iterator itr,
+                                                       Pipeline::SourceContainer* container) {
+    auto singleDocTransform =
+        dynamic_cast<DocumentSourceSingleDocumentTransformation*>((*std::next(itr)).get());
+
+    if (constraints().canSwapWithSingleDocTransform && singleDocTransform) {
+        container->insert(itr, std::move(singleDocTransform));
+        container->erase(std::next(itr));
+        return true;
+    }
+    return false;
+}
+
 Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
-    // Attempt to swap 'itr' with a subsequent $match or subsequent $sample.
-    if (std::next(itr) != container->end() &&
-        (pushMatchBefore(itr, container) || pushSampleBefore(itr, container))) {
+    // Attempt to swap 'itr' with a subsequent stage, if applicable.
+    if (attemptToPushStageBefore(itr, container)) {
         // The stage before the pushed before stage may be able to optimize further, if there is
         // such a stage.
         return std::prev(itr) == container->begin() ? std::prev(itr) : std::prev(std::prev(itr));
