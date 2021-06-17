@@ -83,6 +83,11 @@ public:
     // Allows updating metrics on "documents to copy".
     void onDocumentsCopiedForCurrentOp(int64_t documents, int64_t bytes) noexcept;
 
+    // Allows updating metrics on "opcounters";
+    void gotInsert() noexcept;
+    void gotUpdate() noexcept;
+    void gotDelete() noexcept;
+
     // Starts/ends the timers recording the times spend in the named sections.
     void startCopyingDocuments(Date_t start);
     void endCopyingDocuments(Date_t end);

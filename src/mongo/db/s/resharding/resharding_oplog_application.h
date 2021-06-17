@@ -48,6 +48,7 @@ class Collection;
 class CollectionPtr;
 class NamespaceString;
 class OperationContext;
+class ReshardingMetrics;
 
 /**
  * Applies an operation from an oplog entry using special rules that apply to resharding.
@@ -58,7 +59,8 @@ public:
                                     std::vector<NamespaceString> allStashNss,
                                     size_t myStashIdx,
                                     ShardId donorShardId,
-                                    ChunkManager sourceChunkMgr);
+                                    ChunkManager sourceChunkMgr,
+                                    ReshardingMetrics* metrics);
 
     /**
      * Wraps the op application in a writeConflictRetry loop and is responsible for creating and
@@ -112,6 +114,8 @@ private:
 
     // The chunk manager for the source namespace and original shard key.
     const ChunkManager _sourceChunkMgr;
+
+    ReshardingMetrics* _metrics;
 };
 
 }  // namespace mongo

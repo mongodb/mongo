@@ -256,6 +256,12 @@ public:
         return kStashCollections;
     }
 
+    BSONObj getMetricsOpCounters() {
+        BSONObjBuilder bob;
+        _metrics->serializeCumulativeOpMetrics(&bob);
+        return bob.obj().getObjectField("opcounters").getOwned();
+    }
+
     long long metricsAppliedCount() const {
         BSONObjBuilder bob;
         _metrics->serializeCurrentOpMetrics(&bob, ReshardingMetrics::Role::kRecipient);
@@ -814,6 +820,11 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
     auto future = applier.run(executor, executor, cancelToken, factory);
     ASSERT_OK(future.getNoThrow());
+
+    auto opCountersObj = getMetricsOpCounters();
+    ASSERT_EQ(opCountersObj.getIntField("insert"), 2);
+    ASSERT_EQ(opCountersObj.getIntField("update"), 1);
+    ASSERT_EQ(opCountersObj.getIntField("delete"), 2);
 
     // The in-memory metrics should show the 5 ops above + the final oplog entry, but on disk should
     // not include the final entry in its count.

@@ -45,6 +45,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/stats/counters.h"
@@ -109,13 +110,15 @@ ReshardingOplogApplicationRules::ReshardingOplogApplicationRules(
     std::vector<NamespaceString> allStashNss,
     size_t myStashIdx,
     ShardId donorShardId,
-    ChunkManager sourceChunkMgr)
+    ChunkManager sourceChunkMgr,
+    ReshardingMetrics* metrics)
     : _outputNss(std::move(outputNss)),
       _allStashNss(std::move(allStashNss)),
       _myStashIdx(myStashIdx),
       _myStashNss(_allStashNss.at(_myStashIdx)),
       _donorShardId(std::move(donorShardId)),
-      _sourceChunkMgr(std::move(sourceChunkMgr)) {}
+      _sourceChunkMgr(std::move(sourceChunkMgr)),
+      _metrics(metrics) {}
 
 Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
                                                        const repl::OplogEntry& op) const {
@@ -215,9 +218,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
      * 4. If there exists a document with _id == [op _id] in the output collection and it is NOT
      * owned by this donor shard, insert the contents of 'op' into the conflict stash collection.
      */
-    // Writes are replicated, so use global op counters.
-    OpCounters* opCounters = &globalOpCounters;
-    opCounters->gotInsert();
+    _metrics->gotInsert();
 
     BSONObj oField = op.getObject();
 
@@ -306,9 +307,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
      * 4. If there exists a document with _id == [op _id] in the output collection and it is owned
      * by this donor shard, update the document from this collection.
      */
-    // Writes are replicated, so use global op counters.
-    OpCounters* opCounters = &globalOpCounters;
-    opCounters->gotUpdate();
+    _metrics->gotUpdate();
 
     BSONObj oField = op.getObject();
     BSONObj o2Field;
@@ -393,9 +392,7 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
      * _id == [op _id] arbitrarily from among all resharding conflict stash collections to delete
      * from that resharding conflict stash collection and insert into the output collection.
      */
-    // Writes are replicated, so use global op counters.
-    OpCounters* opCounters = &globalOpCounters;
-    opCounters->gotDelete();
+    _metrics->gotDelete();
 
     BSONObj oField = op.getObject();
 
