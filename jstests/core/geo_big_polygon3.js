@@ -1,6 +1,7 @@
 // @tags: [
 //   does_not_support_stepdowns,
 //   requires_fastcount,
+//   requires_multi_updates,
 //   requires_non_retryable_writes,
 // ]
 
