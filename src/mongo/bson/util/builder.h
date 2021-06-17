@@ -387,15 +387,15 @@ public:
         str.copyTo(grow(len), includeEndingNull);
     }
 
-    /** @return length of current std::string */
+    /** Returns the length of data in the current buffer */
     int len() const {
         return l;
     }
     void setlen(int newLen) {
         l = newLen;
     }
-    /** @return size of the buffer */
-    int getSize() const {
+    /** Returns the capacity of the buffer */
+    int capacity() const {
         return _buf.capacity();
     }
 
