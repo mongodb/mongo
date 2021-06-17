@@ -287,11 +287,27 @@ void ReshardingMetrics::onStepUp(Role role) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
     _emplaceCurrentOpForRole(role, boost::none);
 
-    // TODO SERVER-53913 Implement donor metrics rehydration.
     // TODO SERVER-53914 Implement coordinator metrics rehydration.
 
     // TODO SERVER-57094 Resume the runningOperation duration from a timestamp stored on disk
     // instead of starting from the current time.
+}
+
+void ReshardingMetrics::onStepUp(DonorStateEnum state, ReshardingDonorMetrics donorMetrics) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    auto operationRuntime = donorMetrics.getOperationRuntime();
+    _emplaceCurrentOpForRole(
+        Role::kDonor, operationRuntime.has_value() ? operationRuntime->getStart() : boost::none);
+    _currentOp->donorState = state;
+
+    if (auto criticalSectionTimeInterval = donorMetrics.getCriticalSection();
+        criticalSectionTimeInterval.has_value() &&
+        criticalSectionTimeInterval->getStart().has_value()) {
+        _currentOp->inCriticalSection.start(criticalSectionTimeInterval->getStart().get());
+
+        if (auto stopTime = criticalSectionTimeInterval->getStop(); stopTime.has_value())
+            _currentOp->inCriticalSection.forceEnd(stopTime.get());
+    }
 }
 
 void ReshardingMetrics::onStepDown(Role role) noexcept {

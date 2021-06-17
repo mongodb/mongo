@@ -197,6 +197,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
       _metadata{donorDoc.getCommonReshardingMetadata()},
       _recipientShardIds{donorDoc.getRecipientShards()},
       _donorCtx{donorDoc.getMutableState()},
+      _donorMetricsToRestore{donorDoc.getMetrics()},
       _externalState{std::move(externalState)},
       _markKilledExecutor(std::make_shared<ThreadPool>([] {
           ThreadPool::Options options;
@@ -984,8 +985,9 @@ ReshardingMetrics* ReshardingDonorService::DonorStateMachine::_metrics() const {
 }
 
 void ReshardingDonorService::DonorStateMachine::_startMetrics() {
-    if (_donorCtx.getState() > DonorStateEnum::kPreparingToDonate) {
-        _metrics()->onStepUp(ReshardingMetrics::Role::kDonor);
+    auto donorState = _donorCtx.getState();
+    if (donorState > DonorStateEnum::kPreparingToDonate) {
+        _metrics()->onStepUp(donorState, _donorMetricsToRestore);
     } else {
         _metrics()->onStart(ReshardingMetrics::Role::kDonor, getCurrentTime());
     }

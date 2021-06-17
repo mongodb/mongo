@@ -47,12 +47,14 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -719,6 +721,71 @@ TEST_F(ReshardingDonorServiceTest, TruncatesXLErrorOnDonorDocument) {
         donor->abort(false);
         ASSERT_OK(donor->getCompletionFuture().getNoThrow());
     }
+}
+
+TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
+    auto kDoneState = DonorStateEnum::kDone;
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), kDoneState};
+    auto opCtx = makeOperationContext();
+    auto doc = makeStateDocument(false);
+
+    auto makeDonorCtx = [&]() {
+        DonorShardContext donorCtx;
+        donorCtx.setState(DonorStateEnum::kBlockingWrites);
+        donorCtx.setMinFetchTimestamp(Timestamp(Date_t::now()));
+        donorCtx.setBytesToClone(1);
+        donorCtx.setDocumentsToClone(1);
+        return donorCtx;
+    };
+    doc.setMutableState(makeDonorCtx());
+
+    auto makeMetricsTimeInterval = [&](const Date_t startTime) {
+        ReshardingMetricsTimeInterval timeInterval;
+        timeInterval.setStart(startTime);
+        return timeInterval;
+    };
+
+    auto timeNow = Date_t::now();
+    auto opTimeDurationSecs = 60;
+    auto critSecDurationSecs = 10;
+
+    ReshardingDonorMetrics reshardingDonorMetrics;
+    reshardingDonorMetrics.setOperationRuntime(
+        makeMetricsTimeInterval(timeNow - Seconds(opTimeDurationSecs)));
+    reshardingDonorMetrics.setCriticalSection(
+        makeMetricsTimeInterval(timeNow - Seconds(critSecDurationSecs)));
+    doc.setMetrics(reshardingDonorMetrics);
+
+    createSourceCollection(opCtx.get(), doc);
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+
+    // This acquires the critical section required by resharding donor machine when it is in
+    // kBlockingWrites.
+    RecoverableCriticalSectionService::get(opCtx.get())
+        ->acquireRecoverableCriticalSectionBlockWrites(opCtx.get(),
+                                                       doc.getSourceNss(),
+                                                       BSON("command"
+                                                            << "resharding_donor"
+                                                            << "collection"
+                                                            << doc.getSourceNss().toString()),
+                                                       ShardingCatalogClient::kLocalWriteConcern);
+
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+    notifyReshardingCommitting(opCtx.get(), *donor, doc);
+    stateTransitionsGuard.wait(kDoneState);
+
+    auto currOp =
+        donor
+            ->reportForCurrentOp(MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
+                                 MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle)
+            .get();
+    ASSERT_EQ(currOp.getStringField("donorState"),
+              DonorState_serializer(DonorStateEnum::kBlockingWrites));
+    ASSERT_GTE(currOp.getField("totalOperationTimeElapsedSecs").Long(), opTimeDurationSecs);
+    ASSERT_GTE(currOp.getField("totalCriticalSectionTimeElapsedSecs").Long(), critSecDurationSecs);
+
+    stateTransitionsGuard.unset(kDoneState);
+    ASSERT_OK(donor->getCompletionFuture().getNoThrow());
 }
 
 }  // namespace

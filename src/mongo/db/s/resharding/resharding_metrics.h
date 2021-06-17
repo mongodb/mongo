@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/resharding/common_types_gen.h"
@@ -66,6 +67,8 @@ public:
 
     // Marks the resumption of a resharding operation for a particular role.
     void onStepUp(Role role) noexcept;
+
+    void onStepUp(DonorStateEnum state, ReshardingDonorMetrics donorMetrics);
 
     // So long as a resharding operation is in progress, the following may be used to update the
     // state of a donor, a recipient, and a coordinator, respectively.
