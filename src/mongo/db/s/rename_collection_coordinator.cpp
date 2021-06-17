@@ -219,11 +219,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                                 // Block migrations on involved sharded collections
                                 if (_doc.getOptShardedCollInfo()) {
-                                    sharding_ddl_util::stopMigrations(opCtx, fromNss);
+                                    sharding_ddl_util::stopMigrations(opCtx, fromNss, boost::none);
                                 }
 
                                 if (_doc.getTargetIsSharded()) {
-                                    sharding_ddl_util::stopMigrations(opCtx, toNss);
+                                    sharding_ddl_util::stopMigrations(opCtx, toNss, boost::none);
                                 }
                             }))
         .then(_executePhase(Phase::kBlockCrudAndRename,

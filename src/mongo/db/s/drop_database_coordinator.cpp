@@ -48,7 +48,8 @@ namespace {
 void dropShardedCollection(OperationContext* opCtx,
                            const CollectionType& coll,
                            std::shared_ptr<executor::ScopedTaskExecutor> executor) {
-    sharding_ddl_util::removeCollMetadataFromConfig(opCtx, coll);
+    sharding_ddl_util::removeCollAndChunksMetadataFromConfig(opCtx, coll);
+    sharding_ddl_util::removeTagsMetadataFromConfig_notIdempotent(opCtx, coll.getNss());
 
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
     const ShardsvrDropCollectionParticipant dropCollectionParticipant(coll.getNss());
@@ -166,7 +167,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     const auto& nss = coll.getNss();
                     LOGV2_DEBUG(5494505, 2, "Dropping collection", "namespace"_attr = nss);
 
-                    sharding_ddl_util::stopMigrations(opCtx, nss);
+                    sharding_ddl_util::stopMigrations(opCtx, nss, boost::none);
 
                     auto newStateDoc = _doc;
                     newStateDoc.setCollInfo(coll);
