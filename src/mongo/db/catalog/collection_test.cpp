@@ -37,10 +37,12 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/collection_validation.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 
 #define ASSERT_ID_EQ(EXPR, ID)                        \
     [](boost::optional<Record> record, RecordId id) { \
@@ -55,6 +57,7 @@ using namespace mongo;
 class CollectionTest : public CatalogTestFixture {
 protected:
     void makeCapped(NamespaceString nss, long long cappedSize = 8192);
+    void makeCollectionForMultikey(NamespaceString nss, StringData indexName);
 };
 
 void CollectionTest::makeCapped(NamespaceString nss, long long cappedSize) {
@@ -212,6 +215,123 @@ TEST_F(CollectionTest, AsynchronouslyNotifyCappedWaitersIfNeeded) {
     ASSERT_GTE(after - before, Milliseconds(25));
     thread.join();
     ASSERT_EQ(notifier->getVersion(), thisVersion);
+}
+
+void CollectionTest::makeCollectionForMultikey(NamespaceString nss, StringData indexName) {
+    auto opCtx = operationContext();
+    {
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        auto db = autoColl.ensureDbExists();
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT(db->createCollection(opCtx, nss));
+        wuow.commit();
+    }
+
+    {
+        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        WriteUnitOfWork wuow(opCtx);
+        auto collWriter = autoColl.getWritableCollection();
+        ASSERT_OK(collWriter->getIndexCatalog()->createIndexOnEmptyCollection(
+            opCtx, collWriter, BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1))));
+        wuow.commit();
+    }
+}
+
+TEST_F(CollectionTest, SetIndexIsMultikey) {
+    NamespaceString nss("test.t");
+    auto indexName = "myindex"_sd;
+    makeCollectionForMultikey(nss, indexName);
+
+    auto opCtx = operationContext();
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    const auto& coll = autoColl.getCollection();
+    ASSERT(coll);
+    MultikeyPaths paths = {{0}};
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT(coll->setIndexIsMultikey(opCtx, indexName, paths));
+        wuow.commit();
+    }
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_FALSE(coll->setIndexIsMultikey(opCtx, indexName, paths));
+        wuow.commit();
+    }
+}
+
+TEST_F(CollectionTest, SetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
+    NamespaceString nss("test.t");
+    auto indexName = "myindex"_sd;
+    makeCollectionForMultikey(nss, indexName);
+
+    auto opCtx = operationContext();
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    const auto& coll = autoColl.getCollection();
+    ASSERT(coll);
+    MultikeyPaths paths = {{0}};
+
+    {
+        FailPointEnableBlock failPoint("EFTAlwaysThrowWCEOnWrite");
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_THROWS(coll->setIndexIsMultikey(opCtx, indexName, paths), WriteConflictException);
+    }
+
+    // After rolling back the above WUOW, we should succeed in retrying setIndexIsMultikey().
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_FALSE(coll->setIndexIsMultikey(opCtx, indexName, paths));
+        wuow.commit();
+    }
+}
+
+TEST_F(CollectionTest, ForceSetIndexIsMultikey) {
+    NamespaceString nss("test.t");
+    auto indexName = "myindex"_sd;
+    makeCollectionForMultikey(nss, indexName);
+
+    auto opCtx = operationContext();
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    const auto& coll = autoColl.getCollection();
+    ASSERT(coll);
+    MultikeyPaths paths = {{0}};
+    {
+        WriteUnitOfWork wuow(opCtx);
+        auto desc = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+        coll->forceSetIndexIsMultikey(opCtx, desc, true, paths);
+        wuow.commit();
+    }
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_FALSE(coll->setIndexIsMultikey(opCtx, indexName, paths));
+        wuow.commit();
+    }
+}
+
+TEST_F(CollectionTest, ForceSetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
+    NamespaceString nss("test.t");
+    auto indexName = "myindex"_sd;
+    makeCollectionForMultikey(nss, indexName);
+
+    auto opCtx = operationContext();
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    const auto& coll = autoColl.getCollection();
+    ASSERT(coll);
+    MultikeyPaths paths = {{0}};
+
+    {
+        FailPointEnableBlock failPoint("EFTAlwaysThrowWCEOnWrite");
+        WriteUnitOfWork wuow(opCtx);
+        auto desc = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+        ASSERT_THROWS(coll->forceSetIndexIsMultikey(opCtx, desc, true, paths),
+                      WriteConflictException);
+    }
+
+    // After rolling back the above WUOW, we should succeed in retrying setIndexIsMultikey().
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_FALSE(coll->setIndexIsMultikey(opCtx, indexName, paths));
+        wuow.commit();
+    }
 }
 
 TEST_F(CatalogTestFixture, CollectionPtrNoYieldTag) {
