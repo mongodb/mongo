@@ -28,6 +28,8 @@
 
 # This file defines the format of documents stored in config.localReshardingOperations.donor on the
 # donor shard for a resharding operation.
+# When a new top level field is added to the donor document, add the same field as a member of
+# resharding_donor_service.
 
 global:
     cpp_namespace: "mongo"

@@ -39,7 +39,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/collation/collation_spec.h"
