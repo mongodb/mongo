@@ -4883,9 +4883,9 @@ const ReadPreference ReplicationCoordinatorImpl::_getSyncSourceReadPreference(Wi
         }
     }
     if (!parsedSyncSourceFromInitialSync && !memberState.primary() &&
-        !_rsConfig.isChainingAllowed()) {
-        // If we are not the primary and chaining is disabled in the config, we should only be
-        // syncing from the primary.
+        !_rsConfig.isChainingAllowed() && !enableOverrideClusterChainingSetting.load()) {
+        // If we are not the primary and chaining is disabled in the config (without overrides), we
+        // should only be syncing from the primary.
         readPreference = ReadPreference::PrimaryOnly;
     }
     return readPreference;
