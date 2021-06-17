@@ -93,44 +93,29 @@ public:
         ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
     }
 
-    void resetOplogAndTransactions(OperationContext* opCtx) const {
-        ::mongo::writeConflictRetry(
-            opCtx, "deleteAll", NamespaceString::kRsOplogNamespace.ns(), [&] {
-                opCtx->recoveryUnit()->setTimestampReadSource(
-                    RecoveryUnit::ReadSource::kNoTimestamp);
-                opCtx->recoveryUnit()->abandonSnapshot();
+    void reset(OperationContext* opCtx, NamespaceString nss) const {
+        writeConflictRetry(opCtx, "deleteAll", nss.ns(), [&] {
+            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+            opCtx->recoveryUnit()->abandonSnapshot();
 
-                WriteUnitOfWork wunit(opCtx);
-                {
-                    AutoGetCollection collRaii(
-                        opCtx, NamespaceString::kRsOplogNamespace, LockMode::MODE_X);
+            WriteUnitOfWork wunit(opCtx);
+            {
+                AutoGetCollection collRaii(opCtx, nss, LockMode::MODE_X);
+                if (collRaii) {
                     invariant(collRaii.getWritableCollection()->truncate(opCtx).isOK());
+                } else {
+                    auto db = collRaii.ensureDbExists();
+                    invariant(db->createCollection(opCtx, nss));
                 }
-                {
-                    AutoGetCollection collRaii(opCtx,
-                                               NamespaceString::kSessionTransactionsTableNamespace,
-                                               LockMode::MODE_X);
-                    if (collRaii) {
-                        invariant(collRaii.getWritableCollection()->truncate(opCtx).isOK());
-                    } else {
-                        auto db = collRaii.ensureDbExists();
-                        invariant(db->createCollection(
-                            opCtx, NamespaceString::kSessionTransactionsTableNamespace));
-                    }
-                }
-                {
-                    AutoGetCollection collRaii(
-                        opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_X);
-                    if (collRaii) {
-                        invariant(collRaii.getWritableCollection()->truncate(opCtx).isOK());
-                    } else {
-                        auto db = collRaii.ensureDbExists();
-                        invariant(
-                            db->createCollection(opCtx, NamespaceString::kConfigImagesNamespace));
-                    }
-                }
-                wunit.commit();
-            });
+            }
+            wunit.commit();
+        });
+    }
+
+    void resetOplogAndTransactions(OperationContext* opCtx) const {
+        reset(opCtx, NamespaceString::kRsOplogNamespace);
+        reset(opCtx, NamespaceString::kSessionTransactionsTableNamespace);
+        reset(opCtx, NamespaceString::kConfigImagesNamespace);
     }
 
 protected:
@@ -1552,7 +1537,7 @@ TEST_F(OpObserverRetryableFindAndModifyTest, RetryableFindAndModifyDeleteHasNeed
 
 enum class RetryableOptions { NotRetryable, WithOplog, WithSideCollection };
 using StoreDocOption = CollectionUpdateArgs::StoreDocOption;
-struct TestCase {
+struct UpdateTestCase {
     StoreDocOption imageType;
     bool alwaysRecordPreImages;
     RetryableOptions retryableOptions;
@@ -1594,7 +1579,7 @@ OplogEntry findByTimestamp(const std::vector<BSONObj>& oplogs, Timestamp ts) {
 
     FAIL("Not found.");
     // C++/clang isn't smart enough to know FAIL is guaranteed to throw.
-    MONGO_UNREACHABLE
+    MONGO_UNREACHABLE;
 }
 
 TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
@@ -1614,7 +1599,7 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
     const bool kRecordPreImages = true;
     const bool kDoNotRecordPreImages = false;
 
-    std::vector<TestCase> cases{
+    std::vector<UpdateTestCase> cases{
         // Regular updates.
         {StoreDocOption::None, kDoNotRecordPreImages, RetryableOptions::NotRetryable, 1},
         {StoreDocOption::None, kRecordPreImages, RetryableOptions::NotRetryable, 2},
@@ -1635,10 +1620,10 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
         {StoreDocOption::PostImage, kRecordPreImages, RetryableOptions::WithOplog, 3},
         {StoreDocOption::PostImage, kRecordPreImages, RetryableOptions::WithSideCollection, 2}};
 
-    for (std::size_t idx = 0; idx < cases.size(); ++idx) {
-        const auto& testCase = cases[idx];
+    for (std::size_t testIdx = 0; testIdx < cases.size(); ++testIdx) {
+        const auto& testCase = cases[testIdx];
         LOGV2(5739902,
-              "TestCase",
+              "UpdateTestCase",
               "ImageType"_attr = testCase.getImageTypeStr(),
               "AlwaysRecordPreImages"_attr = testCase.alwaysRecordPreImages,
               "RetryableOptions"_attr = testCase.getRetryableOptionsStr(),
@@ -1665,10 +1650,10 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
         }
         if (testCase.retryableOptions != RetryableOptions::NotRetryable) {
             opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
-            opCtx->setTxnNumber(TxnNumber(idx));
+            opCtx->setTxnNumber(TxnNumber(testIdx));
             contextSession.emplace(opCtx);
             txnParticipant.emplace(TransactionParticipant::get(opCtx));
-            txnParticipant->beginOrContinue(opCtx, TxnNumber(idx), boost::none, boost::none);
+            txnParticipant->beginOrContinue(opCtx, TxnNumber(testIdx), boost::none, boost::none);
         }
 
         if (testCase.imageType == StoreDocOption::None && !testCase.alwaysRecordPreImages) {
@@ -1706,7 +1691,7 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
             const Timestamp preImageOpTime = actualOp.getPreImageOpTime()->getTimestamp();
             ASSERT_FALSE(preImageOpTime.isNull());
             OplogEntry preImage = findByTimestamp(oplogs, preImageOpTime);
-            ASSERT_EQUALS(0, update.updateArgs.preImageDoc->woCompare(preImage.getObject()));
+            ASSERT_BSONOBJ_EQ(update.updateArgs.preImageDoc.get(), preImage.getObject());
         }
 
         const bool checkPostImageInOplog = testCase.imageType == StoreDocOption::PostImage &&
@@ -1716,7 +1701,7 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
             const Timestamp postImageOpTime = actualOp.getPostImageOpTime()->getTimestamp();
             ASSERT_FALSE(postImageOpTime.isNull());
             OplogEntry postImage = findByTimestamp(oplogs, postImageOpTime);
-            ASSERT_EQUALS(0, update.updateArgs.updatedDoc.woCompare(postImage.getObject()));
+            ASSERT_BSONOBJ_EQ(update.updateArgs.updatedDoc, postImage.getObject());
         }
 
         bool checkSideCollection = testCase.imageType != StoreDocOption::None &&
@@ -1740,12 +1725,127 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
             const BSONObj& expectedImage = testCase.imageType == StoreDocOption::PreImage
                 ? update.updateArgs.preImageDoc.get()
                 : update.updateArgs.updatedDoc;
-            ASSERT_EQUALS(0, expectedImage.woCompare(imageEntry.getImage()));
+            ASSERT_BSONOBJ_EQ(expectedImage, imageEntry.getImage());
             if (testCase.imageType == StoreDocOption::PreImage) {
                 ASSERT(imageEntry.getImageKind() == repl::RetryImageEnum::kPreImage);
             } else {
                 ASSERT(imageEntry.getImageKind() == repl::RetryImageEnum::kPostImage);
             }
+        }
+    }
+}
+
+
+struct InsertTestCase {
+    bool isRetryableWrite;
+    int numDocsToInsert;
+};
+TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
+    // Create a registry that only registers the Impl. It can be challenging to call methods on the
+    // Impl directly. It falls into cases where `ReservedTimes` is expected to be instantiated. Due
+    // to strong encapsulation, we use the registry that managers the `ReservedTimes` on our behalf.
+    OpObserverRegistry opObserver;
+    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    NamespaceString nss("test", "coll");
+    CollectionUUID uuid = CollectionUUID::gen();
+
+    const bool isRetryableWrite = true;
+    const bool isNotRetryableWrite = false;
+    const int isSingleInsert = 1;
+    const int isMultiInsert = 3;
+
+    std::vector<InsertTestCase> cases{{isNotRetryableWrite, isSingleInsert},
+                                      {isNotRetryableWrite, isMultiInsert},
+                                      {isRetryableWrite, isSingleInsert},
+                                      {isRetryableWrite, isMultiInsert}};
+
+    for (std::size_t testIdx = 0; testIdx < cases.size(); ++testIdx) {
+        const auto& testCase = cases[testIdx];
+        LOGV2(5739904,
+              "InsertTestCase",
+              "Retryable"_attr = testCase.isRetryableWrite,
+              "NumDocsToInsert"_attr = testCase.numDocsToInsert);
+
+        // Phase 1: Clearing any state and setting up fixtures/the update call.
+        resetOplogAndTransactions(opCtx);
+
+        std::vector<InsertStatement> toInsert;
+        for (int stmtIdx = 0; stmtIdx < testCase.numDocsToInsert; ++stmtIdx) {
+            StmtId stmtId = kUninitializedStmtId;
+            if (testCase.isRetryableWrite) {
+                stmtId = StmtId(stmtIdx);
+            }
+            toInsert.emplace_back(stmtId, BSON("_id" << stmtIdx));
+        }
+
+        boost::optional<MongoDOperationContextSession> contextSession;
+        boost::optional<TransactionParticipant::Participant> txnParticipant;
+        if (testCase.isRetryableWrite) {
+            opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+            opCtx->setTxnNumber(TxnNumber(testIdx));
+            contextSession.emplace(opCtx);
+            txnParticipant.emplace(TransactionParticipant::get(opCtx));
+            txnParticipant->beginOrContinue(opCtx, TxnNumber(testIdx), boost::none, boost::none);
+        }
+
+        // Phase 2: Call the code we're testing.
+        WriteUnitOfWork wuow(opCtx);
+        AutoGetCollection locks(opCtx, nss, LockMode::MODE_IX);
+        const bool fromMigrate = false;
+        opObserver.onInserts(opCtx, nss, uuid, toInsert.begin(), toInsert.end(), fromMigrate);
+        wuow.commit();
+
+        // Phase 3: Analyze the results:
+
+        // This `getNOplogEntries` also asserts that all oplogs are retrieved.
+        std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, toInsert.size());
+        // Entries are returned in ascending timestamp order.
+        for (std::size_t opIdx = 0; opIdx < oplogs.size(); ++opIdx) {
+            const repl::OplogEntry& entry = assertGet(repl::OplogEntry::parse(oplogs[opIdx]));
+
+            ASSERT_BSONOBJ_EQ(entry.getObject(), BSON("_id" << static_cast<int>(opIdx)));
+            if (!testCase.isRetryableWrite) {
+                ASSERT_FALSE(entry.getSessionId());
+                ASSERT_FALSE(entry.getTxnNumber());
+                ASSERT_EQ(0, entry.getStatementIds().size());
+                continue;
+            }
+
+            // Only for retryable writes:
+            ASSERT_EQ(opCtx->getLogicalSessionId().get(), entry.getSessionId().get());
+            ASSERT_EQ(opCtx->getTxnNumber().get(), entry.getTxnNumber().get());
+            ASSERT_EQ(1, entry.getStatementIds().size());
+            ASSERT_EQ(StmtId(opIdx), entry.getStatementIds()[0]);
+            // When we insert multiple documents in retryable writes, each insert will "link" back
+            // to the previous insert. This code verifies that C["prevOpTime"] -> B and
+            // B["prevOpTime"] -> A.
+            Timestamp expectedPrevWriteOpTime = Timestamp(0, 0);
+            if (opIdx > 0) {
+                expectedPrevWriteOpTime =
+                    oplogs[opIdx - 1][repl::OplogEntryBase::kTimestampFieldName].timestamp();
+            }
+            ASSERT_EQ(expectedPrevWriteOpTime,
+                      entry.getPrevWriteOpTimeInTransaction().get().getTimestamp());
+        }
+
+        if (testCase.isRetryableWrite) {
+            // Also assert for retryable writes that the `config.transactions` entry's
+            // `lastWriteOpTime` and `txnNum` reflects the latest oplog entry.
+            AutoGetCollection configTransactions(
+                opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IS);
+
+            SessionTxnRecord transactionRecord = SessionTxnRecord::parse(
+                IDLParserErrorContext("txn record"),
+                Helpers::findOneForTesting(opCtx,
+                                           configTransactions.getCollection(),
+                                           BSON("_id" << opCtx->getLogicalSessionId()->toBSON())));
+            ASSERT_EQ(oplogs.back()[repl::OplogEntryBase::kTimestampFieldName].timestamp(),
+                      transactionRecord.getLastWriteOpTime().getTimestamp());
+            ASSERT_EQ(oplogs.back()[repl::OplogEntryBase::kTxnNumberFieldName].Long(),
+                      transactionRecord.getTxnNum());
         }
     }
 }
