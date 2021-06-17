@@ -277,6 +277,16 @@ server_parameters:
         default: ""
         validator: { callback: 'validateReadPreferenceMode' }
 
+    enableOverrideClusterChainingSetting:
+        description: >-
+            When enabled, allows a node to override the cluster-wide chainingAllowed setting. 
+            If chaining is disabled in the replica set, enabling this parameter allows the node
+            to chain regardless. 
+        set_at: [ startup ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: enableOverrideClusterChainingSetting
+        default: false
+
     startupRecoveryForRestore:
         description: >-
             When set, do startup recovery in such a way that the history of the recovered
