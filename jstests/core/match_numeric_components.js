@@ -172,6 +172,81 @@ assert.commandWorked(coll.insert(kDocs));
     assert.sameMembers(res, expected);
 }
 
+// Using $exists with true and false.
+{
+    let res = coll.find({"a.0": {$exists: false}}).toArray();
+    let expected = [{_id: 0, "a": 42}];
+
+    assert.sameMembers(res, expected);
+
+    res = coll.find({"a.0": {$exists: true}}).toArray();
+    expected = [
+        {_id: 1, "a": [42]},
+        {_id: 2, "a": {"0": 42}},
+        {_id: 3, "a": [[42]]},
+        {_id: 4, "a": [{"0": 42}]},
+        {_id: 5, "a": {"0": [42]}},
+        {_id: 6, "a": {"0": {"0": 42}}},
+        {_id: 7, "a": [[[42]]]},
+        {_id: 8, "a": [[{"0": 42}]]},
+        {_id: 9, "a": [{"0": [42]}]},
+        {_id: 10, "a": [{"0": {"0": 42}}]},
+        {_id: 11, "a": {"0": [[42]]}},
+        {_id: 12, "a": {"0": [{"0": 42}]}},
+        {_id: 13, "a": {"0": {"0": [42]}}},
+        {_id: 14, "a": {"0": {"0": {"0": 42}}}},
+        {_id: 15, "a": [[[[42]]]]},
+        {_id: 16, "a": [[[{"0": 42}]]]},
+        {_id: 17, "a": [[{"0": [42]}]]},
+        {_id: 18, "a": [[{"0": {"0": 42}}]]},
+        {_id: 19, "a": [{"0": [[42]]}]},
+        {_id: 20, "a": [{"0": [{"0": 42}]}]},
+        {_id: 21, "a": [{"0": {"0": [42]}}]},
+        {_id: 22, "a": [{"0": {"0": {"0": 42}}}]},
+        {_id: 23, "a": {"0": [[[42]]]}},
+        {_id: 24, "a": {"0": [[{"0": 42}]]}},
+        {_id: 25, "a": {"0": [{"0": [42]}]}},
+        {_id: 26, "a": {"0": [{"0": {"0": 42}}]}},
+        {_id: 27, "a": {"0": {"0": [[42]]}}},
+        {_id: 28, "a": {"0": {"0": [{"0": 42}]}}},
+        {_id: 29, "a": {"0": {"0": {"0": [42]}}}},
+        {_id: 30, "a": {"0": {"0": {"0": {"0": 42}}}}},
+    ];
+
+    assert.sameMembers(res, expected);
+}
+
+// Using $elemMatch.
+{
+    const res = coll.find({a: {$elemMatch: {"0.0": {$eq: 42}}}}).toArray();
+    const expected = [
+        {_id: 7, "a": [[[42]]]},
+        {_id: 8, "a": [[{"0": 42}]]},
+        {_id: 9, "a": [{"0": [42]}]},
+        {_id: 10, "a": [{"0": {"0": 42}}]},
+        {_id: 16, "a": [[[{"0": 42}]]]},
+        {_id: 17, "a": [[{"0": [42]}]]},
+        {_id: 20, "a": [{"0": [{"0": 42}]}]},
+        {_id: 21, "a": [{"0": {"0": [42]}}]},
+    ];
+
+    assert.sameMembers(res, expected);
+}
+
+// Using top-level $and.
+{
+    const res = coll.find({_id: {$lt: 15}, "a.0": {$gt: 41}}).toArray();
+    const expected = [
+        {_id: 1, "a": [42]},
+        {_id: 2, "a": {"0": 42}},
+        {_id: 4, "a": [{"0": 42}]},
+        {_id: 5, "a": {"0": [42]}},
+        {_id: 9, "a": [{"0": [42]}]},
+    ];
+
+    assert.sameMembers(res, expected);
+}
+
 // $all with equality
 {
     const res = coll.find({"a.0": {$all: [42]}}).toArray();
@@ -262,10 +337,17 @@ assert.commandWorked(coll2.insert(kRegexDocs));
     assert.sameMembers(res, expected);
 }
 
-// $all with regexes
+// $all with regexes.
 {
     const res = coll2.find({"b.0": {$all: [/^hello/]}}).toArray();
     const expected = [{_id: 2, "b": {"0": "hello"}}, {_id: 3, "b": ["hello", "abc", "abc"]}];
+    assert.sameMembers(res, expected);
+}
+
+// $not with regex.
+{
+    const res = coll2.find({"b.0": {$not: /^h/}}).toArray();
+    const expected = [{_id: 1, "b": "hello"}];
     assert.sameMembers(res, expected);
 }
 })();

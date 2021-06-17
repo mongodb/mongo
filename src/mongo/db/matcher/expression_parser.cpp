@@ -94,16 +94,27 @@ bool hasNode(const MatchExpression* root, MatchExpression::MatchType type) {
 // TODO SERVER-49852: Currently SBE cannot handle match expressions with numeric path
 // components due to some of the complexity around how arrays are handled.
 void disableSBEForNumericPathComponent(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       const FieldRef* fieldRef) {
+                                       const MatchExpression* node) {
+    auto fieldRef = node->fieldRef();
     if (fieldRef && fieldRef->hasNumericPathComponents()) {
         expCtx->sbeCompatible = false;
+        return;
+    }
+    for (size_t i = 0; i < node->numChildren(); ++i) {
+        // For some match expressions trees, there could be a path associated with a node deeper in
+        // the tree. This is true in particular for negations. For example, {a: {$not: {$gt: 0}}}
+        // will be converted to a NOT => GT tree, but it is the GT node that carries the path,
+        // rather than the NOT node.
+        disableSBEForNumericPathComponent(expCtx, node->getChild(i));
+        if (!expCtx->sbeCompatible)
+            return;
     }
 }
 
 void addExpressionToRoot(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          AndMatchExpression* root,
                          std::unique_ptr<MatchExpression> newNode) {
-    disableSBEForNumericPathComponent(expCtx, newNode->fieldRef());
+    disableSBEForNumericPathComponent(expCtx, newNode.get());
     root->add(std::move(newNode));
 }
 }  // namespace
@@ -1582,10 +1593,6 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                 expCtx,
                 allowedFeatures);
 
-            // The NotMatchExpression below does not have a path, so 's' must be checked for a
-            // numeric path component instead.
-            disableSBEForNumericPathComponent(expCtx, s.getValue()->fieldRef());
-
             return {std::make_unique<NotMatchExpression>(
                 s.getValue().release(),
                 doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend))};
@@ -1630,9 +1637,6 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                 return parseStatus;
             }
 
-            // The NotMatchExpression below does not have a path, so 's' must be checked for a
-            // numeric path component instead.
-            disableSBEForNumericPathComponent(expCtx, temp->fieldRef());
             return {std::make_unique<NotMatchExpression>(
                 temp.release(),
                 doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend))};
