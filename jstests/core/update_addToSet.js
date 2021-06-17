@@ -2,147 +2,150 @@
 // update/delete on a sharded collection must contain an exact match on _id or contain the shard
 // key.
 //
-// @tags: [assumes_unsharded_collection, requires_fastcount, requires_fcv_50]
+// @tags: [assumes_unsharded_collection, requires_fcv_50]
 
-t = db.update_addToSet1;
-t.drop();
+(function() {
+"use strict";
 
-o = {
-    _id: 1,
-    a: [2, 1]
-};
-t.insert(o);
+const coll = db.update_addToSet;
+coll.drop();
 
-assert.eq(o, t.findOne(), "A1");
+let doc = {_id: 1, a: [2, 1]};
+assert.commandWorked(coll.insert(doc));
 
-t.update({}, {$addToSet: {a: 3}});
-o.a.push(3);
-assert.eq(o, t.findOne(), "A2");
+assert.eq(doc, coll.findOne());
 
-t.update({}, {$addToSet: {a: 3}});
-assert.eq(o, t.findOne(), "A3");
+assert.commandWorked(coll.update({}, {$addToSet: {a: 3}}));
+doc.a.push(3);
+assert.eq(doc, coll.findOne());
+
+coll.update({}, {$addToSet: {a: 3}});
+assert.eq(doc, coll.findOne());
 
 // SERVER-628
-t.update({}, {$addToSet: {a: {$each: [3, 5, 6]}}});
-o.a.push(5);
-o.a.push(6);
-assert.eq(o, t.findOne(), "B1");
+assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [3, 5, 6]}}}));
+doc.a.push(5);
+doc.a.push(6);
+assert.eq(doc, coll.findOne());
 
-t.drop();
-o = {
+assert(coll.drop());
+doc = {
     _id: 1,
     a: [3, 5, 6]
 };
-t.insert(o);
-t.update({}, {$addToSet: {a: {$each: [3, 5, 6]}}});
-assert.eq(o, t.findOne(), "B2");
+assert.commandWorked(coll.insert(doc));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [3, 5, 6]}}}));
+assert.eq(doc, coll.findOne());
 
-t.drop();
-t.update({_id: 1}, {$addToSet: {a: {$each: [3, 5, 6]}}}, true);
-assert.eq(o, t.findOne(), "B3");
-t.update({_id: 1}, {$addToSet: {a: {$each: [3, 5, 6]}}}, true);
-assert.eq(o, t.findOne(), "B4");
+assert(coll.drop());
+assert.commandWorked(coll.update({_id: 1}, {$addToSet: {a: {$each: [3, 5, 6]}}}, true));
+assert.eq(doc, coll.findOne());
+assert.commandWorked(coll.update({_id: 1}, {$addToSet: {a: {$each: [3, 5, 6]}}}, true));
+assert.eq(doc, coll.findOne());
 
 // SERVER-630
-t.drop();
-t.update({_id: 2}, {$addToSet: {a: 3}}, true);
-assert.eq(1, t.count(), "C1");
-assert.eq({_id: 2, a: [3]}, t.findOne(), "C2");
+assert(coll.drop());
+assert.commandWorked(coll.update({_id: 2}, {$addToSet: {a: 3}}, true));
+assert.eq(1, coll.find({}).itcount());
+assert.eq({_id: 2, a: [3]}, coll.findOne());
 
 // SERVER-3245
-o = {
+doc = {
     _id: 1,
     a: [1, 2]
 };
-t.drop();
-t.update({_id: 1}, {$addToSet: {a: {$each: [1, 2]}}}, true);
-assert.eq(o, t.findOne(), "D1");
+assert(coll.drop());
+assert.commandWorked(coll.update({_id: 1}, {$addToSet: {a: {$each: [1, 2]}}}, true));
+assert.eq(doc, coll.findOne());
 
-t.drop();
-t.update({_id: 1}, {$addToSet: {a: {$each: [1, 2, 1, 2]}}}, true);
-assert.eq(o, t.findOne(), "D2");
+assert(coll.drop());
+assert.commandWorked(coll.update({_id: 1}, {$addToSet: {a: {$each: [1, 2, 1, 2]}}}, true));
+assert.eq(doc, coll.findOne());
 
-t.drop();
-t.insert({_id: 1});
-t.update({_id: 1}, {$addToSet: {a: {$each: [1, 2, 2, 1]}}});
-assert.eq(o, t.findOne(), "D3");
+assert(coll.drop());
+assert.commandWorked(coll.insert({_id: 1}));
+assert.commandWorked(coll.update({_id: 1}, {$addToSet: {a: {$each: [1, 2, 2, 1]}}}));
+assert.eq(doc, coll.findOne());
 
-t.update({_id: 1}, {$addToSet: {a: {$each: [3, 2, 2, 3, 3]}}});
-o.a.push(3);
-assert.eq(o, t.findOne(), "D4");
+assert.commandWorked(coll.update({_id: 1}, {$addToSet: {a: {$each: [3, 2, 2, 3, 3]}}}));
+doc.a.push(3);
+assert.eq(doc, coll.findOne());
 
 var isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
                                   .featureFlagDotsAndDollars.value;
 if (!isDotsAndDollarsEnabled) {
     // Test that dotted and '$' prefixed field names fail.
-    t.drop();
-    o = {_id: 1, a: [1, 2]};
-    assert.commandWorked(t.insert(o));
+    assert(coll.drop());
+    doc = {_id: 1, a: [1, 2]};
+    assert.commandWorked(coll.insert(doc));
 
-    assert.commandWorked(t.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
-    assert.commandWorked(t.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
 
-    assert.writeError(t.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
-    assert.writeError(t.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
+    assert.commandFailed(coll.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
+    assert.commandFailed(coll.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
 
-    assert.commandWorked(t.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
 
-    assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
-    assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
 
-    assert.writeError(t.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
-    assert.writeError(t.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
+    assert.commandFailed(coll.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
+    assert.commandFailed(coll.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
 } else {
     // Test that dotted and '$' prefixed field names work when nested.
-    t.drop();
-    o = {_id: 1, a: [1, 2]};
-    assert.commandWorked(t.insert(o));
+    assert(coll.drop());
+    doc = {_id: 1, a: [1, 2]};
+    assert.commandWorked(coll.insert(doc));
 
-    assert.commandWorked(t.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
-    assert.commandWorked(t.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
 
-    assert.commandWorked(t.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
-    assert.commandWorked(t.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
 
-    assert.commandWorked(t.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
 
-    assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
-    assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
 
-    assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
-    assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
+    assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
 }
 
 // Test that nested _id fields are allowed.
-t.drop();
-o = {
+assert(coll.drop());
+doc = {
     _id: 1,
     a: [1, 2]
 };
-assert.commandWorked(t.insert(o));
+assert.commandWorked(coll.insert(doc));
 
-assert.commandWorked(t.update({}, {$addToSet: {a: {_id: ["foo", "bar", "baz"]}}}));
-assert.commandWorked(t.update({}, {$addToSet: {a: {_id: /acme.*corp/}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {_id: ["foo", "bar", "baz"]}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {_id: /acme.*corp/}}}));
 
 // Test that DBRefs are allowed.
-t.drop();
-o = {
+assert(coll.drop());
+doc = {
     _id: 1,
     a: [1, 2]
 };
-assert.commandWorked(t.insert(o));
+assert.commandWorked(coll.insert(doc));
 
-foo = {
+const foo = {
     "foo": "bar"
 };
-assert.commandWorked(t.insert(foo));
-let fooDoc = t.findOne(foo);
+assert.commandWorked(coll.insert(foo));
+const fooDoc = coll.findOne(foo);
 assert.eq(fooDoc.foo, foo.foo);
 
-let fooDocRef = {reference: new DBRef(t.getName(), fooDoc._id, t.getDB().getName())};
+const fooDocRef = {
+    reference: new DBRef(coll.getName(), fooDoc._id, coll.getDB().getName())
+};
 
-assert.commandWorked(t.update({_id: o._id}, {$addToSet: {a: fooDocRef}}));
-assert.eq(t.findOne({_id: o._id}).a[2], fooDocRef);
+assert.commandWorked(coll.update({_id: doc._id}, {$addToSet: {a: fooDocRef}}));
+assert.eq(coll.findOne({_id: doc._id}).a[2], fooDocRef);
 
-assert.commandWorked(t.update({_id: o._id}, {$addToSet: {a: {b: fooDocRef}}}));
-assert.eq(t.findOne({_id: o._id}).a[3].b, fooDocRef);
+assert.commandWorked(coll.update({_id: doc._id}, {$addToSet: {a: {b: fooDocRef}}}));
+assert.eq(coll.findOne({_id: doc._id}).a[3].b, fooDocRef);
+}());
