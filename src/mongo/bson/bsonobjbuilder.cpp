@@ -230,7 +230,7 @@ BSONObjBuilder::~BSONObjBuilder() {
     // BufBuilder but do not own it ourselves, then we must call _done to write in the
     // length. Otherwise, we own this memory and its lifetime ends with us, therefore
     // we can elide the write.
-    if (!_doneCalled && _b.buf() && _buf.getSize() == 0) {
+    if (!_doneCalled && _b.buf() && _buf.capacity() == 0) {
         _done();
     }
 }

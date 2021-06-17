@@ -406,7 +406,7 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         // from getBuffer().
         builder.reset();
         keyString.serialize(builder);
-        BSONBinData binData(builder.buf(), builder.getSize(), BinDataGeneral);
+        BSONBinData binData(builder.buf(), builder.len(), BinDataGeneral);
         toInsert.emplace_back(BSON("op" << (op == Op::kInsert ? "i" : "d") << "key" << binData));
     }
 
@@ -417,7 +417,7 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         for (const auto& keyString : multikeyMetadataKeys) {
             builder.reset();
             keyString.serialize(builder);
-            BSONBinData binData(builder.buf(), builder.getSize(), BinDataGeneral);
+            BSONBinData binData(builder.buf(), builder.len(), BinDataGeneral);
             toInsert.emplace_back(BSON("op"
                                        << "i"
                                        << "key" << binData));
