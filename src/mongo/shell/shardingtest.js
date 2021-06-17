@@ -757,16 +757,20 @@ var ShardingTest = function(params) {
                     continue;
                 }
 
+                const tlsOptions = ['preferTLS', 'requireTLS'];
+                const sslOptions = ['preferSSL', 'requireSSL'];
+                const TLSEnabled = currNode.fullOptions &&
+                    (tlsOptions.includes(currNode.fullOptions.tlsMode) ||
+                     sslOptions.includes(currNode.fullOptions.sslMode));
+
                 const x509AuthRequired = (conn.fullOptions && conn.fullOptions.clusterAuthMode &&
-                                          conn.fullOptions.clusterAuthMode === "x509" &&
-                                          (currNode.fullOptions.sslMode === "requireSSL" ||
-                                           currNode.fullOptions.tlsMode === "requireTLS"));
+                                          conn.fullOptions.clusterAuthMode === "x509");
 
                 if (keyFileUsed) {
                     authutil.asCluster(currNode, keyFileUsed, () => {
                         getShardVersion(currNode, timeoutMs - diff);
                     });
-                } else if (x509AuthRequired) {
+                } else if (x509AuthRequired && TLSEnabled) {
                     const exitCode = _runMongoProgram(
                         ...["mongo",
                             currNode.host,
