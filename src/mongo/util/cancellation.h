@@ -88,7 +88,7 @@ public:
     }
 
     bool isCanceled() const {
-        return _state.loadRelaxed() == State::kCanceled;
+        return _state.load() == State::kCanceled;
     }
 
     SharedSemiFuture<void> onCancel() const {
@@ -99,7 +99,7 @@ public:
      * Returns true if neither cancel() nor dismiss() has been called.
      */
     bool isCancelable() const {
-        return _state.loadRelaxed() == State::kInit;
+        return _state.load() == State::kInit;
     }
 
 private:
