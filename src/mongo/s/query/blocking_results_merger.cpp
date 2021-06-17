@@ -96,6 +96,11 @@ StatusWith<ClusterQueryResult> BlockingResultsMerger::awaitNextWithTimeout(
         auto event = nextEventStatus.getValue();
 
         const auto waitStatus = doWaiting(opCtx, [this, opCtx, &event]() {
+            // Time that an awaitData cursor spends waiting for new results is not counted as
+            // execution time, so we pause the CurOp timer.
+            CurOp::get(opCtx)->pauseTimer();
+            ON_BLOCK_EXIT([&] { CurOp::get(opCtx)->resumeTimer(); });
+
             return _executor->waitForEvent(
                 opCtx, event, awaitDataState(opCtx).waitForInsertsDeadline);
         });

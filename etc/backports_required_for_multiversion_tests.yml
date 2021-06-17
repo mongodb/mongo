@@ -202,6 +202,8 @@ last-lts:
       test_file: jstests/sharding/txn_writes_during_movechunk.js
     - ticket: SERVER-57772
       test_file: jstests/sharding/rewrite_state_change_errors.js
+    - ticket: SERVER-50559
+      test_file: jstests/sharding/log_remote_op_wait.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

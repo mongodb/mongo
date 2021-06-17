@@ -11,7 +11,6 @@ st.stopBalancer();
 
 const dbName = st.s.defaultDB;
 const coll = st.s.getDB(dbName).getCollection('profile_remote_op_wait');
-const shardDB = st.shard0.getDB(dbName);
 
 coll.drop();
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
@@ -96,9 +95,11 @@ cursor.hasNext();
     assert.lte(remoteOpWait, duration);
 }
 
-// A changestream is a type of aggregation, so it reports remoteOpWait.
+// A changestream is a type of aggregation, so it reports remoteOpWait. The initial $changeStream
+// 'aggregate' command never pauses execution while awaiting data, and so we expect the remoteOpWait
+// time to be less than or equal to the total execution duration.
 const watchComment = 'example_watch_should_have_remote_op_wait';
-coll.watch([], {comment: watchComment}).hasNext();
+const csCursor = coll.watch([], {comment: watchComment});
 {
     const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
     const line = findMatchingLogLine(mongosLog.log, {msg: "Slow query", comment: watchComment});
@@ -106,6 +107,21 @@ coll.watch([], {comment: watchComment}).hasNext();
     const remoteOpWait = getRemoteOpWait(line);
     const duration = getDuration(line);
     assert.lte(remoteOpWait, duration);
+}
+
+// A $changeStream getMore may pause execution while awaiting data if no results are currently
+// available. In this case, it is possible for the total execution time to be less than the
+// remoteOpWait time.
+assert(!csCursor.hasNext());
+{
+    const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
+    const line = findMatchingLogLine(
+        mongosLog.log, {msg: "Slow query", comment: watchComment, command: "getMore"});
+    assert(line, "Failed to find a log line matching the comment");
+    const remoteOpWait = getRemoteOpWait(line);
+    const duration = getDuration(line);
+    assert.lte(duration, 100);
+    assert.gte(remoteOpWait, 900);
 }
 
 // An equivalent .find() does not include remoteOpWaitMillis.
