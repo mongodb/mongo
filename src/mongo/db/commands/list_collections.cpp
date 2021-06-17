@@ -395,6 +395,24 @@ public:
                         }
                     } else {
                         auto perCollectionWork = [&](const CollectionPtr& collection) {
+                            if (collection && collection->getTimeseriesOptions() &&
+                                !collection->ns().isDropPendingNamespace() &&
+                                viewCatalog->lookupWithoutValidatingDurableViews(
+                                    opCtx, collection->ns().getTimeseriesViewNamespace().ns()) &&
+                                (!authorizedCollections ||
+                                 as->isAuthorizedForAnyActionOnResource(
+                                     ResourcePattern::forExactNamespace(
+                                         collection->ns().getTimeseriesViewNamespace())))) {
+                                // The time-series view for this buckets namespace exists, so add it
+                                // here while we have the collection options.
+                                _addWorkingSetMember(
+                                    opCtx,
+                                    buildTimeseriesBson(opCtx, collection, nameOnly),
+                                    matcher.get(),
+                                    ws.get(),
+                                    root.get());
+                            }
+
                             if (authorizedCollections &&
                                 (!as->isAuthorizedForAnyActionOnResource(
                                     ResourcePattern::forExactNamespace(collection->ns())))) {
@@ -406,20 +424,6 @@ public:
                             if (!collBson.isEmpty()) {
                                 _addWorkingSetMember(
                                     opCtx, collBson, matcher.get(), ws.get(), root.get());
-                            }
-
-                            if (collection && collection->getTimeseriesOptions() &&
-                                !collection->ns().isDropPendingNamespace() &&
-                                viewCatalog->lookupWithoutValidatingDurableViews(
-                                    opCtx, collection->ns().getTimeseriesViewNamespace().ns())) {
-                                // The time-series view for this buckets namespace exists, so add it
-                                // here while we have the collection options.
-                                _addWorkingSetMember(
-                                    opCtx,
-                                    buildTimeseriesBson(opCtx, collection, nameOnly),
-                                    matcher.get(),
-                                    ws.get(),
-                                    root.get());
                             }
 
                             return true;
