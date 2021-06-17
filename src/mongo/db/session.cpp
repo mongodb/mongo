@@ -656,6 +656,9 @@ void Session::_checkTxnValid(WithLock,
 }
 
 Session::TxnResources::TxnResources(OperationContext* opCtx, bool keepTicket) {
+    if (!opCtx->getWriteUnitOfWork()) {
+        return;
+    }
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     _ruState = opCtx->getWriteUnitOfWork()->release();
     opCtx->setWriteUnitOfWork(nullptr);
