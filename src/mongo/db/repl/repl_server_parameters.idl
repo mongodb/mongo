@@ -372,6 +372,16 @@ server_parameters:
         validator:
             gt: 0
 
+    enableOverrideClusterChainingSetting:
+        description: >-
+            When enabled, allows a node to override the cluster-wide chainingAllowed setting. 
+            If chaining is disabled in the replica set, enabling this parameter allows the node
+            to chain regardless. 
+        set_at: [ startup ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: enableOverrideClusterChainingSetting
+        default: false
+
     disableSplitHorizonIPCheck:
         description: >-
             If true, disable check for IP addresses in split horizon configurations. As per the
