@@ -32,10 +32,11 @@ function checkSBEEnabled(theDB) {
                     continue;
                 }
 
-                const getParam =
-                    conn.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1});
-                checkResult = getParam.hasOwnProperty("internalQueryForceClassicEngine") &&
-                    !getParam.internalQueryForceClassicEngine;
+                const getParam = conn.adminCommand(
+                    {getParameter: 1, internalQueryEnableSlotBasedExecutionEngine: 1});
+                checkResult =
+                    getParam.hasOwnProperty("internalQueryEnableSlotBasedExecutionEngine") &&
+                    getParam.internalQueryEnableSlotBasedExecutionEngine;
                 return true;
             } catch (e) {
                 continue;

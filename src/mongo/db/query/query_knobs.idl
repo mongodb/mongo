@@ -472,10 +472,11 @@ server_parameters:
         gt: 0
         lte: { expr: BSONObjMaxInternalSize }
 
-  internalQueryForceClassicEngine:
-    description: "If true, force use of the classic query engine."
+  internalQueryEnableSlotBasedExecutionEngine:
+    description: "If true, the system will use the SBE execution engine for eligible queries,
+    otherwise all queries will execute using the classic execution engine."
     set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryForceClassicEngine"
+    cpp_varname: "internalQueryEnableSlotBasedExecutionEngine"
     cpp_vartype: AtomicWord<bool>
     default: false
 
