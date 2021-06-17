@@ -36,9 +36,13 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace ephemeral_for_test {
+namespace {
+MONGO_FAIL_POINT_DEFINE(EFTAlwaysThrowWCEOnWrite);
+}  // namespace
 
 RecoveryUnit::RecoveryUnit(KVEngine* parentKVEngine, std::function<void()> cb)
     : _waitUntilDurableCallback(cb), _KVEngine(parentKVEngine) {}
@@ -113,6 +117,13 @@ void RecoveryUnit::doAbandonSnapshot() {
     _dirty = false;
     _isTimestamped = false;
     _setMergeNull();
+}
+
+void RecoveryUnit::makeDirty() {
+    if (MONGO_unlikely(EFTAlwaysThrowWCEOnWrite.shouldFail())) {
+        throw WriteConflictException();
+    }
+    _dirty = true;
 }
 
 bool RecoveryUnit::forkIfNeeded() {

@@ -92,9 +92,7 @@ public:
         return &_workingCopy;
     }
 
-    inline void makeDirty() {
-        _dirty = true;
-    }
+    void makeDirty();
 
     /**
      * Checks if there already exists a current working copy and merge base; if not fetches
