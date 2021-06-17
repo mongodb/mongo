@@ -54,6 +54,7 @@ variables:
     - workloads
     - linkbench
     - linkbench2
+    - tsbs
     - mongo-perf
     - YCSB
     - benchmarks
@@ -90,6 +91,11 @@ modules:
     repo: git@github.com:10gen/linkbench2.git
     prefix: ../../src
     branch: master
+  - name: tsbs
+    repo: git@github.com:gregorynoma/tsbs.git
+    prefix: ../../src
+    branch: master
+    ref: 225e713010463582712dca30ffcfc70c7d661663
   - name: mongo-perf
     repo: git@github.com:mongodb/mongo-perf.git
     prefix: ../../src
@@ -155,6 +161,7 @@ functions:
           signal-processing: ${signal-processing_rev}
           linkbench: ${linkbench_rev}
           linkbench2: ${linkbench2_rev}
+          tsbs: ${tsbs_rev}
           workloads: ${workloads_rev}
           mongo-perf: ${mongo-perf_rev}
           YCSB: ${YCSB_rev}
@@ -367,6 +374,7 @@ functions:
           signal-processing: ${signal-processing_rev}
           linkbench: ${linkbench_rev}
           linkbench2: ${linkbench2_rev}
+          tsbs: ${tsbs_rev}
           workloads: ${workloads_rev}
           mongo-perf: ${mongo-perf_rev}
           YCSB: ${YCSB_rev}
@@ -542,6 +550,27 @@ tasks:
         vars:
           test_control: "linkbench2"
           additional_tfvars: "tags: {expire-on-delta: 12}"
+
+  - name: tsbs_load
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_load"
+
+  - name: tsbs_query
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query"
+
+  - name: tsbs_query_manual_bucketing
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_manual_bucketing"
 
   - name: tpcc
     priority: 5
@@ -1007,6 +1036,9 @@ buildvariants:
       - name: snapshot_reads
       - name: linkbench
       - name: linkbench2
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_manual_bucketing
       - name: tpcc
       - name: industry_benchmarks_wmajority
       - name: sb_large_scale
@@ -1360,6 +1392,9 @@ buildvariants:
       - name: tpcc
       - name: linkbench
       - name: linkbench2
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_manual_bucketing
       - name: sb_large_scale
       - name: sb_timeseries
 
