@@ -246,23 +246,20 @@ Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexB
 }
 
 Status removeIndexBuildEntry(OperationContext* opCtx,
-                             const CollectionPtr& collectionUnused,
+                             const CollectionPtr& collection,
                              UUID indexBuildUUID) {
     return writeConflictRetry(
         opCtx,
         "removeIndexBuildEntry",
         NamespaceString::kIndexBuildEntryNamespace.ns(),
         [&]() -> Status {
-            AutoGetCollection collection(
-                opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
             if (!collection) {
                 str::stream ss;
                 ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
                 return Status(ErrorCodes::NamespaceNotFound, ss);
             }
 
-            RecordId rid =
-                Helpers::findById(opCtx, collection.getCollection(), BSON("_id" << indexBuildUUID));
+            RecordId rid = Helpers::findById(opCtx, collection, BSON("_id" << indexBuildUUID));
             if (rid.isNull()) {
                 str::stream ss;
                 ss << "No matching IndexBuildEntry found with indexBuildUUID: " << indexBuildUUID;
