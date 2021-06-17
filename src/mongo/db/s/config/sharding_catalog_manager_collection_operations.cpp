@@ -53,6 +53,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/executor/network_interface.h"
@@ -458,5 +459,42 @@ void ShardingCatalogManager::updateShardingCatalogEntryForCollectionInTxn(
         throw;
     }
 }
+
+void ShardingCatalogManager::renameShardedMetadata(
+    OperationContext* opCtx,
+    const NamespaceString& from,
+    const NamespaceString& to,
+    boost::optional<CollectionType> optFromCollType) {
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+    // migrations. Take _kZoneOpLock in exclusive mode to prevent concurrent zone operations.
+    // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
+    // move chunks on different collections to proceed in parallel.
+    Lock::ExclusiveLock chunkLk(opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock zoneLk(opCtx->lockState(), _kZoneOpLock);
+
+    std::string logMsg = str::stream() << from << " to " << to;
+    if (optFromCollType) {
+        // Rename CSRS metadata in case the source collection is sharded
+        auto collType = *optFromCollType;
+        sharding_ddl_util::shardedRenameMetadata(opCtx, collType, to);
+        ShardingLogging::get(opCtx)->logChange(
+            opCtx,
+            "renameCollection.metadata",
+            str::stream() << logMsg << ": dropped target collection and renamed source collection",
+            BSON("newCollMetadata" << collType.toBSON()),
+            ShardingCatalogClient::kLocalWriteConcern);
+    } else {
+        // Remove stale CSRS metadata in case the source collection is unsharded and the
+        // target collection was sharded
+        sharding_ddl_util::removeCollMetadataFromConfig(opCtx, to);
+        ShardingLogging::get(opCtx)->logChange(opCtx,
+                                               "renameCollection.metadata",
+                                               str::stream()
+                                                   << logMsg << " : dropped target collection.",
+                                               BSONObj(),
+                                               ShardingCatalogClient::kLocalWriteConcern);
+    }
+}
+
 
 }  // namespace mongo

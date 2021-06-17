@@ -80,7 +80,7 @@ bool removeCollMetadataFromConfig(OperationContext* opCtx, const NamespaceString
  * - Update namespace associated with tags (FROM -> TO)
  * - Update FROM collection entry to TO
  *
- * This function is idempotent.
+ * This function is idempotent and can just be invoked by the CSRS.
  */
 void shardedRenameMetadata(OperationContext* opCtx,
                            CollectionType& fromCollType,

@@ -28,6 +28,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/s/catalog/type_collection.h"
 
 imports:
     - "mongo/db/commands/rename_collection.idl"
@@ -37,6 +39,14 @@ imports:
     - "mongo/s/chunk_version.idl"
     - "mongo/s/database_version.idl"
     - "mongo/s/resharding/common_types.idl"
+
+types:
+    CollectionType:
+        description: "Information of a sharded collection."
+        bson_serialization_type: object
+        cpp_type: CollectionType
+        serializer: "mongo::CollectionType::toBSON"
+        deserializer: "mongo::CollectionType"
 
 structs:
 
@@ -208,6 +218,22 @@ commands:
         api_version: ""
         chained_structs:
             RenameCollectionRequest: RenameCollectionRequest
+
+    _configsvrRenameCollectionMetadata:
+        command_name: _configsvrRenameCollectionMetadata
+        cpp_name: ConfigsvrRenameCollectionMetadata
+        description: "Internal command for renaming collection metadata on the CSRS"
+        strict: false
+        namespace: concatenate_with_db
+        api_version: ""
+        fields:
+            optFromCollection:
+                description: "Information of the source collection to rename, used only for sharded collection."
+                type: CollectionType
+                optional: true
+            to:
+                type: namespacestring
+                description: "The new namespace for the collection being renamed."
 
     _shardsvrReshardCollection:
         command_name: _shardsvrReshardCollection

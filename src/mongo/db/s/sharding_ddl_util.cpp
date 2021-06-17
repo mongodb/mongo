@@ -34,11 +34,13 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -231,6 +233,8 @@ bool removeCollMetadataFromConfig(OperationContext* opCtx, const NamespaceString
 void shardedRenameMetadata(OperationContext* opCtx,
                            CollectionType& fromCollType,
                            const NamespaceString& toNss) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto fromNss = fromCollType.getNss();
 
@@ -255,8 +259,21 @@ void shardedRenameMetadata(OperationContext* opCtx,
     // Update FROM tags to TO
     updateTags(opCtx, fromNss, toNss);
 
-    // Insert the TO collection entry
+    // Update namespace and bump timestamp of the FROM collection entry
     fromCollType.setNss(toNss);
+    auto now = VectorClock::get(opCtx)->getTime();
+    auto newTimestamp = now.clusterTime().asTimestamp();
+    fromCollType.setTimestamp(newTimestamp);
+    {
+        // Only bump the epoch if the whole cluster is in FCV 5.0, so chunks do not contain epochs.
+        FixedFCVRegion fixedFCVRegion(opCtx);
+        if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                ServerGlobalParams::FeatureCompatibility::Version::kVersion50)) {
+            fromCollType.setEpoch(OID::gen());
+        }
+    }
+
+    // Insert the TO collection entry
     uassertStatusOK(
         catalogClient->insertConfigDocument(opCtx,
                                             CollectionType::ConfigNS,

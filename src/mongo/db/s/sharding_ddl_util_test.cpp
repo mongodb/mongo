@@ -154,12 +154,17 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     std::vector<BSONObj> toChunks;
     client.findN(toChunks, ChunkType::ConfigNS.ns(), toChunksQuery, nChunks);
 
-    // Check that the original epoch is preserved in config.collections entry
-    ASSERT(fromCollection.getEpoch() == toCollection.getEpoch());
+    // Check that original epoch/timestamp are changed in config.collections entry
+    ASSERT(fromCollection.getEpoch() != toCollection.getEpoch());
+    ASSERT(fromCollection.getTimestamp() != toCollection.getTimestamp());
 
     // Check that no other CollectionType field has been changed
-    auto fromUnchangedFields = fromDoc.removeField(CollectionType::kNssFieldName);
-    auto toUnchangedFields = toDoc.removeField(CollectionType::kNssFieldName);
+    auto fromUnchangedFields = fromDoc.removeField(CollectionType::kNssFieldName)
+                                   .removeField(CollectionType::kEpochFieldName)
+                                   .removeField(CollectionType::kTimestampFieldName);
+    auto toUnchangedFields = toDoc.removeField(CollectionType::kNssFieldName)
+                                 .removeField(CollectionType::kEpochFieldName)
+                                 .removeField(CollectionType::kTimestampFieldName);
     ASSERT_EQ(fromUnchangedFields.woCompare(toUnchangedFields), 0);
 
     // Check that chunk documents remain unchanged

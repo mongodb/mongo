@@ -62,14 +62,6 @@ enums:
             kDeleteFromRangeDeletions: "deleteFromRangeDeletions"
             kUnblockCRUD: "unblockCRUD"
 
-types:
-    CollectionInfo:
-        description: "Information of the sharded collection to rename."
-        bson_serialization_type: object
-        cpp_type: CollectionType
-        serializer: "mongo::CollectionType::toBSON"
-        deserializer: "mongo::CollectionType"
-
 commands:
     _shardsvrRenameCollectionParticipant:
         command_name: _shardsvrRenameCollectionParticipant
@@ -117,7 +109,7 @@ structs:
                 default: false
             optShardedCollInfo:
                 description: "CollectionType of the collection currently being renamed (if sharded)."
-                type: CollectionInfo
+                type: CollectionType
                 optional: true
             sourceUUID:
                 type: uuid
