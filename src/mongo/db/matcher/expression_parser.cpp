@@ -322,6 +322,12 @@ StatusWithMatchExpression parse(const BSONObj& obj,
             continue;
         }
 
+        // Ensure the path length does not exceed the maximum allowed depth.
+        auto path = e.fieldNameStringData();
+        unsigned int pathLength = std::count(path.begin(), path.end(), '.') + 1;
+        uassert(
+            5729100, "FieldPath is too long", pathLength <= BSONDepth::getMaxDepthForUserStorage());
+
         if (isExpressionDocument(e, false)) {
             auto s = parseSub(e.fieldNameStringData(),
                               e.Obj(),
