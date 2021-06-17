@@ -18,11 +18,13 @@ var ManualInterventionActions = (function() {
         let uuid = res.errmsg.split('uuid: ')[1];
         let query = uuid ? {uuid: UUID(uuid)} : {ns: ns};
 
+        const session = mongosConn.startSession({retryWrites: true});
         while (stillHasChunks) {
-            let writeRes = assert.commandWorked(mongosConn.getDB('config').chunks.remove(
-                query, {justOne: true, writeConcern: {w: 'majority'}}));
+            let writeRes = session.getDatabase('config')['chunks'].remove(
+                query, {justOne: true, writeConcern: {w: 'majority'}});
             stillHasChunks = writeRes.nRemoved > 0;
         }
+        session.endSession();
     };
 
     this.removePartiallyWrittenChunks = function(mongosConn, ns, cmdObj, numAttempts, res) {
