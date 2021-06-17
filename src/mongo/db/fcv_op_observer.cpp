@@ -46,8 +46,12 @@
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
+MONGO_FAIL_POINT_DEFINE(pauseBeforeCloseCxns);
+MONGO_FAIL_POINT_DEFINE(finishedDropConnections);
+
 using FeatureCompatibilityParams = ServerGlobalParams::FeatureCompatibility;
 
 void FcvOpObserver::_setVersion(OperationContext* opCtx,
@@ -76,8 +80,14 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
             transport::Session::kLatestVersionInternalClientKeepOpen |
             transport::Session::kExternalClientKeepOpen);
         // Close all outgoing connections to servers with binary versions lower than ours.
+        pauseBeforeCloseCxns.pauseWhileSet();
+
         executor::EgressTagCloserManager::get(opCtx->getServiceContext())
-            .dropConnections(transport::Session::kKeepOpen);
+            .dropConnections(transport::Session::kKeepOpen | transport::Session::kPending);
+
+        if (MONGO_unlikely(finishedDropConnections.shouldFail())) {
+            LOGV2(575210, "Hit finishedDropConnections failpoint");
+        }
     }
 
     // We make assumptions that transactions don't span an FCV change. And FCV changes also take

@@ -75,6 +75,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCompletion);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeStartingErrorFlow);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforePersistingStateTransition);
+MONGO_FAIL_POINT_DEFINE(pauseBeforeTellDonorToRefresh);
 
 const std::string kReshardingCoordinatorActiveIndexName = "ReshardingCoordinatorActiveIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
@@ -1074,7 +1075,11 @@ ReshardingCoordinatorService::ReshardingCoordinator::_runUntilReadyToPersistDeci
                     _cancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(),
                                                     _markKilledExecutor);
                 })
-                .then([this, executor] { _tellAllDonorsToRefresh(executor); })
+                .then([this, executor] {
+                    pauseBeforeTellDonorToRefresh.pauseWhileSet();
+
+                    _tellAllDonorsToRefresh(executor);
+                })
                 .then([this, executor] { _tellAllRecipientsToRefresh(executor); })
                 .then([this] {
                     // Swap back to using operation contexts canceled upon abort until ready to
