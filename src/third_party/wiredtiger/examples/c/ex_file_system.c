@@ -536,9 +536,12 @@ demo_fs_size(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
 
     ret = ENOENT;
     lock_file_system(&demo_fs->lock);
-    if ((demo_fh = demo_handle_search(file_system, name)) != NULL)
+    if ((demo_fh = demo_handle_search(file_system, name)) != NULL) {
+        unlock_file_system(&demo_fs->lock);
         ret = demo_file_size((WT_FILE_HANDLE *)demo_fh, session, sizep);
-    unlock_file_system(&demo_fs->lock);
+    } else {
+        unlock_file_system(&demo_fs->lock);
+    }
 
     return (ret);
 }

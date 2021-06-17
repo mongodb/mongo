@@ -757,6 +757,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_ISOLATION saved_isolation;
+    wt_off_t hs_size;
     wt_timestamp_t ckpt_tmp_ts;
     uint64_t fsync_duration_usecs, generation, hs_ckpt_duration_usecs;
     uint64_t time_start_fsync, time_stop_fsync, time_start_hs, time_stop_hs;
@@ -766,6 +767,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
     conn = S2C(session);
     cache = conn->cache;
+    hs_size = 0;
     hs_dhandle = NULL;
     txn = session->txn;
     txn_global = &conn->txn_global;
@@ -955,6 +957,12 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     WT_STAT_CONN_SET(session, txn_checkpoint_fsync_post_duration, fsync_duration_usecs);
 
     __checkpoint_verbose_track(session, "sync completed");
+
+    /* If the history store file exists on disk, update its statistic. */
+    if (F_ISSET(hs_dhandle, WT_DHANDLE_OPEN)) {
+        WT_ERR(__wt_block_manager_named_size(session, WT_HS_FILE, &hs_size));
+        WT_STAT_CONN_SET(session, cache_hs_ondisk, hs_size);
+    }
 
     /*
      * Commit the transaction now that we are sure that all files in the checkpoint have been

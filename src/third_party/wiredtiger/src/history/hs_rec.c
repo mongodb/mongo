@@ -696,7 +696,6 @@ __wt_hs_insert_updates(
     }
 
     WT_ERR(__wt_block_manager_named_size(session, WT_HS_FILE, &hs_size));
-    WT_STAT_CONN_SET(session, cache_hs_ondisk, hs_size);
     hs_btree = __wt_curhs_get_btree(hs_cursor);
     max_hs_size = hs_btree->file_max;
     if (max_hs_size != 0 && (uint64_t)hs_size > max_hs_size)
