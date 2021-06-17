@@ -608,14 +608,8 @@ __split_parent_discard_ref(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *paren
         }
     }
 
-    /*
-     * The page-delete and history store memory weren't added to the parent's footprint, ignore it
-     * here.
-     */
-    if (ref->page_del != NULL) {
-        __wt_free(session, ref->page_del->update_list);
-        __wt_free(session, ref->page_del);
-    }
+    /* Free any backing fast-truncate memory. */
+    __wt_free(session, ref->ft_info.del);
 
     /* Free the backing block and address. */
     WT_TRET(__wt_ref_block_free(session, ref));

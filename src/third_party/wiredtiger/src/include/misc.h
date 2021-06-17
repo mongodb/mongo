@@ -118,11 +118,11 @@
           addr))
 
 /*
- * Our internal free function clears the underlying address atomically so there is a smaller chance
- * of racing threads seeing intermediate results while a structure is being free'd. (That would be a
- * bug, of course, but I'd rather not drop core, just the same.) That's a non-standard "free" API,
- * and the resulting bug is a mother to find -- make sure we get it right, don't make the caller
- * remember to put the & operator on the pointer.
+ * Our internal free function clears the underlying address so there is a smaller chance of racing
+ * threads seeing intermediate results while a structure is being free'd. (That would be a bug, of
+ * course, but I'd rather not drop core, just the same.) That's a non-standard "free" API, and the
+ * resulting bug is non-trivial to find -- make sure we get it right, don't make the caller remember
+ * to put the & operator on the pointer.
  */
 #define __wt_free(session, p)            \
     do {                                 \
@@ -134,15 +134,21 @@
 /* Overwrite whether or not this is a diagnostic build. */
 #define __wt_explicit_overwrite(p, size) memset(p, WT_DEBUG_BYTE, size)
 #ifdef HAVE_DIAGNOSTIC
-#define __wt_overwrite_and_free(session, p)       \
-    do {                                          \
-        __wt_explicit_overwrite(p, sizeof(*(p))); \
-        __wt_free(session, p);                    \
+#define __wt_overwrite_and_free(session, p)           \
+    do {                                              \
+        void *__p = &(p);                             \
+        if (*(void **)__p != NULL) {                  \
+            __wt_explicit_overwrite(p, sizeof(*(p))); \
+            __wt_free_int(session, __p);              \
+        }                                             \
     } while (0)
 #define __wt_overwrite_and_free_len(session, p, len) \
     do {                                             \
-        __wt_explicit_overwrite(p, len);             \
-        __wt_free(session, p);                       \
+        void *__p = &(p);                            \
+        if (*(void **)__p != NULL) {                 \
+            __wt_explicit_overwrite(p, len);         \
+            __wt_free_int(session, __p);             \
+        }                                            \
     } while (0)
 #else
 #define __wt_overwrite_and_free(session, p) __wt_free(session, p)

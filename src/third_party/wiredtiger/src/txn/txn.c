@@ -1434,15 +1434,16 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     WT_UPDATE *upd;
     wt_timestamp_t candidate_durable_timestamp, prev_durable_timestamp;
     uint32_t fileid;
-    u_int i;
+    uint8_t previous_state;
+    u_int i, ft_resolution;
 #ifdef HAVE_DIAGNOSTIC
     u_int prepare_count;
 #endif
     bool locked, prepare, readonly, update_durable_ts;
 
-    txn = session->txn;
     conn = S2C(session);
     cursor = NULL;
+    txn = session->txn;
     txn_global = &conn->txn_global;
 #ifdef HAVE_DIAGNOSTIC
     prepare_count = 0;
@@ -1567,6 +1568,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     /* Note: we're going to commit: nothing can fail after this point. */
 
     /* Process and free updates. */
+    ft_resolution = 0;
     for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
         fileid = op->btree->id;
         switch (op->type) {
@@ -1610,8 +1612,12 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
             }
             break;
         case WT_TXN_OP_REF_DELETE:
-            __wt_txn_op_set_timestamp(session, op);
-            break;
+            /*
+             * Fast-truncate operations are resolved in a second pass after failure is no longer
+             * possible.
+             */
+            ++ft_resolution;
+            continue;
         case WT_TXN_OP_TRUNCATE_COL:
         case WT_TXN_OP_TRUNCATE_ROW:
             /* Other operations don't need timestamps. */
@@ -1623,16 +1629,41 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
         if (cursor != NULL)
             WT_CLEAR(cursor->key);
     }
-    txn->mod_count = 0;
-#ifdef HAVE_DIAGNOSTIC
-    WT_ASSERT(session, txn->prepare_count == prepare_count);
-    txn->prepare_count = 0;
-#endif
 
     if (cursor != NULL) {
         WT_ERR(cursor->close(cursor));
         cursor = NULL;
     }
+
+    /*
+     * Resolve any fast-truncate transactions and allow eviction to proceed on instantiated pages.
+     * This isn't done as part of the initial processing because until now the commit could still
+     * switch to an abort. The action allowing eviction to proceed is clearing the WT_UPDATE list,
+     * (if any), associated with the commit. We're the only consumer of that list and we no longer
+     * need it, and eviction knows it means abort or commit has completed on instantiated pages.
+     */
+    for (i = 0, op = txn->mod; ft_resolution > 0 && i < txn->mod_count; i++, op++)
+        if (op->type == WT_TXN_OP_REF_DELETE) {
+            __wt_txn_op_set_timestamp(session, op);
+
+            WT_REF_LOCK(session, op->u.ref, &previous_state);
+            if (previous_state == WT_REF_DELETED)
+                op->u.ref->ft_info.del->committed = 1;
+            else
+                __wt_free(session, op->u.ref->ft_info.update);
+            WT_REF_UNLOCK(op->u.ref, previous_state);
+
+            __wt_txn_op_free(session, op);
+
+            --ft_resolution;
+        }
+    WT_ASSERT(session, ft_resolution == 0);
+
+    txn->mod_count = 0;
+#ifdef HAVE_DIAGNOSTIC
+    WT_ASSERT(session, txn->prepare_count == prepare_count);
+    txn->prepare_count = 0;
+#endif
 
     /*
      * If durable is set, we'll try to update the global durable timestamp with that value. If

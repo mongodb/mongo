@@ -1121,8 +1121,8 @@ __rollback_abort_fast_truncate(
      * individual WT_UPDATE structures. When reviewing internal pages, ignore the second case, an
      * instantiated page is handled when the leaf page is visited.
      */
-    if (ref->state == WT_REF_DELETED && ref->page_del != NULL &&
-      rollback_timestamp < ref->page_del->durable_timestamp) {
+    if (ref->state == WT_REF_DELETED && ref->ft_info.del != NULL &&
+      rollback_timestamp < ref->ft_info.del->durable_timestamp) {
         __wt_verbose(
           session, WT_VERB_RECOVERY_RTS(session), "%p: deleted page rolled back", (void *)ref);
         WT_RET(__wt_delete_page_rollback(session, ref));

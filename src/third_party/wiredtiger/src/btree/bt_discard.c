@@ -290,11 +290,8 @@ __wt_free_ref(WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pa
     /* Free any address allocation. */
     __wt_ref_addr_free(session, ref);
 
-    /* Free any page-deleted information. */
-    if (ref->page_del != NULL) {
-        __wt_free(session, ref->page_del->update_list);
-        __wt_free(session, ref->page_del);
-    }
+    /* Free any backing fast-truncate memory. */
+    __wt_free(session, ref->ft_info.del);
 
     __wt_overwrite_and_free_len(session, ref, WT_REF_CLEAR_SIZE);
 }

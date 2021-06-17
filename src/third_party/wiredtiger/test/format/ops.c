@@ -391,7 +391,8 @@ operations(u_int ops_seconds, bool lastrun)
      * The system should be quiescent at this point, call rollback to stable. Generally, we expect
      * applications to do rollback-to-stable as part of the database open, but calling it outside of
      * the open path is expected in the case of applications that are "restarting" but skipping the
-     * close/re-open pair.
+     * close/re-open pair. Note we are not advancing the oldest timestamp, otherwise we wouldn't be
+     * able to replay operations from after rollback-to-stable completes.
      */
     tinfo_rollback_to_stable(session);
 
