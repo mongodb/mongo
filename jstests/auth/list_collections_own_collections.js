@@ -204,27 +204,13 @@ function runSystemsBucketsTestOnConnection(conn, isMongod) {
 
     admin.logout();
 
-    // TODO SERVER-57558 - mongod bug
-    if (!isMongod) {
-        runTestOnRole(db, "roleWithExactNamespacePrivilegesBuckets", [resFooTS]);
-    }
-    // TODO SERVER-57558 - mongod bug
-    if (!isMongod) {
-        runTestOnRole(
-            db, "roleWithExactNamespaceAndSystemPrivilegesBuckets", [resFooTS, resBarTS, resSBFoo]);
-    } else {
-        runTestOnRole(db, "roleWithExactNamespaceAndSystemPrivilegesBuckets", [resFooTS, resSBFoo]);
-    }
+    runTestOnRole(db, "roleWithExactNamespacePrivilegesBuckets", [resFooTS]);
+    runTestOnRole(
+        db, "roleWithExactNamespaceAndSystemPrivilegesBuckets", [resFooTS, resBarTS, resSBFoo]);
 
-    // TODO SERVER-57558 - mongod bug
-    if (!isMongod) {
-        runTestOnRole(db, "roleWithSystemBucketsInAnyDB", [resFooTS, resBarTS, resSBFoo]);
-    } else {
-        runTestOnRole(db, "roleWithSystemBucketsInAnyDB", [resFooTS, resSBFoo]);
-    }
+    runTestOnRole(db, "roleWithSystemBucketsInAnyDB", [resFooTS, resBarTS, resSBFoo]);
 
     runTestOnRole(db, "roleWithAnySystemBucketsInDB", [resFooTS, resBarTS, resSBFoo, resSBBar]);
-
     runTestOnRole(db, "roleWithAnySystemBuckets", [resFooTS, resBarTS, resSBFoo, resSBBar]);
 }
 
