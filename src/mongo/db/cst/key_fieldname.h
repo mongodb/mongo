@@ -192,7 +192,9 @@ namespace mongo {
     ENUMIFY(week)                \
     ENUMIFY(where)               \
     ENUMIFY(year)                \
-    ENUMIFY(yearArg)
+    ENUMIFY(yearArg)             \
+    ENUMIFY(tsSecond)            \
+    ENUMIFY(tsIncrement)
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(KeyFieldname, KEYFIELDNAMES)
 #undef KEYFIELDNAMES

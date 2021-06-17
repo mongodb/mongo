@@ -461,6 +461,8 @@ public:
     void visit(const ExpressionDateSubtract* expr) final {}
     void visit(const ExpressionGetField* expr) final {}
     void visit(const ExpressionSetField* expr) final {}
+    void visit(const ExpressionTsSecond* expr) final {}
+    void visit(const ExpressionTsIncrement* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(const Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -662,6 +664,8 @@ public:
     void visit(const ExpressionDateSubtract* expr) final {}
     void visit(const ExpressionGetField* expr) final {}
     void visit(const ExpressionSetField* expr) final {}
+    void visit(const ExpressionTsSecond* expr) final {}
+    void visit(const ExpressionTsIncrement* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(const Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -2661,6 +2665,14 @@ public:
 
     void visit(const ExpressionSetField* expr) final {
         unsupportedExpression("$setField");
+    }
+
+    void visit(const ExpressionTsSecond* expr) final {
+        unsupportedExpression("$tsSecond");
+    }
+
+    void visit(const ExpressionTsIncrement* expr) final {
+        unsupportedExpression("$tsIncrement");
     }
 
 private:

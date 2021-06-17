@@ -169,6 +169,10 @@ class AccumulatorStdDevPop;
 class AccumulatorStdDevSamp;
 class AccumulatorSum;
 class AccumulatorMergeObjects;
+
+class ExpressionTsSecond;
+class ExpressionTsIncrement;
+
 template <typename AccumulatorState>
 class ExpressionFromAccumulator;
 
@@ -336,6 +340,8 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionDateSubtract>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionGetField>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSetField>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTsSecond>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTsIncrement>) = 0;
 };
 
 using ExpressionMutableVisitor = ExpressionVisitor<false>;

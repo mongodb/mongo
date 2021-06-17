@@ -4013,4 +4013,62 @@ private:
     boost::intrusive_ptr<Expression>& _value;
 };
 
+class ExpressionTsSecond final : public ExpressionFixedArity<ExpressionTsSecond, 1> {
+public:
+    static constexpr const char* const opName = "$tsSecond";
+
+    explicit ExpressionTsSecond(ExpressionContext* const expCtx)
+        : ExpressionFixedArity<ExpressionTsSecond, 1>(expCtx) {
+        expCtx->sbeCompatible = false;
+    }
+
+    ExpressionTsSecond(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionTsSecond, 1>(expCtx, std::move(children)) {
+        expCtx->sbeCompatible = false;
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    const char* getOpName() const final {
+        return opName;
+    }
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+};
+
+class ExpressionTsIncrement final : public ExpressionFixedArity<ExpressionTsIncrement, 1> {
+public:
+    static constexpr const char* const opName = "$tsIncrement";
+
+    explicit ExpressionTsIncrement(ExpressionContext* const expCtx)
+        : ExpressionFixedArity<ExpressionTsIncrement, 1>(expCtx) {
+        expCtx->sbeCompatible = false;
+    }
+
+    ExpressionTsIncrement(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionTsIncrement, 1>(expCtx, std::move(children)) {
+        expCtx->sbeCompatible = false;
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    const char* getOpName() const final {
+        return opName;
+    }
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+};
+
 }  // namespace mongo

@@ -1283,5 +1283,61 @@ TEST_F(ExpressionLastTest, RejectsNonArrays) {
     assertEvalFails(BSONBinData("asdf", 4, BinDataGeneral));
 }
 
+/* ------------------------- ExpressionTsSecond -------------------------- */
+
+class ExpressionTsSecondTest : public ExpressionNaryTestOneArg {
+public:
+    void assertEval(ImplicitValue input, ImplicitValue output) {
+        _expr = new ExpressionTsSecond(&expCtx);
+        ExpressionNaryTestOneArg::assertEvaluates(input, output);
+    }
+    void assertEvalFails(ImplicitValue input) {
+        _expr = new ExpressionTsSecond(&expCtx);
+        ASSERT_THROWS_CODE(eval(input), DBException, 5687301);
+    }
+};
+
+TEST_F(ExpressionTsSecondTest, HandlesTimestamp) {
+    assertEval(Timestamp(1622731060, 10), static_cast<long long>(1622731060));
+}
+
+TEST_F(ExpressionTsSecondTest, HandlesNullish) {
+    assertEval(BSONNULL, BSONNULL);
+    assertEval(BSONUndefined, BSONNULL);
+    assertEval(Value(), BSONNULL);
+}
+
+TEST_F(ExpressionTsSecondTest, HandlesInvalidTimestamp) {
+    assertEvalFails(1622731060);
+}
+
+/* ------------------------- ExpressionTsIncrement -------------------------- */
+
+class ExpressionTsIncrementTest : public ExpressionNaryTestOneArg {
+public:
+    void assertEval(ImplicitValue input, ImplicitValue output) {
+        _expr = new ExpressionTsIncrement(&expCtx);
+        ExpressionNaryTestOneArg::assertEvaluates(input, output);
+    }
+    void assertEvalFails(ImplicitValue input) {
+        _expr = new ExpressionTsIncrement(&expCtx);
+        ASSERT_THROWS_CODE(eval(input), DBException, 5687302);
+    }
+};
+
+TEST_F(ExpressionTsIncrementTest, HandlesTimestamp) {
+    assertEval(Timestamp(1622731060, 10), static_cast<long long>(10));
+}
+
+TEST_F(ExpressionTsIncrementTest, HandlesNullish) {
+    assertEval(BSONNULL, BSONNULL);
+    assertEval(BSONUndefined, BSONNULL);
+    assertEval(Value(), BSONNULL);
+}
+
+TEST_F(ExpressionTsIncrementTest, HandlesInvalidTimestamp) {
+    assertEvalFails(10);
+}
+
 }  // anonymous namespace
 }  // namespace ExpressionTests

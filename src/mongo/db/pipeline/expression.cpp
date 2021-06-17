@@ -7468,6 +7468,44 @@ Value ExpressionSetField::serialize(const bool explain) const {
                                     {"value"_sd, _value->serialize(explain)}}}});
 }
 
+/* ------------------------- ExpressionTsSecond ----------------------------- */
+
+Value ExpressionTsSecond::evaluate(const Document& root, Variables* variables) const {
+    const Value operand = _children[0]->evaluate(root, variables);
+
+    if (operand.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(5687301,
+            str::stream() << " Argument to " << opName << " must be a timestamp, but is "
+                          << typeName(operand.getType()),
+            operand.getType() == BSONType::bsonTimestamp);
+
+    return Value(static_cast<long long>(operand.getTimestamp().getSecs()));
+}
+
+REGISTER_EXPRESSION(tsSecond, ExpressionTsSecond::parse);
+
+/* ------------------------- ExpressionTsIncrement ----------------------------- */
+
+Value ExpressionTsIncrement::evaluate(const Document& root, Variables* variables) const {
+    const Value operand = _children[0]->evaluate(root, variables);
+
+    if (operand.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(5687302,
+            str::stream() << " Argument to " << opName << " must be a timestamp, but is "
+                          << typeName(operand.getType()),
+            operand.getType() == BSONType::bsonTimestamp);
+
+    return Value(static_cast<long long>(operand.getTimestamp().getInc()));
+}
+
+REGISTER_EXPRESSION(tsIncrement, ExpressionTsIncrement::parse);
+
 MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
 MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())
 }  // namespace mongo

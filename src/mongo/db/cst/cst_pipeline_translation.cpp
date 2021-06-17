@@ -638,6 +638,10 @@ boost::intrusive_ptr<Expression> translateFunctionObject(const CNode::ObjectChil
             return make_intrusive<ExpressionIsArray>(expCtx, std::move(expressions));
         case KeyFieldname::first:
             return make_intrusive<ExpressionFirst>(expCtx, std::move(expressions));
+        case KeyFieldname::tsSecond:
+            return make_intrusive<ExpressionTsSecond>(expCtx, std::move(expressions));
+        case KeyFieldname::tsIncrement:
+            return make_intrusive<ExpressionTsIncrement>(expCtx, std::move(expressions));
         default:
             MONGO_UNREACHABLE;
     }
