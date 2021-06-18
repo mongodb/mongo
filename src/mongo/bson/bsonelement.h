@@ -341,6 +341,14 @@ public:
 
     /** Retrieve int value for the element safely.  Zero returned if not a number. */
     int numberInt() const;
+
+    /** Like numberInt() but with well-defined behavior for doubles that
+     *  are NaNs, or too large/small to be represented as int.
+     *  NaNs -> 0
+     *  very large doubles -> INT_MAX
+     *  very small doubles -> INT_MIN  */
+    int safeNumberInt() const;
+
     /** Retrieve long value for the element safely.  Zero returned if not a number.
      *  Behavior is not defined for double values that are NaNs, or too large/small
      *  to be represented by long longs */
@@ -861,6 +869,16 @@ inline int BSONElement::numberInt() const {
         default:
             return 0;
     }
+}
+
+/** Like numberInt() but with well-defined behavior for doubles that
+ *  are NaNs, or too large/small to be represented as int.
+ *  NaNs -> 0
+ *  very large doubles -> INT_MAX
+ *  very small doubles -> INT_MIN  */
+inline int BSONElement::safeNumberInt() const {
+    return static_cast<int>(std::clamp<long long>(
+        safeNumberLong(), std::numeric_limits<int>::min(), std::numeric_limits<int>::max()));
 }
 
 /** Retrieve long value for the element safely.  Zero returned if not a number. */

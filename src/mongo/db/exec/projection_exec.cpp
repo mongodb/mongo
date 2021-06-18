@@ -63,7 +63,7 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
             BSONElement e2 = obj.firstElement();
             if (e2.fieldNameStringData() == "$slice") {
                 if (e2.isNumber()) {
-                    int i = e2.numberInt();
+                    long long i = e2.safeNumberInt();
                     if (i < 0) {
                         add(e.fieldName(), i, -i);  // limit is now positive
                     } else {
@@ -75,8 +75,8 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
                     invariant(2 == arr.nFields());
 
                     BSONObjIterator it(arr);
-                    int skip = it.next().numberInt();
-                    int limit = it.next().numberInt();
+                    int skip = it.next().safeNumberInt();
+                    int limit = it.next().safeNumberInt();
 
                     invariant(limit > 0);
 
@@ -174,7 +174,7 @@ void ProjectionExec::add(const string& field, bool include) {
     }
 }
 
-void ProjectionExec::add(const string& field, int skip, int limit) {
+void ProjectionExec::add(const string& field, long long skip, long long limit) {
     _special = true;  // can't include or exclude whole object
 
     if (field.empty()) {  // this is the field the user referred to
@@ -399,11 +399,11 @@ Status ProjectionExec::projectHelper(const BSONObj& in,
 }
 
 void ProjectionExec::appendArray(BSONObjBuilder* bob, const BSONObj& array, bool nested) const {
-    int skip = nested ? 0 : _skip;
-    int limit = nested ? -1 : _limit;
+    long long skip = nested ? 0 : _skip;
+    long long limit = nested ? -1 : _limit;
 
     if (skip < 0) {
-        skip = std::max(0, skip + array.nFields());
+        skip = std::max(0ll, skip + array.nFields());
     }
 
     int index = 0;

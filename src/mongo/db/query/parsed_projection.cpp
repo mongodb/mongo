@@ -90,7 +90,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
                     BSONObjIterator it(arr);
                     // Skip over 'skip'.
                     it.next();
-                    int limit = it.next().numberInt();
+                    int limit = it.next().safeNumberInt();
                     if (limit <= 0) {
                         return Status(ErrorCodes::BadValue, "$slice limit must be positive");
                     }

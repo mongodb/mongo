@@ -186,7 +186,7 @@ private:
     /**
      * Add 'field' as a field name that is sliced as part of the projection.
      */
-    void add(const std::string& field, int skip, int limit);
+    void add(const std::string& field, long long skip, long long limit);
 
     //
     // Execution
@@ -241,8 +241,8 @@ private:
     bool _includeID = true;
 
     // Arguments from the $slice operator.
-    int _skip = 0;
-    int _limit = -1;
+    long long _skip = 0;
+    long long _limit = -1;
 
     // Used for $elemMatch and positional operator ($)
     Matchers _matchers;

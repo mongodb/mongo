@@ -65,15 +65,13 @@ std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
  * ProjectionExec::projectCovered().
  */
 boost::optional<std::string> project(
-    const char* specStr,
-    const char* queryStr,
+    const BSONObj& spec,
+    const BSONObj& query,
     const stdx::variant<const char*, const IndexKeyDatum> objStrOrDatum,
     const boost::optional<const CollatorInterface&> collator = boost::none,
     const BSONObj& sortKey = BSONObj(),
     const double textScore = 0.0) {
     // Create projection exec object.
-    BSONObj spec = fromjson(specStr);
-    BSONObj query = fromjson(queryStr);
     std::unique_ptr<MatchExpression> queryExpression = parseMatchExpression(query);
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
@@ -92,6 +90,18 @@ boost::optional<std::string> project(
         return boost::none;
     else
         return boost::make_optional(projected.getValue().toString());
+}
+
+boost::optional<std::string> project(
+    const char* specStr,
+    const char* queryStr,
+    const stdx::variant<const char*, const IndexKeyDatum> objStrOrDatum,
+    const boost::optional<const CollatorInterface&> collator = boost::none,
+    const BSONObj& sortKey = BSONObj(),
+    const double textScore = 0.0) {
+    BSONObj spec = fromjson(specStr);
+    BSONObj query = fromjson(queryStr);
+    return project(spec, query, objStrOrDatum, collator, sortKey, textScore);
 }
 
 //
@@ -182,6 +192,63 @@ TEST(ProjectionExecTest, TransformSliceSkipLimit) {
               project("{a: {$slice: [3, 5]}}", "{}", "{a: [4, 6, 8]}"));
     ASSERT_EQ(boost::make_optional("{ a: [] }"s),
               project("{a: {$slice: [10, 10]}}", "{}", "{a: [4, 6, 8]}"));
+}
+
+TEST(ProjectionExecTest, SliceWithSpecialValuesAsArguments) {
+    auto assertSliceResult =
+        [&](const BSONObj& spec, const char* inputDocument, const char* expectedResult) {
+            ASSERT_EQ(boost::make_optional(std::string(expectedResult)),
+                      project(spec, BSONObj(), inputDocument));
+        };
+
+    const auto positiveClamping =
+        BSON_ARRAY((static_cast<long long>(std::numeric_limits<int>::max()) + 1)
+                   << std::numeric_limits<long long>::max() << std::numeric_limits<double>::max()
+                   << std::numeric_limits<double>::infinity() << Decimal128::kPositiveInfinity
+                   << Decimal128::kLargestPositive);
+    for (const auto& element : positiveClamping) {
+        assertSliceResult(
+            BSON("a" << BSON("$slice" << element)), "{ a: [ 1, 2, 3 ] }", "{ a: [ 1, 2, 3 ] }");
+
+        assertSliceResult(BSON("a" << BSON("$slice" << BSON_ARRAY(1 << element))),
+                          "{ a: [1, 2, 3] }",
+                          "{ a: [ 2, 3 ] }");
+
+        assertSliceResult(BSON("a" << BSON("$slice" << BSON_ARRAY(element << 1))),
+                          "{ a: [ 1, 2, 3 ] }",
+                          "{ a: [] }");
+
+        assertSliceResult(BSON("a" << BSON("$slice" << BSON_ARRAY(element << element))),
+                          "{ a: [ 1, 2, 3 ] }",
+                          "{ a: [] }");
+    }
+
+    const auto negativeClamping =
+        BSON_ARRAY((static_cast<long long>(std::numeric_limits<int>::min()) - 1)
+                   << std::numeric_limits<long long>::min() << std::numeric_limits<double>::lowest()
+                   << -std::numeric_limits<double>::infinity() << Decimal128::kNegativeInfinity
+                   << Decimal128::kLargestNegative);
+    for (const auto& element : negativeClamping) {
+        assertSliceResult(
+            BSON("a" << BSON("$slice" << element)), "{ a: [ 1, 2, 3 ] }", "{ a: [ 1, 2, 3 ] }");
+
+        assertSliceResult(BSON("a" << BSON("$slice" << BSON_ARRAY(element << 1))),
+                          "{ a: [ 1, 2, 3 ] }",
+                          "{ a: [ 1 ] }");
+    }
+
+    const auto convertionToZero =
+        BSON_ARRAY(0ll << 0.0 << 0.3 << -0.3 << std::numeric_limits<double>::quiet_NaN()
+                       << Decimal128::kNegativeNaN << Decimal128::kPositiveNaN
+                       << Decimal128::kSmallestPositive << Decimal128::kSmallestNegative);
+    for (const auto& element : convertionToZero) {
+        assertSliceResult(
+            BSON("a" << BSON("$slice" << element)), "{ a: [ 1, 2, 3 ] }", "{ a: [] }");
+
+        assertSliceResult(BSON("a" << BSON("$slice" << BSON_ARRAY(element << 1))),
+                          "{ a: [ 1, 2, 3 ] }",
+                          "{ a: [ 1 ] }");
+    }
 }
 
 //
