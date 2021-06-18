@@ -1775,21 +1775,6 @@ tasks:
               ${test_env_vars|} test/fops/t
             fi
 
-  - name: million-collection-test
-    commands:
-      - func: "get project"
-      - func: "fetch mongo-tests repo"
-      - command: shell.exec
-        params:
-          working_dir: mongo-tests
-          script: |
-            sudo su
-            set -o errexit
-            set -o verbose
-            ulimit -n 1000000
-            ulimit -c unlimited
-            largescale/run-million-collection-test.sh .
-
   - name: compatibility-test-for-newer-releases
     commands:
       - func: "get project"
@@ -2741,14 +2726,6 @@ buildvariants:
     - name: ftruncate-test
     - name: long-test
     - name: configure-combinations
-
-- name: large-scale-tests
-  display_name: "~ Large scale tests"
-  batchtime: 1440 # 1 day
-  run_on:
-  - rhel80-build
-  tasks:
-    - name: million-collection-test
 
 - name: code-statistics
   display_name: "Code statistics"

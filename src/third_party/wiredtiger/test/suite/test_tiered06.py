@@ -47,14 +47,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
         pdb.set_trace()
 
     def get_local_storage_source(self):
-        local = self.conn.get_storage_source('local_store')
-
-        # Note: do not call local.terminate() .
-        # Since the local_storage extension has been loaded as a consequence of the
-        # wiredtiger_open call, WiredTiger already knows to call terminate when the connection
-        # closes.  Calling it twice would attempt to free the same memory twice.
-        local.terminate = None
-        return local
+        return self.conn.get_storage_source('local_store')
 
     def test_local_basic(self):
         # Test some basic functionality of the storage source API, calling
@@ -133,6 +126,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
         self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
 
         fs.terminate(session)
+        local.terminate(session)
 
     def test_local_write_read(self):
         # Write and read to a file non-sequentially.
@@ -191,6 +185,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
             else:
                 self.assertEquals(in_block, a_block)
         fh.close(session)
+        local.terminate(session)
 
     def create_with_fs(self, fs, fname):
         session = self.session
@@ -346,6 +341,13 @@ class test_tiered06(wttest.WiredTigerTestCase):
         self.check_dirlist(fs1, 'ba', ['bat'])
         self.check_dirlist(fs1, 'be', ['beagle'])
         self.check_dirlist(fs1, 'x', [])
+
+        # Terminate just one of the custom file systems.
+        # We should be able to terminate file systems, but we should
+        # also be able to terminate the storage source without terminating
+        # all the file systems we created.
+        fs1.terminate(session)
+        local.terminate(session)
 
 if __name__ == '__main__':
     wttest.run()

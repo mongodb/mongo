@@ -503,7 +503,6 @@ connection_stats = [
     ##########################################
     StorageStat('flush_state_races', 'flush state races'),
     StorageStat('flush_tier', 'flush_tier operation calls'),
-    StorageStat('flush_tier_busy', 'flush_tier busy retries'),
 
     ##########################################
     # Thread Count statistics

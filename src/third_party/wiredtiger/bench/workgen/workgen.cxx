@@ -415,31 +415,17 @@ Monitor::~Monitor() {}
 int Monitor::run() {
     struct timespec t;
     struct tm *tm, _tm;
-    char time_buf[64], version[100];
+    char version[100];
     Stats prev_totals;
     WorkloadOptions *options = &_wrunner._workload->options;
     uint64_t latency_max = (uint64_t)options->max_latency * THOUSAND;
-    size_t buf_size;
-    bool first;
+    bool first_iteration;
 
-    (*_out) << "#time,"
-            << "totalsec,"
-            << "read ops per second,"
-            << "insert ops per second,"
-            << "update ops per second,"
-            << "checkpoints,"
-            << "read average latency(uS),"
-            << "read minimum latency(uS),"
-            << "read maximum latency(uS),"
-            << "insert average latency(uS),"
-            << "insert min latency(uS),"
-            << "insert maximum latency(uS),"
-            << "update average latency(uS),"
-            << "update min latency(uS),"
-            << "update maximum latency(uS)"
-            << std::endl;
+    // Format header of the table in _out stream.
+    if (_out != NULL)
+        _format_out_header();
 
-    first = true;
+    first_iteration = true;
     workgen_version(version, sizeof(version));
     Stats prev_interval;
 
@@ -449,11 +435,15 @@ int Monitor::run() {
     useconds_t sample_usecs =
       ms_to_us(options->sample_interval_ms) - sec_to_us(sample_secs);
 
+    // Format JSON prefix.
+    if (_json != NULL)
+        _format_json_prefix(version);
+
     while (!_stop) {
         int waitsecs;
         useconds_t waitusecs;
 
-        if (first && options->warmup > 0) {
+        if (first_iteration && options->warmup > 0) {
             waitsecs = options->warmup;
             waitusecs = 0;
         } else {
@@ -471,7 +461,6 @@ int Monitor::run() {
 
         workgen_epoch(&t);
         tm = localtime_r(&t.tv_sec, &_tm);
-        (void)strftime(time_buf, sizeof(time_buf), "%b %d %H:%M:%S", tm);
 
         Stats new_totals(true);
         for (std::vector<ThreadRunner>::iterator tr =
@@ -480,42 +469,90 @@ int Monitor::run() {
         Stats interval(new_totals);
         interval.subtract(prev_totals);
 
-        double interval_secs = options->sample_interval_ms / 1000.0;
-        uint64_t cur_reads = (uint64_t)(interval.read.ops / interval_secs);
-        uint64_t cur_inserts = (uint64_t)(interval.insert.ops / interval_secs);
-        uint64_t cur_updates = (uint64_t)(interval.update.ops / interval_secs);
         bool checkpointing = new_totals.checkpoint.ops_in_progress > 0 ||
           interval.checkpoint.ops > 0;
+        double interval_secs = options->sample_interval_ms / 1000.0;
+        
+        // Format entry into _out stream.
+        if (_out != NULL)
+            _format_out_entry(interval, interval_secs, t, checkpointing, *tm);
 
-        uint64_t totalsec = ts_sec(t - _wrunner._start);
-        (*_out) << time_buf
-                << "," << totalsec
-                << "," << cur_reads
-                << "," << cur_inserts
-                << "," << cur_updates
-                << "," << (checkpointing ? 'Y' : 'N')
-                << "," << interval.read.average_latency()
-                << "," << interval.read.min_latency
-                << "," << interval.read.max_latency
-                << "," << interval.insert.average_latency()
-                << "," << interval.insert.min_latency
-                << "," << interval.insert.max_latency
-                << "," << interval.update.average_latency()
-                << "," << interval.update.min_latency
-                << "," << interval.update.max_latency
-                << std::endl;
+        // Format entry into _json stream.
+        if (_json != NULL)
+            _format_json_entry(*tm, t, first_iteration, interval, checkpointing, interval_secs);
 
-        if (_json != NULL) {
-#define    WORKGEN_TIMESTAMP_JSON        "%Y-%m-%dT%H:%M:%S"
-            buf_size = strftime(time_buf, sizeof(time_buf),
-              WORKGEN_TIMESTAMP_JSON, tm);
-            ASSERT(buf_size <= sizeof(time_buf));
-            snprintf(&time_buf[buf_size], sizeof(time_buf) - buf_size,
-              ".%3.3" PRIu64 "Z", (uint64_t)ns_to_ms(t.tv_nsec));
+        // Check latency threshold. Write warning into std::cerr in case read, insert or update
+        // exceeds latency_max.
+        _check_latency_threshold(interval, latency_max);
 
-            // Note: we could allow this to be configurable.
-            int percentiles[4] = {50, 95, 99, 0};
+        prev_interval.assign(interval);
+        prev_totals.assign(new_totals);
 
+        first_iteration = false;
+    }
+
+    // Format JSON suffix.
+    if (_json != NULL)
+        _format_json_suffix();
+
+    return (0);
+}
+
+void Monitor::_format_out_header() {
+    (*_out) << "#time,"
+            << "totalsec,"
+            << "read ops per second,"
+            << "insert ops per second,"
+            << "update ops per second,"
+            << "checkpoints,"
+            << "read average latency(uS),"
+            << "read minimum latency(uS),"
+            << "read maximum latency(uS),"
+            << "insert average latency(uS),"
+            << "insert min latency(uS),"
+            << "insert maximum latency(uS),"
+            << "update average latency(uS),"
+            << "update min latency(uS),"
+            << "update maximum latency(uS)"
+            << std::endl;
+}
+
+void Monitor::_format_out_entry(const Stats &interval, double interval_secs, 
+    const timespec &timespec, bool checkpointing, const tm &tm) {
+    char time_buf[64];
+    uint64_t cur_reads = (uint64_t)(interval.read.ops / interval_secs);
+    uint64_t cur_inserts = (uint64_t)(interval.insert.ops / interval_secs);
+    uint64_t cur_updates = (uint64_t)(interval.update.ops / interval_secs);
+    uint64_t totalsec = ts_sec(timespec - _wrunner._start);
+
+    (void)strftime(time_buf, sizeof(time_buf), "%b %d %H:%M:%S", &tm);
+    (*_out) << time_buf
+            << "," << totalsec
+            << "," << cur_reads
+            << "," << cur_inserts
+            << "," << cur_updates
+            << "," << (checkpointing ? 'Y' : 'N')
+            << "," << interval.read.average_latency()
+            << "," << interval.read.min_latency
+            << "," << interval.read.max_latency
+            << "," << interval.insert.average_latency()
+            << "," << interval.insert.min_latency
+            << "," << interval.insert.max_latency
+            << "," << interval.update.average_latency()
+            << "," << interval.update.min_latency
+            << "," << interval.update.max_latency
+            << std::endl;
+}
+
+void Monitor::_format_json_prefix(const std::string &version) {
+    (*_json) << "{";
+    (*_json) << "\"version\":\"" << version << "\",";
+    (*_json) << "\"workgen\":[";
+}
+
+void Monitor::_format_json_entry(const tm &tm, const timespec &timespec, bool first_iteration, 
+    const Stats &interval, bool checkpointing, double interval_secs) {
+#define WORKGEN_TIMESTAMP_JSON "%Y-%m-%dT%H:%M:%S"
 #define TRACK_JSON(f, name, t, percentiles, extra)                         \
             do {                                                           \
                 int _i;                                                    \
@@ -532,45 +569,53 @@ int Monitor::run() {
                 (f) << "}";                                                \
             } while(0)
 
-            (*_json) << "{";
-            if (first) {
-                (*_json) << "\"version\":\"" << version << "\",";
-                first = false;
-            }
-            (*_json) << "\"localTime\":\"" << time_buf
-                     << "\",\"workgen\":{";
-            TRACK_JSON(*_json, "read", interval.read, percentiles, "");
-            (*_json) << ",";
-            TRACK_JSON(*_json, "insert", interval.insert, percentiles, "");
-            (*_json) << ",";
-            TRACK_JSON(*_json, "update", interval.update, percentiles, "");
-            (*_json) << ",";
-            TRACK_JSON(*_json, "checkpoint", interval.checkpoint, percentiles,
-              "\"active\":" << (checkpointing ? "1," : "0,"));
-            (*_json) << "}}" << std::endl;
-        }
+    // Note: we could allow this to be configurable.
+    int percentiles[4] = {50, 95, 99, 0};
+    size_t buf_size;
+    char time_buf[64];
 
-        uint64_t read_max = interval.read.max_latency;
-        uint64_t insert_max = interval.insert.max_latency;
-        uint64_t update_max = interval.update.max_latency;
+    buf_size = strftime(time_buf, sizeof(time_buf), WORKGEN_TIMESTAMP_JSON, &tm);
+    ASSERT(buf_size <= sizeof(time_buf));
+    snprintf(&time_buf[buf_size], sizeof(time_buf) - buf_size,
+        ".%3.3" PRIu64 "Z", (uint64_t)ns_to_ms(timespec.tv_nsec));
 
-        if (read_max > latency_max)
-            std::cerr << "WARNING: max latency exceeded for read operation. Threshold "
-                      << latency_max << " us, recorded " << read_max << " us, diff "
-                      << (read_max - latency_max) << " us." << std::endl;
-        if (insert_max > latency_max)
-            std::cerr << "WARNING: max latency exceeded for insert operation. Threshold "
-                      << latency_max << " us, recorded " << insert_max << " us, diff "
-                      << (insert_max - latency_max) << " us." << std::endl;
-        if (update_max > latency_max)
-            std::cerr << "WARNING: max latency exceeded for update operation. Threshold "
-                      << latency_max << " us, recorded " << insert_max << " us, diff "
-                      << (update_max - latency_max) << " us." << std::endl;
+    if (!first_iteration)
+        (*_json) << ",";
 
-        prev_interval.assign(interval);
-        prev_totals.assign(new_totals);
-    }
-    return (0);
+    (*_json) << "{";
+    (*_json) << "\"localTime\":\"" << time_buf << "\",";
+    TRACK_JSON(*_json, "read", interval.read, percentiles, "");
+    (*_json) << ",";
+    TRACK_JSON(*_json, "insert", interval.insert, percentiles, "");
+    (*_json) << ",";
+    TRACK_JSON(*_json, "update", interval.update, percentiles, "");
+    (*_json) << ",";
+    TRACK_JSON(*_json, "checkpoint", interval.checkpoint, percentiles,
+        "\"active\":" << (checkpointing ? "1," : "0,"));
+    (*_json) << "}" << std::endl;
+}
+
+void Monitor::_format_json_suffix() {
+    (*_json) << "]}" << std::endl;
+}
+
+void Monitor::_check_latency_threshold(const Stats &interval, uint64_t latency_max) {
+    uint64_t read_max = interval.read.max_latency;
+    uint64_t insert_max = interval.insert.max_latency;
+    uint64_t update_max = interval.update.max_latency;
+
+    if (read_max > latency_max)
+        std::cerr << "WARNING: max latency exceeded for read operation. Threshold "
+                    << latency_max << " us, recorded " << read_max << " us, diff "
+                    << (read_max - latency_max) << " us." << std::endl;
+    if (insert_max > latency_max)
+        std::cerr << "WARNING: max latency exceeded for insert operation. Threshold "
+                    << latency_max << " us, recorded " << insert_max << " us, diff "
+                    << (insert_max - latency_max) << " us." << std::endl;
+    if (update_max > latency_max)
+        std::cerr << "WARNING: max latency exceeded for update operation. Threshold "
+                    << latency_max << " us, recorded " << insert_max << " us, diff "
+                    << (update_max - latency_max) << " us." << std::endl;
 }
 
 ParetoOptions ParetoOptions::DEFAULT;

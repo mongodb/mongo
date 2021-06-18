@@ -122,6 +122,8 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.progress('populate')
         ds.populate()
         ds.check()
+        self.progress('open extra cursor on ' + self.uri)
+        cursor = self.session.open_cursor(self.uri, None, None)
         self.progress('checkpoint')
         self.session.checkpoint()
 
@@ -146,6 +148,7 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.progress('populate')
         ds.populate()
         ds.check()
+        cursor.close()
         self.progress('close_conn')
         self.close_conn()
 

@@ -68,6 +68,11 @@ typedef struct {
     pthread_rwlock_t file_handle_lock;
 
     /*
+     * Keep the number of references to this storage source.
+     */
+    uint32_t reference_count;
+
+    /*
      * Configuration values are set at startup.
      */
     uint32_t delay_ms;    /* Average length of delay when simulated */
@@ -129,7 +134,7 @@ static int local_writeable(LOCAL_STORAGE *, const char *name, bool *writeable);
 /*
  * Forward function declarations for storage source API implementation
  */
-static int local_exist(WT_FILE_SYSTEM *, WT_SESSION *, const char *, bool *);
+static int local_add_reference(WT_STORAGE_SOURCE *);
 static int local_customize_file_system(
   WT_STORAGE_SOURCE *, WT_SESSION *, const char *, const char *, const char *, WT_FILE_SYSTEM **);
 static int local_flush(
@@ -149,6 +154,7 @@ static int local_directory_list_internal(
 static int local_directory_list_single(
   WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, char ***, uint32_t *);
 static int local_directory_list_free(WT_FILE_SYSTEM *, WT_SESSION *, char **, uint32_t);
+static int local_exist(WT_FILE_SYSTEM *, WT_SESSION *, const char *, bool *);
 static int local_fs_terminate(WT_FILE_SYSTEM *, WT_SESSION *);
 static int local_open(WT_FILE_SYSTEM *, WT_SESSION *, const char *, WT_FS_OPEN_FILE_TYPE file_type,
   uint32_t, WT_FILE_HANDLE **);
@@ -373,6 +379,27 @@ local_path(WT_FILE_SYSTEM *file_system, const char *dir, const char *name, char 
     snprintf(p, len, "%s/%s", dir, name);
     *pathp = p;
     return (ret);
+}
+
+/*
+ * local_add_reference --
+ *     Add a reference to the storage source so we can reference count to know when to really
+ *     terminate.
+ */
+static int
+local_add_reference(WT_STORAGE_SOURCE *storage_source)
+{
+    LOCAL_STORAGE *local;
+
+    local = (LOCAL_STORAGE *)storage_source;
+
+    /*
+     * Missing reference or overflow?
+     */
+    if (local->reference_count == 0 || local->reference_count + 1 == 0)
+        return (EINVAL);
+    ++local->reference_count;
+    return (0);
 }
 
 /*
@@ -1085,6 +1112,9 @@ local_terminate(WT_STORAGE_SOURCE *storage, WT_SESSION *session)
     ret = 0;
     local = (LOCAL_STORAGE *)storage;
 
+    if (--local->reference_count != 0)
+        return (0);
+
     local->op_count++;
 
     /*
@@ -1264,10 +1294,16 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
      * Allocate a local storage structure, with a WT_STORAGE structure as the first field, allowing
      * us to treat references to either type of structure as a reference to the other type.
      */
+    local->storage_source.ss_add_reference = local_add_reference;
     local->storage_source.ss_customize_file_system = local_customize_file_system;
     local->storage_source.ss_flush = local_flush;
     local->storage_source.ss_flush_finish = local_flush_finish;
     local->storage_source.terminate = local_terminate;
+
+    /*
+     * The first reference is implied by the call to add_storage_source.
+     */
+    local->reference_count = 1;
 
     if ((ret = local_configure(local, config)) != 0) {
         free(local);

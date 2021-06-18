@@ -716,6 +716,7 @@ __conn_get_storage_source(
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_NAMED_STORAGE_SOURCE *nstorage_source;
+    WT_STORAGE_SOURCE *storage_source;
 
     conn = (WT_CONNECTION_IMPL *)wt_conn;
     *storage_sourcep = NULL;
@@ -723,7 +724,9 @@ __conn_get_storage_source(
     ret = EINVAL;
     TAILQ_FOREACH (nstorage_source, &conn->storagesrcqh, q)
         if (WT_STREQ(nstorage_source->name, name)) {
-            *storage_sourcep = nstorage_source->storage_source;
+            storage_source = nstorage_source->storage_source;
+            WT_RET(storage_source->ss_add_reference(storage_source));
+            *storage_sourcep = storage_source;
             ret = 0;
             break;
         }

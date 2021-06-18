@@ -90,7 +90,7 @@ __flush_tier_once(WT_SESSION_IMPL *session, uint32_t flags)
         if (WT_PREFIX_MATCH(key, "tiered:")) {
             __wt_verbose(session, WT_VERB_TIERED, "FLUSH_TIER_ONCE: %s %s", key, value);
             /* Is this instantiating every handle even if it is not opened or in use? */
-            WT_ERR(__wt_session_get_dhandle(session, key, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
+            WT_ERR(__wt_session_get_dhandle(session, key, NULL, NULL, 0));
             /*
              * When we call wt_tiered_switch the session->dhandle points to the tiered: entry and
              * the arg is the config string that is currently in the metadata.
@@ -188,7 +188,7 @@ __tier_flush_meta(
     WT_ERR(__wt_meta_track_on(session));
     tracking = true;
 
-    WT_ERR(__wt_session_get_dhandle(session, dhandle->name, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
+    WT_ERR(__wt_session_get_dhandle(session, dhandle->name, NULL, NULL, 0));
     release = true;
     /*
      * Once the flush call succeeds we want to first remove the file: entry from the metadata and
@@ -226,7 +226,6 @@ __wt_tier_do_flush(
     WT_DECL_RET;
     WT_FILE_SYSTEM *bucket_fs;
     WT_STORAGE_SOURCE *storage_source;
-    uint32_t msec, retry;
     const char *local_name, *obj_name;
 
     storage_source = tiered->bstorage->storage_source;
@@ -241,21 +240,8 @@ __wt_tier_do_flush(
     WT_RET(storage_source->ss_flush(
       storage_source, &session->iface, bucket_fs, local_name, obj_name, NULL));
 
-    /*
-     * Flushing the metadata grabs the data handle with exclusive access, and the data handle may be
-     * held by the thread that queues the flush tier work item. As a result, the handle may be busy,
-     * so retry as needed, up to a few seconds.
-     */
-    for (msec = 10, retry = 0; msec < 3000; msec *= 2, retry++) {
-        if (retry != 0)
-            __wt_sleep(0, msec * WT_THOUSAND);
-        WT_WITH_CHECKPOINT_LOCK(session,
-          WT_WITH_SCHEMA_LOCK(
-            session, ret = __tier_flush_meta(session, tiered, local_uri, obj_uri)));
-        if (ret != EBUSY)
-            break;
-        WT_STAT_CONN_INCR(session, flush_tier_busy);
-    }
+    WT_WITH_CHECKPOINT_LOCK(session,
+      WT_WITH_SCHEMA_LOCK(session, ret = __tier_flush_meta(session, tiered, local_uri, obj_uri)));
     WT_RET(ret);
 
     /*

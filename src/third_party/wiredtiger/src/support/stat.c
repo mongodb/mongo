@@ -1250,7 +1250,6 @@ static const char *const __stats_connection_desc[] = {
   "reconciliation: split bytes currently awaiting free",
   "reconciliation: split objects currently awaiting free",
   "session: flush state races",
-  "session: flush_tier busy retries",
   "session: flush_tier operation calls",
   "session: open session count",
   "session: session query timestamp calls",
@@ -1776,7 +1775,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing rec_split_stashed_bytes */
     /* not clearing rec_split_stashed_objects */
     stats->flush_state_races = 0;
-    stats->flush_tier_busy = 0;
     stats->flush_tier = 0;
     /* not clearing session_open */
     stats->session_query_ts = 0;
@@ -2294,7 +2292,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->rec_split_stashed_bytes += WT_STAT_READ(from, rec_split_stashed_bytes);
     to->rec_split_stashed_objects += WT_STAT_READ(from, rec_split_stashed_objects);
     to->flush_state_races += WT_STAT_READ(from, flush_state_races);
-    to->flush_tier_busy += WT_STAT_READ(from, flush_tier_busy);
     to->flush_tier += WT_STAT_READ(from, flush_tier);
     to->session_open += WT_STAT_READ(from, session_open);
     to->session_query_ts += WT_STAT_READ(from, session_query_ts);
