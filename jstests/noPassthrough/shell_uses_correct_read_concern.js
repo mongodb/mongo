@@ -16,7 +16,7 @@ const testDoc = {
     "test": "doc",
     "_id": 0
 };
-coll.insertOne(testDoc);
+assert.commandWorked(coll.insertOne(testDoc));
 rst.awaitReplication();
 
 const getMajorityRCCount = () =>
