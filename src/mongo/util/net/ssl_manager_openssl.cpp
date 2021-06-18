@@ -52,6 +52,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/ssl_connection_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
@@ -100,6 +101,8 @@ int SSL_CTX_set_ciphersuites(SSL_CTX*, const char*) {
 using namespace fmt::literals;
 
 namespace mongo {
+
+using transport::SSLConnectionContext;
 
 namespace {
 
@@ -1106,6 +1109,10 @@ private:
 
     void doPeriodicJob();
 
+    bool _isShutdownConditionLocked(WithLock);
+
+    void _shutdownLocked(WithLock);
+
 private:
     // Hack
     // OpenSSL 1.1.0 = Since OpenSSL is ref counted underneath, we should use SSL_CTX_up_ref.
@@ -1118,6 +1125,10 @@ private:
     // Note: A ref is kept by all futures and the periodic job on the SSLManagerOpenSSL ensure this
     // object is alive.
     SSLManagerOpenSSL* _manager;
+
+    // Weak pointer to verify that the context owning the manager above is still valid
+    // and the manager it owns still matches the manager.
+    std::weak_ptr<const SSLConnectionContext> _ownedByContext;
 
     Mutex _staplingMutex = MONGO_MAKE_LATCH("OCSPStaplingJobRunner::_mutex");
     PeriodicRunner::JobAnchor _ocspStaplingAnchor;
@@ -1141,6 +1152,12 @@ public:
     Status initSSLContext(SSL_CTX* context,
                           const SSLParams& params,
                           ConnectionDirection direction) final;
+
+    void registerOwnedBySSLContext(std::weak_ptr<const SSLConnectionContext> ownedByContext) final;
+
+    std::weak_ptr<const SSLConnectionContext> getSSLContextOwner() {
+        return *_ownedByContext;
+    }
 
     SSLConnectionInterface* connect(Socket* socket) final;
 
@@ -1204,6 +1221,9 @@ private:
     // If set, this manager is an instance providing authentication with remote server specified
     // with TransientSSLParams::targetedClusterConnectionString.
     const std::optional<TransientSSLParams> _transientSSLParams;
+
+    // Weak pointer to verify that this manager is still owned by this context.
+    synchronized_value<std::weak_ptr<const SSLConnectionContext>> _ownedByContext;
 
     Mutex _sharedResponseMutex = MONGO_MAKE_LATCH("OCSPStaplingJobRunner::_sharedResponseMutex");
     std::shared_ptr<OCSPStaplingContext> _ocspStaplingContext;
@@ -1985,6 +2005,9 @@ Status OCSPFetcher::start(SSL_CTX* context, bool asyncOCSPStaple) {
     // the OCSPFetcher
     _ssl = UniqueSSL(SSL_new(context));
     _context = context;
+    _ownedByContext = _manager->getSSLContextOwner();
+    // Verify the consistent link between manager and the context that owns it.
+    invariant(_ownedByContext.lock()->manager.get() == _manager);
 
     auto certificateHolder = getCertificateForContext(_context);
     _cert = std::get<X509*>(certificateHolder);
@@ -2048,7 +2071,7 @@ void OCSPFetcher::startPeriodicJob(StatusWith<Milliseconds> swDurationInitial) {
         return;
     }
 
-    if (_shutdown) {
+    if (_isShutdownConditionLocked(lock)) {
         return;
     }
 
@@ -2072,13 +2095,40 @@ void OCSPFetcher::doPeriodicJob() {
 
             stdx::lock_guard<Latch> lock(this->_staplingMutex);
 
-            if (_shutdown) {
+            if (_isShutdownConditionLocked(lock)) {
                 return;
             }
 
             this->_ocspStaplingAnchor.setPeriod(getPeriodForStapleJob(swDuration));
         });
 }
+
+bool OCSPFetcher::_isShutdownConditionLocked(WithLock lock) {
+    if (_shutdown) {
+        return true;
+    }
+
+    const auto lockedContext = _ownedByContext.lock();
+    const auto lockedContextFromManager = _manager->getSSLContextOwner().lock();
+    if (!lockedContext) {
+        LOGV2(5760101,
+              "SSLConnectionContext that should own the manager for the active OCSPFetcher is "
+              "deleted");
+        _shutdownLocked(lock);
+        return true;
+    }
+
+    if (lockedContext.get() != lockedContextFromManager.get()) {
+        LOGV2_WARNING(5760102,
+                      "SSLConnectionContext that should own the manager for the active OCSPFetcher "
+                      "doesn't match");
+        _shutdownLocked(lock);
+        return true;
+    }
+
+    return false;
+}
+
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 void sslContextGetOtherCerts(SSL_CTX* ctx, STACK_OF(X509) * *sk) {
     SSL_CTX_get_extra_chain_certs(ctx, sk);
@@ -2128,7 +2178,7 @@ Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
             [this, promise](StatusWith<OCSPFetchResponse> swResponse) mutable -> Milliseconds {
                 stdx::lock_guard<Latch> lock(this->_staplingMutex);
 
-                if (_shutdown) {
+                if (_isShutdownConditionLocked(lock)) {
                     return kOCSPUnknownStatusRefreshRate;
                 }
 
@@ -2147,7 +2197,10 @@ Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
 
 void OCSPFetcher::shutdown() {
     stdx::lock_guard<Mutex> lock(_staplingMutex);
+    _shutdownLocked(lock);
+}
 
+void OCSPFetcher::_shutdownLocked(WithLock) {
     _shutdown = true;
 
     if (_ocspStaplingAnchor.isValid()) {
@@ -2382,6 +2435,11 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
     }
 
     return Status::OK();
+}
+
+void SSLManagerOpenSSL::registerOwnedBySSLContext(
+    std::weak_ptr<const SSLConnectionContext> ownedByContext) {
+    _ownedByContext = ownedByContext;
 }
 
 bool SSLManagerOpenSSL::_initSynchronousSSLContext(UniqueSSLContext* contextPtr,

@@ -49,6 +49,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/transport/ssl_connection_context.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
@@ -68,6 +69,8 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+using transport::SSLConnectionContext;
 
 extern SSLManagerCoordinator* theSSLManagerCoordinator;
 
@@ -271,6 +274,9 @@ public:
                           const SSLParams& params,
                           ConnectionDirection direction) final;
 
+    void registerOwnedBySSLContext(
+        std::weak_ptr<const transport::SSLConnectionContext> ownedByContext) final;
+
     SSLConnectionInterface* connect(Socket* socket) final;
 
     SSLConnectionInterface* accept(Socket* socket, const char* initialBytes, int len) final;
@@ -351,6 +357,10 @@ private:
 
     UniqueCertificate _sslCertificate;
     UniqueCertificate _sslClusterCertificate;
+
+    // Weak pointer to verify that this manager is still owned by this context.
+    // Will be used if stapling is implemented.
+    synchronized_value<std::weak_ptr<const SSLConnectionContext>> _ownedByContext;
 };
 
 GlobalInitializerRegisterer sslManagerInitializer(
@@ -1431,6 +1441,11 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
     }
 
     return Status::OK();
+}
+
+void SSLManagerWindows::registerOwnedBySSLContext(
+    std::weak_ptr<const SSLConnectionContext> ownedByContext) {
+    _ownedByContext = ownedByContext;
 }
 
 SSLConnectionInterface* SSLManagerWindows::connect(Socket* socket) {

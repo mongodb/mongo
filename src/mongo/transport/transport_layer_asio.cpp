@@ -1233,7 +1233,10 @@ SSLParams::SSLModes TransportLayerASIO::_sslMode() const {
 
 Status TransportLayerASIO::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                                               bool asyncOCSPStaple) {
-
+    if (manager && manager->isTransient()) {
+        return Status(ErrorCodes::InternalError,
+                      "Should not rotate transient SSL manager's certificates");
+    }
     auto contextOrStatus = _createSSLContext(manager, _sslMode(), asyncOCSPStaple);
     if (!contextOrStatus.isOK()) {
         return contextOrStatus.getStatus();
@@ -1262,6 +1265,8 @@ TransportLayerASIO::_createSSLContext(std::shared_ptr<SSLManagerInterface>& mana
             return status;
         }
 
+        std::weak_ptr<const SSLConnectionContext> weakContextPtr = newSSLContext;
+        manager->registerOwnedBySSLContext(weakContextPtr);
         auto resp = newSSLContext->manager->stapleOCSPResponse(
             newSSLContext->ingress->native_handle(), asyncOCSPStaple);
 
@@ -1297,9 +1302,7 @@ TransportLayerASIO::createTransientSSLContext(const TransientSSLParams& transien
                       "SSLManagerCoordinator is not initialized");
     }
     auto manager = coordinator->createTransientSSLManager(transientSSLParams);
-    if (!manager) {
-        return Status(ErrorCodes::InvalidSSLConfiguration, "TransportLayerASIO has no SSL manager");
-    }
+    invariant(manager);
 
     return _createSSLContext(manager, _sslMode(), true /* asyncOCSPStaple */);
 }

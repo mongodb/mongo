@@ -44,6 +44,7 @@
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
+#include "mongo/transport/ssl_connection_context.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/fail_point.h"
@@ -68,6 +69,8 @@ using asio::ssl::apple::CFUniquePtr;
 extern "C" SecIdentityRef SecIdentityCreate(CFAllocatorRef, SecCertificateRef, SecKeyRef);
 
 namespace mongo {
+
+using transport::SSLConnectionContext;
 
 namespace {
 
@@ -1275,6 +1278,9 @@ public:
                           const SSLParams& params,
                           ConnectionDirection direction) final;
 
+    void registerOwnedBySSLContext(
+        std::weak_ptr<const transport::SSLConnectionContext> ownedByContext) final;
+
     SSLConnectionInterface* connect(Socket* socket) final;
     SSLConnectionInterface* accept(Socket* socket, const char* initialBytes, int len) final;
 
@@ -1324,6 +1330,10 @@ private:
     CFUniquePtr<::CFArrayRef> _serverCA;
 
     SSLConfiguration _sslConfiguration;
+
+    // Weak pointer to verify that this manager is still owned by this context.
+    // Will be used if stapling is implemented.
+    synchronized_value<std::weak_ptr<const SSLConnectionContext>> _ownedByContext;
 };
 
 SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
@@ -1472,6 +1482,11 @@ Status SSLManagerApple::initSSLContext(asio::ssl::apple::Context* context,
 
     return selectCertificate(
         params.sslCertificateSelector, params.sslPEMKeyFile, params.sslPEMKeyPassword);
+}
+
+void SSLManagerApple::registerOwnedBySSLContext(
+    std::weak_ptr<const transport::SSLConnectionContext> ownedByContext) {
+    _ownedByContext = ownedByContext;
 }
 
 SSLConnectionInterface* SSLManagerApple::connect(Socket* socket) {
