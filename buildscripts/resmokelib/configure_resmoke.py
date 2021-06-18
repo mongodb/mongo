@@ -199,6 +199,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.FLOW_CONTROL_TICKETS = config.pop("flow_control_tickets")
 
     _config.INCLUDE_WITH_ANY_TAGS = _tags_from_list(config.pop("include_with_any_tags"))
+    _config.INCLUDE_TAGS = _tags_from_list(config.pop("include_with_all_tags"))
 
     _config.GENNY_EXECUTABLE = _expand_user(config.pop("genny_executable"))
     _config.JOBS = config.pop("jobs")

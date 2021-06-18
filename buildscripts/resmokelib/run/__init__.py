@@ -647,6 +647,12 @@ class RunPlugin(PluginInterface):
                   " only tests which have at least one of the specified tags will be"
                   " run."))
 
+        parser.add_argument(
+            "--includeWithAllTags", action="append", dest="include_with_all_tags",
+            metavar="TAG1,TAG2",
+            help=("Comma separated list of tags. For the jstest portion of the suite(s),"
+                  "tests that have all of the specified tags will be run."))
+
         parser.add_argument("-n", action="store_const", const="tests", dest="dry_run",
                             help="Outputs the tests that would be run.")
 

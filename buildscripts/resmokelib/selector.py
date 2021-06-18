@@ -369,8 +369,13 @@ class _SelectorConfig(object):
         exclude_with_any_tags = self.__merge_lists(exclude_with_any_tags,
                                                    config.EXCLUDE_WITH_ANY_TAGS)
 
+        # This is functionally similar to `include_tags` but contains a list of tags rather
+        # than an expression.
+        include_with_all_tags = config.INCLUDE_TAGS
+
         self.tags_expression = self.__make_tags_expression(
-            include_tags, exclude_tags, include_with_any_tags, exclude_with_any_tags)
+            include_tags, exclude_tags, include_with_any_tags, exclude_with_any_tags,
+            include_with_all_tags)
 
     @staticmethod
     def __merge_lists(list_a, list_b):
@@ -384,10 +389,13 @@ class _SelectorConfig(object):
 
     @staticmethod
     def __make_tags_expression(include_tags, exclude_tags, include_with_any_tags,
-                               exclude_with_any_tags):
+                               exclude_with_any_tags, include_with_all_tags):
         expressions = []
         if include_tags:
             expressions.append(make_expression(include_tags))
+        if include_with_all_tags:
+            include_with_all_tags_expr = make_expression({"$allOf": include_with_all_tags})
+            expressions.append(include_with_all_tags_expr)
         elif exclude_tags:
             expressions.append(_NotExpression(make_expression(exclude_tags)))
         if include_with_any_tags:

@@ -62,6 +62,7 @@ DEFAULTS = {
     "config_fuzz_seed": None,
     "genny_executable": None,
     "include_with_any_tags": None,
+    "include_with_all_tags": None,
     "install_dir": None,
     "jobs": 1,
     "logger_file": "console",
@@ -354,6 +355,9 @@ GENNY_EXECUTABLE = None
 # If set, then only jstests that have at least one of the specified tags will be run during the
 # jstest portion of the suite(s).
 INCLUDE_WITH_ANY_TAGS = None
+
+# If set, only jstests that have all the tags will be run.
+INCLUDE_TAGS = None
 
 # Params that can be set to change internal resmoke behavior. Used to test resmoke and should
 # not be set by the user.

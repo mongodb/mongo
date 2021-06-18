@@ -1458,6 +1458,15 @@ functions:
         args:
           - "./src/evergreen/lint_fuzzer_sanity_all.sh"
 
+  "update patch failure history":
+    - *f_expansions_write
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/update_patch_failure_history.sh"
+
   # Used by generator
   "run jstestfuzz":
     - *f_expansions_write
@@ -2095,6 +2104,16 @@ tasks:
           --separate-debug
           PREFIX=dist-test
 
+- name: determine_patch_tests
+  commands:
+    - *f_expansions_write
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/gen_patch_test_tags.sh"
+
 - name: archive_dist_test
   tags: []
   depends_on:
@@ -2134,6 +2153,7 @@ tasks:
         target: "artifacts.tgz"
         source_dir: "src"
         include:
+          - "patch_test_tags.tgz"
           - "./build/**.gcno"
           - "./etc/*san.suppressions"
           - "./etc/expansions.default.yml"
@@ -6996,6 +7016,16 @@ tasks:
     vars:
       resmoke_args: --suites=mqlrun
 
+- name: update_patch_failure_history
+  # Time out the task if it runs for more than 8 hours. Provides buffer for
+  # when the Evergreen API is busy.
+  exec_timeout_secs: 28800
+  commands:
+    - func: "do non-compile setup"
+    - *f_expansions_write
+    - func: "configure evergreen api credentials"
+    - func: "update patch failure history"
+
 #######################################
 #             Task Groups             #
 #######################################
@@ -7107,6 +7137,7 @@ task_groups:
   name: compile_test_and_package_parallel_core_stream_TG
   tasks:
   - compile_dist_test
+  - determine_patch_tests
   - archive_dist_test
   - archive_dist_test_debug
   - compile_all
@@ -8136,6 +8167,15 @@ buildvariants:
   - name: powercycle_sentinel
   - name: powercycle_smoke_skip_compile_gen
 
+- name: stm-hourly-cron
+  display_name: "~ STM Hourly Cron"
+  batchtime: 60
+  run_on:
+    - rhel80-small
+  stepback: false
+  tasks:
+    - name: update_patch_failure_history
+
 - name: security-daily-cron
   modules:
   - enterprise
@@ -9129,7 +9169,8 @@ buildvariants:
     distros:
       - rhel80-xlarge
 
-- name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
+- &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
+  name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
   display_name: "! Shared Library Enterprise RHEL 8.0 (all feature flags)"
   batchtime: 240 # 4 hour
   stepback: false
@@ -9154,7 +9195,7 @@ buildvariants:
     # To force disable feature flags even on the all feature flags variant, please use this file:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: --runAllFeatureFlagTests
-  tasks:
+  tasks: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-tasks
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - rhel80-large
@@ -9246,7 +9287,8 @@ buildvariants:
 #    distros:
 #      - rhel80-large
 
-- name: enterprise-rhel-80-64-bit-dynamic-sbe-engine
+- &enterprise-rhel-80-64-bit-dynamic-sbe-engine
+  name: enterprise-rhel-80-64-bit-dynamic-sbe-engine
   display_name: "Shared Library Enterprise RHEL 8.0 (SBE Engine)"
   batchtime: 1440 # 1 day
   stepback: false
@@ -11707,3 +11749,27 @@ buildvariants:
   expansions:
     <<: *macos-debug-expansions
     compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --link-model=dynamic --experimental-visibility-support=on
+
+### QO & QE Patch-Specific Build Variants ###
+- <<: *enterprise-rhel-80-64-bit-dynamic-sbe-engine
+  name: enterprise-rhel-80-64-bit-dynamic-sbe-engine-query-patch-only
+  display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (SBE Execution Engine)"
+  batchtime: 7776000 # 90 days. This is a patch-only variant.
+  expansions:
+    <<: *enterprise-rhel-80-64-bit-dynamic-sbe-engine-expansions
+    jstestfuzz_num_generated_files: 20
+    jstestfuzz_concurrent_num_files: 5
+    target_resmoke_time: 30
+    max_sub_suites: 3
+
+# Intentionally derive from SBE to run the SBE tests with all feature flags.
+- <<: *enterprise-rhel-80-64-bit-dynamic-sbe-engine
+  name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only
+  display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (all feature flags)"
+  batchtime: 7776000 # 90 days. This is a patch-only variant.
+  expansions:
+    <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
+    jstestfuzz_num_generated_files: 20
+    jstestfuzz_concurrent_num_files: 5
+    target_resmoke_time: 30
+    max_sub_suites: 3
