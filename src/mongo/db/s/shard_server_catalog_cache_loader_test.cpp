@@ -79,7 +79,7 @@ public:
     /**
      * Sets up the _shardLoader with the results of makeFiveChunks().
      */
-    vector<ChunkType> setUpChunkLoaderWithFiveChunks();
+    std::pair<CollectionType, vector<ChunkType>> setUpChunkLoaderWithFiveChunks();
 
     void refreshCollectionEpochOnRemoteLoader();
 
@@ -199,7 +199,8 @@ CollectionType ShardServerCatalogCacheLoaderTest::makeCollectionType(
     return coll;
 }
 
-vector<ChunkType> ShardServerCatalogCacheLoaderTest::setUpChunkLoaderWithFiveChunks() {
+std::pair<CollectionType, vector<ChunkType>>
+ShardServerCatalogCacheLoaderTest::setUpChunkLoaderWithFiveChunks() {
     ChunkVersion collectionVersion(1, 0, OID::gen(), boost::none /* timestamp */);
 
     CollectionType collectionType = makeCollectionType(collectionVersion);
@@ -216,7 +217,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::setUpChunkLoaderWithFiveChu
         ASSERT_BSONOBJ_EQ(collAndChunksRes.changedChunks[i].toShardBSON(), chunks[i].toShardBSON());
     }
 
-    return chunks;
+    return std::pair{collectionType, std::move(chunks)};
 }
 
 TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromUnshardedToUnsharded) {
@@ -233,8 +234,8 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromUnshardedToUnsharded) {
 
 TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedToUnsharded) {
     // First set up the shard chunk loader as sharded.
-
-    auto chunks = setUpChunkLoaderWithFiveChunks();
+    auto collAndChunks = setUpChunkLoaderWithFiveChunks();
+    auto& chunks = collAndChunks.second;
 
     // Then return a NamespaceNotFound error, which means the collection must have been dropped,
     // clearing the chunk metadata.
@@ -251,8 +252,8 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedToUnsharded) {
 
 TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindNoDiff) {
     // First set up the shard chunk loader as sharded.
-
-    vector<ChunkType> chunks = setUpChunkLoaderWithFiveChunks();
+    auto collAndChunks = setUpChunkLoaderWithFiveChunks();
+    auto& chunks = collAndChunks.second;
 
     // Then set up the remote loader to return a single document we've already seen -- indicates
     // there's nothing new.
@@ -275,8 +276,8 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindNoDiff) {
 // routing table, rather than diff from a known version.
 TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindNoDiffRequestAll) {
     // First set up the shard chunk loader as sharded.
-
-    vector<ChunkType> chunks = setUpChunkLoaderWithFiveChunks();
+    auto collAndChunks = setUpChunkLoaderWithFiveChunks();
+    auto& chunks = collAndChunks.second;
 
     // Then set up the remote loader to return a single document we've already seen -- indicates
     // there's nothing new.
@@ -297,8 +298,8 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindNoDiffReq
 
 TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindDiff) {
     // First set up the shard chunk loader as sharded.
-
-    vector<ChunkType> chunks = setUpChunkLoaderWithFiveChunks();
+    auto collAndChunks = setUpChunkLoaderWithFiveChunks();
+    auto& chunks = collAndChunks.second;
 
     // Then refresh again and find updated chunks.
 
@@ -323,8 +324,8 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindDiff) {
 
 TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindDiffRequestAll) {
     // First set up the shard chunk loader as sharded.
-
-    vector<ChunkType> chunks = setUpChunkLoaderWithFiveChunks();
+    auto collAndChunks = setUpChunkLoaderWithFiveChunks();
+    auto& chunks = collAndChunks.second;
 
     // First cause a remote refresh to find the updated chunks. Then wait for persistence, so that
     // we ensure that nothing is enqueued and the next getChunksSince call will return a predictable
@@ -363,8 +364,8 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindDiffReque
 
 TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindNewEpoch) {
     // First set up the shard chunk loader as sharded.
-
-    vector<ChunkType> chunks = setUpChunkLoaderWithFiveChunks();
+    auto collAndChunks = setUpChunkLoaderWithFiveChunks();
+    auto& chunks = collAndChunks.second;
 
     // Then refresh again and find that the collection has been dropped and recreated.
 
@@ -389,13 +390,11 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindNewEpoch)
 
 TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChunkVersions) {
     // First set up the shard chunk loader as sharded.
-
-    vector<ChunkType> chunks = setUpChunkLoaderWithFiveChunks();
+    auto collAndChunks = setUpChunkLoaderWithFiveChunks();
+    auto& chunks = collAndChunks.second;
 
     // Then refresh again and retrieve chunks from the config server that have mixed epoches, like
     // as if the chunks read yielded around a drop and recreate of the collection.
-
-    CollectionType originalCollectionType = makeCollectionType(chunks.back().getVersion());
 
     ChunkVersion collVersionWithNewEpoch(1, 0, OID::gen(), boost::none /* timestamp */);
     CollectionType collectionTypeWithNewEpoch = makeCollectionType(collVersionWithNewEpoch);
@@ -439,57 +438,165 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChun
     }
 }
 
-TEST_F(ShardServerCatalogCacheLoaderTest,
-       PrimaryLoadFromShardedAndFindCollAndChunksMetadataFormatChanged) {
+TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedWithChangeOnMetadataFormat) {
     // First set up the shard chunk loader as sharded.
-    vector<ChunkType> chunks = setUpChunkLoaderWithFiveChunks();
+    auto collAndChunks = setUpChunkLoaderWithFiveChunks();
+    auto& collType = collAndChunks.first;
+    auto& chunks = collAndChunks.second;
 
-    // Simulating that the config server added timestamps to all chunks
-    {
-        vector<ChunkType> newChunks = chunks;
-        for (auto& chunk : newChunks) {
-            const ChunkVersion v = chunk.getVersion();
-            chunk.setVersion(
-                ChunkVersion(v.majorVersion(), v.minorVersion(), v.epoch(), Timestamp(42)));
-        }
+    auto changeMetadataFormat = [&](const boost::optional<Timestamp>& timestamp) {
+        auto lastChunk = chunks.back();
+        lastChunk.setVersion([&]() {
+            const auto v = lastChunk.getVersion();
+            return ChunkVersion(v.majorVersion(), v.minorVersion(), v.epoch(), timestamp);
+        }());
 
-        CollectionType collectionTypeWithNewEpoch =
-            makeCollectionType(newChunks.back().getVersion());
-        _remoteLoaderMock->setCollectionRefreshReturnValue(collectionTypeWithNewEpoch);
-        _remoteLoaderMock->setChunkRefreshReturnValue(newChunks);
+        collType.setTimestamp(timestamp);
+        _remoteLoaderMock->setCollectionRefreshReturnValue(collType);
+        _remoteLoaderMock->setChunkRefreshReturnValue(std::vector{lastChunk});
 
-        auto collAndChunksRes = _shardLoader->getChunksSince(kNss, newChunks[0].getVersion()).get();
-        ASSERT_EQUALS(collAndChunksRes.epoch, collectionTypeWithNewEpoch.getEpoch());
-        ASSERT_EQUALS(collAndChunksRes.creationTime, Timestamp(42));
+        auto collAndChunksRes = _shardLoader->getChunksSince(kNss, chunks[0].getVersion()).get();
+        ASSERT_EQUALS(collAndChunksRes.epoch, collType.getEpoch());
+        ASSERT_EQUALS(collAndChunksRes.creationTime, timestamp);
         ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 5UL);
         for (const auto& changedChunk : collAndChunksRes.changedChunks) {
-            ASSERT_EQUALS(changedChunk.getVersion().getTimestamp(), Timestamp(42));
+            ASSERT_EQUALS(changedChunk.getVersion().getTimestamp(), timestamp);
             ASSERT_EQUALS(changedChunk.getVersion().epoch(), collAndChunksRes.epoch);
         }
+    };
+
+    // Upgrading the metadata format to 5.0
+    changeMetadataFormat(Timestamp(42));
+    // Downgrading the medata format to 4.4
+    changeMetadataFormat(boost::none /* timestamp */);
+}
+
+TEST_F(ShardServerCatalogCacheLoaderTest,
+       PrimaryLoadFromShardedWithChangeOnMetadataFormatBecauseUpgrade) {
+    const auto timestamp = Timestamp(42);
+    ChunkVersion collectionVersion(1, 0, OID::gen(), boost::none /* timestamp */);
+    CollectionType collectionType = makeCollectionType(collectionVersion);
+    vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
+
+    // 1st refresh as if we were in 4.4: the loader discovers one new chunk without timestamp
+    {
+        _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
+        _remoteLoaderMock->setChunkRefreshReturnValue(std::vector{chunks[0]});
+        const auto collAndChunksRes =
+            _shardLoader->getChunksSince(kNss, chunks[0].getVersion()).get();
+        ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 1UL);
+        ASSERT_EQUALS(collAndChunksRes.creationTime, boost::none);
+        ASSERT_EQUALS(collAndChunksRes.changedChunks[0].getVersion().getTimestamp(), boost::none);
     }
 
-    // Simulating that the config server removed timestamps from all chunks
+    // 2nd refresh as if we were in the phase 1 of the setFCV process to upgrade to 5.0: the loader
+    // discovers a few new chunks with timestamp but the collection doesn't have it yet.
     {
-        vector<ChunkType> newChunks = chunks;
-        for (auto& chunk : newChunks) {
-            const ChunkVersion v = chunk.getVersion();
-            chunk.setVersion(
-                ChunkVersion(v.majorVersion(), v.minorVersion(), v.epoch(), boost::none));
+        for (size_t i = 1; i < chunks.size() - 1; ++i) {
+            chunks[i].setVersion([&]() {
+                const auto v = chunks[i].getVersion();
+                return ChunkVersion(v.majorVersion(), v.minorVersion(), v.epoch(), timestamp);
+            }());
         }
 
-        CollectionType collectionTypeWithNewEpoch =
-            makeCollectionType(newChunks.back().getVersion());
-        _remoteLoaderMock->setCollectionRefreshReturnValue(collectionTypeWithNewEpoch);
-        _remoteLoaderMock->setChunkRefreshReturnValue(newChunks);
-
-        auto collAndChunksRes = _shardLoader->getChunksSince(kNss, newChunks[0].getVersion()).get();
-        ASSERT_EQUALS(collAndChunksRes.epoch, collectionTypeWithNewEpoch.getEpoch());
+        _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
+        _remoteLoaderMock->setChunkRefreshReturnValue(
+            std::vector<ChunkType>(chunks.begin() + 1, chunks.end() - 1));
+        const auto collAndChunksRes =
+            _shardLoader->getChunksSince(kNss, chunks[0].getVersion()).get();
+        const auto& changedChunks = collAndChunksRes.changedChunks;
+        ASSERT_EQUALS(changedChunks.size(), 4UL);
         ASSERT_EQUALS(collAndChunksRes.creationTime, boost::none);
-        ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 5UL);
-        for (const auto& changedChunk : collAndChunksRes.changedChunks) {
-            ASSERT_EQUALS(changedChunk.getVersion().getTimestamp(), boost::none);
-            ASSERT_EQUALS(changedChunk.getVersion().epoch(), collAndChunksRes.epoch);
+        ASSERT_EQUALS(changedChunks[0].getVersion().getTimestamp(), boost::none);
+        for (size_t i = 1; i < chunks.size() - 1; ++i)
+            ASSERT_EQUALS(changedChunks[i].getVersion().getTimestamp(), timestamp);
+    }
+
+    // 3rd refresh as if we were in 5.0: the loader discovers a new chunk. All chunks and the
+    // collection have timestamps.
+    {
+        chunks.back().setVersion([&]() {
+            const auto v = chunks.back().getVersion();
+            return ChunkVersion(v.majorVersion(), v.minorVersion(), v.epoch(), timestamp);
+        }());
+        collectionType.setTimestamp(timestamp);
+
+        _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
+        _remoteLoaderMock->setChunkRefreshReturnValue(std::vector{chunks.back()});
+        const auto collAndChunksRes =
+            _shardLoader->getChunksSince(kNss, chunks[0].getVersion()).get();
+        const auto& changedChunks = collAndChunksRes.changedChunks;
+        ASSERT_EQUALS(changedChunks.size(), 5UL);
+        ASSERT_EQUALS(collAndChunksRes.creationTime, timestamp);
+        for (size_t i = 0; i < chunks.size(); ++i)
+            ASSERT_EQUALS(changedChunks[i].getVersion().getTimestamp(), timestamp);
+    }
+}
+
+TEST_F(ShardServerCatalogCacheLoaderTest,
+       PrimaryLoadFromShardedWithChangeOnMetadataFormatBecauseDowngrade) {
+    const auto timestamp = Timestamp(42);
+    ChunkVersion collectionVersion(1, 0, OID::gen(), timestamp);
+    CollectionType collectionType = makeCollectionType(collectionVersion);
+    vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
+
+    // 1st refresh as if we were in 5.0: the loader discovers one new chunk with timestamp. The
+    // collection also has timestamps.
+    {
+        _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
+        _remoteLoaderMock->setChunkRefreshReturnValue(std::vector{chunks[0]});
+        const auto collAndChunksRes =
+            _shardLoader->getChunksSince(kNss, chunks[0].getVersion()).get();
+        ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 1UL);
+        ASSERT_EQUALS(collAndChunksRes.creationTime, timestamp);
+        ASSERT_EQUALS(collAndChunksRes.changedChunks[0].getVersion().getTimestamp(), timestamp);
+    }
+
+    // 2nd refresh: the loader discovers a few new chunks without timestamp but the collection still
+    // has it.
+    {
+        for (size_t i = 1; i < chunks.size() - 1; ++i) {
+            chunks[i].setVersion([&]() {
+                const auto v = chunks[i].getVersion();
+                return ChunkVersion(
+                    v.majorVersion(), v.minorVersion(), v.epoch(), boost::none /* timestamp */);
+            }());
         }
+
+        _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
+        _remoteLoaderMock->setChunkRefreshReturnValue(
+            std::vector<ChunkType>(chunks.begin() + 1, chunks.end() - 1));
+        const auto collAndChunksRes =
+            _shardLoader->getChunksSince(kNss, chunks[0].getVersion()).get();
+        const auto& changedChunks = collAndChunksRes.changedChunks;
+        ASSERT_EQUALS(changedChunks.size(), 4UL);
+        ASSERT_EQUALS(collAndChunksRes.creationTime, timestamp);
+        ASSERT_EQUALS(changedChunks[0].getVersion().getTimestamp(), timestamp);
+        for (size_t i = 1; i < chunks.size() - 1; ++i)
+            ASSERT_EQUALS(changedChunks[i].getVersion().getTimestamp(),
+                          boost::none /* timestamp */);
+    }
+
+    // 3rd refresh as if we were in 4.4: the loader discovers a new chunk. All chunks and the
+    // collection don't have timestamps.
+    {
+        chunks.back().setVersion([&]() {
+            const auto v = chunks.back().getVersion();
+            return ChunkVersion(
+                v.majorVersion(), v.minorVersion(), v.epoch(), boost::none /* timestamp */);
+        }());
+        collectionType.setTimestamp(boost::none /* timestamp */);
+
+        _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
+        _remoteLoaderMock->setChunkRefreshReturnValue(std::vector{chunks.back()});
+        const auto collAndChunksRes =
+            _shardLoader->getChunksSince(kNss, chunks[0].getVersion()).get();
+        const auto& changedChunks = collAndChunksRes.changedChunks;
+        ASSERT_EQUALS(changedChunks.size(), 5UL);
+        ASSERT_EQUALS(collAndChunksRes.creationTime, boost::none /* timestamp */);
+        for (size_t i = 0; i < chunks.size(); ++i)
+            ASSERT_EQUALS(changedChunks[i].getVersion().getTimestamp(),
+                          boost::none /* timestamp */);
     }
 }
 

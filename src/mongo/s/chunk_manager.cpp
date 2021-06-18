@@ -193,9 +193,13 @@ ShardVersionMap ChunkMap::constructShardVersionMap() const {
 
 void ChunkMap::appendChunk(const std::shared_ptr<ChunkInfo>& chunk) {
     appendChunkTo(_chunkMap, chunk);
-
-    if (_collectionVersion.isOlderThan(chunk->getLastmod()))
-        _collectionVersion = chunk->getLastmod();
+    const auto chunkVersion = chunk->getLastmod();
+    if (_collectionVersion.isOlderThan(chunkVersion)) {
+        _collectionVersion = ChunkVersion(chunkVersion.majorVersion(),
+                                          chunkVersion.minorVersion(),
+                                          chunkVersion.epoch(),
+                                          _collTimestamp);
+    }
 }
 
 std::shared_ptr<ChunkInfo> ChunkMap::findIntersectingChunk(const BSONObj& shardKey) const {
