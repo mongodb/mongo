@@ -152,7 +152,16 @@ int BSONCollectionCatalogEntry::MetaData::findIndexOffset(StringData name) const
 }
 
 void BSONCollectionCatalogEntry::MetaData::insertIndex(IndexMetaData indexMetaData) {
-    indexes.push_back(std::move(indexMetaData));
+    int indexOffset = findIndexOffset(indexMetaData.nameStringData());
+
+    if (indexOffset < 0) {
+        indexes.push_back(std::move(indexMetaData));
+        return;
+    }
+
+    // We have an unused element, was invalidated due to an index drop, that can be reused
+    // for this new index.
+    indexes[indexOffset] = std::move(indexMetaData);
 }
 
 bool BSONCollectionCatalogEntry::MetaData::eraseIndex(StringData name) {
