@@ -338,6 +338,14 @@ public:
 
     /** Retrieve int value for the element safely.  Zero returned if not a number. */
     int numberInt() const;
+
+    /** Like numberInt() but with well-defined behavior for doubles that
+     *  are NaNs, or too large/small to be represented as int.
+     *  NaNs -> 0
+     *  very large doubles -> INT_MAX
+     *  very small doubles -> INT_MIN  */
+    int safeNumberInt() const;
+
     /** Retrieve long value for the element safely.  Zero returned if not a number.
      *  Behavior is not defined for double values that are NaNs, or too large/small
      *  to be represented by long longs */
@@ -820,6 +828,21 @@ inline int BSONElement::numberInt() const {
         default:
             return 0;
     }
+}
+
+/** Like numberInt() but with well-defined behavior for doubles that
+ *  are NaNs, or too large/small to be represented as int.
+ *  NaNs -> 0
+ *  very large doubles -> INT_MAX
+ *  very small doubles -> INT_MIN  */
+inline int BSONElement::safeNumberInt() const {
+    const long long minInt = std::numeric_limits<int>::min();
+    const long long maxInt = std::numeric_limits<int>::max();
+    const auto numberLong = safeNumberLong();
+    if (numberLong < minInt) {
+        return minInt;
+    }
+    return std::min(numberLong, maxInt);
 }
 
 /** Retrieve long value for the element safely.  Zero returned if not a number. */

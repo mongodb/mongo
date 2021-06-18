@@ -66,25 +66,22 @@ unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
  * test function to verify results of transform()
  * on a working set member.
  *
- * specStr - projection specification
- * queryStr - query
- * objStr - object to run projection on
+ * spec - projection specification
+ * query - query
+ * obj - object to run projection on
  * data - computed data. Owned by working set member created in this function if not null.
  * expectedStatusOK - expected status of transformation
- * expectedObjStr - expected object after successful projection.
- *                  Ignored if expectedStatusOK is false.
+ * expectedObj - expected object after successful projection.
+ *               Ignored if expectedStatusOK is false.
  */
-
-void testTransform(const char* specStr,
-                   const char* queryStr,
-                   const char* objStr,
+void testTransform(const BSONObj& spec,
+                   const BSONObj& query,
+                   const BSONObj& obj,
                    WorkingSetComputedData* data,
                    const CollatorInterface* collator,
                    bool expectedStatusOK,
-                   const char* expectedObjStr) {
+                   const BSONObj& expectedObj) {
     // Create projection exec object.
-    BSONObj spec = fromjson(specStr);
-    BSONObj query = fromjson(queryStr);
     unique_ptr<MatchExpression> queryExpression = parseMatchExpression(query);
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
@@ -92,7 +89,7 @@ void testTransform(const char* specStr,
 
     // Create working set member.
     WorkingSetMember wsm;
-    wsm.obj = Snapshotted<BSONObj>(SnapshotId(), fromjson(objStr));
+    wsm.obj = Snapshotted<BSONObj>(SnapshotId(), obj);
     if (data) {
         wsm.addComputed(data);
     }
@@ -106,8 +103,8 @@ void testTransform(const char* specStr,
         if (status.isOK()) {
             mongoutils::str::stream ss;
             ss << "expected transform() to fail but got success instead."
-               << "\nprojection spec: " << specStr << "\nquery: " << queryStr
-               << "\nobject before projection: " << objStr;
+               << "\nprojection spec: " << spec.toString() << "\nquery: " << query.toString()
+               << "\nobject before projection: " << obj.toString();
             FAIL(ss);
         }
         return;
@@ -118,24 +115,39 @@ void testTransform(const char* specStr,
     if (!status.isOK()) {
         mongoutils::str::stream ss;
         ss << "transform() test failed: unexpected failed status: " << status.toString()
-           << "\nprojection spec: " << specStr << "\nquery: " << queryStr
-           << "\nobject before projection: " << objStr
-           << "\nexpected object after projection: " << expectedObjStr;
+           << "\nprojection spec: " << spec.toString() << "\nquery: " << query.toString()
+           << "\nobject before projection: " << obj.toString()
+           << "\nexpected object after projection: " << expectedObj.toString();
         FAIL(ss);
     }
 
     // Finally, we compare the projected object.
-    const BSONObj& obj = wsm.obj.value();
-    BSONObj expectedObj = fromjson(expectedObjStr);
-    if (SimpleBSONObjComparator::kInstance.evaluate(obj != expectedObj)) {
+    const BSONObj& resultObj = wsm.obj.value();
+    if (SimpleBSONObjComparator::kInstance.evaluate(resultObj != expectedObj)) {
         mongoutils::str::stream ss;
         ss << "transform() test failed: unexpected projected object."
-           << "\nprojection spec: " << specStr << "\nquery: " << queryStr
-           << "\nobject before projection: " << objStr
-           << "\nexpected object after projection: " << expectedObjStr
-           << "\nactual object after projection: " << obj.toString();
+           << "\nprojection spec: " << spec.toString() << "\nquery: " << query.toString()
+           << "\nobject before projection: " << obj.toString()
+           << "\nexpected object after projection: " << expectedObj.toString()
+           << "\nactual object after projection: " << resultObj.toString();
         FAIL(ss);
     }
+}
+
+void testTransform(const char* specStr,
+                   const char* queryStr,
+                   const char* objStr,
+                   WorkingSetComputedData* data,
+                   const CollatorInterface* collator,
+                   bool expectedStatusOK,
+                   const char* expectedObjStr) {
+    testTransform(fromjson(specStr),
+                  fromjson(queryStr),
+                  fromjson(objStr),
+                  data,
+                  collator,
+                  expectedStatusOK,
+                  fromjson(expectedObjStr));
 }
 
 /**
@@ -264,6 +276,74 @@ TEST(ProjectionExecTest, TransformSliceSkipLimit) {
     testTransform("{a: {$slice: [1, 1]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [6]}");
     testTransform("{a: {$slice: [3, 5]}}", "{}", "{a: [4, 6, 8]}", true, "{a: []}");
     testTransform("{a: {$slice: [10, 10]}}", "{}", "{a: [4, 6, 8]}", true, "{a: []}");
+}
+
+TEST(ProjectionExecTest, TransformSliceWithSpecialValuesAsArguments) {
+    auto assertSliceResult =
+        [&](const BSONObj& spec, const char* inputDocument, const char* expectedResult) {
+            testTransform(spec,
+                          BSONObj(),
+                          fromjson(inputDocument),
+                          nullptr,
+                          nullptr,
+                          true,
+                          fromjson(expectedResult));
+        };
+
+    const auto positiveClamping =
+        BSON_ARRAY((static_cast<long long>(std::numeric_limits<int>::max()) + 1)
+                   << std::numeric_limits<long long>::max()
+                   << std::numeric_limits<double>::max()
+                   << std::numeric_limits<double>::infinity()
+                   << Decimal128::kPositiveInfinity
+                   << Decimal128::kLargestPositive);
+    for (const auto& element : positiveClamping) {
+        assertSliceResult(
+            BSON("a" << BSON("$slice" << element)), "{ a: [ 1, 2, 3 ] }", "{ a: [ 1, 2, 3 ] }");
+
+        assertSliceResult(BSON("a" << BSON("$slice" << BSON_ARRAY(1 << element))),
+                          "{ a: [1, 2, 3] }",
+                          "{ a: [ 2, 3 ] }");
+
+        assertSliceResult(BSON("a" << BSON("$slice" << BSON_ARRAY(element << 1))),
+                          "{ a: [ 1, 2, 3 ] }",
+                          "{ a: [] }");
+
+        assertSliceResult(BSON("a" << BSON("$slice" << BSON_ARRAY(element << element))),
+                          "{ a: [ 1, 2, 3 ] }",
+                          "{ a: [] }");
+    }
+
+    const auto negativeClamping =
+        BSON_ARRAY((static_cast<long long>(std::numeric_limits<int>::min()) - 1)
+                   << std::numeric_limits<long long>::min()
+                   << std::numeric_limits<double>::lowest()
+                   << -std::numeric_limits<double>::infinity()
+                   << Decimal128::kNegativeInfinity
+                   << Decimal128::kLargestNegative);
+    for (const auto& element : negativeClamping) {
+        assertSliceResult(
+            BSON("a" << BSON("$slice" << element)), "{ a: [ 1, 2, 3 ] }", "{ a: [ 1, 2, 3 ] }");
+
+        assertSliceResult(BSON("a" << BSON("$slice" << BSON_ARRAY(element << 1))),
+                          "{ a: [ 1, 2, 3 ] }",
+                          "{ a: [ 1 ] }");
+    }
+
+    const auto convertionToZero =
+        BSON_ARRAY(0ll << 0.0 << 0.3 << -0.3 << std::numeric_limits<double>::quiet_NaN()
+                       << Decimal128::kNegativeNaN
+                       << Decimal128::kPositiveNaN
+                       << Decimal128::kSmallestPositive
+                       << Decimal128::kSmallestNegative);
+    for (const auto& element : convertionToZero) {
+        assertSliceResult(
+            BSON("a" << BSON("$slice" << element)), "{ a: [ 1, 2, 3 ] }", "{ a: [] }");
+
+        assertSliceResult(BSON("a" << BSON("$slice" << BSON_ARRAY(element << 1))),
+                          "{ a: [ 1, 2, 3 ] }",
+                          "{ a: [ 1 ] }");
+    }
 }
 
 //
