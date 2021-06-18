@@ -9527,6 +9527,7 @@ buildvariants:
     - name: .sharding .jscore !.wo_snapshot
     - name: .sharding .common
     - name: snmp
+    - name: update_fuzzer_gen
 
 # The following build variant is meant to provide a baseline to measure how much overhead we
 # are spending when we split tasks into multiple sub-tasks.
