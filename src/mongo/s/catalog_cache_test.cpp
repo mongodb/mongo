@@ -161,7 +161,8 @@ protected:
     }
 
     CollectionType makeCollectionType(const ChunkVersion& collVersion) {
-        CollectionType coll(kNss, collVersion.epoch(), Date_t::now(), UUID::gen());
+        CollectionType coll(
+            kNss, collVersion.epoch(), collVersion.getTimestamp(), Date_t::now(), UUID::gen());
         coll.setKeyPattern(kShardKeyPattern.getKeyPattern());
         coll.setUnique(false);
         return coll;
@@ -337,6 +338,103 @@ TEST_F(CatalogCacheTest, GetCollectionWithMetadataFormatChange) {
     // epochs and timestamps locally but the loader returns a version with just epochs. The catalog
     // cache returns a new ChunkManager with the new format.
     getCollectionWithRefreshAndCheckResults(collVersionWithoutTimestamp);
+}
+
+TEST_F(CatalogCacheTest,
+       GetCollectionWithRefreshDuringUpgradeWithMetadataFormatChangeChunksDontMatchCollection) {
+    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto epoch = OID::gen();
+    const auto timestamp = Timestamp(42);
+
+    const auto collVersionWithoutTimestamp = ChunkVersion(1, 0, epoch, boost::none /* timestamp */);
+    const auto collVersionWithTimestamp = ChunkVersion(1, 0, epoch, timestamp);
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+
+    const auto coll = makeCollectionType(collVersionWithoutTimestamp);
+    const auto scopedCollProv = scopedCollectionProvider(coll);
+    const auto scopedChunksProv = scopedChunksProvider(makeChunks(collVersionWithTimestamp));
+
+    const auto swChunkManager =
+        _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+    ASSERT_OK(swChunkManager.getStatus());
+
+    const auto& chunkManager = swChunkManager.getValue();
+    const auto collectionVersion = chunkManager.getVersion();
+
+    ASSERT_EQ(collectionVersion.getTimestamp(), boost::none);
+
+    chunkManager.forEachChunk([&](const Chunk& chunk) {
+        ASSERT_EQ(chunk.getLastmod().getTimestamp(), timestamp);
+        return true;
+    });
+}
+
+TEST_F(CatalogCacheTest,
+       GetCollectionWithRefreshDuringUpgradeWithMetadataFormatChangeSomeChunksMatchCollection) {
+    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto epoch = OID::gen();
+    const auto timestamp = Timestamp(42);
+
+    const auto collVersionWithoutTimestamp = ChunkVersion(1, 0, epoch, boost::none /* timestamp */);
+    const auto collVersionWithTimestamp = ChunkVersion(1, 1, epoch, timestamp);
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+
+    const auto coll = makeCollectionType(collVersionWithoutTimestamp);
+    const auto scopedCollProv = scopedCollectionProvider(coll);
+
+    ChunkType chunk1(kNss,
+                     {kShardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 100)},
+                     collVersionWithTimestamp,
+                     {"0"});
+    chunk1.setName(OID::gen());
+
+    ChunkType chunk2(kNss,
+                     {BSON("_id" << 100), kShardKeyPattern.getKeyPattern().globalMax()},
+                     collVersionWithoutTimestamp,
+                     {"0"});
+    chunk2.setName(OID::gen());
+
+    const auto scopedChunksProv = scopedChunksProvider(std::vector{chunk1, chunk2});
+
+    const auto swChunkManager =
+        _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+    ASSERT_OK(swChunkManager.getStatus());
+
+    const auto& chunkManager = swChunkManager.getValue();
+    const auto collectionVersion = chunkManager.getVersion();
+
+    ASSERT_EQ(collectionVersion.getTimestamp(), boost::none);
+}
+
+TEST_F(CatalogCacheTest, GetCollectionWithRefreshDuringDowngradeWithMetadataFormatChange) {
+    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto epoch = OID::gen();
+    const auto timestamp = Timestamp(42);
+
+    const auto collVersionWithoutTimestamp = ChunkVersion(1, 0, epoch, boost::none /* timestamp */);
+    const auto collVersionWithTimestamp = ChunkVersion(1, 0, epoch, timestamp);
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+
+    const auto coll = makeCollectionType(collVersionWithTimestamp);
+    const auto scopedCollProv = scopedCollectionProvider(coll);
+    const auto scopedChunksProv = scopedChunksProvider(makeChunks(collVersionWithoutTimestamp));
+
+    const auto swChunkManager =
+        _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+    ASSERT_OK(swChunkManager.getStatus());
+
+    const auto& chunkManager = swChunkManager.getValue();
+    const auto collectionVersion = chunkManager.getVersion();
+
+    ASSERT_EQ(collectionVersion.getTimestamp(), timestamp);
+
+    chunkManager.forEachChunk([&](const Chunk& chunk) {
+        ASSERT_EQ(chunk.getLastmod().getTimestamp(), boost::none);
+        return true;
+    });
 }
 
 TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {

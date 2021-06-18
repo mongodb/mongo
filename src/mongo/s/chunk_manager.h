@@ -80,7 +80,7 @@ public:
     explicit ChunkMap(OID epoch,
                       const boost::optional<Timestamp>& timestamp,
                       size_t initialCapacity = 0)
-        : _collectionVersion(0, 0, epoch, timestamp) {
+        : _collectionVersion(0, 0, epoch, timestamp), _collTimestamp(timestamp) {
         _chunkMap.reserve(initialCapacity);
     }
 
@@ -134,6 +134,14 @@ private:
 
     // Max version across all chunks
     ChunkVersion _collectionVersion;
+
+    // Represents the timestamp present in config.collections for this ChunkMap.
+    //
+    // Note that due to the way Phase 1 of the FCV upgrade writes timestamps to chunks
+    // (non-atomically), it is possible that chunks exist with timestamps, but the corresponding
+    // config.collections entry doesn't. In this case, the chunks timestamp should be ignored when
+    // computing the collection version and we should use _collTimestamp instead.
+    boost::optional<Timestamp> _collTimestamp;
 };
 
 /**
