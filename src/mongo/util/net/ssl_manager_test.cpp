@@ -622,6 +622,9 @@ TEST(SSLManager, TransientSSLParams) {
     ASSERT_TRUE(swContext.getValue()->manager->isTransient());
     ASSERT_EQ(transientSSLParams.targetedClusterConnectionString.toString(),
               swContext.getValue()->manager->getTargetedClusterConnectionString());
+
+    // Cannot rotate certs on transient manager.
+    ASSERT_NOT_OK(tla.rotateCertificates(swContext.getValue()->manager, true));
 }
 
 #endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL

@@ -80,6 +80,10 @@ namespace mongo {
 struct SSLParams;
 struct TransientSSLParams;
 
+namespace transport {
+struct SSLConnectionContext;
+}  // namespace transport
+
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 typedef SSL_CTX* SSLContextType;
 typedef SSL* SSLConnectionType;
@@ -320,6 +324,12 @@ public:
     virtual Status initSSLContext(SSLContextType context,
                                   const SSLParams& params,
                                   ConnectionDirection direction) = 0;
+
+    /**
+     * Registers this SSL context as the owner of this manager.
+     */
+    virtual void registerOwnedBySSLContext(
+        std::weak_ptr<const transport::SSLConnectionContext> ownedByContext) = 0;
 
     /**
      * Fetches a peer certificate and validates it if it exists. If validation fails, but weak
