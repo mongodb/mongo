@@ -109,16 +109,31 @@ TEST(SBEValues, Hash) {
 
     value::releaseValue(tagDecimalInf, valDecimalInf);
 
-    auto tagDoubleNan = value::TypeTags::NumberDouble;
-    auto valDoubleNan = value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN());
+    auto testDoubleVsDecimal = [](double doubleValue, double decimalValue) {
+        auto tagDouble = value::TypeTags::NumberDouble;
+        auto valDouble = value::bitcastFrom<double>(doubleValue);
 
-    auto [tagDecimalNan, valDecimalNan] =
-        value::makeCopyDecimal(mongo::Decimal128(std::numeric_limits<double>::quiet_NaN()));
+        auto [tagDecimal, valDecimal] = value::makeCopyDecimal(mongo::Decimal128(decimalValue));
+        value::ValueGuard guard{tagDecimal, valDecimal};
 
-    ASSERT_EQUALS(value::hashValue(tagDoubleNan, valDoubleNan),
-                  value::hashValue(tagDecimalNan, valDecimalNan));
+        ASSERT_EQUALS(value::hashValue(tagDouble, valDouble),
+                      value::hashValue(tagDecimal, valDecimal));
+    };
 
-    value::releaseValue(tagDecimalNan, valDecimalNan);
+    // Test bitwise identical NaNs.
+    testDoubleVsDecimal(std::numeric_limits<double>::quiet_NaN(),
+                        std::numeric_limits<double>::quiet_NaN());
+
+    // Test NaNs with different bit representation.
+    auto getDoubleBits = [](double value) {
+        uint64_t bits = 0;
+        memcpy(&bits, &value, sizeof(value));
+        return bits;
+    };
+    const auto firstNan = std::nan("1");
+    const auto secondNan = std::nan("2");
+    ASSERT_NOT_EQUALS(getDoubleBits(firstNan), getDoubleBits(secondNan));
+    testDoubleVsDecimal(firstNan, secondNan);
 
     // Start with a relatively large number that still fits in 64 bits.
     int64_t num = 0x7000000000000000;
