@@ -1864,6 +1864,10 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
 
     if (!setMultikey(*metadata))
         return false;
+
+    opCtx->recoveryUnit()->onRollback(
+        [this, uncommittedMultikeys]() { uncommittedMultikeys->erase(this); });
+
     DurableCatalog::get(opCtx)->putMetaData(opCtx, getCatalogId(), *metadata);
 
     opCtx->recoveryUnit()->onCommit(
@@ -1874,8 +1878,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
             setMultikey(*_metadata);
             uncommittedMultikeys->erase(this);
         });
-    opCtx->recoveryUnit()->onRollback(
-        [this, uncommittedMultikeys]() { uncommittedMultikeys->erase(this); });
+
     return true;
 }
 
@@ -1920,7 +1923,12 @@ void CollectionImpl::forceSetIndexIsMultikey(OperationContext* opCtx,
         metadata = &uncommittedMultikeys->emplace(this, *_metadata).first->second;
     }
     forceSetMultikey(*metadata);
+
+    opCtx->recoveryUnit()->onRollback(
+        [this, uncommittedMultikeys]() { uncommittedMultikeys->erase(this); });
+
     DurableCatalog::get(opCtx)->putMetaData(opCtx, getCatalogId(), *metadata);
+
     opCtx->recoveryUnit()->onCommit(
         [this, uncommittedMultikeys, forceSetMultikey = std::move(forceSetMultikey)](auto ts) {
             // Merge in changes to this index, other indexes may have been updated since we made our
@@ -1928,8 +1936,6 @@ void CollectionImpl::forceSetIndexIsMultikey(OperationContext* opCtx,
             forceSetMultikey(*_metadata);
             uncommittedMultikeys->erase(this);
         });
-    opCtx->recoveryUnit()->onRollback(
-        [this, uncommittedMultikeys]() { uncommittedMultikeys->erase(this); });
 }
 
 int CollectionImpl::getTotalIndexCount() const {

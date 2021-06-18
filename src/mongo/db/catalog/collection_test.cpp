@@ -279,7 +279,7 @@ TEST_F(CollectionTest, SetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
     // After rolling back the above WUOW, we should succeed in retrying setIndexIsMultikey().
     {
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_FALSE(coll->setIndexIsMultikey(opCtx, indexName, paths));
+        ASSERT(coll->setIndexIsMultikey(opCtx, indexName, paths));
         wuow.commit();
     }
 }
@@ -329,7 +329,7 @@ TEST_F(CollectionTest, ForceSetIndexIsMultikeyRemovesUncommittedChangesOnRollbac
     // After rolling back the above WUOW, we should succeed in retrying setIndexIsMultikey().
     {
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_FALSE(coll->setIndexIsMultikey(opCtx, indexName, paths));
+        ASSERT(coll->setIndexIsMultikey(opCtx, indexName, paths));
         wuow.commit();
     }
 }
