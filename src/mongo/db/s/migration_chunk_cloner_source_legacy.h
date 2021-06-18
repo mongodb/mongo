@@ -373,9 +373,15 @@ private:
     // List of _id of documents that were modified that must be re-cloned (xfer mods)
     std::list<BSONObj> _reload;
 
+    // Amount of upsert xfer mods that have not yet reached the recipient.
+    size_t _untransferredUpsertsCounter{0};
+
     // List of _id of documents that were deleted during clone that should be deleted later (xfer
     // mods)
     std::list<BSONObj> _deleted;
+
+    // Amount of delete xfer mods that have not yet reached the recipient.
+    size_t _untransferredDeletesCounter{0};
 
     // Total bytes in _reload + _deleted (xfer mods)
     uint64_t _memoryUsed{0};

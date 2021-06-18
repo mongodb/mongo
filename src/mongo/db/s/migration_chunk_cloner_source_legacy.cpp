@@ -536,6 +536,7 @@ void MigrationChunkClonerSourceLegacy::_addToTransferModsQueue(
         case 'd': {
             stdx::lock_guard<Latch> sl(_mutex);
             _deleted.push_back(idObj);
+            ++_untransferredDeletesCounter;
             _memoryUsed += idObj.firstElement().size() + 5;
         } break;
 
@@ -543,6 +544,7 @@ void MigrationChunkClonerSourceLegacy::_addToTransferModsQueue(
         case 'u': {
             stdx::lock_guard<Latch> sl(_mutex);
             _reload.push_back(idObj);
+            ++_untransferredUpsertsCounter;
             _memoryUsed += idObj.firstElement().size() + 5;
         } break;
 
@@ -747,7 +749,9 @@ Status MigrationChunkClonerSourceLegacy::nextModsBatch(OperationContext* opCtx,
     // Put back remaining ids we didn't consume
     stdx::unique_lock<Latch> lk(_mutex);
     _deleted.splice(_deleted.cbegin(), deleteList);
+    _untransferredDeletesCounter = _deleted.size();
     _reload.splice(_reload.cbegin(), updateList);
+    _untransferredUpsertsCounter = _reload.size();
 
     return Status::OK();
 }
@@ -759,7 +763,9 @@ void MigrationChunkClonerSourceLegacy::_cleanup(OperationContext* opCtx) {
     _drainAllOutstandingOperationTrackRequests(lk);
 
     _reload.clear();
+    _untransferredUpsertsCounter = 0;
     _deleted.clear();
+    _untransferredDeletesCounter = 0;
 }
 
 StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(OperationContext* opCtx,
@@ -1064,14 +1070,24 @@ Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationC
         }
 
         if (res["state"].String() == "catchup" && supportsCriticalSectionDuringCatchUp) {
-            int64_t estimatedUntransferredModsSize = _deleted.size() * _averageObjectIdSize +
-                _reload.size() * _averageObjectSizeForCloneLocs;
+            int64_t estimatedUntransferredModsSize =
+                _untransferredDeletesCounter * _averageObjectIdSize +
+                _untransferredUpsertsCounter * _averageObjectSizeForCloneLocs;
             auto estimatedUntransferredChunkPercentage =
                 (std::min(_args.getMaxChunkSizeBytes(), estimatedUntransferredModsSize) * 100) /
                 _args.getMaxChunkSizeBytes();
             if (estimatedUntransferredChunkPercentage < maxCatchUpPercentageBeforeBlockingWrites) {
                 // The recipient is sufficiently caught-up with the writes on the donor.
                 // Block writes, so that it can drain everything.
+                LOGV2_DEBUG(5630700,
+                            1,
+                            "moveChunk data transfer within threshold to allow write blocking",
+                            "_untransferredUpsertsCounter"_attr = _untransferredUpsertsCounter,
+                            "_untransferredDeletesCounter"_attr = _untransferredDeletesCounter,
+                            "_averageObjectSizeForCloneLocs"_attr = _averageObjectSizeForCloneLocs,
+                            "_averageObjectIdSize"_attr = _averageObjectIdSize,
+                            "maxChunksSizeBytes"_attr = _args.getMaxChunkSizeBytes(),
+                            "_sessionId"_attr = _sessionId.toString());
                 return Status::OK();
             }
         }

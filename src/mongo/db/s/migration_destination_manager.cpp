@@ -287,7 +287,7 @@ MigrationDestinationManager::State MigrationDestinationManager::getState() const
     return _state;
 }
 
-void MigrationDestinationManager::setState(State newState) {
+void MigrationDestinationManager::_setState(State newState) {
     stdx::lock_guard<Latch> sl(_mutex);
     _state = newState;
     _stateChangedCV.notify_all();
@@ -1071,7 +1071,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     repl::OpTime lastOpApplied;
     {
         // 3. Initial bulk clone
-        setState(CLONE);
+        _setState(CLONE);
 
         _sessionMigration->start(opCtx->getServiceContext());
 
@@ -1181,7 +1181,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
     {
         // 4. Do bulk of mods
-        setState(CATCHUP);
+        _setState(CATCHUP);
 
         while (true) {
             auto res = uassertStatusOKWithContext(
@@ -1278,7 +1278,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
     {
         // 5. Wait for commit
-        setState(STEADY);
+        _setState(STEADY);
 
         bool transferAfterCommit = false;
         while (getState() == STEADY || getState() == COMMIT_START) {
@@ -1347,7 +1347,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         return;
     }
 
-    setState(DONE);
+    _setState(DONE);
 
     timing.done(6);
     migrateThreadHangAtStep6.pauseWhileSet();
