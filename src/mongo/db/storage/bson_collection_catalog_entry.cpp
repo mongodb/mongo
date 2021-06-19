@@ -171,7 +171,10 @@ bool BSONCollectionCatalogEntry::MetaData::eraseIndex(StringData name) {
         return false;
     }
 
-    indexes.erase(indexes.begin() + indexOffset);
+    // Zero out the index metadata to be reused later and to keep the indexes of other indexes
+    // stable.
+    indexes[indexOffset] = {};
+
     return true;
 }
 
