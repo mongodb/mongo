@@ -71,7 +71,9 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
       _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(false),
       _isFrozen(isFrozen),
-      _isDropped(false) {
+      _isDropped(false),
+      _indexOffset(invariantStatusOK(
+          collection->checkMetaDataForIndex(_descriptor->indexName(), _descriptor->infoObj()))) {
 
     _descriptor->_entry = this;
     _isReady = collection->isIndexReady(_descriptor->indexName());

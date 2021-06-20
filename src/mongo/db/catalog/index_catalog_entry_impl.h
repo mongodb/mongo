@@ -236,5 +236,10 @@ private:
 
     // The earliest snapshot that is allowed to read this index.
     boost::optional<Timestamp> _minVisibleSnapshot;
+
+    // Offset of this index within the Collection metadata.
+    // Used to improve lookups without having to search for the index name
+    // accessing the collection metadata.
+    int _indexOffset;
 };
 }  // namespace mongo
