@@ -97,10 +97,6 @@ public:
 
         void updateHiddenSetting(bool hidden);
 
-        std::string name() const {
-            return spec["name"].String();
-        }
-
         StringData nameStringData() const {
             return spec["name"].valueStringDataSafe();
         }
