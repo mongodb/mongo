@@ -47,6 +47,10 @@ public:
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
 private:
+    ShardingDDLCoordinatorMetadata const& metadata() const override {
+        return _doc.getShardingDDLCoordinatorMetadata();
+    }
+
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 

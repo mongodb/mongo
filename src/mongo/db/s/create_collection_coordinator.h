@@ -66,6 +66,10 @@ public:
     }
 
 private:
+    ShardingDDLCoordinatorMetadata const& metadata() const override {
+        return _doc.getShardingDDLCoordinatorMetadata();
+    }
+
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
@@ -86,8 +90,6 @@ private:
         };
     };
 
-    void _insertCoordinatorDocument(CoordDoc&& doc);
-    void _updateCoordinatorDocument(CoordDoc&& newStateDoc);
     void _enterPhase(Phase newState);
 
     /**

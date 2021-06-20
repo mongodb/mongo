@@ -31,6 +31,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
@@ -81,24 +82,89 @@ public:
     }
 
     const NamespaceString& nss() const {
-        return _coorMetadata.getId().getNss();
+        return _coordId.getNss();
     }
 
     const ForwardableOperationMetadata& getForwardableOpMetadata() const {
-        invariant(_coorMetadata.getForwardableOpMetadata());
-        return _coorMetadata.getForwardableOpMetadata().get();
+        invariant(metadata().getForwardableOpMetadata());
+        return metadata().getForwardableOpMetadata().get();
     }
+
+    // Cached LSIDs shared between DDL coordinator instances
+    class SessionCache {
+
+    public:
+        SessionCache() = default;
+
+        static SessionCache* get(ServiceContext* serviceContext);
+        static SessionCache* get(OperationContext* opCtx);
+
+        ShardingDDLSession acquire();
+
+        void release(ShardingDDLSession);
+
+    private:
+        std::stack<ShardingDDLSession> _cache;
+
+        // Protects _cache.
+        mutable Mutex _cacheMutex = MONGO_MAKE_LATCH("SessionCache::_cacheMutex");
+    };
 
 protected:
     virtual std::vector<StringData> _acquireAdditionalLocks(OperationContext* opCtx) {
         return {};
     };
 
-    ShardingDDLCoordinatorService* _service;
-    ShardingDDLCoordinatorMetadata _coorMetadata;
-    StringData _coorName;
+    virtual ShardingDDLCoordinatorMetadata const& metadata() const = 0;
 
-    bool _recoveredFromDisk;
+    template <typename StateDoc>
+    StateDoc _insertStateDocument(StateDoc&& newDoc) {
+        auto copyMetadata = newDoc.getShardingDDLCoordinatorMetadata();
+        copyMetadata.setRecoveredFromDisk(true);
+        newDoc.setShardingDDLCoordinatorMetadata(copyMetadata);
+
+        auto opCtx = cc().makeOperationContext();
+        PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
+        store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcern);
+
+        return std::move(newDoc);
+    }
+
+    template <typename StateDoc>
+    StateDoc _updateStateDocument(OperationContext* opCtx, StateDoc&& newDoc) {
+        PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
+        invariant(newDoc.getShardingDDLCoordinatorMetadata().getRecoveredFromDisk());
+        store.update(opCtx,
+                     BSON(StateDoc::kIdFieldName << newDoc.getId().toBSON()),
+                     newDoc.toBSON(),
+                     WriteConcerns::kMajorityWriteConcern);
+        return std::move(newDoc);
+    }
+
+    // lazily acqiure Logical Session ID and a txn number
+    template <typename StateDoc>
+    StateDoc _updateSession(OperationContext* opCtx, StateDoc const& doc) {
+        auto newShardingDDLCoordinatorMetadata = doc.getShardingDDLCoordinatorMetadata();
+
+        auto optSession = newShardingDDLCoordinatorMetadata.getSession();
+        if (optSession) {
+            auto txnNumber = optSession->getTxnNumber();
+            optSession->setTxnNumber(++txnNumber);
+            newShardingDDLCoordinatorMetadata.setSession(optSession);
+        } else {
+            newShardingDDLCoordinatorMetadata.setSession(SessionCache::get(opCtx)->acquire());
+        }
+
+        StateDoc newDoc(doc);
+        newDoc.setShardingDDLCoordinatorMetadata(std::move(newShardingDDLCoordinatorMetadata));
+        return _updateStateDocument(opCtx, std::move(newDoc));
+    }
+
+protected:
+    ShardingDDLCoordinatorService* _service;
+    const ShardingDDLCoordinatorId _coordId;
+
+    const bool _recoveredFromDisk;
     bool _completeOnError{false};
 
 private:

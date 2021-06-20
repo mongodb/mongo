@@ -36,6 +36,7 @@ global:
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/db/logical_session_id.idl"
 
 enums:
     DDLCoordinatorType:
@@ -75,6 +76,15 @@ structs:
             operationType:
                 description: "Type of the sharding DDL coordinator."
                 type: DDLCoordinatorType
+
+    ShardingDDLSession:
+        description: "Container for DDL coordinator session."
+        strict: true
+        fields:
+            lsid:
+                type: LogicalSessionId
+            txnNumber:
+                type: TxnNumber
     
     ShardingDDLCoordinatorMetadata:
         description: "Commong metadata for all sharding DDL coordinator."
@@ -93,4 +103,6 @@ structs:
             databaseVersion:
                 type: DatabaseVersion
                 optional: true
-                
+            session:
+                type: ShardingDDLSession
+                optional: true
