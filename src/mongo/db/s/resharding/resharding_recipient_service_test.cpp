@@ -756,7 +756,8 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
         prevState = state;
 
         recipient.reset();
-        stepUp(opCtx.get());
+        if (state != RecipientStateEnum::kDone)
+            stepUp(opCtx.get());
     }
 }
 
