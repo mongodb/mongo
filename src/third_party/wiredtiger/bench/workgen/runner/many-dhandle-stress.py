@@ -115,7 +115,7 @@ checkpoint_thread = Thread(ops)
 workload = Workload(context, 10 * thread0 + 10 * thread1 + checkpoint_thread)
 workload.options.report_interval=5
 workload.options.run_time=900
-workload.options.max_latency=1000
+workload.options.max_latency=60
 workload.options.sample_rate=1
 workload.options.sample_interval_ms = 5000
 # Uncomment to fail instead of generating a warning
