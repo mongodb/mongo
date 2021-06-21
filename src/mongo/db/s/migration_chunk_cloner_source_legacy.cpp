@@ -354,8 +354,9 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
         }
 
         if (res["state"].String() == "catchup" && supportsCriticalSectionDuringCatchUp) {
-            int64_t estimatedUntransferredModsSize = _deleted.size() * _averageObjectIdSize +
-                _reload.size() * _averageObjectSizeForCloneLocs;
+            int64_t estimatedUntransferredModsSize =
+                _untransferredDeletesCounter * _averageObjectIdSize +
+                _untransferredUpsertsCounter * _averageObjectSizeForCloneLocs;
             auto estimatedUntransferredChunkPercentage =
                 (std::min(_args.getMaxChunkSizeBytes(), estimatedUntransferredModsSize) * 100) /
                 _args.getMaxChunkSizeBytes();
@@ -580,6 +581,7 @@ void MigrationChunkClonerSourceLegacy::_addToTransferModsQueue(
         case 'd': {
             stdx::lock_guard<Latch> sl(_mutex);
             _deleted.push_back(idObj);
+            ++_untransferredDeletesCounter;
             _memoryUsed += idObj.firstElement().size() + 5;
         } break;
 
@@ -587,6 +589,7 @@ void MigrationChunkClonerSourceLegacy::_addToTransferModsQueue(
         case 'u': {
             stdx::lock_guard<Latch> sl(_mutex);
             _reload.push_back(idObj);
+            ++_untransferredUpsertsCounter;
             _memoryUsed += idObj.firstElement().size() + 5;
         } break;
 
@@ -714,7 +717,9 @@ Status MigrationChunkClonerSourceLegacy::nextModsBatch(OperationContext* opCtx,
     // Put back remaining ids we didn't consume
     stdx::unique_lock<Latch> lk(_mutex);
     _deleted.splice(_deleted.cbegin(), deleteList);
+    _untransferredDeletesCounter = _deleted.size();
     _reload.splice(_reload.cbegin(), updateList);
+    _untransferredUpsertsCounter = _reload.size();
 
     return Status::OK();
 }
@@ -726,7 +731,9 @@ void MigrationChunkClonerSourceLegacy::_cleanup(OperationContext* opCtx) {
     _drainAllOutstandingOperationTrackRequests(lk);
 
     _reload.clear();
+    _untransferredUpsertsCounter = 0;
     _deleted.clear();
+    _untransferredDeletesCounter = 0;
 }
 
 StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(const BSONObj& cmdObj) {
