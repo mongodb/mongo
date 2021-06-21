@@ -90,3 +90,7 @@ feature_flags:
         cpp_varname: feature_flags::gTimeseriesCollection
         default: true
         version: 5.0
+    featureFlagTimeseriesUpdatesAndDeletes:
+        description: "When enabled, support for updates and deletes on time-series collections"
+        cpp_varname: feature_flags::gTimeseriesUpdatesAndDeletes
+        default: false
