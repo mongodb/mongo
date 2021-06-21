@@ -34,7 +34,8 @@
 
 using namespace mongo;
 
-void areVectorsEqual(std::vector<uint64_t> actualVector, std::vector<uint64_t> expectedVector) {
+void assertVectorsEqual(const std::vector<uint64_t>& actualVector,
+                        const std::vector<uint64_t>& expectedVector) {
     ASSERT_EQ(actualVector.size(), expectedVector.size());
 
     for (unsigned i = 0; i < actualVector.size(); ++i) {
@@ -53,7 +54,7 @@ TEST(Simple8b, DecodeOneValueTest) {
     uint64_t simple8bWord = 0x0000000000000001E;
     std::vector<uint64_t> values = Simple8b::decodeSimple8b(simple8bWord);
     std::vector<uint64_t> expectedValues = {1};
-    areVectorsEqual(values, expectedValues);
+    assertVectorsEqual(values, expectedValues);
 }
 
 TEST(Simple8b, EncodeMultipleValuesTest) {
@@ -67,7 +68,7 @@ TEST(Simple8b, DecodeMultipleValuesTest) {
     uint64_t simple8bWord = 0x000030000200001C;
     std::vector<uint64_t> values = Simple8b::decodeSimple8b(simple8bWord);
     std::vector<uint64_t> expectedValues = {1, 2, 3};
-    areVectorsEqual(values, expectedValues);
+    assertVectorsEqual(values, expectedValues);
 }
 
 TEST(Simple8b, EncodeMaxValuesTest) {
@@ -81,7 +82,7 @@ TEST(Simple8b, DecodeMaxValuesTest) {
     uint64_t simple8bWord = 0xFFFFFFFFFFFFFFF1;
     std::vector<uint64_t> values = Simple8b::decodeSimple8b(simple8bWord);
     std::vector<uint64_t> expectedValues(60, 1);
-    areVectorsEqual(values, expectedValues);
+    assertVectorsEqual(values, expectedValues);
 }
 
 TEST(Simple8b, EncodeWithTrailingDirtyBitsTest) {
@@ -95,7 +96,7 @@ TEST(Simple8b, DecodeWithTrailingDirtyBitsTest) {
     uint64_t simple8bWord = 0x0010101010101018;
     std::vector<uint64_t> values = Simple8b::decodeSimple8b(simple8bWord);
     std::vector<uint64_t> expectedValues(7, 1);
-    areVectorsEqual(values, expectedValues);
+    assertVectorsEqual(values, expectedValues);
 }
 
 TEST(Simple8b, InvalidEncodeZeroSelectorTest) {

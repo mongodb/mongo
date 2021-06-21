@@ -41,7 +41,8 @@ namespace mongo {
  */
 class Simple8b {
 public:
-    static const uint64_t errCode = 0x0000000000000000;  // Temporary error code.
+    // TODO (SERVER-57724): Remove temporary error code.
+    static constexpr uint64_t errCode = 0x0000000000000000;
 
     /**
      * encodeSimple8b takes a selector and a vector of integers to be compressed into a 64 bit word.

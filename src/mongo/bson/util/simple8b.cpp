@@ -32,7 +32,7 @@
 namespace mongo {
 
 namespace {
-static constexpr uint8_t _maxSelector = 14;  // Change to 15 in SERVER-57794
+static constexpr uint8_t _maxSelector = 14;  // TODO (SERVER-57794): Change to 15.
 static constexpr uint8_t _minSelector = 1;
 static constexpr uint64_t _selectorMask = 0x000000000000000F;
 static constexpr uint8_t _selectorSize = 4;
@@ -50,18 +50,18 @@ constexpr uint8_t _selectorForIntegersCoded[16] = {
 constexpr uint64_t _selectorForMask[16] = {0,
                                            1,
                                            2,
-                                           (1 << 3) - 1,
-                                           (1 << 4) - 1,
-                                           (1 << 5) - 1,
-                                           (1 << 6) - 1,
-                                           (1 << 7) - 1,
-                                           (1 << 8) - 1,
-                                           (1 << 10) - 1,
-                                           (1 << 12) - 1,
-                                           (1 << 15) - 1,
-                                           (1 << 20) - 1,
-                                           (1 << 30) - 1,
-                                           ((uint64_t)1 << 60) - 1,
+                                           (1ull << 3) - 1,
+                                           (1ull << 4) - 1,
+                                           (1ull << 5) - 1,
+                                           (1ull << 6) - 1,
+                                           (1ull << 7) - 1,
+                                           (1ull << 8) - 1,
+                                           (1ull << 10) - 1,
+                                           (1ull << 12) - 1,
+                                           (1ull << 15) - 1,
+                                           (1ull << 20) - 1,
+                                           (1ull << 30) - 1,
+                                           (1ull << 60) - 1,
                                            1};
 
 }  // namespace
