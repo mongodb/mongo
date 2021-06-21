@@ -48,7 +48,12 @@ const createIndexCmd =
     IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), indexSpec);
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName, indexName);
 
-// Shutdown using the default signal which performs a checkpoint.
+jsTest.log("Force checkpoints to move the durable timestamps forward.");
+rst.awaitReplication();
+assert.commandWorked(primary.adminCommand({fsync: 1}));
+assert.commandWorked(secondary.adminCommand({fsync: 1}));
+jsTest.log("Checkpoints taken. Stopping replica set to restart individual nodes in standalone.");
+
 TestData.skipCheckDBHashes = true;
 rst.stopSet(/*signal=*/null, /*forRestart=*/true);
 TestData.skipCheckDBHashes = false;
