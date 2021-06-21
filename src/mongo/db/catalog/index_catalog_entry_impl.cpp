@@ -369,8 +369,8 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
     // CollectionCatalogEntry::setIndexIsMultikey() requires that we discard the path-level
     // multikey information in order to avoid unintentionally setting path-level multikey
     // information on an index created before 3.4.
-    auto indexMetadataHasChanged =
-        collection->setIndexIsMultikey(opCtx, _descriptor->indexName(), multikeyPaths);
+    auto indexMetadataHasChanged = collection->setIndexIsMultikey(
+        opCtx, _descriptor->indexName(), multikeyPaths, _indexOffset);
 
     if (indexMetadataHasChanged) {
         LOGV2_DEBUG(4718705,
