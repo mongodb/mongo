@@ -220,13 +220,13 @@ struct __wt_cache {
 /*
  * Flags.
  */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CACHE_POOL_MANAGER 0x1u /* The active cache pool manager */
 #define WT_CACHE_POOL_RUN 0x2u     /* Cache pool thread running */
-                                   /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                   /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t pool_flags;           /* Cache pool flags */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CACHE_EVICT_CLEAN 0x001u        /* Evict clean pages */
 #define WT_CACHE_EVICT_CLEAN_HARD 0x002u   /* Clean % blocking app threads */
 #define WT_CACHE_EVICT_DEBUG_MODE 0x004u   /* Aggressive debugging mode */
@@ -237,7 +237,7 @@ struct __wt_cache {
 #define WT_CACHE_EVICT_UPDATES 0x080u      /* Evict pages with updates */
 #define WT_CACHE_EVICT_UPDATES_HARD 0x100u /* Update % blocking app threads */
 #define WT_CACHE_EVICT_URGENT 0x200u       /* Pages are in the urgent queue */
-/* AUTOMATIC FLAG VALUE GENERATION STOP */
+/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 #define WT_CACHE_EVICT_ALL (WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_DIRTY | WT_CACHE_EVICT_UPDATES)
 #define WT_CACHE_EVICT_HARD \
     (WT_CACHE_EVICT_CLEAN_HARD | WT_CACHE_EVICT_DIRTY_HARD | WT_CACHE_EVICT_UPDATES_HARD)
@@ -268,9 +268,9 @@ struct __wt_cache_pool {
 
     uint8_t pool_managed; /* Cache pool has a manager thread */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CACHE_POOL_ACTIVE 0x1u /* Cache pool is active */
-                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 };
 
@@ -281,8 +281,8 @@ struct __wt_cache_pool {
 #define WT_IS_HS(dh) F_ISSET(dh, WT_DHANDLE_HS)
 
 /* Flags used with __wt_evict */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_EVICT_CALL_CLOSING 0x1u  /* Closing connection or tree */
 #define WT_EVICT_CALL_NO_SPLIT 0x2u /* Splits not allowed */
 #define WT_EVICT_CALL_URGENT 0x4u   /* Urgent eviction */
-/* AUTOMATIC FLAG VALUE GENERATION STOP */
+/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */

@@ -257,10 +257,8 @@ struct __wt_btree {
 /*
  * Flag values up to 0xfff are reserved for WT_DHANDLE_XXX. See comment with dhandle flags for an
  * explanation.
- *
- * We don't automatically generate these flag values for this reason; there's no way to start at an
- * offset.
  */
+/* AUTOMATIC FLAG VALUE GENERATION START 12 */
 #define WT_BTREE_ALTER 0x0001000u          /* Handle is for alter */
 #define WT_BTREE_BULK 0x0002000u           /* Bulk-load handle */
 #define WT_BTREE_CLOSED 0x0004000u         /* Handle closed */
@@ -274,6 +272,7 @@ struct __wt_btree {
 #define WT_BTREE_SKIP_CKPT 0x0400000u      /* Handle skipped checkpoint */
 #define WT_BTREE_UPGRADE 0x0800000u        /* Handle is for upgrade */
 #define WT_BTREE_VERIFY 0x1000000u         /* Handle is for verify */
+                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 

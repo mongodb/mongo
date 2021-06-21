@@ -20,9 +20,9 @@ struct __wt_tiered_manager {
 #define WT_TIERED_MAX_WORKERS 20
 #define WT_TIERED_MIN_WORKERS 1
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TIERED_MANAGER_SHUTDOWN 0x1u /* Manager has shut down */
-                                        /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                        /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
@@ -39,19 +39,19 @@ struct __wt_tiered_manager {
 #define WT_TIERED_MAX_TIERS 4
 
 /* Object name types */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TIERED_NAME_LOCAL 0x1u
 #define WT_TIERED_NAME_OBJECT 0x2u
 #define WT_TIERED_NAME_PREFIX 0x4u
 #define WT_TIERED_NAME_SHARED 0x8u
-/* AUTOMATIC FLAG VALUE GENERATION STOP */
+/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /* Flush tier flags */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_FLUSH_TIER_FORCE 0x1u
 #define WT_FLUSH_TIER_OFF 0x2u
 #define WT_FLUSH_TIER_ON 0x4u
-/* AUTOMATIC FLAG VALUE GENERATION STOP */
+/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /*
  * The flush state is a simple counter we manipulate atomically.
@@ -61,11 +61,11 @@ struct __wt_tiered_manager {
 /*
  * Different types of work units for tiered trees.
  */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TIERED_WORK_DROP_LOCAL 0x1u  /* Drop object from local storage. */
 #define WT_TIERED_WORK_DROP_SHARED 0x2u /* Drop object from tier. */
 #define WT_TIERED_WORK_FLUSH 0x4u       /* Flush object to tier. */
-/* AUTOMATIC FLAG VALUE GENERATION STOP */
+/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /*
  * WT_TIERED_WORK_UNIT --
@@ -77,10 +77,10 @@ struct __wt_tiered_work_unit {
     uint64_t op_val;                      /* A value for the operation */
     WT_TIERED *tiered;                    /* Tiered tree */
     uint32_t id;                          /* Id of the object */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TIERED_WORK_FORCE 0x1u /* Force operation */
 #define WT_TIERED_WORK_FREE 0x2u  /* Free data after operation */
-                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;               /* Flags for operation */
 };
 
@@ -94,11 +94,11 @@ struct __wt_tiered_work_unit {
 struct __wt_tiered_tiers {
     WT_DATA_HANDLE *tier; /* Data handle for this tier */
     const char *name;     /* Tier's metadata name */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TIERS_OP_FLUSH 0x1u
 #define WT_TIERS_OP_READ 0x2u
 #define WT_TIERS_OP_WRITE 0x4u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags; /* Flags including operations */
 };
 
@@ -131,9 +131,9 @@ struct __wt_tiered {
     WT_COLLATOR *collator; /* TODO: handle custom collation */
     /* TODO: What about compression, encryption, etc? Do we need to worry about that here? */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TIERED_FLAG_UNUSED 0x1u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
@@ -156,9 +156,9 @@ struct __wt_tiered_object {
     uint32_t generation;  /* Do we need this?? */
     uint32_t refcnt;      /* Number of references */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TIERED_OBJ_LOCAL 0x1u /* Local resident also */
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
@@ -172,8 +172,8 @@ struct __wt_tiered_tree {
     const char *name, *config;
     const char *key_format, *value_format;
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TIERED_TREE_UNUSED 0x1u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };

@@ -173,11 +173,11 @@ struct __wt_fstream {
     wt_off_t size; /* File size */
     WT_ITEM buf;   /* Data */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_STREAM_APPEND 0x1u /* Open a stream for append */
 #define WT_STREAM_READ 0x2u   /* Open a stream for read */
 #define WT_STREAM_WRITE 0x4u  /* Open a stream for write */
-                              /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                              /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 
     int (*close)(WT_SESSION_IMPL *, WT_FSTREAM *);

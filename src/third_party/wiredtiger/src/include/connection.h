@@ -48,9 +48,9 @@ struct __wt_bucket_storage {
     TAILQ_ENTRY(__wt_bucket_storage) hashq;
     TAILQ_ENTRY(__wt_bucket_storage) q;
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_BUCKET_FREE 0x1u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
@@ -435,7 +435,7 @@ struct __wt_connection_impl {
     uint32_t tiered_threads_max; /* Max tiered threads */
     uint32_t tiered_threads_min; /* Min tiered threads */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CONN_LOG_ARCHIVE 0x001u         /* Archive is enabled */
 #define WT_CONN_LOG_CONFIG_ENABLED 0x002u  /* Logging is configured */
 #define WT_CONN_LOG_DEBUG_MODE 0x004u      /* Debug-mode logging enabled */
@@ -448,7 +448,7 @@ struct __wt_connection_impl {
 #define WT_CONN_LOG_RECOVER_ERR 0x200u     /* Error if recovery required */
 #define WT_CONN_LOG_RECOVER_FAILED 0x400u  /* Recovery failed */
 #define WT_CONN_LOG_ZERO_FILL 0x800u       /* Manually zero files */
-                                           /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t log_flags;                    /* Global logging configuration */
     WT_CONDVAR *log_cond;                  /* Log server wait mutex */
     WT_SESSION_IMPL *log_session;          /* Log server session */
@@ -523,11 +523,11 @@ struct __wt_connection_impl {
     wt_off_t data_extend_len; /* file_extend data length */
     wt_off_t log_extend_len;  /* file_extend log length */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_DIRECT_IO_CHECKPOINT 0x1u /* Checkpoints */
 #define WT_DIRECT_IO_DATA 0x2u       /* Data files */
 #define WT_DIRECT_IO_LOG 0x4u        /* Log files */
-                                     /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                     /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
     uint64_t direct_io;              /* O_DIRECT, FILE_FLAG_NO_BUFFERING */
     uint64_t write_through;          /* FILE_FLAG_WRITE_THROUGH */
 
@@ -540,17 +540,17 @@ struct __wt_connection_impl {
     uint32_t debug_ckpt_cnt; /* Checkpoint retention number. */
     uint32_t debug_log_cnt;  /* Log file retention count */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CONN_DEBUG_CKPT_RETAIN 0x01u
 #define WT_CONN_DEBUG_CORRUPTION_ABORT 0x02u
 #define WT_CONN_DEBUG_CURSOR_COPY 0x04u
 #define WT_CONN_DEBUG_REALLOC_EXACT 0x08u
 #define WT_CONN_DEBUG_SLOW_CKPT 0x10u
 #define WT_CONN_DEBUG_UPDATE_RESTORE_EVICT 0x20u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
     uint64_t debug_flags;
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_VERB_API 0x0000000001u
 #define WT_VERB_BACKUP 0x0000000002u
 #define WT_VERB_BLOCK 0x0000000004u
@@ -589,13 +589,13 @@ struct __wt_connection_impl {
 #define WT_VERB_VERIFY 0x0800000000u
 #define WT_VERB_VERSION 0x1000000000u
 #define WT_VERB_WRITE 0x2000000000u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
     uint64_t verbose;
 
 /*
  * Variable with flags for which subsystems the diagnostic stress timing delays have been requested.
  */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TIMING_STRESS_AGGRESSIVE_SWEEP 0x0001u
 #define WT_TIMING_STRESS_BACKUP_RENAME 0x0002u
 #define WT_TIMING_STRESS_CHECKPOINT_SLOW 0x0004u
@@ -611,7 +611,7 @@ struct __wt_connection_impl {
 #define WT_TIMING_STRESS_SPLIT_6 0x1000u
 #define WT_TIMING_STRESS_SPLIT_7 0x2000u
 #define WT_TIMING_STRESS_SPLIT_8 0x4000u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
     uint64_t timing_stress_flags;
 
 #define WT_STDERR(s) (&S2C(s)->wt_stderr)
@@ -626,7 +626,7 @@ struct __wt_connection_impl {
 /*
  * Server subsystem flags.
  */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CONN_SERVER_CAPACITY 0x01u
 #define WT_CONN_SERVER_CHECKPOINT 0x02u
 #define WT_CONN_SERVER_LOG 0x04u
@@ -635,10 +635,10 @@ struct __wt_connection_impl {
 #define WT_CONN_SERVER_SWEEP 0x20u
 #define WT_CONN_SERVER_TIERED 0x40u
 #define WT_CONN_SERVER_TIERED_MGR 0x80u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t server_flags;
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CONN_CACHE_CURSORS 0x000001u
 #define WT_CONN_CACHE_POOL 0x000002u
 #define WT_CONN_CKPT_GATHER 0x000004u
@@ -662,6 +662,6 @@ struct __wt_connection_impl {
 #define WT_CONN_RECOVERING 0x100000u
 #define WT_CONN_SALVAGE 0x200000u
 #define WT_CONN_WAS_BACKUP 0x400000u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };

@@ -21,12 +21,12 @@ struct __wt_thread {
  * WT_THREAD and thread-group function flags, merged because WT_THREAD_PANIC_FAIL appears in both
  * groups.
  */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_THREAD_ACTIVE 0x1u     /* Thread is active or paused */
 #define WT_THREAD_CAN_WAIT 0x2u   /* WT_SESSION_CAN_WAIT */
 #define WT_THREAD_PANIC_FAIL 0x4u /* Panic if the thread fails */
 #define WT_THREAD_RUN 0x8u        /* Thread is running */
-                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 
     /*

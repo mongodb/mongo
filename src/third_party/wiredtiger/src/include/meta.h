@@ -81,11 +81,11 @@
 struct __wt_blkincr {
     const char *id_str;   /* User's name for this backup. */
     uint64_t granularity; /* Granularity of this backup. */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_BLKINCR_FULL 0x1u  /* There is no checkpoint, always do full file */
 #define WT_BLKINCR_INUSE 0x2u /* This entry is active */
 #define WT_BLKINCR_VALID 0x4u /* This entry is valid */
-                              /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                              /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
     uint64_t flags;
 };
 
@@ -104,10 +104,10 @@ struct __wt_block_mods {
 
     uint64_t offset; /* Zero bit offset for bitstring */
     uint64_t granularity;
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_BLOCK_MODS_RENAME 0x1u /* Entry is from a rename */
 #define WT_BLOCK_MODS_VALID 0x2u  /* Entry is valid */
-                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
@@ -154,12 +154,12 @@ struct __wt_ckpt {
 
     void *bpriv; /* Block manager private */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CKPT_ADD 0x01u        /* Checkpoint to be added */
 #define WT_CKPT_BLOCK_MODS 0x02u /* Return list of modified blocks */
 #define WT_CKPT_DELETE 0x04u     /* Checkpoint to be deleted */
 #define WT_CKPT_FAKE 0x08u       /* Checkpoint is a fake */
 #define WT_CKPT_UPDATE 0x10u     /* Checkpoint requires update */
-                                 /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };

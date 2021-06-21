@@ -110,13 +110,13 @@ struct __wt_track {
         } col;
     } u;
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TRACK_CHECK_START 0x1u /* Row: initial key updated */
 #define WT_TRACK_CHECK_STOP 0x2u  /* Row: last key updated */
 #define WT_TRACK_MERGE 0x4u       /* Page requires merging */
 #define WT_TRACK_OVFL_REFD 0x8u   /* Overflow page referenced */
-                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
-    u_int flags;
+                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    uint32_t flags;
 };
 
 static int __slvg_cleanup(WT_SESSION_IMPL *, WT_STUFF *);

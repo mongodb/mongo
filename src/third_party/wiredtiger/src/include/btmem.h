@@ -8,7 +8,7 @@
 
 #define WT_RECNO_OOB 0 /* Illegal record number */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_READ_CACHE 0x0001u
 #define WT_READ_DELETED_CHECK 0x0002u
 #define WT_READ_DELETED_SKIP 0x0004u
@@ -22,9 +22,9 @@
 #define WT_READ_SKIP_INTL 0x0400u
 #define WT_READ_TRUNCATE 0x0800u
 #define WT_READ_WONT_NEED 0x1000u
-/* AUTOMATIC FLAG VALUE GENERATION STOP */
+/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_REC_APP_EVICTION_SNAPSHOT 0x001u
 #define WT_REC_CALL_URGENT 0x002u
 #define WT_REC_CHECKPOINT 0x004u
@@ -35,7 +35,7 @@
 #define WT_REC_SCRUB 0x080u
 #define WT_REC_VISIBILITY_ERR 0x100u
 #define WT_REC_VISIBLE_ALL 0x200u
-/* AUTOMATIC FLAG VALUE GENERATION STOP */
+/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /*
  * WT_PAGE_HEADER --
@@ -184,10 +184,10 @@ struct __wt_ovfl_reuse {
  * reconciliation fails for any reason, discard the newly added skiplist entries, along with their
  * underlying blocks.
  */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_OVFL_REUSE_INUSE 0x1u
 #define WT_OVFL_REUSE_JUST_ADDED 0x2u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 
 /*
@@ -658,7 +658,7 @@ struct __wt_page {
 #define WT_PAGE_ROW_LEAF 7      /* Row-store leaf page */
     uint8_t type;               /* Page type */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_PAGE_BUILD_KEYS 0x01u        /* Keys have been built in memory */
 #define WT_PAGE_DISK_ALLOC 0x02u        /* Disk image in allocated memory */
 #define WT_PAGE_DISK_MAPPED 0x04u       /* Disk image in mapped memory */
@@ -667,7 +667,7 @@ struct __wt_page {
 #define WT_PAGE_OVERFLOW_KEYS 0x20u     /* Page has overflow keys */
 #define WT_PAGE_SPLIT_INSERT 0x40u      /* A leaf page was split for append */
 #define WT_PAGE_UPDATE_IGNORE 0x80u     /* Ignore updates on page discard */
-                                        /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                        /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags_atomic;               /* Atomic flags, use F_*_ATOMIC */
 
     uint8_t unused[2]; /* Unused padding */
@@ -873,11 +873,11 @@ struct __wt_ref {
  * miss one). If we run out of bits in the flags field, remove the internal flag and rewrite tests
  * depending on it to be "!leaf" instead.
  */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_REF_FLAG_INTERNAL 0x1u /* Page is an internal page */
 #define WT_REF_FLAG_LEAF 0x2u     /* Page is a leaf page */
 #define WT_REF_FLAG_READING 0x4u  /* Page is being read in */
-                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 
 #define WT_REF_DISK 0       /* Page is on disk */
@@ -1130,7 +1130,7 @@ struct __wt_update {
      */
     volatile uint8_t prepare_state; /* prepare state */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_UPDATE_DS 0x01u                       /* Update has been written to the data store. */
 #define WT_UPDATE_FIXED_HS 0x02u                 /* Update that fixed the history store. */
 #define WT_UPDATE_HS 0x04u                       /* Update has been written to history store. */
@@ -1138,7 +1138,7 @@ struct __wt_update {
 #define WT_UPDATE_RESTORED_FAST_TRUNCATE 0x10u   /* Fast truncate instantiation */
 #define WT_UPDATE_RESTORED_FROM_DS 0x20u         /* Update restored from data store. */
 #define WT_UPDATE_RESTORED_FROM_HS 0x40u         /* Update restored from history store. */
-                                                 /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                                 /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 
     /*
