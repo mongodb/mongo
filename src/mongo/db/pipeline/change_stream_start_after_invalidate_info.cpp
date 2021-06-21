@@ -27,47 +27,26 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/pipeline/change_stream_start_after_invalidate_info.h"
 
-#include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
+#include "mongo/base/init.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
-/**
- * This stage is used internally for change streams to ensure that the resume token is in the
- * stream.  It is not intended to be created by the user.
- */
-class DocumentSourceChangeStreamEnsureResumeTokenPresent final
-    : public DocumentSourceChangeStreamCheckResumability {
-public:
-    static constexpr StringData kStageName = "$_internalChangeStreamEnsureResumeTokenPresent"_sd;
+namespace {
 
-    const char* getSourceName() const final;
+MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ChangeStreamStartAfterInvalidateInfo);
 
-    StageConstraints constraints(Pipeline::SplitState) const final;
+}  // namespace
 
-    GetModPathsReturn getModifiedPaths() const final {
-        // This stage neither modifies nor renames any field.
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
-    }
+std::shared_ptr<const ErrorExtraInfo> ChangeStreamStartAfterInvalidateInfo::parse(
+    const BSONObj& obj) {
+    return std::make_shared<ChangeStreamStartAfterInvalidateInfo>(
+        obj["startAfterInvalidateEvent"].Obj());
+}
 
-    static boost::intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const DocumentSourceChangeStreamSpec& spec);
+void ChangeStreamStartAfterInvalidateInfo::serialize(BSONObjBuilder* bob) const {
+    bob->append("startAfterInvalidateEvent", _startAfterInvalidateEvent);
+}
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
-
-private:
-    /**
-     * Use the create static method to create a DocumentSourceChangeStreamEnsureResumeTokenPresent.
-     */
-    DocumentSourceChangeStreamEnsureResumeTokenPresent(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
-
-    GetNextResult doGetNext() final;
-
-    GetNextResult _tryGetNext();
-
-    // Records whether we have observed the token in the resumed stream.
-    bool _hasSeenResumeToken = false;
-};
 }  // namespace mongo

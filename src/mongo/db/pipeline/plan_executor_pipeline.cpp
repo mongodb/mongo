@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 
+#include "mongo/db/pipeline/change_stream_start_after_invalidate_info.h"
 #include "mongo/db/pipeline/change_stream_topology_change_info.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
@@ -131,6 +132,11 @@ boost::optional<Document> PlanExecutorPipeline::_tryGetNext() try {
     const auto extraInfo = ex.extraInfo<ChangeStreamTopologyChangeInfo>();
     tassert(5669600, "Missing ChangeStreamTopologyChangeInfo on exception", extraInfo);
     return Document::fromBsonWithMetaData(extraInfo->getTopologyChangeEvent());
+} catch (const ExceptionFor<ErrorCodes::ChangeStreamStartAfterInvalidate>& ex) {
+    // This exception contains an event that captures the client-provided resume token.
+    const auto extraInfo = ex.extraInfo<ChangeStreamStartAfterInvalidateInfo>();
+    tassert(5779202, "Missing ChangeStreamStartAfterInvalidationInfo on exception", extraInfo);
+    return Document::fromBsonWithMetaData(extraInfo->getStartAfterInvalidateEvent());
 }
 
 void PlanExecutorPipeline::_updateResumableScanState(const boost::optional<Document>& document) {

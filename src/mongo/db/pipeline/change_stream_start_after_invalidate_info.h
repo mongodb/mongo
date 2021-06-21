@@ -29,45 +29,35 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
+
+class BSONObjBuilder;
+
 /**
- * This stage is used internally for change streams to ensure that the resume token is in the
- * stream.  It is not intended to be created by the user.
+ * Contains information to augment the 'ChangeStreamStartAfterInvalidation' error code. In
+ * particular, this class captures the 'invalidate' event that contains the client-provided resume
+ * token.
  */
-class DocumentSourceChangeStreamEnsureResumeTokenPresent final
-    : public DocumentSourceChangeStreamCheckResumability {
+class ChangeStreamStartAfterInvalidateInfo final : public ErrorExtraInfo {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamEnsureResumeTokenPresent"_sd;
+    static constexpr auto code = ErrorCodes::ChangeStreamStartAfterInvalidate;
 
-    const char* getSourceName() const final;
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
 
-    StageConstraints constraints(Pipeline::SplitState) const final;
+    explicit ChangeStreamStartAfterInvalidateInfo(BSONObj startAfterInvalidateEvent)
+        : _startAfterInvalidateEvent{startAfterInvalidateEvent.getOwned()} {}
 
-    GetModPathsReturn getModifiedPaths() const final {
-        // This stage neither modifies nor renames any field.
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
+    BSONObj getStartAfterInvalidateEvent() const {
+        return _startAfterInvalidateEvent;
     }
 
-    static boost::intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const DocumentSourceChangeStreamSpec& spec);
-
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    void serialize(BSONObjBuilder* bob) const final;
 
 private:
-    /**
-     * Use the create static method to create a DocumentSourceChangeStreamEnsureResumeTokenPresent.
-     */
-    DocumentSourceChangeStreamEnsureResumeTokenPresent(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
-
-    GetNextResult doGetNext() final;
-
-    GetNextResult _tryGetNext();
-
-    // Records whether we have observed the token in the resumed stream.
-    bool _hasSeenResumeToken = false;
+    BSONObj _startAfterInvalidateEvent;
 };
+
 }  // namespace mongo

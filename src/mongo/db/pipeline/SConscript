@@ -220,6 +220,7 @@ env.Library(
     source=[
         'change_stream_topology_change_info.cpp',
         'change_stream_invalidation_info.cpp',
+        'change_stream_start_after_invalidate_info.cpp',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

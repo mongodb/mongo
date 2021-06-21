@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/change_stream_start_after_invalidate_info.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -151,16 +152,19 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckInvalidate::doGetNe
         const bool isSingleElementKey = true;
         result.metadata().setSortKey(Value{resumeTokenDoc}, isSingleElementKey);
 
-        _queuedInvalidate = result.freeze();
+        // If we are here and '_startAfterInvalidate' is present, then the current event matches the
+        // resume token. We throw the event up to DSCSEnsureResumeTokenPresent, to ensure that it is
+        // always delivered regardless of any intervening $match stages.
+        uassert(ChangeStreamStartAfterInvalidateInfo(result.freeze().toBsonWithMetaData()),
+                "Change stream 'startAfter' invalidate event",
+                !_startAfterInvalidate);
 
-        // By this point, either the '_startAfterInvalidate' is absent or it is present and the
-        // current event matches the resume token. In the latter case, we do not want to close the
-        // change stream and should not throw an exception. Therefore, we only queue up an exception
-        // if '_startAfterInvalidate' is absent.
-        if (!_startAfterInvalidate) {
-            _queuedException = ChangeStreamInvalidationInfo(
-                _queuedInvalidate->metadata().getSortKey().getDocument().toBson());
-        }
+        // Otherwise, we are in a normal invalidation scenario. Queue up an invalidation event to be
+        // returned on the following call to getNext, and an invalidation exception to be thrown on
+        // the call after that.
+        _queuedInvalidate = result.freeze();
+        _queuedException = ChangeStreamInvalidationInfo(
+            _queuedInvalidate->metadata().getSortKey().getDocument().toBson());
     }
 
     // Regardless of whether the first document we see is an invalidating command, we only skip the

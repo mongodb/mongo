@@ -44,7 +44,7 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(
     DocumentSourceChangeStreamCheckResumability::createFromBson,
     feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
 
-using ResumeStatus = DocumentSourceChangeStreamCheckResumability::ResumeStatus;
+}  // namespace
 
 // Returns ResumeStatus::kFoundToken if the document retrieved from the resumed pipeline satisfies
 // the client's resume token, ResumeStatus::kCheckNextDoc if it is older than the client's token,
@@ -61,9 +61,11 @@ using ResumeStatus = DocumentSourceChangeStreamCheckResumability::ResumeStatus;
 // seamlessly; in the third case, the worst that can happen is that some entries are missed or
 // duplicated. Note that the simple collation is used to compare the resume tokens, and that we
 // purposefully avoid the user's requested collation if present.
-ResumeStatus compareAgainstClientResumeToken(const intrusive_ptr<ExpressionContext>& expCtx,
-                                             const Document& documentFromResumedStream,
-                                             const ResumeTokenData& tokenDataFromClient) {
+DocumentSourceChangeStreamCheckResumability::ResumeStatus
+DocumentSourceChangeStreamCheckResumability::compareAgainstClientResumeToken(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    const Document& documentFromResumedStream,
+    const ResumeTokenData& tokenDataFromClient) {
     // Parse the stream doc into comprehensible ResumeTokenData.
     auto tokenDataFromResumedStream =
         ResumeToken::parse(documentFromResumedStream["_id"].getDocument()).getData();
@@ -171,7 +173,6 @@ ResumeStatus compareAgainstClientResumeToken(const intrusive_ptr<ExpressionConte
                 ? ResumeStatus::kFoundToken
                 : defaultResumeStatus);
 }
-}  // namespace
 
 DocumentSourceChangeStreamCheckResumability::DocumentSourceChangeStreamCheckResumability(
     const intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token)
@@ -227,7 +228,8 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckResumability::doGet
 
         // Determine whether the current event sorts before, equal to or after the resume token.
         _resumeStatus =
-            compareAgainstClientResumeToken(pExpCtx, nextInput.getDocument(), _tokenFromClient);
+            DocumentSourceChangeStreamCheckResumability::compareAgainstClientResumeToken(
+                pExpCtx, nextInput.getDocument(), _tokenFromClient);
         switch (_resumeStatus) {
             case ResumeStatus::kCheckNextDoc:
                 // If the result was kCheckNextDoc, we are resumable but must swallow this event.

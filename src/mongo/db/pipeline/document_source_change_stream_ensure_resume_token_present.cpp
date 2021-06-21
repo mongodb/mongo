@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 
+#include "mongo/db/pipeline/change_stream_start_after_invalidate_info.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 
 namespace mongo {
@@ -98,7 +99,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent
         // Delegate to DocumentSourceChangeStreamCheckResumability to consume all events up to the
         // token. This will also set '_resumeStatus' to indicate whether we have seen or surpassed
         // the token.
-        nextInput = DocumentSourceChangeStreamCheckResumability::doGetNext();
+        nextInput = _tryGetNext();
 
         // If there are no more results, return EOF. We will continue checking for the resume token
         // the next time the getNext method is called. If we hit EOF, then we cannot have surpassed
@@ -127,6 +128,28 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent
     // At this point, we have seen the token and swallowed it. Return the next event to the client.
     invariant(_hasSeenResumeToken && _resumeStatus == ResumeStatus::kSurpassedToken);
     return nextInput;
+}
+
+DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent::_tryGetNext() {
+    try {
+        return DocumentSourceChangeStreamCheckResumability::doGetNext();
+    } catch (const ExceptionFor<ErrorCodes::ChangeStreamStartAfterInvalidate>& ex) {
+        const auto extraInfo = ex.extraInfo<ChangeStreamStartAfterInvalidateInfo>();
+        tassert(5779200, "Missing ChangeStreamStartAfterInvalidationInfo on exception", extraInfo);
+
+        const DocumentSource::GetNextResult nextInput =
+            Document::fromBsonWithMetaData(extraInfo->getStartAfterInvalidateEvent());
+        _resumeStatus =
+            DocumentSourceChangeStreamCheckResumability::compareAgainstClientResumeToken(
+                pExpCtx, nextInput.getDocument(), _tokenFromClient);
+
+        // This exception should always contain the client-provided resume token.
+        tassert(5779201,
+                "Client resume token did not match with the resume token on the invalidate event",
+                _resumeStatus == ResumeStatus::kFoundToken);
+
+        return nextInput;
+    }
 }
 
 Value DocumentSourceChangeStreamEnsureResumeTokenPresent::serialize(

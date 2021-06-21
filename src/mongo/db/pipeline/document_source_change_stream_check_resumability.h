@@ -101,6 +101,11 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const DocumentSourceChangeStreamSpec& spec);
 
+    static ResumeStatus compareAgainstClientResumeToken(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const Document& documentFromResumedStream,
+        const ResumeTokenData& tokenDataFromClient);
+
 protected:
     /**
      * Use the create static method to create a DocumentSourceChangeStreamCheckResumability.

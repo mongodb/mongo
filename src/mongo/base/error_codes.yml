@@ -440,6 +440,8 @@ error_codes:
     - {code: 349, name: KeyPatternShorterThanBound}
 
     - {code: 350, name: ReshardCollectionTruncatedError}
+
+    - {code: 351, name: ChangeStreamStartAfterInvalidate, extra: ChangeStreamStartAfterInvalidateInfo}
     
     # Error codes 4000-8999 are reserved.
 
