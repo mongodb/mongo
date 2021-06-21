@@ -38,12 +38,14 @@ function stopServerReplication(conn, retryIntervalMS) {
     }
 }
 
-// Stops replication at all replicaset secondaries.
+// Stops replication at all replicaset secondaries. However, it might wait for replication before
+// stopping it.
 function stopReplicationOnSecondaries(rs, changeReplicaSetDefaultWCToLocal = true) {
     if (changeReplicaSetDefaultWCToLocal == true) {
         // The default WC is majority and this test can't satisfy majority writes.
         assert.commandWorked(rs.getPrimary().adminCommand(
             {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+        rs.awaitReplication();
     }
     stopServerReplication(rs.getSecondaries());
 }
