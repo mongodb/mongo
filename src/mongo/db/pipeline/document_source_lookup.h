@@ -76,8 +76,8 @@ public:
          * Lookup from a sharded collection may not be allowed.
          */
         bool allowShardedForeignCollection(NamespaceString nss) const override final {
-            const bool foreignShardedAllowed =
-                getTestCommandsEnabled() && internalQueryAllowShardedLookup.load();
+            const bool foreignShardedAllowed = feature_flags::gFeatureFlagShardedLookup.isEnabled(
+                serverGlobalParams.featureCompatibility);
             if (foreignShardedAllowed) {
                 return true;
             }

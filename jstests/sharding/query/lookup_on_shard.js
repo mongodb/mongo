@@ -1,13 +1,9 @@
 // Test that a pipeline with a $lookup stage on a sharded foreign collection may be run on a mongod.
 (function() {
 
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
+load("jstests/libs/discover_topology.js");  // For findDataBearingNodes.
 
 const sharded = new ShardingTest({mongos: 1, shards: 2});
-
-setParameterOnAllHosts(
-    DiscoverTopology.findNonConfigNodes(sharded.s), "internalQueryAllowShardedLookup", true);
 
 assert.commandWorked(sharded.s.adminCommand({enableSharding: "test"}));
 sharded.ensurePrimaryShard('test', sharded.shard0.shardName);
@@ -72,6 +68,7 @@ const runTest = function() {
                 },
                 {$_internalSplitPipeline: {mergeType: "anyShard"}}
             ];
+
         const results = coll.aggregate(pipeline).toArray();
         assert.eq(results.length, nDocsMainColl);
         for (let i = 0; i < results.length; i++) {
@@ -94,6 +91,7 @@ const runTest = function() {
                 },
                 {$_internalSplitPipeline: {mergeType: "anyShard"}}
             ];
+
         const results = coll.aggregate(pipeline).toArray();
 
         assert.eq(results.length, nDocsMainColl);
@@ -124,27 +122,33 @@ const runTest = function() {
 jsTestLog("Running test with neither collection sharded");
 runTest();
 
-jsTestLog("Running test with foreign collection sharded");
-sharded.shardColl(
-    "foreignColl",
-    {_id: 1},  // shard key
-    {_id: 5},  // split
-    {_id: 5},  // move
-    "test",    // dbName
-    true       // waitForDelete
-);
-runTest();
+const getShardedLookupParam =
+    sharded.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
 
-jsTestLog("Running test with main and foreign collection sharded");
-sharded.shardColl(
-    "mainColl",
-    {_id: 1},  // shard key
-    {_id: 5},  // split
-    {_id: 5},  // move
-    "test",    // dbName
-    true       // waitForDelete
-);
-runTest();
+if (isShardedLookupEnabled) {
+    jsTestLog("Running test with foreign collection sharded");
+    sharded.shardColl(
+        "foreignColl",
+        {_id: 1},  // shard key
+        {_id: 5},  // split
+        {_id: 5},  // move
+        "test",    // dbName
+        true       // waitForDelete
+    );
+    runTest();
 
+    jsTestLog("Running test with main and foreign collection sharded");
+    sharded.shardColl(
+        "mainColl",
+        {_id: 1},  // shard key
+        {_id: 5},  // split
+        {_id: 5},  // move
+        "test",    // dbName
+        true       // waitForDelete
+    );
+    runTest();
+}
 sharded.stop();
 })();

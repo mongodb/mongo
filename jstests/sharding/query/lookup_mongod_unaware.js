@@ -9,6 +9,7 @@
  * @tags: [
  *  requires_fcv_47,
  *  requires_persistence,
+ *  featureFlagShardedLookup
  * ]
  *
  * TODO (SERVER-47265): Remove the requires_fcv_47 flag
@@ -32,11 +33,6 @@ function restartPrimaryShard(rs, localColl, foreignColl) {
     rs.awaitSecondaryNodes();
     assert(!hasRoutingInfoForNs(rs.getPrimary(), localColl.getFullName()));
     assert(!hasRoutingInfoForNs(rs.getPrimary(), foreignColl.getFullName()));
-
-    // Reset the server parameter allowing sharded $lookup on each node.
-    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(rs.getPrimary()),
-                           "internalQueryAllowShardedLookup",
-                           true);
 }
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
@@ -48,11 +44,6 @@ const nodeOptions = {
 const testName = "lookup_stale_mongod";
 const st =
     new ShardingTest({shards: 2, mongos: 2, rs: {nodes: 1}, other: {configOptions: nodeOptions}});
-
-// Set the parameter allowing sharded $lookup on all nodes.
-setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(st.s0).concat([st.s1.host]),
-                       "internalQueryAllowShardedLookup",
-                       true);
 
 const mongos0DB = st.s0.getDB(testName);
 const mongos0LocalColl = mongos0DB[testName + "_local"];

@@ -1,21 +1,24 @@
-// Tests the behavior of a $lookup when the mongos contains stale routing information for the
-// local and/or foreign collections.  This includes when mongos thinks the collection is sharded
-// when it's not, and likewise when mongos thinks the collection is unsharded but is actually
-// sharded.
+/**
+ * Tests the behavior of a $lookup when the mongos contains stale routing information for the
+ * local and/or foreign collections.  This includes when mongos thinks the collection is sharded
+ * when it's not, and likewise when mongos thinks the collection is unsharded but is actually
+ * sharded.
+ *
+ * @tags: [
+ *  requires_fcv_51,
+ *  featureFlagShardedLookup
+ * ]
+ */
 (function() {
 "use strict";
 
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
+load("jstests/libs/discover_topology.js");  // For findDataBearingNodes.
 
 const testName = "lookup_stale_mongos";
 const st = new ShardingTest({
     shards: 2,
     mongos: 2,
 });
-setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(st.s0).concat([st.s1.host]),
-                       "internalQueryAllowShardedLookup",
-                       true);
 
 const mongos0DB = st.s0.getDB(testName);
 assert.commandWorked(mongos0DB.dropDatabase());

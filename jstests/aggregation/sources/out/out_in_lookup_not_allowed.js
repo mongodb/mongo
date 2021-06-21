@@ -1,12 +1,17 @@
-// Tests that $out cannot be used within a $lookup pipeline.
+/**
+ * Tests that $out cannot be used within a $lookup pipeline.
+ *
+ * @tags: [
+ *  featureFlagShardedLookup
+ * ]
+ */
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");                     // For assertErrorCode.
-load("jstests/libs/collection_drop_recreate.js");                // For assertDropCollection.
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findNonConfigNodes.
-load("jstests/libs/fixture_helpers.js");                         // For isSharded.
+load("jstests/aggregation/extras/utils.js");       // For assertErrorCode.
+load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
+load("jstests/libs/discover_topology.js");         // For findNonConfigNodes.
+load("jstests/libs/fixture_helpers.js");           // For isSharded.
 
 const ERROR_CODE_OUT_BANNED_IN_LOOKUP = 51047;
 const coll = db.out_in_lookup_not_allowed;
@@ -14,12 +19,6 @@ coll.drop();
 
 const from = db.out_in_lookup_not_allowed_from;
 from.drop();
-
-if (FixtureHelpers.isSharded(from)) {
-    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
-                           "internalQueryAllowShardedLookup",
-                           true);
-}
 
 let pipeline = [
         {

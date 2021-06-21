@@ -3,16 +3,14 @@
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");                     // For assertErrorCode.
-load("jstests/libs/fixture_helpers.js");                         // For isSharded.
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
+load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+load("jstests/libs/fixture_helpers.js");      // For isSharded.
+load("jstests/libs/discover_topology.js");    // For findDataBearingNodes.
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 const testName = "lookup_sharded";
 
 const nodeList = DiscoverTopology.findNonConfigNodes(st.s);
-setParameterOnAllHosts(nodeList, "internalQueryAllowShardedLookup", true);
 
 const mongosDB = st.s0.getDB(testName);
 assert.commandWorked(mongosDB.dropDatabase());
@@ -548,30 +546,34 @@ assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()})
 st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 
 //
-// Test unsharded local collection and sharded foreign collection.
-//
-
-// Shard the foreign collection on _id.
-st.shardColl(mongosDB.from, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
-runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl);
-
-//
 // Test sharded local collection and unsharded foreign collection.
 //
-assert(mongosDB.from.drop());
 
 // Shard the local collection on _id.
 st.shardColl(mongosDB.lookup, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
 runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl);
 
-//
-// Test sharded local and foreign collections.
-//
+const getShardedLookupParam = mongosDB.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
+if (isShardedLookupEnabled) {
+    //
+    // Test unsharded local collection and sharded foreign collection.
+    //
+    assert(mongosDB.lookup.drop());
 
-// Shard the foreign collection on _id.
-st.shardColl(mongosDB.from, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
-runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl);
+    // Shard the foreign collection on _id.
+    st.shardColl(mongosDB.from, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
+    runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl);
 
+    //
+    // Test sharded local and foreign collections.
+    //
+
+    // Shard the local collection on _id.
+    st.shardColl(mongosDB.lookup, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
+    runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl);
+}
 // Test that a $lookup from an unsharded collection followed by a $merge to a sharded collection
 // is allowed.
 const sourceColl = st.getDB(testName).lookUp;
@@ -593,58 +595,6 @@ sourceColl.aggregate([
 ]);
 
 assert.eq([{a: 0, same: [{_id: 0, b: 0}]}], outColl.find({}, {_id: 0}).toArray());
-
-// Disable the server parameter. Be sure that an attempt to run a $lookup on a sharded
-// collection fails.
-setParameterOnAllHosts(nodeList, "internalQueryAllowShardedLookup", false);
-
-// Re shard the foreign collection on _id.
-st.shardColl(mongosDB.from, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
-
-assert.throwsWithCode(
-    () =>
-        sourceColl
-            .aggregate([{
-                $lookup: {localField: "a", foreignField: "b", from: fromColl.getName(), as: "same"}
-            }])
-            .itcount(),
-    28769);
-assert.throwsWithCode(
-    () => sourceColl
-              .aggregate(
-                  [{
-                      $lookup:
-                          {localField: "a", foreignField: "b", from: fromColl.getName(), as: "same"}
-                  }],
-                  {allowDiskUse: true})
-              .itcount(),
-    28769);
-assert.throwsWithCode(() => sourceColl
-                                  .aggregate(
-                                      [
-                                        {$_internalSplitPipeline: {mergeType: "anyShard"}},
-                                        {
-                                          $lookup: {
-                                              localField: "a",
-                                              foreignField: "b",
-                                              from: fromColl.getName(),
-                                              as: "same"
-                                          }
-                                        }
-                                      ],
-                                      {allowDiskUse: true})
-                                  .itcount(), 28769);
-assert.throwsWithCode(
-    () => sourceColl
-              .aggregate(
-                  [{$facet: {
-                    a: {
-                      $lookup:
-                          {localField: "a", foreignField: "b", from: fromColl.getName(), as: "same"}
-                    }
-                  }}],
-                  {allowDiskUse: true})
-              .itcount(), 40170);
 
 st.stop();
 }());

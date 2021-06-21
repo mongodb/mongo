@@ -21,7 +21,6 @@
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 load("jstests/libs/discover_topology.js");    // For findNonConfigNodes.
 load("jstests/libs/profiler.js");             // For profilerHasSingleMatchingEntryOrThrow.
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
 // For flushRoutersAndRefreshShardMetadata.
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
@@ -100,12 +99,12 @@ const setUp = () => {
 const nodeList = DiscoverTopology.findNonConfigNodes(st.s);
 
 // Tests that $lookup from config.cache.chunks.* yields the expected results.
-const testLookupFromConfigCacheChunks = (lookupAgg, internalQueryAllowShardedLookup) => {
-    jsTestLog(`Running test on lookup: ${tojson(lookupAgg)} with internalQueryAllowShardedLookup: ${
-        internalQueryAllowShardedLookup}`);
+const testLookupFromConfigCacheChunks = (lookupAgg) => {
+    const isShardedLookupEnabled = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1})
+                                       .featureFlagShardedLookup.value;
 
-    setParameterOnAllHosts(
-        nodeList, "internalQueryAllowShardedLookup", internalQueryAllowShardedLookup);
+    jsTestLog(`Running test on lookup: ${tojson(lookupAgg)} with featureFlagShardedLookup: ${
+        isShardedLookupEnabled}`);
 
     const results = sourceCollection.aggregate(lookupAgg).toArray();
     results.forEach((res) => {
@@ -122,8 +121,7 @@ const lookupBasic = {
         as: "results",
     }
 };
-testLookupFromConfigCacheChunks(lookupBasic, false);
-testLookupFromConfigCacheChunks(lookupBasic, true);
+testLookupFromConfigCacheChunks(lookupBasic);
 
 const lookupLet = {
     $lookup: {
@@ -135,7 +133,6 @@ const lookupLet = {
         as: "results",
     }
 };
-testLookupFromConfigCacheChunks(lookupLet, false);
-testLookupFromConfigCacheChunks(lookupLet, true);
+testLookupFromConfigCacheChunks(lookupLet);
 st.stop();
 }());

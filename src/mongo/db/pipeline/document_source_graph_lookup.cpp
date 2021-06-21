@@ -49,9 +49,6 @@
 namespace mongo {
 
 namespace {
-bool foreignShardedLookupAllowed() {
-    return getTestCommandsEnabled() && internalQueryAllowShardedLookup.load();
-}
 
 // Parses $graphLookup 'from' field. The 'from' field must be a string with the exception of
 // 'local.system.tenantMigration.oplogView'.
@@ -210,7 +207,8 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
     long long depth = 0;
     bool shouldPerformAnotherQuery;
     do {
-        if (!foreignShardedLookupAllowed()) {
+        if (!feature_flags::gFeatureFlagShardedLookup.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
             // Enforce that the foreign collection must be unsharded for $graphLookup.
             _fromExpCtx->mongoProcessInterface->setExpectedShardVersion(
                 _fromExpCtx->opCtx, _fromExpCtx->ns, ChunkVersion::UNSHARDED());
@@ -244,7 +242,8 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             pipelineOpts.optimize = true;
             pipelineOpts.attachCursorSource = true;
             // By default, $graphLookup doesn't support a sharded 'from' collection.
-            pipelineOpts.allowTargetingShards = internalQueryAllowShardedLookup.load();
+            pipelineOpts.allowTargetingShards = feature_flags::gFeatureFlagShardedLookup.isEnabled(
+                serverGlobalParams.featureCompatibility);
             _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
             auto pipeline = Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);
             while (auto next = pipeline->getNext()) {
@@ -393,7 +392,9 @@ void DocumentSourceGraphLookUp::performSearch() {
         if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
             uassert(31428,
                     "Cannot run $graphLookup with sharded foreign collection",
-                    foreignShardedLookupAllowed() || !staleInfo->getVersionWanted() ||
+                    feature_flags::gFeatureFlagShardedLookup.isEnabled(
+                        serverGlobalParams.featureCompatibility) ||
+                        !staleInfo->getVersionWanted() ||
                         staleInfo->getVersionWanted() == ChunkVersion::UNSHARDED());
         }
         throw;

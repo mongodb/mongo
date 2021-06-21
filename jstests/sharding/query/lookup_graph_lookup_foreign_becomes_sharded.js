@@ -13,6 +13,10 @@ load("jstests/aggregation/extras/utils.js");         // For assertErrorCode.
 load("jstests/libs/profiler.js");                    // For profilerHasSingleMatchingEntryOrThrow.
 load("jstests/multiVersion/libs/multi_cluster.js");  // For ShardingTest.waitUntilStable.
 
+// Currently, even if the 'featureFlagShardedLookup' flag is enabled, $graphLookup into a
+// sharded collection is not supported (testing this functionality should assert that the
+// command fails). This will be fixed by SERVER-58073.
+
 const st = new ShardingTest({shards: 1, mongos: 2, rs: {nodes: 1}});
 const shard0 = st.rs0;
 
@@ -106,31 +110,49 @@ for (let testCase of testCases) {
 assert.commandWorked(
     freshMongos.adminCommand({shardCollection: foreignCollection.getFullName(), key: {_id: 1}}));
 
+const isShardedLookupEnabled = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1})
+                                   .featureFlagShardedLookup.value;
+
 // Now run a getMore for each of the test cases. The collection has become sharded mid-iteration, so
 // we should observe the error code associated with the test case.
-for (let testCase of testCases) {
-    assert.commandFailedWithCode(
-        freshMongos.runCommand(
-            {getMore: testCase.aggCmdRes.cursor.id, collection: testCase.aggCmd.aggregate}),
-        testCase.errCode,
-        `Expected getMore to fail. Original command: ${tojson(testCase.aggCmd)}`);
+// TODO SERVER-52324: When the feature flag is enabled, assert that the command works and has
+// expected results.
+if (!isShardedLookupEnabled) {
+    for (let testCase of testCases) {
+        assert.commandFailedWithCode(
+            freshMongos.runCommand(
+                {getMore: testCase.aggCmdRes.cursor.id, collection: testCase.aggCmd.aggregate}),
+            testCase.errCode,
+            `Expected getMore to fail. Original command: ${tojson(testCase.aggCmd)}`);
+    }
 }
 
 // Run both test cases again. The fresh mongos knows that the foreign collection is sharded now, so
-// both tests will fail on the mongos with error code 28769 without ever reaching the shard.
-for (let testCase of testCases) {
-    assert.commandFailedWithCode(freshMongos.runCommand(testCase.aggCmd),
-                                 28769,
-                                 `Expected command to fail on mongos: ${tojson(testCase.aggCmd)}`);
+// both tests will fail on the mongos with error code 28769 without ever reaching the shard if the
+// 'featureFlagShardedLookup' flag is disabled.
+// TODO SERVER-52324: When the feature flag is enabled, assert that the command works and has
+// expected results.
+if (!isShardedLookupEnabled) {
+    for (let testCase of testCases) {
+        assert.commandFailedWithCode(
+            freshMongos.runCommand(testCase.aggCmd),
+            28769,
+            `Expected command to fail on mongos: ${tojson(testCase.aggCmd)}`);
+    }
 }
 
 // Run the test cases through the stale mongos. It should still believe that the foreign collection
 // is unsharded, and so it will send the aggregate command to the shard, where it will hit an error
 // as soon as it attempts to access the foreign collection.
-for (let testCase of testCases) {
-    assert.commandFailedWithCode(staleMongos.runCommand(testCase.aggCmd),
-                                 testCase.errCode,
-                                 `Expected command to fail on shard: ${tojson(testCase.aggCmd)}`);
+// TODO SERVER-52324: When the feature flag is enabled, assert that the command works and has
+// expected results.
+if (!isShardedLookupEnabled) {
+    for (let testCase of testCases) {
+        assert.commandFailedWithCode(
+            staleMongos.runCommand(testCase.aggCmd),
+            testCase.errCode,
+            `Expected command to fail on shard: ${tojson(testCase.aggCmd)}`);
+    }
 }
 
 // Reset both collections to unsharded and make sure both mongos know.
@@ -164,14 +186,18 @@ for (let testCase of testCases) {
 // ... and a single StaleConfig exception for the foreign namespace. Note that the 'ns' field of the
 // profiler entry is the source collection in both cases, because the $lookup's parent aggregation
 // produces the profiler entry, and it is always running on the source collection.
-profilerHasSingleMatchingEntryOrThrow({
-    profileDB: primaryDB,
-    filter: {
-        ns: sourceCollection.getFullName(),
-        errCode: ErrorCodes.StaleConfig,
-        errMsg: {$regex: `${foreignCollection.getFullName()} is not currently available`}
-    }
-});
+// TODO SERVER-52324: When the feature flag is enabled, remove the check and ensure the results are
+// expected.
+if (!isShardedLookupEnabled) {
+    profilerHasSingleMatchingEntryOrThrow({
+        profileDB: primaryDB,
+        filter: {
+            ns: sourceCollection.getFullName(),
+            errCode: ErrorCodes.StaleConfig,
+            errMsg: {$regex: `${foreignCollection.getFullName()} is not currently available`}
+        }
+    });
+}
 
 st.stop();
 }());

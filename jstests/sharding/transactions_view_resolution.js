@@ -60,6 +60,19 @@ function setUpShardedCollectionAndView(st, session, primaryShard) {
 }
 
 const st = new ShardingTest({shards: 2, mongos: 1});
+
+// Stop running the tests if the flag allowing $lookup into a sharded collection is enabled because
+// an invariant fails during the aggregation of the pipeline in a transaction where the collection
+// is unsharded.
+// TODO SERVER-57957: Possibly remove this check.
+const getShardedLookupParam = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
+if (isShardedLookupEnabled) {
+    st.stop();
+    return;
+}
+
 const session = st.s.startSession();
 
 // Set up an unsharded collection on shard0.

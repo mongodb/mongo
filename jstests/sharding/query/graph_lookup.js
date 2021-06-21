@@ -43,6 +43,5 @@ assert.throwsWithCode(() => db.foo.aggregate([{
             as: "res"
         }
     }]), 28769);
-
 st.stop();
 })();

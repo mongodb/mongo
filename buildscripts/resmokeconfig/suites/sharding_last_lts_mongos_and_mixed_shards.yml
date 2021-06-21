@@ -11,6 +11,7 @@ selector:
   - requires_fcv_48
   - requires_fcv_49
   - requires_fcv_50
+  - requires_fcv_51
   - backport_required_multiversion
   - sharding_last_lts_mongos_and_mixed_shards_backport_required_multiversion
   exclude_files:

@@ -8,14 +8,14 @@
  *
  * @tags: [
  *   requires_fcv_50,
+ *   featureFlagShardedLookup
  * ]
  */
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");                     // for arrayEq
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
+load("jstests/aggregation/extras/utils.js");  // for arrayEq
+load("jstests/libs/discover_topology.js");    // For findDataBearingNodes.
 
 function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collation) {
     // Test that the $lookup stage respects the inherited collation.
@@ -430,7 +430,6 @@ function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collati
 
     // Test that the $lookup stage uses the "simple" collation if a collation isn't set on the
     // collection or the aggregation operation, even if the foreign collection has a collation.
-
     res = withoutDefaultCollationColl
     .aggregate([
         {$match: {_id: "lowercase"}},
@@ -557,8 +556,6 @@ function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collati
 }
 
 const st = new ShardingTest({shards: 2});
-setParameterOnAllHosts(
-    DiscoverTopology.findNonConfigNodes(st.s), "internalQueryAllowShardedLookup", true);
 
 const testName = "collation_lookup";
 const caseInsensitive = {

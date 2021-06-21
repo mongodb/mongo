@@ -87,10 +87,6 @@ void lookupPipeValidator(const Pipeline& pipeline) {
     });
 }
 
-bool foreignShardedLookupAllowed() {
-    return getTestCommandsEnabled() && internalQueryAllowShardedLookup.load();
-}
-
 // Parses $lookup 'from' field. The 'from' field must be a string or one of the following
 // exceptions:
 // {from: {db: "config", coll: "cache.chunks.*"}, ...} or
@@ -310,7 +306,9 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState) const {
     } else {
         // When $lookup on sharded foreign collections is allowed, the foreign collection is
         // sharded, and the stage is executing on mongos, the stage can run on mongos or any shard.
-        hostRequirement = (foreignShardedLookupAllowed() && pExpCtx->inMongos &&
+        hostRequirement = (feature_flags::gFeatureFlagShardedLookup.isEnabled(
+                               serverGlobalParams.featureCompatibility) &&
+                           pExpCtx->inMongos &&
                            pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _fromNs))
             ? HostTypeRequirement::kNone
             : HostTypeRequirement::kPrimaryShard;
@@ -371,7 +369,9 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
         if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
             uassert(51069,
                     "Cannot run $lookup with sharded foreign collection",
-                    foreignShardedLookupAllowed() || !staleInfo->getVersionWanted() ||
+                    feature_flags::gFeatureFlagShardedLookup.isEnabled(
+                        serverGlobalParams.featureCompatibility) ||
+                        !staleInfo->getVersionWanted() ||
                         staleInfo->getVersionWanted() == ChunkVersion::UNSHARDED());
         }
         throw;
@@ -408,7 +408,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
     // Resolve the 'let' variables to values per the given input document.
     resolveLetVariables(inputDoc, &_fromExpCtx->variables);
 
-    if (!foreignShardedLookupAllowed()) {
+    if (!feature_flags::gFeatureFlagShardedLookup.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         // Enforce that the foreign collection must be unsharded for lookup.
         _fromExpCtx->mongoProcessInterface->setExpectedShardVersion(
             _fromExpCtx->opCtx, _fromExpCtx->ns, ChunkVersion::UNSHARDED());
@@ -421,7 +422,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
         pipelineOpts.attachCursorSource = true;
         pipelineOpts.validator = lookupPipeValidator;
         // By default, $lookup doesnt support sharded 'from' collections.
-        pipelineOpts.allowTargetingShards = internalQueryAllowShardedLookup.load();
+        pipelineOpts.allowTargetingShards = feature_flags::gFeatureFlagShardedLookup.isEnabled(
+            serverGlobalParams.featureCompatibility);
         return Pipeline::makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
     }
 
@@ -451,7 +453,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
     if (!_cache->isServing()) {
         // The cache has either been abandoned or has not yet been built. Attach a cursor.
         pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
-            pipeline.release(), internalQueryAllowShardedLookup.load() /* allowTargetingShards*/);
+            pipeline.release(),
+            feature_flags::gFeatureFlagShardedLookup
+                .isEnabledAndIgnoreFCV() /* allowTargetingShards*/);
     }
 
     // If the cache has been abandoned, release it.

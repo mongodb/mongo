@@ -5,10 +5,9 @@
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");                     // For assertErrorCode.
-load("jstests/libs/collection_drop_recreate.js");                // For assertDropCollection.
-load("jstests/libs/discover_topology.js");                       // For findNonConfigNodes.
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
+load("jstests/aggregation/extras/utils.js");       // For assertErrorCode.
+load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
+load("jstests/libs/discover_topology.js");         // For findNonConfigNodes.
 
 function generateNestedPipeline(foreignCollName, numLevels) {
     let pipeline = [{"$lookup": {pipeline: [], from: foreignCollName, as: "same"}}];
@@ -70,11 +69,14 @@ const sharded = new ShardingTest({mongos: 1, shards: 2});
 
 assert(sharded.adminCommand({enableSharding: "test"}));
 assert(sharded.adminCommand({shardCollection: "test.lookup", key: {_id: 'hashed'}}));
-setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(sharded.getDB('test').getMongo()),
-                       "internalQueryAllowShardedLookup",
-                       true);
 
-runTest(sharded.getDB('test').lookup);
+const isShardedLookupEnabled =
+    sharded.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1})
+        .featureFlagShardedLookup.value;
+
+if (isShardedLookupEnabled) {
+    runTest(sharded.getDB('test').lookup);
+}
 
 sharded.stop();
 }());
