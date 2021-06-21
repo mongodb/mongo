@@ -69,6 +69,12 @@ assert.commandFailedWithCode(
     ErrorCodes.APIDeprecationError,
     "Provided apiDeprecationErrors: true, but the invoked command's deprecatedApiVersions() does not include \"1\"");
 
+// Assert APIStrictError message for unsupported commands contains link to docs site
+var err = assert.commandFailedWithCode(
+    db.runCommand({buildInfo: 1, apiStrict: true, apiVersion: "1"}), ErrorCodes.APIStrictError);
+assert.includes(err.errmsg, 'buildInfo');
+assert.includes(err.errmsg, 'dochub.mongodb.org');
+
 // Test writing to system.js fails.
 assert.commandFailedWithCode(
     db.runCommand({

@@ -70,12 +70,16 @@ const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody
     if (apiParamsFromClient.getApiStrict().get_value_or(false)) {
         auto cmdApiVersions = command->apiVersions();
         auto apiVersionFromClient = apiParamsFromClient.getApiVersion().value().toString();
-
         bool strictAssert = (cmdApiVersions.find(apiVersionFromClient) != cmdApiVersions.end());
-        uassert(ErrorCodes::APIStrictError,
-                str::stream() << "Provided apiStrict:true, but the command " << command->getName()
-                              << " is not in API Version " << apiVersionFromClient,
-                strictAssert);
+        uassert(
+            ErrorCodes::APIStrictError,
+            str::stream() << "Provided apiStrict:true, but the command " << command->getName()
+                          << " is not in API Version " << apiVersionFromClient
+                          << ". Information on supported commands and migrations in API Version "
+                          << apiVersionFromClient
+                          << " can be found at "
+                             "https://dochub.mongodb.org/core/manual-versioned-api",
+            strictAssert);
         bool strictDoesntWriteToSystemJS =
             !(command->getReadWriteType() == BasicCommand::ReadWriteType::kWrite &&
               requestBody.firstElementType() == BSONType::String &&
