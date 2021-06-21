@@ -28,6 +28,8 @@
 
 #include "wtperf.h"
 
+#define WT_BACKUP_COPY_SIZE (128 * 1024)
+
 /* Setup the logging output mechanism. */
 int
 setup_log_file(WTPERF *wtperf)
@@ -101,4 +103,53 @@ lprintf(const WTPERF *wtperf, int err, uint32_t level, const char *fmt, ...)
     /* Never attempt to continue if we got a panic from WiredTiger. */
     if (err == WT_PANIC)
         abort();
+}
+
+/*
+ * backup_read --
+ *     Read in a file, used mainly to measure the impact of backup on a single machine. Backup is
+ *     usually copied across different machines, therefore the write portion doesn't affect the
+ *     machine backup is performing on.
+ */
+void
+backup_read(WTPERF *wtperf, const char *filename)
+{
+    char *buf;
+    int rfd;
+    size_t len;
+    ssize_t rdsize;
+    struct stat st;
+    uint32_t buf_size, size, total;
+
+    buf = NULL;
+    rfd = -1;
+
+    /* Open the file handle. */
+    len = strlen(wtperf->home) + strlen(filename) + 10;
+    buf = dmalloc(len);
+    testutil_check(__wt_snprintf(buf, len, "%s/%s", wtperf->home, filename));
+    error_sys_check(rfd = open(buf, O_RDONLY, 0644));
+
+    /* Get the file's size. */
+    testutil_check(stat(buf, &st));
+    size = (uint32_t)st.st_size;
+    free(buf);
+
+    buf = dmalloc(WT_BACKUP_COPY_SIZE);
+    total = 0;
+    buf_size = WT_MIN(size, WT_BACKUP_COPY_SIZE);
+    while (total < size) {
+        /* Use the read size since we may have read less than the granularity. */
+        error_sys_check(rdsize = read(rfd, buf, buf_size));
+
+        /* If we get EOF, we're done. */
+        if (rdsize == 0)
+            break;
+        total += (uint32_t)rdsize;
+        buf_size = WT_MIN(buf_size, size - total);
+    }
+
+    if (rfd != -1)
+        testutil_check(close(rfd));
+    free(buf);
 }

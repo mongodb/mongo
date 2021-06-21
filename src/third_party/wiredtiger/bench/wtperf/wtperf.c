@@ -1252,8 +1252,6 @@ backup_worker(void *arg)
             break;
 
         wtperf->backup = true;
-        /* Cleanup the data from the previous backup and create the backup directories. */
-        testutil_create_backup_directory(wtperf->home);
 
         /*
          * open_cursor can return EBUSY if concurrent with a metadata operation, retry in that case.
@@ -1266,7 +1264,7 @@ backup_worker(void *arg)
 
         while ((ret = backup_cursor->next(backup_cursor)) == 0) {
             testutil_check(backup_cursor->get_key(backup_cursor, &key));
-            testutil_copy_file(session, key);
+            backup_read(wtperf, key);
         }
 
         if (ret != WT_NOTFOUND) {
