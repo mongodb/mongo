@@ -624,6 +624,15 @@ public:
                   ComparisonRulesSet rules = ComparisonRules::kConsiderFieldName,
                   const StringData::ComparatorInterface* comparator = nullptr) const;
 
+    /**
+     * Returns a boolean for how, using the given comparison functions 'comp' or
+     * 'stringComp', this BSONElement compares with 'other'. Ignores the field name.
+     */
+    template <typename Comparator>
+    bool compare(const BSONElement& other,
+                 Comparator comp,
+                 const StringData::ComparatorInterface* stringComp = nullptr) const;
+
     DeferredComparison operator<(const BSONElement& other) const {
         return DeferredComparison(DeferredComparison::Type::kLT, *this, other);
     }

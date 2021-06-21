@@ -417,12 +417,11 @@ std::pair<MinMaxStore::Iterator, MinMaxStore::Iterator> MinMax::_update(
     };
 
     if (elem.type() == Object) {
-        auto shouldUpdateObject = [&](MinMaxStore::Data& data, auto compare) {
+        auto shouldUpdateObject = [&](MinMaxStore::Data& data, auto comp) {
             return data.type() == MinMaxStore::Type::kObject ||
                 data.type() == MinMaxStore::Type::kUnset ||
-                (data.type() == MinMaxStore::Type::kArray && compare(typeComp(Array), 0)) ||
-                (data.type() == MinMaxStore::Type::kValue &&
-                 compare(typeComp(data.valueType()), 0));
+                (data.type() == MinMaxStore::Type::kArray && comp(typeComp(Array), 0)) ||
+                (data.type() == MinMaxStore::Type::kValue && comp(typeComp(data.valueType()), 0));
         };
         bool updateMin =
             updateMinValues && shouldUpdateObject(obj.element().min(), std::less<int>{});
@@ -446,12 +445,11 @@ std::pair<MinMaxStore::Iterator, MinMaxStore::Iterator> MinMax::_update(
     }
 
     if (elem.type() == Array) {
-        auto shouldUpdateArray = [&](MinMaxStore::Data& data, auto compare) {
+        auto shouldUpdateArray = [&](MinMaxStore::Data& data, auto comp) {
             return data.type() == MinMaxStore::Type::kArray ||
                 data.type() == MinMaxStore::Type::kUnset ||
-                (data.type() == MinMaxStore::Type::kObject && compare(typeComp(Object), 0)) ||
-                (data.type() == MinMaxStore::Type::kValue &&
-                 compare(typeComp(data.valueType()), 0));
+                (data.type() == MinMaxStore::Type::kObject && comp(typeComp(Object), 0)) ||
+                (data.type() == MinMaxStore::Type::kValue && comp(typeComp(data.valueType()), 0));
         };
         bool updateMin =
             updateMinValues && shouldUpdateArray(obj.element().min(), std::less<int>{});
@@ -485,21 +483,21 @@ std::pair<MinMaxStore::Iterator, MinMaxStore::Iterator> MinMax::_update(
         return {obj.iterator(), obj.parent().end()};
     }
 
-    auto maybeUpdateValue = [&](MinMaxStore::Data& data, auto compare) {
+    auto maybeUpdateValue = [&](MinMaxStore::Data& data, auto comp) {
         if (data.type() == MinMaxStore::Type::kUnset ||
-            (data.type() == MinMaxStore::Type::kObject && compare(typeComp(Object), 0)) ||
-            (data.type() == MinMaxStore::Type::kArray && compare(typeComp(Array), 0)) ||
+            (data.type() == MinMaxStore::Type::kObject && comp(typeComp(Object), 0)) ||
+            (data.type() == MinMaxStore::Type::kArray && comp(typeComp(Array), 0)) ||
             (data.type() == MinMaxStore::Type::kValue &&
-             compare(elem.woCompare(data.value(), false, stringComparator), 0))) {
+             elem.compare(data.value(), comp, stringComparator))) {
             data.setValue(elem);
         }
     };
     if (updateMinValues) {
-        maybeUpdateValue(obj.element().min(), std::less<int>{});
+        maybeUpdateValue(obj.element().min(), std::less<>{});
     }
 
     if (updateMaxValues) {
-        maybeUpdateValue(obj.element().max(), std::greater<int>{});
+        maybeUpdateValue(obj.element().max(), std::greater<>{});
     }
 
     return {obj.iterator(), obj.parent().end()};

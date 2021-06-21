@@ -482,6 +482,88 @@ int BSONElement::woCompare(const BSONElement& elem,
     return compareElements(*this, elem, rules, comparator);
 }
 
+template <typename Comparator>
+bool BSONElement::compare(const BSONElement& other,
+                          Comparator comp,
+                          const StringData::ComparatorInterface* stringComp) const {
+    if (type() != other.type())
+        return comp((int)canonicalType(), other.canonicalType());
+    switch (other.type()) {
+        case BSONType::EOO:
+        case BSONType::Undefined:
+        case BSONType::jstNULL:
+        case BSONType::MaxKey:
+        case BSONType::MinKey:
+            return comp(canonicalType(), other.canonicalType());
+        case BSONType::Bool:
+            return comp(*value(), *other.value());
+        case BSONType::bsonTimestamp:
+            return comp(timestamp(), other.timestamp());
+        case BSONType::Date:
+            return comp(Date(), other.Date());
+        case BSONType::NumberInt:
+            return comp(_numberInt(), other._numberInt());
+        case BSONType::NumberLong:
+            return comp(_numberLong(), other._numberLong());
+        case BSONType::NumberDouble:
+            return comp(_numberDouble(), other._numberDouble());
+        case BSONType::NumberDecimal:
+            return comp(_numberDecimal(), other._numberDecimal());
+        case BSONType::jstOID:
+            return comp(memcmp(value(), other.value(), OID::kOIDSize), 0);
+        case BSONType::Code:
+            return comp(compareElementStringValues(*this, other), 0);
+        case BSONType::Symbol:
+        case BSONType::String:
+            return comp(stringComp ? stringComp->compare(valueStringData(), other.valueStringData())
+                                   : compareElementStringValues(*this, other),
+                        0);
+        case BSONType::Object:
+        case BSONType::Array:
+            return embeddedObject().woCompare(other.embeddedObject(),
+                                              BSONObj(),
+                                              BSONElement::ComparisonRules::kConsiderFieldName,
+                                              stringComp);
+        case BSONType::DBRef: {
+            int size = valuesize();
+            int diff = size - other.valuesize();
+            if (diff != 0) {
+                diff = memcmp(value(), other.value(), size);
+            }
+            return comp(diff, 0);
+        }
+        case BSONType::BinData: {
+            int size = objsize();
+            int diff = size - other.objsize();
+            if (diff != 0) {
+                diff = memcmp(value() + 4, other.value() + 4, size + 1);
+            }
+            return comp(diff, 0);
+        }
+        case BSONType::RegEx: {
+            int diff = strcmp(regex(), other.regex());
+            if (diff != 0) {
+                diff = strcmp(regexFlags(), other.regexFlags());
+            }
+            return comp(diff, 0);
+        }
+        case BSONType::CodeWScope: {
+            int diff =
+                StringData(codeWScopeCode(), codeWScopeCodeLen() - 1)
+                    .compare(StringData(other.codeWScopeCode(), other.codeWScopeCodeLen() - 1));
+            if (diff != 0) {
+                return codeWScopeObject().woCompare(
+                    other.codeWScopeObject(),
+                    BSONObj(),
+                    BSONElement::ComparisonRules::kConsiderFieldName);
+            }
+            return comp(diff, 0);
+        }
+    }
+
+    MONGO_UNREACHABLE;
+}
+
 bool BSONElement::binaryEqual(const BSONElement& rhs) const {
     const int elemSize = size();
 
@@ -991,5 +1073,15 @@ struct BSONElementDBRefType {
 struct BSONElementCodeWithScopeType {
 } bsonElementCodeWithScopeType;
 #endif  // defined(_MSC_VER) && defined(_DEBUG)
+
+template bool BSONElement::compare<std::less<>>(
+    const BSONElement& other,
+    std::less<> comp,
+    const StringData::ComparatorInterface* stringComp) const;
+
+template bool BSONElement::compare<std::greater<>>(
+    const BSONElement& other,
+    std::greater<> comp,
+    const StringData::ComparatorInterface* stringComp) const;
 
 }  // namespace mongo
