@@ -287,7 +287,7 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryOnReshardingBegin) {
     ASSERT_EQ(*op.getUuid(), doc.getSourceUUID()) << op.getEntry();
     ASSERT_EQ(op.getObject()["msg"].type(), BSONType::String) << op.getEntry();
     ASSERT_TRUE(receivedChangeEvent == expectedChangeEvent);
-    ASSERT_FALSE(op.getFromMigrate());
+    ASSERT_TRUE(op.getFromMigrate());
     ASSERT_FALSE(bool(op.getDestinedRecipient())) << op.getEntry();
 }
 

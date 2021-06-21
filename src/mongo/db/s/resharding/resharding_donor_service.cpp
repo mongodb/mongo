@@ -567,6 +567,7 @@ void ReshardingDonorService::DonorStateMachine::
             oplog.setObject(BSON("msg"
                                  << "Created temporary resharding collection"));
             oplog.setObject2(changeEvent.toBSON());
+            oplog.setFromMigrate(true);
             oplog.setOpTime(OplogSlot());
             oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
             return oplog;

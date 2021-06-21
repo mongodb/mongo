@@ -1,0 +1,88 @@
+// Tests that internal resharding ops are exposed as change stream events during a
+// resharding operation. Internal resharding ops include:
+// 1. reshardBegin
+//
+// @tags: [
+//   requires_majority_read_concern,
+//   uses_change_streams,
+//   requires_fcv_49,
+//   uses_atclustertime,
+// ]
+(function() {
+"use strict";
+
+load('jstests/libs/change_stream_util.js');
+load("jstests/libs/discover_topology.js");
+load("jstests/sharding/libs/resharding_test_fixture.js");
+
+// Use a higher frequency for periodic noops to speed up the test.
+const reshardingTest = new ReshardingTest({
+    numDonors: 2,
+    numRecipients: 1,
+    reshardInPlace: false,
+    periodicNoopIntervalSecs: 1,
+    writePeriodicNoops: true
+});
+reshardingTest.setup();
+
+const kDbName = "reshardingDb";
+const collName = "coll";
+const ns = kDbName + "." + collName;
+
+const donorShardNames = reshardingTest.donorShardNames;
+const sourceCollection = reshardingTest.createShardedCollection({
+    ns: ns,
+    shardKeyPattern: {oldKey: 1},
+    chunks: [
+        {min: {oldKey: MinKey}, max: {oldKey: 0}, shard: donorShardNames[0]},
+        {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: donorShardNames[1]}
+    ],
+    primaryShardName: donorShardNames[0]
+});
+
+const mongos = sourceCollection.getMongo();
+const recipientShardNames = reshardingTest.recipientShardNames;
+const topology = DiscoverTopology.findConnectedNodes(mongos);
+
+const donor0 = new Mongo(topology.shards[donorShardNames[0]].primary);
+const cstDonor0 = new ChangeStreamTest(donor0.getDB(kDbName));
+let changeStreamsCursorDonor0 = cstDonor0.startWatchingChanges(
+    {pipeline: [{$changeStream: {showMigrationEvents: true}}], collection: collName});
+
+const donor1 = new Mongo(topology.shards[donorShardNames[1]].primary);
+const cstDonor1 = new ChangeStreamTest(donor1.getDB(kDbName));
+let changeStreamsCursorDonor1 = cstDonor1.startWatchingChanges(
+    {pipeline: [{$changeStream: {showMigrationEvents: true}}], collection: collName});
+
+reshardingTest.withReshardingInBackground(
+    {
+        // If a donor is also a recipient, the donor state machine will run renameCollection with
+        // {dropTarget : true} rather than running drop and letting the recipient state machine run
+        // rename at the end of the resharding operation. So, we ensure that only one of the donor
+        // shards will also be a recipient shard in order to verify that neither the rename with
+        // {dropTarget : true} nor the drop command are picked up by the change streams cursor.
+        newShardKeyPattern: {newKey: 1},
+        newChunks: [
+            {min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]},
+        ],
+    },
+    () => {
+        // Wait until participants are aware of the resharding operation.
+        reshardingTest.awaitCloneTimestampChosen();
+
+        const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne();
+        const reshardingUUID = coordinatorDoc._id;
+
+        const expectedReshardBeginEvent = {
+            reshardingUUID: reshardingUUID,
+            operationType: "reshardBegin"
+        };
+
+        cstDonor0.assertNextChangesEqual(
+            {cursor: changeStreamsCursorDonor0, expectedChanges: [expectedReshardBeginEvent]});
+        cstDonor1.assertNextChangesEqual(
+            {cursor: changeStreamsCursorDonor1, expectedChanges: [expectedReshardBeginEvent]});
+    });
+
+reshardingTest.teardown();
+})();

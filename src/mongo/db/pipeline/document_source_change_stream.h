@@ -131,6 +131,12 @@ public:
     // transformation.
     static constexpr StringData kUuidField = "uuid"_sd;
 
+    // This UUID field represents all of:
+    // 1. The UUID for a particular resharding operation.
+    // 2. The UUID for the temporary collection that exists during a resharding operation.
+    // 3. The UUID for a collection being resharded, once a resharding operation has completed.
+    static constexpr StringData kReshardingUuidField = "reshardingUUID"_sd;
+
     // The name of the field where the type of the operation will be located after the
     // transformation.
     static constexpr StringData kOperationTypeField = "operationType"_sd;
@@ -159,6 +165,7 @@ public:
     static constexpr StringData kRenameCollectionOpType = "rename"_sd;
     static constexpr StringData kDropDatabaseOpType = "dropDatabase"_sd;
     static constexpr StringData kInvalidateOpType = "invalidate"_sd;
+    static constexpr StringData kReshardBeginOpType = "reshardBegin"_sd;
     // Internal op type to signal mongos to open cursors on new shards.
     static constexpr StringData kNewShardDetectedOpType = "kNewShardDetected"_sd;
 

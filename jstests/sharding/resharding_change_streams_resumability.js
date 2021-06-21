@@ -50,6 +50,9 @@ let changeStreamsCursor =
     cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collName});
 assert.eq([], changeStreamsCursor.firstBatch, "Expected cursor not to have changes, but it did");
 
+// We want to confirm that change streams can see events before, during, and after the resharding
+// operation. Note in particular that this test confirms that a regular user change stream does
+// NOT see internal resharding events such as reshardBegin.
 const expectedChanges = [
     {
         documentKey: {_id: 0, oldKey: 0},

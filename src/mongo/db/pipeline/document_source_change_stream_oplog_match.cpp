@@ -157,23 +157,33 @@ BSONObj buildMatchFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     // this mechanism in 4.7+, or retain it for future cases where a change stream is targeted to a
     // subset of shards. See SERVER-44039 for details.
 
-    // 2.2) A chunk gets migrated to a new shard that doesn't have any chunks.
-    auto chunkMigratedNewShardMatch = BSON("op"
-                                           << "n"
-                                           << "o2.type"
-                                           << "migrateChunkToNewShard");
+    // 2.2) Noop change events:
+    //     a) migrateChunkToNewShard: A chunk gets migrated to a new shard that doesn't have any
+    //     chunks.
+    //     b) reshardBegin: A resharding operation begins.
+    static const std::vector<StringData> internalOpTypes = {"migrateChunkToNewShard",
+                                                            "reshardBegin"};
+    BSONArrayBuilder internalOpTypeOrBuilder;
+    for (const auto& eventName : internalOpTypes) {
+        internalOpTypeOrBuilder.append(BSON("o2.type" << eventName));
+    }
+    internalOpTypeOrBuilder.done();
+
+    auto internalOpTypeMatch = BSON("op"
+                                    << "n"
+                                    << "$or" << internalOpTypeOrBuilder.arr());
 
     // Supported operations that are either (2.1) or (2.2).
-    BSONObj normalOrChunkMigratedMatch =
-        BSON(opNsMatch["ns"] << OR(normalOpTypeMatch, chunkMigratedNewShardMatch));
+    BSONObj normalOrInternalOpTypeMatch =
+        BSON(opNsMatch["ns"] << OR(normalOpTypeMatch, internalOpTypeMatch));
 
     // Filter excluding entries resulting from chunk migration.
     BSONObj notFromMigrateFilter = BSON("fromMigrate" << NE << true);
 
     BSONObj opMatch =
         (showMigrationEvents
-             ? normalOrChunkMigratedMatch
-             : BSON("$and" << BSON_ARRAY(normalOrChunkMigratedMatch << notFromMigrateFilter)));
+             ? normalOrInternalOpTypeMatch
+             : BSON("$and" << BSON_ARRAY(normalOrInternalOpTypeMatch << notFromMigrateFilter)));
 
     // 3) Look for 'applyOps' which were created as part of a transaction.
     BSONObj applyOps = getTxnApplyOpsFilter(opNsMatch["ns"], nss);
