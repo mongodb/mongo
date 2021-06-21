@@ -115,8 +115,10 @@ private:
     const boost::optional<value::SlotId> _seekKeySlotLow;
     const boost::optional<value::SlotId> _seekKeySlotHigh;
 
-    NamespaceString _collName;
-    uint64_t _catalogEpoch;
+    // These members are default constructed to boost::none and are initialized when 'prepare()'
+    // is called. Once they are set, they are never modified again.
+    boost::optional<NamespaceString> _collName;
+    boost::optional<uint64_t> _catalogEpoch;
 
     CollectionPtr _coll;
 

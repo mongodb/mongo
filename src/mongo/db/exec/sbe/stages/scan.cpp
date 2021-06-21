@@ -184,12 +184,13 @@ void ScanStage::doRestoreState() {
     invariant(_opCtx);
     invariant(!_coll);
 
-    // If this stage is not currently open, then there is nothing to restore.
-    if (!_open) {
+    // If this stage has not been prepared, then yield recovery is a no-op.
+    if (!_collName) {
         return;
     }
 
-    _coll = restoreCollection(_opCtx, _collName, _collUuid, _catalogEpoch);
+    tassert(5777408, "Catalog epoch should be initialized", _catalogEpoch);
+    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
 
     if (_cursor) {
         const bool couldRestore = _cursor->restore();
@@ -236,7 +237,9 @@ void ScanStage::open(bool reOpen) {
             // We're being opened after 'close()'. We need to re-acquire '_coll' in this case and
             // make some validity checks (the collection has not been dropped, renamed, etc.).
             tassert(5071005, "ScanStage is not open but have _cursor", !_cursor);
-            _coll = restoreCollection(_opCtx, _collName, _collUuid, _catalogEpoch);
+            tassert(5777401, "Collection name should be initialized", _collName);
+            tassert(5777402, "Catalog epoch should be initialized", _catalogEpoch);
+            _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
         }
     }
 
@@ -291,12 +294,13 @@ PlanState ScanStage::getNext() {
                     "Index key corruption check can only be performed on the first call "
                     "to getNext() during a seek",
                     res);
+            tassert(5777400, "Collection name should be initialized", _collName);
             _scanCallbacks.indexKeyCorruptionCheckCallback(_opCtx,
                                                            _snapshotIdAccessor,
                                                            _indexKeyAccessor,
                                                            _indexKeyPatternAccessor,
                                                            _key,
-                                                           _collName);
+                                                           *_collName);
         }
         return trackPlanState(PlanState::IS_EOF);
     }
@@ -628,12 +632,13 @@ void ParallelScanStage::doRestoreState() {
     invariant(_opCtx);
     invariant(!_coll);
 
-    // If this stage is not currently open, then there is nothing to restore.
-    if (!_open) {
+    // If this stage has not been prepared, then yield recovery is a no-op.
+    if (!_collName) {
         return;
     }
 
-    _coll = restoreCollection(_opCtx, _collName, _collUuid, _catalogEpoch);
+    tassert(5777409, "Catalog epoch should be initialized", _catalogEpoch);
+    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
 
     if (_cursor) {
         const bool couldRestore = _cursor->restore();
@@ -666,7 +671,9 @@ void ParallelScanStage::open(bool reOpen) {
         // we're being opened after 'close()'. we need to re-acquire '_coll' in this case and
         // make some validity checks (the collection has not been dropped, renamed, etc.).
         tassert(5071013, "ParallelScanStage is not open but have _cursor", !_cursor);
-        _coll = restoreCollection(_opCtx, _collName, _collUuid, _catalogEpoch);
+        tassert(5777403, "Collection name should be initialized", _collName);
+        tassert(5777404, "Catalog epoch should be initialized", _catalogEpoch);
+        _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
     }
 
     if (_coll) {
@@ -742,12 +749,13 @@ PlanState ParallelScanStage::getNext() {
                         "Index key corruption check can only performed when inspecting the first "
                         "recordId in a range",
                         needRange);
+                tassert(5777405, "Collection name should be initialized", _collName);
                 _scanCallbacks.indexKeyCorruptionCheckCallback(_opCtx,
                                                                _snapshotIdAccessor,
                                                                _indexKeyAccessor,
                                                                _indexKeyPatternAccessor,
                                                                _range.begin,
-                                                               _collName);
+                                                               *_collName);
             }
             return trackPlanState(PlanState::IS_EOF);
         }

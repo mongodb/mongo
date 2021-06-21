@@ -186,7 +186,9 @@ void IndexScanStage::doSaveState() {
 }
 
 void IndexScanStage::restoreCollectionAndIndex() {
-    _coll = restoreCollection(_opCtx, _collName, _collUuid, _catalogEpoch);
+    tassert(5777406, "Collection name should be initialized", _collName);
+    tassert(5777407, "Catalog epoch should be initialized", _catalogEpoch);
+    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
     auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
@@ -197,11 +199,10 @@ void IndexScanStage::doRestoreState() {
     invariant(_opCtx);
     invariant(!_coll);
 
-    // If this stage is not currently open, then there is nothing to restore.
-    if (!_open) {
+    // If this stage has not been prepared, then yield recovery is a no-op.
+    if (!_collName) {
         return;
     }
-
     restoreCollectionAndIndex();
 
     if (_cursor) {
