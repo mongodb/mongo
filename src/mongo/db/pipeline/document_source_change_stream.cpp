@@ -80,6 +80,7 @@ constexpr StringData DocumentSourceChangeStream::kFullDocumentField;
 constexpr StringData DocumentSourceChangeStream::kIdField;
 constexpr StringData DocumentSourceChangeStream::kNamespaceField;
 constexpr StringData DocumentSourceChangeStream::kUuidField;
+constexpr StringData DocumentSourceChangeStream::kReshardingUuidField;
 constexpr StringData DocumentSourceChangeStream::kUpdateDescriptionField;
 constexpr StringData DocumentSourceChangeStream::kOperationTypeField;
 constexpr StringData DocumentSourceChangeStream::kStageName;
@@ -95,6 +96,7 @@ constexpr StringData DocumentSourceChangeStream::kDropCollectionOpType;
 constexpr StringData DocumentSourceChangeStream::kRenameCollectionOpType;
 constexpr StringData DocumentSourceChangeStream::kDropDatabaseOpType;
 constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
+constexpr StringData DocumentSourceChangeStream::kReshardBeginOpType;
 constexpr StringData DocumentSourceChangeStream::kNewShardDetectedOpType;
 
 constexpr StringData DocumentSourceChangeStream::kRegexAllCollections;
