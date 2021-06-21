@@ -203,20 +203,24 @@ private:
     Status _storeCurrentLocs(OperationContext* opCtx);
 
     /**
-     * Insert items from docIdList to a new array with the given fieldName in the given builder. If
-     * explode is true, the inserted object will be the full version of the document. Note that
-     * whenever an item from the docList is inserted to the array, it will also be removed from
-     * docList.
-     *
-     * Should be holding the collection lock for ns if explode is true.
+     * Appends to the builder the list of _id of documents that were deleted during migration.
+     * Entries appended to the builder are removed from the list.
+     * Returns the total size of the documents that were appended + initialSize.
      */
-    void _xfer(OperationContext* opCtx,
-               Database* db,
-               std::list<BSONObj>* docIdList,
-               BSONObjBuilder* builder,
-               const char* fieldName,
-               long long* sizeAccumulator,
-               bool explode);
+    long long _xferDeletes(BSONObjBuilder* builder,
+                           std::list<BSONObj>* removeList,
+                           long long initialSize);
+
+    /**
+     * Appends to the builder the list of full documents that were modified/inserted during the
+     * migration. Entries appended to the builder are removed from the list.
+     * Returns the total size of the documents that were appended + initialSize.
+     */
+    long long _xferUpdates(OperationContext* opCtx,
+                           Database* db,
+                           BSONObjBuilder* builder,
+                           std::list<BSONObj>* updateList,
+                           long long initialSize);
 
     // The original move chunk request
     const MoveChunkRequest _args;
@@ -258,9 +262,15 @@ private:
     // List of _id of documents that were modified that must be re-cloned (xfer mods)
     std::list<BSONObj> _reload;
 
+    // Amount of upsert xfer mods that have not yet reached the recipient.
+    size_t _untransferredUpsertsCounter{0};
+
     // List of _id of documents that were deleted during clone that should be deleted later (xfer
     // mods)
     std::list<BSONObj> _deleted;
+
+    // Amount of delete xfer mods that have not yet reached the recipient.
+    size_t _untransferredDeletesCounter{0};
 
     // Total bytes in _reload + _deleted (xfer mods)
     uint64_t _memoryUsed{0};

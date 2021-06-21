@@ -81,7 +81,6 @@ public:
     static MigrationDestinationManager* get(OperationContext* opCtx);
 
     State getState() const;
-    void setState(State newState);
 
     /**
      * Checks whether the MigrationDestinationManager is currently handling a migration.
@@ -145,6 +144,8 @@ private:
      */
     void _setStateFail(StringData msg);
     void _setStateFailWarn(StringData msg);
+
+    void _setState(State newState);
 
     /**
      * Thread which drives the migration apply process on the recipient side.
