@@ -29,8 +29,10 @@
 
 #pragma once
 
-#include "mongo/util/container_size_helper.h"
+#include <optional>
 #include <string>
+
+#include "mongo/util/container_size_helper.h"
 
 namespace mongo {
 

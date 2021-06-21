@@ -32,6 +32,7 @@
 #if defined(BOOST_ENABLE_ASSERT_DEBUG_HANDLER) && !defined(NDEBUG)
 
 #include <boost/assert.hpp>
+#include <exception>
 
 namespace mongo {
 BoostAssertFuncs& BoostAssertFuncs::global() {
