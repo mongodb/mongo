@@ -56,7 +56,6 @@ public:
     ~WiredTigerCursor();
 
     WT_CURSOR* get() const {
-        // TODO(SERVER-16816): assertInActiveTxn();
         return _cursor;
     }
 
