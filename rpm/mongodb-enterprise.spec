@@ -23,7 +23,7 @@ Summary: MongoDB open source document-oriented database system (enterprise metap
 License: Commercial
 URL: http://www.mongodb.org
 Group: Applications/Databases
-Requires: mongodb-enterprise-cryptd, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-tools, mongodb-enterprise-database-tools-extra, mongodb-enterprise-shell
+Requires: mongodb-enterprise-cryptd, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-database-tools-extra, mongodb-enterprise-shell
 
 %if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
 BuildRequires: /usr/bin/pathfix.py, python3-devel
@@ -66,7 +66,7 @@ This metapackage will install the mongo shell, import/export tools, other client
 %package -n mongodb-enterprise
 Summary: MongoDB open source document-oriented database system (enterprise metapackage)
 Group: Applications/Databases
-Requires: mongodb-enterprise-database
+Requires: mongodb-enterprise-database, mongodb-enterprise-tools
 Conflicts: mongo-10gen, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-enterprise-unstable-cryptd, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
 Provides: mongo-10gen-enterprise
 
