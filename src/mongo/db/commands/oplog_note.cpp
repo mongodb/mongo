@@ -51,6 +51,9 @@
 #include "mongo/logv2/log.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangInAppendOplogNote);
+
 namespace {
 Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData note) {
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -116,6 +119,8 @@ public:
                      const string& dbname,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
+        hangInAppendOplogNote.pauseWhileSet();
+
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (!replCoord->isReplEnabled()) {
             uasserted(ErrorCodes::NoReplicationEnabled,

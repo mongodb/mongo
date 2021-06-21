@@ -81,6 +81,11 @@ void checkIfCanWriteOrThrow(OperationContext* opCtx, StringData dbName, Timestam
 Status checkIfCanBuildIndex(OperationContext* opCtx, StringData dbName);
 
 /**
+ * Returns true if there is either a donor or recipient access blocker for the given dbName.
+ */
+bool hasActiveTenantMigration(OperationContext* opCtx, StringData dbName);
+
+/**
  * Scan config.tenantMigrationDonors and creates the necessary TenantMigrationAccessBlockers for
  * unfinished migrations.
  */

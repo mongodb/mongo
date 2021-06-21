@@ -42,7 +42,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -105,17 +105,6 @@ private:
     std::map<Timestamp, std::shared_ptr<Notification<Status>>> _writeRequests;
 };
 
-bool hasActiveTenantMigrationRecipient(OperationContext* opCtx, StringData dbName) {
-    if (dbName.empty()) {
-        return false;
-    }
-
-    auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .getTenantMigrationAccessBlockerForDbName(
-                        dbName, TenantMigrationAccessBlocker::BlockerType::kRecipient);
-    return bool(mtab);
-}
-
 /**
  *  Schedule a write via appendOplogNote command to the primary of this replica set.
  */
@@ -152,10 +141,10 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime, S
     // it needs to be repeated with the later time.
     while (clusterTime > lastAppliedOpTime) {
         // Standalone replica set, so there is no need to advance the OpLog on the primary. The only
-        // exception is after a tenant migration because the target time may be from the donor
-        // replica set and is not guaranteed to be in the recipient's oplog.
+        // exception is after a tenant migration because the target time may be from the other
+        // replica set and is not guaranteed to be in the oplog of this node's set.
         if (serverGlobalParams.clusterRole == ClusterRole::None &&
-            !hasActiveTenantMigrationRecipient(opCtx, dbName)) {
+            !tenant_migration_access_blocker::hasActiveTenantMigration(opCtx, dbName)) {
             return Status::OK();
         }
 

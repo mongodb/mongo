@@ -275,6 +275,15 @@ Status checkIfCanBuildIndex(OperationContext* opCtx, StringData dbName) {
     return Status::OK();
 }
 
+bool hasActiveTenantMigration(OperationContext* opCtx, StringData dbName) {
+    if (dbName.empty()) {
+        return false;
+    }
+
+    return bool(TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .getTenantMigrationAccessBlockerForDbName(dbName));
+}
+
 void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
     TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).shutDown();
 
