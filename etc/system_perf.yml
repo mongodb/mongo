@@ -762,7 +762,6 @@ buildvariants:
   - name: compile-rhel70
     display_name: Compile for Atlas-like
     modules: *modules
-    batchtime: 2880 # 48 hours
     expansions:
       <<: *compile-linux-64-amzn-expansions
       compile_flags: >-
@@ -779,7 +778,6 @@ buildvariants:
 
   - name: linux-1-node-replSet
     display_name: Linux 1-Node ReplSet
-    batchtime: 10080 # 7 days
     modules: *modules
     expansions:
       mongodb_setup: single-replica
@@ -819,7 +817,6 @@ buildvariants:
 
   - name: linux-standalone
     display_name: Linux Standalone
-    batchtime: 2880  # 48 hours
     modules: *modules
     expansions:
       mongodb_setup: standalone
@@ -851,7 +848,6 @@ buildvariants:
 
   - name: linux-standalone-audit
     display_name: Linux Standalone Audit
-    batchtime: 10080 # 7 days
     modules: *modules
     expansions:
       mongodb_setup: standalone-audit
@@ -894,7 +890,6 @@ buildvariants:
 
   - name: linux-1-node-replSet-ese-gcm
     display_name: Linux 1-Node ReplSet ESE GCM
-    batchtime: 5760  # 4 days
     modules: *modules
     expansions:
       mongodb_setup: single-replica-ese-gcm
@@ -916,7 +911,6 @@ buildvariants:
 
   - name: linux-3-shard
     display_name: Linux 3-Shard Cluster
-    batchtime: 10080 # 7 days
     modules: *modules
     expansions:
       mongodb_setup: shard
@@ -946,7 +940,6 @@ buildvariants:
 
   - name: linux-shard-lite
     display_name: Linux Shard Lite Cluster
-    batchtime: 5760  # 4 days
     modules: *modules
     expansions:
       mongodb_setup: shard-lite
@@ -982,7 +975,6 @@ buildvariants:
 
   - name: linux-shard-single
     display_name: Linux Shard Single
-    batchtime: 5760  # 4 days
     modules: *modules
     expansions:
       mongodb_setup: shard-single
@@ -1000,7 +992,6 @@ buildvariants:
 
   - name: linux-3-node-replSet
     display_name: Linux 3-Node ReplSet
-    batchtime: 2880  # 48 hours
     modules: *modules
     expansions:
       mongodb_setup: replica
@@ -1044,7 +1035,6 @@ buildvariants:
 
   - name: linux-3-node-replSet-noflowcontrol
     display_name: Linux 3-Node ReplSet (Flow Control off)
-    batchtime: 10080  # 7 days
     modules: *modules
     expansions:
       mongodb_setup: replica-noflowcontrol
@@ -1073,7 +1063,6 @@ buildvariants:
 
   - name: linux-3-node-replSet-ssl
     display_name: Linux 3-Node ReplSet (SSL)
-    batchtime: 10080 # 7 days
     modules: *modules
     expansions:
       mongodb_setup: replica-ssl
@@ -1093,7 +1082,6 @@ buildvariants:
 
   - name: linux-3-node-replSet-initialsync
     display_name: Linux 3-Node ReplSet Initial Sync
-    batchtime: 2880  # 48 hours
     modules: *modules
     expansions:
       mongodb_setup: replica-2node
@@ -1113,7 +1101,6 @@ buildvariants:
 
   - name: linux-replSet-initialsync-logkeeper
     display_name: Linux ReplSet Initial Sync LogKeeper
-    batchtime: 10080 # 7 days
     modules: *modules
     expansions:
       mongodb_setup: initialsync-logkeeper
@@ -1134,7 +1121,6 @@ buildvariants:
 
   - name: atlas-like-M60
     display_name: M60-Like 3-Node ReplSet
-    batchtime: 5760  # 4 days
     modules: *modules
     expansions:
       mongodb_setup: atlas-like-replica
