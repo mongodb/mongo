@@ -719,9 +719,11 @@ var ReplSetTest = function(opts) {
 
     /**
      * Blocks until the secondary nodes have completed recovery and their roles are known. Blocks on
-     * all secondary nodes or just 'secondaries', if specified.
+     * all secondary nodes or just 'secondaries', if specified. Waits for all 'newlyAdded' fields to
+     * be removed by default.
      */
-    this.awaitSecondaryNodes = function(timeout, secondaries, retryIntervalMS) {
+    this.awaitSecondaryNodes = function(
+        timeout, secondaries, retryIntervalMS, waitForNewlyAddedRemoval) {
         timeout = timeout || self.kDefaultTimeoutMS;
         retryIntervalMS = retryIntervalMS || 200;
 
@@ -741,6 +743,11 @@ var ReplSetTest = function(opts) {
 
             return ready;
         }, "Awaiting secondaries", timeout, retryIntervalMS);
+
+        // We can only wait for newlyAdded field removal if test commands are enabled.
+        if (waitForNewlyAddedRemoval && jsTest.options().enableTestCommands) {
+            self.waitForAllNewlyAddedRemovals();
+        }
     };
 
     /**
