@@ -105,15 +105,19 @@ class TestGenerateExcludeYaml(unittest.TestCase):
 
     def test_create_yaml_suite1(self):
         latest_yaml = {
-            'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'}], 'suites': {
-                'suite1': [{'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'},
-                           {'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+            'last-continuous': None, 'last-lts': {
+                'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'}],
+                'suites': {
+                    'suite1': [{'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'},
+                               {'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+                }
             }
         }
 
         last_lts_yaml = {
-            'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'}], 'suites': {
-                'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+            'last-continuous': None, 'last-lts': {
+                'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'}], 'suites':
+                    {'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]}
             }
         }
 
@@ -128,16 +132,20 @@ class TestGenerateExcludeYaml(unittest.TestCase):
 
     def test_create_yaml_suite1_and_suite2(self):
         latest_yaml = {
-            'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'}], 'suites': {
-                'suite1': [{'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'},
-                           {'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}],
-                'suite2': [{'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'}]
+            'last-continuous': None, 'last-lts': {
+                'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'}],
+                'suites': {
+                    'suite1': [{'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'},
+                               {'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}],
+                    'suite2': [{'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'}]
+                }
             }
         }
 
         last_lts_yaml = {
-            'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'}], 'suites': {
-                'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+            'last-continuous': None, 'last-lts': {
+                'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'}], 'suites':
+                    {'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]}
             }
         }
 
@@ -157,15 +165,19 @@ class TestGenerateExcludeYaml(unittest.TestCase):
 
     def test_both_all_are_none(self):
         latest_yaml = {
-            'all': None, 'suites': {
-                'suite1': [{'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'},
-                           {'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+            'last-continuous': None, 'last-lts': {
+                'all': None, 'suites': {
+                    'suite1': [{'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'},
+                               {'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+                }
             }
         }
 
         last_lts_yaml = {
-            'all': None, 'suites': {
-                'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+            'last-continuous': None, 'last-lts': {
+                'all': None, 'suites': {
+                    'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+                }
             }
         }
 
@@ -180,15 +192,20 @@ class TestGenerateExcludeYaml(unittest.TestCase):
 
     def test_old_all_is_none(self):
         latest_yaml = {
-            'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'}], 'suites': {
-                'suite1': [{'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'},
-                           {'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+            'last-continuous': None, 'last-lts': {
+                'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'}],
+                'suites': {
+                    'suite1': [{'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'},
+                               {'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+                }
             }
         }
 
         last_lts_yaml = {
-            'all': None, 'suites': {
-                'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+            'last-continuous': None, 'last-lts': {
+                'all': None, 'suites': {
+                    'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+                }
             }
         }
 
@@ -206,16 +223,20 @@ class TestGenerateExcludeYaml(unittest.TestCase):
 
     def test_create_yaml_suite1_and_all(self):
         latest_yaml = {
-            'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'},
-                    {'ticket': 'fake_ticket4', 'test_file': 'jstests/fake_file4.js'}], 'suites': {
-                        'suite1': [{'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'},
-                                   {'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
-                    }
+            'last-continuous': None, 'last-lts': {
+                'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'},
+                        {'ticket': 'fake_ticket4', 'test_file': 'jstests/fake_file4.js'}],
+                'suites': {
+                    'suite1': [{'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'},
+                               {'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+                }
+            }
         }
 
         last_lts_yaml = {
-            'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'}], 'suites': {
-                'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+            'last-continuous': None, 'last-lts': {
+                'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'}], 'suites':
+                    {'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]}
             }
         }
 
@@ -234,14 +255,20 @@ class TestGenerateExcludeYaml(unittest.TestCase):
     # Can delete after backporting the changed yml syntax.
     def test_not_backported(self):
         latest_yaml = {
-            'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'}], 'suites': {
-                'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'},
-                           {'ticket': 'fake_ticket3', 'test_file': 'jstests/fake_file3.js'}]
+            'last-continuous': None, 'last-lts': {
+                'all': [{'ticket': 'fake_ticket0', 'test_file': 'jstests/fake_file0.js'},
+                        {'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'}],
+                'suites': {
+                    'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'},
+                               {'ticket': 'fake_ticket3', 'test_file': 'jstests/fake_file3.js'}]
+                }
             }
         }
 
         last_lts_yaml = {
-            'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+            'all': [{'ticket': 'fake_ticket1', 'test_file': 'jstests/fake_file1.js'}], 'suites': {
+                'suite1': [{'ticket': 'fake_ticket2', 'test_file': 'jstests/fake_file2.js'}]
+            }
         }
 
         expected = {
