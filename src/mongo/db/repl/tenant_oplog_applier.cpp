@@ -411,6 +411,10 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
     // All other oplog entries.
     std::vector<TenantNoOpEntry> nonSessionOps;
 
+    // The 'opCtx' must be interruptible on stepdown and stepup to avoid a deadlock situation with
+    // the RSTL.
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
+
     // Prevent the node from being able to change state when reserving oplog slots and writing
     // entries.
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
@@ -530,6 +534,8 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
     // with the client to avoid the invariant in replClientInfo::setLastOp that the optime only goes
     // forward.
     repl::ReplClientInfo::forClient(opCtx->getClient()).clearLastOp();
+
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
 
     // All the ops will have the same session, so we can retain the scopedSession throughout
     // the loop, except when invalidated by multi-document transactions. This allows us to
@@ -844,6 +850,8 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
     // with the client to avoid the invariant in replClientInfo::setLastOp that the optime only goes
     // forward.
     repl::ReplClientInfo::forClient(opCtx->getClient()).clearLastOp();
+
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
 
     AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
     writeConflictRetry(
