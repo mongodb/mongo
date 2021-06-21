@@ -414,20 +414,20 @@ def generate_exclude_yaml(output: str) -> None:
     def diff(list1, list2):
         return [elem for elem in (list1 or []) if elem not in (list2 or [])]
 
-    suites_latest = backports_required_latest["suites"] or {}
-    # Check if the changed syntax for etc/backports_required_multiversion.yml has been backported.
+    suites_latest = backports_required_latest["last-lts"]["suites"] or {}
+    # Check if the changed syntax for etc/backports_required_for_multiversion_tests.yml has been
+    # backported.
     # This variable and all branches where it's not set can be deleted after backporting the change.
-    change_backported = "all" in backports_required_last_lts.keys()
+    change_backported = "last-lts" in backports_required_last_lts.keys()
     if change_backported:
-        always_exclude = diff(backports_required_latest["all"], backports_required_last_lts["all"])
-        suites_last_lts: defaultdict = defaultdict(list, backports_required_last_lts["suites"])
+        always_exclude = diff(backports_required_latest["last-lts"]["all"],
+                              backports_required_last_lts["last-lts"]["all"])
+        suites_last_lts: defaultdict = defaultdict(
+            list, backports_required_last_lts["last-lts"]["suites"])
     else:
-        always_exclude = backports_required_latest["all"] or []
-        suites_last_lts = defaultdict(list, backports_required_last_lts)
-        for suite in suites_latest.keys():
-            for elem in suites_last_lts[suite] or []:
-                if elem in always_exclude:
-                    always_exclude.remove(elem)
+        always_exclude = diff(backports_required_latest["last-lts"]["all"],
+                              backports_required_last_lts["all"])
+        suites_last_lts: defaultdict = defaultdict(list, backports_required_last_lts["suites"])
 
     tags = _tags.TagsConfig()
 
