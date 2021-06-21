@@ -655,7 +655,6 @@ buildvariants:
 
   - name: linux-1-node-replSet
     display_name: Linux 1-Node ReplSet
-    batchtime: 10080 # 7 days
     modules: *modules
     expansions:
       mongodb_setup: single-replica
@@ -688,7 +687,6 @@ buildvariants:
 
   - name: linux-standalone
     display_name: Linux Standalone
-    batchtime: 2880  # 48 hours
     modules: *modules
     expansions:
       mongodb_setup: standalone
@@ -716,7 +714,6 @@ buildvariants:
 
   - name: linux-standalone-audit
     display_name: Linux Standalone Audit
-    batchtime: 10080 # 7 days
     modules: *modules
     expansions:
       mongodb_setup: standalone-audit
@@ -738,7 +735,6 @@ buildvariants:
 
   - name: linux-3-shard
     display_name: Linux 3-Shard Cluster
-    batchtime: 10080 # 7 days
     modules: *modules
     expansions:
       mongodb_setup: shard
@@ -767,7 +763,6 @@ buildvariants:
 
   - name: linux-shard-lite
     display_name: Linux Shard Lite Cluster
-    batchtime: 5760  # 4 days
     modules: *modules
     expansions:
       mongodb_setup: shard-lite
@@ -797,7 +792,6 @@ buildvariants:
 
   - name: linux-3-node-replSet
     display_name: Linux 3-Node ReplSet
-    batchtime: 2880  # 48 hours
     modules: *modules
     expansions:
       mongodb_setup: replica
@@ -834,7 +828,6 @@ buildvariants:
 
   - name: linux-3-node-replSet-initialsync
     display_name: Linux 3-Node ReplSet Initial Sync
-    batchtime: 2880  # 48 hours
     modules: *modules
     expansions:
       mongodb_setup: replica-2node
@@ -853,7 +846,6 @@ buildvariants:
 
   - name: linux-replSet-initialsync-logkeeper
     display_name: Linux ReplSet Initial Sync LogKeeper
-    batchtime: 10080 # 7 days
     modules: *modules
     expansions:
       mongodb_setup: initialsync-logkeeper
