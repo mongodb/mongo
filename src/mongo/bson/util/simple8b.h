@@ -29,8 +29,7 @@
 
 #pragma once
 
-#include <cmath>
-#include <iostream>
+#include <stdint.h>
 #include <vector>
 
 
@@ -42,13 +41,12 @@ namespace mongo {
  */
 class Simple8b {
 public:
-    // A valid Simple8b should never have a selector value of 1, so we will use it as an error code.
-    static const uint64_t errCode = 0x1000000000000000;
+    static const uint64_t errCode = 0x0000000000000000;  // Temporary error code.
 
     /**
      * encodeSimple8b takes a selector and a vector of integers to be compressed into a 64 bit word.
-     * The values will be stored from left to right.
-     * If there are wasted bits, they will be placed at the very end on the right.
+     * The values will be stored from right to left in little endian order.
+     * If there are wasted bits, they will be placed at the very left.
      * For now, we will assume that all ints in the vector are greater or equal to zero.
      * We will also assume that the selector and all values will fit into the 64 bit word.
      * Returns the encoded Simple8b word if the inputs are valid and errCode otherwise.

@@ -32,38 +32,37 @@
 namespace mongo {
 
 namespace {
-static constexpr uint8_t _maxSelector = 15;
-static constexpr uint8_t _minSelector = 2;
-static constexpr uint64_t _selectorMask = 0xF000000000000000;
+static constexpr uint8_t _maxSelector = 14;  // Change to 15 in SERVER-57794
+static constexpr uint8_t _minSelector = 1;
+static constexpr uint64_t _selectorMask = 0x000000000000000F;
 static constexpr uint8_t _selectorSize = 4;
-static constexpr uint8_t _dataSize = 60;
 
 // Pass the selector value as the index to get the number of bits per integer in the Simple8b block.
-const uint8_t _selectorForBitsPerInteger[16] = {
-    0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 30, 60};
+constexpr uint8_t _selectorForBitsPerInteger[16] = {
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 30, 60, 0};
 
 // Pass the selector value as the index to get the number of integers coded in the Simple8b block.
-const uint8_t _selectorForIntegersCoded[16] = {
-    240, 120, 60, 30, 20, 15, 12, 10, 8, 7, 6, 5, 4, 3, 2, 1};
+constexpr uint8_t _selectorForIntegersCoded[16] = {
+    120, 60, 30, 20, 15, 12, 10, 8, 7, 6, 5, 4, 3, 2, 1, 1};
 
 // Pass the selector as the index to get the corresponding mask.
 // Get the maskSize by getting the number of bits for the selector. Then 2^maskSize - 1.
-const uint64_t _selectorForMask[16] = {0,
-                                       0,
-                                       1,
-                                       3,
-                                       7,
-                                       15,
-                                       31,
-                                       63,
-                                       127,
-                                       255,
-                                       1023,
-                                       4095,
-                                       32767,
-                                       1048575,
-                                       1073741823,
-                                       1152921504606846975};
+constexpr uint64_t _selectorForMask[16] = {0,
+                                           1,
+                                           2,
+                                           (1 << 3) - 1,
+                                           (1 << 4) - 1,
+                                           (1 << 5) - 1,
+                                           (1 << 6) - 1,
+                                           (1 << 7) - 1,
+                                           (1 << 8) - 1,
+                                           (1 << 10) - 1,
+                                           (1 << 12) - 1,
+                                           (1 << 15) - 1,
+                                           (1 << 20) - 1,
+                                           (1 << 30) - 1,
+                                           ((uint64_t)1 << 60) - 1,
+                                           1};
 
 }  // namespace
 
@@ -74,10 +73,9 @@ uint64_t Simple8b::encodeSimple8b(uint8_t selector, const std::vector<uint64_t>&
     uint8_t bitsPerInteger = _selectorForBitsPerInteger[selector];
     uint8_t integersCoded = _selectorForIntegersCoded[selector];
 
-    uint64_t encodedWord = (uint64_t)selector << _dataSize;
-
+    uint64_t encodedWord = selector;
     for (uint8_t i = 0; i < integersCoded; ++i) {
-        uint8_t shiftSize = _dataSize - bitsPerInteger * (i + 1);
+        uint8_t shiftSize = bitsPerInteger * i + _selectorSize;
         encodedWord += values[i] << shiftSize;
     }
 
@@ -88,7 +86,7 @@ uint64_t Simple8b::encodeSimple8b(uint8_t selector, const std::vector<uint64_t>&
 std::vector<uint64_t> Simple8b::decodeSimple8b(const uint64_t simple8bWord) {
     std::vector<uint64_t> values;
 
-    uint8_t selector = (simple8bWord & _selectorMask) >> _dataSize;
+    uint8_t selector = simple8bWord & _selectorMask;
 
     if (selector < _minSelector)
         return values;
@@ -96,12 +94,8 @@ std::vector<uint64_t> Simple8b::decodeSimple8b(const uint64_t simple8bWord) {
     uint8_t bitsPerInteger = _selectorForBitsPerInteger[selector];
     uint8_t integersCoded = _selectorForIntegersCoded[selector];
 
-    for (int8_t i = integersCoded - 1; i >= 0; --i) {
-        uint8_t startIdx = bitsPerInteger * i;
-
-        // If there are dirty bits, shift over them.
-        if (selector == 8 || selector == 9)
-            startIdx += 4;
+    for (int8_t i = 0; i < integersCoded; ++i) {
+        uint8_t startIdx = bitsPerInteger * i + _selectorSize;
 
         uint64_t mask = _selectorForMask[selector] << startIdx;
         uint64_t value = (simple8bWord & mask) >> startIdx;
