@@ -141,15 +141,20 @@ class RenameRangeDeletionsTest : public RangeDeleterTest {
 public:
     const NamespaceString kToNss = NamespaceString(kNss.db(), "toColl");
 
+    void setUp() override {
+        RangeDeleterTest::setUp();
+
+        // Suspending range deletions in order to rename tasks with "pending" set to false.
+        // Otherwise, they could potentially complete before the rename.
+        globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::alwaysOn);
+    }
+
     void tearDown() override {
         DBDirectClient client(operationContext());
-        client.dropCollection(kNss.ns());
         client.dropCollection(kToNss.ns());
-
-        migrationutil::getMigrationUtilExecutor(getServiceContext())->shutdown();
-
-        WaitForMajorityService::get(getServiceContext()).shutDown();
-        ShardServerTestFixture::tearDown();
+        // Re-enabling range deletions to drain tasks on the executor
+        globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::off);
+        RangeDeleterTest::tearDown();
     }
 };
 
@@ -949,6 +954,7 @@ TEST_F(RenameRangeDeletionsTest, BasicRenameRangeDeletionsTest) {
         const auto range = ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 1));
         RangeDeletionTask task(
             UUID::gen(), kNss, UUID::gen(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
+        task.setPending(false);
         tasks.push_back(task);
         rangeDeletionsStore.add(operationContext(), task);
     }
@@ -995,6 +1001,7 @@ TEST_F(RenameRangeDeletionsTest, IdempotentRenameRangeDeletionsTest) {
         RangeDeletionTask task(
             UUID::gen(), kNss, UUID::gen(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
         tasks.push_back(task);
+        task.setPending(false);
         rangeDeletionsStore.add(operationContext(), task);
     }
 
