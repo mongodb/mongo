@@ -358,7 +358,8 @@ bool IndexCatalogEntryImpl::isPresentInMySnapshot(OperationContext* opCtx) const
 bool IndexCatalogEntryImpl::_catalogIsMultikey(OperationContext* opCtx,
                                                const CollectionPtr& collection,
                                                MultikeyPaths* multikeyPaths) const {
-    return collection->isIndexMultikey(opCtx, _descriptor->indexName(), multikeyPaths);
+    return collection->isIndexMultikey(
+        opCtx, _descriptor->indexName(), multikeyPaths, _indexOffset);
 }
 
 void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
