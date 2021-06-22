@@ -1131,6 +1131,12 @@ public:
             transactionChecks(opCtx, ns());
 
             write_ops::UpdateCommandReply updateReply;
+
+            if (isTimeseries(opCtx, ns())) {
+                _performTimeseriesUpdates(opCtx, &updateReply);
+                return updateReply;
+            }
+
             long long nModified = 0;
 
             // Tracks the upserted information. The memory of this variable gets moved in the
@@ -1232,6 +1238,13 @@ public:
                                    BSONObj(),
                                    _commandObj,
                                    &bodyBuilder);
+        }
+
+        void _performTimeseriesUpdates(OperationContext* opCtx,
+                                       write_ops::UpdateCommandReply* updateReply) const {
+            uasserted(ErrorCodes::IllegalOperation,
+                      str::stream()
+                          << "Cannot perform an update on a time-series collection: " << ns());
         }
 
         BSONObj _commandObj;
