@@ -1,5 +1,4 @@
 function activate_venv {
-  set -e
   # check if virtualenv is set up
   if [ -d "${workdir}/venv" ]; then
     if [ "Windows_NT" = "$OS" ]; then
@@ -10,11 +9,13 @@ function activate_venv {
     fi
     if [ $? -ne 0 ]; then
       echo "Failed to activate virtualenv: $(cat /tmp/activate_error.log)"
+      exit 1
     fi
     python=python
   else
     if [ -z "$python" ]; then
       echo "\$python is unset. This should never happen"
+      exit 1
     fi
     python=${python}
   fi
@@ -26,5 +27,4 @@ function activate_venv {
   fi
 
   echo "python set to $(which $python)"
-  set +e
 }
