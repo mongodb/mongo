@@ -636,11 +636,11 @@ add_option('libdeps-linting',
     type='choice',
 )
 
-add_option('experimental-visibility-support',
-    choices=['on', 'off'],
-    const='on',
-    default='off',
-    help='Enable visibility annotations (experimental)',
+add_option('visibility-support',
+    choices=['auto', 'on', 'off'],
+    const='auto',
+    default='auto',
+    help='Enable visibility annotations',
     nargs='?',
     type='choice',
 )
@@ -1618,10 +1618,14 @@ if use_system_libunwind and not use_libunwind:
 if use_libunwind == True:
     env.SetConfigHeaderDefine("MONGO_CONFIG_USE_LIBUNWIND")
 
+if get_option('visibility-support') == 'auto':
+    visibility_annotations_enabled = (not env.TargetOSIs('windows') and link_model.startswith("dynamic"))
+else:
+    visibility_annotations_enabled = get_option('visibility-support') == 'on'
 
 # Windows can't currently support anything other than 'object' or 'static', until
 # we have annotated functions for export.
-if env.TargetOSIs('windows') and get_option('experimental-visibility-support') != 'on':
+if env.TargetOSIs('windows') and not visibility_annotations_enabled:
     if link_model not in ['object', 'static', 'dynamic-sdk']:
         env.FatalError("Windows builds must use the 'object', 'dynamic-sdk', or 'static' link models")
 
@@ -1648,7 +1652,7 @@ for builder in ['SharedObject', 'StaticObject']:
 
 if link_model.startswith("dynamic"):
 
-    if link_model == "dynamic" and get_option('experimental-visibility-support') == 'on':
+    if link_model == "dynamic" and visibility_annotations_enabled:
 
         def visibility_cppdefines_generator(target, source, env, for_signature):
             if not 'MONGO_API_NAME' in env:

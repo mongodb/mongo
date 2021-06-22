@@ -2503,7 +2503,7 @@ tasks:
           --opt=on
           --separate-debug
           --link-model=dynamic
-          --experimental-visibility-support=on
+          --visibility-support=on
 
     - command: s3.put
       params:
@@ -11691,13 +11691,6 @@ buildvariants:
   - name: snmp
 #  - name: .updatefuzzer
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-required-template
-  name: rhel-80-64-bit-dynamic-visibility-test
-  display_name: "~ Shared Library RHEL 8.0 (visibility test)"
-  expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --experimental-visibility-support=on
-
 - name: windows-dynamic-visibility-test
   display_name: "~ Shared Library Windows (visibility test)"
   expansions:
@@ -11711,13 +11704,6 @@ buildvariants:
   - name: visibility_test_TG
     distros:
     - windows-vsCurrent-large
-
-- <<: *macos-debug-template
-  name: macos-dynamic-visibility-test
-  display_name: "~ Shared Library macOS DEBUG (visibility test)"
-  expansions:
-    <<: *macos-debug-expansions
-    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --link-model=dynamic --experimental-visibility-support=on
 
 ### QO & QE Patch-Specific Build Variants ###
 - <<: *enterprise-rhel-80-64-bit-dynamic-sbe-engine
