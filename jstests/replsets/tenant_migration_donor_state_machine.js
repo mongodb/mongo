@@ -52,7 +52,7 @@ function testDonorForgetMigrationAfterMigrationCompletes(
     }));
     assert.soon(() => 0 ===
                     donorPrimary.adminCommand({serverStatus: 1})
-                        .repl.primaryOnlyServices.TenantMigrationDonorService);
+                        .repl.primaryOnlyServices.TenantMigrationDonorService.numInstances);
 
     const donorRecipientMonitorPoolStats =
         donorPrimary.adminCommand({connPoolStats: 1}).replicaSets;
@@ -70,7 +70,7 @@ function testDonorForgetMigrationAfterMigrationCompletes(
                     }));
     assert.soon(() => 0 ===
                     recipientPrimary.adminCommand({serverStatus: 1})
-                        .repl.primaryOnlyServices.TenantMigrationRecipientService);
+                        .repl.primaryOnlyServices.TenantMigrationRecipientService.numInstances);
 
     const recipientRecipientMonitorPoolStats =
         recipientPrimary.adminCommand({connPoolStats: 1}).replicaSets;

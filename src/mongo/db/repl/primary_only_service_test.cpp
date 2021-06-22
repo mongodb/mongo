@@ -639,16 +639,30 @@ TEST_F(PrimaryOnlyServiceTest, DoubleCreateInstance) {
 }
 
 TEST_F(PrimaryOnlyServiceTest, ReportServerStatusInfo) {
+    stepDown();
+    // Make the instance rebuild on stepUp hang.
+    auto rebuildingFPTimesEntered =
+        PrimaryOnlyServiceHangBeforeRebuildingInstances.setMode(FailPoint::alwaysOn);
+    stepUp();
+
     {
+        PrimaryOnlyServiceHangBeforeRebuildingInstances.waitForTimesEntered(
+            ++rebuildingFPTimesEntered);
+
         BSONObjBuilder resultBuilder;
         _registry->reportServiceInfoForServerStatus(&resultBuilder);
 
-        ASSERT_BSONOBJ_EQ(BSON("primaryOnlyServices" << BSON("TestService" << 0)),
-                          resultBuilder.obj());
+        ASSERT_BSONOBJ_EQ(
+            BSON("primaryOnlyServices" << BSON("TestService" << BSON("state"
+                                                                     << "rebuilding"
+                                                                     << "numInstances" << 0))),
+            resultBuilder.obj());
     }
 
     // Make sure the instance doesn't complete.
     TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+    PrimaryOnlyServiceHangBeforeRebuildingInstances.setMode(FailPoint::off);
+
     auto opCtx = makeOperationContext();
     auto instance =
         TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
@@ -657,8 +671,11 @@ TEST_F(PrimaryOnlyServiceTest, ReportServerStatusInfo) {
         BSONObjBuilder resultBuilder;
         _registry->reportServiceInfoForServerStatus(&resultBuilder);
 
-        ASSERT_BSONOBJ_EQ(BSON("primaryOnlyServices" << BSON("TestService" << 1)),
-                          resultBuilder.obj());
+        ASSERT_BSONOBJ_EQ(
+            BSON("primaryOnlyServices" << BSON("TestService" << BSON("state"
+                                                                     << "running"
+                                                                     << "numInstances" << 1))),
+            resultBuilder.obj());
     }
 
     auto instance2 =
@@ -668,8 +685,11 @@ TEST_F(PrimaryOnlyServiceTest, ReportServerStatusInfo) {
         BSONObjBuilder resultBuilder;
         _registry->reportServiceInfoForServerStatus(&resultBuilder);
 
-        ASSERT_BSONOBJ_EQ(BSON("primaryOnlyServices" << BSON("TestService" << 2)),
-                          resultBuilder.obj());
+        ASSERT_BSONOBJ_EQ(
+            BSON("primaryOnlyServices" << BSON("TestService" << BSON("state"
+                                                                     << "running"
+                                                                     << "numInstances" << 2))),
+            resultBuilder.obj());
     }
 
     TestServiceHangDuringInitialization.setMode(FailPoint::off);

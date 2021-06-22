@@ -219,8 +219,8 @@ void PrimaryOnlyServiceRegistry::onStepDown() {
 void PrimaryOnlyServiceRegistry::reportServiceInfoForServerStatus(BSONObjBuilder* result) noexcept {
     BSONObjBuilder subBuilder(result->subobjStart("primaryOnlyServices"));
     for (auto& service : _servicesByName) {
-        subBuilder.appendNumber(service.first,
-                                static_cast<long long>(service.second->getNumberOfInstances()));
+        BSONObjBuilder serviceInfoBuilder(subBuilder.subobjStart(service.first));
+        service.second->reportForServerStatus(&serviceInfoBuilder);
     }
 }
 
@@ -236,9 +236,10 @@ void PrimaryOnlyServiceRegistry::reportServiceInfoForCurrentOp(
 PrimaryOnlyService::PrimaryOnlyService(ServiceContext* serviceContext)
     : _serviceContext(serviceContext) {}
 
-size_t PrimaryOnlyService::getNumberOfInstances() {
+void PrimaryOnlyService::reportForServerStatus(BSONObjBuilder* result) noexcept {
     stdx::lock_guard lk(_mutex);
-    return _activeInstances.size();
+    result->append("state", _getStateString(lk));
+    result->appendNumber("numInstances", static_cast<long long>(_activeInstances.size()));
 }
 
 void PrimaryOnlyService::reportInstanceInfoForCurrentOp(
@@ -253,11 +254,6 @@ void PrimaryOnlyService::reportInstanceInfoForCurrentOp(
             ops->push_back(std::move(op.get()));
         }
     }
-}
-
-bool PrimaryOnlyService::isRunning() const {
-    stdx::lock_guard lk(_mutex);
-    return _state == State::kRunning;
 }
 
 void PrimaryOnlyService::registerOpCtx(OperationContext* opCtx, bool allowOpCtxWhileRebuilding) {
@@ -371,6 +367,11 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
     // all previous writes to state documents are also committed, and then schedule work to
     // rebuild Instances from their persisted state documents.
     lk.lock();
+    LOGV2_DEBUG(5601000,
+                2,
+                "Waiting on first write of the new term to be majority committed",
+                "service"_attr = getServiceName(),
+                "stepUpOpTime"_attr = stepUpOpTime);
     WaitForMajorityService::get(_serviceContext)
         .waitUntilMajority(stepUpOpTime, _source.token())
         .thenRunOn(**newScopedExecutor)
@@ -759,6 +760,23 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::_insertNewInst
                                                        std::move(instanceCompleteFuture));
     invariant(inserted);
     return it->second.getInstance();
+}
+
+StringData PrimaryOnlyService::_getStateString(WithLock) const {
+    switch (_state) {
+        case State::kRunning:
+            return "running";
+        case State::kPaused:
+            return "paused";
+        case State::kRebuilding:
+            return "rebuilding";
+        case State::kRebuildFailed:
+            return "rebuildFailed";
+        case State::kShutdown:
+            return "shutdown";
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 PrimaryOnlyService::AllowOpCtxWhenServiceRebuildingBlock::AllowOpCtxWhenServiceRebuildingBlock(
