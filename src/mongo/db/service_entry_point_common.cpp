@@ -219,40 +219,6 @@ void generateErrorResponse(OperationContext* opCtx,
 }
 
 /**
- * Guard object for making a good-faith effort to enter maintenance mode and leave it when it
- * goes out of scope.
- *
- * Sometimes we cannot set maintenance mode, in which case the call to setMaintenanceMode will
- * return a non-OK status.  This class does not treat that case as an error which means that
- * anybody using it is assuming it is ok to continue execution without maintenance mode.
- *
- * TODO: This assumption needs to be audited and documented, or this behavior should be moved
- * elsewhere.
- */
-class MaintenanceModeSetter {
-    MaintenanceModeSetter(const MaintenanceModeSetter&) = delete;
-    MaintenanceModeSetter& operator=(const MaintenanceModeSetter&) = delete;
-
-public:
-    MaintenanceModeSetter(OperationContext* opCtx)
-        : _opCtx(opCtx),
-          _maintenanceModeSet(
-              repl::ReplicationCoordinator::get(_opCtx)->setMaintenanceMode(true).isOK()) {}
-
-    ~MaintenanceModeSetter() {
-        if (_maintenanceModeSet) {
-            repl::ReplicationCoordinator::get(_opCtx)
-                ->setMaintenanceMode(false)
-                .transitional_ignore();
-        }
-    }
-
-private:
-    OperationContext* const _opCtx;
-    const bool _maintenanceModeSet;
-};
-
-/**
  * Given the specified command, returns an effective read concern which should be used or an error
  * if the read concern is not valid for the command.
  * Note that the validation performed is not necessarily exhaustive.
@@ -990,8 +956,6 @@ void execCommandDatabase(OperationContext* opCtx,
                                invocation->ns(),
                                allowTransactionsOnConfigDatabase);
 
-        std::unique_ptr<MaintenanceModeSetter> mmSetter;
-
         BSONElement cmdOptionMaxTimeMSField;
         BSONElement maxTimeMSOpOnlyField;
         BSONElement allowImplicitCollectionCreationField;
@@ -1095,10 +1059,6 @@ void execCommandDatabase(OperationContext* opCtx,
                         "Admin only command: {command}",
                         "Admin only command",
                         "command"_attr = request.getCommandName());
-        }
-
-        if (command->maintenanceMode()) {
-            mmSetter.reset(new MaintenanceModeSetter(opCtx));
         }
 
         if (command->shouldAffectCommandCounter()) {

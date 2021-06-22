@@ -584,7 +584,7 @@ public:
         uassertStatusOK(status);
 
         uassertStatusOK(ReplicationCoordinator::get(opCtx)->setMaintenanceMode(
-            cmdObj["replSetMaintenance"].trueValue()));
+            opCtx, cmdObj["replSetMaintenance"].trueValue()));
         return true;
     }
 

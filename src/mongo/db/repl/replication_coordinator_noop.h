@@ -175,7 +175,7 @@ public:
 
     void cancelAndRescheduleElectionTimeout() final;
 
-    Status setMaintenanceMode(bool) final;
+    Status setMaintenanceMode(OperationContext*, bool) final;
 
     Status processReplSetSyncFrom(OperationContext*, const HostAndPort&, BSONObjBuilder*) final;
 

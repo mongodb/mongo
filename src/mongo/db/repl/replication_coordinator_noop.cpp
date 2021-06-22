@@ -298,7 +298,7 @@ void ReplicationCoordinatorNoOp::cancelAndRescheduleElectionTimeout() {
     MONGO_UNREACHABLE;
 }
 
-Status ReplicationCoordinatorNoOp::setMaintenanceMode(bool) {
+Status ReplicationCoordinatorNoOp::setMaintenanceMode(OperationContext*, bool) {
     MONGO_UNREACHABLE;
 }
 

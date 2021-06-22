@@ -197,7 +197,7 @@ public:
 
     virtual void cancelAndRescheduleElectionTimeout() override;
 
-    virtual Status setMaintenanceMode(bool activate);
+    virtual Status setMaintenanceMode(OperationContext* opCtx, bool activate);
 
     virtual bool getMaintenanceMode();
 

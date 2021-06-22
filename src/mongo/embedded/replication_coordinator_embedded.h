@@ -182,7 +182,7 @@ public:
 
     void cancelAndRescheduleElectionTimeout() override;
 
-    Status setMaintenanceMode(bool) override;
+    Status setMaintenanceMode(OperationContext*, bool) override;
 
     Status processReplSetSyncFrom(OperationContext*, const HostAndPort&, BSONObjBuilder*) override;
 
