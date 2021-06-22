@@ -730,6 +730,53 @@ TEST_F(TenantCollectionClonerTest, QueryStageNamespaceNotFoundOnSubsequentBatch)
 
 // We receive a QueryPlanKilled error, then a NamespaceNotFound error, indicating that the
 // collection no longer exists in the database.
+TEST_F(TenantCollectionClonerTest, QueryPlanKilledCheckIfDonorCollectionIsEmptyStage) {
+    // Set up data for preliminary stages.
+    _mockServer->setCommandReply("count", createCountResponse(3));
+
+    // Set up failpoints.
+    auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
+    auto timesEnteredBeforeStage = beforeStageFailPoint->setMode(
+        FailPoint::alwaysOn,
+        0,
+        fromjson("{cloner: 'TenantCollectionCloner', stage: 'checkIfDonorCollectionIsEmpty'}"));
+    auto beforeRetryFailPoint = globalFailPointRegistry().find("hangBeforeRetryingClonerStage");
+    auto timesEnteredBeforeRetry = beforeRetryFailPoint->setMode(
+        FailPoint::alwaysOn,
+        0,
+        fromjson("{cloner: 'TenantCollectionCloner', stage: 'checkIfDonorCollectionIsEmpty'}"));
+
+    auto cloner = makeCollectionCloner();
+    cloner->setBatchSize_forTest(2);
+
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner");
+        ASSERT_OK(cloner->run());
+        ASSERT_EQ(0, cloner->getStats().documentsCopied);
+    });
+
+    // Wait until we get to the 'checkIfDonorCollectionIsEmpty' stage.
+    beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
+
+    // Despite the name, this will also trigger on the initial batch.
+    auto failNextBatch = globalFailPointRegistry().find("mockCursorThrowErrorOnGetMore");
+    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'QueryPlanKilled'}"));
+
+    // Proceed with the 'checkIfDonorCollectionIsEmpty' stage.
+    beforeStageFailPoint->setMode(FailPoint::off, 0);
+    beforeRetryFailPoint->waitForTimesEntered(timesEnteredBeforeRetry + 1);
+
+    // Follow-up the QueryPlanKilled error with a NamespaceNotFound.
+    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'NamespaceNotFound'}"));
+
+    beforeRetryFailPoint->setMode(FailPoint::off, 0);
+    clonerThread.join();
+
+    ASSERT_EQUALS(0, _opObserver->numDocsInserted);
+}
+
+// We receive a QueryPlanKilled error, then a NamespaceNotFound error, indicating that the
+// collection no longer exists in the database.
 TEST_F(TenantCollectionClonerTest, QueryPlanKilledThenNamespaceNotFoundFirstBatch) {
     // Set up data for preliminary stages.
     _mockServer->setCommandReply("count", createCountResponse(3));
