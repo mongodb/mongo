@@ -207,7 +207,7 @@ var ReplSetTest = function(opts) {
             unauthenticatedConns.length > 0;
 
         // There are few cases where we do not auth
-        // 1. When transitiong to auth
+        // 1. When transitioning to auth
         // 2. When cluster is running in x509 but shell was not started with TLS (i.e. sslSpecial
         // suite)
         if (needsAuth &&
@@ -1200,6 +1200,15 @@ var ReplSetTest = function(opts) {
         }
     };
 
+    this._notX509Auth = function(conn) {
+        const nodeId = "n" + self.getNodeId(conn);
+        const nodeOptions = self.nodeOptions[nodeId] || {};
+        const options =
+            (nodeOptions === {} || !self.startOptions) ? nodeOptions : self.startOptions;
+        const authMode = options.clusterAuthMode;
+        return authMode != "sendX509" && authMode != "x509" && authMode != "sendKeyFile";
+    };
+
     function replSetCommandWithRetry(primary, cmd) {
         print("Running command with retry: " + tojson(cmd));
         const cmdName = Object.keys(cmd)[0];
@@ -1314,7 +1323,8 @@ var ReplSetTest = function(opts) {
     this.initiateWithAnyNodeAsPrimary = function(cfg, initCmd, {
         doNotWaitForStableRecoveryTimestamp: doNotWaitForStableRecoveryTimestamp = false,
         doNotWaitForReplication: doNotWaitForReplication = false,
-        doNotWaitForNewlyAddedRemovals: doNotWaitForNewlyAddedRemovals = false
+        doNotWaitForNewlyAddedRemovals: doNotWaitForNewlyAddedRemovals = false,
+        doNotWaitForPrimaryOnlyServices: doNotWaitForPrimaryOnlyServices = false
     } = {}) {
         let startTime = new Date();  // Measure the execution time of this function.
         var primary = this.nodes[0].getDB("admin");
@@ -1607,17 +1617,8 @@ var ReplSetTest = function(opts) {
                 // asCluster() currently does not validate connections with X509 authentication.
                 // If the test is using X509, we skip disabling the server parameter as the
                 // 'setParameter' command will fail.
-                const nodeId = "n" + self.getNodeId(node);
-                const nodeOptions = self.nodeOptions[nodeId] || {};
-                const options =
-                    (nodeOptions === {} || !self.startOptions) ? nodeOptions : self.startOptions;
-                const authMode = options.clusterAuthMode;
-                const notX509 =
-                    authMode != "sendX509" && authMode != "x509" && authMode != "sendKeyFile";
-
-                // We should only be checking the binary version if we are not using X509 auth,
-                // as any server command will fail if the 'authMode' is X509.
-                if (notX509) {
+                // TODO(SERVER-57924): cleanup asCluster() to avoid checking here.
+                if (self._notX509Auth(node) || node.isTLS()) {
                     const serverStatus =
                         assert.commandWorked(node.getDB("admin").runCommand({serverStatus: 1}));
                     const currVersion = serverStatus.version;
@@ -1665,6 +1666,20 @@ var ReplSetTest = function(opts) {
             });
         }
 
+        // Waits for the primary only services to finish rebuilding to avoid background writes
+        // after initiation is done. PrimaryOnlyServices wait for the stepup optime to be majority
+        // committed before rebuilding services, so we skip waiting for PrimaryOnlyServices if
+        // we do not wait for replication.
+        if (!doNotWaitForReplication && !doNotWaitForPrimaryOnlyServices) {
+            primary = self.getPrimary();
+            // TODO(SERVER-57924): cleanup asCluster() to avoid checking here.
+            if (self._notX509Auth(primary) || primary.isTLS()) {
+                asCluster(self.nodes, function() {
+                    self.waitForPrimaryOnlyServices(primary);
+                });
+            }
+        }
+
         // Turn off the failpoints now that initial sync and initial setup is complete.
         if (failPointsSupported) {
             this.nodes.forEach(function(conn) {
@@ -1683,15 +1698,22 @@ var ReplSetTest = function(opts) {
      * This version should be prefered where possible but requires all connections in the
      * ReplSetTest to be authorized to run replSetGetStatus.
      */
-    this.initiateWithNodeZeroAsPrimary = function(cfg, initCmd) {
+    this.initiateWithNodeZeroAsPrimary = function(cfg, initCmd, {
+        doNotWaitForPrimaryOnlyServices: doNotWaitForPrimaryOnlyServices = false,
+    } = {}) {
         let startTime = new Date();  // Measure the execution time of this function.
-        this.initiateWithAnyNodeAsPrimary(cfg, initCmd);
+        this.initiateWithAnyNodeAsPrimary(cfg, initCmd, {doNotWaitForPrimaryOnlyServices: true});
 
         // stepUp() calls awaitReplication() which requires all nodes to be authorized to run
         // replSetGetStatus.
         asCluster(this.nodes, function() {
-            self.stepUp(self.nodes[0]);
+            const newPrimary = self.nodes[0];
+            self.stepUp(newPrimary);
+            if (!doNotWaitForPrimaryOnlyServices) {
+                self.waitForPrimaryOnlyServices(newPrimary);
+            }
         });
+
         print("ReplSetTest initiateWithNodeZeroAsPrimary took " + (new Date() - startTime) +
               "ms for " + this.nodes.length + " nodes.");
     };
@@ -1700,8 +1722,11 @@ var ReplSetTest = function(opts) {
      * Runs replSetInitiate on the replica set and requests the first node to step up as
      * primary.
      */
-    this.initiate = function(cfg, initCmd) {
-        this.initiateWithNodeZeroAsPrimary(cfg, initCmd);
+    this.initiate = function(cfg, initCmd, {
+        doNotWaitForPrimaryOnlyServices: doNotWaitForPrimaryOnlyServices = false,
+    } = {}) {
+        this.initiateWithNodeZeroAsPrimary(
+            cfg, initCmd, {doNotWaitForPrimaryOnlyServices: doNotWaitForPrimaryOnlyServices});
     };
 
     /**
@@ -1767,6 +1792,27 @@ var ReplSetTest = function(opts) {
 
         jsTest.log("ReplSetTest stepUp: Finished stepping up " + node.host);
         return node;
+    };
+
+    /**
+     * Waits for primary only services to finish the rebuilding stage after a primary is elected.
+     * This is useful for tests that are expecting particular write timestamps since some primary
+     * only services can do background writes (e.g. build indexes) during rebuilding stage that
+     * could advance the last write timestamp.
+     */
+    this.waitForPrimaryOnlyServices = function(primary) {
+        jsTest.log("Waiting for primary only services to finish rebuilding");
+        primary = primary || self.getPrimary();
+
+        assert.soonNoExcept(function() {
+            const res = assert.commandWorked(primary.adminCommand({serverStatus: 1, repl: 1}));
+            // 'PrimaryOnlyServices' does not exist prior to v5.0, using empty
+            // object to skip waiting in case of multiversion tests.
+            const services = res.repl.primaryOnlyServices || {};
+            return Object.keys(services).every((s) => {
+                return services[s].state === undefined || services[s].state === "running";
+            });
+        }, "Timed out waiting for primary only services to finish rebuilding");
     };
 
     /**

@@ -152,7 +152,10 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         tenantMigrationTest.getDonorRst().startSet(Object.assign({}, migrationX509Options.donor, {
             setParameter: {['failpoint.' + fpName]: tojson({mode: 'alwaysOn'})}
         }));
-        tenantMigrationTest.getDonorRst().initiate();
+        // The failpoints in this test run hang the TenantMigrationDonorService during service
+        // rebuild, so we need to skip waiting on PrimaryOnlyServices.
+        tenantMigrationTest.getDonorRst().initiate(
+            null, null, {doNotWaitForPrimaryOnlyServices: true});
         TenantMigrationUtil.createTenantMigrationRecipientRoleIfNotExist(
             tenantMigrationTest.getDonorRst());
 
