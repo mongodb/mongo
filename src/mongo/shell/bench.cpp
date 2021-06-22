@@ -34,6 +34,7 @@
 #include "mongo/shell/bench.h"
 
 #include <pcrecpp.h>
+#include <string>
 
 #include "mongo/base/shim.h"
 #include "mongo/client/dbclient_cursor.h"
@@ -222,17 +223,19 @@ int runQueryWithReadCommands(DBClientBase* conn,
                              boost::optional<TxnNumber> txnNumber,
                              std::unique_ptr<FindCommandRequest> findCommand,
                              Milliseconds delayBeforeGetMore,
+                             BSONObj readPrefObj,
                              BSONObj* objOut) {
     const auto dbName =
         findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).db().toString();
 
     BSONObj findCommandResult;
+    BSONObj findCommandObj = findCommand->toBSON(readPrefObj);
     uassert(ErrorCodes::CommandFailed,
             str::stream() << "find command failed; reply was: " << findCommandResult,
             runCommandWithSession(
                 conn,
                 dbName,
-                findCommand->toBSON(BSONObj()),
+                findCommandObj,
                 // read command with txnNumber implies performing reads in a
                 // multi-statement transaction
                 txnNumber ? kStartTransactionOption | kMultiStatementTransactionOption : kNoOptions,
@@ -297,8 +300,13 @@ Timestamp getLatestClusterTime(DBClientBase* conn) {
         findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).db().toString();
 
     BSONObj oplogResult;
-    int count = runQueryWithReadCommands(
-        conn, boost::none, boost::none, std::move(findCommand), Milliseconds(0), &oplogResult);
+    int count = runQueryWithReadCommands(conn,
+                                         boost::none,
+                                         boost::none,
+                                         std::move(findCommand),
+                                         Milliseconds(0),
+                                         BSONObj(),
+                                         &oplogResult);
     uassert(ErrorCodes::OperationFailed,
             str::stream() << "Find cmd on the oplog collection failed; reply was: " << oplogResult,
             count == 1);
@@ -626,6 +634,26 @@ BenchRunOp opFromBson(const BSONObj& op) {
                               << opType,
                 (opType == "find") || (opType == "query"));
             myOp.maxRandomMillisecondDelayBeforeGetMore = arg.numberInt();
+        } else if (name == "readPrefMode") {
+            uassert(
+                ErrorCodes::InvalidOptions,
+                str::stream() << "Field 'readPrefMode' is only valid for find op types. Type is "
+                              << opType,
+                (opType == "find") || (opType == "query") || (opType == "findOne"));
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Field 'readPrefMode' should be a string, instead it's type: "
+                                  << typeName(arg.type()),
+                    arg.type() == BSONType::String);
+
+            ReadPreference mode;
+            try {
+                mode = ReadPreference_parse(IDLParserErrorContext("mode"), arg.str());
+            } catch (DBException& e) {
+                e.addContext("benchRun(): Could not parse readPrefMode argument");
+                throw;
+            }
+
+            myOp.readPrefObj = ReadPreferenceSetting(mode).toContainingBSON();
         } else {
             uassert(34394, str::stream() << "Benchrun op has unsupported field: " << name, false);
         }
@@ -1019,8 +1047,13 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 txnNumberForOp = state->txnNumber;
                 state->inProgressMultiStatementTxn = true;
             }
-            runQueryWithReadCommands(
-                conn, lsid, txnNumberForOp, std::move(findCommand), Milliseconds(0), &result);
+            runQueryWithReadCommands(conn,
+                                     lsid,
+                                     txnNumberForOp,
+                                     std::move(findCommand),
+                                     Milliseconds(0),
+                                     readPrefObj,
+                                     &result);
 
             if (!config.hideResults || this->showResult)
                 LOGV2_INFO(22796, "Result from benchRun thread [findOne]", "result"_attr = result);
@@ -1122,6 +1155,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                                              txnNumberForOp,
                                              std::move(findCommand),
                                              Milliseconds(delayBeforeGetMore),
+                                             readPrefObj,
                                              nullptr);
 
             if (this->expected >= 0 && count != this->expected) {
