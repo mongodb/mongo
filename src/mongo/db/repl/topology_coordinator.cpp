@@ -2961,6 +2961,11 @@ void TopologyCoordinator::adjustMaintenanceCountBy(int inc) {
     invariant(_maintenanceModeCalls >= 0);
 }
 
+void TopologyCoordinator::resetMaintenanceCount() {
+    invariant(_role == Role::kFollower);
+    _maintenanceModeCalls = 0;
+}
+
 int TopologyCoordinator::getMaintenanceCount() const {
     return _maintenanceModeCalls;
 }

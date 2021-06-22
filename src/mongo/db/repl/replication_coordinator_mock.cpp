@@ -466,7 +466,7 @@ void ReplicationCoordinatorMock::appendSecondaryInfoData(BSONObjBuilder* result)
 void ReplicationCoordinatorMock::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
 }
 
-Status ReplicationCoordinatorMock::setMaintenanceMode(bool activate) {
+Status ReplicationCoordinatorMock::setMaintenanceMode(OperationContext* opCtx, bool activate) {
     return Status::OK();
 }
 
