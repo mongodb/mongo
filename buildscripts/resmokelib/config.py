@@ -99,7 +99,7 @@ DEFAULTS = {
     "storage_engine": None,
     "storage_engine_cache_size_gb": None,
     "suite_files": "with_server",
-    "tag_file": None,
+    "tag_files": [],
     "test_files": [],
     "transport_layer": None,
     "user_friendly_output": None,
@@ -504,7 +504,7 @@ STORAGE_ENGINE_CACHE_SIZE = None
 SUITE_FILES = None
 
 # The tag file to use that associates tests with tags.
-TAG_FILE = None
+TAG_FILES = None
 
 # The test files to execute.
 TEST_FILES = None

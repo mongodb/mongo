@@ -12,7 +12,7 @@ variant_name = sys.argv[2]
 
 task_name = task_name.replace("_" + variant_name, "")
 
-if task_name[-1].isdigit():
+if task_name[-1].isdigit() or task_name.endswith("_misc"):
     # Is a generated task.
     task_name = task_name.rsplit("_", maxsplit=1)[0]
 

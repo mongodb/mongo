@@ -114,7 +114,7 @@ class TestFileExplorer(object):
         return program.returncode, stdout.decode("utf-8"), stderr.decode("utf-8")
 
     @staticmethod
-    def parse_tag_file(test_kind, tag_file=None, tagged_tests=None):
+    def parse_tag_files(test_kind, tag_files=None, tagged_tests=None):
         """Parse the tag file and return a dict of tagged tests.
 
         The resulting dict will have as a key the filename and the
@@ -122,17 +122,19 @@ class TestFileExplorer(object):
         """
         if tagged_tests is None:
             tagged_tests = collections.defaultdict(list)
-        if tag_file and os.path.exists(tag_file):
-            tags_conf = _tags.TagsConfig.from_file(tag_file)
-            tagged_roots = tags_conf.get_test_patterns(test_kind)
-            for tagged_root in tagged_roots:
-                # Multiple tests could be returned for a set of tags.
-                tests = globstar.iglob(tagged_root)
-                test_tags = tags_conf.get_tags(test_kind, tagged_root)
-                for test in tests:
-                    # A test could have a tag in more than one place, due to wildcards in the
-                    # selector.
-                    tagged_tests[test].extend(test_tags)
+
+        for tag_file in tag_files:
+            if tag_file and os.path.exists(tag_file):
+                tags_conf = _tags.TagsConfig.from_file(tag_file)
+                tagged_roots = tags_conf.get_test_patterns(test_kind)
+                for tagged_root in tagged_roots:
+                    # Multiple tests could be returned for a set of tags.
+                    tests = globstar.iglob(tagged_root)
+                    test_tags = tags_conf.get_tags(test_kind, tagged_root)
+                    for test in tests:
+                        # A test could have a tag in more than one place, due to wildcards in the
+                        # selector.
+                        tagged_tests[test].extend(test_tags)
         return tagged_tests
 
 
@@ -482,11 +484,11 @@ class _JSTestSelector(_Selector):
 
     def __init__(self, test_file_explorer):
         _Selector.__init__(self, test_file_explorer)
-        self._tags = self._test_file_explorer.parse_tag_file("js_test", config.TAG_FILE)
+        self._tags = self._test_file_explorer.parse_tag_files("js_test", config.TAG_FILES)
 
     def select(self, selector_config):
-        self._tags = self._test_file_explorer.parse_tag_file("js_test", selector_config.tag_file,
-                                                             self._tags)
+        self._tags = self._test_file_explorer.parse_tag_files("js_test", [selector_config.tag_file],
+                                                              self._tags)
         return _Selector.select(self, selector_config)
 
     def get_tags(self, test_file):

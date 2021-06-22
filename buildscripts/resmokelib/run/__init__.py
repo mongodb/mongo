@@ -1020,8 +1020,9 @@ class RunPlugin(PluginInterface):
                                        metavar="REVISION_ORDER_ID",
                                        help="Sets the chronological order number of this commit.")
 
-        evergreen_options.add_argument("--tagFile", dest="tag_file", metavar="OPTIONS",
-                                       help="A YAML file that associates tests and tags.")
+        evergreen_options.add_argument("--tagFile", action="append", dest="tag_files",
+                                       metavar="TAG_FILES",
+                                       help="One or more YAML files that associate tests and tags.")
 
         evergreen_options.add_argument(
             "--taskName", dest="task_name", metavar="TASK_NAME",

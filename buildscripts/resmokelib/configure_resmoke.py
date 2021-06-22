@@ -287,7 +287,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.SUITE_FILES = config.pop("suite_files")
     if _config.SUITE_FILES is not None:
         _config.SUITE_FILES = _config.SUITE_FILES.split(",")
-    _config.TAG_FILE = config.pop("tag_file")
+    _config.TAG_FILES = config.pop("tag_files")
     _config.TRANSPORT_LAYER = config.pop("transport_layer")
     _config.USER_FRIENDLY_OUTPUT = config.pop("user_friendly_output")
 
