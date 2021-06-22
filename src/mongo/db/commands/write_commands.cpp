@@ -1304,8 +1304,17 @@ public:
 
         write_ops::DeleteCommandReply typedRun(OperationContext* opCtx) final try {
             transactionChecks(opCtx, ns());
-
             write_ops::DeleteCommandReply deleteReply;
+
+            if (isTimeseries(opCtx, ns())) {
+                try {
+                    throw "Time-series deletes are not currently supported";
+                } catch (DBException& ex) {
+                    ex.addContext(str::stream() << "time-series delete failed: " << ns().ns());
+                    throw;
+                }
+                return deleteReply;
+            }
 
             auto reply = write_ops_exec::performDeletes(opCtx, request());
             populateReply(opCtx,
