@@ -377,7 +377,7 @@ void BackgroundSync::_produce() {
                     "earliestOpTimeSeen"_attr = syncSourceResp.earliestOpTimeSeen);
 
         // Activate maintenance mode and transition to RECOVERING.
-        auto status = _replCoord->setMaintenanceMode(true);
+        auto status = _replCoord->setMaintenanceMode(opCtx.get(), true);
         if (!status.isOK()) {
             LOGV2_WARNING(21116,
                           "Failed to transition into maintenance mode: {error}",
@@ -459,7 +459,9 @@ void BackgroundSync::_produce() {
               "No longer too stale. Able to sync from {syncSource}",
               "No longer too stale. Able to start syncing",
               "syncSource"_attr = source);
-        auto status = _replCoord->setMaintenanceMode(false);
+
+        auto opCtx = cc().makeOperationContext();
+        auto status = _replCoord->setMaintenanceMode(opCtx.get(), false);
         if (!status.isOK()) {
             LOGV2_WARNING(21118,
                           "Failed to leave maintenance mode: {error}",
