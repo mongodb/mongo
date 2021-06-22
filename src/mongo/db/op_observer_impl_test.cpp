@@ -99,14 +99,12 @@ public:
             opCtx->recoveryUnit()->abandonSnapshot();
 
             WriteUnitOfWork wunit(opCtx);
-            {
-                AutoGetCollection collRaii(opCtx, nss, LockMode::MODE_X);
-                if (collRaii) {
-                    invariant(collRaii.getWritableCollection()->truncate(opCtx).isOK());
-                } else {
-                    auto db = collRaii.ensureDbExists();
-                    invariant(db->createCollection(opCtx, nss));
-                }
+            AutoGetCollection collRaii(opCtx, nss, LockMode::MODE_X);
+            if (collRaii) {
+                invariant(collRaii.getWritableCollection()->truncate(opCtx).isOK());
+            } else {
+                auto db = collRaii.ensureDbExists();
+                invariant(db->createCollection(opCtx, nss));
             }
             wunit.commit();
         });
@@ -159,6 +157,26 @@ protected:
     // Assert that oplog only has a single entry and return that oplog entry.
     BSONObj getSingleOplogEntry(OperationContext* opCtx) {
         return getNOplogEntries(opCtx, 1).back();
+    }
+
+    repl::ImageEntry getImageEntryFromSideCollection(OperationContext* opCtx,
+                                                     const LogicalSessionId& sessionId) {
+        AutoGetCollection sideCollection(
+            opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IS);
+        return repl::ImageEntry::parse(
+            IDLParserErrorContext("image entry"),
+            Helpers::findOneForTesting(
+                opCtx, sideCollection.getCollection(), BSON("_id" << sessionId.toBSON())));
+    }
+
+    SessionTxnRecord getTxnRecord(OperationContext* opCtx, const LogicalSessionId& sessionId) {
+        AutoGetCollection configTransactions(
+            opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IS);
+
+        return SessionTxnRecord::parse(
+            IDLParserErrorContext("txn record"),
+            Helpers::findOneForTesting(
+                opCtx, configTransactions.getCollection(), BSON("_id" << sessionId.toBSON())));
     }
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
@@ -1715,13 +1733,8 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
         }
 
         if (checkSideCollection) {
-            AutoGetCollection sideCollection(
-                opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IS);
-            auto imageEntry = repl::ImageEntry::parse(
-                IDLParserErrorContext("image entry"),
-                Helpers::findOneForTesting(opCtx,
-                                           sideCollection.getCollection(),
-                                           BSON("_id" << actualOp.getSessionId()->toBSON())));
+            repl::ImageEntry imageEntry =
+                getImageEntryFromSideCollection(opCtx, *actualOp.getSessionId());
             const BSONObj& expectedImage = testCase.imageType == StoreDocOption::PreImage
                 ? update.updateArgs.preImageDoc.get()
                 : update.updateArgs.updatedDoc;
@@ -1754,13 +1767,13 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
 
     const bool isRetryableWrite = true;
     const bool isNotRetryableWrite = false;
-    const int isSingleInsert = 1;
-    const int isMultiInsert = 3;
+    const int oneDoc = 1;
+    const int threeDocs = 3;
 
-    std::vector<InsertTestCase> cases{{isNotRetryableWrite, isSingleInsert},
-                                      {isNotRetryableWrite, isMultiInsert},
-                                      {isRetryableWrite, isSingleInsert},
-                                      {isRetryableWrite, isMultiInsert}};
+    std::vector<InsertTestCase> cases{{isNotRetryableWrite, oneDoc},
+                                      {isNotRetryableWrite, threeDocs},
+                                      {isRetryableWrite, oneDoc},
+                                      {isRetryableWrite, threeDocs}};
 
     for (std::size_t testIdx = 0; testIdx < cases.size(); ++testIdx) {
         const auto& testCase = cases[testIdx];
@@ -1774,10 +1787,7 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
 
         std::vector<InsertStatement> toInsert;
         for (int stmtIdx = 0; stmtIdx < testCase.numDocsToInsert; ++stmtIdx) {
-            StmtId stmtId = kUninitializedStmtId;
-            if (testCase.isRetryableWrite) {
-                stmtId = StmtId(stmtIdx);
-            }
+            StmtId stmtId = testCase.isRetryableWrite ? StmtId(stmtIdx) : kUninitializedStmtId;
             toInsert.emplace_back(stmtId, BSON("_id" << stmtIdx));
         }
 
@@ -1799,7 +1809,7 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
         wuow.commit();
 
         // Phase 3: Analyze the results:
-
+        // ----
         // This `getNOplogEntries` also asserts that all oplogs are retrieved.
         std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, toInsert.size());
         // Entries are returned in ascending timestamp order.
@@ -1834,18 +1844,138 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
         if (testCase.isRetryableWrite) {
             // Also assert for retryable writes that the `config.transactions` entry's
             // `lastWriteOpTime` and `txnNum` reflects the latest oplog entry.
-            AutoGetCollection configTransactions(
-                opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IS);
-
-            SessionTxnRecord transactionRecord = SessionTxnRecord::parse(
-                IDLParserErrorContext("txn record"),
-                Helpers::findOneForTesting(opCtx,
-                                           configTransactions.getCollection(),
-                                           BSON("_id" << opCtx->getLogicalSessionId()->toBSON())));
+            SessionTxnRecord transactionRecord = getTxnRecord(opCtx, *opCtx->getLogicalSessionId());
             ASSERT_EQ(oplogs.back()[repl::OplogEntryBase::kTimestampFieldName].timestamp(),
                       transactionRecord.getLastWriteOpTime().getTimestamp());
             ASSERT_EQ(oplogs.back()[repl::OplogEntryBase::kTxnNumberFieldName].Long(),
                       transactionRecord.getTxnNum());
+        }
+    }
+}
+
+// Delete tests (with and without findAndModify) can be expressed with the same fields as a
+// traditional update. The only exception is that the postImage for a delete is trivial.
+using DeleteTestCase = UpdateTestCase;
+TEST_F(OpObserverTest, TestFundamentalOnDeleteOutputs) {
+    // Create a registry that only registers the Impl. It can be challenging to call methods on the
+    // Impl directly. It falls into cases where `ReservedTimes` is expected to be instantiated. Due
+    // to strong encapsulation, we use the registry that managers the `ReservedTimes` on our behalf.
+    OpObserverRegistry opObserver;
+    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    NamespaceString nss("test", "coll");
+    CollectionUUID uuid = CollectionUUID::gen();
+
+    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
+
+    const bool kRecordPreImages = true;
+    const bool kDoNotRecordPreImages = false;
+
+    std::vector<DeleteTestCase> cases{
+        // Regular deletes.
+        {StoreDocOption::None, kDoNotRecordPreImages, RetryableOptions::NotRetryable, 1},
+        {StoreDocOption::None, kRecordPreImages, RetryableOptions::NotRetryable, 2},
+        {StoreDocOption::None, kRecordPreImages, RetryableOptions::WithOplog, 2},
+        {StoreDocOption::None, kRecordPreImages, RetryableOptions::WithSideCollection, 2},
+        // FindAndModify asking for a preImage.
+        {StoreDocOption::PreImage, kDoNotRecordPreImages, RetryableOptions::NotRetryable, 1},
+        {StoreDocOption::PreImage, kDoNotRecordPreImages, RetryableOptions::WithOplog, 2},
+        {StoreDocOption::PreImage, kDoNotRecordPreImages, RetryableOptions::WithSideCollection, 1},
+        {StoreDocOption::PreImage, kRecordPreImages, RetryableOptions::NotRetryable, 2},
+        {StoreDocOption::PreImage, kRecordPreImages, RetryableOptions::WithOplog, 2},
+        {StoreDocOption::PreImage, kRecordPreImages, RetryableOptions::WithSideCollection, 2}};
+
+    for (std::size_t testIdx = 0; testIdx < cases.size(); ++testIdx) {
+        const auto& testCase = cases[testIdx];
+        LOGV2(5739905,
+              "DeleteTestCase",
+              "ImageType"_attr = testCase.getImageTypeStr(),
+              "AlwaysRecordPreImages"_attr = testCase.alwaysRecordPreImages,
+              "RetryableOptions"_attr = testCase.getRetryableOptionsStr(),
+              "ExpectedOplogEntries"_attr = testCase.numOutputOplogs);
+
+        // Phase 1: Clearing any state and setting up fixtures/the update call.
+        resetOplogAndTransactions(opCtx);
+
+        boost::optional<MongoDOperationContextSession> contextSession;
+        boost::optional<TransactionParticipant::Participant> txnParticipant;
+        if (testCase.retryableOptions != RetryableOptions::NotRetryable) {
+            opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+            opCtx->setTxnNumber(TxnNumber(testIdx));
+            contextSession.emplace(opCtx);
+            txnParticipant.emplace(TransactionParticipant::get(opCtx));
+            txnParticipant->beginOrContinue(opCtx, TxnNumber(testIdx), boost::none, boost::none);
+        }
+
+        switch (testCase.retryableOptions) {
+            case RetryableOptions::NotRetryable:
+                break;
+            case RetryableOptions::WithOplog:
+                repl::gStoreFindAndModifyImagesInSideCollection.store(false);
+                break;
+            case RetryableOptions::WithSideCollection:
+                repl::gStoreFindAndModifyImagesInSideCollection.store(true);
+                break;
+        }
+
+        const BSONObj deletedDoc = BSON("_id" << 0 << "valuePriorToDelete"
+                                              << "marvelous");
+        OpObserver::OplogDeleteEntryArgs deleteArgs;
+        if (testCase.retryableOptions != RetryableOptions::NotRetryable ||
+            testCase.alwaysRecordPreImages) {
+            deleteArgs.deletedDoc = &deletedDoc;
+            deleteArgs.preImageRecordingEnabledForCollection = testCase.alwaysRecordPreImages;
+        }
+        // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect of
+        // setting of `documentKey` on the delete for sharding purposes. `OpObserverImpl::onDelete`
+        // asserts its existence.
+        documentKeyDecoration(opCtx).emplace(deletedDoc["_id"].wrap(), boost::none);
+        StmtId deleteStmtId = kUninitializedStmtId;
+        if (testCase.retryableOptions != RetryableOptions::NotRetryable) {
+            deleteStmtId = {1};
+        }
+
+        // Phase 2: Call the code we're testing.
+        WriteUnitOfWork wuow(opCtx);
+        AutoGetCollection locks(opCtx, nss, LockMode::MODE_IX);
+        opObserver.onDelete(opCtx, nss, uuid, deleteStmtId, deleteArgs);
+        wuow.commit();
+
+        // Phase 3: Analyze the results:
+
+        // This `getNOplogEntries` also asserts that all oplogs are retrieved.
+        std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, testCase.numOutputOplogs);
+        // Entries are returned in ascending timestamp order.
+        const OplogEntry& actualOp = assertGet(OplogEntry::parse(oplogs.back()));
+
+        const bool checkPreImageInOplog = testCase.alwaysRecordPreImages ||
+            (testCase.imageType == StoreDocOption::PreImage &&
+             testCase.retryableOptions == RetryableOptions::WithOplog);
+        if (checkPreImageInOplog) {
+            ASSERT(actualOp.getPreImageOpTime());
+            const Timestamp preImageOpTime = actualOp.getPreImageOpTime()->getTimestamp();
+            ASSERT_FALSE(preImageOpTime.isNull());
+            OplogEntry preImage = findByTimestamp(oplogs, preImageOpTime);
+            ASSERT_BSONOBJ_EQ(deletedDoc, preImage.getObject());
+        }
+
+        bool checkSideCollection = testCase.imageType != StoreDocOption::None &&
+            testCase.retryableOptions == RetryableOptions::WithSideCollection;
+        if (checkSideCollection && testCase.alwaysRecordPreImages &&
+            testCase.imageType == StoreDocOption::PreImage) {
+            // When `alwaysRecordPreImages` is enabled for a collection, we always store an image in
+            // the oplog. To avoid unnecessary writes, we won't also store an image in the side
+            // collection.
+            checkSideCollection = false;
+        }
+
+        if (checkSideCollection) {
+            repl::ImageEntry imageEntry =
+                getImageEntryFromSideCollection(opCtx, *actualOp.getSessionId());
+            ASSERT(imageEntry.getImageKind() == repl::RetryImageEnum::kPreImage);
+            ASSERT_BSONOBJ_EQ(deletedDoc, imageEntry.getImage());
         }
     }
 }
