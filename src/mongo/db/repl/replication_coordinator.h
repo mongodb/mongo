@@ -645,9 +645,12 @@ public:
     /**
      * Toggles maintenanceMode to the value expressed by 'activate'
      * return Status::OK if the change worked, NotSecondary if it failed because we are
-     * PRIMARY, and OperationFailed if we are not currently in maintenance mode
+     * PRIMARY, and OperationFailed if we are not currently in maintenance mode.
+     *
+     * Takes the ReplicationStateTransitionLock (RSTL) in X mode, since the state can potentially
+     * change to and from RECOVERING.
      */
-    virtual Status setMaintenanceMode(bool activate) = 0;
+    virtual Status setMaintenanceMode(OperationContext* opCtx, bool activate) = 0;
 
     /**
      * Retrieves the current count of maintenanceMode and returns 'true' if greater than 0.

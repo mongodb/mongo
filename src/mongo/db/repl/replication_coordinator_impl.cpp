@@ -737,11 +737,8 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
             const auto lastApplied = opTimeStatus.getValue();
             _setMyLastAppliedOpTimeAndWallTime(
                 lock, lastApplied, false, DataConsistency::Consistent);
-        }
 
-        // Clear maint. mode.
-        while (getMaintenanceMode()) {
-            setMaintenanceMode(false).transitional_ignore();
+            _topCoord->resetMaintenanceCount();
         }
 
         if (startCompleted) {
@@ -2570,11 +2567,14 @@ bool ReplicationCoordinatorImpl::getMaintenanceMode() {
     return _topCoord->getMaintenanceCount() > 0;
 }
 
-Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
+Status ReplicationCoordinatorImpl::setMaintenanceMode(OperationContext* opCtx, bool activate) {
     if (getReplicationMode() != modeReplSet) {
         return Status(ErrorCodes::NoReplicationEnabled,
                       "can only set maintenance mode on replica set members");
     }
+
+    // It is possible that we change state to or from RECOVERING. Thus, we need the RSTL in X mode.
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx, MODE_X);
 
     stdx::unique_lock<Latch> lk(_mutex);
     if (_topCoord->getRole() == TopologyCoordinator::Role::kCandidate ||

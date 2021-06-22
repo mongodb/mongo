@@ -2291,7 +2291,7 @@ TEST_F(
     // Go into maintenance mode.
     ASSERT_EQUALS(0, getTopoCoord().getMaintenanceCount());
     ASSERT_FALSE(getReplCoord()->getMaintenanceMode());
-    ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(opCtx.get(), true));
     ASSERT_EQUALS(1, getTopoCoord().getMaintenanceCount());
     ASSERT_TRUE(getReplCoord()->getMaintenanceMode());
 
@@ -2728,8 +2728,10 @@ TEST_F(ReplCoordTest,
     replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
 
+    const auto opCtx = makeOperationContext();
+
     // Can't unset maintenance mode if it was never set to begin with.
-    Status status = getReplCoord()->setMaintenanceMode(false);
+    Status status = getReplCoord()->setMaintenanceMode(opCtx.get(), false);
     ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 }
@@ -2750,12 +2752,14 @@ TEST_F(ReplCoordTest,
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+
+    const auto opCtx = makeOperationContext();
+
     // valid set
-    ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(opCtx.get(), true));
     ASSERT_TRUE(getReplCoord()->getMemberState().recovering());
 
     // We must take the RSTL in mode X before transitioning to RS_ROLLBACK.
-    const auto opCtx = makeOperationContext();
     ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
 
     // If we go into rollback while in maintenance mode, our state changes to RS_ROLLBACK.
@@ -2779,17 +2783,21 @@ TEST_F(ReplCoordTest, AllowAsManyUnsetMaintenanceModesAsThereHaveBeenSetMaintena
                                           << BSON("_id" << 2 << "host"
                                                         << "test3:1234"))),
                        HostAndPort("test2", 1234));
+
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+
+    const auto opCtx = makeOperationContext();
+
     // Can set multiple times
-    ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
-    ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(opCtx.get(), true));
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(opCtx.get(), true));
 
     // Need to unset the number of times you set.
-    ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
-    ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
-    Status status = getReplCoord()->setMaintenanceMode(false);
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(opCtx.get(), false));
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(opCtx.get(), false));
+    Status status = getReplCoord()->setMaintenanceMode(opCtx.get(), false);
     // third one fails b/c we only set two times.
     ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
     // Unsetting maintenance mode changes our state to secondary if maintenance mode was
@@ -2821,19 +2829,19 @@ TEST_F(ReplCoordTest, SettingAndUnsettingMaintenanceModeShouldNotAffectRollbackS
     // state.
     ASSERT_OK(getReplCoord()->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
     ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
-    ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(opCtx.get(), true));
     ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
-    ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(opCtx.get(), false));
     ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
 
     // Rollback is sticky even if entered while in maintenance mode.
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-    ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(opCtx.get(), true));
     ASSERT_TRUE(getReplCoord()->getMemberState().recovering());
     ASSERT_OK(getReplCoord()->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
     ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
-    ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(opCtx.get(), false));
     ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
@@ -2857,21 +2865,20 @@ TEST_F(ReplCoordTest, DoNotAllowMaintenanceModeWhilePrimary) {
     // Can't modify maintenance mode when PRIMARY
     simulateSuccessfulV1Election();
 
-    Status status = getReplCoord()->setMaintenanceMode(true);
-    ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
-    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
-
     auto opCtx = makeOperationContext();
 
+    Status status = getReplCoord()->setMaintenanceMode(opCtx.get(), true);
+    ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // Step down from primary.
     getReplCoord()->updateTerm(opCtx.get(), getReplCoord()->getTerm() + 1).transitional_ignore();
     ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_SECONDARY, Seconds(1)));
 
-    status = getReplCoord()->setMaintenanceMode(false);
+    status = getReplCoord()->setMaintenanceMode(opCtx.get(), false);
     ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
-    ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
-    ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(opCtx.get(), true));
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(opCtx.get(), false));
 }
 
 TEST_F(ReplCoordTest, DoNotAllowSettingMaintenanceModeWhileConductingAnElection) {
@@ -2917,16 +2924,16 @@ TEST_F(ReplCoordTest, DoNotAllowSettingMaintenanceModeWhileConductingAnElection)
     ASSERT_EQUALS(when, net->now());
     net->exitNetwork();
     ASSERT_EQUALS(TopologyCoordinator::Role::kCandidate, getTopoCoord().getRole());
-    Status status = getReplCoord()->setMaintenanceMode(false);
+    Status status = getReplCoord()->setMaintenanceMode(opCtx.get(), false);
     ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
-    status = getReplCoord()->setMaintenanceMode(true);
+    status = getReplCoord()->setMaintenanceMode(opCtx.get(), true);
     ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
 
     simulateSuccessfulDryRun();
     ASSERT_EQUALS(TopologyCoordinator::Role::kCandidate, getTopoCoord().getRole());
-    status = getReplCoord()->setMaintenanceMode(false);
+    status = getReplCoord()->setMaintenanceMode(opCtx.get(), false);
     ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
-    status = getReplCoord()->setMaintenanceMode(true);
+    status = getReplCoord()->setMaintenanceMode(opCtx.get(), true);
     ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
 
     // We must take the RSTL in mode X before transitioning to RS_ROLLBACK.

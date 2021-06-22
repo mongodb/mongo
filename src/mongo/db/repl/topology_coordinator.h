@@ -288,6 +288,11 @@ public:
      */
     void adjustMaintenanceCountBy(int inc);
 
+    /**
+     * Sets the value of the maintenance mode counter to 0.
+     */
+    void resetMaintenanceCount();
+
     ////////////////////////////////////////////////////////////
     //
     // Methods that prepare responses to command requests.

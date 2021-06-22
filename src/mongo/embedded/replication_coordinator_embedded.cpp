@@ -329,7 +329,7 @@ void ReplicationCoordinatorEmbedded::cancelAndRescheduleElectionTimeout() {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-Status ReplicationCoordinatorEmbedded::setMaintenanceMode(bool) {
+Status ReplicationCoordinatorEmbedded::setMaintenanceMode(OperationContext*, bool) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

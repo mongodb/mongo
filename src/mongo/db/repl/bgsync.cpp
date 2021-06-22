@@ -359,7 +359,7 @@ void BackgroundSync::_produce() {
         log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
 
         // Activate maintenance mode and transition to RECOVERING.
-        auto status = _replCoord->setMaintenanceMode(true);
+        auto status = _replCoord->setMaintenanceMode(opCtx.get(), true);
         if (!status.isOK()) {
             warning() << "Failed to transition into maintenance mode: " << status;
             // Do not mark ourselves too stale on errors so we can try again next time.
@@ -413,11 +413,13 @@ void BackgroundSync::_produce() {
     // transition to SECONDARY.
     if (_tooStale) {
 
+
         _tooStale = false;
 
         log() << "No longer too stale. Able to sync from " << source;
 
-        auto status = _replCoord->setMaintenanceMode(false);
+        auto opCtx = cc().makeOperationContext();
+        auto status = _replCoord->setMaintenanceMode(opCtx.get(), false);
         if (!status.isOK()) {
             warning() << "Failed to leave maintenance mode: " << status;
         }
