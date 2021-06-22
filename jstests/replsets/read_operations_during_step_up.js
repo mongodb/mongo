@@ -94,13 +94,14 @@ checkLog.contains(secondary, "Starting to kill user operations");
 
 // Enable "waitAfterCommandFinishesExecution" fail point to make sure the find and get more
 // commands on database 'test' does not complete before step up.
-setFailPoint(secondaryAdmin,
-             "waitAfterCommandFinishesExecution",
-             {ns: secondaryCollNss, commands: ["find", "getMore"]});
+configureFailPoint(secondaryAdmin,
+                   "waitAfterCommandFinishesExecution",
+                   {ns: secondaryCollNss, commands: ["find", "getMore"]});
 
 jsTestLog("4. Disable fail points");
-clearFailPoint(secondaryAdmin, "waitInFindBeforeMakingBatch");
-clearFailPoint(secondaryAdmin, "waitAfterPinningCursorBeforeGetMoreBatch");
+configureFailPoint(secondaryAdmin, "waitInFindBeforeMakingBatch", {} /* data */, "off");
+configureFailPoint(
+    secondaryAdmin, "waitAfterPinningCursorBeforeGetMoreBatch", {} /* data */, "off");
 
 // Wait until the secondary transitioned to PRIMARY state.
 joinStepUpThread();
@@ -109,7 +110,7 @@ rst.waitForState(secondary, ReplSetTest.State.PRIMARY);
 // We don't want to check if we have reached "waitAfterCommandFinishesExecution" fail point
 // because we already know that the secondary has stepped up successfully. This implies that
 // the find and get more commands are still running even after the node stepped up.
-clearFailPoint(secondaryAdmin, "waitAfterCommandFinishesExecution");
+configureFailPoint(secondaryAdmin, "waitAfterCommandFinishesExecution", {} /* data */, "off");
 
 // Wait for find & getmore thread to join.
 joinGetMoreThread();

@@ -80,13 +80,13 @@ checkLog.contains(primary, "Starting to kill user operations");
 
 // Enable "waitAfterCommandFinishesExecution" fail point to make sure the find and get more
 // commands on database 'test' does not complete before step down.
-setFailPoint(primaryAdmin,
-             "waitAfterCommandFinishesExecution",
-             {ns: collNss, commands: ["find", "getMore"]});
+const failPointAfterCommand = configureFailPoint(primaryAdmin,
+                                                 "waitAfterCommandFinishesExecution",
+                                                 {ns: collNss, commands: ["find", "getMore"]});
 
 jsTestLog("4. Disable fail points");
-clearFailPoint(primaryAdmin, "waitInFindBeforeMakingBatch");
-clearFailPoint(primaryAdmin, "waitAfterPinningCursorBeforeGetMoreBatch");
+configureFailPoint(primaryAdmin, "waitInFindBeforeMakingBatch", {} /* data */, "off");
+configureFailPoint(primaryAdmin, "waitAfterPinningCursorBeforeGetMoreBatch", {} /* data */, "off");
 
 // Wait until the primary transitioned to SECONDARY state.
 joinStepDownThread();
@@ -95,8 +95,7 @@ rst.waitForState(primary, ReplSetTest.State.SECONDARY);
 // We don't want to check if we have reached "waitAfterCommandFinishesExecution" fail point
 // because we already know that the primary has stepped down successfully. This implies that
 // the find and get more commands are still running even after the node stepped down.
-clearFailPoint(primaryAdmin, "waitAfterCommandFinishesExecution");
-
+failPointAfterCommand.off();
 // Wait for find & getmore thread to join.
 joinGetMoreThread();
 joinFindThread();

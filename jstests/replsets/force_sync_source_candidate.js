@@ -24,9 +24,9 @@ function getDataObj(syncSource) {
     return {hostAndPort: syncSource.host};
 }
 
-setFailPoint(nodes[1], failpointName, getDataObj(nodes[0]));
-setFailPoint(nodes[2], failpointName, getDataObj(nodes[1]));
-setFailPoint(nodes[3], failpointName, getDataObj(nodes[2]));
+configureFailPoint(nodes[1], failpointName, getDataObj(nodes[0]));
+configureFailPoint(nodes[2], failpointName, getDataObj(nodes[1]));
+configureFailPoint(nodes[3], failpointName, getDataObj(nodes[2]));
 
 rst.initiate();
 const primary = rst.getPrimary();
