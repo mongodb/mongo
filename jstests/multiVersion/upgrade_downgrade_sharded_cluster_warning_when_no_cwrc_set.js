@@ -33,13 +33,13 @@ function testShardingUpgrade(setCWWC) {
     st.upgradeCluster('latest');
     if (setCWWC) {
         assert(
-            rawMongoProgramOutput().search('5686202') == -1,
+            rawMongoProgramOutput().search(/5686202.*The default read concern/) == -1,
             'Sharded cluster should not have warning when upgrading to 5.0 if cluster-wide read' +
                 ' concern is set');
 
     } else {
         assert.soon(
-            () => rawMongoProgramOutput().match('5686202'),
+            () => rawMongoProgramOutput().match('5686202.*The default read concern'),
             'Sharded cluster should have warning when upgrading to 5.0 if no cluster-wide read' +
                 ' concern is set',
             ReplSetTest.kDefaultTimeoutMS);
@@ -49,12 +49,12 @@ function testShardingUpgrade(setCWWC) {
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
     if (setCWWC) {
         assert(
-            rawMongoProgramOutput().search('5686200') == -1,
+            rawMongoProgramOutput().search(/5686200.*The default read concern/) == -1,
             'Sharded cluster should not have warning when upgrading FCV to 5.0 if cluster-wide ' +
                 'read concern is set');
     } else {
         assert.soon(
-            () => rawMongoProgramOutput().match('5686200'),
+            () => rawMongoProgramOutput().match('5686200.*The default read concern'),
             'Sharded cluster should have warning when upgrading FCV to 5.0 if no cluster-wide ' +
                 'read concern is set',
             ReplSetTest.kDefaultTimeoutMS);
@@ -79,11 +79,11 @@ function testShardingDowngrade(setCWWC) {
 
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
     if (setCWWC) {
-        assert(rawMongoProgramOutput().search('5686201') == -1,
+        assert(rawMongoProgramOutput().search(/5686201.*The default read concern/) == -1,
                'Sharded cluster should not have warning when downgrading FCV from 5.0 if ' +
                    'cluster-wide read concern is set');
     } else {
-        assert.soon(() => rawMongoProgramOutput().match('5686201'),
+        assert.soon(() => rawMongoProgramOutput().match('5686201.*The default read concern'),
                     'Sharded cluster should have warning when downgrading FCV from 5.0 if no ' +
                         'cluster-wide read concern is set',
                     ReplSetTest.kDefaultTimeoutMS);

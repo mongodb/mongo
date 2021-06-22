@@ -22,13 +22,13 @@ function testReplSetUpgrade(setCWWC) {
     jsTestLog("Upgrading replica set to 5.0");
     replTest.upgradeSet({binVersion: "latest"});
     if (setCWWC) {
-        assert(rawMongoProgramOutput().search('5569202') == -1,
+        assert(rawMongoProgramOutput().search(/5569202.*The default write concern/) == -1,
                'Replica set should not have warning when upgrading to 5.0 if cluster-wide write ' +
                    'concern is set');
 
     } else {
         assert.soon(
-            () => rawMongoProgramOutput().match('5569202'),
+            () => rawMongoProgramOutput().match('5569202.*The default write concern'),
             'Replica set should have warning when upgrading to 5.0 if no cluster-wide write ' +
                 'concern is set',
             ReplSetTest.kDefaultTimeoutMS);
@@ -39,12 +39,12 @@ function testReplSetUpgrade(setCWWC) {
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
     if (setCWWC) {
         assert(
-            rawMongoProgramOutput().search('5569200') == -1,
+            rawMongoProgramOutput().search(/5569200.*The default write concern/) == -1,
             'Replica set should not have warning when upgrading FCV to 5.0 if cluster-wide write' +
                 ' concern is set');
     } else {
         assert.soon(
-            () => rawMongoProgramOutput().match('5569200'),
+            () => rawMongoProgramOutput().match('5569200.*The default write concern'),
             'Replica set should have warning when upgrading FCV to 5.0 if no cluster-wide write' +
                 ' concern is set',
             ReplSetTest.kDefaultTimeoutMS);
@@ -67,12 +67,12 @@ function testReplSetDowngrade(setCWWC) {
     jsTestLog("Downgrading FCV from 5.0");
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
     if (setCWWC) {
-        assert(rawMongoProgramOutput().search('5569201') == -1,
+        assert(rawMongoProgramOutput().search(/5569201.*The default write concern/) == -1,
                'Replica set should not have warning when downgrading FCV from 5.0 if cluster-wide' +
                    ' write concern is set');
     } else {
         assert.soon(
-            () => rawMongoProgramOutput().match('5569201'),
+            () => rawMongoProgramOutput().match('5569201.*The default write concern'),
             'Replica set should have warning when downgrading FCV from 5.0 if no cluster-wide' +
                 ' write concern is set',
             ReplSetTest.kDefaultTimeoutMS);
@@ -108,13 +108,13 @@ function testShardingUpgrade(setCWWC) {
     st.upgradeCluster('latest');
     if (setCWWC) {
         assert(
-            rawMongoProgramOutput().search('5569202') == -1,
+            rawMongoProgramOutput().search(/5569202.*The default write concern/) == -1,
             'Sharded cluster should not have warning when upgrading to 5.0 if cluster-wide write' +
                 ' concern is set');
 
     } else {
         assert.soon(
-            () => rawMongoProgramOutput().match('5569202'),
+            () => rawMongoProgramOutput().match('5569202.*The default write concern'),
             'Sharded cluster should have warning when upgrading to 5.0 if no cluster-wide write' +
                 ' concern is set',
             ReplSetTest.kDefaultTimeoutMS);
@@ -124,12 +124,12 @@ function testShardingUpgrade(setCWWC) {
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
     if (setCWWC) {
         assert(
-            rawMongoProgramOutput().search('5569200') == -1,
+            rawMongoProgramOutput().search(/5569200.*The default write concern/) == -1,
             'Sharded cluster should not have warning when upgrading FCV to 5.0 if cluster-wide ' +
                 'write concern is set');
     } else {
         assert.soon(
-            () => rawMongoProgramOutput().match('5569200'),
+            () => rawMongoProgramOutput().match('5569200.*The default write concern'),
             'Sharded cluster should have warning when upgrading FCV to 5.0 if no cluster-wide ' +
                 'write concern is set',
             ReplSetTest.kDefaultTimeoutMS);
@@ -154,11 +154,11 @@ function testShardingDowngrade(setCWWC) {
 
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
     if (setCWWC) {
-        assert(rawMongoProgramOutput().search('5569201') == -1,
+        assert(rawMongoProgramOutput().search(/5569201.*The default write concern/) == -1,
                'Sharded cluster should not have warning when downgrading FCV from 5.0 if ' +
                    'cluster-wide write concern is set');
     } else {
-        assert.soon(() => rawMongoProgramOutput().match('5569201'),
+        assert.soon(() => rawMongoProgramOutput().match('5569201.*The default write concern'),
                     'Sharded cluster should have warning when downgrading FCV from 5.0 if no ' +
                         'cluster-wide write concern is set',
                     ReplSetTest.kDefaultTimeoutMS);
