@@ -1337,6 +1337,8 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
             uassertStatusOK(
                 _sslConfiguration.setServerSubjectName(uassertStatusOK(certificateGetSubject(
                     _serverCtx.certs.get(), &_sslConfiguration.serverCertificateExpirationDate))));
+            static auto task =
+                CertificateExpirationMonitor(_sslConfiguration.serverCertificateExpirationDate);
 
             auto swSans = extractSubjectAlternateNames(_serverCtx.certs.get());
             const bool hasSan = swSans.isOK() && (0 != swSans.getValue().size());
