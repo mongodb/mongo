@@ -89,15 +89,13 @@ class workload_tracking : public component {
         session = connection_manager::instance().create_session();
         testutil_check(
           session->create(session, _schema_table_name.c_str(), _schema_table_config.c_str()));
-        testutil_check(
-          session->open_cursor(session, _schema_table_name.c_str(), NULL, NULL, &_cursor_schema));
+        testutil_check(session->open_cursor(
+          session, _schema_table_name.c_str(), nullptr, nullptr, &_schema_track_cursor));
         debug_print("Schema tracking initiated", DEBUG_TRACE);
 
         /* Initiate operations tracking. */
         testutil_check(
           session->create(session, _operation_table_name.c_str(), _operation_table_config.c_str()));
-        testutil_check(session->open_cursor(
-          session, _operation_table_name.c_str(), NULL, NULL, &_cursor_operations));
         debug_print("Operations tracking created", DEBUG_TRACE);
     }
 
@@ -118,9 +116,9 @@ class workload_tracking : public component {
 
         if (operation == tracking_operation::CREATE_COLLECTION ||
           operation == tracking_operation::DELETE_COLLECTION) {
-            _cursor_schema->set_key(_cursor_schema, collection_name.c_str(), ts);
-            _cursor_schema->set_value(_cursor_schema, static_cast<int>(operation));
-            testutil_check(_cursor_schema->insert(_cursor_schema));
+            _schema_track_cursor->set_key(_schema_track_cursor, collection_name.c_str(), ts);
+            _schema_track_cursor->set_value(_schema_track_cursor, static_cast<int>(operation));
+            testutil_check(_schema_track_cursor->insert(_schema_track_cursor));
         } else {
             error_message = "save_schema_operation: invalid operation " +
               std::to_string(static_cast<int>(operation));
@@ -132,12 +130,14 @@ class workload_tracking : public component {
     template <typename K, typename V>
     void
     save_operation(const tracking_operation &operation, const std::string &collection_name,
-      const K &key, const V &value, wt_timestamp_t ts)
+      const K &key, const V &value, wt_timestamp_t ts, WT_CURSOR *op_track_cursor)
     {
         std::string error_message;
 
         if (!_enabled)
             return;
+
+        testutil_assert(op_track_cursor != nullptr);
 
         if (operation == tracking_operation::CREATE_COLLECTION ||
           operation == tracking_operation::DELETE_COLLECTION) {
@@ -145,16 +145,15 @@ class workload_tracking : public component {
               "save_operation: invalid operation " + std::to_string(static_cast<int>(operation));
             testutil_die(EINVAL, error_message.c_str());
         } else {
-            _cursor_operations->set_key(_cursor_operations, collection_name.c_str(), key, ts);
-            _cursor_operations->set_value(_cursor_operations, static_cast<int>(operation), value);
-            testutil_check(_cursor_operations->insert(_cursor_operations));
+            op_track_cursor->set_key(op_track_cursor, collection_name.c_str(), key, ts);
+            op_track_cursor->set_value(op_track_cursor, static_cast<int>(operation), value);
+            testutil_check(op_track_cursor->insert(op_track_cursor));
         }
         debug_print("save_operation: workload tracking saved operation.", DEBUG_TRACE);
     }
 
     private:
-    WT_CURSOR *_cursor_operations = nullptr;
-    WT_CURSOR *_cursor_schema = nullptr;
+    WT_CURSOR *_schema_track_cursor = nullptr;
     const std::string _operation_table_config;
     const std::string _operation_table_name;
     const std::string _schema_table_config;

@@ -34,9 +34,9 @@ using namespace test_harness;
 
 /*
  * Here we want to age out entire pages, i.e. the stop time pair on a page should be globally
- * visible. To do so we'll update ranges of keys with increasing timestamps which will age out
- * the pre-existing data. It may not trigger a cleanup on the data file but should result in
- * data getting cleaned up from the history store.
+ * visible. To do so we'll update ranges of keys with increasing timestamps which will age out the
+ * pre-existing data. It may not trigger a cleanup on the data file but should result in data
+ * getting cleaned up from the history store.
  *
  * This is then tracked using the associated statistic which can be found in the runtime_monitor.
  */
@@ -56,7 +56,8 @@ class hs_cleanup : public test {
 
         /* In this test each thread gets a single collection. */
         testutil_assert(tc->database.get_collection_count() == tc->thread_count);
-        testutil_check(session->open_cursor(session,  collection_name.c_str(), nullptr, nullptr, &cursor));
+        testutil_check(
+          session->open_cursor(session, collection_name.c_str(), nullptr, nullptr, &cursor));
 
         /* We don't know the keyrange we're operating over here so we can't be much smarter here. */
         while (tc->running()) {
@@ -81,7 +82,8 @@ class hs_cleanup : public test {
 
             /* Update the record but take care to handle WT_ROLLBACK. */
             ret = update(tc->tracking, cursor, collection_name, key_value_t(key_tmp).c_str(),
-             random_generator::instance().generate_string(tc->value_size).c_str(), ts);
+              random_generator::instance().generate_string(tc->value_size).c_str(), ts,
+              tc->op_track_cursor);
             /* Increment the current op count for the current transaction. */
             tc->transaction.op_count++;
             if (ret == WT_ROLLBACK)
