@@ -247,11 +247,11 @@ private:
     // The size of the batches of documents returned in collection cloning.
     int _collectionClonerBatchSize;  // (R)
 
-    TenantCollectionClonerStage _countStage;                          // (R)
-    TenantCollectionClonerStage _checkIfDonorCollectionIsEmptyStage;  // (R)
-    TenantCollectionClonerStage _listIndexesStage;                    // (R)
-    TenantCollectionClonerStage _createCollectionStage;               // (R)
-    TenantCollectionClonerQueryStage _queryStage;                     // (R)
+    TenantCollectionClonerStage _countStage;                               // (R)
+    TenantCollectionClonerQueryStage _checkIfDonorCollectionIsEmptyStage;  // (R)
+    TenantCollectionClonerStage _listIndexesStage;                         // (R)
+    TenantCollectionClonerStage _createCollectionStage;                    // (R)
+    TenantCollectionClonerQueryStage _queryStage;                          // (R)
 
     ProgressMeter _progressMeter;           // (X) progress meter for this instance.
     std::vector<BSONObj> _readyIndexSpecs;  // (X) Except for _id_

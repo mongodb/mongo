@@ -127,7 +127,25 @@ runDropTest({
     createNew: true
 });
 
-jsTestLog("[3] Testing dropping between count and listIndexes.");
+jsTestLog("[3] Testing dropping before checkIfDonorCollectionIsEmpty stage.");
+runDropTest({
+    failPointName: "hangBeforeClonerStage",
+    failPointData: {cloner: "TenantCollectionCloner", stage: "checkIfDonorCollectionIsEmpty"},
+    expectedLog:
+        '{code: 5289701, attr: { namespace: nss, uuid: (x)=>(x.uuid.$uuid === uuid), tenantId: tenantId}}'
+});
+
+jsTestLog(
+    "[4] Testing dropping before checkIfDonorCollectionIsEmpty stage, with same-name collection created");
+runDropTest({
+    failPointName: "hangBeforeClonerStage",
+    failPointData: {cloner: "TenantCollectionCloner", stage: "checkIfDonorCollectionIsEmpty"},
+    expectedLog:
+        '{code: 5289701, attr: { namespace: nss, uuid: (x)=>(x.uuid.$uuid === uuid), tenantId: tenantId}}',
+    createNew: true
+});
+
+jsTestLog("[5] Testing dropping between checkIfDonorCollectionIsEmpty and listIndexes.");
 runDropTest({
     failPointName: "hangBeforeClonerStage",
     failPointData: {cloner: "TenantCollectionCloner", stage: "listIndexes"},
@@ -135,7 +153,8 @@ runDropTest({
         '{code: 5289701, attr: { namespace: nss, uuid: (x)=>(x.uuid.$uuid === uuid), tenantId: tenantId}}'
 });
 
-jsTestLog("[4] Testing dropping between count and listIndexes, with same-name collection created");
+jsTestLog(
+    "[6] Testing dropping between checkIfDonorCollectionIsEmpty and listIndexes, with same-name collection created");
 runDropTest({
     failPointName: "hangBeforeClonerStage",
     failPointData: {cloner: "TenantCollectionCloner", stage: "listIndexes"},
@@ -144,7 +163,7 @@ runDropTest({
     createNew: true
 });
 
-jsTestLog("[5] Testing dropping between listIndexes and find.");
+jsTestLog("[7] Testing dropping between listIndexes and find.");
 runDropTest({
     failPointName: "hangBeforeClonerStage",
     failPointData: {cloner: "TenantCollectionCloner", stage: "query"},
@@ -152,7 +171,7 @@ runDropTest({
         '{code: 5289701, attr: { namespace: nss, uuid: (x)=>(x.uuid.$uuid === uuid), tenantId: tenantId}}'
 });
 
-jsTestLog("[6] Testing dropping between listIndexes and find, with same-name collection created");
+jsTestLog("[8] Testing dropping between listIndexes and find, with same-name collection created");
 runDropTest({
     failPointName: "hangBeforeClonerStage",
     failPointData: {cloner: "TenantCollectionCloner", stage: "query"},
@@ -161,7 +180,7 @@ runDropTest({
     createNew: true
 });
 
-jsTestLog("[7] Testing dropping between getMore calls.");
+jsTestLog("[9] Testing dropping between getMore calls.");
 runDropTest({
     // Will trigger right after the first batch.
     failPointName: "tenantMigrationHangCollectionClonerAfterHandlingBatchResponse",
@@ -169,7 +188,7 @@ runDropTest({
         '{code: 5289701, attr: { namespace: nss, uuid: (x)=>(x.uuid.$uuid === uuid), tenantId: tenantId}}',
 });
 
-jsTestLog("[8] Testing dropping between getMore calls, with same-name collection created");
+jsTestLog("[10] Testing dropping between getMore calls, with same-name collection created");
 runDropTest({
     // Will trigger right after the first batch.
     failPointName: "tenantMigrationHangCollectionClonerAfterHandlingBatchResponse",
