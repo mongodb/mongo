@@ -159,7 +159,8 @@ for (var testName in testCases) {
 
     // Restart oplog application on the secondary and ensure the committed view is updated.
     restartServerReplication(secondary);
-    coll.getDB().getLastError("majority", 60 * 1000);
+    replTest.awaitLastOpCommitted();
+
     assert.eq(doCommittedRead(coll), test.expectedAfter);
     assert.neq(readLatestOplogEntry('majority').ts, initialOplogTs);
 

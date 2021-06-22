@@ -31,14 +31,14 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 /**
  * Prepares to call testConnReadPreference(), testCursorReadPreference() or testBadMode().
  */
-var setUp = function() {
+var setUp = function(rst) {
     var configDB = st.s.getDB('config');
     assert.commandWorked(configDB.adminCommand({enableSharding: kDbName}));
     assert.commandWorked(configDB.adminCommand({shardCollection: kShardedNs, key: {x: 1}}));
 
     // Each time we drop the database we have to re-enable profiling. Enable profiling on 'admin'
     // to test the $currentOp aggregation stage.
-    st.rs0.nodes.forEach(function(node) {
+    rst.nodes.forEach(function(node) {
         assert(node.getDB(kDbName).setProfilingLevel(2));
         assert(node.getDB('admin').setProfilingLevel(2));
     });
@@ -48,10 +48,9 @@ var setUp = function() {
  * Cleans up after testConnReadPreference(), testCursorReadPreference() or testBadMode(),
  * prepares to call setUp() again.
  */
-var tearDown = function() {
+var tearDown = function(rst) {
     assert.commandWorked(st.s.getDB(kDbName).dropDatabase());
-    // Hack until SERVER-7739 gets fixed
-    st.rs0.awaitReplication();
+    rst.awaitReplication();
 };
 
 /**
@@ -157,7 +156,8 @@ let assertCmdRanOnExpectedNodes = function(conn, isMongos, rsNodes, cmdTestCase)
  *          hedge {Object} hedge options of the form {enabled: <bool>}.
  * @param expectedNode {string} which node should this run on: "primary", "secondary", or "any".
  */
-let testConnReadPreference = function(conn, isMongos, rsNodes, {readPref, expectedNode}) {
+let testConnReadPreference = function(conn, isMongos, rst, {readPref, expectedNode}) {
+    let rsNodes = rst.nodes;
     jsTest.log(`Testing ${isMongos ? "mongos" : "mongod"} connection with readPreference mode: ${
         readPref.mode}, tag sets: ${tojson(readPref.tagSets)}, hedge ${tojson(readPref.hedge)}`);
 
@@ -209,8 +209,9 @@ let testConnReadPreference = function(conn, isMongos, rsNodes, {readPref, expect
             allowedOnSecondary.kNever,
             false,
             formatProfileQuery(kUnshardedNs, {create: kUnshardedCollName}));
+
     // Make sure the unsharded collection is propagated to secondaries before proceeding.
-    testDB.runCommand({getLastError: 1, w: nodeCount});
+    rst.awaitReplication();
 
     var mapFunc = function(doc) {};
     var reduceFunc = function(key, values) {
@@ -444,7 +445,7 @@ let testBadMode = function(conn, isMongos, rsNodes, readPref) {
     }
 };
 
-var testAllModes = function(conn, rsNodes, isMongos) {
+var testAllModes = function(conn, rst, isMongos) {
     // The primary is tagged with { tag: "one" } and one of the secondaries is
     // tagged with { tag: "two" }. We can use this to test the interaction between
     // modes, tags, and hedge options. Test a bunch of combinations.
@@ -485,14 +486,14 @@ var testAllModes = function(conn, rsNodes, isMongos) {
         {readPref: {mode: "nearest", hedge: {enabled: true}}, expectedNode: "any"}
 
     ].forEach(function(testCase) {
-        setUp();
+        setUp(rst);
 
         // Run testCursorReadPreference() first since testConnReadPreference() sets the connection's
         // read preference.
-        testCursorReadPreference(conn, isMongos, rsNodes, testCase);
-        testConnReadPreference(conn, isMongos, rsNodes, testCase);
+        testCursorReadPreference(conn, isMongos, rst.nodes, testCase);
+        testConnReadPreference(conn, isMongos, rst, testCase);
 
-        tearDown();
+        tearDown(rst);
     });
 
     [
@@ -514,9 +515,9 @@ var testAllModes = function(conn, rsNodes, isMongos) {
         {readPref: {mode: "nearest", hedge: {doesnotexist: true}}},
 
     ].forEach(function(testCase) {
-        setUp();
-        testBadMode(conn, isMongos, rsNodes, testCase.readPref);
-        tearDown();
+        setUp(rst);
+        testBadMode(conn, isMongos, rst.nodes, testCase.readPref);
+        tearDown(rst);
     });
 };
 
@@ -612,7 +613,7 @@ st.rs0.nodes.forEach(function(conn) {
 assert.commandWorked(
     st.s.adminCommand({setParameter: 1, logComponentVerbosity: {network: {verbosity: 3}}}));
 
-testAllModes(replConn, st.rs0.nodes, false);
+testAllModes(replConn, st.rs0, false);
 
 jsTest.log('Starting test for mongos connection');
 
@@ -625,7 +626,7 @@ assert(replicaSetMonitorProtocol === "streamable" || replicaSetMonitorProtocol =
 
 let failPoint = configureFailPoint(st.s, "sdamServerSelectorIgnoreLatencyWindow");
 
-testAllModes(st.s, st.rs0.nodes, true);
+testAllModes(st.s, st.rs0, true);
 failPoint.off();
 
 st.stop();

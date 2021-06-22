@@ -163,19 +163,6 @@ assertLastOplog({_id: id, a: 200}, null, msg);           // No new oplog entry
 coll.remove({});
 assert.eq(coll.find().itcount(), 0, "collection not empty-2");
 
-/* inconsistent oplog format with old code -- new is okay but less efficient
- * enable once we switch the default
-var msg = "bad array $push";
-coll.save({_id:1, a:[1,2]})
-coll.update({}, {$push:{a:3}});
-var gle = cdb.getLastErrorObj();
-assert.isnull(gle.err, msg);
-assert.eq(gle.n, 1, "update failed for '" + msg +"': "+ tojson(gle));
-assert.docEq({_id:1, a:[1,2,3]}, coll.findOne({}), msg);
-//assertLastOplog({$set:{"a.2": 3}}, {_id:1}, msg); // old format
-assertLastOplog({$set:{"a": [1,2,3]}}, {_id:1}, msg); // new format
- */
-
 var msg = "bad array $push 2";
 coll.save({_id: 1, a: "foo"});
 res = assert.commandWorked(coll.update({}, {$push: {c: 18}}));

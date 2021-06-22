@@ -10,26 +10,6 @@ const defaultTimeout = 10 * 60 * 1000;
 const mongoRunCommandOriginal = Mongo.prototype.runCommand;
 const mongoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
 
-function awaitLatestOperationMajorityConfirmed(primary) {
-    // Get the latest optime from the primary.
-    const replSetStatus = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}),
-                                               "error getting replication status from primary");
-    const primaryInfo = replSetStatus.members.find(memberInfo => memberInfo.self);
-    assert(primaryInfo !== undefined,
-           "failed to find self in replication status: " + tojson(replSetStatus));
-
-    // Wait for all operations until 'primaryInfo.optime' to be applied by a majority of the
-    // replica set.
-    assert.commandWorked(  //
-        primary.adminCommand({
-            getLastError: 1,
-            w: "majority",
-            wtimeout: defaultTimeout,
-            wOpTime: primaryInfo.optime,
-        }),
-        "error awaiting replication");
-}
-
 function runCommandWithRetries(conn, dbName, commandObj, func, makeFuncArgs) {
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
@@ -130,16 +110,8 @@ function runCommandWithRetries(conn, dbName, commandObj, func, makeFuncArgs) {
                 msg += " " + tojsononeline(commandObj);
             }
 
-            msg += " failed due to the " + dbName + " database being marked as drop-pending." +
-                " Waiting for the latest operation to become majority confirmed before trying" +
-                " again.";
+            msg += " failed due to the " + dbName + " database being marked as drop-pending.";
             print(msg);
-
-            // We wait for the primary's latest operation to become majority confirmed.
-            // However, we may still need to retry more than once because the primary may not
-            // yet have generated the oplog entry for the "dropDatabase" operation while it is
-            // dropping each intermediate collection.
-            awaitLatestOperationMajorityConfirmed(conn);
 
             if (TestData.skipDropDatabaseOnDatabaseDropPending && commandName === "dropDatabase") {
                 // We avoid retrying the "dropDatabase" command when another "dropDatabase"

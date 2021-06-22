@@ -579,14 +579,8 @@ var Cluster = function(options) {
                        phase +
                            ', failed to find self in replication status: ' + tojson(replSetStatus));
 
-                // Wait for all previous workload operations to complete, with "getLastError".
-                res = primary.getDB('test').runCommand({
-                    getLastError: 1,
-                    w: options.replication.numNodes,
-                    wtimeout: 5 * 60 * 1000,
-                    wOpTime: primaryInfo.optime
-                });
-                assert.commandWorked(res, phase + ', error awaiting replication');
+                // Wait for all previous workload operations to complete.
+                rst.awaitReplication();
             }
         });
     };

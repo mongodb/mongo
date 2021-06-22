@@ -21,8 +21,7 @@ t.drop();
 
 db.createCollection(t.getName(), {capped: true, size: 16 * 1024, max: 1});
 
-t.insert([{_id: 1}, {_id: 2}]);
-assert.gleSuccess(db);
+assert.commandWorked(t.insert([{_id: 1}, {_id: 2}]));
 
 // Ensure the collection is valid.
 var res = t.validate({full: true});
