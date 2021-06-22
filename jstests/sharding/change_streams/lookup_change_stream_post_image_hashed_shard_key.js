@@ -1,6 +1,7 @@
 // Tests the behavior of looking up the post image for change streams on collections which are
 // sharded with a hashed shard key.
 // @tags: [
+//   does_not_support_stepdowns,
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
