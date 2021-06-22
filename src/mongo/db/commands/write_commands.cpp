@@ -1304,8 +1304,12 @@ public:
 
         write_ops::DeleteCommandReply typedRun(OperationContext* opCtx) final try {
             transactionChecks(opCtx, ns());
-
             write_ops::DeleteCommandReply deleteReply;
+
+            if (isTimeseries(opCtx, ns())) {
+                _performTimeseriesDeletes(opCtx, &deleteReply);
+                return deleteReply;
+            }
 
             auto reply = write_ops_exec::performDeletes(opCtx, request());
             populateReply(opCtx,
@@ -1368,6 +1372,13 @@ public:
                                    BSONObj(),
                                    _commandObj,
                                    &bodyBuilder);
+        }
+
+        void _performTimeseriesDeletes(OperationContext* opCtx,
+                                       write_ops::DeleteCommandReply* deleteReply) const {
+            uasserted(ErrorCodes::IllegalOperation,
+                      str::stream()
+                          << "Cannot perform a delete on a time-series collection: " << ns());
         }
 
         const BSONObj& _commandObj;
