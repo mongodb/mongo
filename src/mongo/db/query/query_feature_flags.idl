@@ -50,3 +50,8 @@ feature_flags:
       description: "Feature flag for allowing sharding a Time Series collection"
       cpp_varname: gFeatureFlagShardedTimeSeries
       default: false
+
+    featureFlagSBEGroupAndLookup:
+      description: "Feature flag for allowing SBE $group and $lookup"
+      cpp_varname: gFeatureFlagSBEGroupAndLookup
+      default: false

@@ -47,7 +47,7 @@ const expectedParamDefaults = {
     internalQueryPlannerGenerateCoveredWholeIndexScans: false,
     internalQueryIgnoreUnknownJSONSchemaKeywords: false,
     internalQueryProhibitBlockingMergeOnMongoS: false,
-    internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: 1000,
+    internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: 1000
 };
 
 function assertDefaultParameterValues() {
