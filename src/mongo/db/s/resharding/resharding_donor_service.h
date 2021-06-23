@@ -114,7 +114,15 @@ public:
     static void insertStateDocument(OperationContext* opCtx,
                                     const ReshardingDonorDocument& donorDoc);
 
-    // Initiates the cancellation of the resharding operation.
+    /**
+     * Indicates that the coordinator has persisted a decision. Unblocks the
+     * _coordinatorHasDecisionPersisted promise.
+     */
+    void commit();
+
+    /**
+     * Initiates the cancellation of the resharding operation.
+     */
     void abort(bool isUserCancelled);
 
 private:

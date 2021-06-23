@@ -904,6 +904,17 @@ void ReshardingDonorService::DonorStateMachine::insertStateDocument(
     store.add(opCtx, donorDoc, kNoWaitWriteConcern);
 }
 
+void ReshardingDonorService::DonorStateMachine::commit() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    tassert(ErrorCodes::ReshardCollectionInProgress,
+            "Attempted to commit the resharding operation in an incorrect state",
+            _donorCtx.getState() >= DonorStateEnum::kBlockingWrites);
+
+    if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
+        _coordinatorHasDecisionPersisted.emplaceValue();
+    }
+}
+
 void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
     DonorShardContext&& newDonorCtx) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
@@ -926,6 +937,7 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
         wuow.commit();
     });
 
+    stdx::lock_guard<Latch> lk(_mutex);
     _donorCtx = newDonorCtx;
 }
 
