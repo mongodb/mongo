@@ -495,6 +495,29 @@ StatusWith<std::vector<std::string>> extractSubjectAlternateNames(::CFDictionary
     return ret;
 }
 
+StatusWith<::SecCertificateRef> getCertificate(::CFArrayRef certs);
+
+StatusWith<std::vector<std::string>> extractSubjectAlternateNames(::CFArrayRef certs) {
+    auto swCert = getCertificate(certs);
+    if (!swCert.isOK()) {
+        return swCert.getStatus();
+    }
+    CFUniquePtr<::SecCertificateRef> cert(swCert.getValue());
+
+    CFUniquePtr<::CFMutableArrayRef> oids(
+        ::CFArrayCreateMutable(nullptr, 1, &::kCFTypeArrayCallBacks));
+    ::CFArrayAppendValue(oids.get(), ::kSecOIDSubjectAltName);
+
+    ::CFErrorRef err = nullptr;
+    CFUniquePtr<::CFDictionaryRef> cfdict(::SecCertificateCopyValues(cert.get(), oids.get(), &err));
+    CFUniquePtr<::CFErrorRef> cferror(err);
+    if (cferror) {
+        return Status(ErrorCodes::NoSuchKey, "Could not find Subject Alternative Name");
+    }
+
+    return extractSubjectAlternateNames(cfdict.get());
+}
+
 bool isCFDataEqual(::CFDataRef a, ::CFDataRef b) {
     const auto len = ::CFDataGetLength(a);
     if (::CFDataGetLength(b) != len) {
@@ -757,6 +780,27 @@ StatusWith<CFUniquePtr<::CFArrayRef>> loadPEM(const std::string& keyfilepath,
 
     // Rewrap the return to be the non-mutable type.
     return std::move(cfcerts);
+}
+
+// Get the root certificate from an array of certs.
+StatusWith<::SecCertificateRef> getCertificate(::CFArrayRef certs) {
+    if (::CFArrayGetCount(certs) <= 0) {
+        return {ErrorCodes::InvalidSSLConfiguration, "No certificates in certificate list"};
+    }
+
+    auto root = ::CFArrayGetValueAtIndex(certs, 0);
+    if (!root || (::CFGetTypeID(root) != ::SecIdentityGetTypeID())) {
+        return {ErrorCodes::InvalidSSLConfiguration, "Root certificate not an identity pair"};
+    }
+
+    ::SecCertificateRef idcert = nullptr;
+    auto status = ::SecIdentityCopyCertificate(cf_cast<::SecIdentityRef>(root), &idcert);
+    if (status != ::errSecSuccess) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                str::stream() << "Unable to get certificate from identity: "
+                              << stringFromOSStatus(status)};
+    }
+    return idcert;
 }
 
 StatusWith<SSLX509Name> certificateGetSubject(::SecCertificateRef cert, Date_t* expire = nullptr) {
@@ -1230,6 +1274,13 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
                 _serverCtx.certs.get(), &_sslConfiguration.serverCertificateExpirationDate));
             static auto task =
                 CertificateExpirationMonitor(_sslConfiguration.serverCertificateExpirationDate);
+
+            auto swSans = extractSubjectAlternateNames(_serverCtx.certs.get());
+            const bool hasSan = swSans.isOK() && (0 != swSans.getValue().size());
+            if (!hasSan) {
+                warning() << "Server certificate has no compatible Subject Alternative Name. "
+                             "This may prevent TLS clients from connecting";
+            }
         }
     }
 

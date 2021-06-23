@@ -37,6 +37,8 @@
 #include "mongo/config.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/ssl/context.hpp"
+#include "mongo/util/net/ssl_options.h"
 
 
 namespace mongo {
@@ -264,5 +266,50 @@ TEST(SSLManager, EscapeRFC2253) {
 
 #endif
 
-//  // namespace
+static bool isSanWarningWritten(const std::vector<std::string>& logLines) {
+    for (const auto& line : logLines) {
+        if (std::string::npos !=
+            line.find("Server certificate has no compatible Subject Alternative Name")) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// This test verifies there is a startup warning if Subject Alternative Name is missing
+TEST(SSLManager, InitContextSanWarning) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslCAFile = "jstests/libs/ca.pem";
+    params.sslPEMKeyFile = "jstests/libs/server_no_SAN.pem";
+
+    startCapturingLogMessages();
+    auto manager = SSLManagerInterface::create(params, true);
+    auto egress = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
+
+    uassertStatusOK(manager->initSSLContext(
+        egress->native_handle(), params, SSLManagerInterface::ConnectionDirection::kIncoming));
+    stopCapturingLogMessages();
+
+    ASSERT_TRUE(isSanWarningWritten(getCapturedLogMessages()));
+}
+
+// This test verifies there is no startup warning if Subject Alternative Name is present
+TEST(SSLManager, InitContextNoSanWarning) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslCAFile = "jstests/libs/ca.pem";
+    params.sslPEMKeyFile = "jstests/libs/server.pem";
+
+    startCapturingLogMessages();
+    auto manager = SSLManagerInterface::create(params, true);
+    auto egress = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
+
+    uassertStatusOK(manager->initSSLContext(
+        egress->native_handle(), params, SSLManagerInterface::ConnectionDirection::kIncoming));
+    stopCapturingLogMessages();
+
+    ASSERT_FALSE(isSanWarningWritten(getCapturedLogMessages()));
+}
+
 }  // namespace mongo
