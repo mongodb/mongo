@@ -174,8 +174,12 @@ private:
                             executor->sleepFor(delay.getNext(), cancelToken)
                                 .getAsync([this, self, resultPromise = std::move(resultPromise)](
                                               Status s) mutable {
+                                    // Prevent another loop iteration when cancellation happens
+                                    // after loop body
                                     if (s.isOK()) {
                                         runImpl(std::move(resultPromise));
+                                    } else {
+                                        resultPromise.setError(std::move(s));
                                     }
                                 });
                         }
