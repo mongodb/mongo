@@ -61,14 +61,10 @@ using std::unique_ptr;
 // Failpoint which causes to hang "count" cmd after acquiring the DB lock.
 MONGO_FAIL_POINT_DEFINE(hangBeforeCollectionCount);
 
-// The count command is deprecated in 5.0
-
 /**
  * Implements the MongoD side of the count command.
  */
 class CmdCount : public BasicCommand {
-    inline static Rarely _sampler;
-
 public:
     CmdCount() : BasicCommand("count") {}
 
@@ -218,13 +214,6 @@ public:
              const string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-
-        if (_sampler.tick()) {
-            LOGV2_WARNING(5725601,
-                          "The count command is deprecated. For more information, see "
-                          "https://docs.mongodb.com/manual/reference/method/db.collection.count/");
-        }
-
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
         // of a view, the locks need to be released.
