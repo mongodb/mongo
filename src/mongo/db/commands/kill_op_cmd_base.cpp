@@ -26,16 +26,50 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/db/auth/authorization_session.h"
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/kill_op_cmd_base.h"
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/operation_killer.h"
+#include "mongo/logv2/log.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
+
+void KillOpCmdBase::reportSuccessfulCompletion(OperationContext* opCtx,
+                                               const std::string& db,
+                                               const BSONObj& cmdObj) {
+
+    logv2::DynamicAttributes attr;
+
+    auto client = opCtx->getClient();
+    if (client) {
+        if (AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {
+            auto user = AuthorizationSession::get(client)->getAuthenticatedUserNames();
+            attr.add("user", user->toBSON());
+        }
+
+        if (client->session()) {
+            attr.add("remote", client->session()->remote());
+        }
+
+        if (auto metadata = ClientMetadata::get(client)) {
+            attr.add("metadata", metadata->getDocument());
+        }
+    }
+
+    attr.add("db", db);
+    attr.add("command", cmdObj);
+
+    LOGV2(558700, "Successful killOp", attr);
+}
+
 
 Status KillOpCmdBase::checkAuthForCommand(Client* worker,
                                           const std::string& dbname,

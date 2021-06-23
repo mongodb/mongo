@@ -18,7 +18,8 @@ function runTest(m, failPointName) {
 
     admin.createUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles});
     admin.auth('admin', 'password');
-    db.createUser({user: 'reader', pwd: 'reader', roles: [{db: 'foo', role: 'read'}]});
+    const logReader = {db: 'admin', role: 'clusterMonitor'};
+    db.createUser({user: 'reader', pwd: 'reader', roles: [{db: 'foo', role: 'read'}, logReader]});
     db.createUser({user: 'otherReader', pwd: 'otherReader', roles: [{db: 'foo', role: 'read'}]});
     admin.createRole({
         role: 'opAdmin',
@@ -90,6 +91,7 @@ function runTest(m, failPointName) {
     var start = new Date();
     db.auth('reader', 'reader');
     assert.commandWorked(db.killOp(o[0]));
+    checkLog.contains(db, '"msg":"Successful killOp"');
     assert.commandWorked(db.adminCommand({configureFailPoint: failPointName, mode: "off"}));
 
     jsTestLog("Waiting for ops to terminate");

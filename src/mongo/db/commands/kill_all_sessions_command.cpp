@@ -108,6 +108,7 @@ public:
         }
 
         uassertStatusOK(killSessionsCmdHelper(opCtx, result, patterns));
+        killSessionsReport(opCtx, cmdObj);
         return true;
     }
 } killAllSessionsCommand;

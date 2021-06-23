@@ -56,6 +56,11 @@ Status killSessionsCmdHelper(OperationContext* opCtx,
                              BSONObjBuilder& result,
                              const KillAllSessionsByPatternSet& patterns);
 
+/**
+ * Helper for logging kill sessions command.
+ */
+void killSessionsReport(OperationContext* opCtx, const BSONObj& cmdObj);
+
 class ScopedKillAllSessionsByPatternImpersonator {
 public:
     ScopedKillAllSessionsByPatternImpersonator(OperationContext* opCtx,

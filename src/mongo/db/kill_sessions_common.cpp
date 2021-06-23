@@ -38,6 +38,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 
 namespace mongo {
 
@@ -90,6 +91,31 @@ Status killSessionsCmdHelper(OperationContext* opCtx,
     }
 
     return Status::OK();
+}
+
+void killSessionsReport(OperationContext* opCtx, const BSONObj& cmdObj) {
+
+    logv2::DynamicAttributes attr;
+
+    auto client = opCtx->getClient();
+    if (client) {
+        if (AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {
+            auto user = AuthorizationSession::get(client)->getAuthenticatedUserNames();
+            attr.add("user", user->toBSON());
+        }
+
+        if (client->session()) {
+            attr.add("remote", client->session()->remote());
+        }
+
+        if (auto metadata = ClientMetadata::get(client)) {
+            attr.add("metadata", metadata->getDocument());
+        }
+    }
+
+    attr.add("command", cmdObj);
+
+    LOGV2(558701, "Success: kill session", attr);
 }
 
 }  // namespace mongo

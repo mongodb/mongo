@@ -65,12 +65,18 @@ public:
         if (isKillingLocalOp(element)) {
             const unsigned int opId = KillOpCmdBase::parseOpId(cmdObj);
             killLocalOperation(opCtx, opId);
+            reportSuccessfulCompletion(opCtx, db, cmdObj);
 
             // killOp always reports success once past the auth check.
             return true;
         } else if (element.type() == BSONType::String) {
             // It's a string. Should be of the form shardid:opid.
-            return _killShardOperation(opCtx, element.str(), result);
+            if (_killShardOperation(opCtx, element.str(), result)) {
+                reportSuccessfulCompletion(opCtx, db, cmdObj);
+                return true;
+            } else {
+                return false;
+            }
         }
 
         uasserted(50760,

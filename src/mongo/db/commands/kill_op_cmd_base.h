@@ -72,6 +72,10 @@ protected:
      */
     static unsigned int parseOpId(const BSONObj& cmdObj);
 
+    static void reportSuccessfulCompletion(OperationContext* opCtx,
+                                           const std::string& db,
+                                           const BSONObj& cmdObj);
+
     /**
      * Return whether the operation being killed is "local" or not. All operations on a mongod are
      * local. On a mongos, killOp may may kill an operation on a shard, or an operation "local" to
