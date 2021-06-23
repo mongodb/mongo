@@ -146,7 +146,13 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
 
     if (params.count("replication.enableMajorityReadConcern") &&
         params["replication.enableMajorityReadConcern"].as<bool>() == false) {
-        LOGV2_FATAL_CONTINUE(5324700, "enableMajorityReadConcern:false is no longer supported");
+        LOGV2_FATAL_CONTINUE(
+            5324700,
+            "** ERROR: Starting in 5.0, disabling enableMajorityReadConcern setting "
+            "is no longer available because of MongoDB's resiliency enhancements. If "
+            "your environment was previously running with eMRC=f, please see "
+            "https://docs.mongodb.com/v5.0/reference/read-concern-majority/"
+            "#disable-read-concern-majority");
         return false;
     }
 

@@ -13,7 +13,7 @@ if (storageEngine === "wiredTiger" || storageEngine === "inMemory") {
     const conn = MongoRunner.runMongod({enableMajorityReadConcern: false});
     assert(!conn);
     var logContents = rawMongoProgramOutput();
-    assert(logContents.indexOf("enableMajorityReadConcern:false is no longer supported") > 0);
+    assert(logContents.search(/5324700.*Starting in 5.0, disabling enableMajorityReadConcern/) > 0);
     return;
 }
 
