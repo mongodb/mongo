@@ -221,8 +221,8 @@ void removeChunks(OperationContext* opCtx, const UUID& uuid) {
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
-        deleteOp.setDeletes(
-            std::vector{write_ops::DeleteOpEntry(BSON(ChunkType::collectionUUID << uuid), false)});
+        deleteOp.setDeletes(std::vector{write_ops::DeleteOpEntry(
+            BSON(ChunkType::collectionUUID << uuid), true /* multi: true */)});
         return deleteOp;
     }());
 
