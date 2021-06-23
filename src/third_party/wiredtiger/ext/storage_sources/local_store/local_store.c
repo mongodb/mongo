@@ -177,14 +177,14 @@ static int local_file_write(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t, size_t, co
  * Report an error for a file operation. Note that local_err returns its third argument, and this
  * macro will too.
  */
-#define FS2LOCAL(fs) (((LOCAL_FILE_SYSTEM *)(fs))->local_storage)
+#define WT_FS2LOCAL(fs) (((LOCAL_FILE_SYSTEM *)(fs))->local_storage)
 
-#define VERBOSE(local, ...)               \
+#define WT_VERBOSE_LS(local, ...)         \
     do {                                  \
         if ((local)->verbose > 0)         \
             fprintf(stderr, __VA_ARGS__); \
     } while (0);
-#define SHOW_STRING(s) (((s) == NULL) ? "<null>" : (s))
+#define WT_SHOW_STRING(s) (((s) == NULL) ? "<null>" : (s))
 
 /*
  * local_configure
@@ -244,7 +244,7 @@ local_delay(LOCAL_STORAGE *local)
 
     ret = 0;
     if (local->force_delay != 0 && local->object_flushes % local->force_delay == 0) {
-        VERBOSE(local,
+        WT_VERBOSE_LS(local,
           "Artificial delay %" PRIu32 " milliseconds after %" PRIu64 " object flushes\n",
           local->delay_ms, local->object_flushes);
         tv.tv_sec = local->delay_ms / 1000;
@@ -252,7 +252,7 @@ local_delay(LOCAL_STORAGE *local)
         (void)select(0, NULL, NULL, NULL, &tv);
     }
     if (local->force_error != 0 && local->object_flushes % local->force_error == 0) {
-        VERBOSE(local, "Artificial error returned after %" PRIu64 " object flushes\n",
+        WT_VERBOSE_LS(local, "Artificial error returned after %" PRIu64 " object flushes\n",
           local->object_flushes);
         ret = ENETUNREACH;
     }
@@ -375,7 +375,7 @@ local_path(WT_FILE_SYSTEM *file_system, const char *dir, const char *name, char 
     }
     len = strlen(dir) + strlen(name) + 2;
     if ((p = malloc(len)) == NULL)
-        return (local_err(FS2LOCAL(file_system), NULL, ENOMEM, "local_path"));
+        return (local_err(WT_FS2LOCAL(file_system), NULL, ENOMEM, "local_path"));
     snprintf(p, len, "%s/%s", dir, name);
     *pathp = p;
     return (ret);
@@ -513,7 +513,7 @@ local_exist(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, 
     int ret;
     char *path;
 
-    local = FS2LOCAL(file_system);
+    local = WT_FS2LOCAL(file_system);
     path = NULL;
 
     /* If the file exists directly in the file system, it's not yet flushed, and we're done. */
@@ -682,7 +682,7 @@ static int
 local_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *directory,
   const char *prefix, char ***dirlistp, uint32_t *countp)
 {
-    FS2LOCAL(file_system)->op_count++;
+    WT_FS2LOCAL(file_system)->op_count++;
     return (
       local_directory_list_internal(file_system, session, directory, prefix, 0, dirlistp, countp));
 }
@@ -695,7 +695,7 @@ static int
 local_directory_list_single(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *directory,
   const char *prefix, char ***dirlistp, uint32_t *countp)
 {
-    FS2LOCAL(file_system)->op_count++;
+    WT_FS2LOCAL(file_system)->op_count++;
     return (
       local_directory_list_internal(file_system, session, directory, prefix, 1, dirlistp, countp));
 }
@@ -710,7 +710,7 @@ local_directory_list_free(
 {
     (void)session;
 
-    FS2LOCAL(file_system)->op_count++;
+    WT_FS2LOCAL(file_system)->op_count++;
     if (dirlist != NULL) {
         while (count > 0)
             free(dirlist[--count]);
@@ -838,7 +838,7 @@ local_fs_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *session)
     (void)session; /* unused */
 
     local_fs = (LOCAL_FILE_SYSTEM *)file_system;
-    FS2LOCAL(file_system)->op_count++;
+    WT_FS2LOCAL(file_system)->op_count++;
     free(local_fs->auth_token);
     free(local_fs->bucket_dir);
     free(local_fs->cache_dir);
@@ -975,8 +975,8 @@ local_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
 
     *file_handlep = file_handle;
 
-    VERBOSE(
-      local, "File opened: %s final path=%s\n", SHOW_STRING(name), SHOW_STRING(local_fh->fh->name));
+    WT_VERBOSE_LS(local, "File opened: %s final path=%s\n", WT_SHOW_STRING(name),
+      WT_SHOW_STRING(local_fh->fh->name));
 
 err:
     free(alloced_path);
@@ -1004,7 +1004,7 @@ local_rename(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *from,
     int ret;
     bool writeable;
 
-    local = FS2LOCAL(file_system);
+    local = WT_FS2LOCAL(file_system);
     local_fs = (LOCAL_FILE_SYSTEM *)file_system;
     wt_fs = local_fs->wt_fs;
 
@@ -1040,7 +1040,7 @@ local_remove(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
 
     (void)flags; /* Unused */
 
-    local = FS2LOCAL(file_system);
+    local = WT_FS2LOCAL(file_system);
 
     local->op_count++;
     if ((ret = local_writeable(local, name, &writeable)) != 0)
@@ -1072,7 +1072,7 @@ local_size(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, w
     int ret;
     char *path;
 
-    local = FS2LOCAL(file_system);
+    local = WT_FS2LOCAL(file_system);
     path = NULL;
 
     local->op_count++;
