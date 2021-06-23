@@ -125,8 +125,6 @@ def CachePushFunc(target, source, env):
         else:
             cd.copy_to_cache(env, t.get_internal_path(), tempfile)
         fs.rename(tempfile, cachefile)
-        st = fs.stat(t.get_internal_path())
-        fs.chmod(cachefile, stat.S_IMODE(st[stat.ST_MODE]) | stat.S_IWRITE)
     except EnvironmentError:
         # It's possible someone else tried writing the file at the
         # same time we did, or else that there was some problem like
@@ -289,7 +287,11 @@ class CacheDir(object):
     @classmethod
     def copy_to_cache(cls, env, src, dst):
         try:
-            return env.fs.copy2(src, dst)
+            result = env.fs.copy2(src, dst)
+            fs = env.File(src).fs
+            st = fs.stat(src)
+            fs.chmod(dst, stat.S_IMODE(st[stat.ST_MODE]) | stat.S_IWRITE)
+            return result
         except AttributeError as ex:
             raise EnvironmentError from ex
 

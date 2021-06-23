@@ -28,6 +28,7 @@ import pathlib
 import shutil
 import traceback
 
+
 import SCons
 
 cache_debug_suffix = " (target: %s, cachefile: %s) "
@@ -68,8 +69,7 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
 
     @staticmethod
     def get_file_contents_path(default_cachefile_path):
-        return pathlib.Path(default_cachefile_path + CacheDirValidate.get_ext()) / pathlib.Path(default_cachefile_path).name
-
+        return pathlib.Path(default_cachefile_path) / pathlib.Path(default_cachefile_path).name.split('.')[0]
 
     @staticmethod
     def get_bad_cachefile_path(cksum_cachefile_dir):
@@ -79,65 +79,72 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
     def get_hash_path(cksum_cachefile_path):
         return pathlib.Path(cksum_cachefile_path).parent / 'content_hash'
 
+    @staticmethod
+    def get_cachedir_path(path):
+        return str(pathlib.Path(path + CacheDirValidate.get_ext()))
+
     @classmethod
     def copy_from_cache(cls, env, src, dst):
 
-        cksum_dir = pathlib.Path(src).parent
-        if not str(cksum_dir).endswith(cls.get_ext()):
+        if not str(pathlib.Path(src)).endswith(cls.get_ext()):
             return super().copy_from_cache(env, src, dst)
 
         if env.cache_timestamp_newer:
             raise UnsupportedError(cls.__name__, "timestamp-newer")
 
-        if cls.get_bad_cachefile_path(cksum_dir).exists():
-            raise InvalidChecksum(cls.get_hash_path(src), dst, f"cachefile marked as bad checksum")
+        src_file = cls.get_file_contents_path(src)
+
+        if cls.get_bad_cachefile_path(src).exists():
+            raise InvalidChecksum(cls.get_hash_path(src_file), dst, f"cachefile marked as bad checksum")
 
         csig = None
         try:
-            with open(cls.get_hash_path(src), 'rb') as f_out:
+            with open(cls.get_hash_path(src_file), 'rb') as f_out:
                 csig = f_out.read().decode().strip()
         except OSError as ex:
-            raise InvalidChecksum(cls.get_hash_path(src), dst, f"failed to read hash file: {ex}") from ex
+            raise InvalidChecksum(cls.get_hash_path(src_file), dst, f"failed to read hash file: {ex}") from ex
         finally:
             if not csig:
-                raise InvalidChecksum(cls.get_hash_path(src), dst, f"no content_hash data found")
+                raise InvalidChecksum(cls.get_hash_path(src_file), dst, f"no content_hash data found")
 
         try:
-            shutil.copy2(src, dst)
+            shutil.copy2(src_file, dst)
         except OSError as ex:
-            raise CacheTransferFailed(src, dst, f"failed to copy from cache: {ex}") from ex
+            raise CacheTransferFailed(src_file, dst, f"failed to copy from cache: {ex}") from ex
 
         new_csig = SCons.Util.MD5filesignature(dst,
             chunksize=SCons.Node.FS.File.md5_chunksize*1024)
 
         if csig != new_csig:
             raise InvalidChecksum(
-                cls.get_hash_path(src), dst, f"checksums don't match {csig} != {new_csig}", cache_csig=csig, computed_csig=new_csig)
+                cls.get_hash_path(src_file), dst, f"checksums don't match {csig} != {new_csig}", cache_csig=csig, computed_csig=new_csig)
 
     @classmethod
     def copy_to_cache(cls, env, src, dst):
 
         # dst is bsig/file from cachepath method, so
         # we make sure to make the bsig dir first
-        os.makedirs(pathlib.Path(dst).parent, exist_ok=True)
+        dst = pathlib.Path(dst)
+        os.makedirs(dst, exist_ok=True)
 
+        dst_file = dst / dst.name.split('.')[0]
         try:
-            shutil.copy2(src, dst)
+            super().copy_to_cache(env, src, dst_file)
         except OSError as ex:
-            raise CacheTransferFailed(src, dst, f"failed to copy to cache: {ex}") from ex
+            raise CacheTransferFailed(src, dst_file, f"failed to copy to cache: {ex}") from ex
 
         try:
-            with open(cls.get_hash_path(dst), 'w') as f_out:
+            with open(cls.get_hash_path(dst_file), 'w') as f_out:
                 f_out.write(env.File(src).get_content_hash())
         except OSError as ex:
-            raise CacheTransferFailed(src, dst, f"failed to create hash file: {ex}") from ex
+            raise CacheTransferFailed(src, dst_file, f"failed to create hash file: {ex}") from ex
 
     def log_json_cachedebug(self, node, pushing=False):
         if (pushing
             and (node.nocache or SCons.CacheDir.cache_readonly or 'conftest' in str(node))):
                 return
 
-        cachefile = self.cachepath(node)[1]
+        cachefile = self.get_file_contents_path(self.cachepath(node)[1])
         if node.fs.exists(cachefile):
             cache_event = 'double_push' if pushing else 'hit'
         else:
@@ -202,7 +209,7 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
 
     def print_cache_issue(self, node, ex):
 
-        cksum_dir = pathlib.Path(self.cachepath(node)[1]).parent
+        cksum_dir = pathlib.Path(self.cachepath(node)[1])
         msg = ('An issue was detected while validating the cache:\n' +
               '    ' + "\n    ".join("".join(traceback.format_exc()).split("\n")))
 
@@ -210,7 +217,7 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
 
     def clean_bad_cachefile(self, node, cache_csig, computed_csig):
 
-        cksum_dir = pathlib.Path(self.cachepath(node)[1]).parent
+        cksum_dir = pathlib.Path(self.cachepath(node)[1])
 
         try:
             pathlib.Path(self.get_bad_cachefile_path(cksum_dir)).touch()
@@ -236,14 +243,14 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
     def get_cachedir_csig(self, node):
         cachedir, cachefile = self.cachepath(node)
         if cachefile and os.path.exists(cachefile):
-            with open(self.get_hash_path(cachefile), 'rb') as f_out:
+            with open(self.get_hash_path(self.get_file_contents_path(cachefile)), 'rb') as f_out:
                 return f_out.read().decode()
 
     def cachepath(self, node):
         dir, path = super().cachepath(node)
         if node.fs.exists(path):
             return dir, path
-        return dir, str(self.get_file_contents_path(path))
+        return dir, str(self.get_cachedir_path(path))
 
 def exists(env):
     return True
