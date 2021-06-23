@@ -208,55 +208,6 @@ class _FieldUsageCheckerBase(object, metaclass=ABCMeta):
         pass
 
 
-class _SlowFieldUsageChecker(_FieldUsageCheckerBase):
-    """
-    Check for duplicate fields, and required fields as needed.
-
-    Detects duplicate extra fields.
-    Generates code with a C++ std::set to maintain a set of fields seen while parsing a BSON
-    document. The std::set has O(N lg N) lookup, and allocates memory in the heap.
-    """
-
-    def __init__(self, indented_writer):
-        # type: (writer.IndentedTextWriter) -> None
-        super(_SlowFieldUsageChecker, self).__init__(indented_writer)
-
-        self._writer.write_line('std::set<StringData> usedFields;')
-
-    def add_store(self, field_name):
-        # type: (str) -> None
-        self._writer.write_line('auto push_result = usedFields.insert(%s);' % (field_name))
-        with writer.IndentedScopedBlock(self._writer,
-                                        'if (MONGO_unlikely(push_result.second == false)) {', '}'):
-            self._writer.write_line('ctxt.throwDuplicateField(%s);' % (field_name))
-
-    def add(self, field, bson_element_variable):
-        # type: (ast.Field, str) -> None
-        if not field in self._fields:
-            self._fields.append(field)
-
-    def add_final_checks(self):
-        # type: () -> None
-        for field in self._fields:
-            if (not field.optional) and (not field.ignore) and (not field.chained):
-                pred = 'if (MONGO_unlikely(usedFields.find(%s) == usedFields.end())) {' % \
-                    (_get_field_constant_name(field))
-                with writer.IndentedScopedBlock(self._writer, pred, '}'):
-                    if field.default:
-                        default_value = (field.type.cpp_type + "::" + field.default) \
-                            if field.type.is_enum else field.default
-                        if field.chained_struct_field:
-                            self._writer.write_line('%s.%s(%s);' % (_get_field_member_name(
-                                field.chained_struct_field), _get_field_member_setter_name(field),
-                                                                    default_value))
-                        else:
-                            self._writer.write_line(
-                                '%s = %s;' % (_get_field_member_name(field), default_value))
-                    else:
-                        self._writer.write_line(
-                            'ctxt.throwMissingField(%s);' % (_get_field_constant_name(field)))
-
-
 def _gen_field_usage_constant(field):
     # type: (ast.Field) -> str
     """Get the name for a bitset constant in field usage checking."""
@@ -329,21 +280,38 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
                             self._writer,
                             'if (!usedFields[%s]) {' % (_gen_field_usage_constant(field)), '}'):
                         if field.default:
+                            default_value = (field.type.cpp_type + "::" + field.default) \
+                                if field.type.is_enum else field.default
                             if field.chained_struct_field:
                                 self._writer.write_line(
                                     '%s.%s(%s);' %
                                     (_get_field_member_name(field.chained_struct_field),
-                                     _get_field_member_setter_name(field), field.default))
-                            elif field.type.is_enum:
-                                self._writer.write_line(
-                                    '%s = %s::%s;' % (_get_field_member_name(field),
-                                                      field.type.cpp_type, field.default))
+                                     _get_field_member_setter_name(field), default_value))
                             else:
                                 self._writer.write_line(
-                                    '%s = %s;' % (_get_field_member_name(field), field.default))
+                                    '%s = %s;' % (_get_field_member_name(field), default_value))
                         else:
                             self._writer.write_line(
                                 'ctxt.throwMissingField(%s);' % (_get_field_constant_name(field)))
+
+
+class _SlowFieldUsageChecker(_FastFieldUsageChecker):
+    """
+    Check for duplicate fields, and required fields as needed.
+
+    Generates code with a C++ std::set to maintain a set of fields seen while parsing a BSON
+    document. The std::set has O(N lg N) lookup, and allocates memory in the heap.
+    The fast and slow duplicate/field usage checkers are merged together through
+    inheritance. The fast checker assumes it only needs to check a finite list of
+    fields for duplicates. The slow checker simply uses the fast check for all known
+    fields and a std::set for other fields to detect duplication.
+    """
+
+    def __init__(self, indented_writer, fields):
+        # type: (writer.IndentedTextWriter, List[ast.Field]) -> None
+        super(_SlowFieldUsageChecker, self).__init__(indented_writer, fields)
+
+        self._writer.write_line('std::set<StringData> usedFieldSet;')
 
 
 def _get_field_usage_checker(indented_writer, struct):
@@ -354,7 +322,7 @@ def _get_field_usage_checker(indented_writer, struct):
     if struct.strict:
         return _FastFieldUsageChecker(indented_writer, struct.fields)
 
-    return _SlowFieldUsageChecker(indented_writer)
+    return _SlowFieldUsageChecker(indented_writer, struct.fields)
 
 
 # Turn a python string into a C++ literal.
@@ -490,6 +458,14 @@ class _CppFileWriterBase(object):
             conditional = conditional + ' constexpr'
 
         return writer.IndentedScopedBlock(self._writer, '%s (%s) {' % (conditional, check_str), '}')
+
+    def _else(self, check_bool):
+        # type: (bool) -> Union[writer.IndentedScopedBlock,writer.EmptyBlock]
+        """Generate an else block if check_bool is true."""
+        if not check_bool:
+            return writer.EmptyBlock()
+
+        return writer.IndentedScopedBlock(self._writer, 'else {', '}')
 
     def _condition(self, condition, preprocessor_only=False):
         # type: (ast.Condition, bool) -> writer.WriterBlock
@@ -1699,7 +1675,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line('firstFieldFound = true;')
                     self._writer.write_line('continue;')
 
-            field_usage_check.add_store("fieldName")
             self._writer.write_empty_line()
 
             first_field = True
@@ -1726,15 +1701,22 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # End of for fields
             # Generate strict check for extranous fields
             if struct.strict:
-                with self._block('else {', '}'):
-                    # For commands, check if this a well known command field that the IDL parser
-                    # should ignore regardless of strict mode.
-                    command_predicate = None
-                    if isinstance(struct, ast.Command):
-                        command_predicate = "!mongo::isGenericArgument(fieldName)"
+                # For commands, check if this is a well known command field that the IDL parser
+                # should ignore regardless of strict mode.
+                command_predicate = None
+                if isinstance(struct, ast.Command):
+                    command_predicate = "!mongo::isGenericArgument(fieldName)"
 
+                with self._block('else {', '}'):
                     with self._predicate(command_predicate):
                         self._writer.write_line('ctxt.throwUnknownField(fieldName);')
+            else:
+                with self._else(not first_field):
+                    self._writer.write_line('auto push_result = usedFieldSet.insert(fieldName);')
+                    with writer.IndentedScopedBlock(
+                            self._writer, 'if (MONGO_unlikely(push_result.second == false)) {',
+                            '}'):
+                        self._writer.write_line('ctxt.throwDuplicateField(fieldName);')
 
         # Parse chained structs if not inlined
         # Parse chained types always here
@@ -1919,9 +1901,17 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                     # End of for fields
                     # Generate strict check for extranous fields
-                    if struct.strict:
-                        with self._block('else {', '}'):
+                    with self._block('else {', '}'):
+                        if struct.strict:
                             self._writer.write_line('ctxt.throwUnknownField(sequence.name);')
+                        else:
+                            self._writer.write_line(
+                                'auto push_result = usedFieldSet.insert(sequence.name);')
+                            with writer.IndentedScopedBlock(
+                                    self._writer,
+                                    'if (MONGO_unlikely(push_result.second == false)) {', '}'):
+                                self._writer.write_line('ctxt.throwDuplicateField(sequence.name);')
+
                 self._writer.write_empty_line()
 
             # Check for required fields

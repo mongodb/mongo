@@ -1023,6 +1023,13 @@ TEST(IDLStructTests, TestNonStrictStruct) {
             BSON("field4" << 1234 << "1" << 12 << "2" << 123 << "3" << 1234 << "field4" << 1234);
         ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), AssertionException);
     }
+
+    // Negative: null required field
+    {
+        auto testDoc = BSON(RequiredNonStrictField3::kCppField1FieldName << 12 << "2" << 123 << "3"
+                                                                         << BSONNULL);
+        ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), AssertionException);
+    }
 }
 
 TEST(IDLStructTests, WriteConcernTest) {
