@@ -42,6 +42,7 @@
 
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -223,6 +224,12 @@ bool RewriteStateChangeErrors::getEnabled(ServiceContext* sc) {
 
 void RewriteStateChangeErrors::setEnabled(ServiceContext* sc, bool e) {
     enabledForService(sc).enabled = e;
+}
+
+void RewriteStateChangeErrors::onActiveFailCommand(OperationContext* opCtx, const BSONObj& data) {
+    bool b;
+    if (!bsonExtractBooleanField(data, "allowRewriteStateChange", &b).isOK() || !b)
+        setEnabled(opCtx, false);
 }
 
 boost::optional<BSONObj> RewriteStateChangeErrors::rewrite(BSONObj doc, OperationContext* opCtx) {

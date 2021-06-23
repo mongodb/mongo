@@ -305,6 +305,7 @@ void ExecCommandClient::_epilogue() {
     if (_invocation->supportsWriteConcern()) {
         failCommand.executeIf(
             [&](const BSONObj& data) {
+                rpc::RewriteStateChangeErrors::onActiveFailCommand(opCtx, data);
                 result->getBodyBuilder().append(data["writeConcernError"]);
                 if (data.hasField(kErrorLabelsFieldName) &&
                     data[kErrorLabelsFieldName].type() == Array) {
