@@ -296,15 +296,20 @@ const char* DocumentSourceLookUp::getSourceName() const {
     return kStageName.rawData();
 }
 
-StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState) const {
+StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeState) const {
     HostTypeRequirement hostRequirement;
     if (_fromNs.isConfigDotCacheDotChunks()) {
         // $lookup from config.cache.chunks* namespaces is permitted to run on each individual
         // shard, rather than just the primary, since each shard should have an identical copy of
         // the namespace.
         hostRequirement = HostTypeRequirement::kAnyShard;
+    } else if (pipeState == Pipeline::SplitState::kSplitForShards) {
+        // This stage will only be on the shards pipeline if $lookup on sharded foreign collections
+        // is allowed.
+        hostRequirement = HostTypeRequirement::kAnyShard;
     } else {
-        // When $lookup on sharded foreign collections is allowed, the foreign collection is
+        // If the pipeline is unsplit or this stage is on the merging part of the pipeline,
+        // when $lookup on sharded foreign collections is allowed, the foreign collection is
         // sharded, and the stage is executing on mongos, the stage can run on mongos or any shard.
         hostRequirement = (feature_flags::gFeatureFlagShardedLookup.isEnabled(
                                serverGlobalParams.featureCompatibility) &&
@@ -1006,6 +1011,14 @@ DepsTracker::State DocumentSourceLookUp::getDependencies(DepsTracker* deps) cons
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceLookUp::distributedPlanLogic() {
+    // If $lookup into a sharded foreign collection is allowed, top-level $lookup stages can run in
+    // parallel on the shards.
+    if (feature_flags::gFeatureFlagShardedLookup.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
+        pExpCtx->subPipelineDepth == 0) {
+        return boost::none;
+    }
+
     if (_fromExpCtx->ns.isConfigDotCacheDotChunks()) {
         // When $lookup reads from config.cache.chunks.* namespaces, it should run on each
         // individual shard in parallel. This is a special case, and atypical for standard $lookup
