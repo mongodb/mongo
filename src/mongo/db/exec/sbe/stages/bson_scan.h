@@ -34,6 +34,16 @@
 
 namespace mongo {
 namespace sbe {
+/**
+ * Scans a buffer of contiguous BSON documents, with the start of the buffer indicated by
+ * 'bsonBegin' and the end indicated by 'bsonEnd'. The resulting BSON documents are placed into the
+ * given 'recordSlot', if provided.
+ *
+ * The caller can also optionally provide a vector of top-level field names, 'fields', to extract
+ * from each BSON object. The resulting values are placed into the slots indicated by the 'vars'
+ * slot vector each time this stage advances. The provided 'fields' and 'vars' vectors must be of
+ * equal length.
+ */
 class BSONScanStage final : public PlanStage {
 public:
     BSONScanStage(const char* bsonBegin,

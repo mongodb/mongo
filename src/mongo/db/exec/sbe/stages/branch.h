@@ -36,7 +36,13 @@
 namespace mongo::sbe {
 /**
  * This stage delivers results from either 'then' or 'else' branch depending on the value of the
- * 'filter' expression as evaluated during the open() call.
+ * 'filter' expression as evaluated during the open() call. Debug string representation:
+ *
+ *   branch { expr } [<output slots>] [<then slots>] thenChildStage [<else slots>] elseChildStage
+ *
+ * When this stage returns 'PlanStage::ADVANCED', the vector of output slots will hold values from
+ * either the <then slots> slot vector or the <else slots> slot vector, depending on which branch is
+ * engaged.
  */
 class BranchStage final : public PlanStage {
 public:

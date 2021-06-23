@@ -35,17 +35,21 @@
 
 namespace mongo::sbe {
 /**
- * This stage deduplicates by a given key. Unlike a HashAgg, this stage is not blocking
- * and rows are returned in the same order as they appear in the input stream.
+ * This stage deduplicates by a given key. Unlike a HashAgg, this stage is not blocking and rows are
+ * returned in the same order as they appear in the input stream.
  *
- * TODO: It is possible to optimize this stage in the case where the input is sorted
- * by key X, we are "uniquing" by key Y, and we are guaranteed that all identical values
- * of Y appear are associated with the same key X. In this case the hash table of seen elements
- * can be cleared each time a new key X is encountered.
+ * TODO: It is possible to optimize this stage in the case where the input is sorted by key X, we
+ * are "uniquing" by key Y, and we are guaranteed that all identical values of Y appear are
+ * associated with the same key X. In this case the hash table of seen elements can be cleared each
+ * time a new key X is encountered.
  *
  * For example, this optimization is possible when the UniqueStage is uniquing by record ID and
  * below it there are non-multikey index scans merged via a SortMerge stage. Each duplicate record
  * ID will be associated with the same sort key.
+ *
+ * Debug string representation:
+ *
+ *   unique [<keys>] childStage
  */
 class UniqueStage final : public PlanStage {
 public:

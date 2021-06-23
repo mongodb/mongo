@@ -39,6 +39,28 @@ class Sorter;
 }  // namespace mongo
 
 namespace mongo::sbe {
+/**
+ * Sorts the incoming data from the 'input' tree. The keys on which we are sorting are given by the
+ * order-by slots, 'obs'.  The ascending/descending sort direction associated with each of these
+ * order-by slots is given by 'dirs'. The 'obs' and 'dirs' vectors must be the same length. The
+ * 'vals' slot vector indicates the values that should associated with the sort keys.
+ *
+ * Together, a set of values for 'obs' and 'vals' consistute one of the rows being sorted. These
+ * rows are materialized at runtime. The given 'memoryLimit' contrains the amount of materialized
+ * data that can be held in memory. If this limit is exceeded, and 'allowDiskUse' is false, then
+ * this stage throws a query-fatal exception. If 'allowDiskUse' is true, then this stage will spill
+ * materialized rows to disk.
+ *
+ * If 'limit' is not std::numeric_limits<size_t>::max(), then this is a top-k sort that should only
+ * return the number of rows given by the limit.
+ *
+ * This stage is a binding reflector, meaning that only the 'obs' and 'vals' slots are visible to
+ * nodes higher in the tree.
+ *
+ * Debug string representation:
+ *
+ *   sort [<order-by slots>] [asc/desc, ...] [<value slots>] limit? childStage
+ */
 class SortStage final : public PlanStage {
 public:
     SortStage(std::unique_ptr<PlanStage> input,

@@ -42,6 +42,16 @@ enum class MakeObjOutputType { object, bsonObject };
  * Base stage for creating a bsonObject or object.
  *
  * Template argument 'O' indicates which output type to use.
+ *
+ * Debug string formats:
+ *
+ *  mkobj objSlot (rootSlot [<list of field names>] drop|keep)?
+ *       [projectedField_1 = slot_1, ..., projectedField_n = slot_n]
+ *       forceNewObj returnOldObject childStage
+ *
+ *  mkbson objSlot (rootSlot [<list of field names>] drop|keep)?
+ *       [projectedField_1 = slot_1, ..., projectedField_n = slot_n]
+ *       forceNewObj returnOldObject childStage
  */
 template <MakeObjOutputType O>
 class MakeObjStageBase final : public PlanStage {

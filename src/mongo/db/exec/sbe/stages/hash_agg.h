@@ -38,6 +38,25 @@
 
 namespace mongo {
 namespace sbe {
+/**
+ * Performs a hash-based aggregation. Appears as the "group" stage in debug output. Groups the input
+ * based on the provided vector of group-by slots, 'gbs'. The 'aggs' parameter is a map from
+ * 'SlotId' to expression. This defines a set of output slots whose values will be computed based on
+ * the corresponding aggregate expressions. Each distinct grouping will produce a single output,
+ * consisting of the values of the group-by keys and the results of the aggregate functions.
+ *
+ * Since the data must be buffered in a hash table, this is a "binding reflector". This means slots
+ * from the 'input' tree are not visible higher in tree. Stages higher in the tree can only see the
+ * slots holding the group-by keys as well as those holding the corresponding aggregate values.
+ *
+ * The optional 'collatorSlot', if provided, changes the definition of string equality used when
+ * determining whether two group-by keys are equal. For instance, the plan may require us to do a
+ * case-insensitive group on a string field.
+ *
+ * Debug string representation:
+ *
+ *  group [<group by slots>] [slot_1 = expr_1, ..., slot_n = expr_n] collatorSlot? childStage
+ */
 class HashAggStage final : public PlanStage {
 public:
     HashAggStage(std::unique_ptr<PlanStage> input,

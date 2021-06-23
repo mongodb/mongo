@@ -35,11 +35,22 @@
 
 namespace mongo::sbe {
 /**
- * This is a filter plan stage. If the IsConst template parameter is true then the filter expression
- * is 'constant' i.e. it does not depend on values coming from its input. It means that we can
- * evaluate it in the open() call and skip getNext() calls completely if the result is false.
- * The IsEof template parameter controls 'early out' behavior of the filter expression. Once the
- * filter evaluates to false then the getNext() call returns EOF.
+ * A plan stage which discards or retains values based on a predicate expression.
+ *
+ * If the 'IsConst' template parameter is true then the filter expression is 'constant' i.e. it does
+ * not depend on values coming from its input. In this case, the stage is notated as "cfilter"
+ * rather than plain "filter". The predicate is evaluated in the open() call. If the result is
+ * false, then 'getNext()' returns EOF immediately.
+ *
+ * The IsEof template parameter controls 'early out' behavior of the filter expression. If this
+ * template parameter is true, then the stage is notated as "efilter" rather than plain "filter".
+ * Once the filter evaluates to false then the getNext() call returns EOF.
+ *
+ * Debug string representations:
+ *
+ *  filter { predicate } childStage
+ *  cfilter { predicate } childStage
+ *  efilter { predicate } childStage
  */
 template <bool IsConst, bool IsEof = false>
 class FilterStage final : public PlanStage {

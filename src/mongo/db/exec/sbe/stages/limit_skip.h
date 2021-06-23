@@ -33,6 +33,18 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 
 namespace mongo::sbe {
+/**
+ * Limits the number of results from the child stage, or skips results from the child stage, or
+ * both. If both a skip of 's' and a limit of 'l' are provided, first skips 's' results and then
+ * limits the remaining results to at most 'l'.
+ *
+ * Debug string formats:
+ *
+ *  limit limitAmount
+ *  limitskip limitAmount skipAmount
+ *
+ * If there is just a skip but no limit, the format is "limitskip none skipAmount".
+ */
 class LimitSkipStage final : public PlanStage {
 public:
     LimitSkipStage(std::unique_ptr<PlanStage> input,

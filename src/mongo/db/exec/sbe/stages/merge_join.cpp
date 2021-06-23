@@ -358,8 +358,6 @@ std::vector<DebugPrinter::Block> MergeJoinStage::debugPrint() const {
 
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
 
-    DebugPrinter::addKeyword(ret, "outer");
-
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _dirs.size(); idx++) {
         if (idx) {
@@ -369,6 +367,8 @@ std::vector<DebugPrinter::Block> MergeJoinStage::debugPrint() const {
                                     _dirs[idx] == value::SortDirection::Ascending ? "asc" : "desc");
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
+
+    DebugPrinter::addKeyword(ret, "left");
 
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _outerKeys.size(); ++idx) {
@@ -394,7 +394,7 @@ std::vector<DebugPrinter::Block> MergeJoinStage::debugPrint() const {
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
-    DebugPrinter::addKeyword(ret, "inner");
+    DebugPrinter::addKeyword(ret, "right");
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _innerKeys.size(); ++idx) {
         if (idx) {

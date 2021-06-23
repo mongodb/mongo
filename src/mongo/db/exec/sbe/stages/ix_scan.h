@@ -57,6 +57,18 @@ namespace mongo::sbe {
  * The 'indexKeysToInclude' bitset determines which values are included in the projection based
  * on their order in the index pattern. The number of bits set in 'indexKeysToInclude' must be
  * the same as the number of slots in the 'vars' SlotVector.
+ *
+ * The 'forward' flag indicates the direction of the index scan, which can be either forwards or
+ * backwards.
+ *
+ * Debug string representation:
+ *
+ *   ixscan recordSlot? recordIdSlot? snapshotIdSlot? [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
+ *                      collectionUuid indexName forward
+ *
+ *   ixseek lowKey highKey recordSlot? recordIdSlot? snapshotIdSlot?
+ *          [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
+ *          collectionUuid indexName forward
  */
 class IndexScanStage final : public PlanStage {
 public:

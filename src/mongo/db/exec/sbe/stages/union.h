@@ -34,6 +34,20 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 
 namespace mongo::sbe {
+/**
+ * Combines values from multiple streams into one stream. The union has n 'inputStages', each of
+ * which provides m slots, specified as a vector of slot vectors 'inputVals'. (This vector has n * m
+ * total slots.) The union stage itself also returns m slots, specified as 'outputVals'. Each of the
+ * n branches is executed in turn until reaching EOF, and the values from its m slots are remapped
+ * to the m output slots.
+ *
+ * This is a binding reflector, meaning that only the 'outputVals' slots are visible to stages
+ * higher in the tree.
+ *
+ * Debug string repsentation:
+ *
+ *   union [<output slots>] [[<input slots 1>] childStage_1, ..., [<input slots n>] childStage_n]
+ */
 class UnionStage final : public PlanStage {
 public:
     UnionStage(std::vector<std::unique_ptr<PlanStage>> inputStages,

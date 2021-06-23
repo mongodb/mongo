@@ -38,9 +38,20 @@ namespace mongo::sbe {
 /**
  * This stage performs a merge join given an outer and an inner child stage. The stage remaps
  * both the outer side (buffer to support full cross product) and the inner side to buffer inner
- * values to survive yielding.
+ * values to survive yielding. The join is an equi-join where the join key from the outer side is
+ * given by the 'outerKeys' slot vector and the join key from the inner side is given by the
+ * 'innerKeys' slot vector. In addition, each resulting row returned by the join has the
+ * 'outerProjects' values from the outer side and the 'innerProjects' values from the inner side.
  *
- * The stage expects the data to be sorted according to the 'sortDirs' parameter.
+ * The stage expects the data to be sorted according to the 'sortDirs' parameter. This describes the
+ * sort direction for each of keys on which we are joining, so the 'sortDirs', 'outerKeys', and
+ * 'innerKeys' vectors must each be the same length.
+ *
+ * Debug string format:
+ *
+ *   mj [asc|desc, ...]
+ *     left [<outer keys>] [<outer projects>] childStage
+ *     right [<inner keys>] [<inner projects>] childStage
  */
 class MergeJoinStage final : public PlanStage {
 public:

@@ -38,12 +38,30 @@ namespace mongo::sbe {
  * This is an array traversal operator. If the input value coming from the 'outer' side is an array
  * then we execute the 'inner' side exactly once for every element of the array. The results from
  * the 'inner' side are then collected into the output array value. The traversal is recursive and
- * the structure of nested arrays is preserved (up to optional depth). If the input value is not an
- * array then we execute the inner side just once and return the result.
+ * the structure of nested arrays is preserved (up to optional depth 'nestedArraysDepth'). If the
+ * input value is not an array then we execute the inner side just once and return the result.
  *
- * If an optional 'fold' expression is provided then instead of the output array we combine
- * individual results into a single output value. Another expression 'final' controls optional
+ * The 'inField' slot contains the value from the outer side which ie being traversed. When the
+ * traversal is complete, the resulting value is placed in the slot given by 'outField'. Note that
+ * it is legal for 'outField' and 'inField' to be the same slot when there are no fold or final
+ * expressions. The 'outFieldInner' slot is the slot that the traverse stage should read in order to
+ * get the resulting value whenever it executes the inner side. In other words, when the inner side
+ * is re-opened and executed once for a particular array element, the 'outFieldInner' slot holds the
+ * result of this operation (which may subsequently be passed to the fold/final expressions).
+ *
+ * The 'outerCorrelated' slots are slots from the outer side that are made visible to the inner
+ * side.
+ *
+ * If an optional 'foldExpr' expression is provided, then instead of the output array we combine
+ * individual results into a single output value. Another expression 'finalExpr' controls optional
  * short-circuiting (a.k.a. early out) logic.
+ *
+ * Debug string representation:
+ *
+ *  traverse outputSlot outputFromInnerBranchSlot inputSlot [<correlated slots>]
+ *          { foldExpr }? { finalExpr }?
+ *          from childStage
+ *          in childStage
  */
 class TraverseStage final : public PlanStage {
 public:

@@ -35,6 +35,28 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 namespace mongo::sbe {
+/**
+ * Performs a traditional hash join. All rows from the 'outer' side are used to construct a hash
+ * table. Keys from the 'inner' side are used to probe the hash table and produce output rows.  This
+ * is an equality join where the join is defined by equality between the 'outerCond' slot vector on
+ * the outer side and the 'innerCond' slot vector on the inner side. These two slot vectors must
+ * have the same length. Each side can define additional slots which appear in each of the rows
+ * produced by the join, 'outerProjects' and 'innerProjects'.
+ *
+ * This is a binding reflector for the outer/build side; since the data is materialized in a hash
+ * table, stages higher in the tree cannot see any slots lower in the tree on the outer side. This
+ * is _not_ the case for the inner side, since it can stream data as it probes the hash table.
+ *
+ * The optional 'collatorSlot' can be provided to make the join predicate use a special definition
+ * for string equality. For example, this can be used to perform a case-insensitive join on string
+ * values.
+ *
+ * Debug string representation:
+ *
+ *   hj collatorSlot?
+ *     left [<outer cond>] [<outer projects>] childStage
+ *     right [<inner cond>] [<inner projects>] childStage
+ */
 class HashJoinStage final : public PlanStage {
 public:
     HashJoinStage(std::unique_ptr<PlanStage> outer,
