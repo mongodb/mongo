@@ -20,10 +20,12 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+import datetime
 import json
 import os
 import pathlib
 import shutil
+import traceback
 
 import SCons
 
@@ -138,11 +140,11 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         try:
             return super().retrieve(node)
         except InvalidChecksum as ex:
-            self.print_cache_issue(node, str(ex))
+            self.print_cache_issue(node, ex)
             self.clean_bad_cachefile(node, ex.cache_csig, ex.computed_csig)
             return False
         except (UnsupportedError, CacheTransferFailed) as ex:
-            self.print_cache_issue(node, str(ex))
+            self.print_cache_issue(node, ex)
             return False
 
     def push(self, node):
@@ -150,7 +152,7 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         try:
             return super().push(node)
         except CacheTransferFailed as ex:
-            self.print_cache_issue(node, str(ex))
+            self.print_cache_issue(node, ex)
             return False
 
     def CacheDebugJson(self, json_data, target, cachefile):
@@ -164,6 +166,7 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
                 cachefile = cksum_cachefile
 
             json_data.update({
+                'timestamp': str(datetime.datetime.now(datetime.timezone.utc)),
                 'realfile': str(target),
                 'cachefile': pathlib.Path(cachefile).name,
                 'cache_dir': str(pathlib.Path(cachefile).parent.parent),
@@ -181,10 +184,12 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         else:
             super().CacheDebug(fmt, target, cachefile)
 
-    def print_cache_issue(self, node, msg):
+    def print_cache_issue(self, node, ex):
 
         cksum_dir = pathlib.Path(self.cachepath(node)[1]).parent
-        print(msg)
+        msg = str(ex)
+        print('ERROR: An issue was detected while validating the cache:\n' +
+              '    ' + "\n    ".join("".join(traceback.format_exc()).split("\n")))
         self.CacheDebug(msg + cache_debug_suffix, node, cksum_dir)
         self.CacheDebugJson({'type': 'error', 'error': msg}, node, cksum_dir)
 
