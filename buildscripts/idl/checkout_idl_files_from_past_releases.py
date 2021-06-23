@@ -35,8 +35,7 @@ from typing import List
 
 from packaging.version import Version
 
-# TODO (SERVER-55203): Change FIRST_API_V1_RELEASE to r5.0.0-rc0.
-FIRST_API_V1_RELEASE = '4.9.0-alpha5'
+FIRST_API_V1_RELEASE = '5.0.0-rc3'
 LOGGER_NAME = 'checkout-idl'
 LOGGER = logging.getLogger(LOGGER_NAME)
 

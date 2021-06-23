@@ -2274,17 +2274,6 @@ commands:
                 type: array<StructType>
         reply_type: ArrayTypeStruct
 
-    # TODO (SERVER-55203): Remove InvalidReplySkippedCommand.
-    InvalidReplySkippedCommand:
-        description: "new command should fail because it has invalid reply, but this command will
-                      be added to skipped command list."
-        command_name: invalidReplySkippedCommand
-        namespace: ignored
-        cpp_name: InvalidReplySkippedCommand
-        strict: true
-        api_version: "1"
-        reply_type: OkReply
-
     accessCheckTypeChange:
         description: "new command fails because the access check type has changed"
         command_name: accessCheckTypeChange
