@@ -1,0 +1,20 @@
+### Overrides for more than 1 suite ###
+- name: replica_fixture
+  value:
+    executor:
+      fixture:
+        num_nodes: 2
+- name: sharded_fixture
+  value:
+    executor:
+      fixture:
+        num_shards: 2
+        num_rs_nodes_per_shard: 2
+
+
+### Suite-specific overrides ###
+- name: multiversion_sanity_check_selector
+  value:
+    selector:
+      include_with_any_tags:
+        - multiversion_sanity_check

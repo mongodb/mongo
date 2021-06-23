@@ -55,7 +55,6 @@ SHARDED_MIXED_VERSION_CONFIGS = ["new-old-old-new"]
 BURN_IN_TASK = "burn_in_tests_multiversion"
 MULTIVERSION_CONFIG_KEY = "use_in_multiversion"
 PASSTHROUGH_TAG = "multiversion_passthrough"
-RANDOM_REPLSETS_TAG = "random_multiversion_ds"
 BACKPORT_REQUIRED_TAG = "backport_required_multiversion"
 EXCLUDE_TAGS = f"{REQUIRES_FCV_TAG},multiversion_incompatible,{BACKPORT_REQUIRED_TAG}"
 EXCLUDE_TAGS_FILE = "multiversion_exclude_tags.yml"

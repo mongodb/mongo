@@ -1,0 +1,32 @@
+# TODO SERVER-55857: check for history conflicts in overrides outside of explicitly set keys.
+# TODO SERVER-55857: use the generated suite if --originSuite is used (to indicate that a generated suite exists).
+# TODO SERVER-55857: ensure listSuites work with matrix suites.
+- suite_name: change_streams_multiversion_passthrough
+  base_suite: change_streams
+  overrides:
+    - "multiversion.replica_fixture"
+- suite_name: change_streams_sharded_collections_multiversion_passthrough
+  base_suite: change_streams_sharded_collections_passthrough
+  overrides:
+    - "multiversion.sharded_fixture"
+- suite_name: concurrency_replication_multiversion_passthrough
+  base_suite: concurrency_replication
+  overrides:
+    - "multiversion.replica_fixture"
+- suite_name: multiversion_sanity_check_passthrough
+  base_suite: replica_sets_jscore_passthrough
+  overrides:
+    - "multiversion.replica_fixture"
+    - "multiversion.multiversion_sanity_check_selector"
+- suite_name: concurrency_sharded_replication_multiversion_passthrough
+  base_suite: concurrency_sharded_replication
+  overrides:
+    - "multiversion.sharded_fixture"
+- suite_name: sharding_jscore_multiversion_passthrough
+  base_suite: sharding_jscore_passthrough
+  overrides:
+    - "multiversion.sharded_fixture"
+- suite_name: sharded_collections_jscore_multiversion_passthrough
+  base_suite: sharded_collections_jscore_passthrough
+  overrides:
+    - "multiversion.sharded_fixture"
