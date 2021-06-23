@@ -6,6 +6,8 @@ selector:
 
 executor:
   archive:
+    tests:
+      - jstests/slow1/terminate_during_shutdown_checkpoint.js
     hooks:
       - ValidateCollections
   config:
