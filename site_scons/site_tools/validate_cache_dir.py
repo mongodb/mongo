@@ -22,6 +22,7 @@
 
 import datetime
 import json
+import logging
 import os
 import pathlib
 import shutil
@@ -66,21 +67,30 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         return '.cksum'
 
     @staticmethod
-    def get_file_contents_path(path):
-        return str(pathlib.Path(path + CacheDirValidate.get_ext()) / pathlib.Path(path).name)
+    def get_file_contents_path(default_cachefile_path):
+        return pathlib.Path(default_cachefile_path + CacheDirValidate.get_ext()) / pathlib.Path(default_cachefile_path).name
+
 
     @staticmethod
-    def get_hash_path(path):
-        return str(pathlib.Path(path).parent / 'content_hash')
+    def get_bad_cachefile_path(cksum_cachefile_dir):
+        return pathlib.Path(cksum_cachefile_dir) / 'bad_cache_file'
+
+    @staticmethod
+    def get_hash_path(cksum_cachefile_path):
+        return pathlib.Path(cksum_cachefile_path).parent / 'content_hash'
 
     @classmethod
     def copy_from_cache(cls, env, src, dst):
 
-        if not str(pathlib.Path(src).parent).endswith(cls.get_ext()):
+        cksum_dir = pathlib.Path(src).parent
+        if not str(cksum_dir).endswith(cls.get_ext()):
             return super().copy_from_cache(env, src, dst)
 
         if env.cache_timestamp_newer:
             raise UnsupportedError(cls.__name__, "timestamp-newer")
+
+        if cls.get_bad_cachefile_path(cksum_dir).exists():
+            raise InvalidChecksum(cls.get_hash_path(src), dst, f"cachefile marked as bad checksum")
 
         csig = None
         try:
@@ -184,33 +194,43 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         else:
             super().CacheDebug(fmt, target, cachefile)
 
+    def _log(self, msg, log_msg, json_info, realnode, cachefile):
+        logging.basicConfig(format='%(levelname)s:validate_cachedir: %(message)s')
+        logging.error(msg)
+        self.CacheDebug(log_msg + cache_debug_suffix, realnode, cachefile)
+        self.CacheDebugJson(json_info, realnode, cachefile)
+
     def print_cache_issue(self, node, ex):
 
         cksum_dir = pathlib.Path(self.cachepath(node)[1]).parent
-        msg = str(ex)
-        print('ERROR: An issue was detected while validating the cache:\n' +
+        msg = ('An issue was detected while validating the cache:\n' +
               '    ' + "\n    ".join("".join(traceback.format_exc()).split("\n")))
-        self.CacheDebug(msg + cache_debug_suffix, node, cksum_dir)
-        self.CacheDebugJson({'type': 'error', 'error': msg}, node, cksum_dir)
+
+        self._log(msg, str(ex), {'type': 'error', 'error': msg}, node, cksum_dir)
 
     def clean_bad_cachefile(self, node, cache_csig, computed_csig):
 
         cksum_dir = pathlib.Path(self.cachepath(node)[1]).parent
-        if cksum_dir.is_dir():
-            # TODO: Turn this back on and fix the error message when the race condition
-            # has been resolved in SERVER-56625
-            #rm_path = f"{cksum_dir}.{SCons.CacheDir.cache_tmp_uuid}.del"
-            #cksum_dir.replace(rm_path)
-            #shutil.rmtree(rm_path)
 
-            clean_msg = f"Bad cachefile {cksum_dir} found in cache."
-            print(clean_msg)
-            self.CacheDebug(clean_msg + cache_debug_suffix, node, cksum_dir)
-            self.CacheDebugJson({
-                'type': 'invalid_checksum',
-                'cache_csig': cache_csig,
-                'computed_csig': computed_csig
-            }, node, cksum_dir)
+        try:
+            pathlib.Path(self.get_bad_cachefile_path(cksum_dir)).touch()
+        except FileExistsError:
+            pass
+
+        rm_path = f"{cksum_dir}.{SCons.CacheDir.cache_tmp_uuid}.del"
+        try:
+            cksum_dir.replace(rm_path)
+        except OSError as ex:
+            msg = f"Failed to rename {cksum_dir} to {rm_path}: {ex}"
+            self._log(msg, msg, {'type': 'error', 'error': msg}, node, cksum_dir)
+            return
+
+        msg = f"Removed bad cachefile {cksum_dir} found in cache."
+        self._log(msg, msg, {
+            'type': 'invalid_checksum',
+            'cache_csig': cache_csig,
+            'computed_csig': computed_csig
+        }, node, cksum_dir)
 
 
     def get_cachedir_csig(self, node):
@@ -223,7 +243,7 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         dir, path = super().cachepath(node)
         if node.fs.exists(path):
             return dir, path
-        return dir, self.get_file_contents_path(path)
+        return dir, str(self.get_file_contents_path(path))
 
 def exists(env):
     return True
