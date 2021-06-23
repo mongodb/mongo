@@ -692,6 +692,20 @@ private:
         }
     }
 
+    // Do any initialization of the lock state required for a transaction.
+    void _setLockStateForTransaction(OperationContext* opCtx) {
+        opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
+        opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
+    }
+
+    // Clear any lock state which may have changed after the locker update.
+    void _resetLockerStateAfterShardingUpdate(OperationContext* opCtx) {
+        dassert(!opCtx->isContinuingMultiDocumentTransaction());
+        _execContext->behaviors->resetLockerState(opCtx);
+        if (opCtx->isStartingMultiDocumentTransaction())
+            _setLockStateForTransaction(opCtx);
+    }
+
     // Any logic, such as authorization and auditing, that must precede execution of the command.
     void _initiateCommand();
 
@@ -1581,8 +1595,7 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     if (startTransaction) {
-        opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
-        opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
+        _setLockStateForTransaction(opCtx);
     }
 
     // Remember whether or not this operation is starting a transaction, in case something later in
@@ -1673,6 +1686,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
                 if (refreshed) {
                     _refreshedDatabase = true;
                     if (!opCtx->isContinuingMultiDocumentTransaction()) {
+                        _resetLockerStateAfterShardingUpdate(opCtx);
                         return _commandExec();
                     }
                 }
@@ -1693,6 +1707,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
                     if (refreshed) {
                         _refreshedCollection = true;
                         if (!opCtx->isContinuingMultiDocumentTransaction()) {
+                            _resetLockerStateAfterShardingUpdate(opCtx);
                             return _commandExec();
                         }
                     }
@@ -1719,6 +1734,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
                 if (refreshed) {
                     _refreshedCatalogCache = true;
                     if (!opCtx->isContinuingMultiDocumentTransaction()) {
+                        _resetLockerStateAfterShardingUpdate(opCtx);
                         return _commandExec();
                     }
                 }
