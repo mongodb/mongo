@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/optional/optional_io.hpp>
+#include <utility>
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
@@ -177,6 +178,13 @@ public:
     void notifyToStartBlockingWrites(OperationContext* opCtx,
                                      DonorStateMachine& donor,
                                      const ReshardingDonorDocument& donorDoc) {
+        notifyToStartBlockingWritesNoWait(opCtx, donor, donorDoc);
+        ASSERT_OK(donor.awaitCriticalSectionAcquired().waitNoThrow(opCtx));
+    }
+
+    void notifyToStartBlockingWritesNoWait(OperationContext* opCtx,
+                                           DonorStateMachine& donor,
+                                           const ReshardingDonorDocument& donorDoc) {
         _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kBlockingWrites);
     }
 
@@ -184,6 +192,7 @@ public:
                                     DonorStateMachine& donor,
                                     const ReshardingDonorDocument& donorDoc) {
         _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kCommitting);
+        ASSERT_OK(donor.awaitCriticalSectionPromoted().waitNoThrow(opCtx));
     }
 
     void checkStateDocumentRemoved(OperationContext* opCtx) {
@@ -319,8 +328,17 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
 TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
     const std::vector<DonorStateEnum> donorStates{DonorStateEnum::kDonatingInitialData,
                                                   DonorStateEnum::kDonatingOplogEntries,
+                                                  DonorStateEnum::kPreparingToBlockWrites,
                                                   DonorStateEnum::kBlockingWrites,
                                                   DonorStateEnum::kDone};
+
+    const std::vector<std::pair<DonorStateEnum, bool>> donorStateTransitions{
+        {DonorStateEnum::kDonatingInitialData, false},
+        {DonorStateEnum::kDonatingOplogEntries, false},
+        {DonorStateEnum::kPreparingToBlockWrites, false},
+        {DonorStateEnum::kBlockingWrites, false},
+        {DonorStateEnum::kBlockingWrites, true},
+        {DonorStateEnum::kDone, true}};
 
     for (bool isAlsoRecipient : {false, true}) {
         LOGV2(5641801,
@@ -336,7 +354,10 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
         auto opCtx = makeOperationContext();
 
         auto prevState = DonorStateEnum::kUnused;
-        for (const auto state : donorStates) {
+        for (const auto& [state, critSecHeld] : donorStateTransitions) {
+            // The kBlockingWrite state is interrupted twice so we don't unset the guard until after
+            // the second time.
+            bool shouldUnsetPrevState = !(state == DonorStateEnum::kBlockingWrites && critSecHeld);
             auto donor = [&] {
                 if (prevState == DonorStateEnum::kUnused) {
                     createSourceCollection(opCtx.get(), doc);
@@ -352,7 +373,9 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
 
                     // Allow the transition to prevState to succeed on this primary-only service
                     // instance.
-                    stateTransitionsGuard.unset(prevState);
+                    if (shouldUnsetPrevState) {
+                        stateTransitionsGuard.unset(prevState);
+                    }
                     return *maybeDonor;
                 }
             }();
@@ -364,8 +387,25 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
                     notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
                     break;
                 }
+                case DonorStateEnum::kPreparingToBlockWrites: {
+                    notifyToStartBlockingWritesNoWait(opCtx.get(), *donor, doc);
+                    break;
+                }
                 case DonorStateEnum::kBlockingWrites: {
-                    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+                    // A shard version refresh cannot be triggered once the critical section has
+                    // been acquired. We intentionally test the DonorStateEnum::kBlockingWrites
+                    // transition being triggered two different ways:
+                    //
+                    //   - The first transition would wait for the RecoverRefreshThread to
+                    //     notify the donor about the CoordinatorStateEnum::kBlockingWrites state.
+                    //
+                    //   - The second transition would rely on the donor having already written down
+                    //     DonorStateEnum::kPreparingToBlockWrites as a result of the
+                    //     RecoverRefreshThread having already been notified the donor about the
+                    //     CoordinatorStateEnum::kBlockingWrites state before.
+                    if (!critSecHeld) {
+                        notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+                    }
                     break;
                 }
                 case DonorStateEnum::kDone: {

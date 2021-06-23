@@ -253,7 +253,7 @@ TEST_F(ReshardingMetricsTest, TestDonorAndRecipientMetrics) {
 
     // Update metrics for donor
     const auto kWritesDuringCriticalSection = 7;
-    getMetrics()->setDonorState(DonorStateEnum::kDonatingOplogEntries);
+    getMetrics()->setDonorState(DonorStateEnum::kPreparingToBlockWrites);
     getMetrics()->enterCriticalSection(getGlobalServiceContext()->getFastClockSource()->now());
     getMetrics()->onWriteDuringCriticalSection(kWritesDuringCriticalSection);
     advanceTime(Seconds(elapsedTime));
@@ -431,7 +431,7 @@ TEST_F(ReshardingMetricsTest, EstimatedRemainingOperationTime) {
 }
 
 TEST_F(ReshardingMetricsTest, CurrentOpReportForDonor) {
-    const auto kDonorState = DonorStateEnum::kDonatingOplogEntries;
+    const auto kDonorState = DonorStateEnum::kPreparingToBlockWrites;
     startOperation(ReshardingMetrics::Role::kDonor);
     advanceTime(Seconds(2));
     getMetrics()->setDonorState(kDonorState);

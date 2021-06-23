@@ -59,6 +59,7 @@ enums:
             kPreparingToDonate: "preparing-to-donate"
             kDonatingInitialData: "donating-initial-data"
             kDonatingOplogEntries: "donating-oplog-entries"
+            kPreparingToBlockWrites: "preparing-to-block-writes"
             kError: "error"
             kBlockingWrites: "blocking-writes"
             kDone: "done"
