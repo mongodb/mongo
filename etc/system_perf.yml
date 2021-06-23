@@ -107,7 +107,7 @@ modules:
     repo: git@github.com:mongodb-labs/py-tpcc.git
     prefix: ../../src
     branch: master
-    ref: 2d19705337a40e24831a904266a648b85df5be84
+    ref: 46f8f42a71626fc2057d2604ab9359ccf0395ba0
 #  - name: mongo
 #    repo: git@github.com:mongodb/mongo.git
 #    prefix: ../../src
