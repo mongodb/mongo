@@ -80,12 +80,14 @@ recipientRst.awaitReplication();
 let local = recipientPrimary.getDB("local");
 let appliedNoOps = local.oplog.rs.find({fromTenantMigration: migrationId, op: "n"});
 let resultsArr = appliedNoOps.toArray();
-// We should have applied the no-op oplog entries for the first batch of documents (size 2).
-assert.eq(2, appliedNoOps.count(), appliedNoOps);
-// No-op entries will be in the same order.
+// It is possible that the first batch applied includes a resume no-op token. We do not write no-op
+// entries for resume token entries in tenant migrations.
+assert.gt(appliedNoOps.count(), 0, resultsArr);
+assert.lte(appliedNoOps.count(), 2, resultsArr);
 assert.eq(docsToApply[0], resultsArr[0].o2.o, resultsArr);
-assert.eq(docsToApply[1], resultsArr[1].o2.o, resultsArr);
-
+if (appliedNoOps.count() === 2) {
+    assert.eq(docsToApply[1], resultsArr[1].o2.o, resultsArr);
+}
 // Step up a new node in the recipient set and trigger a failover. The new primary should resume
 // fetching starting from the unapplied documents.
 const newRecipientPrimary = recipientRst.getSecondaries()[0];
