@@ -51,6 +51,14 @@ public:
     static void setEnabled(OperationContext* opCtx, bool e);
 
     /**
+     * State change codes are rewritten on the way out of a `mongos` server.
+     * Errors injected via `failCommand` manipulation are normally exempt from
+     * this. However, we provide an override option so they can be made subject
+     * to rewriting if that's really necessary.
+     */
+    static void onActiveFailCommand(OperationContext* opCtx, const BSONObj& data);
+
+    /**
      * Transforms an outgoing message to conditionally mask "state change" errors,
      * which are errors that cause a client to change its connection to the host
      * that sent it, such as marking it "Unknown". A shutdown error that's emitted

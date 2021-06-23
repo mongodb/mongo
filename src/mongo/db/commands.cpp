@@ -682,12 +682,7 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
     const Command* cmd = invocation->definition();
     failCommand.executeIf(
         [&](const BSONObj& data) {
-            // State change codes are rewritten on the way out of a `mongos`
-            // server. Errors injected via failpoint manipulation are normally
-            // exempt from this. However, we provide an override option so they
-            // can be made subject to rewriting if that's really necessary.
-            if (bool b; !bsonExtractBooleanField(data, "allowRewriteStateChange", &b).isOK() || !b)
-                rpc::RewriteStateChangeErrors::setEnabled(opCtx, false);
+            rpc::RewriteStateChangeErrors::onActiveFailCommand(opCtx, data);
 
             if (data.hasField(kErrorLabelsFieldName) &&
                 data[kErrorLabelsFieldName].type() == Array) {

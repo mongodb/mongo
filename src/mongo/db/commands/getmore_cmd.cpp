@@ -570,10 +570,7 @@ public:
             // the given 'errorCode' value, or ErrorCodes::InternalError if 'errorCode' is omitted.
             failGetMoreAfterCursorCheckout.executeIf(
                 [&](const BSONObj& data) {
-                    if (bool b;
-                        !bsonExtractBooleanField(data, "allowRewriteStateChange", &b).isOK() || !b)
-                        rpc::RewriteStateChangeErrors::setEnabled(opCtx, false);
-
+                    rpc::RewriteStateChangeErrors::onActiveFailCommand(opCtx, data);
                     auto errorCode = (data["errorCode"] ? data["errorCode"].safeNumberLong()
                                                         : ErrorCodes::InternalError);
                     uasserted(errorCode, "Hit the 'failGetMoreAfterCursorCheckout' failpoint");

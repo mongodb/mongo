@@ -200,6 +200,8 @@ last-lts:
       test_file: jstests/sharding/movechunk_parallel.js
     - ticket: SERVER-52906
       test_file: jstests/sharding/txn_writes_during_movechunk.js
+    - ticket: SERVER-57772
+      test_file: jstests/sharding/rewrite_state_change_errors.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
