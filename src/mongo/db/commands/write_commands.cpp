@@ -1308,7 +1308,7 @@ public:
 
             if (isTimeseries(opCtx, ns())) {
                 try {
-                    throw "Time-series deletes are not currently supported";
+                    _performTimeseriesDeletes(opCtx, &deleteReply);
                 } catch (DBException& ex) {
                     ex.addContext(str::stream() << "time-series delete failed: " << ns().ns());
                     throw;
@@ -1377,6 +1377,13 @@ public:
                                    BSONObj(),
                                    _commandObj,
                                    &bodyBuilder);
+        }
+
+        void _performTimeseriesDeletes(OperationContext* opCtx,
+                                       write_ops::DeleteCommandReply* deleteReply) const {
+            uasserted(ErrorCodes::IllegalOperation,
+                      str::stream()
+                          << "Cannot perform a delete on a time-series collection: " << ns());
         }
 
         const BSONObj& _commandObj;
