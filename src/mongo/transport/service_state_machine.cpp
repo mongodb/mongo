@@ -668,7 +668,7 @@ void ServiceStateMachine::Impl::setCleanupHook(std::function<void()> hook) {
 }
 
 void ServiceStateMachine::Impl::cleanupSession(const Status& status) {
-    LOGV2_INFO(5127900, "Ending session", "error"_attr = status);
+    LOGV2_DEBUG(5127900, 2, "Ending session", "error"_attr = status);
 
     cleanupExhaustResources();
 
