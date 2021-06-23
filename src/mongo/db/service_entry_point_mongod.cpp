@@ -137,16 +137,6 @@ public:
         // wait for write concern on operations the transaction observed.
         if (opCtx->lockState()->wasGlobalLockTakenForWrite() &&
             !opCtx->inMultiDocumentTransaction()) {
-
-            // Recently stepped down nodes will receive the proper error message because the
-            // rstlKillOpThread would have already interrupted this thread since it took a lock for
-            // a write. We should allow standalone nodes to wait for write concern since they might
-            // be waiting for journaling.
-            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            if (!replCoord->canAcceptNonLocalWrites() && replCoord->isReplEnabled()) {
-                return;
-            }
-
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
             lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             waitForWriteConcernAndAppendStatus();
