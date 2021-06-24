@@ -144,8 +144,12 @@ BSONObj BSONObj::redact() const {
     struct redactor {
         void operator()(BSONObjBuilder& builder, const BSONObj& obj) {
             for (BSONElement e : obj) {
-                if (e.type() == Object || e.type() == Array) {
+                if (e.type() == Object) {
                     BSONObjBuilder subBuilder = builder.subobjStart(e.fieldNameStringData());
+                    operator()(subBuilder, e.Obj());
+                    subBuilder.done();
+                } else if (e.type() == Array) {
+                    BSONObjBuilder subBuilder = builder.subarrayStart(e.fieldNameStringData());
                     operator()(subBuilder, e.Obj());
                     subBuilder.done();
                 } else {

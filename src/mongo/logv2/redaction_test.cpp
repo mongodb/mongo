@@ -106,7 +106,6 @@ void testBSONCases(std::initializer_list<BSONStringPair> testCases) {
 
 TEST(RedactBSONTest, BasicBSON) {
     logv2::setShouldRedactLogs(true);
-    std::vector<BSONStringPair> testCases;
 
     testBSONCases({BSONStringPair(BSONObj(), "{}"),
                    BSONStringPair(BSON("" << 1), "{ : \"###\" }"),
@@ -122,7 +121,13 @@ TEST(RedactBSONTest, BasicBSON) {
                                            << "1"),
                                   "{ a: \"###\", a: \"###\" }")});
 }
-/*
+
+void testBSONCases(std::vector<BSONStringPair>& testCases) {
+    for (auto m : testCases) {
+        ASSERT_EQ(redact(m.first).toString(), m.second);
+    }
+}
+
 TEST(RedactBSONTest, NestedBSON) {
     logv2::setShouldRedactLogs(true);
     std::vector<BSONStringPair> testCases;
@@ -134,7 +139,7 @@ TEST(RedactBSONTest, NestedBSON) {
     testCases.push_back(BSONStringPair(BSON("a" << BSON("a" << 1)), "{ a: { a: \"###\" } }"));
     testCases.push_back(BSONStringPair(BSON("a" << BSON("a" << 1 << "b" << 1)),
                                        "{ a: { a: \"###\", b: \"###\" } }"));
-    testBSONVector(testCases);
+    testBSONCases(testCases);
 }
 
 TEST(RedactBSONTest, BSONWithArrays) {
@@ -147,7 +152,7 @@ TEST(RedactBSONTest, BSONWithArrays) {
     testCases.push_back(BSONStringPair(BSON("a" << BSON_ARRAY(BSON("a" << 1) << BSON("b" << 1))),
                                        "{ a: [ { a: \"###\" }, { b: \"###\" } ] }"));
 
-    testBSONVector(testCases);
-}*/
+    testBSONCases(testCases);
+}
 }  // namespace
 }  // namespace mongo
