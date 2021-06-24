@@ -73,6 +73,16 @@ assertError([16610, 4848403], [{$mod: ['$one', '$zero']}, '$zero']);
 assertResult(undefined, ['$my_null', '$my_undefined']);
 assertResult(undefined, ['$my_undefined', '$my_undefined']);
 
+// Constant arg.
+assertResult(1, [null, '$one']);
+assertResult(1, [null, null, '$one']);
+assertResult(null, [null, null]);
+assertResult(2, [null, 2]);
+assertResult(2, [2, '$one']);
+assertResult(2, [2, 3]);
+assertResult(3, ['$my_null', null, '$three']);
+assertResult(3, ['$my_null', 3, '$one']);
+
 // Nested.
 assert(t.drop());
 assert.commandWorked(t.insertOne({d: 'foo'}));

@@ -3153,10 +3153,50 @@ Value ExpressionIfNull::evaluate(const Document& root, Variables* variables) con
     return Value();
 }
 
-REGISTER_STABLE_EXPRESSION(ifNull, ExpressionIfNull::parse);
+boost::intrusive_ptr<Expression> ExpressionIfNull::optimize() {
+    bool allOperandsConst = true;
+    for (auto& operand : _children) {
+        operand = operand->optimize();
+        if (!dynamic_cast<ExpressionConstant*>(operand.get())) {
+            allOperandsConst = false;
+        }
+    }
+
+    // If all the operands are constant expressions, collapse the expression into one constant
+    // expression.
+    if (allOperandsConst) {
+        return ExpressionConstant::create(
+            getExpressionContext(), evaluate(Document(), &(getExpressionContext()->variables)));
+    }
+
+    // Remove all null constants, unless it is the only child.
+    // If one of the operands is a non-null constant expression, remove any operands that follow it.
+    auto it = _children.begin();
+    while (it != _children.end() && _children.size() > 1) {
+        if (auto constExpression = dynamic_cast<ExpressionConstant*>(it->get())) {
+            if (constExpression->getValue().nullish()) {
+                it = _children.erase(it);
+            } else {
+                _children.erase(it + 1, _children.end());
+                break;
+            }
+        } else {
+            ++it;
+        }
+    }
+
+    if (_children.size() == 1) {
+        // Replace $ifNull with its only child.
+        return _children[0];
+    }
+    return this;
+}
+
 const char* ExpressionIfNull::getOpName() const {
     return "$ifNull";
 }
+
+REGISTER_STABLE_EXPRESSION(ifNull, ExpressionIfNull::parse);
 
 /* ----------------------- ExpressionIn ---------------------------- */
 

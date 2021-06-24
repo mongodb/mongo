@@ -1893,6 +1893,7 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
     void validateArguments(const ExpressionVector& args) const final;
+    boost::intrusive_ptr<Expression> optimize() final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
