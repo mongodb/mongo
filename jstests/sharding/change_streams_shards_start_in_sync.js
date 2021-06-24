@@ -13,6 +13,13 @@
 (function() {
 "use strict";
 
+// Check the build flags to determine whether we are running in a code-coverage variant. These
+// variants are sufficiently slow as to interfere with the operation of this test, so we skip them.
+if (buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage')) {
+    jsTestLog("Skipping the test case run with code-coverage enabled");
+    return;
+}
+
 const st = new ShardingTest({
     shards: 2,
     mongos: 2,
