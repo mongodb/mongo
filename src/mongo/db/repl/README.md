@@ -530,6 +530,7 @@ by reading from the storage engine's most recent snapshot. On a secondary, it pe
 read at the lastApplied, so that it does not see writes from the batch that is currently being
 applied. For information on how local read concern works within a multi-document transaction, see
 the [Read Concern Behavior Within Transactions](#read-concern-behavior-within-transactions) section.
+Local read concern is the default read concern.
 
 **Majority** does a timestamped read at the stable timestamp (also called the last committed
 snapshot in the code, for legacy reasons). The data read only reflects the oplog entries that have
@@ -568,6 +569,21 @@ Linearizable read concern is not allowed within a multi-document transaction.
 **Snapshot** read concern can only be run within a multi-document transaction. See the
 [Read Concern Behavior Within Transactions](#read-concern-behavior-within-transactions) section for
 more information.
+
+**Available** read concern behaves identically to local read concern in most cases. The exception is
+reads for sharded collections from secondary shard nodes. Local read concern will wait to refresh
+the routing table cache when the node realizes its
+[metadata is stale](../s/README.md#when-the-routing-table-cache-will-refresh), which requires
+contacting the shard's primary or config servers before being able to serve the read. Available read
+concern does not provide consistency guarantees because it does not wait for routing table cache
+refreshes. As a result, available read concern potentially serves reads faster and is more tolerant
+to network partitions than any other read concern, since the node does not need to communicate with
+another node in the cluster to serve the read. However, this also means that if the node's metadata
+was stale, available read concern could potentially return
+[orphan documents](../s/README.md#orphan-filtering) or even a stale view of a chunk that has been
+moved a long time ago and modified on another shard.
+
+Available read concern is not allowed to be used with causally consistent sessions or transactions.
 
 **afterOpTime** is another read concern option, only used internally, only for config servers as
 replica sets. **Read after optime** means that the read will block until the node has replicated
