@@ -680,7 +680,7 @@ void Parser::walkScan(AstQuery& ast) {
                                  lookupSlots(ast.nodes[projectsPos]->renames),
                                  boost::none,
                                  forward,
-                                 _yieldPolicy,
+                                 nullptr,
                                  getCurrentPlanNodeId(),
                                  ScanCallbacks{});
 }
@@ -731,7 +731,7 @@ void Parser::walkParallelScan(AstQuery& ast) {
                                          lookupSlot(indexKeyPatternName),
                                          ast.nodes[projectsPos]->identifiers,
                                          lookupSlots(ast.nodes[projectsPos]->renames),
-                                         _yieldPolicy,
+                                         nullptr,
                                          getCurrentPlanNodeId(),
                                          ScanCallbacks{});
 }
@@ -794,7 +794,7 @@ void Parser::walkSeek(AstQuery& ast) {
                                  lookupSlots(ast.nodes[projectsPos]->renames),
                                  lookupSlot(ast.nodes[0]->identifier),
                                  forward,
-                                 _yieldPolicy,
+                                 nullptr,
                                  getCurrentPlanNodeId(),
                                  ScanCallbacks{});
 }
@@ -855,7 +855,7 @@ void Parser::walkIndexScan(AstQuery& ast) {
                                       vars,
                                       boost::none,
                                       boost::none,
-                                      _yieldPolicy,
+                                      nullptr,
                                       getCurrentPlanNodeId());
 }
 
@@ -915,7 +915,7 @@ void Parser::walkIndexSeek(AstQuery& ast) {
                                       vars,
                                       lookupSlot(ast.nodes[0]->identifier),
                                       lookupSlot(ast.nodes[1]->identifier),
-                                      _yieldPolicy,
+                                      nullptr,
                                       getCurrentPlanNodeId());
 }
 
@@ -1209,7 +1209,7 @@ void Parser::walkSkip(AstQuery& ast) {
 void Parser::walkCoScan(AstQuery& ast) {
     walkChildren(ast);
 
-    ast.stage = makeS<CoScanStage>(getCurrentPlanNodeId(), _yieldPolicy);
+    ast.stage = makeS<CoScanStage>(getCurrentPlanNodeId(), nullptr);
 }
 
 void Parser::walkTraverse(AstQuery& ast) {
@@ -1847,12 +1847,10 @@ Parser::Parser(RuntimeEnvironment* env) : _env(env) {
 
 std::unique_ptr<PlanStage> Parser::parse(OperationContext* opCtx,
                                          StringData defaultDb,
-                                         StringData line,
-                                         PlanYieldPolicy* yieldPolicy) {
+                                         StringData line) {
     std::shared_ptr<AstQuery> ast;
 
     _opCtx = opCtx;
-    _yieldPolicy = yieldPolicy;
     _defaultDb = defaultDb.toString();
 
     auto result = _parser.parse_n(line.rawData(), line.size(), ast);

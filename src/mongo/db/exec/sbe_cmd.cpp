@@ -39,8 +39,6 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/plan_executor_factory.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/yield_policy_callbacks_impl.h"
 
 namespace mongo {
 /**
@@ -48,7 +46,8 @@ namespace mongo {
  *
  * db.runCommand({sbe: "sbe query text"})
  *
- * The command is enabled only for testing.
+ * This command is only for testing/experimentation, and requires the 'enableTestCommands' flag to
+ * be turned on.
  */
 class SBECommand final : public BasicCommand {
 public:
@@ -67,30 +66,33 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+
+        // If SBE is disabled, then also disallow the SBE command.
+        uassert(5772200,
+                "the SBE command requires the SBE engine to be enabled",
+                internalQueryEnableSlotBasedExecutionEngine.load());
+
+        // The SBE command may read from multiple collections, but no logic is in place to acquire
+        // locks on all of the necessary collections and databases. Therefore, its implementation
+        // depends on lock free reads being enabled (which is the case by default).
+        uassert(5772201,
+                "the SBE command requires lock free reads",
+                !storageGlobalParams.disableLockFreeReads);
+
         long long batchSize;
         uassertStatusOK(CursorRequest::parseCommandCursorOptions(
             cmdObj, query_request_helper::kDefaultBatchSize, &batchSize));
 
-        NamespaceString nss{dbname};
-
-        auto yieldPolicy = std::make_unique<PlanYieldPolicySBE>(
-            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-            opCtx->getServiceContext()->getFastClockSource(),
-            internalQueryExecYieldIterations.load(),
-            Milliseconds{internalQueryExecYieldPeriodMS.load()},
-            nullptr,
-            std::make_unique<YieldPolicyCallbacksImpl>(nss));
-
         auto env = std::make_unique<sbe::RuntimeEnvironment>();
         sbe::Parser parser(env.get());
-        auto root = parser.parse(opCtx, dbname, cmdObj["sbe"].String(), yieldPolicy.get());
+        auto root = parser.parse(opCtx, dbname, cmdObj["sbe"].String());
         auto [resultSlot, recordIdSlot] = parser.getTopLevelSlots();
 
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
         BSONArrayBuilder firstBatch;
 
-
         // Create a trivial cannonical query for the 'sbe' command execution.
+        NamespaceString nss{dbname};
         auto statusWithCQ =
             CanonicalQuery::canonicalize(opCtx, std::make_unique<FindCommandRequest>(nss));
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
@@ -104,6 +106,18 @@ public:
             data.outputs.set(stage_builder::PlanStageSlots::kRecordId, *recordIdSlot);
         }
 
+        // Acquire the global lock, acquire a snapshot, and stash our version of the collection
+        // catalog. The is necessary because SBE plan executors currently use the external lock
+        // policy.
+        //
+        // Unlike the similar 'AutoGetCollection*' variants of this db_raii object, this will not
+        // handle re-establishing a view of the catalog which is consistent with the new storage
+        // snapshot after a yield. For this reason, the SBE command cannot yield.
+        //
+        // Also, this will not handle all read concerns. This is ok because the SBE command is
+        // experimental and need not support the various read concerns.
+        AutoGetDbForReadLockFree autoGet{opCtx, dbname};
+
         root->attachToOperationContext(opCtx);
         exec = uassertStatusOK(plan_executor_factory::make(opCtx,
                                                            std::move(cq),
@@ -112,7 +126,7 @@ public:
                                                            &CollectionPtr::null,
                                                            false, /* returnOwnedBson */
                                                            nss,
-                                                           std::move(yieldPolicy)));
+                                                           nullptr));
         for (long long objCount = 0; objCount < batchSize; objCount++) {
             BSONObj next;
             PlanExecutor::ExecState state = exec->getNext(&next, nullptr);
