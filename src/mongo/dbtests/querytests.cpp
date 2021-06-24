@@ -1910,35 +1910,6 @@ private:
     OldClientContext _ctx;
 };
 
-class Exhaust : public CollectionInternalBase {
-public:
-    Exhaust() : CollectionInternalBase("exhaust") {}
-    void run() {
-        // Skip the test if the storage engine doesn't support capped collections.
-        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
-            return;
-        }
-
-        BSONObj info;
-        ASSERT(_client.runCommand("unittests",
-                                  BSON("create"
-                                       << "querytests.exhaust"
-                                       << "capped" << true << "size" << 8192),
-                                  info));
-        _client.insert(ns(), BSON("ts" << Timestamp(1000, 0)));
-        Message message = makeQueryMessage(ns(),
-                                           BSON("ts" << GTE << Timestamp(1000, 0)),
-                                           0,
-                                           0,
-                                           nullptr,
-                                           QueryOption_CursorTailable | QueryOption_Exhaust);
-        DbMessage dbMessage(message);
-        QueryMessage queryMessage(dbMessage);
-        Message result;
-        ASSERT_TRUE(runQuery(&_opCtx, queryMessage, NamespaceString(ns()), result));
-    }
-};
-
 class QueryReadsAll : public CollectionBase {
 public:
     QueryReadsAll() : CollectionBase("queryreadsall") {}
@@ -2061,7 +2032,6 @@ public:
         add<GetIndexSpecsByUUID>();
         add<CountByUUID>();
         add<GetDatabaseInfosTest>();
-        add<Exhaust>();
         add<QueryReadsAll>();
         add<queryobjecttests::names1>();
         add<OrderingTest>();

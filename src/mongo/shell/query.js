@@ -91,14 +91,28 @@ DBQuery.prototype._checkModify = function() {
         throw Error("query already executed");
 };
 
-DBQuery.prototype._canUseFindCommand = function() {
-    // Since runCommand() is implemented by running a findOne() against the $cmd collection, we have
-    // to make sure that we don't try to run a find command against the $cmd collection.
-    //
-    // We also forbid queries with the exhaust option from running as find commands, because the
-    // find command does not support exhaust.
+DBQuery.prototype._canUseCommandCursor = function() {
+    // We also forbid queries with the exhaust option from running as DBCommandCursor, because the
+    // DBCommandCursor does not support exhaust.
     return (this._collection.getName().indexOf("$cmd") !== 0) &&
         (this._options & DBQuery.Option.exhaust) === 0;
+};
+
+/**
+ * This method is exposed only for the purpose of testing and should not be used in most contexts.
+ *
+ * Indicates whether the OP_MSG moreToCome bit was set in the most recent getMore response received
+ * for the cursor. Should always return false unless the 'exhaust' option was set when creating the
+ * cursor.
+ */
+DBQuery.prototype._hasMoreToCome = function() {
+    this._exec();
+
+    if (this._cursor instanceof DBCommandCursor) {
+        return false;
+    }
+
+    return this._cursor.hasMoreToCome();
 };
 
 DBQuery.prototype._exec = function() {
@@ -106,7 +120,7 @@ DBQuery.prototype._exec = function() {
         assert.eq(0, this._numReturned);
         this._cursorSeen = 0;
 
-        if (this._canUseFindCommand()) {
+        if (this._canUseCommandCursor()) {
             var canAttachReadPref = true;
             var findCmd = this._convertToCommand(canAttachReadPref);
             var cmdRes = this._db.runReadCommand(findCmd, null, this._options);
@@ -117,19 +131,19 @@ DBQuery.prototype._exec = function() {
             // to continue using exhaust cursors through the shell, they are only disallowed with
             // explicit sessions.
             if (this._db.getSession()._isExplicit) {
-                throw new Error("Cannot run a legacy query on a session.");
+                throw new Error("Explicit session is not allowed for exhaust queries");
             }
 
             if (this._special && this._query.readConcern) {
-                throw new Error("readConcern requires use of read commands");
+                throw new Error("readConcern is not allowed for exhaust queries");
             }
 
             if (this._special && this._query.collation) {
-                throw new Error("collation requires use of read commands");
+                throw new Error("collation is not allowed for exhaust queries");
             }
 
             if (this._special && this._query._allowDiskUse) {
-                throw new Error("allowDiskUse option requires use of read commands");
+                throw new Error("allowDiskUse is not allowed for exhaust queries");
             }
 
             this._cursor = this._mongo.find(this._ns,

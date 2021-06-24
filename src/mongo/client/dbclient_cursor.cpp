@@ -266,7 +266,7 @@ void DBClientCursor::requestMore() {
     // For exhaust queries, once the stream has been initiated we get data blasted to us
     // from the remote server, without a need to send any more 'getMore' requests.
     const auto isExhaust = opts & QueryOption_Exhaust;
-    if (isExhaust && (!_useFindCommand || _connectionHasPendingReplies)) {
+    if (isExhaust && _connectionHasPendingReplies) {
         return exhaustReceiveMore();
     }
 
@@ -588,20 +588,14 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       haveLimit(nToReturn > 0 && !(queryOptions & QueryOption_CursorTailable)),
       nToSkip(nToSkip),
       fieldsToReturn(fieldsToReturn),
-      opts(queryOptions & ~QueryOptionLocal_forceOpQuery),
+      opts(queryOptions),
       batchSize(batchSize == 1 ? 2 : batchSize),
       resultFlags(0),
       cursorId(cursorId),
       _ownCursor(true),
       wasError(false),
       _readConcernObj(readConcernObj),
-      _operationTime(operationTime) {
-    if (queryOptions & QueryOptionLocal_forceOpQuery) {
-        // Legacy OP_QUERY does not support UUIDs.
-        invariant(!_nsOrUuid.uuid());
-        _useFindCommand = false;
-    }
-}
+      _operationTime(operationTime) {}
 
 /* static */
 StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationRequest(

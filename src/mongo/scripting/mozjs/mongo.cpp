@@ -61,7 +61,6 @@ namespace mozjs {
 const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(auth, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(close, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorFromId, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorHandleFromId, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(find, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(generateDataKey, MongoExternalInfo),
@@ -360,9 +359,6 @@ void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     int batchSize = ValueWriter(cx, args.get(5)).toInt32();
     int options = ValueWriter(cx, args.get(6)).toInt32();
 
-    // The shell only calls this method when it wants to test OP_QUERY.
-    options |= DBClientCursor::QueryOptionLocal_forceOpQuery;
-
     std::unique_ptr<DBClientCursor> cursor(conn->query(NamespaceString(ns),
                                                        q,
                                                        nToReturn,
@@ -434,39 +430,6 @@ void MongoBase::Functions::logout::call(JSContext* cx, JS::CallArgs args) {
     // Make a copy because I want to insulate us from whether conn->logout
     // writes an owned bson or not
     ValueReader(cx, args.rval()).fromBSON(ret.getOwned(), nullptr, false);
-}
-
-void MongoBase::Functions::cursorFromId::call(JSContext* cx, JS::CallArgs args) {
-    auto scope = getScope(cx);
-
-    if (!(args.length() == 2 || args.length() == 3))
-        uasserted(ErrorCodes::BadValue, "cursorFromId needs 2 or 3 args");
-
-    if (!scope->getProto<NumberLongInfo>().instanceOf(args.get(1)))
-        uasserted(ErrorCodes::BadValue, "2nd arg must be a NumberLong");
-
-    if (!(args.get(2).isNumber() || args.get(2).isUndefined()))
-        uasserted(ErrorCodes::BadValue, "3rd arg must be a js Number");
-
-    auto conn = getConnection(args);
-
-    std::string ns = ValueWriter(cx, args.get(0)).toString();
-
-    long long cursorId = NumberLongInfo::ToNumberLong(cx, args.get(1));
-
-    // The shell only calls this method when it wants to test OP_GETMORE.
-    auto cursor = std::make_unique<DBClientCursor>(
-        conn, NamespaceString(ns), cursorId, 0, DBClientCursor::QueryOptionLocal_forceOpQuery);
-
-    if (args.get(2).isNumber())
-        cursor->setBatchSize(ValueWriter(cx, args.get(2)).toInt32());
-
-    JS::RootedObject c(cx);
-    scope->getProto<CursorInfo>().newObject(&c);
-
-    setCursor(scope, c, std::move(cursor), args);
-
-    args.rval().setObjectOrNull(c);
 }
 
 void MongoBase::Functions::cursorHandleFromId::call(JSContext* cx, JS::CallArgs args) {

@@ -41,7 +41,7 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec CursorInfo::methods[8] = {
+const JSFunctionSpec CursorInfo::methods[9] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(close, CursorInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(hasNext, CursorInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(next, CursorInfo),
@@ -49,6 +49,7 @@ const JSFunctionSpec CursorInfo::methods[8] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getId, CursorInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(readOnly, CursorInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isClosed, CursorInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(hasMoreToCome, CursorInfo),
     JS_FS_END,
 };
 
@@ -149,6 +150,17 @@ void CursorInfo::Functions::isClosed::call(JSContext* cx, JS::CallArgs args) {
     }
 
     args.rval().setBoolean(cursor->isDead());
+}
+
+void CursorInfo::Functions::hasMoreToCome::call(JSContext* cx, JS::CallArgs args) {
+    auto cursor = getCursor(args);
+
+    if (!cursor) {
+        args.rval().setBoolean(false);
+        return;
+    }
+
+    args.rval().setBoolean(cursor->hasMoreToCome());
 }
 
 }  // namespace mozjs
