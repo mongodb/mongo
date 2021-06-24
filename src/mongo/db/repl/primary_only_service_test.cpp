@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <boost/optional/optional_io.hpp>
 #include <memory>
 
 #include "mongo/db/client.h"
@@ -89,6 +90,10 @@ public:
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
         return std::make_shared<TestService::Instance>(this, std::move(initialState));
     }
+
+    // Make this public since it's protected in the base class but it needs to be public if we want
+    // to test it here.
+    using PrimaryOnlyService::getAllInstances;
 
     class Instance final : public PrimaryOnlyService::TypedInstance<Instance> {
     public:
@@ -603,6 +608,99 @@ DEATH_TEST_F(PrimaryOnlyServiceTest,
         ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
         TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
     }
+}
+
+TEST_F(PrimaryOnlyServiceTest, LookupInstanceAfterStepDownReturnsNone) {
+    // Make sure the instance doesn't complete before we try to look it up.
+    auto timesEntered = TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+    ASSERT(instance.get());
+    ASSERT_EQ(0, instance->getID());
+
+    // Wait for Instance::run() to be called before calling stepDown so that the _completionPromise
+    // will eventually be set.
+    TestServiceHangDuringInitialization.waitForTimesEntered(timesEntered + 1);
+
+    stepDown();
+
+    auto instance2 = TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+
+    ASSERT_EQ(instance2, boost::none);
+
+    TestServiceHangDuringInitialization.setMode(FailPoint::off);
+    ASSERT_EQ(ErrorCodes::Interrupted, instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(PrimaryOnlyServiceTest, LookupInstanceAfterShutDownReturnsNone) {
+    // Make sure the instance doesn't complete before we try to look it up.
+    auto timesEntered = TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+    ASSERT(instance.get());
+    ASSERT_EQ(0, instance->getID());
+    // Make sure we enter the run function before shutting down.
+    TestServiceHangDuringInitialization.waitForTimesEntered(timesEntered + 1);
+    TestServiceHangDuringInitialization.setMode(FailPoint::off);
+
+    shutdown();
+
+    auto instance2 = TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+
+    ASSERT_EQ(instance2, boost::none);
+
+    ASSERT_EQ(ErrorCodes::Interrupted, instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(PrimaryOnlyServiceTest, GetAllInstancesAfterStepDownReturnsEmptyVector) {
+    // Make sure the instance doesn't complete before we try to look it up.
+    auto timesEntered = TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+    ASSERT(instance.get());
+    ASSERT_EQ(0, instance->getID());
+
+    // Wait for Instance::run() to be called before calling stepDown so that the _completionPromise
+    // will eventually be set.
+    TestServiceHangDuringInitialization.waitForTimesEntered(timesEntered + 1);
+
+    stepDown();
+
+    auto instances = static_cast<TestService*>(_service)->getAllInstances(opCtx.get());
+
+    ASSERT_EQ(instances.size(), 0);
+
+    TestServiceHangDuringInitialization.setMode(FailPoint::off);
+    ASSERT_EQ(ErrorCodes::Interrupted, instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(PrimaryOnlyServiceTest, GetAllInstancesAfterShutDownReturnsEmptyVector) {
+    // Make sure the instance doesn't complete before we try to look it up.
+    auto timesEntered = TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+    ASSERT(instance.get());
+    ASSERT_EQ(0, instance->getID());
+
+    // Make sure we enter the run function before shutting down.
+    TestServiceHangDuringInitialization.waitForTimesEntered(timesEntered + 1);
+    TestServiceHangDuringInitialization.setMode(FailPoint::off);
+
+    shutdown();
+
+    auto instances = static_cast<TestService*>(_service)->getAllInstances(opCtx.get());
+
+    ASSERT_EQ(instances.size(), 0);
+
+    ASSERT_EQ(ErrorCodes::Interrupted, instance->getCompletionFuture().getNoThrow());
 }
 
 TEST_F(PrimaryOnlyServiceTest, GetOrCreateInstanceInterruptible) {

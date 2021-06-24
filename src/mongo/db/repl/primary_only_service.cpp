@@ -542,7 +542,6 @@ boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyServic
         _rebuildCV, lk, [this]() { return _state != State::kRebuilding; });
 
     if (_state == State::kShutdown || _state == State::kPaused) {
-        invariant(_activeInstances.empty());
         return boost::none;
     }
     if (_state == State::kRebuildFailed) {
@@ -573,7 +572,6 @@ std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::g
         _rebuildCV, lk, [this]() { return _state != State::kRebuilding; });
 
     if (_state == State::kShutdown || _state == State::kPaused) {
-        invariant(_activeInstances.empty());
         return instances;
     }
     if (_state == State::kRebuildFailed) {
