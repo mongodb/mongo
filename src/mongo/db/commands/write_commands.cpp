@@ -57,6 +57,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/retryable_writes_stats.h"
@@ -312,25 +313,24 @@ boost::optional<BSONObj> generateError(OperationContext* opCtx,
                    status.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()) {
         error.append("code", static_cast<int>(ErrorCodes::DocumentValidationFailure));
         error.append("errInfo", docValidationError->getDetails());
-    } else if (ErrorCodes::isTenantMigrationError(status.code())) {
-        if (ErrorCodes::TenantMigrationConflict == status.code()) {
-            auto migrationConflictInfo = status.extraInfo<TenantMigrationConflictInfo>();
+    } else if (status.code() == ErrorCodes::TenantMigrationConflict) {
+        hangWriteBeforeWaitingForMigrationDecision.pauseWhileSet(opCtx);
 
-            hangWriteBeforeWaitingForMigrationDecision.pauseWhileSet(opCtx);
+        auto migrationStatus =
+            tenant_migration_access_blocker::handleTenantMigrationConflict(opCtx, status);
 
-            auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker();
+        // Interruption errors encountered during batch execution fail the entire batch, so throw on
+        // such errors here for consistency.
+        if (ErrorCodes::isInterruption(migrationStatus)) {
+            uassertStatusOK(migrationStatus);
+        }
 
-            auto migrationStatus = mtab->waitUntilCommittedOrAborted(opCtx);
-            mtab->recordTenantMigrationError(migrationStatus);
-            error.append("code", static_cast<int>(migrationStatus.code()));
+        error.append("code", migrationStatus.code());
 
-            // We want to append an empty errmsg for the errors after the first one, so let the
-            // code below that appends errmsg do that.
-            if (status.reason() != "") {
-                error.append("errmsg", errorMessage(migrationStatus.reason()));
-            }
-        } else {
-            error.append("code", int(status.code()));
+        // We want to append an empty errmsg for the errors after the first one, so let the
+        // code below that appends errmsg do that.
+        if (status.reason() != "") {
+            error.append("errmsg", errorMessage(migrationStatus.reason()));
         }
     } else {
         error.append("code", int(status.code()));

@@ -36,12 +36,14 @@
 
 namespace mongo {
 
-class TenantMigrationConflictInfo final : public ErrorExtraInfo {
-public:
-    static constexpr auto code = ErrorCodes::TenantMigrationConflict;
+const Status kNonRetryableTenantMigrationStatus(
+    ErrorCodes::Interrupted,
+    "Operation interrupted by an internal data migration and could not be automatically retried");
 
-    TenantMigrationConflictInfo(const std::string tenantId,
-                                std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr)
+class TenantMigrationConflictInfoBase : public ErrorExtraInfo {
+public:
+    TenantMigrationConflictInfoBase(const std::string tenantId,
+                                    std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr)
         : _tenantId(std::move(tenantId)), _mtab(std::move(mtab)){};
 
     const auto& getTenantId() const {
@@ -59,7 +61,25 @@ private:
     std::string _tenantId;
     std::shared_ptr<TenantMigrationAccessBlocker> _mtab;
 };
-using TenantMigrationConflictException = ExceptionFor<ErrorCodes::TenantMigrationConflict>;
+
+class TenantMigrationConflictInfo final : public TenantMigrationConflictInfoBase {
+public:
+    static constexpr auto code = ErrorCodes::TenantMigrationConflict;
+
+    TenantMigrationConflictInfo(const std::string tenantId,
+                                std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr)
+        : TenantMigrationConflictInfoBase(std::move(tenantId), std::move(mtab)) {}
+};
+
+class NonRetryableTenantMigrationConflictInfo final : public TenantMigrationConflictInfoBase {
+public:
+    static constexpr auto code = ErrorCodes::NonRetryableTenantMigrationConflict;
+
+    NonRetryableTenantMigrationConflictInfo(
+        const std::string tenantId, std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr)
+        : TenantMigrationConflictInfoBase(std::move(tenantId), std::move(mtab)) {}
+};
+
 using TenantMigrationCommittedException = ExceptionFor<ErrorCodes::TenantMigrationCommitted>;
 
 }  // namespace mongo

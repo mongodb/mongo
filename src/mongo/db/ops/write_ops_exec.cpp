@@ -66,6 +66,7 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -293,17 +294,24 @@ bool handleError(OperationContext* opCtx,
     }
 
     if (ErrorCodes::isTenantMigrationError(ex)) {
+        // Multiple not-idempotent updates are not safe to retry at the cloud level. We treat these
+        // the same as an interruption due to a repl state change and fail the whole batch.
         if (isMultiUpdate) {
-            BSONObjBuilder builder;
-            ex.serialize(&builder);
-            // Multiple not-idempotent updates are not safe to retry at the cloud level. To indicate
-            // this, we replace the original error.
-            out->results.emplace_back(
-                Status(ErrorCodes::Interrupted,
-                       str::stream() << "Multi update was interrupted by error: " << ex.reason(),
-                       builder.obj()));
-            return false;
+            if (ex.code() != ErrorCodes::TenantMigrationConflict) {
+                uassertStatusOK(kNonRetryableTenantMigrationStatus);
+            }
+
+            // If the migration is active, we throw a different code that will be caught higher up
+            // and replaced with a non-retryable code after the migration finishes to avoid wasted
+            // retries.
+            auto migrationConflictInfo = ex.toStatus().extraInfo<TenantMigrationConflictInfo>();
+            uassertStatusOK(
+                Status(NonRetryableTenantMigrationConflictInfo(
+                           migrationConflictInfo->getTenantId(),
+                           migrationConflictInfo->getTenantMigrationAccessBlocker()),
+                       "Multi update must block until this tenant migration commits or aborts"));
         }
+
         // If an op fails due to a TenantMigrationError then subsequent ops will also fail due to a
         // migration blocking, committing, or aborting.
         out->results.emplace_back(ex.toStatus());

@@ -38,17 +38,18 @@ namespace mongo {
 namespace {
 
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(TenantMigrationConflictInfo);
+MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(NonRetryableTenantMigrationConflictInfo);
 
 constexpr StringData kTenantIdFieldName = "tenantId"_sd;
 
 }  // namespace
 
-void TenantMigrationConflictInfo::serialize(BSONObjBuilder* bob) const {
+void TenantMigrationConflictInfoBase::serialize(BSONObjBuilder* bob) const {
     bob->append(kTenantIdFieldName, _tenantId);
 }
 
-std::shared_ptr<const ErrorExtraInfo> TenantMigrationConflictInfo::parse(const BSONObj& obj) {
-    return std::make_shared<TenantMigrationConflictInfo>(obj[kTenantIdFieldName].String());
+std::shared_ptr<const ErrorExtraInfo> TenantMigrationConflictInfoBase::parse(const BSONObj& obj) {
+    return std::make_shared<TenantMigrationConflictInfoBase>(obj[kTenantIdFieldName].String());
 }
 
 }  // namespace mongo

@@ -768,9 +768,9 @@ Future<void> InvokeCommand::run() {
                    .get(execContext->getOpCtx());
                return runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());
            })
-        .onError<ErrorCodes::TenantMigrationConflict>([this](Status status) {
-            tenant_migration_access_blocker::handleTenantMigrationConflict(
-                _ecd->getExecutionContext()->getOpCtx(), std::move(status));
+        .onErrorCategory<ErrorCategory::TenantMigrationConflictError>([this](Status status) {
+            uassertStatusOK(tenant_migration_access_blocker::handleTenantMigrationConflict(
+                _ecd->getExecutionContext()->getOpCtx(), std::move(status)));
             return Status::OK();
         });
 }
@@ -786,13 +786,13 @@ Future<void> CheckoutSessionAndInvokeCommand::run() {
                    .get(execContext->getOpCtx());
                return runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());
            })
-        .onError<ErrorCodes::TenantMigrationConflict>([this](Status status) {
+        .onErrorCategory<ErrorCategory::TenantMigrationConflictError>([this](Status status) {
             // Abort transaction and clean up transaction resources before blocking the
             // command to allow the stable timestamp on the node to advance.
             _cleanupTransaction();
 
-            tenant_migration_access_blocker::handleTenantMigrationConflict(
-                _ecd->getExecutionContext()->getOpCtx(), std::move(status));
+            uassertStatusOK(tenant_migration_access_blocker::handleTenantMigrationConflict(
+                _ecd->getExecutionContext()->getOpCtx(), std::move(status)));
         })
         .tapError([this](Status status) { _tapError(status); })
         .then([this] { return _commitInvocation(); });

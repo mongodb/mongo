@@ -86,32 +86,13 @@ function doMultiUpdate(
         } catch (err) {
             jsTestLog(`Received error ${err}`);
             assert.commandFailedWithCode(err, ErrorCodes.Interrupted);
-            assert.lte(err["nModified"], records);
-            let actualNumModified = 0;
             let findResult = assert.commandWorked(
                 db.runCommand({find: collName, readConcern: {level: readConcern}}));
             var cursor = new DBCommandCursor(db, findResult);
             cursor.forEach(doc => {
                 assert(doc.x == completedCycles || doc.x == completedCycles + 1,
                        "expected each doc to be updated at most once");
-                actualNumModified += (doc.x == completedCycles + 1 ? 1 : 0);
             });
-            // TODO(SERVER-15292): uncomment this when the bug is fixed, and reconcile with the
-            // block after the commented section.
-            //    assert.eq(err["nModified"], actualNumModified,
-            //           `expected the count of incremented values to match nModified: ${
-            //               err} during iteration # ${completedCycles}, actually modified ${
-            //               actualNumModified} in ${JSON.stringify(findResult)}`);
-            // if (actualNumModified == records) {
-            //     // All records were modified, we can continue.
-            //     continue;
-            // }
-            // break;
-            if (err["nModified"] != actualNumModified) {
-                jsTestLog(`expected the count of incremented values to match nModified: ${
-                    err} during iteration # ${completedCycles}, actually modified ${
-                    actualNumModified} in ${JSON.stringify(findResult)}`);
-            }
             break;
         }
     }

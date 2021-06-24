@@ -10,6 +10,8 @@
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   # TODO SERVER-59090: Remove this tag.
+ *   backport_required_multiversion,
  * ]
  */
 (function() {
@@ -27,6 +29,7 @@ const kTenantDefinedDbName = "0";
 const kNumWriteOps = 6;  // num of writes to run in bulk.
 const kNumWriteBatchesWithoutMigrationConflict =
     2;  // num of write batches we allow to complete before migration blocks writes.
+const kNumUpdatesWithoutMigrationConflict = 2;
 const kMaxSleepTimeMS = 1000;
 const kBatchTypes = {
     insert: 1,
@@ -48,6 +51,9 @@ const donorRst = new ReplSetTest({
         }
     })
 });
+donorRst.startSet();
+donorRst.initiate();
+
 const recipientRst = new ReplSetTest({
     nodes: 1,
     name: 'recipient',
@@ -59,9 +65,20 @@ const recipientRst = new ReplSetTest({
         },
     })
 });
+recipientRst.startSet();
+recipientRst.initiate();
+
 const kRecipientConnString = recipientRst.getURL();
 
-function bulkWriteDocsOrdered(primaryHost, dbName, collName, numDocs) {
+const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+    donorRst.stopSet();
+    recipientRst.stopSet();
+    return;
+}
+
+function bulkInsertDocsOrdered(primaryHost, dbName, collName, numDocs) {
     const primary = new Mongo(primaryHost);
     let primaryDB = primary.getDB(dbName);
     let bulk = primaryDB[collName].initializeOrderedBulkOp();
@@ -78,7 +95,7 @@ function bulkWriteDocsOrdered(primaryHost, dbName, collName, numDocs) {
     return {res: res.getRawResponse(), ops: bulk.getOperations()};
 }
 
-function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
+function bulkInsertDocsUnordered(primaryHost, dbName, collName, numDocs) {
     const primary = new Mongo(primaryHost);
     let primaryDB = primary.getDB(dbName);
     let bulk = primaryDB[collName].initializeUnorderedBulkOp();
@@ -95,23 +112,58 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     return {res: res.getRawResponse(), ops: bulk.getOperations()};
 }
 
+function bulkMultiUpdateDocsOrdered(primaryHost, dbName, collName, numDocs) {
+    const primary = new Mongo(primaryHost);
+    let primaryDB = primary.getDB(dbName);
+
+    // Insert initial docs to be updated.
+    let insertBulk = primaryDB[collName].initializeOrderedBulkOp();
+    for (let i = 0; i < numDocs; ++i) {
+        insertBulk.insert({x: i});
+    }
+    insertBulk.execute();
+
+    let updateBulk = primaryDB[collName].initializeOrderedBulkOp();
+    for (let i = 0; i < numDocs; ++i) {
+        updateBulk.find({x: i}).update({$set: {ordered_update: true}});
+    }
+
+    let res;
+    try {
+        res = updateBulk.execute();
+    } catch (e) {
+        res = e;
+    }
+    return {res: res.getRawResponse ? res.getRawResponse() : res, ops: updateBulk.getOperations()};
+}
+
+function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
+    const primary = new Mongo(primaryHost);
+    let primaryDB = primary.getDB(dbName);
+
+    // Insert initial docs to be updated.
+    let insertBulk = primaryDB[collName].initializeOrderedBulkOp();
+    for (let i = 0; i < numDocs; ++i) {
+        insertBulk.insert({x: i});
+    }
+    insertBulk.execute();
+
+    let updateBulk = primaryDB[collName].initializeUnorderedBulkOp();
+    for (let i = 0; i < numDocs; ++i) {
+        updateBulk.find({x: i}).update({$set: {unordered_update: true}});
+    }
+
+    let res;
+    try {
+        res = updateBulk.execute();
+    } catch (e) {
+        res = e;
+    }
+    return {res: res.getRawResponse ? res.getRawResponse() : res, ops: updateBulk.getOperations()};
+}
+
 (() => {
     jsTestLog("Testing unordered bulk insert against a tenant migration that commits.");
-
-    donorRst.startSet();
-    donorRst.initiate();
-
-    recipientRst.startSet();
-    recipientRst.initiate();
-
-    const tenantMigrationTest =
-        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        recipientRst.stopSet();
-        return;
-    }
 
     const tenantId = "bulkUnorderedInserts-committed";
     const migrationOpts = {
@@ -128,7 +180,7 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     const writeFp = configureFailPoint(
         primaryDB, "hangDuringBatchInsert", {}, {skip: kNumWriteBatchesWithoutMigrationConflict});
     const bulkWriteThread =
-        new Thread(bulkWriteDocsUnordered, primary.host, dbName, kCollName, kNumWriteOps);
+        new Thread(bulkInsertDocsUnordered, primary.host, dbName, kCollName, kNumWriteOps);
 
     bulkWriteThread.start();
     writeFp.wait();
@@ -145,40 +197,23 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     assert.eq(writeErrors.length,
               (kNumWriteOps - (kMaxBatchSize * kNumWriteBatchesWithoutMigrationConflict)));
 
+    let expectedErrorIndex = kMaxBatchSize * kNumWriteBatchesWithoutMigrationConflict;
     writeErrors.forEach((err, arrIndex) => {
         assert.eq(err.code, ErrorCodes.TenantMigrationCommitted);
+        assert.eq(err.index, expectedErrorIndex++);
         if (arrIndex == 0) {
             assert(err.errmsg);
         } else {
             assert(!err.errmsg);
         }
     });
-
-    tenantMigrationTest.stop();
-    donorRst.stopSet();
-    recipientRst.stopSet();
 })();
 
 (() => {
     jsTestLog(
         "Testing unordered bulk insert against a tenant migration that blocks a few inserts and commits.");
 
-    donorRst.startSet();
-    donorRst.initiate();
-
-    recipientRst.startSet();
-    recipientRst.initiate();
-
-    const tenantMigrationTest =
-        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        recipientRst.stopSet();
-        return;
-    }
-
-    const tenantId = "bulkUnorderedInserts-committed";
+    const tenantId = "bulkUnorderedInserts-blocks-committed";
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: kRecipientConnString,
@@ -195,7 +230,7 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     const writeFp = configureFailPoint(
         primaryDB, "hangDuringBatchInsert", {}, {skip: kNumWriteBatchesWithoutMigrationConflict});
     const bulkWriteThread =
-        new Thread(bulkWriteDocsUnordered, primary.host, dbName, kCollName, kNumWriteOps);
+        new Thread(bulkInsertDocsUnordered, primary.host, dbName, kCollName, kNumWriteOps);
 
     const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
     const migrationThread =
@@ -223,8 +258,10 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     assert.eq(writeErrors.length,
               (kNumWriteOps - (kMaxBatchSize * kNumWriteBatchesWithoutMigrationConflict)));
 
+    let expectedErrorIndex = kMaxBatchSize * kNumWriteBatchesWithoutMigrationConflict;
     writeErrors.forEach((err, index) => {
         assert.eq(err.code, ErrorCodes.TenantMigrationCommitted);
+        assert.eq(err.index, expectedErrorIndex++);
         if (index == 0) {
             assert.eq(err.errmsg,
                       "Write or read must be re-routed to the new owner of this tenant");
@@ -232,30 +269,11 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
             assert.eq(err.errmsg, "");
         }
     });
-
-    tenantMigrationTest.stop();
-    donorRst.stopSet();
-    recipientRst.stopSet();
 })();
 
 (() => {
     jsTestLog("Testing unordered bulk insert against a tenant migration that aborts.");
 
-    donorRst.startSet();
-    donorRst.initiate();
-
-    recipientRst.startSet();
-    recipientRst.initiate();
-
-    const tenantMigrationTest =
-        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        recipientRst.stopSet();
-        return;
-    }
     const tenantId = "bulkUnorderedInserts-aborted";
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -273,7 +291,7 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     const writeFp = configureFailPoint(
         primaryDB, "hangDuringBatchInsert", {}, {skip: kNumWriteBatchesWithoutMigrationConflict});
     const bulkWriteThread =
-        new Thread(bulkWriteDocsUnordered, primary.host, dbName, kCollName, kNumWriteOps);
+        new Thread(bulkInsertDocsUnordered, primary.host, dbName, kCollName, kNumWriteOps);
 
     const abortFp = configureFailPoint(primaryDB, "abortTenantMigrationBeforeLeavingBlockingState");
 
@@ -308,37 +326,20 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     assert.eq(writeErrors.length,
               (kNumWriteOps - (kMaxBatchSize * kNumWriteBatchesWithoutMigrationConflict)));
 
+    let expectedErrorIndex = kMaxBatchSize * kNumWriteBatchesWithoutMigrationConflict;
     writeErrors.forEach((err, arrIndex) => {
         assert.eq(err.code, ErrorCodes.TenantMigrationAborted);
+        assert.eq(err.index, expectedErrorIndex++);
         if (arrIndex == 0) {
             assert(err.errmsg);
         } else {
             assert(!err.errmsg);
         }
     });
-
-    tenantMigrationTest.stop();
-    donorRst.stopSet();
-    recipientRst.stopSet();
 })();
 
 (() => {
     jsTestLog("Testing ordered bulk inserts against a tenant migration that commits.");
-
-    donorRst.startSet();
-    donorRst.initiate();
-
-    recipientRst.startSet();
-    recipientRst.initiate();
-
-    const tenantMigrationTest =
-        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        recipientRst.stopSet();
-        return;
-    }
 
     const tenantId = "bulkOrderedInserts-committed";
     const migrationOpts = {
@@ -355,7 +356,7 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     const writeFp = configureFailPoint(
         primaryDB, "hangDuringBatchInsert", {}, {skip: kNumWriteBatchesWithoutMigrationConflict});
     const bulkWriteThread =
-        new Thread(bulkWriteDocsOrdered, primary.host, dbName, kCollName, kNumWriteOps);
+        new Thread(bulkInsertDocsOrdered, primary.host, dbName, kCollName, kNumWriteOps);
 
     bulkWriteThread.start();
     writeFp.wait();
@@ -376,32 +377,13 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     // started blocking writes.
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationCommitted);
-
-    tenantMigrationTest.stop();
-    donorRst.stopSet();
-    recipientRst.stopSet();
 })();
 
 (() => {
     jsTestLog(
         "Testing ordered bulk insert against a tenant migration that blocks a few inserts and commits.");
 
-    donorRst.startSet();
-    donorRst.initiate();
-
-    recipientRst.startSet();
-    recipientRst.initiate();
-
-    const tenantMigrationTest =
-        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        recipientRst.stopSet();
-        return;
-    }
-
-    const tenantId = "bulkOrderedInserts-committed";
+    const tenantId = "bulkOrderedInserts-blocks-committed";
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
@@ -418,7 +400,7 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     const writeFp = configureFailPoint(
         primaryDB, "hangDuringBatchInsert", {}, {skip: kNumWriteBatchesWithoutMigrationConflict});
     const bulkWriteThread =
-        new Thread(bulkWriteDocsOrdered, primary.host, dbName, kCollName, kNumWriteOps);
+        new Thread(bulkInsertDocsOrdered, primary.host, dbName, kCollName, kNumWriteOps);
 
     const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
     const migrationThread =
@@ -449,29 +431,10 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     // started blocking writes.
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationCommitted);
-
-    tenantMigrationTest.stop();
-    donorRst.stopSet();
-    recipientRst.stopSet();
 })();
 
 (() => {
     jsTestLog("Testing ordered bulk write against a tenant migration that aborts.");
-
-    donorRst.startSet();
-    donorRst.initiate();
-
-    recipientRst.startSet();
-    recipientRst.initiate();
-
-    const tenantMigrationTest =
-        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        recipientRst.stopSet();
-        return;
-    }
 
     const tenantId = "bulkOrderedInserts-aborted";
     const migrationOpts = {
@@ -490,7 +453,7 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     const writeFp = configureFailPoint(
         primaryDB, "hangDuringBatchInsert", {}, {skip: kNumWriteBatchesWithoutMigrationConflict});
     const bulkWriteThread =
-        new Thread(bulkWriteDocsOrdered, primary.host, dbName, kCollName, kNumWriteOps);
+        new Thread(bulkInsertDocsOrdered, primary.host, dbName, kCollName, kNumWriteOps);
 
     const abortFp = configureFailPoint(primaryDB, "abortTenantMigrationBeforeLeavingBlockingState");
 
@@ -529,9 +492,179 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     // started blocking writes.
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationAborted);
-
-    tenantMigrationTest.stop();
-    donorRst.stopSet();
-    recipientRst.stopSet();
 })();
+
+(() => {
+    jsTestLog("Testing unordered bulk multi update that blocks.");
+
+    const tenantId = "bulkUnorderedMultiUpdates-blocks";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        recipientConnString: kRecipientConnString,
+        tenantId,
+    };
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+
+    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const primary = donorRst.getPrimary();
+    const primaryDB = primary.getDB(dbName);
+
+    assert.commandWorked(primaryDB.runCommand({create: kCollName}));
+
+    const writeFp = configureFailPoint(
+        primaryDB, "hangDuringBatchUpdate", {}, {skip: kNumUpdatesWithoutMigrationConflict});
+    const bulkWriteThread =
+        new Thread(bulkMultiUpdateDocsUnordered, primary.host, dbName, kCollName, kNumWriteOps);
+
+    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
+    const migrationThread =
+        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
+
+    bulkWriteThread.start();
+    writeFp.wait();
+
+    migrationThread.start();
+    blockFp.wait();
+
+    writeFp.off();
+    sleep(Math.random() * kMaxSleepTimeMS);
+    blockFp.off();
+
+    bulkWriteThread.join();
+    migrationThread.join();
+
+    TenantMigrationTest.assertCommitted(migrationThread.returnData());
+
+    let bulkWriteRes = bulkWriteThread.returnData();
+    assert.eq(bulkWriteRes.res.code, ErrorCodes.Interrupted, tojson(bulkWriteRes));
+    assert.eq(
+        bulkWriteRes.res.errmsg,
+        "Operation interrupted by an internal data migration and could not be automatically retried",
+        tojson(bulkWriteRes));
+})();
+
+(() => {
+    jsTestLog("Testing ordered bulk multi update that blocks.");
+
+    const tenantId = "bulkOrderedMultiUpdates-blocks";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        recipientConnString: kRecipientConnString,
+        tenantId,
+    };
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+
+    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const primary = donorRst.getPrimary();
+    const primaryDB = primary.getDB(dbName);
+
+    assert.commandWorked(primaryDB.runCommand({create: kCollName}));
+
+    const writeFp = configureFailPoint(
+        primaryDB, "hangDuringBatchUpdate", {}, {skip: kNumUpdatesWithoutMigrationConflict});
+    const bulkWriteThread =
+        new Thread(bulkMultiUpdateDocsOrdered, primary.host, dbName, kCollName, kNumWriteOps);
+
+    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
+    const migrationThread =
+        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
+
+    bulkWriteThread.start();
+    writeFp.wait();
+
+    migrationThread.start();
+    blockFp.wait();
+
+    writeFp.off();
+    sleep(Math.random() * kMaxSleepTimeMS);
+    blockFp.off();
+
+    bulkWriteThread.join();
+    migrationThread.join();
+
+    TenantMigrationTest.assertCommitted(migrationThread.returnData());
+
+    let bulkWriteRes = bulkWriteThread.returnData();
+    assert.eq(bulkWriteRes.res.code, ErrorCodes.Interrupted, tojson(bulkWriteRes));
+    assert.eq(
+        bulkWriteRes.res.errmsg,
+        "Operation interrupted by an internal data migration and could not be automatically retried",
+        tojson(bulkWriteRes));
+})();
+
+(() => {
+    jsTestLog("Testing unordered multi updates against a tenant migration that has completed.");
+
+    const tenantId = "bulkUnorderedMultiUpdates-completed";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        tenantId,
+    };
+
+    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const primary = donorRst.getPrimary();
+    const primaryDB = primary.getDB(dbName);
+
+    assert.commandWorked(primaryDB.runCommand({create: kCollName}));
+
+    const writeFp = configureFailPoint(
+        primaryDB, "hangDuringBatchUpdate", {}, {skip: kNumUpdatesWithoutMigrationConflict});
+    const bulkWriteThread =
+        new Thread(bulkMultiUpdateDocsUnordered, primary.host, dbName, kCollName, kNumWriteOps);
+
+    bulkWriteThread.start();
+    writeFp.wait();
+
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
+
+    writeFp.off();
+    bulkWriteThread.join();
+
+    const bulkWriteRes = bulkWriteThread.returnData();
+    assert.eq(bulkWriteRes.res.code, ErrorCodes.Interrupted, tojson(bulkWriteRes));
+    assert.eq(
+        bulkWriteRes.res.errmsg,
+        "Operation interrupted by an internal data migration and could not be automatically retried",
+        tojson(bulkWriteRes));
+})();
+
+(() => {
+    jsTestLog("Testing ordered multi updates against a tenant migration that has completed.");
+
+    const tenantId = "bulkOrderedMultiUpdates-completed";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        tenantId,
+    };
+
+    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const primary = donorRst.getPrimary();
+    const primaryDB = primary.getDB(dbName);
+
+    assert.commandWorked(primaryDB.runCommand({create: kCollName}));
+
+    const writeFp = configureFailPoint(
+        primaryDB, "hangDuringBatchUpdate", {}, {skip: kNumUpdatesWithoutMigrationConflict});
+    const bulkWriteThread =
+        new Thread(bulkMultiUpdateDocsOrdered, primary.host, dbName, kCollName, kNumWriteOps);
+
+    bulkWriteThread.start();
+    writeFp.wait();
+
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
+
+    writeFp.off();
+    bulkWriteThread.join();
+
+    const bulkWriteRes = bulkWriteThread.returnData();
+    assert.eq(bulkWriteRes.res.code, ErrorCodes.Interrupted, tojson(bulkWriteRes));
+    assert.eq(
+        bulkWriteRes.res.errmsg,
+        "Operation interrupted by an internal data migration and could not be automatically retried",
+        tojson(bulkWriteRes));
+})();
+
+tenantMigrationTest.stop();
+donorRst.stopSet();
+recipientRst.stopSet();
 })();

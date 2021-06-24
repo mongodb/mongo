@@ -13,6 +13,8 @@
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   # TODO SERVER-59090: Remove this tag.
+ *   backport_required_multiversion,
  * ]
  */
 (function() {
@@ -44,6 +46,9 @@ const kCollName = "testColl";
 const kTenantDefinedDbName = "0";
 const kTestDoc = {
     x: -1
+};
+const kTestDoc2 = {
+    x: -2
 };
 
 const kTestIndexKey = {
@@ -118,6 +123,11 @@ function createCollectionAndInsertDocs(primaryDB, collName, isCapped, numDocs = 
 
 function insertTestDoc(primaryDB, collName) {
     assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [kTestDoc]}));
+}
+
+function insertTwoTestDocs(primaryDB, collName) {
+    assert.commandWorked(
+        primaryDB.runCommand({insert: collName, documents: [kTestDoc, kTestDoc2]}));
 }
 
 function createTestIndex(primaryDB, collName) {
@@ -196,7 +206,9 @@ function makeTestOptions(
         dbName,
         collName,
         useSession,
-        testInTransaction
+        testInTransaction,
+        isBatchWrite: testCase.isBatchWrite,
+        isMultiUpdate: testCase.isMultiUpdate
     };
 }
 
@@ -219,6 +231,16 @@ function runTest(
 
 function runCommand(testOpts, expectedError) {
     let res;
+
+    if (testOpts.isMultiUpdate && !testOpts.testInTransaction) {
+        // Multi writes outside a transaction cannot be automatically retried, so we return a
+        // different error code than usual. This does not apply to the MaxTimeMS case because the
+        // error in that case is already not retryable.
+        if (expectedError == ErrorCodes.TenantMigrationCommitted ||
+            expectedError == ErrorCodes.TenantMigrationAborted) {
+            expectedError = ErrorCodes.Interrupted;
+        }
+    }
 
     if (testOpts.testInTransaction) {
         // Since oplog entries for write commands inside a transaction are not generated until the
@@ -251,16 +273,27 @@ function runCommand(testOpts, expectedError) {
 
     if (expectedError) {
         assert.commandFailedWithCode(res, expectedError);
-        // The 'TransientTransactionError' label is attached only in a scope of a transaction.
-        if (testOpts.testInTransaction &&
+
+        const expectTransientTransactionError = testOpts.testInTransaction &&
             (expectedError == ErrorCodes.TenantMigrationAborted ||
-             expectedError == ErrorCodes.TenantMigrationCommitted)) {
+             expectedError == ErrorCodes.TenantMigrationCommitted);
+        if (expectTransientTransactionError) {
             assert(res["errorLabels"] != null, "Error labels are absent from " + tojson(res));
             const expectedErrorLabels = ['TransientTransactionError'];
             assert.sameMembers(res["errorLabels"],
                                expectedErrorLabels,
                                "Error labels " + tojson(res["errorLabels"]) +
                                    " are different from expected " + expectedErrorLabels);
+        }
+
+        const expectTopLevelError = !testOpts.isBatchWrite ||
+            ErrorCodes.isInterruption(expectedError) || expectTransientTransactionError;
+        if (expectTopLevelError) {
+            assert.eq(res.code, expectedError, tojson(res));
+            assert.eq(res.ok, 0, tojson(res));
+        } else {
+            assert.isnull(res.code, tojson(res));
+            assert.eq(res.ok, 1, tojson(res));
         }
     } else {
         assert.commandWorked(res);
@@ -674,6 +707,7 @@ const testCases = {
         command: function(dbName, collName) {
             return {delete: collName, deletes: [{q: kTestDoc, limit: 1}]};
         },
+        isBatchWrite: true,
         assertCommandSucceeded: function(db, dbName, collName) {
             assert.eq(countDocs(db, collName, kTestDoc), 0);
         },
@@ -790,6 +824,7 @@ const testCases = {
         command: function(dbName, collName) {
             return {insert: collName, documents: [kTestDoc]};
         },
+        isBatchWrite: true,
         assertCommandSucceeded: function(db, dbName, collName) {
             assert.eq(countDocs(db, collName, kTestDoc), 1);
         },
@@ -917,11 +952,31 @@ const testCases = {
                 updates: [{q: kTestDoc, u: {$set: {y: 0}}, upsert: false, multi: false}]
             };
         },
+        isBatchWrite: true,
         assertCommandSucceeded: function(db, dbName, collName) {
             assert.eq(countDocs(db, collName, Object.assign({y: 0}, kTestDoc)), 1);
         },
         assertCommandFailed: function(db, dbName, collName) {
             assert.eq(countDocs(db, collName, Object.assign({y: 0}, kTestDoc)), 0);
+        }
+    },
+    multiUpdate: {
+        testInTransaction: true,
+        testAsRetryableWrite: false,
+        setUp: insertTwoTestDocs,
+        command: function(dbName, collName) {
+            return {
+                update: collName,
+                updates: [{q: {}, u: {$set: {y: 0}}, upsert: false, multi: true}]
+            };
+        },
+        isBatchWrite: true,
+        isMultiUpdate: true,
+        assertCommandSucceeded: function(db, dbName, collName) {
+            assert.eq(countDocs(db, collName, Object.assign({y: 0})), 2);
+        },
+        assertCommandFailed: function(db, dbName, collName) {
+            assert.eq(countDocs(db, collName, Object.assign({y: 0})), 0);
         }
     },
     updateRole: {skip: isAuthCommand},

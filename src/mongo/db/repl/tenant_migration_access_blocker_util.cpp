@@ -223,12 +223,12 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgReque
                 }
 
                 if (isCanceledDueToTimeout) {
-                    return Status(
-                        timeoutError,
-                        "Blocked read timed out waiting for tenant migration to commit or abort");
+                    return Status(timeoutError,
+                                  "Blocked read timed out waiting for an internal data migration "
+                                  "to commit or abort");
                 }
 
-                return status.withContext("Canceled read blocked by tenant migration");
+                return status.withContext("Canceled read blocked by internal data migration");
             })
         .semi();  // To require continuation in the user executor.
 }
@@ -384,14 +384,33 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
     });
 }
 
-void handleTenantMigrationConflict(OperationContext* opCtx, Status status) {
-    auto migrationConflictInfo = status.extraInfo<TenantMigrationConflictInfo>();
+template <typename MigrationConflictInfoType>
+Status _handleTenantMigrationConflict(OperationContext* opCtx, Status status) {
+    auto migrationConflictInfo = status.extraInfo<MigrationConflictInfoType>();
     invariant(migrationConflictInfo);
     auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker();
     invariant(mtab);
     auto migrationStatus = mtab->waitUntilCommittedOrAborted(opCtx);
     mtab->recordTenantMigrationError(migrationStatus);
-    uassertStatusOK(migrationStatus);
+    return migrationStatus;
+}
+
+Status handleTenantMigrationConflict(OperationContext* opCtx, Status status) {
+    if (status.code() == ErrorCodes::NonRetryableTenantMigrationConflict) {
+        auto migrationStatus =
+            _handleTenantMigrationConflict<NonRetryableTenantMigrationConflictInfo>(opCtx, status);
+
+        // Some operations, like multi updates, can't safely be automatically retried so we return a
+        // non retryable error instead of TenantMigrationCommitted/TenantMigrationAborted. If
+        // waiting failed for a different reason, e.g. MaxTimeMS expiring, propagate that to the
+        // user unchanged.
+        if (ErrorCodes::isTenantMigrationError(migrationStatus)) {
+            return kNonRetryableTenantMigrationStatus;
+        }
+        return migrationStatus;
+    }
+
+    return _handleTenantMigrationConflict<TenantMigrationConflictInfo>(opCtx, status);
 }
 
 void performNoopWrite(OperationContext* opCtx, StringData msg) {

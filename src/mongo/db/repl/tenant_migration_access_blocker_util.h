@@ -93,9 +93,10 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx);
 
 /**
  * Blocks until the migration commits or aborts, then returns TenantMigrationCommitted or
- * TenantMigrationAborted.
+ * TenantMigrationAborted, or a non-retryable error if the given status is
+ * NonRetryableTenantMigrationConflict.
  */
-void handleTenantMigrationConflict(OperationContext* opCtx, Status status);
+Status handleTenantMigrationConflict(OperationContext* opCtx, Status status);
 
 /**
  * Appends a no-op to the oplog.

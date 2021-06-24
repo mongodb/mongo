@@ -334,8 +334,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     } catch (const WriteConflictException&) {
         // Avoid converting WCE to Status.
         throw;
-    } catch (const TenantMigrationConflictException&) {
-        // Avoid converting TenantMigrationConflictException to Status.
+    } catch (const ExceptionForCat<ErrorCategory::TenantMigrationConflictError>&) {
+        // Avoid converting TenantMigrationConflict errors to Status.
         throw;
     } catch (const TenantMigrationCommittedException&) {
         // Avoid converting TenantMigrationCommittedException to Status.
