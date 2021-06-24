@@ -1025,11 +1025,23 @@ void markCompleted(const Status& status) {
         ReshardingMetrics::Role::kCoordinator, metricsOperationStatus, getCurrentTime());
 }
 
-BSONObj createFlushReshardingStateChangeCommand(const NamespaceString& nss) {
+BSONObj createFlushReshardingStateChangeCommand(const NamespaceString& nss,
+                                                const UUID& reshardingUUID) {
     _flushReshardingStateChange cmd(nss);
     cmd.setDbName(nss.db());
+    cmd.setReshardingUUID(reshardingUUID);
     return cmd.toBSON(
         BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+}
+
+BSONObj createShardsvrCommitReshardCollectionCmd(const NamespaceString& nss,
+                                                 const UUID& reshardingUUID) {
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append(_flushReshardingStateChange::kCommandAlias, nss.toString());
+    reshardingUUID.appendToBuilder(&cmdBuilder,
+                                   _flushReshardingStateChange::kReshardingUUIDFieldName);
+    cmdBuilder.append(WriteConcernOptions::kWriteConcernField, WriteConcernOptions::Majority);
+    return cmdBuilder.obj();
 }
 
 ExecutorFuture<ReshardingCoordinatorDocument>
@@ -1600,7 +1612,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRe
         nssToRefresh = _coordinatorDoc.getSourceNss();
     }
 
-    auto refreshCmd = createFlushReshardingStateChangeCommand(nssToRefresh);
+    auto refreshCmd =
+        createFlushReshardingStateChangeCommand(nssToRefresh, _coordinatorDoc.getReshardingUUID());
 
     _reshardingCoordinatorExternalState->sendCommandToShards(
         opCtx.get(),
@@ -1615,7 +1628,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllDonorsToRefres
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     auto donorIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
 
-    auto refreshCmd = createFlushReshardingStateChangeCommand(_coordinatorDoc.getSourceNss());
+    auto refreshCmd = createFlushReshardingStateChangeCommand(_coordinatorDoc.getSourceNss(),
+                                                              _coordinatorDoc.getReshardingUUID());
     _reshardingCoordinatorExternalState->sendCommandToShards(opCtx.get(),
                                                              NamespaceString::kAdminDb,
                                                              refreshCmd,
@@ -1633,11 +1647,12 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsTo
     std::set<ShardId> participantShardIds{donorShardIds.begin(), donorShardIds.end()};
     participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
 
-    auto refreshCmd = createFlushReshardingStateChangeCommand(nss);
+    auto commitCmd =
+        createShardsvrCommitReshardCollectionCmd(nss, _coordinatorDoc.getReshardingUUID());
     _reshardingCoordinatorExternalState->sendCommandToShards(
         opCtx.get(),
         NamespaceString::kAdminDb,
-        refreshCmd,
+        commitCmd,
         {participantShardIds.begin(), participantShardIds.end()},
         **executor);
 }
