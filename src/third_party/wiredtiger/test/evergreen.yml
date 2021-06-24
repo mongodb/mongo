@@ -2530,6 +2530,23 @@ tasks:
     name: recovery-stress-test-3
     tags: ["stress-test-3", "stress-test-zseries-3"]
 
+  - name: many-dhandle-stress-test
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars:
+            CXX=/opt/mongodbtoolchain/v3/bin/g++
+            PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-ggdb -fPIC"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/bench/workgen/runner"
+          script: |
+            set -o errexit
+            set -o verbose
+            export "PATH=/opt/mongodbtoolchain/v3/bin:$PATH"
+            ./workgen_perf_check.sh many-dhandle-stress.py output.log 50 500 500
+
   - name: cyclomatic-complexity
     commands:
       - func: "get project"
@@ -2658,6 +2675,18 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
+
+- name: large-scale-tests
+  display_name: "Large scale tests"
+  run_on:
+  - ubuntu1804-test
+  expansions:
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+    posix_configure_flags:
+      --enable-silent-rules --enable-python --enable-zlib --enable-snappy
+      --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+  tasks:
+    - name: many-dhandle-stress-test
 
 - name: package
   display_name: "~ Package"
