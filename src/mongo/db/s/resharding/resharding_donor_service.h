@@ -96,6 +96,10 @@ public:
     void onReshardingFieldsChanges(OperationContext* opCtx,
                                    const TypeCollectionReshardingFields& reshardingFields);
 
+    SharedSemiFuture<void> awaitCriticalSectionAcquired();
+
+    SharedSemiFuture<void> awaitCriticalSectionPromoted();
+
     SharedSemiFuture<void> awaitFinalOplogEntriesWritten();
 
     /**
@@ -154,7 +158,7 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken);
 
-    ExecutorFuture<void> _awaitAllRecipientsDoneApplying(
+    ExecutorFuture<void> _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken);
 

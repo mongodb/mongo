@@ -110,6 +110,15 @@ void processReshardingFieldsForDonorCollection(OperationContext* opCtx,
                                                               ReshardingDonorDocument>(
             opCtx, reshardingFields.getReshardingUUID())) {
         donorStateMachine->get()->onReshardingFieldsChanges(opCtx, reshardingFields);
+
+        const auto coordinatorState = reshardingFields.getState();
+        if (coordinatorState == CoordinatorStateEnum::kBlockingWrites) {
+            (*donorStateMachine)->awaitCriticalSectionAcquired().wait(opCtx);
+        } else if (coordinatorState == CoordinatorStateEnum::kCommitting) {
+            (*donorStateMachine)->awaitCriticalSectionAcquired().wait(opCtx);
+            (*donorStateMachine)->awaitCriticalSectionPromoted().wait(opCtx);
+        }
+
         return;
     }
 

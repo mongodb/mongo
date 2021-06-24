@@ -507,7 +507,7 @@ void ReshardingMetrics::onWriteDuringCriticalSection(int64_t writes) noexcept {
         return;
 
     invariant(checkState(*_currentOp->donorState,
-                         {DonorStateEnum::kDonatingOplogEntries,
+                         {DonorStateEnum::kPreparingToBlockWrites,
                           DonorStateEnum::kBlockingWrites,
                           DonorStateEnum::kError}));
 
