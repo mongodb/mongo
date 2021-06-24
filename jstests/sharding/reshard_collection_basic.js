@@ -248,6 +248,12 @@ assert.commandFailedWithCode(mongos.adminCommand({
 }),
                              4952607);
 
+jsTestLog("Fail if splitting collection into multiple chunks while it is still empty.");
+assert.commandFailedWithCode(
+    mongos.adminCommand({reshardCollection: ns, key: {b: 1}, numInitialChunks: 2}), 4952606);
+assert.commandFailedWithCode(
+    st.s.adminCommand({reshardCollection: ns, key: {b: "hashed"}, numInitialChunks: 2}), 4952606);
+
 jsTest.log(
     "Fail if authoritative tags exist in config.tags collection and zones are not provided.");
 const existingZoneName = 'x1';
@@ -333,6 +339,15 @@ assertReshardCollOk({
     zones: [{zone: newZoneName, min: {newKey: MinKey}, max: {newKey: MaxKey}}]
 },
                     1);
+
+jsTest.log("Succeed with hashed shard key that provides enough cardinality.");
+assert.commandWorked(
+    mongos.adminCommand({shardCollection: ns, key: {a: "hashed"}, numInitialChunks: 5}));
+assert.commandWorked(mongos.getCollection(ns).insert(
+    Array.from({length: 10000}, (_, i) => ({a: new ObjectId(), b: new ObjectId()}))));
+assert.commandWorked(
+    st.s.adminCommand({reshardCollection: ns, key: {b: "hashed"}, numInitialChunks: 5}));
+mongos.getDB(kDbName)[collName].drop();
 
 st.stop();
 })();
