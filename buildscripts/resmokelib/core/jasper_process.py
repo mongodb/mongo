@@ -16,6 +16,9 @@ from buildscripts.resmokelib.core import process as _process
 from buildscripts.resmokelib.logging.jasper_logger import get_logger_config
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 
+# The pids of processes spawned by jasper in resmoke
+JASPER_PIDS = set()
+
 
 class Process(_process.Process):
     """Class for spawning a process using mongodb/jasper."""
@@ -52,6 +55,7 @@ class Process(_process.Process):
 
         val = self._stub.Create(create_options)
         self.pid = val.pid
+        JASPER_PIDS.add(self.pid)
         self._id = self.pb.JasperProcessID(value=val.id)
         self._return_code = None
 
@@ -72,6 +76,7 @@ class Process(_process.Process):
 
         signal_process = self.pb.SignalProcess(ProcessID=self._id, signal=signal)
         val = self._stub.Signal(signal_process)
+        JASPER_PIDS.discard(self.pid)
         if not val.success \
                 and "cannot signal a process that has terminated" not in val.text \
                 and "os: process already finished" not in val.text:
@@ -91,4 +96,5 @@ class Process(_process.Process):
         if self._return_code is None:
             wait = self._stub.Wait(self._id)
             self._return_code = wait.exit_code
+        JASPER_PIDS.discard(self.pid)
         return self._return_code
