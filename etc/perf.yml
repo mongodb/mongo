@@ -175,6 +175,14 @@ functions:
     - command: shell.exec
       params:
         script: ./src/dsi/run-dsi post_run
+    - command: perf.send
+      params:
+        file: ./build/CedarReports/cedar_report.json
+        aws_key: ${terraform_key}
+        aws_secret: ${terraform_secret}
+        bucket: genny-metrics
+        region: us-east-1
+        prefix: ${task_id}_${execution}
     - command: attach.results
       params:
         file_location: ./build/EvergreenResultsJson/results.json
