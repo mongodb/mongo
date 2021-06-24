@@ -242,8 +242,14 @@ public:
     void cleanupSession(const Status& status);
 
     /*
-     * This is the initial function called at the beginning of a thread's lifecycle in the
-     * TransportLayer.
+     * Schedules a new loop for this state machine on a service executor. The status argument
+     * specifies whether the last execution of the loop, if any, was successful.
+     */
+    void scheduleNewLoop(Status status);
+
+    /*
+     * Starts a new loop by running an iteration for this state machine (e.g., source, process and
+     * then sink).
      */
     void startNewLoop(const Status& execStatus);
 
@@ -518,16 +524,46 @@ void ServiceStateMachine::Impl::start(ServiceExecutorContext seCtx) {
     }
 
     invariant(_state.swap(State::Source) == State::Created);
+    invariant(!_inExhaust, "Cannot start the state machine in exhaust mode");
 
-    auto cb = [this, anchor = shared_from_this()](Status execStatus) {
-        _clientStrand->run([&] { startNewLoop(execStatus); });
-    };
-    executor()->runOnDataAvailable(session(), std::move(cb));
+    scheduleNewLoop(Status::OK());
 }
 
-void ServiceStateMachine::Impl::startNewLoop(const Status& execStatus) {
-    if (!execStatus.isOK()) {
-        cleanupSession(execStatus);
+void ServiceStateMachine::Impl::scheduleNewLoop(Status status) try {
+    // We may or may not have an operation context, but it should definitely be gone now.
+    _opCtx.reset();
+
+    uassertStatusOK(status);
+
+    auto cb = [this, anchor = shared_from_this()](Status executorStatus) {
+        _clientStrand->run([&] { startNewLoop(executorStatus); });
+    };
+
+    try {
+        // Start our loop again with a new stack.
+        if (_inExhaust) {
+            // If we're in exhaust, we're not expecting more data.
+            executor()->schedule(std::move(cb));
+        } else {
+            executor()->runOnDataAvailable(session(), std::move(cb));
+        }
+    } catch (const DBException& ex) {
+        LOGV2_WARNING_OPTIONS(22993,
+                              {logv2::LogComponent::kExecutor},
+                              "Unable to schedule a new loop for the service state machine",
+                              "error"_attr = ex.toStatus());
+        throw;
+    }
+} catch (const DBException& ex) {
+    LOGV2_DEBUG(5763901, 2, "Terminating session due to error", "error"_attr = ex.toStatus());
+    _state.store(State::EndSession);
+    terminate();
+    cleanupSession(ex.toStatus());
+}
+
+void ServiceStateMachine::Impl::startNewLoop(const Status& executorStatus) {
+    if (!executorStatus.isOK()) {
+        cleanupSession(executorStatus);
         return;
     }
 
@@ -546,37 +582,8 @@ void ServiceStateMachine::Impl::startNewLoop(const Status& execStatus) {
 
             return sinkMessage();
         })
-        .getAsync([this](Status status) {
-            // We may or may not have an operation context, but it should definitely be gone now.
-            _opCtx.reset();
-
-            if (!status.isOK()) {
-                _state.store(State::EndSession);
-                // The service executor failed to schedule the task. This could for example be that
-                // we failed to start a worker thread. Terminate this connection to leave the system
-                // in a valid state.
-                LOGV2_WARNING_OPTIONS(4910400,
-                                      {logv2::LogComponent::kExecutor},
-                                      "Terminating session due to error: {error}",
-                                      "Terminating session due to error",
-                                      "error"_attr = status);
-                terminate();
-                cleanupSession(status);
-
-                return;
-            }
-
-            auto cb = [this, anchor = shared_from_this()](Status execStatus) {
-                _clientStrand->run([&] { startNewLoop(execStatus); });
-            };
-
-            // Start our loop again with a new stack.
-            if (_inExhaust) {
-                // If we're in exhaust, we're not expecting more data.
-                executor()->schedule(std::move(cb));
-            } else {
-                executor()->runOnDataAvailable(session(), std::move(cb));
-            }
+        .getAsync([this, anchor = shared_from_this()](Status status) {
+            scheduleNewLoop(std::move(status));
         });
 }
 
