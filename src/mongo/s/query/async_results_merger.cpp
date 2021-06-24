@@ -489,15 +489,15 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
 
 Status AsyncResultsMerger::scheduleGetMores() {
     stdx::lock_guard<Latch> lk(_mutex);
-
-    if (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
-        _assertNotInvalidated(lk);
-    }
-
     return _scheduleGetMores(lk);
 }
 
 Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {
+    // Before scheduling more work, check whether the cursor has been invalidated.
+    if (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
+        _assertNotInvalidated(lk);
+    }
+
     // Schedule remote work on hosts for which we need more results.
     for (size_t i = 0; i < _remotes.size(); ++i) {
         auto& remote = _remotes[i];
@@ -540,11 +540,6 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() 
         // eventually be signaled.
         return Status(ErrorCodes::IllegalOperation,
                       "nextEvent() called before an outstanding event was signaled");
-    }
-
-    // Check if the cursor should be invalidated.
-    if (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
-        _assertNotInvalidated(lk);
     }
 
     auto getMoresStatus = _scheduleGetMores(lk);
