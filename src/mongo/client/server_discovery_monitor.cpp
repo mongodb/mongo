@@ -371,8 +371,6 @@ void SingleServerDiscoveryMonitor::shutdown() {
 
     _cancelOutstandingRequest(lock);
 
-    _executor = nullptr;
-
     LOGV2_DEBUG(4333229,
                 kLogLevel + 1,
                 "RSM {replicaSet} Done Closing host {host}",
