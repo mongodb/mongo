@@ -15,12 +15,13 @@ load("jstests/libs/auto_retry_transaction_in_sharding.js");
 
 function runCollectionCreateTest(command, explicitCreate) {
     const session = db.getMongo().startSession();
+    const dbName = 'test_txns_create_collection';
     const collName = "create_new_collection";
     // Note: using strange collection name here to test sorting of operations by namespace,
     // SERVER-48628
     const secondCollName = "\n" + collName + "_second";
 
-    let sessionDB = session.getDatabase("test");
+    let sessionDB = session.getDatabase(dbName);
     let sessionColl = sessionDB[collName];
     let secondSessionColl = sessionDB[secondCollName];
     sessionColl.drop({writeConcern: {w: "majority"}});
