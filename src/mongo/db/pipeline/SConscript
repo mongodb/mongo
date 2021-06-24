@@ -68,10 +68,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/scripting/scripting',
         '$BUILD_DIR/mongo/util/intrusive_counter',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/mongohasher',
-    ],
+    ]
 )
 
 env.Library(
@@ -100,7 +97,10 @@ env.Library(
         '$BUILD_DIR/mongo/util/summation',
         'dependencies',
         'expression_context',
-    ]
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/mongohasher',
+    ],
 )
 
 env.Library(

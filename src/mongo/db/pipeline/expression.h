@@ -2927,9 +2927,10 @@ public:
                                boost::intrusive_ptr<Expression> inputExpression)
         : Expression(expCtx, {inputExpression}){};
 
-    static boost::intrusive_ptr<Expression> parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                                  BSONElement expr,
-                                                  const VariablesParseState& vps);
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement expr,
+        const VariablesParseState& vps);
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);

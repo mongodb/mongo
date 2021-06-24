@@ -6610,9 +6610,10 @@ Value ExpressionRandom::serialize(const bool explain) const {
 /* ------------------------- ExpressionToHashedIndexKey -------------------------- */
 REGISTER_EXPRESSION(toHashedIndexKey, ExpressionToHashedIndexKey::parse);
 
-boost::intrusive_ptr<Expression> ExpressionToHashedIndexKey::parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                                                   BSONElement expr,
-                                                                   const VariablesParseState& vps) {
+boost::intrusive_ptr<Expression> ExpressionToHashedIndexKey::parse(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    BSONElement expr,
+    const VariablesParseState& vps) {
     return make_intrusive<ExpressionToHashedIndexKey>(expCtx, parseOperand(expCtx, expr, vps));
 }
 
@@ -6631,7 +6632,7 @@ Value ExpressionToHashedIndexKey::serialize(bool explain) const {
 }
 
 void ExpressionToHashedIndexKey::_doAddDependencies(DepsTracker* deps) const {
-    // Nothing to do
+    _children[0]->addDependencies(deps);
 }
 
 MONGO_INITIALIZER(expressionParserMap)(InitializerContext*) {

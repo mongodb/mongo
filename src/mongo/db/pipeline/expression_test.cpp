@@ -3113,5 +3113,16 @@ TEST(ExpressionToHashedIndexKeyTest, UndefinedInputSucceeds) {
     ASSERT_VALUE_EQ(result, Value::createIntOrLong(40158834000849533LL));
 }
 
+TEST(ExpressionToHashedIndexKeyTest, DoesAddInputDependencies) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const BSONObj obj = BSON("$toHashedIndexKey"
+                             << "$someValue");
+    auto expression = Expression::parseExpression(expCtx, obj, expCtx->variablesParseState);
+
+    DepsTracker deps;
+    expression->addDependencies(&deps);
+    ASSERT_EQ(deps.fields.count("someValue"), 1u);
+    ASSERT_EQ(deps.fields.size(), 1u);
+}
 }  // namespace ExpressionToHashedIndexKeyTest
 }  // namespace ExpressionTests
