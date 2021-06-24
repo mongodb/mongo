@@ -6890,7 +6890,7 @@ Value ExpressionToHashedIndexKey::serialize(bool explain) const {
 }
 
 void ExpressionToHashedIndexKey::_doAddDependencies(DepsTracker* deps) const {
-    // Nothing to do
+    _children[0]->addDependencies(deps);
 }
 
 /* ------------------------- ExpressionDateArithmetics -------------------------- */
