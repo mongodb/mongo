@@ -48,23 +48,19 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_peer_info.h"
-#include "mongo/util/quick_exit.h"
 
 namespace mongo {
 namespace transport {
@@ -193,18 +189,6 @@ public:
                      // state() if this is the current state.
     };
 
-    /*
-     * When start() is called with Ownership::kOwned, the SSM will swap the Client/thread name
-     * whenever it runs a stage of the state machine, and then unswap them out when leaving the SSM.
-     *
-     * With Ownership::kStatic, it will assume that the SSM will only ever be run from one thread,
-     * and that thread will not be used for other SSM's. It will swap in the Client/thread name for
-     * the first run and leave them in place.
-     *
-     * kUnowned is used internally to mark that the SSM is inactive.
-     */
-    enum class Ownership { kUnowned, kOwned, kStatic };
-
     Impl(ServiceContext::UniqueClient client)
         : _state{State::Created},
           _serviceContext{client->getServiceContext()},
@@ -233,13 +217,6 @@ public:
      * This will not block on the session terminating cleaning itself up, it returns immediately.
      */
     void terminateIfTagsDontMatch(transport::Session::TagMask tags);
-
-    /*
-     * Terminates the associated transport Session if status indicate error.
-     *
-     * This will not block on the session terminating cleaning itself up, it returns immediately.
-     */
-    void terminateAndLogIfError(Status status);
 
     /*
      * This function actually calls into the database and processes a request. It's broken out
@@ -625,17 +602,6 @@ void ServiceStateMachine::Impl::terminateIfTagsDontMatch(transport::Session::Tag
     }
 
     terminate();
-}
-
-void ServiceStateMachine::Impl::terminateAndLogIfError(Status status) {
-    if (!status.isOK()) {
-        LOGV2_WARNING_OPTIONS(22993,
-                              {logv2::LogComponent::kExecutor},
-                              "Terminating session due to error: {error}",
-                              "Terminating session due to error",
-                              "error"_attr = status);
-        terminate();
-    }
 }
 
 void ServiceStateMachine::Impl::cleanupExhaustResources() noexcept try {
