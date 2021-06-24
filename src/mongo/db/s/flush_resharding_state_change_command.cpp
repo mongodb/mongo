@@ -52,6 +52,10 @@ class FlushReshardingStateChangeCmd final : public TypedCommand<FlushReshardingS
 public:
     using Request = _flushReshardingStateChange;
 
+    FlushReshardingStateChangeCmd()
+        : TypedCommand<FlushReshardingStateChangeCmd>(Request::kCommandName,
+                                                      Request::kCommandAlias) {}
+
     std::string help() const override {
         return "Internal command used by the resharding coordinator to flush state changes to the "
                "participant shards while the critical section is active.";
@@ -75,6 +79,10 @@ public:
 
         NamespaceString ns() const override {
             return request().getCommandParameter();
+        }
+
+        UUID reshardingUUID() const {
+            return request().getReshardingUUID();
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
