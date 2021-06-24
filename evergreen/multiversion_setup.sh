@@ -20,7 +20,7 @@ $python buildscripts/resmoke.py setup-multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --useLatest 3.6 4.0
+  --useLatest 4.0
 
 # The platform and architecture for how some of the binaries are reported in
 # https://downloads.mongodb.org/full.json changed between MongoDB 4.0 and MongoDB 4.2.
