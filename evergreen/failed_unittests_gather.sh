@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 cd src
@@ -14,14 +14,14 @@ unittest_bin_dir=dist-unittests/bin
 mkdir -p $unittest_bin_dir || true
 
 # Find all core files
-core_files=$(/usr/bin/find -H . \( -name "dump_*.core" -o -name "*.mdmp" \) 2>/dev/null)
+core_files=$(/usr/bin/find -H . \( -name "dump_*.core" -o -name "*.mdmp" \) 2> /dev/null)
 for core_file in $core_files; do
   # A core file name does not always have the executable name that generated it.
   # See http://stackoverflow.com/questions/34801353/core-dump-filename-gets-thread-name-instead-of-executable-name-with-core-pattern
   # On platforms with GDB, we get the binary name from core file
   gdb=/opt/mongodbtoolchain/gdb/bin/gdb
   if [ -f $gdb ]; then
-    binary_file=$($gdb -batch --quiet -ex "core $core_file" 2>/dev/null | grep "Core was generated" | cut -f2 -d "\`" | cut -f1 -d "'" | cut -f1 -d " ")
+    binary_file=$($gdb -batch --quiet -ex "core $core_file" 2> /dev/null | grep "Core was generated" | cut -f2 -d "\`" | cut -f1 -d "'" | cut -f1 -d " ")
     binary_file_locations=$binary_file
   else
     # Find the base file name from the core file name, note it may be truncated.
@@ -29,7 +29,7 @@ for core_file in $core_files; do
     binary_file=$(echo "$core_file" | sed "s/.*\///;s/dump_//;s/\..*\.core//;s/\..*\.mdmp//")
     # Locate the binary file. Since the base file name might be truncated, the find
     # may return more than 1 file.
-    binary_file_locations=$(/usr/bin/find -H . -executable -name "$binary_file*${exe}" 2>/dev/null)
+    binary_file_locations=$(/usr/bin/find -H . -executable -name "$binary_file*${exe}" 2> /dev/null)
   fi
 
   if [ -z "$binary_file_locations" ]; then
@@ -70,7 +70,7 @@ has_recorded_failures=""
 if [[ -f "failed_recorded_tests.txt" ]]; then
   while read -r line; do
     cp "$line" .
-  done <"failed_recorded_tests.txt"
+  done < "failed_recorded_tests.txt"
 
   has_recorded_failures="true"
 fi

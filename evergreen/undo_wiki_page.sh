@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 set -o errexit
@@ -10,4 +10,4 @@ $python -c 'import json; print(json.dumps([{
   "link": "https://wiki.corp.mongodb.com/display/COREENG/Time+Travel+Debugging+in+MongoDB",
   "visibility": "public",
   "ignore_for_fetch": True
-}]))' >undo_wiki_page_location.json
+}]))' > undo_wiki_page_location.json

@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 cd src
@@ -26,7 +26,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
       tags_build_variant="enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required"
     fi
 
-    $python buildscripts/testmatrix/getdisplaytaskname.py "${task_name}" "${build_variant}" >display_task_name.txt
+    $python buildscripts/testmatrix/getdisplaytaskname.py "${task_name}" "${build_variant}" > display_task_name.txt
     display_task_name=$(cat display_task_name.txt)
 
     tar -xzf patch_test_tags.tgz
@@ -62,7 +62,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
   if [ -f /proc/self/coredump_filter ]; then
     # Set the shell process (and its children processes) to dump ELF headers (bit 4),
     # anonymous shared mappings (bit 1), and anonymous private mappings (bit 0).
-    echo 0x13 >/proc/self/coredump_filter
+    echo 0x13 > /proc/self/coredump_filter
 
     if [ -f /sbin/sysctl ]; then
       # Check that the core pattern is set explicitly on our distro image instead
@@ -170,14 +170,14 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
   # 75 is exit code resmoke.py uses when the log output would be incomplete due to failing
   # to communicate with logkeeper.
   if [[ $resmoke_exit_code = 74 || $resmoke_exit_code = 75 ]]; then
-    echo $resmoke_exit_code >run_tests_infrastructure_failure
+    echo $resmoke_exit_code > run_tests_infrastructure_failure
     exit 0
   elif [ $resmoke_exit_code != 0 ]; then
     # On failure save the resmoke exit code.
-    echo $resmoke_exit_code >resmoke_error_code
+    echo $resmoke_exit_code > resmoke_error_code
   elif [ $resmoke_exit_code = 0 ]; then
     # On success delete core files.
-    core_files=$(/usr/bin/find -H .. \( -name "*.core" -o -name "*.mdmp" \) 2>/dev/null)
+    core_files=$(/usr/bin/find -H .. \( -name "*.core" -o -name "*.mdmp" \) 2> /dev/null)
     rm -rf $core_files
   fi
 

@@ -1,7 +1,7 @@
 # exit immediately if virtualenv is not found
 set -o errexit
 
-evergreen_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)/.."
+evergreen_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)/.."
 . "$evergreen_dir/prelude_workdir.sh"
 . "$evergreen_dir/prelude_python.sh"
 
@@ -53,4 +53,4 @@ if [ $? != 0 ]; then
   cat install.log
   exit 1
 fi
-python -m pip freeze >pip-requirements.txt
+python -m pip freeze > pip-requirements.txt

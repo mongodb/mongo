@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 cd src
@@ -8,7 +8,7 @@ set -o verbose
 
 activate_venv
 export MYPY="$(
-  if which cygpath 2>/dev/null; then
+  if which cygpath 2> /dev/null; then
     PATH+=":$(cypath "${workdir}")/venv_3/Scripts"
   else
     PATH+=":${workdir}/venv_3/bin"

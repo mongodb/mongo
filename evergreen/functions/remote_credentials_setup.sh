@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/../prelude.sh"
 
 # Since the macros 'private_key_remote' and 'private_key_file' are not always defined
@@ -9,7 +9,7 @@ fi
 if [ ! -z "${private_key_remote}" ] && [ ! -z "${private_key_file}" ]; then
   mkdir -p ~/.ssh
   private_key_file=$(eval echo "$private_key_file")
-  echo -n "${private_key_remote}" >${private_key_file}
+  echo -n "${private_key_remote}" > ${private_key_file}
   chmod 0600 ${private_key_file}
 fi
 
@@ -28,19 +28,19 @@ if [ $aws_profile = "default" ]; then
 else
   aws_profile_config="[profile $aws_profile]"
 fi
-cat <<EOF >>~/.aws/config
+cat << EOF >> ~/.aws/config
 $aws_profile_config
 region = us-east-1
 EOF
 
 # The profile in the credentials file is specified as [<profile>].
-cat <<EOF >>~/.aws/credentials
+cat << EOF >> ~/.aws/credentials
 [$aws_profile]
 aws_access_key_id = ${aws_key_remote}
 aws_secret_access_key = ${aws_secret_remote}
 EOF
 
-cat <<EOF >~/.boto
+cat << EOF > ~/.boto
 [Boto]
 https_validate_certificates = False
 EOF
