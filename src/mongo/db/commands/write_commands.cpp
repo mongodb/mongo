@@ -120,6 +120,34 @@ bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
         .get();
 }
 
+template <typename OpEntry>
+bool isTimeseriesMetadataOnlyQuery(OperationContext* opCtx,
+                                   NamespaceString ns,
+                                   const std::vector<OpEntry>& opEntries) {
+
+    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
+        opCtx, ns.makeTimeseriesBucketsNamespace());
+    uassert(ErrorCodes::NamespaceNotFound,
+            "Could not find time-series buckets collection for write",
+            collection);
+    auto timeseriesOptions = collection->getTimeseriesOptions();
+    uassert(ErrorCodes::InvalidOptions,
+            "Time-series buckets collection is missing time-series options",
+            timeseriesOptions);
+
+    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, nullptr, ns));
+    std::vector<BSONObj> rawPipeline;
+    rawPipeline.reserve(opEntries.size());
+    for (auto&& opEntry : opEntries) {
+        rawPipeline.push_back(BSON("$match" << opEntry.getQ()));
+    }
+    DepsTracker dependencies = Pipeline::parse(rawPipeline, expCtx)->getDependencies({});
+
+    StringData queryField(*dependencies.fields.begin());
+    return dependencies.fields.size() == 1 &&
+        queryField.substr(0, queryField.find('.')) == timeseriesOptions->getMetaField();
+}
+
 // Default for control.version in time-series bucket collection.
 const int kTimeseriesControlVersion = 1;
 
@@ -1242,6 +1270,12 @@ public:
 
         void _performTimeseriesUpdates(OperationContext* opCtx,
                                        write_ops::UpdateCommandReply* updateReply) const {
+
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Cannot perform an update on a time-series collection "
+                                     "when querying on a field that is not the metaField: "
+                                  << ns(),
+                    isTimeseriesMetadataOnlyQuery(opCtx, ns(), request().getUpdates()));
             uasserted(ErrorCodes::IllegalOperation,
                       str::stream()
                           << "Cannot perform an update on a time-series collection: " << ns());
@@ -1376,6 +1410,11 @@ public:
 
         void _performTimeseriesDeletes(OperationContext* opCtx,
                                        write_ops::DeleteCommandReply* deleteReply) const {
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Cannot perform an update on a time-series collection "
+                                     "when querying on a field that is not the metaField: "
+                                  << ns(),
+                    isTimeseriesMetadataOnlyQuery(opCtx, ns(), request().getDeletes()));
             uasserted(ErrorCodes::IllegalOperation,
                       str::stream()
                           << "Cannot perform a delete on a time-series collection: " << ns());

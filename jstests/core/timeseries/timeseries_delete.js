@@ -18,9 +18,45 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(testDB.dropDatabase());
     const coll = testDB.getCollection('t');
     const timeFieldName = "time";
-    assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-    assert.commandWorked(insert(coll, {[timeFieldName]: ISODate(), tag: "A"}));
+    const metaFieldName = "tag";
+    assert.commandWorked(testDB.createCollection(
+        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(insert(coll, {[timeFieldName]: ISODate(), [metaFieldName]: "A"}));
+
     assert.commandFailedWithCode(coll.remove({tag: "A"}), ErrorCodes.IllegalOperation);
+
+    // Query on a single field that is the metaField.
+    assert.commandFailedWithCode(coll.remove({[metaFieldName]: {b: "B"}}),
+                                 ErrorCodes.IllegalOperation);
+
+    // Query on a single field that is not the metaField.
+    assert.commandFailedWithCode(coll.remove({measurement: "cpu"}), ErrorCodes.InvalidOptions);
+
+    // Query on a single field that is the metaField using dot notation.
+    assert.commandFailedWithCode(coll.remove({[metaFieldName + ".a"]: "A"}),
+                                 ErrorCodes.IllegalOperation);
+
+    // Query on a single field that is not the metaField using dot notation.
+    assert.commandFailedWithCode(coll.remove({"measurement.A": "cpu"}), ErrorCodes.InvalidOptions);
+
+    // Multiple queries on a single field that is the metaField.
+    assert.commandFailedWithCode(testDB.runCommand({
+        delete: coll.getName(),
+        deletes: [
+            {q: {[metaFieldName]: {a: "A", b: "B"}}, limit: 0},
+            {q: {"$and": [{[metaFieldName]: {b: "B"}}, {[metaFieldName]: {a: "A"}}]}, limit: 0}
+        ]
+    }),
+                                 ErrorCodes.IllegalOperation);
+
+    // Multiple queries on both the metaField and a field that is not the metaField.
+    assert.commandFailedWithCode(testDB.runCommand({
+        delete: coll.getName(),
+        deletes: [
+            {q: {[metaFieldName]: {a: "A", b: "B"}}, limit: 0},
+            {q: {measurement: "cpu", [metaFieldName]: {b: "B"}}, limit: 0}
+        ],
+    }),
+                                 ErrorCodes.InvalidOptions);
 });
 })();
