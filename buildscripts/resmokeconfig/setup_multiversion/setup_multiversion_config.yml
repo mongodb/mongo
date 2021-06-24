@@ -13,8 +13,6 @@ evergreen_projects:
   - mongodb-mongo-v4.4
   - mongodb-mongo-v4.2
   - mongodb-mongo-v4.0
-  - mongodb-mongo-v3.6
-  - mongodb-mongo-v3.4
 
 
 evergreen_buildvariants:
@@ -238,7 +236,7 @@ evergreen_buildvariants:
     edition: base
     platform: windows_x86_64-2008plus-ssl
     architecture: x86_64
-    versions: ["3.4", "3.6", "4.0"]
+    versions: ["4.0"]
 
   - name: enterprise-windows
     edition: enterprise
@@ -249,13 +247,7 @@ evergreen_buildvariants:
     edition: enterprise
     platform: windows
     architecture: x86_64
-    versions: ["3.6", "4.0", "4.2"]
-
-  - name: enterprise-windows-64
-    edition: enterprise
-    platform: windows
-    architecture: x86_64
-    versions: ["3.4"]
+    versions: ["4.0", "4.2"]
 
   - name: macos
     edition: base
@@ -268,18 +260,6 @@ evergreen_buildvariants:
     architecture: x86_64
     versions: ["4.0"]
 
-  - name: osx-1010-ssl
-    edition: base
-    platform: osx-ssl
-    architecture: x86_64
-    versions: ["3.6"]
-
-  - name: osx-108-ssl
-    edition: base
-    platform: osx-ssl
-    architecture: x86_64
-    versions: ["3.4"]
-
   - name: enterprise-macos
     edition: enterprise
     platform: osx
@@ -289,16 +269,10 @@ evergreen_buildvariants:
     edition: enterprise
     platform: osx
     architecture: x86_64
-    versions: ["3.6", "4.0"]
-
-  - name: enterprise-osx-108
-    edition: enterprise
-    platform: osx
-    architecture: x86_64
-    versions: ["3.4"]
+    versions: ["4.0"]
 
   - name: linux-64
     edition: base
     platform: linux_x86_64
     architecture: x86_64
-    versions: ["3.4", "3.6", "4.0"]
+    versions: ["4.0"]
