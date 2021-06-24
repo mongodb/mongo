@@ -81,7 +81,7 @@ public:
     public:
         WriteBatch() = delete;
 
-        WriteBatch(Bucket* bucket, const UUID& lsid, const std::shared_ptr<ExecutionStats>& stats);
+        WriteBatch(Bucket* bucket, OperationId opId, const std::shared_ptr<ExecutionStats>& stats);
 
         /**
          * Attempt to claim the right to commit (or abort) a batch. If it returns true, rights are
@@ -149,7 +149,7 @@ public:
 
 
         Bucket* _bucket;
-        const UUID _lsid;
+        OperationId _opId;
         std::shared_ptr<ExecutionStats> _stats;
 
         std::vector<BSONObj> _measurements;
@@ -366,7 +366,7 @@ public:
         /**
          * Return a pointer to the current, open batch.
          */
-        std::shared_ptr<WriteBatch> _activeBatch(const UUID& lsid,
+        std::shared_ptr<WriteBatch> _activeBatch(OperationId opId,
                                                  const std::shared_ptr<ExecutionStats>& stats);
 
         // Access to the bucket is controlled by this lock
@@ -414,8 +414,8 @@ public:
         // any.
         std::shared_ptr<WriteBatch> _preparedBatch;
 
-        // Batches, per logical session, that haven't been committed or aborted yet.
-        stdx::unordered_map<UUID, std::shared_ptr<WriteBatch>, UUID::Hash> _batches;
+        // Batches, per operation, that haven't been committed or aborted yet.
+        stdx::unordered_map<OperationId, std::shared_ptr<WriteBatch>> _batches;
 
         // If the bucket is in _idleBuckets, then its position is recorded here.
         boost::optional<IdleList::iterator> _idleListEntry = boost::none;

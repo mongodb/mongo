@@ -138,13 +138,14 @@ void normalizeTopLevel(BSONObjBuilder* builder, const BSONElement& elem) {
     }
 }
 
-UUID getLsid(OperationContext* opCtx, BucketCatalog::CombineWithInsertsFromOtherClients combine) {
-    static const UUID common{UUID::gen()};
+OperationId getOpId(OperationContext* opCtx,
+                    BucketCatalog::CombineWithInsertsFromOtherClients combine) {
     switch (combine) {
         case BucketCatalog::CombineWithInsertsFromOtherClients::kAllow:
-            return common;
+            return 0;
         case BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow:
-            return opCtx->getLogicalSessionId()->getId();
+            invariant(opCtx->getOpID());
+            return opCtx->getOpID();
     }
     MONGO_UNREACHABLE;
 }
@@ -253,7 +254,7 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
                                                     &sizeToBeAdded);
     }
 
-    auto batch = bucket->_activeBatch(getLsid(opCtx, combine), stats);
+    auto batch = bucket->_activeBatch(getOpId(opCtx, combine), stats);
     batch->_addMeasurement(doc);
     batch->_recordNewFields(std::move(newFieldNamesToBeInserted));
 
@@ -303,7 +304,7 @@ bool BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
     batch->_prepareCommit();
     _memoryUsage.fetchAndAdd(bucket->_memoryUsage - prevMemoryUsage);
 
-    bucket->_batches.erase(batch->_lsid);
+    bucket->_batches.erase(batch->_opId);
 
     return true;
 }
@@ -806,10 +807,10 @@ bool BucketCatalog::Bucket::allCommitted() const {
 }
 
 std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::Bucket::_activeBatch(
-    const UUID& lsid, const std::shared_ptr<ExecutionStats>& stats) {
-    auto it = _batches.find(lsid);
+    OperationId opId, const std::shared_ptr<ExecutionStats>& stats) {
+    auto it = _batches.find(opId);
     if (it == _batches.end()) {
-        it = _batches.try_emplace(lsid, std::make_shared<WriteBatch>(this, lsid, stats)).first;
+        it = _batches.try_emplace(opId, std::make_shared<WriteBatch>(this, opId, stats)).first;
     }
     return it->second;
 }
@@ -1093,9 +1094,9 @@ Date_t BucketCatalog::BucketAccess::getTime() const {
 }
 
 BucketCatalog::WriteBatch::WriteBatch(Bucket* bucket,
-                                      const UUID& lsid,
+                                      OperationId opId,
                                       const std::shared_ptr<ExecutionStats>& stats)
-    : _bucket{bucket}, _lsid(lsid), _stats{stats} {}
+    : _bucket{bucket}, _opId(opId), _stats{stats} {}
 
 bool BucketCatalog::WriteBatch::claimCommitRights() {
     return !_commitRights.swap(true);

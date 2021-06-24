@@ -41,7 +41,11 @@ OperationIdSlot UniqueOperationIdRegistry::acquireSlot() {
     invariant(_activeIds.size() < (1 << 20));
 
     while (true) {
-        const auto&& [it, ok] = _activeIds.insert(_nextOpId++);
+        auto opId = _nextOpId++;
+        if (!_nextOpId) {
+            _nextOpId = 1U;
+        }
+        const auto&& [it, ok] = _activeIds.insert(opId);
         if (ok) {
             return OperationIdSlot(*it, shared_from_this());
         }

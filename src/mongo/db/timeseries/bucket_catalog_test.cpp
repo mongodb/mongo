@@ -58,6 +58,10 @@ protected:
     };
 
     void setUp() override;
+
+    std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
+    _makeOperationContext();
+
     virtual BSONObj _makeTimeseriesOptionsForCreate() const;
 
     TimeseriesOptions _getTimeseriesOptions(const NamespaceString& ns) const;
@@ -118,6 +122,13 @@ void BucketCatalogTest::setUp() {
             ns.db().toString(),
             BSON("create" << ns.coll() << "timeseries" << _makeTimeseriesOptionsForCreate())));
     }
+}
+
+std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
+BucketCatalogTest::_makeOperationContext() {
+    auto client = getServiceContext()->makeClient("BucketCatalogTest");
+    auto opCtx = client->makeOperationContext();
+    return {std::move(client), std::move(opCtx)};
 }
 
 BSONObj BucketCatalogTest::_makeTimeseriesOptionsForCreate() const {
@@ -751,7 +762,6 @@ TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
 }
 
 TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
-    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     auto batch1 = _bucketCatalog
                       ->insert(_opCtx,
                                _ns1,
@@ -761,9 +771,8 @@ TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
                                BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow)
                       .getValue();
 
-    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     auto batch2 = _bucketCatalog
-                      ->insert(_opCtx,
+                      ->insert(_makeOperationContext().second.get(),
                                _ns1,
                                _getCollator(_ns1),
                                _getTimeseriesOptions(_ns1),
@@ -771,9 +780,8 @@ TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
                                BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow)
                       .getValue();
 
-    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     auto batch3 = _bucketCatalog
-                      ->insert(_opCtx,
+                      ->insert(_makeOperationContext().second.get(),
                                _ns1,
                                _getCollator(_ns1),
                                _getTimeseriesOptions(_ns1),
@@ -781,9 +789,8 @@ TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
                                BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
                       .getValue();
 
-    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     auto batch4 = _bucketCatalog
-                      ->insert(_opCtx,
+                      ->insert(_makeOperationContext().second.get(),
                                _ns1,
                                _getCollator(_ns1),
                                _getTimeseriesOptions(_ns1),
@@ -802,7 +809,6 @@ TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
 }
 
 TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
-    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     auto batch1 = _bucketCatalog
                       ->insert(_opCtx,
                                _ns1,
@@ -812,9 +818,8 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
                                BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow)
                       .getValue();
 
-    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     auto batch2 = _bucketCatalog
-                      ->insert(_opCtx,
+                      ->insert(_makeOperationContext().second.get(),
                                _ns1,
                                _getCollator(_ns1),
                                _getTimeseriesOptions(_ns1),
@@ -840,7 +845,6 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
 }
 
 TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
-    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     auto batch1 = _bucketCatalog
                       ->insert(_opCtx,
                                _ns1,
@@ -850,9 +854,8 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
                                BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow)
                       .getValue();
 
-    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     auto batch2 = _bucketCatalog
-                      ->insert(_opCtx,
+                      ->insert(_makeOperationContext().second.get(),
                                _ns1,
                                _getCollator(_ns1),
                                _getTimeseriesOptions(_ns1),
