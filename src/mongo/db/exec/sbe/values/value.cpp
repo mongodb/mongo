@@ -823,8 +823,6 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
             auto dbl = bitcastTo<double>(val);
             if (auto asInt = representAs<int64_t>(dbl); asInt) {
                 return abslHash(*asInt);
-            } else if (std::isnan(dbl)) {
-                return abslHash(std::numeric_limits<double>::quiet_NaN());
             } else {
                 // Doubles not representable as int64_t will hash as doubles.
                 return abslHash(dbl);
@@ -835,8 +833,6 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
             auto dec = bitcastTo<Decimal128>(val);
             if (auto asInt = representAs<int64_t>(dec); asInt) {
                 return abslHash(*asInt);
-            } else if (dec.isNaN()) {
-                return abslHash(std::numeric_limits<double>::quiet_NaN());
             } else if (auto asDbl = representAs<double>(dec); asDbl) {
                 return abslHash(*asDbl);
             } else {
