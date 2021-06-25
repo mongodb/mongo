@@ -833,11 +833,6 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, c
           session, ret = __wt_session_get_btree_ckpt(session, uri, cfg, flags));
     else
         ret = __wt_session_get_btree_ckpt(session, uri, cfg, flags);
-
-    /* Check whether the exclusive open for a bulk load succeeded. */
-    if (bulk && ret == EBUSY)
-        WT_RET_MSG(session, EBUSY, "bulk-load is only supported on newly created objects");
-
     WT_RET(ret);
 
     WT_ERR(__curfile_create(session, owner, cfg, bulk, bitmap, cursorp));
