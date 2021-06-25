@@ -104,7 +104,7 @@ std::unique_ptr<mongo::WindowFunctionExec> translateDerivative(
                                                   expr->expCtx()->variablesParseState);
 
     return std::make_unique<WindowFunctionExecDerivative>(
-        iter, expr->input(), sortExpr, expr->bounds(), expr->outputUnit(), memTracker);
+        iter, expr->input(), sortExpr, expr->bounds(), expr->unit(), memTracker);
 }
 
 

@@ -41,9 +41,9 @@ namespace mongo {
 REGISTER_WINDOW_FUNCTION(integral, mongo::window_function::ExpressionIntegral::parse);
 
 AccumulatorIntegral::AccumulatorIntegral(ExpressionContext* const expCtx,
-                                         boost::optional<long long> outputUnitMillis)
+                                         boost::optional<long long> unitMillis)
     : AccumulatorForWindowFunctions(expCtx),
-      _integralWF(expCtx, outputUnitMillis, true /* isNonremovable */) {
+      _integralWF(expCtx, unitMillis, true /* isNonremovable */) {
     _memUsageBytes = sizeof(*this);
 }
 
@@ -64,8 +64,8 @@ void AccumulatorIntegral::reset() {
 }
 
 boost::intrusive_ptr<AccumulatorState> AccumulatorIntegral::create(
-    ExpressionContext* const expCtx, boost::optional<long long> outputUnitMillis) {
-    return new AccumulatorIntegral(expCtx, outputUnitMillis);
+    ExpressionContext* const expCtx, boost::optional<long long> unitMillis) {
+    return new AccumulatorIntegral(expCtx, unitMillis);
 }
 
 const char* AccumulatorIntegral::getOpName() const {

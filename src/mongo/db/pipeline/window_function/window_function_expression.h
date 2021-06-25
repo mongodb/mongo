@@ -415,28 +415,27 @@ protected:
     boost::optional<Decimal128> _alpha;
 };
 
-class ExpressionWithOutputUnit : public Expression {
+class ExpressionWithUnit : public Expression {
 public:
     static constexpr StringData kArgInput = "input"_sd;
-    static constexpr StringData kArgOutputUnit = "outputUnit"_sd;
+    static constexpr StringData kArgUnit = "unit"_sd;
 
-    ExpressionWithOutputUnit(ExpressionContext* expCtx,
-                             std::string accumulatorName,
-                             boost::intrusive_ptr<::mongo::Expression> input,
-                             WindowBounds bounds,
-                             boost::optional<TimeUnit> outputUnit)
-        : Expression(expCtx, accumulatorName, std::move(input), std::move(bounds)),
-          _outputUnit(outputUnit) {}
+    ExpressionWithUnit(ExpressionContext* expCtx,
+                       std::string accumulatorName,
+                       boost::intrusive_ptr<::mongo::Expression> input,
+                       WindowBounds bounds,
+                       boost::optional<TimeUnit> unit)
+        : Expression(expCtx, accumulatorName, std::move(input), std::move(bounds)), _unit(unit) {}
 
-    boost::optional<TimeUnit> outputUnit() const {
-        return _outputUnit;
+    boost::optional<TimeUnit> unit() const {
+        return _unit;
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument result;
         result[_accumulatorName][kArgInput] = _input->serialize(static_cast<bool>(explain));
-        if (_outputUnit) {
-            result[_accumulatorName][kArgOutputUnit] = Value(serializeTimeUnit(*_outputUnit));
+        if (_unit) {
+            result[_accumulatorName][kArgUnit] = Value(serializeTimeUnit(*_unit));
         }
 
         MutableDocument windowField;
@@ -446,20 +445,20 @@ public:
     }
 
 protected:
-    static boost::optional<TimeUnit> parseOutputUnit(const BSONElement& arg) {
-        boost::optional<TimeUnit> outputUnit;
+    static boost::optional<TimeUnit> parseUnit(const BSONElement& arg) {
+        boost::optional<TimeUnit> unit;
         {
             uassert(ErrorCodes::FailedToParse,
-                    str::stream() << kArgOutputUnit << "' must be a string, but got " << arg.type(),
+                    str::stream() << kArgUnit << "' must be a string, but got " << arg.type(),
                     arg.type() == String);
-            outputUnit = parseTimeUnit(arg.valueStringData());
-            switch (*outputUnit) {
+            unit = parseTimeUnit(arg.valueStringData());
+            switch (*unit) {
                 // These larger time units vary so much, it doesn't make sense to define a
                 // fixed conversion from milliseconds. (See 'timeUnitTypicalMilliseconds'.)
                 case TimeUnit::year:
                 case TimeUnit::quarter:
                 case TimeUnit::month:
-                    uasserted(5490704, "outputUnit must be 'week' or smaller");
+                    uasserted(5490704, "unit must be 'week' or smaller");
                 // Only these time units are allowed.
                 case TimeUnit::week:
                 case TimeUnit::day:
@@ -470,7 +469,7 @@ protected:
                     break;
             }
         }
-        return outputUnit;
+        return unit;
     }
 
     static void validateSortBy(const boost::optional<SortPattern>& sortBy,
@@ -486,27 +485,26 @@ protected:
                 !sortBy->begin()->expression);
     }
 
-    boost::optional<long long> convertTimeUnitToMillis(boost::optional<TimeUnit> outputUnit) const {
-        if (!outputUnit)
+    boost::optional<long long> convertTimeUnitToMillis(boost::optional<TimeUnit> unit) const {
+        if (!unit)
             return boost::none;
 
-        auto status = timeUnitTypicalMilliseconds(*outputUnit);
+        auto status = timeUnitTypicalMilliseconds(*unit);
         tassert(status);
 
         return status.getValue();
     }
 
-    boost::optional<TimeUnit> _outputUnit;
+    boost::optional<TimeUnit> _unit;
 };
 
-class ExpressionDerivative : public ExpressionWithOutputUnit {
+class ExpressionDerivative : public ExpressionWithUnit {
 public:
     ExpressionDerivative(ExpressionContext* expCtx,
                          boost::intrusive_ptr<::mongo::Expression> input,
                          WindowBounds bounds,
-                         boost::optional<TimeUnit> outputUnit)
-        : ExpressionWithOutputUnit(
-              expCtx, "$derivative", std::move(input), std::move(bounds), outputUnit) {}
+                         boost::optional<TimeUnit> unit)
+        : ExpressionWithUnit(expCtx, "$derivative", std::move(input), std::move(bounds), unit) {}
 
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
@@ -514,7 +512,7 @@ public:
         // {
         //   $derivative: {
         //     input: <expr>,
-        //     outputUnit: <string>, // optional
+        //     unit: <string>, // optional
         //   }
         //   window: {...} // optional
         // }
@@ -545,13 +543,13 @@ public:
                 derivativeArgs.type() == BSONType::Object);
 
         boost::intrusive_ptr<::mongo::Expression> input;
-        boost::optional<TimeUnit> outputUnit;
+        boost::optional<TimeUnit> unit;
         for (const auto& arg : derivativeArgs.Obj()) {
             auto argName = arg.fieldNameStringData();
             if (argName == kArgInput) {
                 input = ::mongo::Expression::parseOperand(expCtx, arg, expCtx->variablesParseState);
-            } else if (argName == kArgOutputUnit) {
-                outputUnit = parseOutputUnit(arg);
+            } else if (argName == kArgUnit) {
+                unit = parseUnit(arg);
             } else {
                 uasserted(ErrorCodes::FailedToParse,
                           str::stream() << "$derivative got unexpected argument: " << argName);
@@ -566,7 +564,7 @@ public:
                 bounds != boost::none);
 
         return make_intrusive<ExpressionDerivative>(
-            expCtx, std::move(input), std::move(*bounds), outputUnit);
+            expCtx, std::move(input), std::move(*bounds), unit);
     }
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
@@ -578,14 +576,13 @@ public:
     }
 };
 
-class ExpressionIntegral : public ExpressionWithOutputUnit {
+class ExpressionIntegral : public ExpressionWithUnit {
 public:
     ExpressionIntegral(ExpressionContext* expCtx,
                        boost::intrusive_ptr<::mongo::Expression> input,
                        WindowBounds bounds,
-                       boost::optional<TimeUnit> outputUnit)
-        : ExpressionWithOutputUnit(
-              expCtx, "$integral", std::move(input), std::move(bounds), outputUnit) {}
+                       boost::optional<TimeUnit> unit)
+        : ExpressionWithUnit(expCtx, "$integral", std::move(input), std::move(bounds), unit) {}
 
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
@@ -593,7 +590,7 @@ public:
         // {
         //   $integral: {
         //     input: <expr>,
-        //     outputUnit: <string>, // optional
+        //     unit: <string>, // optional
         //   }
         //   window: {...} // optional
         // }
@@ -627,16 +624,16 @@ public:
                 integralArgs.type() == BSONType::Object);
 
         boost::intrusive_ptr<::mongo::Expression> input;
-        boost::optional<TimeUnit> outputUnit = boost::none;
+        boost::optional<TimeUnit> unit = boost::none;
         for (const auto& arg : integralArgs.Obj()) {
             auto argName = arg.fieldNameStringData();
             if (argName == kArgInput) {
                 input = ::mongo::Expression::parseOperand(expCtx, arg, expCtx->variablesParseState);
-            } else if (argName == kArgOutputUnit) {
+            } else if (argName == kArgUnit) {
                 uassert(ErrorCodes::FailedToParse,
-                        "There can be only one 'outputUnit' field for $integral",
-                        outputUnit == boost::none);
-                outputUnit = parseOutputUnit(arg);
+                        "There can be only one 'unit' field for $integral",
+                        unit == boost::none);
+                unit = parseUnit(arg);
             } else {
                 uasserted(ErrorCodes::FailedToParse,
                           str::stream() << "$integral got unexpected argument: " << argName);
@@ -645,15 +642,15 @@ public:
         uassert(ErrorCodes::FailedToParse, "$integral requires an 'input' expression", input);
 
         return make_intrusive<ExpressionIntegral>(
-            expCtx, std::move(input), bounds ? *bounds : WindowBounds(), outputUnit);
+            expCtx, std::move(input), bounds ? *bounds : WindowBounds(), unit);
     }
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
-        return AccumulatorIntegral::create(_expCtx, convertTimeUnitToMillis(_outputUnit));
+        return AccumulatorIntegral::create(_expCtx, convertTimeUnitToMillis(_unit));
     }
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final {
-        return WindowFunctionIntegral::create(_expCtx, convertTimeUnitToMillis(_outputUnit));
+        return WindowFunctionIntegral::create(_expCtx, convertTimeUnitToMillis(_unit));
     }
 };
 

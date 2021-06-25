@@ -47,8 +47,8 @@ public:
             integral.add(val);
     }
 
-    void createWindowFunctionIntegralWithOutputUnit(long long kOutputUnitMillis) {
-        integral = WindowFunctionIntegral(expCtx.get(), kOutputUnitMillis);
+    void createWindowFunctionIntegralWithUnit(long long kUnitMillis) {
+        integral = WindowFunctionIntegral(expCtx.get(), kUnitMillis);
     }
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -202,15 +202,15 @@ TEST_F(WindowFunctionIntegralTest, ShouldWidenToDecimalOnlyIfNeeded) {
     ASSERT_TRUE(val.getType() == NumberDouble);
 }
 
-TEST_F(WindowFunctionIntegralTest, CanHandleDateTypeWithOutputUnit) {
+TEST_F(WindowFunctionIntegralTest, CanHandleDateTypeWithUnit) {
     const std::vector<Value> values = {
         Value(std::vector<Value>({Value(Date_t::fromMillisSinceEpoch(1000)), Value(0)})),
         Value(std::vector<Value>({Value(Date_t::fromMillisSinceEpoch(1002)), Value(2)})),
         Value(std::vector<Value>({Value(Date_t::fromMillisSinceEpoch(1004)), Value(4)})),
     };
 
-    const long long kOutputUnitMillis = 1000;
-    createWindowFunctionIntegralWithOutputUnit(kOutputUnitMillis);
+    const long long kUnitMillis = 1000;
+    createWindowFunctionIntegralWithUnit(kUnitMillis);
 
     integral.add(values[0]);
     integral.add(values[1]);
@@ -227,7 +227,7 @@ TEST_F(WindowFunctionIntegralTest, CanHandleDateTypeWithOutputUnit) {
     ASSERT_VALUE_EQ(integral.getValue(), Value(expectedIntegral));
 }
 
-TEST_F(WindowFunctionIntegralTest, DatesWithoutOutputUnitShouldFail) {
+TEST_F(WindowFunctionIntegralTest, DatesWithoutUnitShouldFail) {
     const std::vector<Value> values = {
         Value(std::vector<Value>({Value(Date_t::fromMillisSinceEpoch(1000)), Value(2)})),
         Value(std::vector<Value>({Value(Date_t::fromMillisSinceEpoch(1002)), Value(4)})),
@@ -237,7 +237,7 @@ TEST_F(WindowFunctionIntegralTest, DatesWithoutOutputUnitShouldFail) {
     ASSERT_THROWS_CODE(addValuesToWindow(values), AssertionException, 5423902);
 }
 
-TEST_F(WindowFunctionIntegralTest, NumbersWithOutputUnitShouldFail) {
+TEST_F(WindowFunctionIntegralTest, NumbersWithUnitShouldFail) {
     const std::vector<Value> values = {
         Value(std::vector<Value>({Value(3), Value(2)})),
         Value(std::vector<Value>({Value(5), Value(4)})),
@@ -245,13 +245,13 @@ TEST_F(WindowFunctionIntegralTest, NumbersWithOutputUnitShouldFail) {
         Value(std::vector<Value>({Value(Date_t::fromMillisSinceEpoch(1002)), Value(4)})),
     };
 
-    const long long kOutputUnitMillis = 1000;
-    createWindowFunctionIntegralWithOutputUnit(kOutputUnitMillis);
+    const long long kUnitMillis = 1000;
+    createWindowFunctionIntegralWithUnit(kUnitMillis);
 
     ASSERT_THROWS_CODE(addValuesToWindow(values), AssertionException, 5423901);
 }
 
-TEST_F(WindowFunctionIntegralTest, ResetShouldNotResetOutputUnit) {
+TEST_F(WindowFunctionIntegralTest, ResetShouldNotResetUnit) {
     const std::vector<Value> dateValues = {
         Value(std::vector<Value>({Value(Date_t::fromMillisSinceEpoch(1000)), Value(0)})),
         Value(std::vector<Value>({Value(Date_t::fromMillisSinceEpoch(1002)), Value(2)})),
@@ -262,8 +262,8 @@ TEST_F(WindowFunctionIntegralTest, ResetShouldNotResetOutputUnit) {
         Value(std::vector<Value>({Value(2), Value(2)})),
     };
 
-    const long long kOutputUnitMillis = 1000;
-    createWindowFunctionIntegralWithOutputUnit(kOutputUnitMillis);
+    const long long kUnitMillis = 1000;
+    createWindowFunctionIntegralWithUnit(kUnitMillis);
 
     addValuesToWindow(dateValues);
     double expectedIntegral = (0 + 2) * (1002 - 1000) / 2.0 / 1000.0;
@@ -271,7 +271,7 @@ TEST_F(WindowFunctionIntegralTest, ResetShouldNotResetOutputUnit) {
 
     integral.reset();
 
-    // Because 'outputUnit' is not reset and is still specified, dates input are expected.
+    // Because 'unit' is not reset and is still specified, dates input are expected.
     ASSERT_THROWS_CODE(addValuesToWindow(numericValues), AssertionException, 5423901);
 }
 

@@ -91,9 +91,9 @@ const resultDesc = coll.aggregate([
                        .toArray();
 assert.sameMembers(result, resultDesc);
 
-// 'outputUnit' only supports 'week' and smaller.
+// 'unit' only supports 'week' and smaller.
 coll.drop();
-function explainUnit(outputUnit) {
+function explainUnit(unit) {
     return coll.runCommand({
         explain: {
             aggregate: coll.getName(),
@@ -105,7 +105,7 @@ function explainUnit(outputUnit) {
                         integral: {
                             $integral: {
                                 input: "$y",
-                                outputUnit: outputUnit,
+                                unit: unit,
                             },
                             window: {documents: [-1, 1]}
                         },
@@ -125,7 +125,7 @@ assert.commandWorked(explainUnit('minute'));
 assert.commandWorked(explainUnit('second'));
 assert.commandWorked(explainUnit('millisecond'));
 
-// Test if 'outputUnit' is specified. Date type input is supported.
+// Test if 'unit' is specified. Date type input is supported.
 coll.drop();
 assert.commandWorked(coll.insert([
     {x: ISODate("2020-01-01T00:00:00.000Z"), y: 0},
@@ -134,19 +134,18 @@ assert.commandWorked(coll.insert([
     {x: ISODate("2020-01-01T00:00:00.006Z"), y: 6},
 ]));
 
-const pipelineWithOutputUnit = [
+const pipelineWithUnit = [
     {
         $setWindowFields: {
             sortBy: {x: 1},
             output: {
-                integral:
-                    {$integral: {input: "$y", outputUnit: 'second'}, window: {documents: [-1, 1]}},
+                integral: {$integral: {input: "$y", unit: 'second'}, window: {documents: [-1, 1]}},
             }
         }
     },
     {$unset: "_id"},
 ];
-result = coll.aggregate(pipelineWithOutputUnit).toArray();
+result = coll.aggregate(pipelineWithUnit).toArray();
 assert.sameMembers(result, [
     // We should scale the result by 'millisecond/second'.
     {x: ISODate("2020-01-01T00:00:00.000Z"), y: 0, integral: 0.002},
@@ -155,7 +154,7 @@ assert.sameMembers(result, [
     {x: ISODate("2020-01-01T00:00:00.006Z"), y: 6, integral: 0.010},
 ]);
 
-const pipelineWithNoOutputUnit = [
+const pipelineWithNoUnit = [
     {
         $setWindowFields: {
             sortBy: {x: 1},
@@ -166,8 +165,8 @@ const pipelineWithNoOutputUnit = [
     },
     {$unset: "_id"},
 ];
-// 'outputUnit' is only valid if the 'sortBy' values are ISODate objects.
-// Dates are only valid if 'outputUnit' is specified.
+// 'unit' is only valid if the 'sortBy' values are ISODate objects.
+// Dates are only valid if 'unit' is specified.
 coll.drop();
 assert.commandWorked(coll.insert([
     {x: 0, y: 100},
@@ -177,14 +176,14 @@ assert.commandWorked(coll.insert([
 ]));
 assert.commandFailedWithCode(db.runCommand({
     aggregate: "setWindowFields_integral",
-    pipeline: pipelineWithOutputUnit,
+    pipeline: pipelineWithUnit,
     cursor: {},
 }),
                              5423901);
 
 assert.commandFailedWithCode(db.runCommand({
     aggregate: "setWindowFields_integral",
-    pipeline: pipelineWithNoOutputUnit,
+    pipeline: pipelineWithNoUnit,
     cursor: {},
 }),
                              5423902);
@@ -234,7 +233,7 @@ function runRangeBasedIntegral(bounds) {
                     sortBy: {time: 1},
                     output: {
                         integral: {
-                            $integral: {input: "$y", outputUnit: "second"},
+                            $integral: {input: "$y", unit: "second"},
                             window: {range: bounds, unit: "second"}
                         },
                     }

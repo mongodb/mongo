@@ -74,15 +74,12 @@ public:
 
     Value eval(std::pair<Value, Value> start,
                std::pair<Value, Value> end,
-               boost::optional<TimeUnit> outputUnit = {}) {
+               boost::optional<TimeUnit> unit = {}) {
         const std::deque<DocumentSource::GetNextResult> docs{
             Document{{"t", start.first}, {"y", start.second}},
             Document{{"t", end.first}, {"y", end.second}}};
-        auto mgr = createForFieldPath(std::move(docs),
-                                      "$y",
-                                      "$t",
-                                      {WindowBounds::DocumentBased{0, 1}},
-                                      std::move(outputUnit));
+        auto mgr = createForFieldPath(
+            std::move(docs), "$y", "$t", {WindowBounds::DocumentBased{0, 1}}, std::move(unit));
         return mgr.getNext();
     }
 
@@ -265,7 +262,7 @@ TEST_F(WindowFunctionExecDerivativeTest, NonNumbers) {
 }
 
 TEST_F(WindowFunctionExecDerivativeTest, DatesAreNonNumbers) {
-    // When no outputUnit is specified, dates are considered an invalid type (an error).
+    // When no unit is specified, dates are considered an invalid type (an error).
 
     auto t0 = Value{Date_t::fromMillisSinceEpoch(0)};
     auto t1 = Value{Date_t::fromMillisSinceEpoch(8)};
@@ -274,7 +271,7 @@ TEST_F(WindowFunctionExecDerivativeTest, DatesAreNonNumbers) {
     ASSERT_THROWS_CODE(eval({t0, y0}, {t1, y1}), DBException, 5624901);
 }
 
-TEST_F(WindowFunctionExecDerivativeTest, OutputUnit) {
+TEST_F(WindowFunctionExecDerivativeTest, Unit) {
     // 'y' increases by 1, over 8ms.
     auto t0 = Value{Date_t::fromMillisSinceEpoch(0)};
     auto t1 = Value{Date_t::fromMillisSinceEpoch(8)};
@@ -296,8 +293,8 @@ TEST_F(WindowFunctionExecDerivativeTest, OutputUnit) {
     ASSERT_VALUE_EQ(Value{(1.0 / 8) * 1000 * 60 * 60 * 24 * 7}, calc(TimeUnit::week));
 }
 
-TEST_F(WindowFunctionExecDerivativeTest, OutputUnitNonDate) {
-    // outputUnit requires the time input to be a datetime: non-datetimes throw an error.
+TEST_F(WindowFunctionExecDerivativeTest, UnitNonDate) {
+    // unit requires the time input to be a datetime: non-datetimes throw an error.
 
     auto t0 = Value{Date_t::fromMillisSinceEpoch(0)};
     auto t1 = Value{Date_t::fromMillisSinceEpoch(1000)};

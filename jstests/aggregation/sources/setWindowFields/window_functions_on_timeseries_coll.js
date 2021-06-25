@@ -139,7 +139,7 @@ assertExplainBehaviorAndCorrectResults(
                 posAvgTemp: {$avg: "$temperature", window: {documents: [-1, 1]}},
                 timeAvgTemp: {$avg: "$temperature", window: {range: [-5, 0], unit: "day"}},
                 tempRateOfChange: {
-                    $derivative: {input: "$temperature", outputUnit: "hour"},
+                    $derivative: {input: "$temperature", unit: "hour"},
                     window: {documents: [-1, 0]}
                 }
             }

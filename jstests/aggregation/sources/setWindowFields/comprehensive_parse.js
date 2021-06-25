@@ -28,9 +28,9 @@ const functions = {
     max: {$max: '$a'},
     count: {$count: {}},
     derivative: {$derivative: {input: '$a'}},
-    derivative_date: {$derivative: {input: '$date', outputUnit: 'millisecond'}},
+    derivative_date: {$derivative: {input: '$date', unit: 'millisecond'}},
     integral: {$integral: {input: '$a'}},
-    integral_date: {$integral: {input: '$a', outputUnit: 'millisecond'}},
+    integral_date: {$integral: {input: '$a', unit: 'millisecond'}},
     covariancePop: {$covariancePop: ['$a', '$date']},
     covarianceSamp: {$covarianceSamp: ['$a', '$date']},
     expMovingAvgN: {$expMovingAvg: {input: '$a', N: 3}},
@@ -125,12 +125,12 @@ function expectedResult(wfType, windowType, sortType, partitionType) {
         }
 
         if (wfType == 'derivative_date' && !sortType.endsWith('date')) {
-            // "$derivative with outputUnit expects the sortBy field to be a Date".
+            // "$derivative with unit expects the sortBy field to be a Date".
             return 5624900;
         }
 
         if (sortType.endsWith('date') && wfType != 'derivative_date') {
-            // "$derivative where the sortBy is a Date requires an 'outputUnit'.
+            // "$derivative where the sortBy is a Date requires a 'unit'.
             return 5624901;
         }
     } else if (wfType.startsWith('integral')) {
@@ -145,12 +145,12 @@ function expectedResult(wfType, windowType, sortType, partitionType) {
         }
 
         if (wfType == 'integral_date' && !sortType.endsWith('date')) {
-            // "$integral with outputUnit expects the sortBy field to be a Date"
+            // "$integral with unit expects the sortBy field to be a Date"
             return 5423901;
         }
 
         if (sortType.endsWith('date') && wfType != 'integral_date') {
-            // $integral where the sortBy is a Date requires an 'outputUnit'
+            // $integral where the sortBy is a Date requires a 'unit'
             return 5423902;
         }
     } else if (wfType.startsWith('expMovingAvg')) {

@@ -167,9 +167,9 @@ assert.docEq(result, [
     {time: 20, y: 30, dy: (30 - 12) / (20 - 10)},
 ]);
 
-// 'outputUnit' only supports 'week' and smaller.
+// 'unit' only supports 'week' and smaller.
 coll.drop();
-function derivativeStage(outputUnit) {
+function derivativeStage(unit) {
     const stage = {
         $setWindowFields: {
             sortBy: {time: 1},
@@ -183,15 +183,14 @@ function derivativeStage(outputUnit) {
             }
         }
     };
-    if (outputUnit) {
-        stage.$setWindowFields.output.dy.$derivative.outputUnit = outputUnit;
+    if (unit) {
+        stage.$setWindowFields.output.dy.$derivative.unit = unit;
     }
     return stage;
 }
-function explainUnit(outputUnit) {
-    return coll.runCommand({
-        explain: {aggregate: coll.getName(), cursor: {}, pipeline: [derivativeStage(outputUnit)]}
-    });
+function explainUnit(unit) {
+    return coll.runCommand(
+        {explain: {aggregate: coll.getName(), cursor: {}, pipeline: [derivativeStage(unit)]}});
 }
 assert.commandFailedWithCode(explainUnit('year'), 5490704);
 assert.commandFailedWithCode(explainUnit('quarter'), 5490704);
@@ -203,7 +202,7 @@ assert.commandWorked(explainUnit('minute'));
 assert.commandWorked(explainUnit('second'));
 assert.commandWorked(explainUnit('millisecond'));
 
-// When the time field is numeric, 'outputUnit' is not allowed.
+// When the time field is numeric, 'unit' is not allowed.
 coll.drop();
 assert.commandWorked(coll.insert([
     {time: 0, y: 100},
@@ -218,7 +217,7 @@ assert.sameMembers(result, [
     {time: 2, y: 100, dy: 0},
 ]);
 
-// When the time field is a Date, 'outputUnit' is required.
+// When the time field is a Date, 'unit' is required.
 coll.drop();
 assert.commandWorked(coll.insert([
     {time: ISODate("2020-01-01T00:00:00.000Z"), y: 5},
@@ -238,7 +237,7 @@ assert.sameMembers(result, [
 // The change per minute is 60*1000 larger than the change per millisecond.
 result = coll.aggregate([derivativeStage('minute'), {$unset: "_id"}]).toArray();
 assert.sameMembers(result, [
-    // 'outputUnit' applied to an ISODate expresses the output in terms of that unit.
+    // 'unit' applied to an ISODate expresses the output in terms of that unit.
     {time: ISODate("2020-01-01T00:00:00.000Z"), y: 5, dy: null},
     {time: ISODate("2020-01-01T00:00:00.001Z"), y: 4, dy: -1 * 60 * 1000},
     {time: ISODate("2020-01-01T00:00:00.002Z"), y: 6, dy: +2 * 60 * 1000},
@@ -260,7 +259,7 @@ result = coll.aggregate([
                          sortBy: {time: 1},
                          output: {
                              dy: {
-                                 $derivative: {input: "$y", outputUnit: 'millisecond'},
+                                 $derivative: {input: "$y", unit: 'millisecond'},
                                  window: {documents: [-1, 0]}
                              },
                          }
@@ -277,7 +276,7 @@ assert.sameMembers(result, [
 ]);
 
 // When the sortBy field is a mixture of dates and numbers, it's an error:
-// whether or not you specify outputUnit, either the date or the number values
+// whether or not you specify unit, either the date or the number values
 // will be an invalid type.
 coll.drop();
 assert.commandWorked(coll.insert([
@@ -334,7 +333,7 @@ result = coll.aggregate([
                          sortBy: {time: 1},
                          output: {
                              dy: {
-                                 $derivative: {input: "$y", outputUnit: 'second'},
+                                 $derivative: {input: "$y", unit: 'second'},
                                  window: {
                                      documents: ['unbounded', 'unbounded'],
                                  }
@@ -368,7 +367,7 @@ result = coll.aggregate([
                          sortBy: {time: 1},
                          output: {
                              dy: {
-                                 $derivative: {input: "$y", outputUnit: 'second'},
+                                 $derivative: {input: "$y", unit: 'second'},
                                  window: {range: [-10, 0], unit: 'second'}
                              },
                          }

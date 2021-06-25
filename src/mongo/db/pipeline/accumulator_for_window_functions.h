@@ -132,7 +132,7 @@ public:
 class AccumulatorIntegral : public AccumulatorForWindowFunctions {
 public:
     explicit AccumulatorIntegral(ExpressionContext* const expCtx,
-                                 boost::optional<long long> outputUnitMillis = boost::none);
+                                 boost::optional<long long> unitMillis = boost::none);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
@@ -141,7 +141,7 @@ public:
     const char* getOpName() const final;
 
     static boost::intrusive_ptr<AccumulatorState> create(
-        ExpressionContext* const expCtx, boost::optional<long long> outputUnitMillis = boost::none);
+        ExpressionContext* const expCtx, boost::optional<long long> unitMillis = boost::none);
 
 private:
     WindowFunctionIntegral _integralWF;
