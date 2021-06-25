@@ -44,8 +44,8 @@ assert.eq(
         .itcount());
 
 // Pause migrations at shards 2 and 3
-pauseMigrateAtStep(st.shard2, migrateStepNames.deletedPriorDataInRange);
-pauseMigrateAtStep(st.shard3, migrateStepNames.deletedPriorDataInRange);
+pauseMigrateAtStep(st.shard2, migrateStepNames.rangeDeletionTaskScheduled);
+pauseMigrateAtStep(st.shard3, migrateStepNames.rangeDeletionTaskScheduled);
 
 // Both move chunk operations should proceed
 var joinMoveChunk1 = moveChunkParallel(
@@ -53,11 +53,11 @@ var joinMoveChunk1 = moveChunkParallel(
 var joinMoveChunk2 = moveChunkParallel(
     staticMongod, st.s0.host, {Key: 30}, null, 'TestDB.TestColl', st.shard3.shardName);
 
-waitForMigrateStep(st.shard2, migrateStepNames.deletedPriorDataInRange);
-waitForMigrateStep(st.shard3, migrateStepNames.deletedPriorDataInRange);
+waitForMigrateStep(st.shard2, migrateStepNames.rangeDeletionTaskScheduled);
+waitForMigrateStep(st.shard3, migrateStepNames.rangeDeletionTaskScheduled);
 
-unpauseMigrateAtStep(st.shard2, migrateStepNames.deletedPriorDataInRange);
-unpauseMigrateAtStep(st.shard3, migrateStepNames.deletedPriorDataInRange);
+unpauseMigrateAtStep(st.shard2, migrateStepNames.rangeDeletionTaskScheduled);
+unpauseMigrateAtStep(st.shard3, migrateStepNames.rangeDeletionTaskScheduled);
 
 joinMoveChunk1();
 joinMoveChunk2();

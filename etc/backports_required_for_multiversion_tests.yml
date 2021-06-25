@@ -188,6 +188,18 @@ last-lts:
       test_file: jstests/core/or_to_in.js
     - ticket: SERVER-21929
       test_file: jstests/aggregation/sources/lookup/lookup_null_semantics.js
+    - ticket: SERVER-52906
+      test_file: jstests/sharding/prepare_transaction_then_migrate.js
+    - ticket: SERVER-52906
+      test_file: jstests/sharding/migration_waits_for_majority_commit.js
+    - ticket: SERVER-52906
+      test_file: jstests/sharding/migration_ignore_interrupts_1.js
+    - ticket: SERVER-52906
+      test_file: jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
+    - ticket: SERVER-52906
+      test_file: jstests/sharding/movechunk_parallel.js
+    - ticket: SERVER-52906
+      test_file: jstests/sharding/txn_writes_during_movechunk.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

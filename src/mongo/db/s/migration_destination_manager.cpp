@@ -268,6 +268,7 @@ MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep3);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep4);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep5);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep6);
+MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep7);
 
 MONGO_FAIL_POINT_DEFINE(failMigrationOnRecipient);
 MONGO_FAIL_POINT_DEFINE(failMigrationReceivedOutOfRangeOperation);
@@ -944,7 +945,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
           "migrationId"_attr = _migrationId->toBSON());
 
     MoveTimingHelper timing(
-        outerOpCtx, "to", _nss.ns(), _min, _max, 6 /* steps */, &_errmsg, _toShard, _fromShard);
+        outerOpCtx, "to", _nss.ns(), _min, _max, 7 /* steps */, &_errmsg, _toShard, _fromShard);
 
     const auto initialState = getState();
 
@@ -968,6 +969,41 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     auto fromShard =
         uassertStatusOK(Grid::get(outerOpCtx)->shardRegistry()->getShard(outerOpCtx, _fromShard));
 
+    const ChunkRange range(_min, _max);
+
+    // 1. Ensure any data which might have been left orphaned in the range being moved has been
+    // deleted.
+    if (migrationutil::checkForConflictingDeletions(
+            outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
+        uassert(ErrorCodes::ResumableRangeDeleterDisabled,
+                "Failing migration because the disableResumableRangeDeleter server "
+                "parameter is set to true on the recipient shard, which contains range "
+                "deletion tasks overlapping the incoming range.",
+                !disableResumableRangeDeleter.load());
+
+        LOGV2(22001,
+              "Migration paused because the requested range {range} for {namespace} "
+              "overlaps with a range already scheduled for deletion",
+              "Migration paused because the requested range overlaps with a range already "
+              "scheduled for deletion",
+              "namespace"_attr = _nss.ns(),
+              "range"_attr = redact(range.toString()),
+              "migrationId"_attr = _migrationId->toBSON());
+
+        auto status = CollectionShardingRuntime::waitForClean(
+            outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
+
+        if (!status.isOK()) {
+            _setStateFail(redact(status.toString()));
+            return;
+        }
+    }
+
+    timing.done(1);
+    migrateThreadHangAtStep1.pauseWhileSet();
+
+
+    // 2. Create the parent collection and its indexes, if needed.
     // The conventional usage of retryable writes is to assign statement id's to all of
     // the writes done as part of the data copying so that _recvChunkStart is
     // conceptually a retryable write batch. However, we are using an alternate approach to do those
@@ -975,6 +1011,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     // statement id's through to all the places where they are needed would make this code more
     // complex, and 2) some of the operations, like creating the collection or building indexes, are
     // not currently supported in retryable writes.
+    outerOpCtx->setAlwaysInterruptAtStepDownOrUp();
     {
         auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
         {
@@ -991,44 +1028,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         _dropLocalIndexesIfNecessary(altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes);
         cloneCollectionIndexesAndOptions(altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes);
 
-        timing.done(1);
-        migrateThreadHangAtStep1.pauseWhileSet();
+        timing.done(2);
+        migrateThreadHangAtStep2.pauseWhileSet();
     }
 
     {
-        const ChunkRange range(_min, _max);
-
-        // 2. Ensure any data which might have been left orphaned in the range being moved has been
-        // deleted.
-        while (migrationutil::checkForConflictingDeletions(
-            outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
-            uassert(ErrorCodes::ResumableRangeDeleterDisabled,
-                    "Failing migration because the disableResumableRangeDeleter server "
-                    "parameter is set to true on the recipient shard, which contains range "
-                    "deletion tasks overlapping the incoming range.",
-                    !disableResumableRangeDeleter.load());
-
-            LOGV2(22001,
-                  "Migration paused because the requested range {range} for {namespace} "
-                  "overlaps with a range already scheduled for deletion",
-                  "Migration paused because the requested range overlaps with a range already "
-                  "scheduled for deletion",
-                  "namespace"_attr = _nss.ns(),
-                  "range"_attr = redact(range.toString()),
-                  "migrationId"_attr = _migrationId->toBSON());
-
-            auto status = CollectionShardingRuntime::waitForClean(
-                outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
-
-            if (!status.isOK()) {
-                _setStateFail(redact(status.toString()));
-                return;
-            }
-
-            outerOpCtx->sleepFor(Milliseconds(1000));
-        }
-
-        // Insert a pending range deletion task for the incoming range.
+        // 3. Insert a pending range deletion task for the incoming range.
         RangeDeletionTask recipientDeletionTask(*_migrationId,
                                                 _nss,
                                                 donorCollectionOptionsAndIndexes.uuid,
@@ -1053,8 +1058,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                 outerOpCtx, latestOpTime, WriteConcerns::kMajorityWriteConcern, &ignoreResult));
         });
 
-        timing.done(2);
-        migrateThreadHangAtStep2.pauseWhileSet();
+        timing.done(3);
+        migrateThreadHangAtStep3.pauseWhileSet();
     }
 
     auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
@@ -1070,7 +1075,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     auto opCtx = newOpCtxPtr.get();
     repl::OpTime lastOpApplied;
     {
-        // 3. Initial bulk clone
+        // 4. Initial bulk clone
         _setState(CLONE);
 
         _sessionMigration->start(opCtx->getServiceContext());
@@ -1167,8 +1172,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         // secondaries
         lastOpApplied = cloneDocumentsFromDonor(opCtx, insertBatchFn, fetchBatchFn);
 
-        timing.done(3);
-        migrateThreadHangAtStep3.pauseWhileSet();
+        timing.done(4);
+        migrateThreadHangAtStep4.pauseWhileSet();
 
         if (MONGO_unlikely(failMigrationOnRecipient.shouldFail())) {
             _setStateFail(str::stream() << "failing migration after cloning " << _numCloned
@@ -1180,7 +1185,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     const BSONObj xferModsRequest = createTransferModsRequest(_nss, *_sessionId);
 
     {
-        // 4. Do bulk of mods
+        // 5. Do bulk of mods
         _setState(CATCHUP);
 
         while (true) {
@@ -1241,8 +1246,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
             }
         }
 
-        timing.done(4);
-        migrateThreadHangAtStep4.pauseWhileSet();
+        timing.done(5);
+        migrateThreadHangAtStep5.pauseWhileSet();
     }
 
     {
@@ -1277,7 +1282,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     }
 
     {
-        // 5. Wait for commit
+        // 6. Wait for commit
         _setState(STEADY);
 
         bool transferAfterCommit = false;
@@ -1337,8 +1342,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
             return;
         }
 
-        timing.done(5);
-        migrateThreadHangAtStep5.pauseWhileSet();
+        timing.done(6);
+        migrateThreadHangAtStep6.pauseWhileSet();
     }
 
     runWithoutSession(outerOpCtx, [&] { _sessionMigration->join(); });
@@ -1349,8 +1354,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
     _setState(DONE);
 
-    timing.done(6);
-    migrateThreadHangAtStep6.pauseWhileSet();
+    timing.done(7);
+    migrateThreadHangAtStep7.pauseWhileSet();
 }
 
 bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,

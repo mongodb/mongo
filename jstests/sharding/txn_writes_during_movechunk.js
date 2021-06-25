@@ -17,12 +17,12 @@ assert.commandWorked(coll.insert({_id: 'updateMe'}));
 assert.commandWorked(coll.insert({_id: 'deleteMe'}));
 assert.commandWorked(coll.insert({_id: 'deleteMeUsingFindAndModify'}));
 
-pauseMigrateAtStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
+pauseMigrateAtStep(st.shard1, migrateStepNames.rangeDeletionTaskScheduled);
 
 let joinMoveChunk =
     moveChunkParallel(staticMongod, st.s0.host, {_id: 0}, null, 'test.user', st.shard1.shardName);
 
-waitForMigrateStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
+waitForMigrateStep(st.shard1, migrateStepNames.rangeDeletionTaskScheduled);
 
 let session = st.s.startSession();
 let sessionDB = session.getDatabase('test');
@@ -35,7 +35,7 @@ sessionColl.remove({_id: 'deleteMe'});
 sessionColl.findAndModify({query: {_id: 'deleteMeUsingFindAndModify'}, remove: true});
 
 pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
-unpauseMigrateAtStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
+unpauseMigrateAtStep(st.shard1, migrateStepNames.rangeDeletionTaskScheduled);
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
 let recipientColl = st.rs1.getPrimary().getDB('test').user;
