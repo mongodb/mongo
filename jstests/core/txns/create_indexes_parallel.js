@@ -12,14 +12,14 @@ load("jstests/libs/auto_retry_transaction_in_sharding.js");
 load("jstests/libs/create_index_txn_helpers.js");
 
 let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
-    const dbName = "test";
+    const dbName = 'test_txns_create_indexes_parallel';
     const collName = "create_new_collection";
     const distinctCollName = collName + "_second";
     const session = db.getMongo().getDB(dbName).getMongo().startSession();
     const secondSession = db.getMongo().getDB(dbName).getMongo().startSession();
 
-    let sessionDB = session.getDatabase("test");
-    let secondSessionDB = secondSession.getDatabase("test");
+    let sessionDB = session.getDatabase(dbName);
+    let secondSessionDB = secondSession.getDatabase(dbName);
     let sessionColl = sessionDB[collName];
     let secondSessionColl = secondSessionDB[collName];
     sessionColl.drop({writeConcern: {w: "majority"}});
