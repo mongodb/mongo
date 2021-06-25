@@ -45,7 +45,7 @@ using std::list;
 REGISTER_DOCUMENT_SOURCE(sortByCount,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceSortByCount::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
+                         AllowedWithApiStrict::kAlways);
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceSortByCount::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {

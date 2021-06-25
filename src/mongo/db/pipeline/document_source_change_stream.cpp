@@ -72,7 +72,7 @@ using std::vector;
 REGISTER_DOCUMENT_SOURCE(changeStream,
                          DocumentSourceChangeStream::LiteParsed::parse,
                          DocumentSourceChangeStream::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
+                         AllowedWithApiStrict::kAlways);
 
 constexpr StringData DocumentSourceChangeStream::kDocumentKeyField;
 constexpr StringData DocumentSourceChangeStream::kFullDocumentBeforeChangeField;

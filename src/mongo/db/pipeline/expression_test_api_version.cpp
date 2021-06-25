@@ -33,7 +33,10 @@
 
 namespace mongo {
 
-REGISTER_TEST_EXPRESSION(_testApiVersion, ExpressionTestApiVersion::parse);
+REGISTER_TEST_EXPRESSION(_testApiVersion,
+                         AllowedWithApiStrict::kSometimes,
+                         AllowedWithClientType::kAny,
+                         ExpressionTestApiVersion::parse);
 
 ExpressionTestApiVersion::ExpressionTestApiVersion(ExpressionContext* const expCtx,
                                                    bool unstable,

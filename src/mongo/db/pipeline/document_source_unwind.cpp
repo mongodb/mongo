@@ -169,7 +169,7 @@ DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext
 REGISTER_DOCUMENT_SOURCE(unwind,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceUnwind::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
+                         AllowedWithApiStrict::kAlways);
 
 const char* DocumentSourceUnwind::getSourceName() const {
     return kStageName.rawData();

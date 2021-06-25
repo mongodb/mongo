@@ -41,7 +41,7 @@ namespace mongo {
 REGISTER_DOCUMENT_SOURCE(listSessions,
                          DocumentSourceListSessions::LiteParsed::parse,
                          DocumentSourceListSessions::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1);
+                         AllowedWithApiStrict::kNeverInVersion1);
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {

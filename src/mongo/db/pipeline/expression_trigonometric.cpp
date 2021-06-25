@@ -39,29 +39,29 @@ namespace mongo {
 /**
  * Inclusive Bounds
  */
-REGISTER_EXPRESSION(acos, ExpressionArcCosine::parse);
-REGISTER_EXPRESSION(asin, ExpressionArcSine::parse);
-REGISTER_EXPRESSION(atanh, ExpressionHyperbolicArcTangent::parse);
-REGISTER_EXPRESSION(acosh, ExpressionHyperbolicArcCosine::parse);
+REGISTER_STABLE_EXPRESSION(acos, ExpressionArcCosine::parse);
+REGISTER_STABLE_EXPRESSION(asin, ExpressionArcSine::parse);
+REGISTER_STABLE_EXPRESSION(atanh, ExpressionHyperbolicArcTangent::parse);
+REGISTER_STABLE_EXPRESSION(acosh, ExpressionHyperbolicArcCosine::parse);
 
 /**
  * Exclusive Bounds
  */
-REGISTER_EXPRESSION(cos, ExpressionCosine::parse);
-REGISTER_EXPRESSION(sin, ExpressionSine::parse);
-REGISTER_EXPRESSION(tan, ExpressionTangent::parse);
+REGISTER_STABLE_EXPRESSION(cos, ExpressionCosine::parse);
+REGISTER_STABLE_EXPRESSION(sin, ExpressionSine::parse);
+REGISTER_STABLE_EXPRESSION(tan, ExpressionTangent::parse);
 
 /**
  * Unbounded
  */
-REGISTER_EXPRESSION(atan, ExpressionArcTangent::parse);
-REGISTER_EXPRESSION(asinh, ExpressionHyperbolicArcSine::parse);
-REGISTER_EXPRESSION(cosh, ExpressionHyperbolicCosine::parse);
-REGISTER_EXPRESSION(sinh, ExpressionHyperbolicSine::parse);
-REGISTER_EXPRESSION(tanh, ExpressionHyperbolicTangent::parse);
+REGISTER_STABLE_EXPRESSION(atan, ExpressionArcTangent::parse);
+REGISTER_STABLE_EXPRESSION(asinh, ExpressionHyperbolicArcSine::parse);
+REGISTER_STABLE_EXPRESSION(cosh, ExpressionHyperbolicCosine::parse);
+REGISTER_STABLE_EXPRESSION(sinh, ExpressionHyperbolicSine::parse);
+REGISTER_STABLE_EXPRESSION(tanh, ExpressionHyperbolicTangent::parse);
 
-REGISTER_EXPRESSION(atan2, ExpressionArcTangent2::parse);
+REGISTER_STABLE_EXPRESSION(atan2, ExpressionArcTangent2::parse);
 
-REGISTER_EXPRESSION(degreesToRadians, ExpressionDegreesToRadians::parse);
-REGISTER_EXPRESSION(radiansToDegrees, ExpressionRadiansToDegrees::parse);
+REGISTER_STABLE_EXPRESSION(degreesToRadians, ExpressionDegreesToRadians::parse);
+REGISTER_STABLE_EXPRESSION(radiansToDegrees, ExpressionRadiansToDegrees::parse);
 }  // namespace mongo

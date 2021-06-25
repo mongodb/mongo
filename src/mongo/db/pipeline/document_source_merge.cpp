@@ -50,7 +50,7 @@ MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceMergeBatch);
 REGISTER_DOCUMENT_SOURCE(merge,
                          DocumentSourceMerge::LiteParsed::parse,
                          DocumentSourceMerge::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
+                         AllowedWithApiStrict::kAlways);
 
 namespace {
 using MergeStrategyDescriptor = DocumentSourceMerge::MergeStrategyDescriptor;

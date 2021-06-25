@@ -105,7 +105,7 @@ BSONObj makeTimeseriesIndexStats(const TimeseriesConversionOptions& bucketSpec,
 REGISTER_DOCUMENT_SOURCE(_internalConvertBucketIndexStats,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalConvertBucketIndexStats::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kInternal);
+                         AllowedWithApiStrict::kInternal);
 
 DocumentSourceInternalConvertBucketIndexStats::DocumentSourceInternalConvertBucketIndexStats(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

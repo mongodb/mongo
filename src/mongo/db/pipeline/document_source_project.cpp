@@ -46,12 +46,12 @@ using boost::intrusive_ptr;
 REGISTER_DOCUMENT_SOURCE(project,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceProject::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
+                         AllowedWithApiStrict::kAlways);
 
 REGISTER_DOCUMENT_SOURCE(unset,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceProject::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
+                         AllowedWithApiStrict::kAlways);
 
 namespace {
 BSONObj buildExclusionProjectionSpecification(const std::vector<BSONElement>& unsetSpec) {

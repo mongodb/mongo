@@ -42,7 +42,7 @@ using boost::intrusive_ptr;
 REGISTER_DOCUMENT_SOURCE(indexStats,
                          DocumentSourceIndexStats::LiteParsed::parse,
                          DocumentSourceIndexStats::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1);
+                         AllowedWithApiStrict::kNeverInVersion1);
 
 const char* DocumentSourceIndexStats::getSourceName() const {
     return kStageName.rawData();

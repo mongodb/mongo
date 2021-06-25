@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-REGISTER_EXPRESSION(_internalJsEmit, ExpressionInternalJsEmit::parse);
+REGISTER_STABLE_EXPRESSION(_internalJsEmit, ExpressionInternalJsEmit::parse);
 
 namespace {
 /**

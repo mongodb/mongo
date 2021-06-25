@@ -55,7 +55,7 @@ using boost::intrusive_ptr;
 REGISTER_DOCUMENT_SOURCE(currentOp,
                          DocumentSourceCurrentOp::LiteParsed::parse,
                          DocumentSourceCurrentOp::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1);
+                         AllowedWithApiStrict::kNeverInVersion1);
 
 constexpr StringData DocumentSourceCurrentOp::kStageName;
 
