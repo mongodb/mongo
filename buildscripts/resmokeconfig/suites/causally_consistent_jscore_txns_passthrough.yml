@@ -30,7 +30,6 @@ executor:
       eval: >-
         var testingReplication = true;
         load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
-      readMode: commands
   hooks:
   # We don't execute dbHash or oplog consistency checks since there is only a single replica set
   # node.

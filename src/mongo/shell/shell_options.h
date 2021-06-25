@@ -76,7 +76,7 @@ struct ShellGlobalParams {
     bool useWriteCommandsDefault = true;
 
     std::string writeMode = "commands";
-    std::string readMode = "compatibility";
+    std::string readMode = "commands";
     bool shouldRetryWrites = false;
     bool shouldUseImplicitSessions = true;
 

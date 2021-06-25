@@ -129,7 +129,6 @@ executor:
       # We specify nodb so the shell used by each test will attempt to connect after loading the
       # retry logic in auto_retry_on_network_error.js.
       nodb: ""
-      readMode: commands
   hooks:
   - class: ContinuousStepdown
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied

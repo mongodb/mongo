@@ -17,9 +17,7 @@ executor:
       - CheckReplDBHash
       - ValidateCollections
     tests: true
-  config:
-    shell_options:
-      readMode: commands
+  config: {}
   hooks:
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash

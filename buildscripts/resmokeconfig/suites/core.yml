@@ -14,7 +14,6 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      readMode: commands
       eval: load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
   hooks:
   - class: ValidateCollections

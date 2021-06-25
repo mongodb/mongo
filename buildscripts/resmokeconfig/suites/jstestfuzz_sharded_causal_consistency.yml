@@ -12,7 +12,6 @@ executor:
   config:
     shell_options:
       eval: load("jstests/libs/override_methods/enable_causal_consistency.js")
-      readMode: commands
       global_vars:
         TestData:
           runningWithCausalConsistency: true

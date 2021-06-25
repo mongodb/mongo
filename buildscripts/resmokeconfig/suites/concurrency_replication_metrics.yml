@@ -27,9 +27,7 @@ executor:
     hooks:
     - AggregateResourceConsumptionMetricsInBackground
     tests: true
-  config:
-    shell_options:
-      readMode: commands
+  config: {}
   hooks:
     - class: AggregateResourceConsumptionMetricsInBackground
     - class: CleanupConcurrencyWorkloads

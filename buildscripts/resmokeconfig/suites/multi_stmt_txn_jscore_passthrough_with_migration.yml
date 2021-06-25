@@ -328,7 +328,6 @@ executor:
             # coordinateCommit commmand returns as soon as the decision is made durable, and
             # prepare conflicts are explicity ignored for non-causal reads.
             causalConsistency: true
-      readMode: commands
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're

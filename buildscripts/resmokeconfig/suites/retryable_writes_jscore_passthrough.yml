@@ -63,7 +63,6 @@ executor:
           alwaysInjectTransactionNumber: true
           sessionOptions:
             retryWrites: true
-      readMode: commands
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're

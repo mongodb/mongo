@@ -16,5 +16,4 @@ executor:
           # The UUID check calls _flushRoutingTableCacheUpdates on each shard, which is illegal on
           # read-only shard servers.
           skipCheckingUUIDsConsistentAcrossCluster: true
-      readMode: commands
       nodb: ""

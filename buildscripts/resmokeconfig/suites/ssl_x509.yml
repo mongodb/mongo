@@ -14,7 +14,6 @@ executor:
       sslCAFile: jstests/libs/ca.pem
       # We use server.pem so that shell can auth as __system.
       sslPEMKeyFile: jstests/libs/server.pem
-      readMode: commands
       global_vars:
         TestData:
           setParameters:

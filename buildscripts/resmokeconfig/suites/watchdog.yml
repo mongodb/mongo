@@ -5,9 +5,7 @@ selector:
   - jstests/watchdog/*.js
 
 executor:
-  config:
-    shell_options:
-      readMode: commands
+  config: {}
   hooks:
   - class: CleanEveryN
     n: 20

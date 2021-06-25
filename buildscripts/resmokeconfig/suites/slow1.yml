@@ -10,9 +10,7 @@ executor:
       - jstests/slow1/terminate_during_shutdown_checkpoint.js
     hooks:
       - ValidateCollections
-  config:
-    shell_options:
-      readMode: commands
+  config: {}
   hooks:
   - class: ValidateCollections
   - class: CleanEveryN

@@ -22,4 +22,3 @@ executor:
           enableEncryption: ''
           encryptionKeyFile: *keyFile
           encryptionCipherMode: 'AES256-GCM'
-      readMode: commands

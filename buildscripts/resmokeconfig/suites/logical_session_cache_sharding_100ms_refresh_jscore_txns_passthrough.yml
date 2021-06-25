@@ -50,7 +50,6 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      readMode: commands
       eval: load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js")
   hooks:
   - class: CheckReplDBHash

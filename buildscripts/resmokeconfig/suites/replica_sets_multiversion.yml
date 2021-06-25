@@ -26,7 +26,6 @@ executor:
   config:
     shell_options:
       nodb: ''
-      readMode: commands
       global_vars:
         TestData:
           useRandomBinVersionsWithinReplicaSet: true

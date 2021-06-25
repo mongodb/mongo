@@ -205,7 +205,6 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
-      readMode: commands
   hooks:
   - class: ContinuousTenantMigration
     shell_options:

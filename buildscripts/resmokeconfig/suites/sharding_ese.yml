@@ -21,4 +21,3 @@ executor:
         TestData:
           enableEncryption: ''
           encryptionKeyFile: *keyFile
-      readMode: commands

@@ -8,7 +8,6 @@ executor:
   config:
     shell_options:
       nodb: ''
-      readMode: commands
       ssl: ''
       tlsCAFile: jstests/libs/ocsp/ca_ocsp.pem
       tlsCertificateKeyFile: jstests/libs/ocsp/client_ocsp.pem

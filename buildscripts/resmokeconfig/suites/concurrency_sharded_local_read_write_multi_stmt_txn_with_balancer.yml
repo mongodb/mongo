@@ -155,7 +155,6 @@ executor:
     tests: true
   config:
     shell_options:
-      readMode: commands
       global_vars:
         TestData:
           # Reads and writes outside of transactions will not have their read or write concerns

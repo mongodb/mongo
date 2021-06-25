@@ -24,4 +24,3 @@ executor:
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
       nodb: ''
-      readMode: commands

@@ -47,7 +47,6 @@ executor:
         var testingReplication = true;
         load('jstests/libs/override_methods/enable_causal_consistency.js');
         load('jstests/libs/override_methods/detect_spawning_own_mongod.js');
-      readMode: commands
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're

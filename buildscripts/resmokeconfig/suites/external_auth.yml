@@ -11,7 +11,6 @@ executor:
         TestData:
           roleGraphInvalidationIsFatal: true
       nodb: ''
-      readMode: commands
       gssapiServiceName: "mockservice"
       process_kwargs:
           env_vars:

@@ -8,7 +8,6 @@ executor:
   config:
     shell_options:
       nodb: ''
-      readMode: commands
       ssl: ''
       tlsAllowInvalidHostnames: ''
       tlsAllowInvalidCertificates: ''

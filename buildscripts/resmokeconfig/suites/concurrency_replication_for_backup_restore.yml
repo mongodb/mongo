@@ -44,7 +44,6 @@ selector:
 executor:
   config:
     shell_options:
-      readMode: commands
       global_vars:
         TestData:
           # The backup_restore*.js tests are expected to run the FSM workloads directly against the

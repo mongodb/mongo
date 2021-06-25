@@ -120,7 +120,6 @@ executor:
         load('jstests/libs/override_methods/set_read_and_write_concerns.js');
         load("jstests/libs/override_methods/enable_causal_consistency.js");
         load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
-      readMode: commands
   hooks:
   - class: CheckReplDBHash
   - class: ValidateCollections

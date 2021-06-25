@@ -12,7 +12,6 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      readMode: commands
       global_vars:
         TestData:
           # Other fuzzers test commands against replica sets with logical session ids.

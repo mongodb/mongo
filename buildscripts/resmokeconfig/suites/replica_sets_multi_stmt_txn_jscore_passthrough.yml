@@ -256,7 +256,6 @@ executor:
             # Tests in this suite only read from primaries and only one node is electable, so causal
             # consistency is not required to read your own writes.
             causalConsistency: false
-      readMode: commands
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're

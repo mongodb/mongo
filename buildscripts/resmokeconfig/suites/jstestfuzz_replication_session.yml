@@ -13,7 +13,6 @@ executor:
   config:
     shell_options:
       eval: load("jstests/libs/override_methods/enable_sessions.js")
-      readMode: commands
   hooks:
   - class: FuzzerRestoreSettings
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied

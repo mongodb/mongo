@@ -111,7 +111,6 @@ executor:
     tests: true
   config:
     shell_options:
-      readMode: commands
       global_vars:
         TestData:
           runningWithCausalConsistency: true

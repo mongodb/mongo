@@ -21,7 +21,6 @@ executor:
   config:
     shell_options:
       eval: "testingReplication = true;"
-      readMode: commands
   hooks:
   # We don't execute dbHash or oplog consistency checks since there is only a single replica set
   # node.

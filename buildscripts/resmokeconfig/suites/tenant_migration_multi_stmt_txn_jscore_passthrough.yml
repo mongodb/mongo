@@ -379,7 +379,6 @@ executor:
             # Tests in this suite only read from primaries and only one node is electable, so causal
             # consistency is not required to read your own writes.
             causalConsistency: false
-      readMode: commands
   hooks:
   - class: ContinuousTenantMigration
     shell_options:

@@ -15,7 +15,6 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      readMode: commands
       eval: load("jstests/libs/override_methods/implicitly_wrap_pipelines_in_facets.js");
   hooks:
   - class: ValidateCollections

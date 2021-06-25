@@ -19,7 +19,6 @@ executor:
     shell_options:
       eval: >-
         testingReplication = true;
-      readMode: commands
   hooks:
   - class: ValidateCollections
   - class: CleanEveryN

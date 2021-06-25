@@ -39,7 +39,6 @@ executor:
           roleGraphInvalidationIsFatal: true
       eval: jsTest.authenticate(db.getMongo())
       <<: *authOptions
-      readMode: commands
   hooks:
   - class: ValidateCollections
     shell_options:

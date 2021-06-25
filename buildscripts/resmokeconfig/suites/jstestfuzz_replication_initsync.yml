@@ -10,7 +10,6 @@ executor:
       - BackgroundInitialSync
   config:
     shell_options:
-      readMode: commands
       global_vars:
         TestData:
           ignoreCommandsIncompatibleWithInitialSync: true

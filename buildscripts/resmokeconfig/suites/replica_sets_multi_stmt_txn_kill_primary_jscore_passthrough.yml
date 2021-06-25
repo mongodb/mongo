@@ -334,7 +334,6 @@ executor:
       # We specify nodb so the shell used by each test will attempt to connect after loading the
       # retry logic in auto_retry_on_network_error.js.
       nodb: ""
-      readMode: commands
   hooks:
   # We use a stepdown interval of 15 seconds because we will retry all commands in a transaction
   # so we need to allow time for at most 10 operations to be re-run and then re-committed. If

@@ -17,9 +17,7 @@ executor:
   archive:
     hooks:
       - ValidateCollections
-  config:
-    shell_options:
-      readMode: commands
+  config: {}
   hooks:
   - class: ValidateCollections
   - class: CleanEveryN

@@ -37,7 +37,6 @@ executor:
         load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
         load('jstests/libs/override_methods/implicit_whole_cluster_changestreams.js');
         load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
-      readMode: commands
   hooks:
   - class: CheckReplDBHash
   - class: ValidateCollections

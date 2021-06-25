@@ -246,4 +246,3 @@ executor:
           skipCheckOrphans: true
       eval: "load('jstests/libs/override_methods/sharding_continuous_config_stepdown.js');"
       nodb: ''
-      readMode: commands

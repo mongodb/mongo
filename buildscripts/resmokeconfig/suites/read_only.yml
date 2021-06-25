@@ -10,5 +10,4 @@ executor:
       global_vars:
         TestData:
           fixture: standalone
-      readMode: commands
       nodb: ""

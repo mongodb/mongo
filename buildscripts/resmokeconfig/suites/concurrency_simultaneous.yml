@@ -47,9 +47,7 @@ executor:
     hooks:
       - ValidateCollections
     tests: true
-  config:
-    shell_options:
-      readMode: commands
+  config: {}
   hooks:
   - class: ValidateCollections
     shell_options:

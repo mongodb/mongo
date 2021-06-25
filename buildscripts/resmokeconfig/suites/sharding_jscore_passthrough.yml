@@ -49,9 +49,7 @@ executor:
     hooks:
       - CheckReplDBHash
       - ValidateCollections
-  config:
-    shell_options:
-      readMode: commands
+  config: {}
   hooks:
   - class: CheckReplDBHash
   - class: ValidateCollections

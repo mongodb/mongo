@@ -11,4 +11,3 @@ executor:
       global_vars:
         TestData:
           storageEngine: wiredTiger
-      readMode: commands

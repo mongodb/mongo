@@ -35,7 +35,6 @@ selector:
 executor:
   config:
     shell_options:
-      readMode: commands
       global_vars:
         TestData:
           # The live export and import tests are expected to run the FSM workloads directly against

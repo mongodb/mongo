@@ -46,7 +46,6 @@ executor:
   config:
     shell_options:
       eval: "testingReplication = true;"
-      readMode: commands
   hooks:
   - class: BackgroundInitialSync
     n: *run_hook_interval
