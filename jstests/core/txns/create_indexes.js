@@ -14,10 +14,11 @@ load("jstests/libs/create_index_txn_helpers.js");
 
 let doCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
     const session = db.getMongo().startSession();
+    const dbName = 'test_txns_create_indexes';
     const collName = "create_new_indexes";
     const secondCollName = collName + "_second";
 
-    let sessionDB = session.getDatabase("test");
+    let sessionDB = session.getDatabase(dbName);
     let sessionColl = sessionDB[collName];
     let secondSessionColl = sessionDB[secondCollName];
     sessionColl.drop({writeConcern: {w: "majority"}});
