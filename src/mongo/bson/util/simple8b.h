@@ -47,13 +47,19 @@ public:
     /**
      * Retrieves all integers in the order it was appended.
      */
-    std::vector<uint64_t> getAllInts();
+    std::vector<std::pair<uint32_t, uint64_t>> getAllInts();
 
     /**
      * Appends a value to the Simple8b chain of words.
      * Return true if successfully appended and false otherwise.
      */
     bool append(uint64_t val);
+
+    /**
+     * Appends an empty bucket to handle missing values. This works by incrementing an underlying
+     * simple8b index by one and encoding a "missing value" in the simple8b block as all 1s.
+     */
+    void skip();
 
 private:
     /**
@@ -63,23 +69,26 @@ private:
     bool _doesIntegerFitInCurrentWord(uint64_t value) const;
 
     /**
-     * Encodes the largest possible simple8b word from _currNums without unused buckets.
-     * It removes the integers used to form the simple8b word from _currNums permanently.
+     * Encodes the largest possible simple8b word from _pendingValues without unused buckets.
+     * It removes the integers used to form the simple8b word from _pendingValues permanently.
      */
     int64_t _encodeLargestPossibleWord();
 
     /**
-     * Checks if the selector is appropriate for the elements in _currNums.
+     * Checks if the selector is appropriate for the elements in _pendingValues.
      * Checks if the are no unused trailing buckets at the end
      * and if all the integers fit in the bucket.
      */
     bool _isSelectorValid(uint8_t selector, uint8_t maxBitsSoFar) const;
 
     /**
-     * Decodes a simple8b word into a vector of integers and appends directly into the passed
-     * in vector. When the selector is invalid, nothing will be appended.
+     * Decodes a simple8b word into a vector of integers and their indices. It appends directly
+     * into the passed in vector and the index values starts from the passed in index variable.
+     * When the selector is invalid, nothing will be appended.
      */
-    void _decode(uint64_t simple8bWord, std::vector<uint64_t>* decodedValues) const;
+    void _decode(uint64_t simple8bWord,
+                 uint32_t* index,
+                 std::vector<std::pair<uint32_t, uint64_t>>* decodedValues) const;
 
     /**
      * Takes a vector of integers to be compressed into a 64 bit word.
@@ -91,9 +100,16 @@ private:
      */
     uint64_t _encode(uint8_t selector, uint8_t endIdx);
 
-    BufBuilder _buf;
+    struct PendingValue {
+        PendingValue(bool skip, uint64_t val) : skip(skip), val(val){};
+
+        bool skip;
+        uint64_t val;
+    };
+
+    BufBuilder _buffer;
     uint8_t _currMaxBitLen = 0;
-    std::deque<uint64_t> _currNums;
+    std::deque<PendingValue> _pendingValues;
 };
 
 }  // namespace mongo
