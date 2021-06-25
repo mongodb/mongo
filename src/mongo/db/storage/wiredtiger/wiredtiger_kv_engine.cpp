@@ -1966,6 +1966,26 @@ void WiredTigerKVEngine::setJournalListener(JournalListener* jl) {
     return _sessionCache->setJournalListener(jl);
 }
 
+namespace {
+uint64_t _fetchAllDurableValue(WT_CONNECTION* conn) {
+    // Fetch the latest all_durable value from the storage engine. This value will be a timestamp
+    // that has no holes (uncommitted transactions with lower timestamps) behind it.
+    char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
+    auto wtStatus = conn->query_timestamp(conn, buf, "get=all_durable");
+    if (wtStatus == WT_NOTFOUND) {
+        // Treat this as lowest possible timestamp; we need to see all preexisting data but no new
+        // (timestamped) data.
+        return StorageEngine::kMinimumTimestamp;
+    } else {
+        invariantWTOK(wtStatus);
+    }
+
+    uint64_t tmp;
+    fassert(38002, NumberParser().base(16)(buf, &tmp));
+    return tmp;
+}
+}  // namespace
+
 void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool force) {
     if (MONGO_unlikely(WTPauseStableTimestamp.shouldFail())) {
         return;
@@ -1981,7 +2001,7 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
         return;
     }
 
-    Timestamp allDurableTimestamp = getAllDurableTimestamp();
+    Timestamp allDurableTimestamp = Timestamp(_fetchAllDurableValue(_conn));
 
     // When 'force' is set, the all durable timestamp will be advanced to the stable timestamp.
     // TODO SERVER-52623: to remove this enable majority read concern check.
@@ -2219,26 +2239,6 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
 
     return {stableTimestamp};
 }
-
-namespace {
-uint64_t _fetchAllDurableValue(WT_CONNECTION* conn) {
-    // Fetch the latest all_durable value from the storage engine. This value will be a timestamp
-    // that has no holes (uncommitted transactions with lower timestamps) behind it.
-    char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-    auto wtstatus = conn->query_timestamp(conn, buf, "get=all_durable");
-    if (wtstatus == WT_NOTFOUND) {
-        // Treat this as lowest possible timestamp; we need to see all preexisting data but no new
-        // (timestamped) data.
-        return StorageEngine::kMinimumTimestamp;
-    } else {
-        invariantWTOK(wtstatus);
-    }
-
-    uint64_t tmp;
-    fassert(38002, NumberParser().base(16)(buf, &tmp));
-    return tmp;
-}
-}  // namespace
 
 Timestamp WiredTigerKVEngine::getAllDurableTimestamp() const {
     auto ret = _fetchAllDurableValue(_conn);
