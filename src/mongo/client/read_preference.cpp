@@ -115,6 +115,11 @@ TagSet defaultTagSetForMode(ReadPreference mode) {
 
 }  // namespace
 
+ReadPreference ReadPreferenceMode_parse(StringData prefStr) {
+    auto sw = parseReadPreferenceMode(prefStr);
+    uassertStatusOK(sw);
+    return sw.getValue();
+}
 
 /**
  * Replica set refresh period on the task executor.

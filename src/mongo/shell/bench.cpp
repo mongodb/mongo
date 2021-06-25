@@ -35,6 +35,7 @@
 #include "mongo/shell/bench.h"
 
 #include <pcrecpp.h>
+#include <string>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/namespace_string.h"
@@ -230,16 +231,22 @@ int runQueryWithReadCommands(DBClientBase* conn,
                              const boost::optional<LogicalSessionIdToClient>& lsid,
                              boost::optional<TxnNumber> txnNumber,
                              std::unique_ptr<QueryRequest> qr,
+                             BSONObj readPrefObj,
                              BSONObj* objOut) {
     const auto dbName = qr->nss().db().toString();
 
     BSONObj findCommandResult;
+    BSONObjBuilder findCommandBuilder;
+    qr->asFindCommand(&findCommandBuilder);
+    if (!readPrefObj.isEmpty()) {
+        findCommandBuilder.append("$readPreference", readPrefObj);
+    }
     uassert(ErrorCodes::CommandFailed,
             str::stream() << "find command failed; reply was: " << findCommandResult,
             runCommandWithSession(
                 conn,
                 dbName,
-                qr->asFindCommand(),
+                findCommandBuilder.obj(),
                 // read command with txnNumber implies performing reads in a
                 // multi-statement transaction
                 txnNumber ? kStartTransactionOption | kMultiStatementTransactionOption : kNoOptions,
@@ -559,6 +566,27 @@ BenchRunOp opFromBson(const BSONObj& op) {
             BSONObjBuilder valBuilder;
             valBuilder.append(arg);
             myOp.value = valBuilder.obj();
+        } else if (name == "readPrefMode") {
+            uassert(
+                ErrorCodes::InvalidOptions,
+                str::stream() << "Field 'readPrefMode' is only valid for find op types. Type is "
+                              << opType,
+                (opType == "find") || (opType == "query") || (opType == "findOne"));
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Field 'readPrefMode' should be a string, instead it's type: "
+                                  << typeName(arg.type()),
+                    arg.type() == BSONType::String);
+
+            extern ReadPreference ReadPreferenceMode_parse(StringData);
+            ReadPreference mode;
+            try {
+                mode = ReadPreferenceMode_parse(arg.str());
+            } catch (DBException& e) {
+                e.addContext("benchRun(): Could not parse readPrefMode argument");
+                throw;
+            }
+
+            myOp.readPrefObj = ReadPreferenceSetting(mode).toInnerBSON();
         } else {
             uassert(34394, str::stream() << "Benchrun op has unsupported field: " << name, false);
         }
@@ -936,7 +964,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     txnNumberForOp = state->txnNumber;
                     state->inProgressMultiStatementTxn = true;
                 }
-                runQueryWithReadCommands(conn, lsid, txnNumberForOp, std::move(qr), &result);
+                runQueryWithReadCommands(
+                    conn, lsid, txnNumberForOp, std::move(qr), readPrefObj, &result);
             } else {
                 if (!this->sort.isEmpty()) {
                     fixedQuery = makeQueryLegacyCompatible(std::move(fixedQuery), this->sort);
@@ -1032,8 +1061,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     txnNumberForOp = state->txnNumber;
                     state->inProgressMultiStatementTxn = true;
                 }
-                count =
-                    runQueryWithReadCommands(conn, lsid, txnNumberForOp, std::move(qr), nullptr);
+                count = runQueryWithReadCommands(
+                    conn, lsid, txnNumberForOp, std::move(qr), readPrefObj, nullptr);
             } else {
                 if (!this->sort.isEmpty()) {
                     fixedQuery = makeQueryLegacyCompatible(std::move(fixedQuery), this->sort);

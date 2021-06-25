@@ -123,6 +123,9 @@ struct BenchRunOp {
     BSONObj writeConcern;
     BSONObj value;
 
+    // Format: {mode: modeStr}.  Only mode field is allowed.
+    BSONObj readPrefObj;
+
     // This is an owned copy of the raw operation. All unowned members point into this.
     BSONObj myBsonOp;
 };
