@@ -627,7 +627,7 @@ public:
     /**
      * Returns a boolean for how, using the rules specified by 'rules' and the given
      * comparison functions 'comp' and 'stringComp', this BSONElement compares with 'other'.
-     * Returns the result of BSONObj::woCompare if this object is an Array or Object.
+     * Returns the result of BSONObj::woCompare if this object is an Array, Object, or CodeWScope.
      */
     template <typename Comparator>
     bool compare(const BSONElement& other,
