@@ -11,15 +11,17 @@
 load("jstests/libs/create_collection_txn_helpers.js");
 load("jstests/libs/auto_retry_transaction_in_sharding.js");
 
+const dbName = 'test_txns_create_collection_parallel';
+
 function runParallelCollectionCreateTest(command, explicitCreate) {
-    const dbName = "test";
+    const dbName = 'test_txns_create_collection_parallel';
     const collName = "create_new_collection";
     const distinctCollName = collName + "_second";
     const session = db.getMongo().getDB(dbName).getMongo().startSession();
     const secondSession = db.getMongo().getDB(dbName).getMongo().startSession();
 
-    let sessionDB = session.getDatabase("test");
-    let secondSessionDB = secondSession.getDatabase("test");
+    let sessionDB = session.getDatabase(dbName);
+    let secondSessionDB = secondSession.getDatabase(dbName);
     let sessionColl = sessionDB[collName];
     sessionColl.drop({writeConcern: {w: "majority"}});
     let distinctSessionColl = sessionDB[distinctCollName];
@@ -91,7 +93,7 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
     retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
         createCollAndCRUDInTxn(
-            secondSession.getDatabase("test"), collName, command, explicitCreate);
+            secondSession.getDatabase(dbName), collName, command, explicitCreate);
     }, {writeConcern: {w: "majority"}});
 
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
@@ -114,7 +116,7 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
     retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
         createCollAndCRUDInTxn(
-            secondSession.getDatabase("test"), collName, command, explicitCreate);
+            secondSession.getDatabase(dbName), collName, command, explicitCreate);
     }, {writeConcern: {w: "majority"}});
 
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
@@ -136,7 +138,7 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
     retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
         createCollAndCRUDInTxn(
-            secondSession.getDatabase("test"), collName, command, explicitCreate);
+            secondSession.getDatabase(dbName), collName, command, explicitCreate);
     }, {writeConcern: {w: "majority"}});
 
     session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
