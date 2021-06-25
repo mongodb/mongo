@@ -1400,6 +1400,33 @@ rollback must remove all oplog entries after the `common point`. This is called 
 and is written into the `oplogTruncateAfterPoint` document. Now, the recovery process knows where to
 truncate the oplog on the rollback node.
 
+Before truncating the oplog, the rollback procedure will also make sure that session information in
+`config.transactions` table is consistent with the `stableTimestamp`. As part of [vectored inserts](https://github.com/mongodb/mongo/blob/1182fa8c9889c88c22a5eb934d99e098456d0cbc/src/mongo/db/catalog/README.md#vectored-inserts)
+and secondary oplog application of retryable writes, updates to the same session entry in the
+`config.transactions` table will be coalesced as a single update when applied in the same batch. In
+other words, we will only apply the last update to a session entry in a batch. However, if
+the `stableTimestamp` refers to a point in time that is before the last update, it is possible to
+lose the session information that was never applied as part of the coalescing.
+
+As an example, consider the following:
+1.  During a single batch of secondary oplog application:
+    i).  User data write for stmtId=0 at t=10.
+    ii).  User data write for stmtId=1 at t=11.
+    iii).  User data write for stmtId=2 at t=12.
+    iv).  Session txn record write at t=12 with stmtId=2 as lastWriteOpTime. In particular, no
+    session txn record write for t=10 with stmtId=0 as lastWriteOpTime or for t=11 with stmtId=1 as lastWriteOpTime because they were coalseced by the [SessionUpdateTracker](https://github.com/mongodb/mongo/blob/9d601c939bca2a4304dca2d3c8abd195c1f070af/src/mongo/db/repl/session_update_tracker.cpp#L217-L221).
+2.  Rollback to stable timestamp t=10.
+3.  The session txn record won't exist with stmtId=0 as lastWriteOpTime (because the write was
+entirely skipped by oplog application) despite the user data write for stmtId=0 being reflected
+on-disk. Without any fix, this allows stmtId=0 to be re-executed by this node if it became primary.
+
+As a solution, we traverse the oplog to find the last completed retryable write statements that occur before or at the `stableTimestamp`, and use this information to restore the `config.transactions`
+table. More specifically, we perform a forward scan of the oplog starting from the first entry
+greater than the `stableTimestamp`. For any entries with a non-null `prevWriteOpTime` value less
+than or equal to the `stableTimestamp`, we create a `SessionTxnRecord` and perform an untimestamped
+write to the `config.transactions` table. We must do an untimestamped write so that it will not be
+rolled back on recovering to the `stableTimestamp` if we were to crash. Finally, we take a stable checkpoint so that these restoration writes are persisted to disk before truncating the oplog.
+
 During the last few steps of the data modification section, we clear the state of the
 `DropPendingCollectionReaper`, which manages collections that are marked as drop-pending by the Two
 Phase Drop algorithm, and make sure it aligns with what is currently on disk. After doing so, we can
