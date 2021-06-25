@@ -142,6 +142,7 @@ void Simple8b::skip() {
 
 bool Simple8b::_doesIntegerFitInCurrentWord(uint8_t numBits) const {
     uint8_t numBitsWithNewInt = std::max(_currMaxBitLen, numBits);
+
     uint8_t newPendingValueSize = _pendingValues.size() + 1;
     numBitsWithNewInt *= newPendingValueSize;
 
