@@ -34,11 +34,11 @@
 namespace mongo {
 
 namespace {
-static constexpr uint8_t _maxSelector = 14;  // TODO (SERVER-57794): Change to 15.
-static constexpr uint8_t _minSelector = 1;
-static constexpr uint64_t _selectorMask = 0x000000000000000F;
-static constexpr uint8_t _selectorBits = 4;
-static constexpr uint8_t _dataBits = 60;
+static constexpr uint8_t kMaxSelector = 14;  // TODO (SERVER-57794): Change to 15.
+static constexpr uint8_t kMinSelector = 1;
+static constexpr uint64_t kSelectorMask = 0x000000000000000F;
+static constexpr uint8_t kSelectorBits = 4;
+static constexpr uint8_t kDataBits = 60;
 
 // Pass the selector as the index to get the corresponding mask.
 // Get the maskSize by getting the number of bits for the selector. Then 2^maskSize - 1.
@@ -75,8 +75,8 @@ uint8_t _countBits(uint64_t value) {
 
 }  // namespace
 
-std::vector<std::pair<uint32_t, uint64_t>> Simple8b::getAllInts() {
-    std::vector<std::pair<uint32_t, uint64_t>> values;
+std::vector<Simple8b::Value> Simple8b::getAllInts() {
+    std::vector<Simple8b::Value> values;
 
     // Add integers in the BufBuilder first.
     SharedBuffer sb = _buffer.release();
@@ -99,7 +99,7 @@ std::vector<std::pair<uint32_t, uint64_t>> Simple8b::getAllInts() {
             continue;
         }
 
-        values.push_back(std::make_pair(index, _pendingValues[pendingValuesIdx].val));
+        values.push_back({index, _pendingValues[pendingValuesIdx].val});
         ++index;
     }
 
@@ -110,13 +110,13 @@ bool Simple8b::append(uint64_t value) {
     uint8_t valueNumBits = _countBits(value);
 
     // Check if the amount of bits needed is more than the largest selector allows.
-    if (countLeadingZeros64(value) < _selectorBits)
+    if (countLeadingZeros64(value) < kSelectorBits)
         return false;
 
-    if (_doesIntegerFitInCurrentWord(value)) {
+    if (_doesIntegerFitInCurrentWord(valueNumBits)) {
         // If the integer fits in the current word, add it and update global variables if necessary.
         _currMaxBitLen = std::max(_currMaxBitLen, valueNumBits);
-        _pendingValues.emplace_back(false, value);
+        _pendingValues.push_back({false, value});
     } else {
         // If the integer does not fit in the current word, convert the integers into simple8b
         // word(s) with no unused buckets until the new value can be added to _pendingValues. Then
@@ -125,16 +125,10 @@ bool Simple8b::append(uint64_t value) {
         do {
             uint64_t simple8bWord = _encodeLargestPossibleWord();
             _buffer.appendNum(simple8bWord);
-        } while (!_doesIntegerFitInCurrentWord(value));
+        } while (!_doesIntegerFitInCurrentWord(valueNumBits));
 
-        _pendingValues.emplace_back(false, value);
-        _currMaxBitLen =
-            _countBits((*std::max_element(_pendingValues.begin(),
-                                          _pendingValues.end(),
-                                          [](PendingValue& lhs, PendingValue& rhs) {
-                                              return _countBits(lhs.val) < _countBits(rhs.val);
-                                          }))
-                           .val);
+        _pendingValues.push_back({false, value});
+        _currMaxBitLen = std::max(_currMaxBitLen, valueNumBits);
     }
 
     return true;
@@ -143,33 +137,36 @@ bool Simple8b::append(uint64_t value) {
 void Simple8b::skip() {
     // Push true into skip and the dummy value, 0, into currNum. We use the dummy value, 0,
     // because it takes 1 bit and it will not affect _currMaxBitLen calculations.
-    _pendingValues.emplace_back(true, 0);
+    _pendingValues.push_back({true, 0});
 }
 
-bool Simple8b::_doesIntegerFitInCurrentWord(uint64_t value) const {
-    uint8_t valueNumBits = _countBits(value);
-    uint8_t numBitsWithNewInt = _currMaxBitLen < valueNumBits ? valueNumBits : _currMaxBitLen;
-    numBitsWithNewInt *= (_pendingValues.size() + 1);
+bool Simple8b::_doesIntegerFitInCurrentWord(uint8_t numBits) const {
+    uint8_t numBitsWithNewInt = std::max(_currMaxBitLen, numBits);
+    uint8_t newPendingValueSize = _pendingValues.size() + 1;
+    numBitsWithNewInt *= newPendingValueSize;
 
-    return _dataBits >= numBitsWithNewInt;
+    // We can compare with kDataBits in all cases even when we have fewer data bits in the case
+    // of selector 7 and 8. Because their slot size is not divisible with 60 and uses the closest
+    // smaller integer. One more would be strictly more than 60 making this comparison safe.
+    return kDataBits >= numBitsWithNewInt;
 }
 
 int64_t Simple8b::_encodeLargestPossibleWord() {
-    std::vector<uint8_t> maxBitsSoFarVec;
-
-    // Store the max number of bits up to each point in the _pendingValues.
-    // Use dynamic programming to make determining selector faster.
-    maxBitsSoFarVec.push_back(_countBits(_pendingValues[0].val));
-    for (size_t i = 1; i < _pendingValues.size(); ++i) {
-        maxBitsSoFarVec.push_back(
-            std::max(_countBits(_pendingValues[i].val), maxBitsSoFarVec[i - 1]));
+    // TODO (SERVER-58520): Remove invariants before release.
+    // Check that all values in _pendingValues can fit in a single Simple8b word.
+    if (_pendingValues.size() == 7 || _pendingValues.size() == 8) {
+        invariant(kDataBits - 4 >= _pendingValues.size() * _currMaxBitLen);
+    } else {
+        invariant(kDataBits >= _pendingValues.size() * _currMaxBitLen);
     }
 
-    // Determine best selector value.
+    // Since this is always called right after _doesIntegerFitInCurrentWord fails for the first
+    // time, we know all values in _pendingValues fits in the slots for the selector that can store
+    // this many values. Find the smallest selector that doesn't leave any unused slots.
     uint8_t selector = [&] {
-        for (int i = 0; i <= _maxSelector; ++i) {
-            if (_isSelectorValid(i, maxBitsSoFarVec[i]))
-                return i;
+        for (int s = kMinSelector; s <= kMaxSelector; ++s) {
+            if (_pendingValues.size() >= _intsCodedForSelector[s])
+                return s;
         }
 
         // TODO (SERVER-57808): The only edge case is if the value requires more than 60 bits.
@@ -178,23 +175,24 @@ int64_t Simple8b::_encodeLargestPossibleWord() {
 
     uint8_t integersCoded = _intsCodedForSelector[selector];
     uint64_t encodedWord = _encode(selector, integersCoded);
+
     _pendingValues.erase(_pendingValues.begin(), _pendingValues.begin() + integersCoded);
+    _currMaxBitLen =
+        _countBits((*std::max_element(_pendingValues.begin(),
+                                      _pendingValues.end(),
+                                      [](const PendingValue& lhs, const PendingValue& rhs) {
+                                          return _countBits(lhs.val) < _countBits(rhs.val);
+                                      }))
+                       .val);
 
     return encodedWord;
 }
 
-bool Simple8b::_isSelectorValid(uint8_t selector, uint8_t maxBitsSoFar) const {
-    uint8_t numInts = _intsCodedForSelector[selector];
-    bool areNoTrailingUnusedBuckets = _pendingValues.size() >= numInts;
-    bool doesIntegersFitInBuckets = maxBitsSoFar <= _bitsPerIntForSelector[selector];
-    return areNoTrailingUnusedBuckets && doesIntegersFitInBuckets;
-}
-
 void Simple8b::_decode(const uint64_t simple8bWord,
                        uint32_t* index,
-                       std::vector<std::pair<uint32_t, uint64_t>>* decodedValues) const {
-    uint8_t selector = simple8bWord & _selectorMask;
-    if (selector < _minSelector)
+                       std::vector<Simple8b::Value>* decodedValues) const {
+    uint8_t selector = simple8bWord & kSelectorMask;
+    if (selector < kMinSelector)
         return;
 
     uint8_t bitsPerInteger = _bitsPerIntForSelector[selector];
@@ -202,14 +200,14 @@ void Simple8b::_decode(const uint64_t simple8bWord,
     uint64_t unshiftedMask = _maskForSelector[selector];
 
     for (uint8_t integerIdx = 0; integerIdx < integersCoded; ++integerIdx) {
-        uint8_t startIdx = bitsPerInteger * integerIdx + _selectorBits;
+        uint8_t startIdx = bitsPerInteger * integerIdx + kSelectorBits;
 
         uint64_t mask = unshiftedMask << startIdx;
         uint64_t value = (simple8bWord & mask) >> startIdx;
 
         // If it is not a skip encoding, add it to the decoded values.
         if (unshiftedMask != value)
-            decodedValues->push_back(std::make_pair(*index, value));
+            decodedValues->push_back({*index, value});
 
         ++(*index);
     }
@@ -217,7 +215,7 @@ void Simple8b::_decode(const uint64_t simple8bWord,
 
 uint64_t Simple8b::_encode(uint8_t selector, uint8_t endIdx) {
     // TODO (SERVER-57808): create global error code.
-    if (selector > _maxSelector || selector < _minSelector)
+    if (selector > kMaxSelector || selector < kMinSelector)
         return errCode;
 
     uint8_t bitsPerInteger = _bitsPerIntForSelector[selector];
@@ -226,7 +224,7 @@ uint64_t Simple8b::_encode(uint8_t selector, uint8_t endIdx) {
 
     uint64_t encodedWord = selector;
     for (uint8_t i = 0; i < integersCoded; ++i) {
-        uint8_t shiftSize = bitsPerInteger * i + _selectorBits;
+        uint8_t shiftSize = bitsPerInteger * i + kSelectorBits;
         uint64_t currEncodedWord = _pendingValues[i].skip ? unshiftedMask : _pendingValues[i].val;
 
         encodedWord |= currEncodedWord << shiftSize;

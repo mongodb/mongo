@@ -33,23 +33,24 @@
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
+
 // TODO: SERVER-58434 fix simple8b big endian and reenable tests.
 /*
-void assertVectorsEqual(const std::vector<std::pair<uint32_t, uint64_t>>& actualVector,
-                        const std::vector<std::pair<uint32_t, uint64_t>>& expectedVector) {
+void assertVectorsEqual(const std::vector<Simple8b::Value>& actualVector,
+                        const std::vector<Simple8b::Value>& expectedVector) {
     ASSERT_EQ(actualVector.size(), expectedVector.size());
 
     for (size_t i = 0; i < actualVector.size(); ++i) {
-        ASSERT_EQ(actualVector[i].first, expectedVector[i].first);
-        ASSERT_EQ(actualVector[i].second, expectedVector[i].second);
+        ASSERT_EQ(actualVector[i].val, expectedVector[i].val);
+        ASSERT_EQ(actualVector[i].index, expectedVector[i].index);
     }
 }
 
 TEST(Simple8b, NoValues) {
     Simple8b s8b;
 
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues = {};
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> expectedValues = {};
 
     assertVectorsEqual(values, expectedValues);
 }
@@ -58,51 +59,65 @@ TEST(Simple8b, OnlySkip) {
     Simple8b s8b;
 
     s8b.skip();
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues = {};
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> expectedValues = {};
 
     assertVectorsEqual(values, expectedValues);
 }
 
-TEST(Simple8b, OneValueTemporaryVector) {
+TEST(Simple8b, OneValuePending) {
     Simple8b s8b;
 
     std::vector<uint64_t> expectedInts = {1};
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues;
+    std::vector<Simple8b::Value> expectedValues;
     for (size_t i = 0; i < expectedInts.size(); ++i) {
-        expectedValues.push_back(std::make_pair(i, expectedInts[i]));
+        expectedValues.push_back({(uint32_t)i, expectedInts[i]});
         ASSERT_TRUE(s8b.append(expectedInts[i]));
     }
 
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
     assertVectorsEqual(values, expectedValues);
 }
 
-TEST(Simple8b, MultipleValuesTemporaryVector) {
+TEST(Simple8b, MaxValuePending) {
+    Simple8b s8b;
+
+    std::vector<uint64_t> expectedInts = {0xFFFFFFFFE};
+    std::vector<Simple8b::Value> expectedValues;
+    for (size_t i = 0; i < expectedInts.size(); ++i) {
+        expectedValues.push_back({(uint32_t)i, expectedInts[i]});
+        ASSERT_TRUE(s8b.append(expectedInts[i]));
+    }
+
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
+    assertVectorsEqual(values, expectedValues);
+}
+
+TEST(Simple8b, MultipleValuesPending) {
     Simple8b s8b;
 
     std::vector<uint64_t> expectedInts = {1, 2, 3};
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues;
+    std::vector<Simple8b::Value> expectedValues;
     for (size_t i = 0; i < expectedInts.size(); ++i) {
-        expectedValues.push_back(std::make_pair(i, expectedInts[i]));
+        expectedValues.push_back({(uint32_t)i, expectedInts[i]});
         ASSERT_TRUE(s8b.append(expectedInts[i]));
     }
 
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
     assertVectorsEqual(values, expectedValues);
 }
 
-TEST(Simple8b, MaxValuesTemporaryVector) {
+TEST(Simple8b, MaxValuesPending) {
     Simple8b s8b;
 
     std::vector<uint64_t> expectedInts(60, 1);
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues;
+    std::vector<Simple8b::Value> expectedValues;
     for (size_t i = 0; i < expectedInts.size(); ++i) {
-        expectedValues.push_back(std::make_pair(i, expectedInts[i]));
+        expectedValues.push_back({(uint32_t)i, expectedInts[i]});
         ASSERT_TRUE(s8b.append(expectedInts[i]));
     }
 
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
     assertVectorsEqual(values, expectedValues);
 }
 
@@ -110,45 +125,86 @@ TEST(Simple8b, EncodeWithTrailingDirtyBits) {
     Simple8b s8b;
 
     std::vector<uint64_t> expectedInts(7, 1);
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues;
+    std::vector<Simple8b::Value> expectedValues;
     for (size_t i = 0; i < expectedInts.size(); ++i) {
-        expectedValues.push_back(std::make_pair(i, expectedInts[i]));
+        expectedValues.push_back({(uint32_t)i, expectedInts[i]});
         ASSERT_TRUE(s8b.append(expectedInts[i]));
     }
 
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
     assertVectorsEqual(values, expectedValues);
 }
 
-TEST(Simple8b, FullBufferAndVector) {
+TEST(Simple8b, FullBufferAndPending) {
     Simple8b s8b;
 
     std::vector<uint64_t> expectedInts(120, 1);
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues;
+    std::vector<Simple8b::Value> expectedValues;
     for (size_t i = 0; i < expectedInts.size(); ++i) {
-        expectedValues.push_back(std::make_pair(i, expectedInts[i]));
+        expectedValues.push_back({(uint32_t)i, expectedInts[i]});
         ASSERT_TRUE(s8b.append(expectedInts[i]));
     }
 
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
     assertVectorsEqual(values, expectedValues);
 }
 
-TEST(Simple8b, TwoFullBuffersAndVector) {
+TEST(Simple8b, MaxValueBuffer) {
+    Simple8b s8b;
+
+    std::vector<uint64_t> expectedInts(3, 0xFFFFFFFFE);
+
+    std::vector<Simple8b::Value> expectedValues;
+    for (size_t i = 0; i < expectedInts.size(); ++i) {
+        expectedValues.push_back({(uint32_t)i, expectedInts[i]});
+        ASSERT_TRUE(s8b.append(expectedInts[i]));
+    }
+
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
+    assertVectorsEqual(values, expectedValues);
+}
+
+TEST(Simple8b, TrySomeSmallValues) {
+    Simple8b s8b;
+
+    std::vector<Simple8b::Value> expectedValues;
+    for (size_t num = 0; num <= 0x0001FFFFF; ++num) {
+        expectedValues.push_back({(uint32_t)num, num});
+        ASSERT_TRUE(s8b.append(num));
+    }
+
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
+    assertVectorsEqual(values, expectedValues);
+}
+
+TEST(Simple8b, TrySomeLargeValues) {
+    Simple8b s8b;
+
+    std::vector<Simple8b::Value> expectedValues;
+    for (size_t num = 0xF00000000; num <= 0xF001FFFFF; ++num) {
+        expectedValues.push_back({(uint32_t)num, num});
+        ASSERT_TRUE(s8b.append(num));
+    }
+
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
+    assertVectorsEqual(values, expectedValues);
+}
+
+TEST(Simple8b, TwoFullBuffersAndPending) {
     Simple8b s8b;
 
     std::vector<uint64_t> expectedInts(180, 1);
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues;
+    std::vector<Simple8b::Value> expectedValues;
     for (size_t i = 0; i < expectedInts.size(); ++i) {
-        expectedValues.push_back(std::make_pair(i, expectedInts[i]));
+        expectedValues.push_back({(uint32_t)i, expectedInts[i]});
         ASSERT_TRUE(s8b.append(expectedInts[i]));
     }
 
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
     assertVectorsEqual(values, expectedValues);
 }
 
-TEST(Simple8b, BreakVectorIntoMultipleSimple8bBlocks) {
+TEST(Simple8b, BreakPendingIntoMultipleSimple8bBlocks) {
     Simple8b s8b;
 
     std::vector<uint64_t> expectedInts(58, 1);
@@ -158,32 +214,32 @@ TEST(Simple8b, BreakVectorIntoMultipleSimple8bBlocks) {
     // if the last 2 bits are empty or unused.
     // Therefore, we must form a word with 30 integers of 1's, 20 integers of 1's
     // and the current vector would have eight 1's and one 7.
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues;
+    std::vector<Simple8b::Value> expectedValues;
     for (size_t i = 0; i < expectedInts.size(); ++i) {
-        expectedValues.push_back(std::make_pair(i, expectedInts[i]));
+        expectedValues.push_back({(uint32_t)i, expectedInts[i]});
         ASSERT_TRUE(s8b.append(expectedInts[i]));
     }
 
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
     assertVectorsEqual(values, expectedValues);
 }
 
-TEST(Simple8b, SkipInTemporaryVector) {
+TEST(Simple8b, SkipInPending) {
     Simple8b s8b;
 
     std::vector<uint64_t> expectedInts(3, 3);
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues;
+    std::vector<Simple8b::Value> expectedValues;
     for (size_t i = 0; i < expectedInts.size(); ++i) {
-        expectedValues.push_back(std::make_pair(i, expectedInts[i]));
+        expectedValues.push_back({(uint32_t)i, expectedInts[i]});
         ASSERT_TRUE(s8b.append(expectedInts[i]));
     }
 
     s8b.skip();
     int index = expectedInts.size() + 1;
-    expectedValues.push_back(std::make_pair(index, 7));
-    ASSERT_TRUE(s8b.append(expectedValues.back().second));
+    expectedValues.push_back({(uint32_t)index, 7});
+    ASSERT_TRUE(s8b.append(expectedValues.back().val));
 
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
     assertVectorsEqual(values, expectedValues);
 }
 
@@ -191,20 +247,20 @@ TEST(Simple8b, SkipInBuf) {
     Simple8b s8b;
 
     std::vector<uint64_t> expectedInts(50, 1);
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues;
+    std::vector<Simple8b::Value> expectedValues;
     for (size_t i = 0; i < expectedInts.size(); ++i) {
-        expectedValues.push_back(std::make_pair(i, expectedInts[i]));
+        expectedValues.push_back({(uint32_t)i, expectedInts[i]});
         ASSERT_TRUE(s8b.append(expectedInts[i]));
     }
 
     s8b.skip();
 
     for (size_t i = 0; i < expectedInts.size(); ++i) {
-        expectedValues.push_back(std::make_pair(i + expectedInts.size() + 1, expectedInts[i]));
+        expectedValues.push_back({(uint32_t)(i + expectedInts.size() + 1), expectedInts[i]});
         ASSERT_TRUE(s8b.append(expectedInts[i]));
     }
 
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
     assertVectorsEqual(values, expectedValues);
 }
 
@@ -212,16 +268,16 @@ TEST(Simple8b, TrailingSkipsDoNotShowUp) {
     Simple8b s8b;
 
     std::vector<uint64_t> expectedInts(48, 1);
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues;
+    std::vector<Simple8b::Value> expectedValues;
     for (size_t i = 0; i < expectedInts.size(); ++i) {
-        expectedValues.push_back(std::make_pair(i, expectedInts[i]));
+        expectedValues.push_back({(uint32_t)i, expectedInts[i]});
         ASSERT_TRUE(s8b.append(expectedInts[i]));
     }
 
     s8b.skip();
     s8b.skip();
 
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
     assertVectorsEqual(values, expectedValues);
 }
 
@@ -233,13 +289,13 @@ TEST(Simple8b, LeadingSkips) {
     s8b.skip();
 
     std::vector<uint64_t> expectedInts = {3, 8, 13};
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues;
+    std::vector<Simple8b::Value> expectedValues;
     for (size_t i = 0; i < expectedInts.size(); ++i) {
-        expectedValues.push_back(std::make_pair(i + numSkips, expectedInts[i]));
+        expectedValues.push_back({(uint32_t)i + numSkips, expectedInts[i]});
         ASSERT_TRUE(s8b.append(expectedInts[i]));
     }
 
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
     assertVectorsEqual(values, expectedValues);
 }
 
@@ -252,11 +308,11 @@ TEST(Simple8b, WordOfSkips) {
 
     uint64_t numWithMoreThanThirtyBits = 1ull << 30;
     std::vector<uint64_t> expectedInts = {numWithMoreThanThirtyBits};
-    std::vector<std::pair<uint32_t, uint64_t>> expectedValues;
-    expectedValues.push_back(std::make_pair(numSkips, numWithMoreThanThirtyBits));
+    std::vector<Simple8b::Value> expectedValues;
+    expectedValues.push_back({(uint32_t)numSkips, numWithMoreThanThirtyBits});
     ASSERT_TRUE(s8b.append(numWithMoreThanThirtyBits));
 
-    std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
     assertVectorsEqual(values, expectedValues);
 }
 */
