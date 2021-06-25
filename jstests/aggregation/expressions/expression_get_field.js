@@ -65,7 +65,6 @@ assertGetFieldFailedWithCode({field: "a"}, 3041703);
 // Test that $getField fails with a document with one or more arguments of incorrect type.
 assertGetFieldFailedWithCode({field: true, input: {a: "b"}}, 5654602);
 assertGetFieldFailedWithCode({field: {"a": 1}, input: {"a": 1}}, 5654601);
-assertGetFieldFailedWithCode({field: "a", input: true}, 3041705);
 assertGetFieldFailedWithCode(5, 5654602);
 assertGetFieldFailedWithCode(true, 5654602);
 assertGetFieldFailedWithCode({field: null, input: {"a": 1}}, 5654602);
@@ -120,6 +119,8 @@ assertGetFieldResultsEq({field: "a.b.c", input: {$const: {"a.b.c": 5}}},
                         [{_id: 0, test: 5}, {_id: 1, test: 5}]);
 assertGetFieldResultsEq({field: "a.b.c", input: {a: {b: {c: 5}}}},
                         [{_id: 0}, {_id: 1}]);  // The test field should evaluate to missing.
+assertGetFieldResultsEq({field: "d", input: {$getField: "c"}},
+                        [{_id: 0, "test": "x"}, {_id: 1, "test": "x"}]);
 
 // Test that $getField works with fields that contain '$'.
 assertGetFieldResultsEq({field: "a$b", input: {"a$b": "b"}},
@@ -150,6 +151,10 @@ assertGetFieldResultsEq({field: "a", input: {}},
 assertGetFieldResultsEq({$const: "$v.."}, [{_id: 0, test: null}, {_id: 1, test: null}]);
 assertGetFieldResultsEq({$const: "$u.."},
                         [{_id: 0}, {_id: 1}]);  // The test field should evaluate to missing.
+assertGetFieldResultsEq({field: "doesNotExist2", input: {$getField: "doesNotExist1"}},
+                        [{_id: 0}, {_id: 1}]);
+assertGetFieldResultsEq({field: "x", input: {$getField: "doesNotExist"}}, [{_id: 0}, {_id: 1}]);
+assertGetFieldResultsEq({field: "a", input: true}, [{_id: 0}, {_id: 1}]);
 
 // Test case where $getField stages are nested.
 assertGetFieldResultsEq(
@@ -160,7 +165,7 @@ assertGetFieldResultsEq(
     [{_id: 0}, {_id: 1}]);
 assertGetFieldResultsEq(
     {field: "a", input: {$getField: {field: "b.d", input: {$const: {"b.c": {a: 5}}}}}},
-    [{_id: 0, test: null}, {_id: 1, test: null}]);
+    [{_id: 0}, {_id: 1}]);
 assertGetFieldResultsEq({field: {$const: "$a"}, input: {$getField: {$const: "$x..$y"}}},
                         [{_id: 0, test: 1}, {_id: 1, test: 1}]);
 assertGetFieldResultsEq({field: {$const: "$b..$c"}, input: {$getField: {$const: "$x..$y"}}},

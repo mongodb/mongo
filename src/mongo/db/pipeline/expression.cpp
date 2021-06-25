@@ -7314,15 +7314,15 @@ Value ExpressionGetField::evaluate(const Document& root, Variables* variables) c
 
     auto inputValue = _input->evaluate(root, variables);
     if (inputValue.nullish()) {
-        return Value(BSONNULL);
+        if (inputValue.missing()) {
+            return Value();
+        } else {
+            return Value(BSONNULL);
+        }
+    } else if (inputValue.getType() != BSONType::Object) {
+        return Value();
     }
 
-    uassert(3041705,
-            str::stream() << kExpressionName
-                          << " requires 'input' to evaluate to type Object, "
-                             "but got "
-                          << typeName(inputValue.getType()),
-            inputValue.getType() == BSONType::Object);
 
     return inputValue.getDocument().getField(fieldValue.getString());
 }
