@@ -50,8 +50,7 @@ public:
         const NamespaceString& nss,
         UUID collectionUUID,
         const Document& documentKey,
-        boost::optional<BSONObj> readConcern,
-        bool allowSpeculativeMajorityRead = false) final;
+        boost::optional<BSONObj> readConcern) final;
 
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const final;
@@ -234,7 +233,9 @@ public:
      * operation.
      */
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        Pipeline* pipeline, bool allowTargetingShards) final;
+        Pipeline* pipeline,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none) final;
 
     std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const final {

@@ -46,6 +46,7 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/storage_stats_spec_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/record_id.h"
@@ -265,11 +266,13 @@ public:
      * Changing it to a unique_ptr introduces a circular dependency on certain platforms where the
      * compiler expects to find an implementation of PipelineDeleter.
      *
-     * If `allowTargetingShards` is true, the cursor will only be for local reads regardless of
-     * whether or not this function is called in a sharded environment.
+     * If `shardTargetingPolicy` is kNotAllowed, the cursor will only be for local reads regardless
+     * of whether or not this function is called in a sharded environment.
      */
     virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        Pipeline* pipeline, bool allowTargetingShards = true) = 0;
+        Pipeline* pipeline,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none) = 0;
 
     /**
      * Accepts a pipeline and attaches a cursor source to it. Returns a BSONObj of the form
@@ -351,14 +354,17 @@ public:
      * as a unique identifier of a document, and may include an _id or all fields from the shard key
      * and an _id. Throws if more than one match was found. Returns boost::none if no matching
      * documents were found, including cases where the given namespace does not exist.
+     *
+     * If this interface needs to send requests (possibly to other nodes) in order to look up the
+     * document, 'readConcern' will be attached to these requests. Otherwise 'readConcern' will be
+     * ignored.
      */
     virtual boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
         UUID,
         const Document& documentKey,
-        boost::optional<BSONObj> readConcern,
-        bool allowSpeculativeMajorityRead = false) = 0;
+        boost::optional<BSONObj> readConcern) = 0;
 
     /**
      * Returns a vector of all idle (non-pinned) local cursors.

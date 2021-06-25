@@ -122,6 +122,21 @@ ShardServerProcessInterface::collectDocumentKeyFieldsForHostedCollection(Operati
     return {{"_id"}, false};
 }
 
+boost::optional<Document> ShardServerProcessInterface::lookupSingleDocument(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    UUID collectionUUID,
+    const Document& documentKey,
+    boost::optional<BSONObj> readConcern) {
+    // We only want to retrieve the one document that corresponds to 'documentKey', so we
+    // ignore collation when computing which shard to target.
+    MakePipelineOptions opts;
+    opts.shardTargetingPolicy = ShardTargetingPolicy::kForceTargetingWithSimpleCollation;
+    opts.readConcern = std::move(readConcern);
+
+    return doLookupSingleDocument(expCtx, nss, collectionUUID, documentKey, std::move(opts));
+}
+
 Status ShardServerProcessInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const NamespaceString& ns,
                                            std::vector<BSONObj>&& objs,
@@ -381,8 +396,10 @@ void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
 
 std::unique_ptr<Pipeline, PipelineDeleter>
 ShardServerProcessInterface::attachCursorSourceToPipeline(Pipeline* ownedPipeline,
-                                                          bool allowTargetingShards) {
-    return sharded_agg_helpers::attachCursorToPipeline(ownedPipeline, allowTargetingShards);
+                                                          ShardTargetingPolicy shardTargetingPolicy,
+                                                          boost::optional<BSONObj> readConcern) {
+    return sharded_agg_helpers::attachCursorToPipeline(
+        ownedPipeline, shardTargetingPolicy, std::move(readConcern));
 }
 
 void ShardServerProcessInterface::setExpectedShardVersion(

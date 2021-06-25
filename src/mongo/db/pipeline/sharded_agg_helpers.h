@@ -124,20 +124,24 @@ SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
 DispatchShardPipelineResults dispatchShardPipeline(
     Document serializedCommand,
     bool hasChangeStream,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline);
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+    boost::optional<BSONObj> readConcern = boost::none);
 
 BSONObj createPassthroughCommandForShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Document serializedCommand,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     Pipeline* pipeline,
-    BSONObj collationObj);
+    BSONObj collationObj,
+    boost::optional<BSONObj> readConcern);
 
 BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        Document serializedCommand,
                                        const SplitPipeline& splitPipeline,
                                        const boost::optional<ShardedExchangePolicy> exchangeSpec,
-                                       bool needsMerge);
+                                       bool needsMerge,
+                                       boost::optional<BSONObj> readConcern = boost::none);
 
 /**
  * Creates a new DocumentSourceMergeCursors from the provided 'remoteCursors' and adds it to the
@@ -189,8 +193,10 @@ Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx);
  * merging half executing in this process after attaching a $mergeCursors. Will retry on network
  * errors and also on StaleConfig errors to avoid restarting the entire operation.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(Pipeline* ownedPipeline,
-                                                                  bool allowTargetingShards);
+std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
+    Pipeline* ownedPipeline,
+    ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+    boost::optional<BSONObj> readConcern = boost::none);
 
 /**
  * For a sharded collection, establishes remote cursors on each shard that may have results, and
@@ -206,7 +212,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>, AggregateCommandRequest>
         targetRequest,
-    boost::optional<BSONObj> shardCursorsSortSpec = boost::none);
+    boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+    ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+    boost::optional<BSONObj> readConcern = boost::none);
 
 /**
  * For a sharded or unsharded collection, establishes a remote cursor on only the specified shard,

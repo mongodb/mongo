@@ -71,6 +71,13 @@ public:
         uasserted(50997, "Unexpected attempt to consult catalog cache on a shard server");
     }
 
+    boost::optional<Document> lookupSingleDocument(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        UUID collectionUUID,
+        const Document& documentKey,
+        boost::optional<BSONObj> readConcern) final;
+
     /**
      * Inserts the documents 'objs' into the namespace 'ns' using the ClusterWriter for locking,
      * routing, stale config handling, etc.
@@ -124,7 +131,9 @@ public:
      * operation.
      */
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        Pipeline* pipeline, bool allowTargetingShards) final;
+        Pipeline* pipeline,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none) final;
 
     void setExpectedShardVersion(OperationContext* opCtx,
                                  const NamespaceString& nss,

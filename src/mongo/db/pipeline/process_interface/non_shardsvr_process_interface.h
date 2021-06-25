@@ -52,7 +52,9 @@ public:
                                      bool includeBuildUUIDs) override;
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        Pipeline* pipeline, bool allowTargetingShards) override;
+        Pipeline* pipeline,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none) override;
 
     BSONObj preparePipelineAndExplain(Pipeline* ownedPipeline, ExplainOptions::Verbosity verbosity);
 
@@ -78,6 +80,13 @@ public:
 
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const final;
+
+    boost::optional<Document> lookupSingleDocument(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        UUID collectionUUID,
+        const Document& documentKey,
+        boost::optional<BSONObj> readConcern) final;
 
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,

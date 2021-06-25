@@ -76,13 +76,6 @@ public:
         Pipeline* pipeline) final;
     std::string getShardName(OperationContext* opCtx) const final;
 
-    boost::optional<Document> lookupSingleDocument(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& nss,
-        UUID collectionUUID,
-        const Document& documentKey,
-        boost::optional<BSONObj> readConcern,
-        bool allowSpeculativeMajorityRead = false) final;
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const final;
     BackupCursorState openBackupCursor(OperationContext* opCtx,
@@ -131,6 +124,13 @@ public:
                                     std::unique_ptr<TemporaryRecordStore> rs) const final;
 
 protected:
+    boost::optional<Document> doLookupSingleDocument(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        UUID collectionUUID,
+        const Document& documentKey,
+        MakePipelineOptions opts);
+
     /**
      * Builds an ordered insert op on namespace 'nss' and documents to be written 'objs'.
      */

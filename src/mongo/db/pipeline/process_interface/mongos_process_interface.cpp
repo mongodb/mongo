@@ -100,9 +100,16 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 }  // namespace
 
 std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::attachCursorSourceToPipeline(
-    Pipeline* ownedPipeline, bool allowTargetingShards) {
+    Pipeline* ownedPipeline,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern) {
     // On mongos we can't have local cursors.
-    return sharded_agg_helpers::attachCursorToPipeline(ownedPipeline, allowTargetingShards);
+    tassert(5530900,
+            "shardTargetingPolicy cannot be kNotAllowed on mongos",
+            shardTargetingPolicy != ShardTargetingPolicy::kNotAllowed);
+
+    return sharded_agg_helpers::attachCursorToPipeline(
+        ownedPipeline, shardTargetingPolicy, std::move(readConcern));
 }
 
 BSONObj MongosProcessInterface::preparePipelineAndExplain(Pipeline* ownedPipeline,
@@ -122,8 +129,7 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
     const NamespaceString& nss,
     UUID collectionUUID,
     const Document& filter,
-    boost::optional<BSONObj> readConcern,
-    bool allowSpeculativeMajorityRead) {
+    boost::optional<BSONObj> readConcern) {
     auto foreignExpCtx = expCtx->copyWith(nss, collectionUUID);
 
     // Create the find command to be dispatched to the shard(s) in order to return the post-image.
@@ -136,11 +142,9 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
         cmdBuilder.append("find", nss.coll());
     }
     cmdBuilder.append("filter", filterObj);
+    cmdBuilder.append("allowSpeculativeMajorityRead", true);
     if (readConcern) {
         cmdBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcern);
-    }
-    if (allowSpeculativeMajorityRead) {
-        cmdBuilder.append("allowSpeculativeMajorityRead", true);
     }
 
     try {

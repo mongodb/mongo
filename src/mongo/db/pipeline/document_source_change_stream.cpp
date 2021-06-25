@@ -239,11 +239,23 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
         stages.push_back(DocumentSourceChangeStreamCheckResumability::create(expCtx, spec));
     }
 
-    // If the pipeline is built on MongoS, then the stage 'DSCSHandleTopologyChange' acts as the
-    // split point for the pipline. All stages before this stages will run on shards and all stages
-    // after and inclusive of this stage will run on the MongoS.
+    // If the pipeline is built on MongoS, we check for topology change events here. If a topology
+    // change event is detected, this stage forwards the event directly to the executor via an
+    // exception (bypassing the rest of the pipeline). MongoS must see all topology change events,
+    // so it's important that this stage occurs before any filtering is performed.
     if (expCtx->inMongos) {
         stages.push_back(DocumentSourceChangeStreamCheckTopologyChange::create(expCtx));
+    }
+
+    // If 'fullDocument' is set to "updateLookup", add the DSCSLookupPostImage stage here.
+    if (spec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup) {
+        stages.push_back(DocumentSourceChangeStreamLookupPostImage::create(expCtx));
+    }
+
+    // If the pipeline is built on MongoS, then the DSCSHandleTopologyChange stage acts as the
+    // split point for the pipline. All stages before this stages will run on shards and all
+    // stages after and inclusive of this stage will run on the MongoS.
+    if (expCtx->inMongos) {
         stages.push_back(DocumentSourceChangeStreamHandleTopologyChange::create(expCtx));
     }
 
@@ -261,12 +273,6 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
     if (spec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff) {
         invariant(!expCtx->inMongos);
         stages.push_back(DocumentSourceChangeStreamLookupPreImage::create(expCtx, spec));
-    }
-
-    // There should be only one post-image lookup stage.  If we're on the shards and producing
-    // input to be merged, the lookup is done on the mongos.
-    if (spec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup) {
-        stages.push_back(DocumentSourceChangeStreamLookupPostImage::create(expCtx));
     }
 
     return stages;

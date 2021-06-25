@@ -93,8 +93,8 @@ assert.eq(latestChange.operationType, "update");
 assert.eq(latestChange.fullDocument,
           {_id: "fullDocument is lookup", replaced: true, updated: true});
 
-// Test that looking up the post image of an update after deleting the document will result
-// in a 'fullDocument' with a value of null.
+// Test how a change stream behaves when it is created with 'fullDocument: updateLookup', then a
+// document is updated and removed, and then events are retrieved from the change stream.
 cursor = cst.startWatchingChanges({
     collection: coll,
     pipeline: [{$changeStream: {fullDocument: "updateLookup"}}, {$match: {operationType: "update"}}]
@@ -106,45 +106,31 @@ assert.commandWorked(coll.remove({_id: "fullDocument is lookup"}));
 // assume looking up the document will fail.
 FixtureHelpers.awaitLastOpCommitted(db);
 
+// The next entry is the 'update' operation. Because the corresponding document has been deleted,
+// our attempt to look up the post-image results in a null document.
 latestChange = cst.getOneChange(cursor);
 assert.eq(latestChange.operationType, "update");
 assert(latestChange.hasOwnProperty("fullDocument"));
 assert.eq(latestChange.fullDocument, null);
+
 const deleteDocResumePoint = latestChange._id;
 
-// Test that looking up the post image of an update after the collection has been dropped
-// will result in 'fullDocument' with a value of null.  This must be done using getMore
-// because new cursors cannot be established after a collection drop.
+// Test how a change stream behaves when it is created with 'fullDocument: updateLookup' using a
+// resume token from an earlier point in time, then the collection gets dropped, and then events
+// are retrieved from the change stream.
 assert.commandWorked(coll.insert({_id: "fullDocument is lookup 2"}));
 assert.commandWorked(coll.update({_id: "fullDocument is lookup 2"}, {$set: {updated: true}}));
 
-// Open a $changeStream cursor with batchSize 0, so that no oplog entries are retrieved yet.
+// Open the $changeStream cursor with batchSize 0 so that no change stream events are prefetched
+// before the collection is dropped.
 cursor = cst.startWatchingChanges({
     collection: coll,
     pipeline: [
-        {$changeStream: {fullDocument: "updateLookup", resumeAfter: deleteDocResumePoint}},
+        {$changeStream: {resumeAfter: deleteDocResumePoint, fullDocument: "updateLookup"}},
         {$match: {operationType: {$ne: "delete"}}}
     ],
     aggregateOptions: {cursor: {batchSize: 0}}
 });
-
-// Save another stream to test post-image lookup after the collection is recreated.
-const cursorBeforeDrop = cst.startWatchingChanges({
-    collection: coll,
-    pipeline: [
-        {$changeStream: {fullDocument: "updateLookup", resumeAfter: deleteDocResumePoint}},
-        {$match: {operationType: {$ne: "delete"}}}
-    ],
-    aggregateOptions: {cursor: {batchSize: 0}}
-});
-
-// Retrieve the 'insert' operation from the latter stream. This is necessary on a sharded
-// collection so that the documentKey is retrieved before the collection is recreated;
-// otherwise, per SERVER-31691, a uassert will occur.
-latestChange = cst.getOneChange(cursorBeforeDrop);
-assert.eq(latestChange.operationType, "insert");
-assert(latestChange.hasOwnProperty("fullDocument"));
-assert.eq(latestChange.fullDocument, {_id: "fullDocument is lookup 2"});
 
 // Drop the collection and wait until two-phase drop finishes.
 assertDropCollection(db, coll.getName());
@@ -169,18 +155,18 @@ assert.eq(latestChange.operationType, "update");
 assert(latestChange.hasOwnProperty("fullDocument"));
 assert.eq(latestChange.fullDocument, null);
 
-// Test that we can resume a change stream with 'fullDocument: updateLookup' after the
-// collection has been dropped. This is only allowed if an explicit collation is provided.
+// After a collection has been dropped, verify that a change stream can be created with
+// 'fullDocument: updateLookup' using a resume token from an earlier point in time.
 cursor = cst.startWatchingChanges({
     collection: coll,
     pipeline: [
         {$changeStream: {resumeAfter: deleteDocResumePoint, fullDocument: "updateLookup"}},
         {$match: {operationType: {$ne: "delete"}}}
     ],
-    aggregateOptions: {cursor: {batchSize: 0}, collation: {locale: "simple"}}
+    aggregateOptions: {cursor: {batchSize: 0}}
 });
 
-// Check the next $changeStream entry; this is the test document inserted above.
+// The next entry is the 'insert' operation.
 latestChange = cst.getOneChange(cursor);
 assert.eq(latestChange.operationType, "insert");
 assert(latestChange.hasOwnProperty("fullDocument"));
@@ -193,18 +179,36 @@ assert.eq(latestChange.operationType, "update");
 assert(latestChange.hasOwnProperty("fullDocument"));
 assert.eq(latestChange.fullDocument, null);
 
-// Test that looking up the post image of an update after the collection has been dropped
-// and created again will result in 'fullDocument' with a value of null. This must be done
-// using getMore because new cursors cannot be established after a collection drop.
-
-// Insert a document with the same _id, verify the change stream won't return it due to
-// different UUID.
+// Test how a change stream behaves when a collection is dropped and re-created, then the change
+// stream is created with 'fullDocument: updateLookup' using a resume token from before the
+// collection was dropped, and then events are retrieved from the change stream.
 assertCreateCollection(db, coll.getName());
+
+// Insert a new document with the same _id as the document from the previous incarnation of this
+// collection.
 assert.commandWorked(coll.insert({_id: "fullDocument is lookup 2"}));
 
-// Confirm that the next entry's post-image is null since new collection has a different
-// UUID.
-latestChange = cst.getOneChange(cursorBeforeDrop);
+// After a collection has been dropped and re-created, verify a change stream can be created with
+// 'fullDocument: updateLookup' using a resume token from before the collection was dropped.
+cursor = cst.startWatchingChanges({
+    collection: coll,
+    pipeline: [
+        {$changeStream: {resumeAfter: deleteDocResumePoint, fullDocument: "updateLookup"}},
+        {$match: {operationType: {$ne: "delete"}}}
+    ],
+    aggregateOptions: {cursor: {batchSize: 0}}
+});
+
+// The next entry is the 'insert' operation.
+latestChange = cst.getOneChange(cursor);
+assert.eq(latestChange.operationType, "insert");
+assert(latestChange.hasOwnProperty("fullDocument"));
+assert.eq(latestChange.fullDocument, {_id: "fullDocument is lookup 2"});
+
+// The next entry is the 'update' operation. Confirm that the next entry's post-image is null
+// because the original collection (i.e. the collection that the 'update' was applied to) has
+// been dropped and the new incarnation of the collection has a different UUID.
+latestChange = cst.getOneChange(cursor);
 assert.eq(latestChange.operationType, "update");
 assert(latestChange.hasOwnProperty("fullDocument"));
 assert.eq(latestChange.fullDocument, null);

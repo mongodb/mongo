@@ -427,8 +427,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
         pipelineOpts.attachCursorSource = true;
         pipelineOpts.validator = lookupPipeValidator;
         // By default, $lookup doesnt support sharded 'from' collections.
-        pipelineOpts.allowTargetingShards = feature_flags::gFeatureFlagShardedLookup.isEnabled(
-            serverGlobalParams.featureCompatibility);
+        pipelineOpts.shardTargetingPolicy = feature_flags::gFeatureFlagShardedLookup.isEnabled(
+                                                serverGlobalParams.featureCompatibility)
+            ? ShardTargetingPolicy::kAllowed
+            : ShardTargetingPolicy::kNotAllowed;
         return Pipeline::makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
     }
 
@@ -457,10 +459,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
 
     if (!_cache->isServing()) {
         // The cache has either been abandoned or has not yet been built. Attach a cursor.
+        auto shardTargetingPolicy = feature_flags::gFeatureFlagShardedLookup.isEnabledAndIgnoreFCV()
+            ? ShardTargetingPolicy::kAllowed
+            : ShardTargetingPolicy::kNotAllowed;
         pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
-            pipeline.release(),
-            feature_flags::gFeatureFlagShardedLookup
-                .isEnabledAndIgnoreFCV() /* allowTargetingShards*/);
+            pipeline.release(), shardTargetingPolicy);
     }
 
     // If the cache has been abandoned, release it.

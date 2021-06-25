@@ -130,7 +130,8 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
 BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                   boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                                  BSONObj collationObj) {
+                                  BSONObj collationObj,
+                                  boost::optional<BSONObj> readConcern) {
     // Serialize the variables.
     // Check whether we are in a mixed-version cluster and so must use the old serialization format.
     // This is only tricky in the case we are sending an aggregate from shard to shard. For this
@@ -174,6 +175,10 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                 << " field set: " << cmdForShards.peek().toString());
         cmdForShards[OperationSessionInfo::kTxnNumberFieldName] =
             Value(static_cast<long long>(*expCtx->opCtx->getTxnNumber()));
+    }
+
+    if (readConcern) {
+        cmdForShards["readConcern"] = Value(std::move(*readConcern));
     }
 
     return cmdForShards.freeze().toBson();
@@ -636,7 +641,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>, AggregateCommandRequest>
         targetRequest,
-    boost::optional<BSONObj> shardCursorsSortSpec) {
+    boost::optional<BSONObj> shardCursorsSortSpec,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern) {
     auto&& [aggRequest, pipeline] = [&] {
         return stdx::visit(
             visit_helper::Overloaded{
@@ -670,7 +677,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     auto shardDispatchResults =
         dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
                               hasChangeStream,
-                              std::move(pipeline));
+                              std::move(pipeline),
+                              shardTargetingPolicy,
+                              std::move(readConcern));
 
     std::vector<ShardId> targetedShards;
     targetedShards.reserve(shardDispatchResults.remoteCursors.size());
@@ -827,15 +836,19 @@ BSONObj createPassthroughCommandForShard(
     Document serializedCommand,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     Pipeline* pipeline,
-    BSONObj collationObj) {
+    BSONObj collationObj,
+    boost::optional<BSONObj> readConcern) {
     // Create the command for the shards.
     MutableDocument targetedCmd(serializedCommand);
     if (pipeline) {
         targetedCmd[AggregateCommandRequest::kPipelineFieldName] = Value(pipeline->serialize());
     }
 
-    auto shardCommand =
-        genericTransformForShards(std::move(targetedCmd), expCtx, explainVerbosity, collationObj);
+    auto shardCommand = genericTransformForShards(std::move(targetedCmd),
+                                                  expCtx,
+                                                  explainVerbosity,
+                                                  std::move(collationObj),
+                                                  std::move(readConcern));
 
     // Apply filter and RW concern to the final shard command.
     return CommandHelpers::filterCommandRequestForPassthrough(
@@ -849,7 +862,8 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
                                        Document serializedCommand,
                                        const SplitPipeline& splitPipeline,
                                        const boost::optional<ShardedExchangePolicy> exchangeSpec,
-                                       bool needsMerge) {
+                                       bool needsMerge,
+                                       boost::optional<BSONObj> readConcern) {
     // Create the command for the shards.
     MutableDocument targetedCmd(serializedCommand);
     // If we've parsed a pipeline on mongos, always override the pipeline, in case parsing it
@@ -880,8 +894,11 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
     targetedCmd[AggregateCommandRequest::kExchangeFieldName] =
         exchangeSpec ? Value(exchangeSpec->exchangeSpec.toBSON()) : Value();
 
-    auto shardCommand = genericTransformForShards(
-        std::move(targetedCmd), expCtx, expCtx->explain, expCtx->getCollatorBSON());
+    auto shardCommand = genericTransformForShards(std::move(targetedCmd),
+                                                  expCtx,
+                                                  expCtx->explain,
+                                                  expCtx->getCollatorBSON(),
+                                                  std::move(readConcern));
 
     // Apply RW concern to the final shard command.
     return applyReadWriteConcern(expCtx->opCtx,
@@ -898,7 +915,9 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
 DispatchShardPipelineResults dispatchShardPipeline(
     Document serializedCommand,
     bool hasChangeStream,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline) {
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern) {
     auto expCtx = pipeline->getContext();
 
     // The process is as follows:
@@ -930,11 +949,19 @@ DispatchShardPipelineResults dispatchShardPipeline(
         ? std::move(executionNsRoutingInfoStatus.getValue())
         : boost::optional<ChunkManager>{};
 
+    // A $changeStream update lookup attempts to retrieve a single document by documentKey. In this
+    // case, we wish to target a single shard using the simple collation, but we also want to ensure
+    // that we use the collection-default collation on the shard so that the lookup can use the _id
+    // index. We therefore ignore the collation on the expCtx.
+    const auto& shardTargetingCollation =
+        shardTargetingPolicy == ShardTargetingPolicy::kForceTargetingWithSimpleCollation
+        ? CollationSpec::kSimpleSpec
+        : expCtx->getCollatorBSON();
+
     // Determine whether we can run the entire aggregation on a single shard.
-    const auto collationObj = expCtx->getCollatorBSON();
     const bool mustRunOnAll = mustRunOnAllShards(expCtx->ns, hasChangeStream);
-    std::set<ShardId> shardIds =
-        getTargetedShards(expCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, collationObj);
+    std::set<ShardId> shardIds = getTargetedShards(
+        expCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, shardTargetingCollation);
 
     // Don't need to split the pipeline if we are only targeting a single shard, unless:
     // - There is a stage that needs to be run on the primary shard and the single target shard
@@ -962,11 +989,18 @@ DispatchShardPipelineResults dispatchShardPipeline(
 
     // Generate the command object for the targeted shards.
     BSONObj targetedCommand =
-        (splitPipelines
-             ? createCommandForTargetedShards(
-                   expCtx, serializedCommand, *splitPipelines, exchangeSpec, true /* needsMerge */)
-             : createPassthroughCommandForShard(
-                   expCtx, serializedCommand, expCtx->explain, pipeline.get(), collationObj));
+        (splitPipelines ? createCommandForTargetedShards(expCtx,
+                                                         serializedCommand,
+                                                         *splitPipelines,
+                                                         exchangeSpec,
+                                                         true /* needsMerge */,
+                                                         std::move(readConcern))
+                        : createPassthroughCommandForShard(expCtx,
+                                                           serializedCommand,
+                                                           expCtx->explain,
+                                                           pipeline.get(),
+                                                           expCtx->getCollatorBSON(),
+                                                           std::move(readConcern)));
 
     // A $changeStream pipeline must run on all shards, and will also open an extra cursor on the
     // config server in order to monitor for new shards. To guarantee that we do not miss any
@@ -984,7 +1018,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
         Grid::get(opCtx)->shardRegistry()->reload(opCtx);
         // Rebuild the set of shards as the shard registry might have changed.
         shardIds = getTargetedShards(
-            expCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, collationObj);
+            expCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, shardTargetingCollation);
     }
 
     // If there were no shards when we began execution, we wouldn't have run this aggregation in the
@@ -1018,7 +1052,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                                            ReadPreferenceSetting::get(opCtx),
                                                            Shard::RetryPolicy::kIdempotent,
                                                            shardQuery,
-                                                           collationObj);
+                                                           shardTargetingCollation);
         }
     } else {
         cursors = establishShardCursors(opCtx,
@@ -1253,8 +1287,10 @@ bool mustRunOnAllShards(const NamespaceString& nss, bool hasChangeStream) {
     return nss.isCollectionlessAggregateNS() || hasChangeStream;
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(Pipeline* ownedPipeline,
-                                                                  bool allowTargetingShards) {
+std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
+    Pipeline* ownedPipeline,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern) {
     auto expCtx = ownedPipeline->getContext();
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
@@ -1274,15 +1310,19 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(Pipeline* owne
     return shardVersionRetry(
         expCtx->opCtx, catalogCache, expCtx->ns, "targeting pipeline to attach cursors"_sd, [&]() {
             auto pipelineToTarget = pipeline->clone();
-            if (!allowTargetingShards || expCtx->ns.db() == "local" ||
-                expCtx->ns.isReshardingLocalOplogBufferCollection()) {
+            if (shardTargetingPolicy == ShardTargetingPolicy::kNotAllowed ||
+                expCtx->ns.db() == "local" || expCtx->ns.isReshardingLocalOplogBufferCollection()) {
                 // If the db is local, this may be a change stream examining the oplog. We know the
                 // oplog, other local collections, and collections that store the local resharding
                 // oplog buffer won't be sharded.
                 return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
                     pipelineToTarget.release());
             }
-            return targetShardsAndAddMergeCursors(expCtx, std::move(pipelineToTarget));
+            return targetShardsAndAddMergeCursors(expCtx,
+                                                  std::move(pipelineToTarget),
+                                                  boost::none,
+                                                  shardTargetingPolicy,
+                                                  std::move(readConcern));
         });
 }
 

@@ -49,8 +49,10 @@ StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipelineForLocalRe
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>
-StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipeline(Pipeline* ownedPipeline,
-                                                                       bool allowTargetingShards) {
+StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipeline(
+    Pipeline* ownedPipeline,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern) {
     return attachCursorSourceToPipelineForLocalRead(ownedPipeline);
 }
 
@@ -59,8 +61,7 @@ boost::optional<Document> StubLookupSingleDocumentProcessInterface::lookupSingle
     const NamespaceString& nss,
     UUID collectionUUID,
     const Document& documentKey,
-    boost::optional<BSONObj> readConcern,
-    bool allowSpeculativeMajorityRead) {
+    boost::optional<BSONObj> readConcern) {
     // The namespace 'nss' may be different than the namespace on the ExpressionContext in the
     // case of a change stream on a whole database so we need to make a copy of the
     // ExpressionContext with the new namespace.

@@ -40,12 +40,15 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/repl/speculative_majority_read_info.h"
 
 namespace mongo {
 
 std::unique_ptr<Pipeline, PipelineDeleter>
-NonShardServerProcessInterface::attachCursorSourceToPipeline(Pipeline* ownedPipeline,
-                                                             bool allowTargetingShards) {
+NonShardServerProcessInterface::attachCursorSourceToPipeline(
+    Pipeline* ownedPipeline,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern) {
     return attachCursorSourceToPipelineForLocalRead(ownedPipeline);
 }
 
@@ -64,6 +67,38 @@ NonShardServerProcessInterface::collectDocumentKeyFieldsForHostedCollection(
 std::vector<FieldPath> NonShardServerProcessInterface::collectDocumentKeyFieldsActingAsRouter(
     OperationContext* opCtx, const NamespaceString& nss) const {
     return {"_id"};  // Nothing is sharded.
+}
+
+boost::optional<Document> NonShardServerProcessInterface::lookupSingleDocument(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    UUID collectionUUID,
+    const Document& documentKey,
+    boost::optional<BSONObj> readConcern) {
+    MakePipelineOptions opts;
+    opts.shardTargetingPolicy = ShardTargetingPolicy::kNotAllowed;
+    opts.readConcern = std::move(readConcern);
+
+    auto lookedUpDocument =
+        doLookupSingleDocument(expCtx, nss, collectionUUID, documentKey, std::move(opts));
+
+    // Set the speculative read timestamp appropriately after we do a document lookup locally. We
+    // set the speculative read timestamp based on the timestamp used by the transaction.
+    repl::SpeculativeMajorityReadInfo& speculativeMajorityReadInfo =
+        repl::SpeculativeMajorityReadInfo::get(expCtx->opCtx);
+    if (speculativeMajorityReadInfo.isSpeculativeRead()) {
+        // Speculative majority reads are required to use the 'kNoOverlap' read source.
+        // Storage engine operations require at least Global IS.
+        Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
+        invariant(expCtx->opCtx->recoveryUnit()->getTimestampReadSource() ==
+                  RecoveryUnit::ReadSource::kNoOverlap);
+        boost::optional<Timestamp> readTs =
+            expCtx->opCtx->recoveryUnit()->getPointInTimeReadTimestamp(expCtx->opCtx);
+        invariant(readTs);
+        speculativeMajorityReadInfo.setSpeculativeReadTimestampForward(*readTs);
+    }
+
+    return lookedUpDocument;
 }
 
 Status NonShardServerProcessInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,

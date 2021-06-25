@@ -66,12 +66,16 @@ public:
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         invariant(pipeState != Pipeline::SplitState::kSplitForShards);
+
+        // TODO SERVER-55659: remove the feature flag.
+        HostTypeRequirement hostTypeRequirement =
+            feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()
+            ? HostTypeRequirement::kAnyShard
+            : HostTypeRequirement::kLocalOnly;
+
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kNone,
-                                     // If this is parsed on mongos it should stay on mongos. If
-                                     // we're not in a sharded cluster then it's okay to run on
-                                     // mongod.
-                                     HostTypeRequirement::kLocalOnly,
+                                     hostTypeRequirement,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,

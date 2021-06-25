@@ -8,8 +8,9 @@
 (function() {
 "use strict";
 
-load("jstests/libs/profiler.js");   // For profilerHas*OrThrow() helpers.
-load("jstests/replsets/rslib.js");  // For reconfig().
+load('jstests/libs/change_stream_util.js');  // For isChangeStreamOptimizationEnabled().
+load("jstests/libs/profiler.js");            // For profilerHas*OrThrow() helpers.
+load("jstests/replsets/rslib.js");           // For reconfig().
 
 // For stopServerReplication() and restartServerReplication().
 load("jstests/libs/write_concern_util.js");
@@ -60,7 +61,8 @@ assert.commandWorked(st.s.adminCommand(
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 
-// Shard the collection to ensure the change stream will perform update lookup from mongos.
+const isChangeStreamOptimized = isChangeStreamOptimizationEnabled(mongosDB);
+
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
 assert.commandWorked(
     mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
@@ -107,22 +109,24 @@ profilerHasAtLeastOneMatchingEntryOrThrow(
     {profileDB: closestSecondaryDB, filter: {"originatingCommand.comment": changeStreamComment}});
 
 // Test that the update lookup goes to the secondary as well.
+let filter = {
+    op: isChangeStreamOptimized ? "command" : "query",
+    ns: mongosColl.getFullName(),
+    "command.comment": changeStreamComment,
+    // We need to filter out any profiler entries with a stale config - this is the first read on
+    // this secondary with a readConcern specified, so it is the first read on this secondary that
+    // will enforce shard version.
+    errCode: {$ne: ErrorCodes.StaleConfig}
+};
+filter[isChangeStreamOptimized ? "command.aggregate" : "command.find"] = mongosColl.getName();
+filter[isChangeStreamOptimized ? "command.pipeline.0.$match._id" : "command.filter._id"] = 1;
+
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: closestSecondaryDB,
-    filter: {
-        op: "query",
-        ns: mongosColl.getFullName(),
-        "command.filter._id": 1,
-        "command.comment": changeStreamComment,
-        // We need to filter out any profiler entries with a stale config - this is the first
-        // read on this secondary with a readConcern specified, so it is the first read on this
-        // secondary that will enforce shard version.
-        errCode: {$ne: ErrorCodes.StaleConfig}
-    },
+    filter: filter,
     errorMsgFilter: {ns: mongosColl.getFullName()},
     errorMsgProj: {ns: 1, op: 1, command: 1},
 });
-
 // Now add a new secondary which is "closer" (add the "closestSecondary" tag to that secondary,
 // and remove it from the old node with that tag) to force update lookups target a different
 // node than the change stream itself.
@@ -182,11 +186,11 @@ const joinResumeReplicationShell =
                 function() {
                     return changeStreamDB
                                .currentOp({
-                                   op: "query",
-                                   // Note the namespace here happens to be the database.$cmd,
-                                   // because we're blocked waiting for the read concern, which
-                                   // happens before we get to the command processing level and
-                                   // adjust the currentOp namespace to include the collection name.
+                                   op: ${isChangeStreamOptimized} ? "command" : "query",
+                                   // Note the namespace here happens to be database.$cmd, because
+                                   // we're blocked waiting for the read concern, which happens
+                                   // before we get to the command processing level and adjust the
+                                   // currentOp namespace to include the collection name.
                                    ns: "${mongosDB.getName()}.$cmd",
                                    "command.comment": "${changeStreamComment}",
                                })
@@ -206,18 +210,18 @@ assert.docEq(latestChange.fullDocument, {_id: 1, updatedCount: 2});
 joinResumeReplicationShell();
 
 // Test that the update lookup goes to the new closest secondary.
-profilerHasSingleMatchingEntryOrThrow({
-    profileDB: newClosestSecondaryDB,
-    filter: {
-        op: "query",
-        ns: mongosColl.getFullName(),
-        "command.comment": changeStreamComment,
-        // We need to filter out any profiler entries with a stale config - this is the first
-        // read on this secondary with a readConcern specified, so it is the first read on this
-        // secondary that will enforce shard version.
-        errCode: {$ne: ErrorCodes.StaleConfig}
-    }
-});
+filter = {
+    op: isChangeStreamOptimized ? "command" : "query",
+    ns: mongosColl.getFullName(),
+    "command.comment": changeStreamComment,
+    // We need to filter out any profiler entries with a stale config - this is the first read on
+    // this secondary with a readConcern specified, so it is the first read on this secondary that
+    // will enforce shard version.
+    errCode: {$ne: ErrorCodes.StaleConfig}
+};
+filter[isChangeStreamOptimized ? "command.aggregate" : "command.find"] = mongosColl.getName();
+
+profilerHasSingleMatchingEntryOrThrow({profileDB: newClosestSecondaryDB, filter: filter});
 
 changeStream.close();
 st.stop();

@@ -40,6 +40,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/executor/task_executor.h"
@@ -69,8 +70,9 @@ using PipelineValidatorCallback = std::function<void(const Pipeline&)>;
 struct MakePipelineOptions {
     bool optimize = true;
     bool attachCursorSource = true;
-    bool allowTargetingShards = true;
+    ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed;
     PipelineValidatorCallback validator = nullptr;
+    boost::optional<BSONObj> readConcern;
 };
 
 /**

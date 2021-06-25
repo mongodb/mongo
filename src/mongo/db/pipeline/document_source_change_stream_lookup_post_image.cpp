@@ -123,24 +123,15 @@ Value DocumentSourceChangeStreamLookupPostImage::lookupPostImage(const Document&
     auto resumeToken =
         ResumeToken::parse(updateOp[DocumentSourceChangeStream::kIdField].getDocument());
 
-    const auto readConcern = pExpCtx->inMongos
-        ? boost::optional<BSONObj>(BSON("level"
-                                        << "majority"
-                                        << "afterClusterTime" << resumeToken.getData().clusterTime))
-        : boost::none;
-
+    auto readConcern = BSON("level"
+                            << "majority"
+                            << "afterClusterTime" << resumeToken.getData().clusterTime);
 
     // Update lookup queries sent from mongoS to shards are allowed to use speculative majority
     // reads.
-    const auto allowSpeculativeMajorityRead = pExpCtx->inMongos;
     invariant(resumeToken.getData().uuid);
-    auto lookedUpDoc =
-        pExpCtx->mongoProcessInterface->lookupSingleDocument(pExpCtx,
-                                                             nss,
-                                                             *resumeToken.getData().uuid,
-                                                             documentKey,
-                                                             readConcern,
-                                                             allowSpeculativeMajorityRead);
+    auto lookedUpDoc = pExpCtx->mongoProcessInterface->lookupSingleDocument(
+        pExpCtx, nss, *resumeToken.getData().uuid, documentKey, std::move(readConcern));
 
     // Check whether the lookup returned any documents. Even if the lookup itself succeeded, it may
     // not have returned any results if the document was deleted in the time since the update op.

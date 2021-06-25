@@ -55,7 +55,6 @@
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_curop.h"
@@ -326,19 +325,12 @@ std::vector<GenericCursor> CommonMongodProcessInterface::getIdleCursors(
     return CursorManager::get(expCtx->opCtx)->getIdleCursors(expCtx->opCtx, userMode);
 }
 
-boost::optional<Document> CommonMongodProcessInterface::lookupSingleDocument(
+boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     UUID collectionUUID,
     const Document& documentKey,
-    boost::optional<BSONObj> readConcern,
-    bool allowSpeculativeMajorityRead) {
-    invariant(!readConcern);  // We don't currently support a read concern on mongod - it's only
-                              // expected to be necessary on mongos.
-    invariant(!allowSpeculativeMajorityRead);  // We don't expect 'allowSpeculativeMajorityRead' on
-                                               // mongod - it's only expected to be necessary on
-                                               // mongos.
-
+    MakePipelineOptions opts) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
     try {
         // Be sure to do the lookup using the collection default collation
@@ -346,11 +338,7 @@ boost::optional<Document> CommonMongodProcessInterface::lookupSingleDocument(
             nss,
             collectionUUID,
             _getCollectionDefaultCollator(expCtx->opCtx, nss.db(), collectionUUID));
-        // When looking up on a mongoD, we only ever want to read from the local collection. By
-        // default, makePipeline will attach a cursor source which may read from remote if the
-        // collection is sharded, so we configure it to not allow that here.
-        MakePipelineOptions opts;
-        opts.allowTargetingShards = false;
+
         pipeline = Pipeline::makePipeline({BSON("$match" << documentKey)}, foreignExpCtx, opts);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         return boost::none;
@@ -362,22 +350,6 @@ boost::optional<Document> CommonMongodProcessInterface::lookupSingleDocument(
                   str::stream() << "found more than one document with document key "
                                 << documentKey.toString() << " [" << lookedUpDocument->toString()
                                 << ", " << next->toString() << "]");
-    }
-
-    // Set the speculative read timestamp appropriately after we do a document lookup locally. We
-    // set the speculative read timestamp based on the timestamp used by the transaction.
-    repl::SpeculativeMajorityReadInfo& speculativeMajorityReadInfo =
-        repl::SpeculativeMajorityReadInfo::get(expCtx->opCtx);
-    if (speculativeMajorityReadInfo.isSpeculativeRead()) {
-        // Speculative majority reads are required to use the 'kNoOverlap' read source.
-        // Storage engine operations require at least Global IS.
-        Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
-        invariant(expCtx->opCtx->recoveryUnit()->getTimestampReadSource() ==
-                  RecoveryUnit::ReadSource::kNoOverlap);
-        boost::optional<Timestamp> readTs =
-            expCtx->opCtx->recoveryUnit()->getPointInTimeReadTimestamp(expCtx->opCtx);
-        invariant(readTs);
-        speculativeMajorityReadInfo.setSpeculativeReadTimestampForward(*readTs);
     }
 
     return lookedUpDocument;

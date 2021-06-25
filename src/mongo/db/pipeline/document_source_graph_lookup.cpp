@@ -242,8 +242,10 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             pipelineOpts.optimize = true;
             pipelineOpts.attachCursorSource = true;
             // By default, $graphLookup doesn't support a sharded 'from' collection.
-            pipelineOpts.allowTargetingShards = feature_flags::gFeatureFlagShardedLookup.isEnabled(
-                serverGlobalParams.featureCompatibility);
+            pipelineOpts.shardTargetingPolicy = feature_flags::gFeatureFlagShardedLookup.isEnabled(
+                                                    serverGlobalParams.featureCompatibility)
+                ? ShardTargetingPolicy::kAllowed
+                : ShardTargetingPolicy::kNotAllowed;
             _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
             auto pipeline = Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);
             while (auto next = pipeline->getNext()) {

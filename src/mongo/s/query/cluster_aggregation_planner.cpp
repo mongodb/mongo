@@ -624,7 +624,8 @@ Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& 
                                                                            serializedCommand,
                                                                            explain,
                                                                            nullptr, /* pipeline */
-                                                                           BSONObj());
+                                                                           BSONObj(),
+                                                                           boost::none);
 
     const auto shardId = cm.dbPrimary();
     const auto cmdObjWithShardVersion = (shardId != ShardId::kConfigServerId)

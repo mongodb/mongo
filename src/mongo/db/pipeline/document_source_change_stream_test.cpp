@@ -158,8 +158,7 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
         const NamespaceString& nss,
         UUID collectionUUID,
         const Document& documentKey,
-        boost::optional<BSONObj> readConcern,
-        bool allowSpeculativeMajorityRead) final {
+        boost::optional<BSONObj> readConcern) final {
         Matcher matcher(documentKey.toBson(), expCtx);
         auto it = std::find_if(_documentsForLookup.begin(),
                                _documentsForLookup.end(),
