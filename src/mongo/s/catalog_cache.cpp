@@ -705,6 +705,10 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                       "duration"_attr = Milliseconds(t.millis()));
 
             return LookupResult(OptionalRoutingTableHistory(), std::move(newComparableVersion));
+        } else if (ex.code() == ErrorCodes::InvalidOptions) {
+            LOGV2_WARNING(5738000,
+                          "This error could be due to the fact that the config server is running "
+                          "an older version");
         }
 
         LOGV2_FOR_CATALOG_REFRESH(4619903,
