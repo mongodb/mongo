@@ -1307,12 +1307,7 @@ public:
             write_ops::DeleteCommandReply deleteReply;
 
             if (isTimeseries(opCtx, ns())) {
-                try {
-                    _performTimeseriesDeletes(opCtx, &deleteReply);
-                } catch (DBException& ex) {
-                    ex.addContext(str::stream() << "time-series delete failed: " << ns().ns());
-                    throw;
-                }
+                _performTimeseriesDeletes(opCtx, &deleteReply);
                 return deleteReply;
             }
 
