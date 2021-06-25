@@ -1,20 +1,25 @@
-// Cannot implicitly shard accessed collections because unsupported use of sharded collection
-// for target collection of $lookup and $graphLookup.
-// @tags: [
-//   assumes_unsharded_collection,
-// ]
-
 // In SERVER-24714, the 'restrictSearchWithMatch' option was added to $graphLookup. In this file,
 // we test the functionality and correctness of the option.
 
 (function() {
 "use strict";
 
+load("jstests/libs/fixture_helpers.js");  // For isSharded.
+
 var local = db.local;
 var foreign = db.foreign;
 
 local.drop();
 foreign.drop();
+
+// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
+// allow $lookup/$graphLookup into a sharded collection is disabled.
+const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
+if (FixtureHelpers.isSharded(foreign) && !isShardedLookupEnabled) {
+    return;
+}
 
 var bulk = foreign.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
@@ -25,34 +30,34 @@ assert.commandWorked(local.insert({starting: 0}));
 
 // Assert that the graphLookup only retrieves ten documents, with _id from 0 to 9.
 var res = local
-                  .aggregate({
-                      $graphLookup: {
-                          from: "foreign",
-                          startWith: "$starting",
-                          connectFromField: "neighbors",
-                          connectToField: "_id",
-                          as: "integers",
-                          restrictSearchWithMatch: {_id: {$lt: 10}}
-                      }
-                  })
-                  .toArray()[0];
+                .aggregate({
+                    $graphLookup: {
+                        from: "foreign",
+                        startWith: "$starting",
+                        connectFromField: "neighbors",
+                        connectToField: "_id",
+                        as: "integers",
+                        restrictSearchWithMatch: {_id: {$lt: 10}}
+                    }
+                })
+                .toArray()[0];
 
 assert.eq(res.integers.length, 10);
 
 // Assert that the graphLookup doesn't retrieve any documents, as to do so it would need to
 // traverse nodes in the graph that don't match the 'restrictSearchWithMatch' predicate.
 res = local
-              .aggregate({
-                  $graphLookup: {
-                      from: "foreign",
-                      startWith: "$starting",
-                      connectFromField: "neighbors",
-                      connectToField: "_id",
-                      as: "integers",
-                      restrictSearchWithMatch: {_id: {$gt: 10}}
-                  }
-              })
-              .toArray()[0];
+            .aggregate({
+                $graphLookup: {
+                    from: "foreign",
+                    startWith: "$starting",
+                    connectFromField: "neighbors",
+                    connectToField: "_id",
+                    as: "integers",
+                    restrictSearchWithMatch: {_id: {$gt: 10}}
+                }
+            })
+            .toArray()[0];
 
 assert.eq(res.integers.length, 0);
 
