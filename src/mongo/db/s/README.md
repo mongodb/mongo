@@ -926,6 +926,40 @@ the donor shard until the migration reaches the commit phase to clone any oplog 
 information for the migrated chunk. Upon receiving each response, the recipient shard writes the oplog entries
 to disk and [updates](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/transaction_participant.cpp#L2142-L2144) its in-memory transaction state to restore the session state for the chunk.
 
+### Retryable writes and findAndModify
+
+For most writes, persisting only the (lsid, txnId) pair alone is sufficient to reconstruct a
+response. For findAndModify however, we also need to respond with the document that would have
+originally been returned. In version 5.0 and earlier, the default behavior is to
+[record the document image into the oplog](https://github.com/mongodb/mongo/blob/33ad68c0dc4bda897a5647608049422ae784a15e/src/mongo/db/op_observer_impl.cpp#L191)
+as a no-op entry. The oplog entries generated would look something like:
+
+* `{ op: "d", o: {_id: 1}, ts: Timestamp(100, 2), preImageOpTime: Timestamp(100, 1), lsid: ..., txnNumber: ...}`
+* `{ op: "n", o: {_id: 1, imageBeforeDelete: "foobar"}, ts: Timestamp(100, 1)}`
+
+There's a cost in "explicitly" replicating these images via the oplog. We've addressed this cost
+with 5.1 where the default is to instead [save the image into a side collection](https://github.com/mongodb/mongo/blob/33ad68c0dc4bda897a5647608049422ae784a15e/src/mongo/db/op_observer_impl.cpp#L646-L650)
+with the namespace `config.image_collection`. A primary will add `needsRetryImage:
+<preImage/postImage>` to the oplog entry to communicate to secondaries that they must make a
+corollary write to `config.image_collection`.
+
+Note that this feature was backported to 4.0, 4.2, 4.4 and 5.0. Released binaries with this
+capability can be turned on by [setting the `storeFindAndModifyImagesInSideCollection` server
+parameter](https://github.com/mongodb/mongo/blob/2ac9fd6e613332f02636c6a7ec7f6cff4a8d05ab/src/mongo/db/repl/repl_server_parameters.idl#L506-L512).
+
+Partial cloning mechanisms such as chunk migrations, tenant migrations and resharding all support
+the destination picking up the responsibility for satisfying a retryable write the source had
+originally processed (to some degree). These cloning mechanisms naturally tail the oplog to pick up
+on changes. Because the traditional retryable findAndModify algorithm places the images into the
+oplog, the destination just needs to relink the timestamps for its oplog to support retryable
+findAndModify.
+
+For retry images saved in the image collection, the source will "downconvert" oplog entries with
+`needsRetryImage: true` into two oplog entries, simulating the old format. As chunk migrations use
+internal commands, [this downconverting procedure](https://github.com/mongodb/mongo/blob/0beb0cacfcaf7b24259207862e1d0d489e1c16f1/src/mongo/db/s/session_catalog_migration_source.cpp#L58-L97)
+is installed under the hood. For resharding and tenant migrations, a new aggregation stage will be
+introduced that performs the identical substituion.
+
 #### Code references
 * [**TransactionParticipant class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/transaction_participant.h)
 * How a write operation [checks if a statement has been executed](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/ops/write_ops_exec.cpp#L811-L816)
