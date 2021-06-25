@@ -93,7 +93,7 @@ class HookTestArchival(object):
                                                         config.EVERGREEN_EXECUTION,
                                                         self._tests_repeat[test_name])
         # Retrieve root directory for all dbPaths from fixture.
-        input_files = test.fixture.get_dbpath_prefix()
+        input_files = test.fixture.get_path_for_archival()
         s3_bucket = config.ARCHIVE_BUCKET
         s3_path = "{}/{}/{}/datafiles/{}".format(config.EVERGREEN_PROJECT_NAME,
                                                  config.EVERGREEN_VARIANT_NAME,

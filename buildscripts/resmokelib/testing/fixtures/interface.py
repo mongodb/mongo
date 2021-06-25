@@ -152,6 +152,14 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         """Return dbpath prefix."""
         return self._dbpath_prefix
 
+    def get_path_for_archival(self):
+        """
+        Return the dbpath for archival that includes all possible directories.
+
+        This includes directories for resmoke fixtures and fixtures spawned by the shell.
+        """
+        return self._dbpath_prefix
+
     def get_internal_connection_string(self):
         """Return the connection string for this fixture.
 
