@@ -625,12 +625,14 @@ public:
                   const StringData::ComparatorInterface* comparator = nullptr) const;
 
     /**
-     * Returns a boolean for how, using the given comparison functions 'comp' or
-     * 'stringComp', this BSONElement compares with 'other'. Ignores the field name.
+     * Returns a boolean for how, using the rules specified by 'rules' and the given
+     * comparison functions 'comp' and 'stringComp', this BSONElement compares with 'other'.
+     * Returns the result of BSONObj::woCompare if this object is an Array or Object.
      */
     template <typename Comparator>
     bool compare(const BSONElement& other,
                  Comparator comp,
+                 ComparisonRulesSet rules = ComparisonRules::kConsiderFieldName,
                  const StringData::ComparatorInterface* stringComp = nullptr) const;
 
     DeferredComparison operator<(const BSONElement& other) const {

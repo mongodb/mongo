@@ -488,7 +488,7 @@ std::pair<MinMaxStore::Iterator, MinMaxStore::Iterator> MinMax::_update(
             (data.type() == MinMaxStore::Type::kObject && comp(typeComp(Object), 0)) ||
             (data.type() == MinMaxStore::Type::kArray && comp(typeComp(Array), 0)) ||
             (data.type() == MinMaxStore::Type::kValue &&
-             elem.compare(data.value(), comp, stringComparator))) {
+             elem.compare(data.value(), comp, false, stringComparator))) {
             data.setValue(elem);
         }
     };

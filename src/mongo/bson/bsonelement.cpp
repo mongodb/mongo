@@ -485,9 +485,12 @@ int BSONElement::woCompare(const BSONElement& elem,
 template <typename Comparator>
 bool BSONElement::compare(const BSONElement& other,
                           Comparator comp,
+                          ComparisonRulesSet rules,
                           const StringData::ComparatorInterface* stringComp) const {
     if (type() != other.type())
-        return comp((int)canonicalType(), other.canonicalType());
+        return comp(canonicalType(), other.canonicalType());
+    if (rules & ComparisonRules::kConsiderFieldName)
+        return comp(fieldNameStringData(), other.fieldNameStringData());
     switch (other.type()) {
         case BSONType::EOO:
         case BSONType::Undefined:
@@ -520,10 +523,12 @@ bool BSONElement::compare(const BSONElement& other,
                         0);
         case BSONType::Object:
         case BSONType::Array:
-            return embeddedObject().woCompare(other.embeddedObject(),
-                                              BSONObj(),
-                                              BSONElement::ComparisonRules::kConsiderFieldName,
-                                              stringComp);
+            return comp(
+                embeddedObject().woCompare(other.embeddedObject(),
+                                           BSONObj(),
+                                           rules | BSONElement::ComparisonRules::kConsiderFieldName,
+                                           stringComp),
+                0);
         case BSONType::DBRef: {
             int size = valuesize();
             int diff = size - other.valuesize();
@@ -551,12 +556,15 @@ bool BSONElement::compare(const BSONElement& other,
             int diff =
                 StringData(codeWScopeCode(), codeWScopeCodeLen() - 1)
                     .compare(StringData(other.codeWScopeCode(), other.codeWScopeCodeLen() - 1));
+
+            // Consider field names when comparing scope objects.
             if (diff != 0) {
-                return codeWScopeObject().woCompare(
+                diff = codeWScopeObject().woCompare(
                     other.codeWScopeObject(),
                     BSONObj(),
-                    BSONElement::ComparisonRules::kConsiderFieldName);
+                    rules | BSONElement::ComparisonRules::kConsiderFieldName);
             }
+
             return comp(diff, 0);
         }
     }
@@ -1077,11 +1085,13 @@ struct BSONElementCodeWithScopeType {
 template bool BSONElement::compare<std::less<>>(
     const BSONElement& other,
     std::less<> comp,
+    ComparisonRulesSet rules,
     const StringData::ComparatorInterface* stringComp) const;
 
 template bool BSONElement::compare<std::greater<>>(
     const BSONElement& other,
     std::greater<> comp,
+    ComparisonRulesSet rules,
     const StringData::ComparatorInterface* stringComp) const;
 
 }  // namespace mongo
