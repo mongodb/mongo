@@ -140,6 +140,9 @@ struct BenchRunOp {
     // resources that a snapshot transaction would hold for a time.
     int maxRandomMillisecondDelayBeforeGetMore{0};
 
+    // Format: {mode: modeStr}.  Only mode field is allowed.
+    BSONObj readPrefObj;
+
     // This is an owned copy of the raw operation. All unowned members point into this.
     BSONObj myBsonOp;
 };
