@@ -56,18 +56,18 @@ public:
                                  boost::intrusive_ptr<Expression> position,
                                  boost::intrusive_ptr<Expression> time,
                                  WindowBounds bounds,
-                                 boost::optional<TimeUnit> outputUnit,
+                                 boost::optional<TimeUnit> unit,
                                  MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
         : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kEndpoints),
                              memTracker),
           _position(std::move(position)),
           _time(std::move(time)),
           _bounds(std::move(bounds)),
-          _outputUnitMillis([&]() -> boost::optional<long long> {
-              if (!outputUnit)
+          _unitMillis([&]() -> boost::optional<long long> {
+              if (!unit)
                   return boost::none;
 
-              auto status = timeUnitTypicalMilliseconds(*outputUnit);
+              auto status = timeUnitTypicalMilliseconds(*unit);
               tassert(status);
               return status.getValue();
           }()) {}
@@ -79,7 +79,7 @@ private:
     boost::intrusive_ptr<Expression> _position;
     boost::intrusive_ptr<Expression> _time;
     WindowBounds _bounds;
-    boost::optional<long long> _outputUnitMillis;
+    boost::optional<long long> _unitMillis;
 };
 
 }  // namespace mongo

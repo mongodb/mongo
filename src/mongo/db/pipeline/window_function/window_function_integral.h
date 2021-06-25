@@ -39,15 +39,14 @@ public:
     static inline const Value kDefault = Value{BSONNULL};
 
     static std::unique_ptr<WindowFunctionState> create(
-        ExpressionContext* const expCtx,
-        boost::optional<long long> outputUnitMillis = boost::none) {
-        return std::make_unique<WindowFunctionIntegral>(expCtx, outputUnitMillis);
+        ExpressionContext* const expCtx, boost::optional<long long> unitMillis = boost::none) {
+        return std::make_unique<WindowFunctionIntegral>(expCtx, unitMillis);
     }
 
     explicit WindowFunctionIntegral(ExpressionContext* const expCtx,
-                                    boost::optional<long long> outputUnitMillis = boost::none,
+                                    boost::optional<long long> unitMillis = boost::none,
                                     bool isNonremovable = false)
-        : WindowFunctionState(expCtx), _integral(expCtx), _outputUnitMillis(outputUnitMillis) {
+        : WindowFunctionState(expCtx), _integral(expCtx), _unitMillis(unitMillis) {
         _memUsageBytes = sizeof(*this);
     }
 
@@ -75,9 +74,9 @@ public:
             return Value(std::numeric_limits<double>::quiet_NaN());
 
 
-        return _outputUnitMillis ? uassertStatusOK(ExpressionDivide::apply(
-                                       _integral.getValue(), Value(*_outputUnitMillis)))
-                                 : _integral.getValue();
+        return _unitMillis
+            ? uassertStatusOK(ExpressionDivide::apply(_integral.getValue(), Value(*_unitMillis)))
+            : _integral.getValue();
     }
 
 private:
@@ -93,7 +92,7 @@ private:
 
     WindowFunctionSum _integral;
     std::deque<Value> _values;
-    boost::optional<long long> _outputUnitMillis;
+    boost::optional<long long> _unitMillis;
     int _nanCount = 0;
     bool isNonremovable = false;
 };

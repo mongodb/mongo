@@ -63,13 +63,13 @@ void WindowFunctionIntegral::assertValueType(const Value& value) {
                 (value.getArray()[0].numeric() || value.getArray()[0].getType() == BSONType::Date));
 
     auto arr = value.getArray();
-    if (_outputUnitMillis) {
+    if (_unitMillis) {
         uassert(5423901,
-                "$integral with 'outputUnit' expects the sortBy field to be a Date",
+                "$integral with 'unit' expects the sortBy field to be a Date",
                 arr[0].getType() == BSONType::Date);
     } else {
         uassert(5423902,
-                "$integral (with no 'outputUnit') expects the sortBy field to be numeric",
+                "$integral (with no 'unit') expects the sortBy field to be numeric",
                 arr[0].numeric());
     }
 }
