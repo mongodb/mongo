@@ -3931,8 +3931,8 @@ public:
      * Constructs a $getField expression where 'field' is an expression resolving to a constant
      * string Value and 'input' is an expression resolving to an object Value (or null).
      *
-     * If 'input' is nullish, $getField evaluates to null. Furthermore, if 'input' does not contain
-     * 'field', then $getField returns missing.
+     * If 'input' is nullish (but not missing), $getField evaluates to null. Furthermore, if 'input'
+     * does not contain 'field', then $getField returns missing.
      */
     ExpressionGetField(ExpressionContext* const expCtx,
                        boost::intrusive_ptr<Expression> field,
