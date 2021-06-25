@@ -500,49 +500,48 @@ std::shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule
 
     auto retVal = migration.completionNotification;
 
-    _schedule(lock,
-              opCtx,
-              fromHostStatus.getValue(),
-              std::move(migration),
-              migrateInfo,
-              waitForDelete,
-              scopedMigrationRequests);
+    _acquireDistLockAndSchedule(lock,
+                                opCtx,
+                                fromHostStatus.getValue(),
+                                std::move(migration),
+                                migrateInfo,
+                                waitForDelete,
+                                scopedMigrationRequests);
 
     return retVal;
 }
 
-void MigrationManager::_schedule(WithLock lock,
-                                 OperationContext* opCtx,
-                                 const HostAndPort& targetHost,
-                                 Migration migration,
-                                 const MigrateInfo& migrateInfo,
-                                 bool waitForDelete,
-                                 ScopedMigrationRequestsMap* scopedMigrationRequests) {
+void MigrationManager::_acquireDistLockAndSchedule(
+    WithLock lock,
+    OperationContext* opCtx,
+    const HostAndPort& targetHost,
+    Migration migration,
+    const MigrateInfo& migrateInfo,
+    bool waitForDelete,
+    ScopedMigrationRequestsMap* scopedMigrationRequests) noexcept {
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
     const NamespaceString nss(migration.nss);
 
     auto it = _activeMigrations.find(nss);
     if (it == _activeMigrations.end()) {
-        const std::string whyMessage(str::stream()
-                                     << "Migrating chunk(s) in collection " << nss.ns());
+        boost::optional<DistLockManager::ScopedLock> scopedLock;
+        try {
+            scopedLock.emplace(DistLockManager::get(opCtx)->lockDirectLocally(
+                opCtx, nss.ns(), DistLockManager::kSingleLockAttemptTimeout));
 
-        // Acquire the local lock for this nss (blocking call)
-        auto scopedLock = DistLockManager::get(opCtx)->lockDirectLocally(
-            opCtx, nss.ns(), DistLockManager::kSingleLockAttemptTimeout);
-
-        // Acquire the collection distributed lock (blocking call)
-        auto status = DistLockManager::get(opCtx)->lockDirect(
-            opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
-
-        if (!status.isOK()) {
+            const std::string whyMessage(str::stream()
+                                         << "Migrating chunk(s) in collection " << nss.ns());
+            uassertStatusOK(DistLockManager::get(opCtx)->lockDirect(
+                opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout));
+        } catch (const DBException& ex) {
             migration.completionNotification->set(
-                status.withContext(str::stream() << "Could not acquire collection lock for "
-                                                 << nss.ns() << " to migrate chunks"));
+                ex.toStatus(str::stream() << "Could not acquire collection lock for " << nss.ns()
+                                          << " to migrate chunks"));
             return;
         }
 
-        MigrationsState migrationsState(std::move(scopedLock));
+        MigrationsState migrationsState(std::move(*scopedLock));
         it = _activeMigrations.insert(std::make_pair(nss, std::move(migrationsState))).first;
     }
 
@@ -553,7 +552,6 @@ void MigrationManager::_schedule(WithLock lock,
         // recovered by the Balancer.
         auto statusWithScopedMigrationRequest =
             ScopedMigrationRequest::writeMigration(opCtx, migrateInfo, waitForDelete);
-
         if (!statusWithScopedMigrationRequest.isOK()) {
             migrationRequestStatus = std::move(statusWithScopedMigrationRequest.getStatus());
         } else {
@@ -564,7 +562,8 @@ void MigrationManager::_schedule(WithLock lock,
 
     auto migrations = &it->second.migrationsList;
 
-    // Add ourselves to the list of migrations on this collection
+    // Add ourselves to the list of migrations on this collection. From that point onwards, requests
+    // must call _complete regardless of success or failure in order to remove it from the list.
     migrations->push_front(std::move(migration));
     auto itMigration = migrations->begin();
 
