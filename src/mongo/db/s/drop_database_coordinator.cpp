@@ -33,6 +33,7 @@
 
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
@@ -147,6 +148,16 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
+                const auto critSecReason = BSON("dropDatabase" << _dbName);
+
+                {
+                    Lock::DBLock dbLock(opCtx, _dbName, MODE_X);
+                    auto dss = DatabaseShardingState::get(opCtx, _dbName);
+                    auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
+                    dss->enterCriticalSectionCatchUpPhase(opCtx, dssLock, critSecReason);
+                    dss->enterCriticalSectionCommitPhase(opCtx, dssLock, critSecReason);
+                }
+
                 if (_doc.getCollInfo()) {
                     const auto& coll = _doc.getCollInfo().get();
                     LOGV2_DEBUG(5494504,
@@ -198,6 +209,12 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     opCtx, _dbName, cmdObj, participants, **executor);
 
                 removeDatabaseMetadataFromConfig(opCtx, _dbName);
+
+                {
+                    Lock::DBLock dbLock(opCtx, _dbName, MODE_X);
+                    auto dss = DatabaseShardingState::get(opCtx, _dbName);
+                    dss->exitCriticalSection(opCtx, critSecReason);
+                }
 
                 {
                     // Send _flushDatabaseCacheUpdates to all shards
