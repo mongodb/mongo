@@ -208,13 +208,13 @@ private:
      * pointer is passed. Otherwise, writes the migration document under the collection distributed
      * lock and adds it to the map.
      */
-    void _schedule(WithLock,
-                   OperationContext* opCtx,
-                   const HostAndPort& targetHost,
-                   Migration migration,
-                   const MigrateInfo& migrateInfo,
-                   bool waitForDelete,
-                   ScopedMigrationRequestsMap* scopedMigrationRequests);
+    void _acquireDistLockAndSchedule(WithLock,
+                                     OperationContext* opCtx,
+                                     const HostAndPort& targetHost,
+                                     Migration migration,
+                                     const MigrateInfo& migrateInfo,
+                                     bool waitForDelete,
+                                     ScopedMigrationRequestsMap* scopedMigrationRequests) noexcept;
 
     /**
      * Used internally for migrations scheduled with the distributed lock acquired by the config
