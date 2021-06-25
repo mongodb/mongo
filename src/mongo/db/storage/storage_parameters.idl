@@ -89,3 +89,7 @@ feature_flags:
         description: "When enabled, support for updates and deletes on time-series collections"
         cpp_varname: feature_flags::gTimeseriesUpdatesAndDeletes
         default: false
+    featureFlagTimeseriesMetricIndexes:
+        description: "When enabled, support secondary indexes on time-series measurements"
+        cpp_varname: feature_flags::gTimeseriesMetricIndexes
+        default: false
