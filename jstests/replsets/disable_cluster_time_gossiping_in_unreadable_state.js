@@ -39,7 +39,7 @@ let res, validClusterTimeMetadata;
 assert.soonNoExcept(() => {
     res = assert.commandWorked(secondaryTestDB.runCommand({find: "foo", filter: {}}));
     assert.hasFields(res, ["$clusterTime", "operationTime"]);
-    validClusterTimeMetadata = res.$clusterTime;
+    validClusterTimeMetadata = Object.assign({}, res.$clusterTime);
     return true;
 });
 
