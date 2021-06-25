@@ -158,8 +158,8 @@ function waitForMoveChunkStep(shardConnection, stepNumber) {
 }
 
 var migrateStepNames = {
-    copiedIndexes: 1,
-    deletedPriorDataInRange: 2,
+    deletedPriorDataInRange: 1,
+    copiedIndexes: 2,
     cloned: 3,
     catchup: 4,  // About to enter steady state.
     steady: 5,
