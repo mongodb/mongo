@@ -460,5 +460,24 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
     ASSERT(chunkManager.getTimeseriesFields().is_initialized());
 }
 
+TEST_F(CatalogCacheTest, LookupCollectionWithInvalidOptions) {
+    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto epoch = OID::gen();
+    const auto version = ChunkVersion(1, 0, epoch, Timestamp(42));
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+
+    auto coll = makeCollectionType(version);
+
+    const auto scopedCollProv = scopedCollectionProvider(coll);
+    const auto scopedChunksProv = scopedChunksProvider(StatusWith<std::vector<ChunkType>>(
+        ErrorCodes::InvalidOptions, "Testing error with invalid options"));
+
+    const auto swChunkManager =
+        _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+
+    ASSERT_EQUALS(swChunkManager.getStatus(), ErrorCodes::InvalidOptions);
+}
+
 }  // namespace
 }  // namespace mongo
