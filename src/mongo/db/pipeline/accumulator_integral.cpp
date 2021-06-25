@@ -67,9 +67,4 @@ boost::intrusive_ptr<AccumulatorState> AccumulatorIntegral::create(
     ExpressionContext* const expCtx, boost::optional<long long> unitMillis) {
     return new AccumulatorIntegral(expCtx, unitMillis);
 }
-
-const char* AccumulatorIntegral::getOpName() const {
-    return "$integral";
-}
-
 }  // namespace mongo

@@ -48,12 +48,6 @@ REGISTER_STABLE_EXPRESSION(min, ExpressionFromAccumulator<AccumulatorMin>::parse
 REGISTER_REMOVABLE_WINDOW_FUNCTION(max, AccumulatorMax, WindowFunctionMax);
 REGISTER_REMOVABLE_WINDOW_FUNCTION(min, AccumulatorMin, WindowFunctionMin);
 
-const char* AccumulatorMinMax::getOpName() const {
-    if (_sense == Sense::kMin)
-        return "$min";
-    return "$max";
-}
-
 void AccumulatorMinMax::processInternal(const Value& input, bool merging) {
     // nullish values should have no impact on result
     if (!input.nullish()) {

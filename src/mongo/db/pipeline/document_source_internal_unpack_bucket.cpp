@@ -787,7 +787,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
     bool suitable = true;
     std::vector<AccumulationStatement> accumulationStatements;
     for (const AccumulationStatement& stmt : groupPtr->getAccumulatedFields()) {
-        const std::string& op = stmt.makeAccumulator()->getOpName();
+        const auto op = stmt.expr.name;
         const bool isMin = op == "$min";
         const bool isMax = op == "$max";
 

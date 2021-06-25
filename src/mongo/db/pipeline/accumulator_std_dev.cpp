@@ -49,10 +49,6 @@ REGISTER_STABLE_EXPRESSION(stdDevSamp, ExpressionFromAccumulator<AccumulatorStdD
 REGISTER_REMOVABLE_WINDOW_FUNCTION(stdDevPop, AccumulatorStdDevPop, WindowFunctionStdDevPop);
 REGISTER_REMOVABLE_WINDOW_FUNCTION(stdDevSamp, AccumulatorStdDevSamp, WindowFunctionStdDevSamp);
 
-const char* AccumulatorStdDev::getOpName() const {
-    return (_isSamp ? "$stdDevSamp" : "$stdDevPop");
-}
-
 void AccumulatorStdDev::processInternal(const Value& input, bool merging) {
     if (!merging) {
         // non numeric types have no impact on standard deviation

@@ -46,10 +46,6 @@ using std::vector;
 REGISTER_ACCUMULATOR(push, genericParseSingleExpressionAccumulator<AccumulatorPush>);
 REGISTER_REMOVABLE_WINDOW_FUNCTION(push, AccumulatorPush, WindowFunctionPush);
 
-const char* AccumulatorPush::getOpName() const {
-    return "$push";
-}
-
 void AccumulatorPush::processInternal(const Value& input, bool merging) {
     if (!merging) {
         if (!input.missing()) {

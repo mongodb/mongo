@@ -102,8 +102,9 @@ namespace mongo {
 struct AccumulationExpression {
     AccumulationExpression(boost::intrusive_ptr<Expression> initializer,
                            boost::intrusive_ptr<Expression> argument,
-                           AccumulatorState::Factory factory)
-        : initializer(initializer), argument(argument), factory(factory) {
+                           AccumulatorState::Factory factory,
+                           StringData name)
+        : initializer(initializer), argument(argument), factory(factory), name(name) {
         invariant(this->initializer);
         invariant(this->argument);
     }
@@ -119,6 +120,12 @@ struct AccumulationExpression {
 
     // A no argument function object that can be called to create an AccumulatorState.
     const AccumulatorState::Factory factory;
+
+    // The name of the accumulator expression. It is the caller's responsibility to make sure the
+    // memory this points to does not get freed. This can best be accomplished by passing in a
+    // pointer to a string constant. This StringData is always required to point to a valid
+    // null-terminated string.
+    const StringData name;
 };
 
 /**
@@ -131,7 +138,7 @@ AccumulationExpression genericParseSingleExpressionAccumulator(ExpressionContext
                                                                VariablesParseState vps) {
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
     auto argument = Expression::parseOperand(expCtx, elem, vps);
-    return {initializer, argument, [expCtx]() { return AccName::create(expCtx); }};
+    return {initializer, argument, [expCtx]() { return AccName::create(expCtx); }, AccName::kName};
 }
 
 /**
@@ -145,7 +152,10 @@ inline AccumulationExpression parseCountAccumulator(ExpressionContext* const exp
             elem.type() == BSONType::Object && elem.Obj().isEmpty());
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
     auto argument = ExpressionConstant::create(expCtx, Value(1));
-    return {initializer, argument, [expCtx]() { return AccumulatorSum::create(expCtx); }};
+    return {initializer,
+            argument,
+            [expCtx]() { return AccumulatorSum::create(expCtx); },
+            AccumulatorSum::kName};
 }
 
 /**

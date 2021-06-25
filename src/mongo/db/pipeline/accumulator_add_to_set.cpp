@@ -46,10 +46,6 @@ using std::vector;
 REGISTER_ACCUMULATOR(addToSet, genericParseSingleExpressionAccumulator<AccumulatorAddToSet>);
 REGISTER_REMOVABLE_WINDOW_FUNCTION(addToSet, AccumulatorAddToSet, WindowFunctionAddToSet);
 
-const char* AccumulatorAddToSet::getOpName() const {
-    return "$addToSet";
-}
-
 void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
     auto addValue = [this](auto&& val) {
         bool inserted = _set.insert(val).second;

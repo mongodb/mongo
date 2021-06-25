@@ -529,7 +529,7 @@ public:
     }
 
     const char* getOpName() const final {
-        return AccumulatorState(this->getExpressionContext()).getOpName();
+        return AccumulatorState::kName.rawData();
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {

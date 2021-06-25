@@ -44,9 +44,6 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 REGISTER_WINDOW_FUNCTION(expMovingAvg, mongo::window_function::ExpressionExpMovingAvg::parse);
-const char* AccumulatorExpMovingAvg::getOpName() const {
-    return "$expMovingAvg";
-}
 
 void AccumulatorExpMovingAvg::processInternal(const Value& input, bool merging) {
     tassert(5433600, "$expMovingAvg can't be merged", !merging);

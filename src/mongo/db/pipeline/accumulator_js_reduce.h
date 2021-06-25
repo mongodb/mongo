@@ -40,7 +40,11 @@ namespace mongo {
 
 class AccumulatorInternalJsReduce final : public AccumulatorState {
 public:
-    static constexpr auto kAccumulatorName = "$_internalJsReduce"_sd;
+    static constexpr auto kName = "$_internalJsReduce"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx,
                                                          StringData funcSource);
@@ -52,10 +56,6 @@ public:
     AccumulatorInternalJsReduce(ExpressionContext* const expCtx, StringData funcSource)
         : AccumulatorState(expCtx), _funcSource(funcSource) {
         _memUsageBytes = sizeof(*this);
-    }
-
-    const char* getOpName() const final {
-        return kAccumulatorName.rawData();
     }
 
     void processInternal(const Value& input, bool merging) final;
@@ -78,9 +78,10 @@ private:
 
 class AccumulatorJs final : public AccumulatorState {
 public:
-    static constexpr auto kAccumulatorName = "$accumulator"_sd;
+    static constexpr auto kName = "$accumulator"_sd;
+
     const char* getOpName() const final {
-        return kAccumulatorName.rawData();
+        return kName.rawData();
     }
 
     // An AccumulatorState instance only owns its "static" arguments: those that don't need to be

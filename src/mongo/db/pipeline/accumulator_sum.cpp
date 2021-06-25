@@ -54,10 +54,6 @@ REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
 
 REGISTER_WINDOW_FUNCTION(count, window_function::parseCountWindowFunction);
 
-const char* AccumulatorSum::getOpName() const {
-    return "$sum";
-}
-
 namespace {
 const char subTotalName[] = "subTotal";
 const char subTotalErrorName[] = "subTotalError";  // Used for extra precision.

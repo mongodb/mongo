@@ -48,10 +48,6 @@ REGISTER_ACCUMULATOR(avg, genericParseSingleExpressionAccumulator<AccumulatorAvg
 REGISTER_STABLE_EXPRESSION(avg, ExpressionFromAccumulator<AccumulatorAvg>::parse);
 REGISTER_REMOVABLE_WINDOW_FUNCTION(avg, AccumulatorAvg, WindowFunctionAvg);
 
-const char* AccumulatorAvg::getOpName() const {
-    return "$avg";
-}
-
 namespace {
 const char subTotalName[] = "subTotal";
 const char subTotalErrorName[] = "subTotalError";  // Used for extra precision

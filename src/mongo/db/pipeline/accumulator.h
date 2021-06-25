@@ -158,6 +158,12 @@ private:
 
 class AccumulatorAddToSet final : public AccumulatorState {
 public:
+    static constexpr auto kName = "$addToSet"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     /**
      * Creates a new $addToSet accumulator. If no memory limit is given, defaults to the value of
      * the server parameter 'internalQueryMaxAddToSetBytes'.
@@ -167,7 +173,6 @@ public:
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
-    const char* getOpName() const final;
     void reset() final;
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
@@ -187,11 +192,16 @@ private:
 
 class AccumulatorFirst final : public AccumulatorState {
 public:
+    static constexpr auto kName = "$first"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     explicit AccumulatorFirst(ExpressionContext* const expCtx);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
-    const char* getOpName() const final;
     void reset() final;
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
@@ -207,11 +217,16 @@ private:
 
 class AccumulatorLast final : public AccumulatorState {
 public:
+    static constexpr auto kName = "$last"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     explicit AccumulatorLast(ExpressionContext* const expCtx);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
-    const char* getOpName() const final;
     void reset() final;
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
@@ -226,11 +241,16 @@ private:
 
 class AccumulatorSum final : public AccumulatorState {
 public:
+    static constexpr auto kName = "$sum"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     explicit AccumulatorSum(ExpressionContext* const expCtx);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
-    const char* getOpName() const final;
     void reset() final;
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
@@ -260,7 +280,6 @@ public:
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
-    const char* getOpName() const final;
     void reset() final;
 
     bool isAssociative() const final {
@@ -278,6 +297,12 @@ private:
 
 class AccumulatorMax final : public AccumulatorMinMax {
 public:
+    static constexpr auto kName = "$max"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     explicit AccumulatorMax(ExpressionContext* const expCtx)
         : AccumulatorMinMax(expCtx, Sense::kMax) {}
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
@@ -285,6 +310,12 @@ public:
 
 class AccumulatorMin final : public AccumulatorMinMax {
 public:
+    static constexpr auto kName = "$min"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     explicit AccumulatorMin(ExpressionContext* const expCtx)
         : AccumulatorMinMax(expCtx, Sense::kMin) {}
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
@@ -292,6 +323,12 @@ public:
 
 class AccumulatorPush final : public AccumulatorState {
 public:
+    static constexpr auto kName = "$push"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     /**
      * Creates a new $push accumulator. If no memory limit is given, defaults to the value of the
      * server parameter 'internalQueryMaxPushBytes'.
@@ -301,7 +338,6 @@ public:
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
-    const char* getOpName() const final;
     void reset() final;
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
@@ -313,11 +349,16 @@ private:
 
 class AccumulatorAvg final : public AccumulatorState {
 public:
+    static constexpr auto kName = "$avg"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     explicit AccumulatorAvg(ExpressionContext* const expCtx);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
-    const char* getOpName() const final;
     void reset() final;
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
@@ -341,7 +382,6 @@ public:
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
-    const char* getOpName() const final;
     void reset() final;
 
 private:
@@ -353,6 +393,12 @@ private:
 
 class AccumulatorStdDevPop final : public AccumulatorStdDev {
 public:
+    static constexpr auto kName = "$stdDevPop"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     explicit AccumulatorStdDevPop(ExpressionContext* const expCtx)
         : AccumulatorStdDev(expCtx, false) {}
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
@@ -360,6 +406,12 @@ public:
 
 class AccumulatorStdDevSamp final : public AccumulatorStdDev {
 public:
+    static constexpr auto kName = "$stdDevSamp"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     explicit AccumulatorStdDevSamp(ExpressionContext* const expCtx)
         : AccumulatorStdDev(expCtx, true) {}
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
@@ -367,11 +419,16 @@ public:
 
 class AccumulatorMergeObjects : public AccumulatorState {
 public:
+    static constexpr auto kName = "$mergeObjects"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     AccumulatorMergeObjects(ExpressionContext* const expCtx);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
-    const char* getOpName() const final;
     void reset() final;
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
@@ -382,11 +439,16 @@ private:
 
 class AccumulatorExpMovingAvg : public AccumulatorState {
 public:
+    static constexpr auto kName = "$expMovingAvg"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     AccumulatorExpMovingAvg(ExpressionContext* const expCtx, Decimal128 alpha);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
-    const char* getOpName() const final;
     void reset() final;
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx,

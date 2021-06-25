@@ -40,10 +40,6 @@ using boost::intrusive_ptr;
 
 REGISTER_ACCUMULATOR(last, genericParseSingleExpressionAccumulator<AccumulatorLast>);
 
-const char* AccumulatorLast::getOpName() const {
-    return "$last";
-}
-
 void AccumulatorLast::processInternal(const Value& input, bool merging) {
     /* always remember the last value seen */
     _last = input;

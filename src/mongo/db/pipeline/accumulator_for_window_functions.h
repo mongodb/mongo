@@ -74,6 +74,8 @@ private:
 
 class AccumulatorCovarianceSamp final : public AccumulatorCovariance {
 public:
+    static constexpr auto kName = "$covarianceSamp"_sd;
+
     explicit AccumulatorCovarianceSamp(ExpressionContext* const expCtx)
         : AccumulatorCovariance(expCtx, true) {}
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
@@ -81,6 +83,8 @@ public:
 
 class AccumulatorCovariancePop final : public AccumulatorCovariance {
 public:
+    static constexpr auto kName = "$covariancePop"_sd;
+
     explicit AccumulatorCovariancePop(ExpressionContext* const expCtx)
         : AccumulatorCovariance(expCtx, false) {}
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
@@ -102,9 +106,14 @@ protected:
 
 class AccumulatorRank : public AccumulatorRankBase {
 public:
+    static constexpr auto kName = "$rank"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     explicit AccumulatorRank(ExpressionContext* const expCtx) : AccumulatorRankBase(expCtx) {}
     void processInternal(const Value& input, bool merging) final;
-    const char* getOpName() const final;
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
     void reset() final;
 
@@ -114,31 +123,45 @@ private:
 
 class AccumulatorDocumentNumber : public AccumulatorRankBase {
 public:
+    static constexpr auto kName = "$documentNumber"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     explicit AccumulatorDocumentNumber(ExpressionContext* const expCtx)
         : AccumulatorRankBase(expCtx) {}
     void processInternal(const Value& input, bool merging) final;
-    const char* getOpName() const final;
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
 };
 
 class AccumulatorDenseRank : public AccumulatorRankBase {
 public:
+    static constexpr auto kName = "$denseRank"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     explicit AccumulatorDenseRank(ExpressionContext* const expCtx) : AccumulatorRankBase(expCtx) {}
     void processInternal(const Value& input, bool merging) final;
-    const char* getOpName() const final;
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
 };
 
 class AccumulatorIntegral : public AccumulatorForWindowFunctions {
 public:
+    static constexpr auto kName = "$integral"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
     explicit AccumulatorIntegral(ExpressionContext* const expCtx,
                                  boost::optional<long long> unitMillis = boost::none);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
     void reset() final;
-
-    const char* getOpName() const final;
 
     static boost::intrusive_ptr<AccumulatorState> create(
         ExpressionContext* const expCtx, boost::optional<long long> unitMillis = boost::none);

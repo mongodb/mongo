@@ -40,8 +40,7 @@ REGISTER_ACCUMULATOR(_internalJsReduce, AccumulatorInternalJsReduce::parseIntern
 AccumulationExpression AccumulatorInternalJsReduce::parseInternalJsReduce(
     ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
     uassert(31326,
-            str::stream() << kAccumulatorName << " requires a document argument, but found "
-                          << elem.type(),
+            str::stream() << kName << " requires a document argument, but found " << elem.type(),
             elem.type() == BSONType::Object);
     BSONObj obj = elem.embeddedObject();
 
@@ -55,16 +54,16 @@ AccumulationExpression AccumulatorInternalJsReduce::parseInternalJsReduce(
             argument = Expression::parseOperand(expCtx, element, vps);
         } else {
             uasserted(31243,
-                      str::stream() << "Invalid argument specified to " << kAccumulatorName << ": "
+                      str::stream() << "Invalid argument specified to " << kName << ": "
                                     << element.toString());
         }
     }
     uassert(31245,
-            str::stream() << kAccumulatorName
+            str::stream() << kName
                           << " requires 'eval' argument, recieved input: " << obj.toString(false),
             !funcSource.empty());
     uassert(31349,
-            str::stream() << kAccumulatorName
+            str::stream() << kName
                           << " requires 'data' argument, recieved input: " << obj.toString(false),
             argument);
 
@@ -73,13 +72,16 @@ AccumulationExpression AccumulatorInternalJsReduce::parseInternalJsReduce(
     };
 
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
-    return {std::move(initializer), std::move(argument), std::move(factory)};
+    return {std::move(initializer),
+            std::move(argument),
+            std::move(factory),
+            AccumulatorInternalJsReduce::kName};
 }
 
 std::string AccumulatorInternalJsReduce::parseReduceFunction(BSONElement func) {
     uassert(
         31244,
-        str::stream() << kAccumulatorName
+        str::stream() << kName
                       << " requires the 'eval' argument to be of type string, or code but found "
                       << func.type(),
         func.type() == BSONType::String || func.type() == BSONType::Code);
@@ -91,7 +93,7 @@ void AccumulatorInternalJsReduce::processInternal(const Value& input, bool mergi
         return;
     }
     uassert(31242,
-            str::stream() << kAccumulatorName << " requires a document argument, but found "
+            str::stream() << kName << " requires a document argument, but found "
                           << input.getType(),
             input.getType() == BSONType::Object);
     Document data = input.getDocument();
@@ -102,7 +104,7 @@ void AccumulatorInternalJsReduce::processInternal(const Value& input, bool mergi
 
     uassert(
         31251,
-        str::stream() << kAccumulatorName
+        str::stream() << kName
                       << " requires the 'data' argument to have a 'k' and 'v' field. Instead found"
                       << data.toString(),
         data.computeSize() == 2ull && !kField.missing() && !vField.missing());
@@ -188,7 +190,7 @@ void AccumulatorInternalJsReduce::reset() {
 Document AccumulatorInternalJsReduce::serialize(boost::intrusive_ptr<Expression> initializer,
                                                 boost::intrusive_ptr<Expression> argument,
                                                 bool explain) const {
-    return DOC(getOpName() << DOC("data" << argument->serialize(explain) << "eval" << _funcSource));
+    return DOC(kName << DOC("data" << argument->serialize(explain) << "eval" << _funcSource));
 }
 
 REGISTER_ACCUMULATOR(accumulator, AccumulatorJs::parse);
@@ -237,7 +239,7 @@ Document AccumulatorJs::serialize(boost::intrusive_ptr<Expression> initializer,
         args.addField("finalize", Value(*_finalize));
     }
     args.addField("lang", Value("js"_sd));
-    return DOC(getOpName() << args.freeze());
+    return DOC(kName << args.freeze());
 }
 
 AccumulationExpression AccumulatorJs::parse(ExpressionContext* const expCtx,
@@ -314,7 +316,8 @@ AccumulationExpression AccumulatorJs::parse(ExpressionContext* const expCtx,
                     finalize = std::move(finalize)]() {
         return new AccumulatorJs(expCtx, init, accumulate, merge, finalize);
     };
-    return {std::move(initArgs), std::move(accumulateArgs), std::move(factory)};
+    return {
+        std::move(initArgs), std::move(accumulateArgs), std::move(factory), AccumulatorJs::kName};
 }
 
 Value AccumulatorJs::getValue(bool toBeMerged) {

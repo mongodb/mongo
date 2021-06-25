@@ -130,7 +130,8 @@ auto translateReduce(boost::intrusive_ptr<ExpressionContext> expCtx, std::string
     AccumulationStatement jsReduce("value",
                                    AccumulationExpression(std::move(initializer),
                                                           std::move(argument),
-                                                          std::move(reduceFactory)));
+                                                          std::move(reduceFactory),
+                                                          AccumulatorInternalJsReduce::kName));
     auto groupKeyExpression =
         ExpressionFieldPath::parse(expCtx.get(), "$emits.k", expCtx->variablesParseState);
     return DocumentSourceGroup::create(expCtx,

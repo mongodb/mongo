@@ -40,10 +40,6 @@ using boost::intrusive_ptr;
 
 REGISTER_ACCUMULATOR(first, genericParseSingleExpressionAccumulator<AccumulatorFirst>);
 
-const char* AccumulatorFirst::getOpName() const {
-    return "$first";
-}
-
 void AccumulatorFirst::processInternal(const Value& input, bool merging) {
     /* only remember the first value seen */
     if (!_haveFirst) {

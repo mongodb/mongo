@@ -45,10 +45,6 @@ REGISTER_ACCUMULATOR(mergeObjects,
                      genericParseSingleExpressionAccumulator<AccumulatorMergeObjects>);
 REGISTER_STABLE_EXPRESSION(mergeObjects, ExpressionFromAccumulator<AccumulatorMergeObjects>::parse);
 
-const char* AccumulatorMergeObjects::getOpName() const {
-    return "$mergeObjects";
-}
-
 intrusive_ptr<AccumulatorState> AccumulatorMergeObjects::create(ExpressionContext* const expCtx) {
     return new AccumulatorMergeObjects(expCtx);
 }

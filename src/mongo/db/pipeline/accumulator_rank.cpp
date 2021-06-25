@@ -53,10 +53,6 @@ REGISTER_WINDOW_FUNCTION(
     documentNumber,
     mongo::window_function::ExpressionFromRankAccumulator<AccumulatorDocumentNumber>::parse);
 
-const char* AccumulatorRank::getOpName() const {
-    return "$rank";
-}
-
 void AccumulatorRank::processInternal(const Value& input, bool merging) {
     tassert(5417001, "$rank can't be merged", !merging);
     if (!_lastInput ||
@@ -70,18 +66,10 @@ void AccumulatorRank::processInternal(const Value& input, bool merging) {
     }
 }
 
-const char* AccumulatorDocumentNumber::getOpName() const {
-    return "$documentNumber";
-}
-
 void AccumulatorDocumentNumber::processInternal(const Value& input, bool merging) {
     tassert(5417002, "$documentNumber can't be merged", !merging);
     // DocumentNumber doesn't need to keep track of what we just saw.
     ++_lastRank;
-}
-
-const char* AccumulatorDenseRank::getOpName() const {
-    return "$denseRank";
 }
 
 void AccumulatorDenseRank::processInternal(const Value& input, bool merging) {
