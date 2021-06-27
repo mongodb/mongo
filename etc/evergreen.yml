@@ -6755,8 +6755,6 @@ buildvariants:
   - name: compile
     distros:
     - amazon2-large
-    distros:
-    - amazon2-large
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth_WT
