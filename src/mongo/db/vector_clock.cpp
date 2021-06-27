@@ -221,8 +221,6 @@ public:
             }
         }
 
-        // TODO SERVER-48432: use IDL to do this serialization.
-
         BSONObjBuilder subObjBuilder(out->subobjStart(_fieldName));
         signedTime.getTime().asTimestamp().append(subObjBuilder.bb(), kClusterTimeFieldName);
 
@@ -244,8 +242,6 @@ public:
                    const BSONObj& in,
                    bool couldBeUnauthenticated,
                    Component component) const override {
-        // TODO SERVER-48432: use IDL to do this deserialization.
-
         const auto& metadataElem = in.getField(_fieldName);
         if (metadataElem.eoo()) {
             // Nothing to gossip in.
