@@ -130,8 +130,6 @@ let st = new ShardingTest({shards: 1});
 
 // enableSharding
 checkCommandMongos({enableSharding: dbName}, setupFuncs.noop, cleanupFuncs.dropDatabase);
-checkCommandConfigSvr(
-    {_configsvrEnableSharding: dbName}, setupFuncs.noop, cleanupFuncs.dropDatabase);
 
 // movePrimary
 checkCommandMongos({movePrimary: dbName, to: st.shard0.name},

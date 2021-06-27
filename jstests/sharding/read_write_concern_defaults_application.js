@@ -93,6 +93,7 @@ let testCases = {
     _configsvrCreateDatabase: {skip: "internal command"},
     _configsvrDropCollection: {skip: "internal command"},
     _configsvrDropDatabase: {skip: "internal command"},
+    // TODO (SERVER-58843): Remove this line when 6.0 becomes last LTS
     _configsvrEnableSharding: {skip: "internal command"},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: "internal command"},
     _configsvrMoveChunk: {skip: "internal command"},

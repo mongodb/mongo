@@ -465,7 +465,6 @@ const testCases = {
     _configsvrCreateDatabase: {skip: isNotRunOnUserDatabase},
     _configsvrDropCollection: {skip: isNotRunOnUserDatabase},
     _configsvrDropDatabase: {skip: isNotRunOnUserDatabase},
-    _configsvrEnableSharding: {skip: isNotRunOnUserDatabase},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isNotRunOnUserDatabase},
     _configsvrMoveChunk: {skip: isNotRunOnUserDatabase},
     _configsvrMovePrimary: {skip: isNotRunOnUserDatabase},

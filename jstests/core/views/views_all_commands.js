@@ -93,6 +93,7 @@ let viewsCommandTests = {
     _configsvrCreateDatabase: {skip: isAnInternalCommand},
     _configsvrDropCollection: {skip: isAnInternalCommand},
     _configsvrDropDatabase: {skip: isAnInternalCommand},
+    // TODO (SERVER-58843): Remove this line when 6.0 becomes last LTS
     _configsvrEnableSharding: {skip: isAnInternalCommand},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isAnInternalCommand},
     _configsvrMoveChunk: {skip: isAnInternalCommand},

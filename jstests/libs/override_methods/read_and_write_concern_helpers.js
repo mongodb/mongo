@@ -36,7 +36,6 @@ var kCommandsSupportingWriteConcern = new Set([
     "_configsvrCommitChunkMigration",
     "_configsvrCommitChunkSplit",
     "_configsvrCreateDatabase",
-    "_configsvrEnableSharding",
     "_configsvrMoveChunk",
     "_configsvrMovePrimary",
     "_configsvrRemoveShard",

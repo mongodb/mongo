@@ -311,7 +311,6 @@ env.Library(
         'config/configsvr_create_database_command.cpp',
         'config/configsvr_drop_collection_command.cpp',
         'config/configsvr_drop_database_command.cpp',
-        'config/configsvr_enable_sharding_command.cpp',
         'config/configsvr_ensure_chunk_version_is_greater_than_command.cpp',
         'config/configsvr_merge_chunk_command.cpp',
         'config/configsvr_merge_chunks_command.cpp',

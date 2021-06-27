@@ -43,7 +43,6 @@ const allCommands = {
     _configsvrCreateDatabase: {skip: isPrimaryOnly},
     _configsvrDropCollection: {skip: isPrimaryOnly},
     _configsvrDropDatabase: {skip: isPrimaryOnly},
-    _configsvrEnableSharding: {skip: isPrimaryOnly},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isPrimaryOnly},
     _configsvrMoveChunk: {skip: isPrimaryOnly},
     _configsvrMovePrimary: {skip: isPrimaryOnly},
