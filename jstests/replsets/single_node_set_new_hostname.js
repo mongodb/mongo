@@ -41,9 +41,15 @@ jsTestLog(`Original config: ${tojson(config)}`);
 config.version++;
 config.members[0].host = newHostAndPort;
 jsTestLog(`New config: ${tojson(config)}`);
+
 // Force reconfig since the restarted node is in REMOVED state, not PRIMARY.
-assert.commandWorked(
-    restartedNode.getDB("admin").runCommand({replSetReconfig: config, force: true}));
+// The connection to the mongod may have been closed after reaching the REMOVED state. In case of a
+// network error, retry the command until it succeeds.
+assert.soonNoExcept(() => {
+    assert.commandWorked(
+        restartedNode.getDB("admin").runCommand({replSetReconfig: config, force: true}));
+    return true;
+}, `Couldn't run 'replSetReconfig' with config ${config} on the node ${newHostAndPort}`);
 waitForState(restartedNode, ReplSetTest.State.PRIMARY);
 
 replTest.stopSet();
