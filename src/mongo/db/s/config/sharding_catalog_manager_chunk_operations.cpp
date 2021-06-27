@@ -468,14 +468,10 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         BSONObjBuilder b;
         b.append("ns", ChunkType::ConfigNS.ns());
         b.append("q",
-                 BSON("query" << BSON(ChunkType::ns(nss.ns()) << ChunkType::min() << range.getMin()
-                                                              << ChunkType::max() << range.getMax())
+                 BSON("query" << BSON(ChunkType::ns(nss.ns()) << ChunkType::min(range.getMin())
+                                                              << ChunkType::max(range.getMax()))
                               << "orderby" << BSON(ChunkType::lastmod() << -1)));
-        {
-            BSONObjBuilder bb(b.subobjStart("res"));
-            bb.append(ChunkType::epoch(), requestEpoch);
-            bb.append(ChunkType::shard(), shardName);
-        }
+        b.append("res", BSON(ChunkType::epoch(requestEpoch) << ChunkType::shard(shardName)));
         preCond.append(b.obj());
     }
 
@@ -540,6 +536,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
     // This method must never be called with empty chunks to merge
     invariant(!chunkBoundaries.empty());
 
+    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
@@ -553,7 +551,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
     // Get the max chunk version for this namespace.
     auto swCollVersion = getMaxChunkVersionFromQueryResponse(
         nss,
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+        configShard->exhaustiveFindOnConfig(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
@@ -578,7 +576,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
     // Get the shard version (max chunk version) for the shard requesting the merge.
     auto swShardVersion = getMaxChunkVersionFromQueryResponse(
         nss,
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+        configShard->exhaustiveFindOnConfig(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
@@ -767,10 +765,10 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
     // 2. Retrieve the list of chunks belonging to the requested shard + key range.
     const auto shardChunksInRangeQuery = [&]() {
         BSONObjBuilder queryBuilder;
-        queryBuilder << ChunkType::epoch(coll.getEpoch());
+        queryBuilder << ChunkType::ns(coll.getNs().ns());
         queryBuilder << ChunkType::shard(shardId.toString());
         queryBuilder << ChunkType::min(BSON("$gte" << chunkRange.getMin()));
-        queryBuilder << ChunkType::max(BSON("$lte" << chunkRange.getMax()));
+        queryBuilder << ChunkType::min(BSON("$lt" << chunkRange.getMax()));
         return queryBuilder.obj();
     }();
 
