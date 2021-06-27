@@ -77,7 +77,6 @@ const expectedExceptions =
 const logExceptionsDBName = 'exceptions';
 const logExceptionsCollName = 'log';
 
-// TODO SERVER-56198: no need to log exceptions once the ticket will be completed.
 function logException(db, exceptionCode) {
     db = db.getSiblingDB(logExceptionsDBName);
     const coll = db[logExceptionsCollName];
@@ -137,10 +136,9 @@ var $config = (function() {
     };
 
     let teardown = function(db, collName, cluster) {
-        // TODO SERVER-56198: don't verify that exceptions have been thrown
         // Ensure that NamespaceNotFound and ConflictingOperationInProgress have been raised at
         // least once: with a high level of concurrency, it's too improbable for such exceptions to
-        // never be thrown (in that case, it's very lickely that a bug has been introduced).
+        // never be thrown (in that case, it's very likely that a bug has been introduced).
         expectedExceptions.forEach(errCode => checkExceptionHasBeenThrown(db, errCode));
 
         // Check that at most one collection per test DB is present and that no data has been lost
