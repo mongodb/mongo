@@ -5,7 +5,6 @@
  * addition of voters) until the mutated new config gets stored locally.
  * 3. FCV downgrade blocks until all nodes in the replica set have latest config without
  * 'newlyAdded' field.
- * 4. No 'newlyAdded' members in replica set config on fcv downgrade.
  *
  * This tests behavior centered around downgrading FCV.
  * @tags: [multiversion_incompatible]
@@ -203,40 +202,6 @@ checkFCV({version: latestFCV, targetVersion: null});
 
 assert.commandWorked(
     secondary.adminCommand({configureFailPoint: "blockHeartbeatReconfigFinish", mode: 'off'}));
-// Cleanup the test.
-testCleanup(newNode.conn);
-
-// Scenario # 4: Test that no 'newlyAdded' members in repl config on fcv downgrade.
-jsTestLog("Downgrade FCV to " + lastLTSFCV);
-assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
-
-checkFCV({version: lastLTSFCV, targetVersion: null});
-
-// Check that the "newlyAdded" field doesn't exist in the config document on all nodes.
-rst.nodes.forEach(function(node) {
-    jsTestLog("Checking the 'newlyAdded' field on node " + tojson(node.host) +
-              " after FCV downgrade.");
-    assert(!replConfigHasNewlyAddedMembers(node), () => {
-        return "replSetconfig contains 'newlyAdded' field: " +
-            tojson(node.getDB("local").system.replset.findOne());
-    });
-});
-
-newNode = addNewVotingNode(
-    {startupParams: {"failpoint.initialSyncHangAfterDataCloning": tojson({mode: 'alwaysOn'})}});
-
-waitForInitialSyncHang(newNode.conn);
-
-// Check that 'newlyAdded' field is not set.
-assert(!isMemberNewlyAdded(primary, 4));
-assertVoteCount(primary, {
-    votingMembersCount: 5,
-    majorityVoteCount: 3,
-    writableVotingMembersCount: 5,
-    writeMajorityCount: 3,
-    totalMembersCount: 5,
-});
-
 // Cleanup the test.
 testCleanup(newNode.conn);
 
