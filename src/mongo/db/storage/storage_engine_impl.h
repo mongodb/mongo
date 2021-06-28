@@ -39,7 +39,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/durable_catalog_feature_tracker.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
 #include "mongo/db/storage/record_store.h"
@@ -320,18 +319,14 @@ public:
 
     void checkpoint() override;
 
-    DurableCatalog* getCatalog() override {
-        return _catalog.get();
-    }
-
-    const DurableCatalog* getCatalog() const override {
-        return _catalog.get();
-    }
-
     StatusWith<ReconcileResult> reconcileCatalogAndIdents(
         OperationContext* opCtx, LastShutdownState lastShutdownState) override;
 
     std::string getFilesystemPathForDb(const std::string& dbName) const override;
+
+    DurableCatalog* getCatalog() override;
+
+    const DurableCatalog* getCatalog() const override;
 
     /**
      * When loading after an unclean shutdown, this performs cleanup on the DurableCatalogImpl.
@@ -346,11 +341,6 @@ public:
 
     std::set<std::string> getDropPendingIdents() const override {
         return _dropPendingIdentReaper.getAllIdentNames();
-    }
-
-    Status currentFilesCompatible(OperationContext* opCtx) const override {
-        // Delegate to the FeatureTracker as to whether the data files are compatible or not.
-        return _catalog->getFeatureTracker()->isCompatibleWithCurrentCode(opCtx);
     }
 
     int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) override;

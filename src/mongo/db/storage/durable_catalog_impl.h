@@ -49,7 +49,6 @@ class StorageEngineInterface;
 
 class DurableCatalogImpl : public DurableCatalog {
 public:
-    class FeatureTracker;
     /**
      * The RecordStore must be thread-safe, in particular with concurrent calls to
      * RecordStore::find, updateRecord, insertRecord, deleteRecord and dataFor. The
@@ -93,11 +92,6 @@ public:
 
     bool isCollectionIdent(StringData ident) const;
 
-    FeatureTracker* getFeatureTracker() const {
-        invariant(_featureTracker);
-        return _featureTracker.get();
-    }
-
     RecordStore* getRecordStore() {
         return _rs;
     }
@@ -119,12 +113,6 @@ public:
                        RecordId catalogId,
                        const CollectionOptions& collOptions,
                        const IndexDescriptor* spec);
-
-    BSONCollectionCatalogEntry::IndexMetaData prepareIndexMetaDataForIndexBuild(
-        OperationContext* opCtx,
-        const IndexDescriptor* spec,
-        boost::optional<UUID> buildUUID,
-        bool isBackgroundSecondaryBuild);
 
     StatusWith<ImportResult> importCollection(OperationContext* opCtx,
                                               const NamespaceString& nss,
@@ -197,6 +185,9 @@ private:
      */
     bool _hasEntryCollidingWithRand(WithLock) const;
 
+    // Allows featureDocuments to be checked with older versions
+    static bool isFeatureDocument(BSONObj obj);
+
     RecordStore* _rs;  // not owned
     const bool _directoryPerDb;
     const bool _directoryForIndexes;
@@ -209,10 +200,6 @@ private:
     std::map<RecordId, Entry> _catalogIdToEntryMap;
     mutable Mutex _catalogIdToEntryMapLock =
         MONGO_MAKE_LATCH("DurableCatalogImpl::_catalogIdToEntryMap");
-
-    // Manages the feature document that may be present in the DurableCatalogImpl. '_featureTracker'
-    // is guaranteed to be non-null after DurableCatalogImpl::init() is called.
-    std::unique_ptr<FeatureTracker> _featureTracker;
 
     StorageEngineInterface* const _engine;
 };

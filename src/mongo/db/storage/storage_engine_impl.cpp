@@ -43,7 +43,7 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/storage/durable_catalog_feature_tracker.h"
+#include "mongo/db/storage/durable_catalog_impl.h"
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/temporary_kv_record_store.h"
@@ -992,16 +992,6 @@ bool StorageEngineImpl::supportsRecoveryTimestamp() const {
 StatusWith<Timestamp> StorageEngineImpl::recoverToStableTimestamp(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
 
-    // The "feature document" should not be rolled back. Perform a non-timestamped update to the
-    // feature document to lock in the current state.
-    DurableCatalogImpl::FeatureTracker::FeatureBits featureInfo;
-    {
-        WriteUnitOfWork wuow(opCtx);
-        featureInfo = _catalog->getFeatureTracker()->getInfo(opCtx);
-        _catalog->getFeatureTracker()->putInfo(opCtx, featureInfo);
-        wuow.commit();
-    }
-
     auto state = catalog::closeCatalog(opCtx);
 
     StatusWith<Timestamp> swTimestamp = _engine->recoverToStableTimestamp(opCtx);
@@ -1268,6 +1258,14 @@ void StorageEngineImpl::unpinOldestTimestamp(const std::string& requestingServic
 
 void StorageEngineImpl::setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) {
     _engine->setPinnedOplogTimestamp(pinnedTimestamp);
+}
+
+DurableCatalog* StorageEngineImpl::getCatalog() {
+    return _catalog.get();
+}
+
+const DurableCatalog* StorageEngineImpl::getCatalog() const {
+    return _catalog.get();
 }
 
 }  // namespace mongo

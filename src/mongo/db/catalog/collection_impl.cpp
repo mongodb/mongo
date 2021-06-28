@@ -1737,8 +1737,16 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
                                             bool isBackgroundSecondaryBuild) {
 
     auto durableCatalog = DurableCatalog::get(opCtx);
-    auto imd = durableCatalog->prepareIndexMetaDataForIndexBuild(
-        opCtx, spec, buildUUID, isBackgroundSecondaryBuild);
+    BSONCollectionCatalogEntry::IndexMetaData imd;
+    imd.spec = spec->infoObj();
+    imd.ready = false;
+    imd.multikey = false;
+    imd.isBackgroundSecondaryBuild = isBackgroundSecondaryBuild;
+    imd.buildUUID = buildUUID;
+
+    if (indexTypeSupportsPathLevelMultikeyTracking(spec->getAccessMethodName())) {
+        imd.multikeyPaths = MultikeyPaths{static_cast<size_t>(spec->keyPattern().nFields())};
+    }
 
     // Confirm that our index is not already in the current metadata.
     invariant(-1 == _metadata->findIndexOffset(imd.nameStringData()),

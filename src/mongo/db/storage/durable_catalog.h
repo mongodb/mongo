@@ -140,12 +140,6 @@ public:
                                const CollectionOptions& collOptions,
                                const IndexDescriptor* spec) = 0;
 
-    virtual BSONCollectionCatalogEntry::IndexMetaData prepareIndexMetaDataForIndexBuild(
-        OperationContext* opCtx,
-        const IndexDescriptor* spec,
-        boost::optional<UUID> buildUUID,
-        bool isBackgroundSecondaryBuild) = 0;
-
     /**
      * Import a collection by inserting the given metadata into the durable catalog and instructing
      * the storage engine to import the corresponding idents. The metadata object should be a valid

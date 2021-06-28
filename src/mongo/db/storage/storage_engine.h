@@ -641,20 +641,6 @@ public:
      */
     virtual std::string getFilesystemPathForDb(const std::string& dbName) const = 0;
 
-    /**
-     * Returns whethers the data files are compatible with the current code:
-     *
-     *   - Status::OK() if the data files are compatible with the current code.
-     *
-     *   - ErrorCodes::CanRepairToDowngrade if the data files are incompatible with the current
-     *     code, but a --repair would make them compatible. For example, when rebuilding all indexes
-     *     in the data files would resolve the incompatibility.
-     *
-     *   - ErrorCodes::MustUpgrade if the data files are incompatible with the current code and a
-     *     newer version is required to start up.
-     */
-    virtual Status currentFilesCompatible(OperationContext* opCtx) const = 0;
-
     virtual int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) = 0;
 
     virtual bool isUsingDirectoryPerDb() const = 0;

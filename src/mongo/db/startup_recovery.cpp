@@ -270,34 +270,6 @@ void openDatabases(OperationContext* opCtx, const StorageEngine* storageEngine, 
     }
 }
 
-// Check for storage engine file compatibility. Exits the process if there is an incompatibility.
-void assertFilesCompatible(OperationContext* opCtx, StorageEngine* storageEngine) {
-    auto status = storageEngine->currentFilesCompatible(opCtx);
-    if (status.isOK()) {
-        return;
-    }
-
-    if (status.code() == ErrorCodes::CanRepairToDowngrade) {
-        // Convert CanRepairToDowngrade statuses to MustUpgrade statuses to avoid logging a
-        // potentially confusing and inaccurate message.
-        //
-        // TODO SERVER-24097: Log a message informing the user that they can start the current
-        // version of mongod with --repair and then proceed with normal startup.
-        status = {ErrorCodes::MustUpgrade, status.reason()};
-    }
-    LOGV2_FATAL_CONTINUE(
-        21023,
-        "Unable to start mongod due to an incompatibility with the data files and this version "
-        "of mongod: {error}. Please consult our documentation when trying to downgrade to a "
-        "previous major release",
-        "Unable to start mongod due to an incompatibility with the data files and this version "
-        "of mongod. Please consult our documentation when trying to downgrade to a previous "
-        "major release",
-        "error"_attr = redact(status));
-    quickExit(EXIT_NEED_UPGRADE);
-    MONGO_UNREACHABLE;
-}
-
 /**
  * Returns 'true' if this server has a configuration document in local.system.replset.
  */
@@ -644,8 +616,6 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
     } else {
         startupRecovery(opCtx, storageEngine, lastShutdownState);
     }
-
-    assertFilesCompatible(opCtx, storageEngine);
 }
 
 }  // namespace startup_recovery

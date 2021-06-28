@@ -44,7 +44,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/storage/durable_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -232,164 +231,12 @@ public:
     const std::string _ident;
 };
 
-bool DurableCatalogImpl::FeatureTracker::isFeatureDocument(BSONObj obj) {
+bool DurableCatalogImpl::isFeatureDocument(BSONObj obj) {
     BSONElement firstElem = obj.firstElement();
     if (firstElem.fieldNameStringData() == kIsFeatureDocumentFieldName) {
         return firstElem.booleanSafe();
     }
     return false;
-}
-
-Status DurableCatalogImpl::FeatureTracker::isCompatibleWithCurrentCode(
-    OperationContext* opCtx) const {
-    FeatureBits versionInfo = getInfo(opCtx);
-
-    uint64_t unrecognizedNonRepairableFeatures =
-        versionInfo.nonRepairableFeatures & ~_usedNonRepairableFeaturesMask;
-    if (unrecognizedNonRepairableFeatures) {
-        StringBuilder sb;
-        sb << "The data files use features not recognized by this version of mongod; the NR feature"
-              " bits in positions ";
-        appendPositionsOfBitsSet(unrecognizedNonRepairableFeatures, &sb);
-        sb << " aren't recognized by this version of mongod";
-        return {ErrorCodes::MustUpgrade, sb.str()};
-    }
-
-    uint64_t unrecognizedRepairableFeatures =
-        versionInfo.repairableFeatures & ~_usedRepairableFeaturesMask;
-    if (unrecognizedRepairableFeatures) {
-        StringBuilder sb;
-        sb << "The data files use features not recognized by this version of mongod; the R feature"
-              " bits in positions ";
-        appendPositionsOfBitsSet(unrecognizedRepairableFeatures, &sb);
-        sb << " aren't recognized by this version of mongod";
-        return {ErrorCodes::CanRepairToDowngrade, sb.str()};
-    }
-
-    return Status::OK();
-}
-
-std::unique_ptr<DurableCatalogImpl::FeatureTracker> DurableCatalogImpl::FeatureTracker::get(
-    OperationContext* opCtx, DurableCatalogImpl* catalog, RecordId rid) {
-    auto record = catalog->_rs->dataFor(opCtx, rid);
-    BSONObj obj = record.toBson();
-    invariant(isFeatureDocument(obj));
-    return std::unique_ptr<DurableCatalogImpl::FeatureTracker>(
-        new DurableCatalogImpl::FeatureTracker(catalog, rid));
-}
-
-std::unique_ptr<DurableCatalogImpl::FeatureTracker> DurableCatalogImpl::FeatureTracker::create(
-    OperationContext* opCtx, DurableCatalogImpl* catalog) {
-    return std::unique_ptr<DurableCatalogImpl::FeatureTracker>(
-        new DurableCatalogImpl::FeatureTracker(catalog, RecordId()));
-}
-
-bool DurableCatalogImpl::FeatureTracker::isNonRepairableFeatureInUse(
-    OperationContext* opCtx, NonRepairableFeature feature) const {
-    FeatureBits versionInfo = getInfo(opCtx);
-    return versionInfo.nonRepairableFeatures & static_cast<NonRepairableFeatureMask>(feature);
-}
-
-void DurableCatalogImpl::FeatureTracker::markNonRepairableFeatureAsInUse(
-    OperationContext* opCtx, NonRepairableFeature feature) {
-    FeatureBits versionInfo = getInfo(opCtx);
-    versionInfo.nonRepairableFeatures |= static_cast<NonRepairableFeatureMask>(feature);
-    putInfo(opCtx, versionInfo);
-}
-
-void DurableCatalogImpl::FeatureTracker::markNonRepairableFeatureAsNotInUse(
-    OperationContext* opCtx, NonRepairableFeature feature) {
-    FeatureBits versionInfo = getInfo(opCtx);
-    versionInfo.nonRepairableFeatures &= ~static_cast<NonRepairableFeatureMask>(feature);
-    putInfo(opCtx, versionInfo);
-}
-
-bool DurableCatalogImpl::FeatureTracker::isRepairableFeatureInUse(OperationContext* opCtx,
-                                                                  RepairableFeature feature) const {
-    FeatureBits versionInfo = getInfo(opCtx);
-    return versionInfo.repairableFeatures & static_cast<RepairableFeatureMask>(feature);
-}
-
-void DurableCatalogImpl::FeatureTracker::markRepairableFeatureAsInUse(OperationContext* opCtx,
-                                                                      RepairableFeature feature) {
-    FeatureBits versionInfo = getInfo(opCtx);
-    versionInfo.repairableFeatures |= static_cast<RepairableFeatureMask>(feature);
-    putInfo(opCtx, versionInfo);
-}
-
-void DurableCatalogImpl::FeatureTracker::markRepairableFeatureAsNotInUse(
-    OperationContext* opCtx, RepairableFeature feature) {
-    FeatureBits versionInfo = getInfo(opCtx);
-    versionInfo.repairableFeatures &= ~static_cast<RepairableFeatureMask>(feature);
-    putInfo(opCtx, versionInfo);
-}
-
-DurableCatalogImpl::FeatureTracker::FeatureBits DurableCatalogImpl::FeatureTracker::getInfo(
-    OperationContext* opCtx) const {
-    if (_rid.isNull()) {
-        return {};
-    }
-
-    auto record = _catalog->_rs->dataFor(opCtx, _rid);
-    BSONObj obj = record.toBson();
-    invariant(isFeatureDocument(obj));
-
-    BSONElement nonRepairableFeaturesElem;
-    auto nonRepairableFeaturesStatus = bsonExtractTypedField(
-        obj, kNonRepairableFeaturesFieldName, BSONType::NumberLong, &nonRepairableFeaturesElem);
-    if (!nonRepairableFeaturesStatus.isOK()) {
-        LOGV2_ERROR(22215,
-                    "error: exception extracting typed field with obj:{obj}",
-                    "Exception extracting typed field from obj",
-                    "obj"_attr = redact(obj),
-                    "fieldName"_attr = kNonRepairableFeaturesFieldName);
-        fassert(40111, nonRepairableFeaturesStatus);
-    }
-
-    BSONElement repairableFeaturesElem;
-    auto repairableFeaturesStatus = bsonExtractTypedField(
-        obj, kRepairableFeaturesFieldName, BSONType::NumberLong, &repairableFeaturesElem);
-    if (!repairableFeaturesStatus.isOK()) {
-        LOGV2_ERROR(22216,
-                    "error: exception extracting typed field with obj:{obj}",
-                    "Exception extracting typed field from obj",
-                    "obj"_attr = redact(obj),
-                    "fieldName"_attr = kRepairableFeaturesFieldName);
-        fassert(40112, repairableFeaturesStatus);
-    }
-
-    FeatureBits versionInfo;
-    versionInfo.nonRepairableFeatures =
-        static_cast<NonRepairableFeatureMask>(nonRepairableFeaturesElem.numberLong());
-    versionInfo.repairableFeatures =
-        static_cast<RepairableFeatureMask>(repairableFeaturesElem.numberLong());
-    return versionInfo;
-}
-
-void DurableCatalogImpl::FeatureTracker::putInfo(OperationContext* opCtx,
-                                                 const FeatureBits& versionInfo) {
-    BSONObjBuilder bob;
-    bob.appendBool(kIsFeatureDocumentFieldName, true);
-    // We intentionally include the "ns" field with a null value in the feature document to prevent
-    // older versions that do 'obj["ns"].String()' from starting up. This way only versions that are
-    // aware of the feature document's existence can successfully start up.
-    bob.appendNull(kNamespaceFieldName);
-    bob.append(kNonRepairableFeaturesFieldName,
-               static_cast<long long>(versionInfo.nonRepairableFeatures));
-    bob.append(kRepairableFeaturesFieldName,
-               static_cast<long long>(versionInfo.repairableFeatures));
-    BSONObj obj = bob.done();
-
-    if (_rid.isNull()) {
-        // This is the first time a feature is being marked as in-use or not in-use, so we must
-        // insert the feature document rather than update it.
-        auto rid = _catalog->_rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), Timestamp());
-        fassert(40113, rid.getStatus());
-        _rid = rid.getValue();
-    } else {
-        auto status = _catalog->_rs->updateRecord(opCtx, _rid, obj.objdata(), obj.objsize());
-        fassert(40114, status);
-    }
 }
 
 DurableCatalogImpl::DurableCatalogImpl(RecordStore* rs,
@@ -464,13 +311,8 @@ void DurableCatalogImpl::init(OperationContext* opCtx) {
     while (auto record = cursor->next()) {
         BSONObj obj = record->data.releaseToBson();
 
-        if (FeatureTracker::isFeatureDocument(obj)) {
-            // There should be at most one version document in the catalog.
-            invariant(!_featureTracker);
-
-            // Initialize the feature tracker and skip over the version document because it doesn't
-            // correspond to a namespace entry.
-            _featureTracker = FeatureTracker::get(opCtx, this, record->id);
+        // For backwards compatibility where older version have a written feature document
+        if (isFeatureDocument(obj)) {
             continue;
         }
 
@@ -478,16 +320,6 @@ void DurableCatalogImpl::init(OperationContext* opCtx) {
         auto ident = obj["ident"].String();
         auto ns = obj["ns"].String();
         _catalogIdToEntryMap[record->id] = Entry(record->id, ident, NamespaceString(ns));
-    }
-
-    if (!_featureTracker) {
-        // If there wasn't a feature document, commit a default one to disk. All deployments will
-        // end up with `kPathLevelMultikeyTracking` as every `_id` index build sets this.
-        WriteUnitOfWork wuow(opCtx);
-        _featureTracker = DurableCatalogImpl::FeatureTracker::create(opCtx, this);
-        _featureTracker->markRepairableFeatureAsInUse(
-            opCtx, FeatureTracker::RepairableFeature::kPathLevelMultikeyTracking);
-        wuow.commit();
     }
 
     // In the unlikely event that we have used this _rand before generate a new one.
@@ -504,7 +336,7 @@ std::vector<DurableCatalog::Entry> DurableCatalogImpl::getAllCatalogEntries(
     auto cursor = _rs->getCursor(opCtx);
     while (auto record = cursor->next()) {
         BSONObj obj = record->data.releaseToBson();
-        if (FeatureTracker::isFeatureDocument(obj)) {
+        if (isFeatureDocument(obj)) {
             // Skip over the version document because it doesn't correspond to a collection.
             continue;
         }
@@ -732,7 +564,7 @@ std::vector<std::string> DurableCatalogImpl::getAllIdents(OperationContext* opCt
     auto cursor = _rs->getCursor(opCtx);
     while (auto record = cursor->next()) {
         BSONObj obj = record->data.releaseToBson();
-        if (FeatureTracker::isFeatureDocument(obj)) {
+        if (isFeatureDocument(obj)) {
             // Skip over the version document because it doesn't correspond to a namespace entry and
             // therefore doesn't refer to any idents.
             continue;
@@ -838,14 +670,6 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
     Status status = _engine->getEngine()->createRecordStore(opCtx, nss.ns(), entry.ident, options);
     if (!status.isOK())
         return status;
-
-    // Mark collation feature as in use if the collection has a non-simple default collation.
-    if (!options.collation.isEmpty()) {
-        const auto feature = DurableCatalogImpl::FeatureTracker::NonRepairableFeature::kCollation;
-        if (getFeatureTracker()->isNonRepairableFeatureInUse(opCtx, feature)) {
-            getFeatureTracker()->markNonRepairableFeatureAsInUse(opCtx, feature);
-        }
-    }
 
     auto ru = opCtx->recoveryUnit();
     CollectionUUID uuid = options.uuid.get();
@@ -959,14 +783,6 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
         }
     }
 
-    // Mark collation feature as in use if the collection has a non-simple default collation.
-    if (!md.options.collation.isEmpty()) {
-        const auto feature = DurableCatalogImpl::FeatureTracker::NonRepairableFeature::kCollation;
-        if (getFeatureTracker()->isNonRepairableFeatureInUse(opCtx, feature)) {
-            getFeatureTracker()->markNonRepairableFeatureAsInUse(opCtx, feature);
-        }
-    }
-
     opCtx->recoveryUnit()->onRollback(
         [opCtx, catalog = this, ident = entry.ident, indexIdents = indexIdents]() {
             catalog->_engine->getEngine()->dropIdentForImport(opCtx, ident);
@@ -1005,37 +821,6 @@ Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, RecordId cata
     }
 
     return Status::OK();
-}
-
-BSONCollectionCatalogEntry::IndexMetaData DurableCatalogImpl::prepareIndexMetaDataForIndexBuild(
-    OperationContext* opCtx,
-    const IndexDescriptor* spec,
-    boost::optional<UUID> buildUUID,
-    bool isBackgroundSecondaryBuild) {
-    BSONCollectionCatalogEntry::IndexMetaData imd;
-    imd.spec = spec->infoObj();
-    imd.ready = false;
-    imd.multikey = false;
-    imd.isBackgroundSecondaryBuild = isBackgroundSecondaryBuild;
-    imd.buildUUID = buildUUID;
-
-    if (indexTypeSupportsPathLevelMultikeyTracking(spec->getAccessMethodName())) {
-        const auto feature = FeatureTracker::RepairableFeature::kPathLevelMultikeyTracking;
-        if (!getFeatureTracker()->isRepairableFeatureInUse(opCtx, feature)) {
-            getFeatureTracker()->markRepairableFeatureAsInUse(opCtx, feature);
-        }
-        imd.multikeyPaths = MultikeyPaths{static_cast<size_t>(spec->keyPattern().nFields())};
-    }
-
-    // Mark collation feature as in use if the index has a non-simple collation.
-    if (imd.spec["collation"]) {
-        const auto feature = FeatureTracker::NonRepairableFeature::kCollation;
-        if (!getFeatureTracker()->isNonRepairableFeatureInUse(opCtx, feature)) {
-            getFeatureTracker()->markNonRepairableFeatureAsInUse(opCtx, feature);
-        }
-    }
-
-    return imd;
 }
 
 Status DurableCatalogImpl::dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
