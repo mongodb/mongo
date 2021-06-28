@@ -620,24 +620,5 @@ runCommentParamTest({
     expectedRunningOps: 1
 });
 
-//
-// Tests for Legacy query.
-//
-
-// Verify that $comment at top level is treated as a 'comment' field.
-const legacyComment = {
-    testName: jsTestName(),
-    commentField: "Legacy_find_comment"
-};
-runCommentParamTest({
-    coll: shardedColl,
-    expectedRunningOps: 2,
-    cmdName: "find",
-    commentObj: legacyComment,
-    parallelFunction: `const sourceDB = db.getSiblingDB(jsTestName());
-        sourceDB.getMongo().forceReadMode("legacy");
-        sourceDB.coll.find({$query: {a: 1}, $comment: ${tojson(legacyComment)}});`
-});
-
 st.stop();
 })();

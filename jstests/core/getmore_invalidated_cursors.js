@@ -39,7 +39,6 @@ setupCollection();
 const batchSize = (nDocs / FixtureHelpers.numberOfShardsForCollection(coll)) - 1;
 
 const isShardedCollection = coll.stats().sharded;
-const shellReadMode = testDB.getMongo().readMode();
 
 let cursor = coll.find().batchSize(batchSize);
 cursor.next();  // Send the query to the server.
@@ -48,13 +47,8 @@ assert.commandWorked(testDB.dropDatabase());
 
 let error = assert.throws(() => cursor.itcount());
 
-if (testDB.runCommand({isdbgrid: 1}).isdbgrid && shellReadMode == 'legacy') {
-    // The cursor will be invalidated on mongos, and we won't be able to find it.
-    assert.neq(-1, error.message.indexOf('didn\'t exist on server'), error.message);
-} else {
-    assert(kKilledByDropErrorCodes.includes(error.code), tojson(error));
-    assert.neq(-1, error.message.indexOf('collection dropped'), error.message);
-}
+assert(kKilledByDropErrorCodes.includes(error.code), tojson(error));
+assert.neq(-1, error.message.indexOf('collection dropped'), error.message);
 
 // Test that dropping the collection between a find and a getMore will return an appropriate
 // error code and message.

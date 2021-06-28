@@ -25,7 +25,7 @@ load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 const coll = db.plan_cache_sbe;
 coll.drop();
 
-const isSBECompat = checkSBECompatible(db);
+const isSBEEnabled = checkSBEEnabled(db);
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 
 // We need two indexes so that the multi-planner is executed.
@@ -40,6 +40,6 @@ const allStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
 assert.eq(allStats.length, 1, allStats);
 const stats = allStats[0];
 assert(stats.hasOwnProperty("cachedPlan"), stats);
-assert.eq(stats.cachedPlan.hasOwnProperty("queryPlan"), isSBECompat, stats);
-assert.eq(stats.cachedPlan.hasOwnProperty("slotBasedPlan"), isSBECompat, stats);
+assert.eq(stats.cachedPlan.hasOwnProperty("queryPlan"), isSBEEnabled, stats);
+assert.eq(stats.cachedPlan.hasOwnProperty("slotBasedPlan"), isSBEEnabled, stats);
 })();

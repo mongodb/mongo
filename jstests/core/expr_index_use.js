@@ -261,13 +261,11 @@ const caseInsensitiveCollation = {
     locale: "en_US",
     strength: 2
 };
-if (db.getMongo().useReadCommands()) {
-    confirmExpectedExprExecution({$eq: ["$w", "FoO"]}, {nReturned: 2}, caseInsensitiveCollation);
-    confirmExpectedExprExecution({$gt: ["$w", "FoO"]}, {nReturned: 2}, caseInsensitiveCollation);
-    confirmExpectedExprExecution({$gte: ["$w", "FoO"]}, {nReturned: 4}, caseInsensitiveCollation);
-    confirmExpectedExprExecution({$lt: ["$w", "FoO"]}, {nReturned: 19}, caseInsensitiveCollation);
-    confirmExpectedExprExecution({$lte: ["$w", "FoO"]}, {nReturned: 21}, caseInsensitiveCollation);
-}
+confirmExpectedExprExecution({$eq: ["$w", "FoO"]}, {nReturned: 2}, caseInsensitiveCollation);
+confirmExpectedExprExecution({$gt: ["$w", "FoO"]}, {nReturned: 2}, caseInsensitiveCollation);
+confirmExpectedExprExecution({$gte: ["$w", "FoO"]}, {nReturned: 4}, caseInsensitiveCollation);
+confirmExpectedExprExecution({$lt: ["$w", "FoO"]}, {nReturned: 19}, caseInsensitiveCollation);
+confirmExpectedExprExecution({$lte: ["$w", "FoO"]}, {nReturned: 21}, caseInsensitiveCollation);
 
 // Test equality queries against a hashed index.
 assert.commandWorked(coll.dropIndex({w: 1}));

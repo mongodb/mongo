@@ -18,7 +18,6 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
 
     const mongos = new Mongo(this.s.host);
     mongos.fullOptions = this.s.fullOptions || {};
-    mongos.forceReadMode("commands");
     mongos.setReadPref("primary");
 
     const keyFile = this.keyFile;

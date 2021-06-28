@@ -17,8 +17,6 @@
 var coll = db.write_result;
 coll.drop();
 
-assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands");
-
 var result = null;
 
 //

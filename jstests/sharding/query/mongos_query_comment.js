@@ -35,55 +35,6 @@ for (let i = 0; i < 5; ++i) {
 assert.commandWorked(shardDB.setProfilingLevel(2));
 const profiler = shardDB.system.profile;
 
-//
-// Set legacy read mode for the mongos and shard connections.
-//
-mongosDB.getMongo().forceReadMode("legacy");
-shardDB.getMongo().forceReadMode("legacy");
-
-// TEST CASE: A legacy string $comment meta-operator inside $query is propagated to the shards via
-// mongos but not treated as a 'comment' field.
-assert.eq(mongosColl.find({a: 1, $comment: "TEST"}).itcount(), 1);
-profilerHasSingleMatchingEntryOrThrow({
-    profileDB: shardDB,
-    filter: {
-        op: "query",
-        ns: collNS,
-        "command.filter": {a: 1, $comment: "TEST"},
-        "command.comment": {$exists: false}
-    }
-});
-
-// TEST CASE: A legacy string $comment meta-operator is propagated to the shards via mongos.
-assert.eq(mongosColl.find({$query: {a: 1}, $comment: "TEST"}).itcount(), 1);
-profilerHasSingleMatchingEntryOrThrow(
-    {profileDB: shardDB, filter: {op: "query", ns: collNS, "command.comment": "TEST"}});
-
-// TEST CASE: A legacy BSONObj $comment propagated via mongos.
-assert.eq(mongosColl.find({$query: {a: 1}, $comment: {c: 2, d: {e: "TEST"}}}).itcount(), 1);
-profilerHasSingleMatchingEntryOrThrow({
-    profileDB: shardDB,
-    filter: {
-        op: "query",
-        ns: collNS,
-        "command.comment": {c: 2, d: {e: "TEST"}},
-        "command.filter": {a: 1}
-    }
-});
-
-// TEST CASE: Legacy BSONObj $comment when issued on the mongod.
-assert.eq(shardColl.find({$query: {a: 1}, $comment: {c: 3, d: {e: "TEST"}}}).itcount(), 1);
-profilerHasSingleMatchingEntryOrThrow({
-    profileDB: shardDB,
-    filter: {op: "query", ns: collNS, "command.comment": {c: 3, d: {e: "TEST"}}}
-});
-
-//
-// Revert to "commands" read mode for the find command test cases below.
-//
-mongosDB.getMongo().forceReadMode("commands");
-shardDB.getMongo().forceReadMode("commands");
-
 // TEST CASE: Verify that find.comment and non-string find.filter.$comment propagate.
 assert.eq(mongosColl.find({a: 1, $comment: {b: "TEST"}}).comment("TEST").itcount(), 1);
 profilerHasSingleMatchingEntryOrThrow({

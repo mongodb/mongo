@@ -87,12 +87,12 @@ assert.eq(cacheEntry.isActive, true);
 // Should be at least two plans: one using the {a: 1} index and the other using the b.$** index.
 assert.gte(cacheEntry.creationExecStats.length, 2, tojson(cacheEntry.plans));
 
-const isSBECompat = checkSBECompatible(db);
+const isSBEEnabled = checkSBEEnabled(db);
 
 // In SBE index scan stage does not serialize key pattern in execution stats, so we use IXSCAN from
 // the query plan instead.
-const plan =
-    isSBECompat ? cacheEntry.cachedPlan.queryPlan : cacheEntry.creationExecStats[0].executionStages;
+const plan = isSBEEnabled ? cacheEntry.cachedPlan.queryPlan
+                          : cacheEntry.creationExecStats[0].executionStages;
 const ixScanStage = getPlanStage(plan, "IXSCAN");
 assert.neq(ixScanStage, null, () => tojson(plan));
 assert.eq(ixScanStage.keyPattern, {"$_path": 1, "b": 1}, () => tojson(plan));

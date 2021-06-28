@@ -48,18 +48,3 @@ function checkSBEEnabled(theDB) {
 
     return checkResult;
 }
-
-/**
- * Returns whether queries will run with SBE or not. This is distinct from determining whether SBE
- * is enabled because queries run using the legacy read mode will not use SBE even if it is
- * enabled.
- */
-function checkSBECompatible(theDB) {
-    if (!checkSBEEnabled(theDB)) {
-        return false;
-    }
-
-    // We can use SBE if we're not using legacy reads, or if we're connected to mongos (which will
-    // always use read commands against the shards).
-    return theDB.getMongo().readMode() != "legacy" || FixtureHelpers.isMongos(theDB);
-}

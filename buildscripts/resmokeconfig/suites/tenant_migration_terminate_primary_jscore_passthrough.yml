@@ -63,7 +63,6 @@ selector:
   - jstests/core/user_management_helpers.js
   # These tests use legacy read mode which does not use runCommand.
   - jstests/core/comment_field.js
-  - jstests/core/invalidated_legacy_cursors.js
   # This test contains assertions for the hostname that operations run on.
   - jstests/core/currentop_cursors.js
   # Server parameters are stored in-memory only so are not transferred onto the recipient. These

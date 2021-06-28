@@ -138,36 +138,34 @@ coll.drop();
 assert.commandWorked(coll.insert({a: "str"}));
 assert.commandWorked(coll.insert({a: ["STR", "sTr"]}));
 
-if (testDB.getMongo().useReadCommands()) {
-    assert.eq(0, coll.find({$jsonSchema: schema}).collation(caseInsensitiveCollation).itcount());
-    assert.eq(2,
-              coll.find({$jsonSchema: {properties: {a: {uniqueItems: true}}}})
-                  .collation(caseInsensitiveCollation)
-                  .itcount());
-    assert.eq(2, coll.find({a: "STR"}).collation(caseInsensitiveCollation).itcount());
+assert.eq(0, coll.find({$jsonSchema: schema}).collation(caseInsensitiveCollation).itcount());
+assert.eq(2,
+          coll.find({$jsonSchema: {properties: {a: {uniqueItems: true}}}})
+              .collation(caseInsensitiveCollation)
+              .itcount());
+assert.eq(2, coll.find({a: "STR"}).collation(caseInsensitiveCollation).itcount());
 
-    // Test that $jsonSchema can be used in a $match stage within a view.
-    coll.drop();
-    let bulk = coll.initializeUnorderedBulkOp();
-    bulk.insert({name: "Peter", age: 65});
-    bulk.insert({name: "Paul", age: 105});
-    bulk.insert({name: "Mary", age: 10});
-    bulk.insert({name: "John", age: "unknown"});
-    bulk.insert({name: "Mark"});
-    bulk.insert({});
-    assert.commandWorked(bulk.execute());
+// Test that $jsonSchema can be used in a $match stage within a view.
+coll.drop();
+let bulk = coll.initializeUnorderedBulkOp();
+bulk.insert({name: "Peter", age: 65});
+bulk.insert({name: "Paul", age: 105});
+bulk.insert({name: "Mary", age: 10});
+bulk.insert({name: "John", age: "unknown"});
+bulk.insert({name: "Mark"});
+bulk.insert({});
+assert.commandWorked(bulk.execute());
 
-    assert.commandWorked(testDB.createView(
-        "seniorCitizens", coll.getName(), [{
-            $match: {
-                $jsonSchema: {
-                    required: ["name", "age"],
-                    properties: {name: {type: "string"}, age: {type: "number", minimum: 65}}
-                }
+assert.commandWorked(testDB.createView(
+    "seniorCitizens", coll.getName(), [{
+        $match: {
+            $jsonSchema: {
+                required: ["name", "age"],
+                properties: {name: {type: "string"}, age: {type: "number", minimum: 65}}
             }
-        }]));
-    assert.eq(2, testDB.seniorCitizens.find().itcount());
-}
+        }
+    }]));
+assert.eq(2, testDB.seniorCitizens.find().itcount());
 
 // Test that $jsonSchema can be used in the listCollections filter.
 res = testDB.runCommand(
@@ -220,18 +218,9 @@ assert.eq(2, res.deletedCount);
 assert.eq(0, coll.find({$jsonSchema: schema}).itcount());
 
 // Test that $jsonSchema does not respect the collation specified in a delete command.
-if (db.getMongo().writeMode() === "commands") {
-    res = coll.deleteMany({$jsonSchema: {properties: {a: {enum: ["STR"]}}}},
-                          {collation: caseInsensitiveCollation});
-    assert.eq(0, res.deletedCount);
-} else {
-    res = testDB.runCommand({
-        delete: coll.getName(),
-        deletes: [{q: {$jsonSchema: {properties: {a: {enum: ["STR"]}}}}}],
-        collation: caseInsensitiveCollation,
-    });
-    assert.eq(res.deletedCount);
-}
+res = coll.deleteMany({$jsonSchema: {properties: {a: {enum: ["STR"]}}}},
+                      {collation: caseInsensitiveCollation});
+assert.eq(0, res.deletedCount);
 
 // Test that $jsonSchema is legal in an update command.
 coll.drop();

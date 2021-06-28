@@ -13,8 +13,6 @@ load("jstests/libs/fixture_helpers.js");           // For isSharded.
 db = db.getSiblingDB(jsTestName());
 let cst = new ChangeStreamTest(db);
 
-db.getMongo().forceReadMode('commands');
-
 // Test that it is possible to open a new change stream cursor on a collection that does not
 // exist.
 const collName = "test";

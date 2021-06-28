@@ -12,8 +12,6 @@
 (function() {
 "use strict";
 const coll = db.jstests_currentop_cursors;
-// Will skip lsid tests if not in commands read mode.
-const commandReadMode = db.getMongo().readMode() == "commands";
 
 load("jstests/libs/fixture_helpers.js");  // for FixtureHelpers
 
@@ -76,11 +74,8 @@ runTest({
         } else {
             assert(!result[0].hasOwnProperty("planSummary"), result);
         }
-        // Lsid will not exist if not in command read mode.
-        if (commandReadMode) {
-            assert(result[0].lsid.hasOwnProperty('id'), result);
-            assert(result[0].lsid.hasOwnProperty('uid'), result);
-        }
+        assert(result[0].lsid.hasOwnProperty('id'), result);
+        assert(result[0].lsid.hasOwnProperty('uid'), result);
         const uri = new MongoURI(db.getMongo().host);
         assert(uri.servers.some((server) => {
             return result[0].host == getHostName() + ":" + server.port;
@@ -230,21 +225,18 @@ if (!FixtureHelpers.isMongos(db)) {
         }
     });
 }
-// Test lsid.id value is correct if in commandReadMode.
-if (commandReadMode) {
-    const session = db.getMongo().startSession();
-    runTest({
-        findFunc: function() {
-            const sessionDB = session.getDatabase("test");
-            return assert
-                .commandWorked(
-                    sessionDB.runCommand({find: "jstests_currentop_cursors", batchSize: 2}))
-                .cursor.id;
-        },
-        assertFunc: function(cursorId, result) {
-            assert.eq(result.length, 1, result);
-            assert.eq(session.getSessionId().id, result[0].lsid.id);
-        }
-    });
-}
+// Test lsid.id value is correct.
+const session = db.getMongo().startSession();
+runTest({
+    findFunc: function() {
+        const sessionDB = session.getDatabase("test");
+        return assert
+            .commandWorked(sessionDB.runCommand({find: "jstests_currentop_cursors", batchSize: 2}))
+            .cursor.id;
+    },
+    assertFunc: function(cursorId, result) {
+        assert.eq(result.length, 1, result);
+        assert.eq(session.getSessionId().id, result[0].lsid.id);
+    }
+});
 })();

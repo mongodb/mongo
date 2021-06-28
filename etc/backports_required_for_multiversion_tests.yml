@@ -90,8 +90,6 @@ last-lts:
       test_file: jstests/replsets/secondaryOk_slaveOk_aliases.js
     - ticket: SERVER-43902
       test_file: jstests/sharding/scaled_collection_stats.js
-    - ticket: SERVER-50416
-      test_file: jstests/replsets/disconnect_on_legacy_write_to_secondary.js
     - ticket: SERVER-50417
       test_file: jstests/replsets/no_disconnect_on_stepdown.js
     - ticket: SERVER-50417

@@ -209,16 +209,6 @@ assert.commandWorked(db.t2.insert({_id: 101, renameCollection: "test.dne1", to: 
 cst.assertNoChange(dne1cursor);
 cst.assertNoChange(dne2cursor);
 
-if (!isMongos) {
-    jsTestLog("Ensuring attempt to read with legacy operations fails.");
-    db.getMongo().forceReadMode('legacy');
-    const legacyCursor = db.tailable2.aggregate([{$changeStream: {}}], {cursor: {batchSize: 0}});
-    assert.throws(function() {
-        legacyCursor.next();
-    }, [], "Legacy getMore expected to fail on changeStream cursor.");
-    db.getMongo().forceReadMode('commands');
-}
-
 jsTestLog("Testing resumability");
 assertDropAndRecreateCollection(db, "resume1");
 

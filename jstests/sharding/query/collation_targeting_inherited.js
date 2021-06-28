@@ -187,12 +187,10 @@ assert.commandWorked(explain);
 assert.eq(3, explain.queryPlanner.winningPlan.shards.length);
 
 // Test a find command with a simple collation. This should be single-shard.
-if (testDB.getMongo().useReadCommands()) {
-    assert.eq(1, collCaseInsensitive.find({a: "foo"}).collation({locale: "simple"}).itcount());
-    explain = collCaseInsensitive.find({a: "foo"}).collation({locale: "simple"}).explain();
-    assert.commandWorked(explain);
-    assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
-}
+assert.eq(1, collCaseInsensitive.find({a: "foo"}).collation({locale: "simple"}).itcount());
+explain = collCaseInsensitive.find({a: "foo"}).collation({locale: "simple"}).explain();
+assert.commandWorked(explain);
+assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // Test a find command on numbers with a non-simple collation inherited from the collection
 // default. This should be single-shard.

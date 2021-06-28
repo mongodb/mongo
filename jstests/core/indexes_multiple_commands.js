@@ -142,23 +142,18 @@ assert.commandWorked(coll.insert([{a: "a"}, {a: "A"}, {a: 20}]));
 
 // An ambiguous hint pattern fails.
 assert.throws(() => coll.find({a: 1}).hint({a: 1}).itcount());
-if (db.getMongo().useReadCommands()) {
-    assert.throws(
-        () => coll.find({a: 1}).collation({locale: "en_US", strength: 2}).hint({a: 1}).itcount());
-}
+assert.throws(
+    () => coll.find({a: 1}).collation({locale: "en_US", strength: 2}).hint({a: 1}).itcount());
 
 // Index hint by name succeeds.
 assert.eq(coll.find({a: "a"}).hint("sbc").itcount(), 1);
 // A hint on an incompatible index does a whole index scan, and then filters using the query
 // collation.
 assert.eq(coll.find({a: "a"}).hint("caseInsensitive").itcount(), 1);
-if (db.getMongo().useReadCommands()) {
-    assert.eq(coll.find({a: "a"}).collation({locale: "en_US", strength: 2}).hint("sbc").itcount(),
-              2);
+assert.eq(coll.find({a: "a"}).collation({locale: "en_US", strength: 2}).hint("sbc").itcount(), 2);
 
-    // A non-ambiguous index hint by key pattern is allowed, even if the collation doesn't
-    // match.
-    assertIndexesCreated(() => coll.createIndex({b: 1}, {collation: {locale: "fr"}}));
-    assert.eq(coll.find({a: "a"}).collation({locale: "en_US"}).hint({b: 1}).itcount(), 1);
-}
+// A non-ambiguous index hint by key pattern is allowed, even if the collation doesn't
+// match.
+assertIndexesCreated(() => coll.createIndex({b: 1}, {collation: {locale: "fr"}}));
+assert.eq(coll.find({a: "a"}).collation({locale: "en_US"}).hint({b: 1}).itcount(), 1);
 })();

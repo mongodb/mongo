@@ -162,12 +162,10 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 // Find.
 
 // Test a find command on strings with a non-simple collation. This should be scatter-gather.
-if (testDB.getMongo().useReadCommands()) {
-    assert.eq(2, coll.find({a: "foo"}).collation(caseInsensitive).itcount());
-    explain = coll.find({a: "foo"}).collation(caseInsensitive).explain();
-    assert.commandWorked(explain);
-    assert.eq(3, explain.queryPlanner.winningPlan.shards.length);
-}
+assert.eq(2, coll.find({a: "foo"}).collation(caseInsensitive).itcount());
+explain = coll.find({a: "foo"}).collation(caseInsensitive).explain();
+assert.commandWorked(explain);
+assert.eq(3, explain.queryPlanner.winningPlan.shards.length);
 
 // Test a find command with a simple collation. This should be single-shard.
 assert.eq(1, coll.find({a: "foo"}).itcount());
@@ -176,12 +174,10 @@ assert.commandWorked(explain);
 assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // Test a find command on numbers with a non-simple collation. This should be single-shard.
-if (testDB.getMongo().useReadCommands()) {
-    assert.eq(1, coll.find({a: 100}).collation(caseInsensitive).itcount());
-    explain = coll.find({a: 100}).collation(caseInsensitive).explain();
-    assert.commandWorked(explain);
-    assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
-}
+assert.eq(1, coll.find({a: 100}).collation(caseInsensitive).itcount());
+explain = coll.find({a: 100}).collation(caseInsensitive).explain();
+assert.commandWorked(explain);
+assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // FindAndModify.
 

@@ -64,7 +64,6 @@ selector:
   - jstests/core/user_management_helpers.js
   # These tests use legacy read mode which does not use runCommand.
   - jstests/core/comment_field.js
-  - jstests/core/invalidated_legacy_cursors.js
   # This test contains assertions for the hostname that operations run on.
   - jstests/core/currentop_cursors.js
   # Server parameters are stored in-memory only so are not transferred onto the recipient. These
@@ -145,9 +144,7 @@ selector:
   # These test run commands using legacy queries, which are not supported on sessions.
   - jstests/core/comment_field.js
   - jstests/core/exhaust.js
-  - jstests/core/invalidated_legacy_cursors.js
   - jstests/core/validate_cmd_ns.js
-  - jstests/core/tailable_cursor_legacy_read_mode.js
 
   # Unacknowledged writes prohibited in an explicit session.
   - jstests/core/crud_api.js

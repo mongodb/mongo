@@ -40,30 +40,26 @@ assert(coll.validate().valid);
 
 // Ensure that sorts with a collation and no index return the correct ordering. Here we use the
 // 'numericOrdering' option which orders number-like strings by their numerical values.
-if (db.getMongo().useReadCommands()) {
-    coll.drop();
-    assert.commandWorked(coll.insert({_id: 0, str: '1000'}));
-    assert.commandWorked(coll.insert({_id: 1, str: '5'}));
-    assert.commandWorked(coll.insert({_id: 2, str: '200'}));
+coll.drop();
+assert.commandWorked(coll.insert({_id: 0, str: '1000'}));
+assert.commandWorked(coll.insert({_id: 1, str: '5'}));
+assert.commandWorked(coll.insert({_id: 2, str: '200'}));
 
-    var cursor = coll.find().sort({str: -1}).collation({locale: 'en_US', numericOrdering: true});
-    assert.eq(cursor.next(), {_id: 0, str: '1000'});
-    assert.eq(cursor.next(), {_id: 2, str: '200'});
-    assert.eq(cursor.next(), {_id: 1, str: '5'});
-    assert(!cursor.hasNext());
-}
+var cursor = coll.find().sort({str: -1}).collation({locale: 'en_US', numericOrdering: true});
+assert.eq(cursor.next(), {_id: 0, str: '1000'});
+assert.eq(cursor.next(), {_id: 2, str: '200'});
+assert.eq(cursor.next(), {_id: 1, str: '5'});
+assert(!cursor.hasNext());
 
 // Ensure that sorting of arrays correctly respects a collation with numeric ordering.
-if (db.getMongo().useReadCommands()) {
-    coll.drop();
-    assert.commandWorked(coll.insert({_id: 0, strs: ['1000', '500']}));
-    assert.commandWorked(coll.insert({_id: 1, strs: ['2000', '60']}));
-    cursor = coll.find({strs: {$lt: '1000'}}).sort({strs: 1}).collation({
-        locale: 'en_US',
-        numericOrdering: true
-    });
-    assert.eq(cursor.next(), {_id: 1, strs: ['2000', '60']});
-    assert.eq(cursor.next(), {_id: 0, strs: ['1000', '500']});
-    assert(!cursor.hasNext());
-}
+coll.drop();
+assert.commandWorked(coll.insert({_id: 0, strs: ['1000', '500']}));
+assert.commandWorked(coll.insert({_id: 1, strs: ['2000', '60']}));
+cursor = coll.find({strs: {$lt: '1000'}}).sort({strs: 1}).collation({
+    locale: 'en_US',
+    numericOrdering: true
+});
+assert.eq(cursor.next(), {_id: 1, strs: ['2000', '60']});
+assert.eq(cursor.next(), {_id: 0, strs: ['1000', '500']});
+assert(!cursor.hasNext());
 })();

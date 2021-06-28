@@ -14,10 +14,6 @@ const ns = dbName + '.' + collName;
 const st = new ShardingTest({shards: 2, config: 1});
 const testDB = st.s.getDB(dbName);
 
-// Only testing the command read and write modes.
-assert(testDB.getMongo().readMode() === "commands");
-assert(testDB.getMongo().writeMode() === "commands");
-
 // Shard a collection with the only chunk on shard0.
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);

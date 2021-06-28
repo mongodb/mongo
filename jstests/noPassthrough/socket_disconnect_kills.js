@@ -160,13 +160,6 @@ function runTests(client) {
              }
          })
      ],
-     [
-         checkClosedEarly,
-         function(client) {
-             client.forceReadMode("legacy");
-             assert(client.getDB(testName).test.findOne({}));
-         }
-     ],
     ].forEach(runWithCuropFailPointEnabled(client, "waitInFindBeforeMakingBatch"));
 
     // After SERVER-39475, re-enable these tests and add negative testing for $out cursors.
@@ -180,18 +173,8 @@ function runTests(client) {
                 assert.commandWorked(client.getDB(testName).runCommand(
                     {getMore: result.cursor.id, collection: "test"}));
             }
-        ],
-         [
-             checkClosedEarly,
-             function(client) {
-                 client.forceReadMode("legacy");
-                 var cursor = client.getDB(testName).test.find({}).batchSize(2);
-                 assert(cursor.next());
-                 assert(cursor.next());
-                 assert(cursor.next());
-             }
-         ],
-        ].forEach(runWithCuropFailPointEnabled(client, "waitAfterPinningCursorBeforeGetMoreBatch"));
+        ]].forEach(runWithCuropFailPointEnabled(client,
+                                                "waitAfterPinningCursorBeforeGetMoreBatch"));
     }
 
     [[checkClosedEarly, runCommand({aggregate: "test", pipeline: [], cursor: {}})],

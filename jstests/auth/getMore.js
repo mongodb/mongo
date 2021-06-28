@@ -47,20 +47,6 @@ function runTest(conn) {
                                  "read from another user's find cursor");
     testDB.logout();
 
-    // Test that "Mallory" cannot use a legacy find cursor created by "Alice".
-    testDB.getMongo().forceReadMode("legacy");
-    assert.eq(1, testDB.auth("Alice", "pwd"));
-    let cursor = testDB.foo.find().batchSize(2);
-    cursor.next();
-    cursor.next();
-    testDB.logout();
-    assert.eq(1, testDB.auth("Mallory", "pwd"));
-    assert.throws(function() {
-        cursor.next();
-    }, [], "read from another user's legacy find cursor");
-    testDB.logout();
-    testDB.getMongo().forceReadMode("commands");
-
     // Test that "Mallory" cannot use an aggregation cursor created by "Alice".
     assert.eq(1, testDB.auth("Alice", "pwd"));
     res = assert.commandWorked(

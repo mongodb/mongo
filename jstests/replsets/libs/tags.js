@@ -168,9 +168,6 @@ var TagsTest = function(options) {
                       ' agree that ' + nodeId + ' (' + replTest.nodes[nodeId].host +
                       ') should be primary.');
 
-            if (options.forceWriteMode) {
-                primary.forceWriteMode(options.forceWriteMode);
-            }
             var writeConcern = {
                 writeConcern: {w: expectedWritableNodesCount, wtimeout: replTest.kDefaultTimeoutMS}
             };

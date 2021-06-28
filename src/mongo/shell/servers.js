@@ -1568,12 +1568,6 @@ runMongoProgram = function() {
                      '--authenticationDatabase=admin');
     }
 
-    if (progName == 'mongo' && !_useWriteCommandsDefault()) {
-        progName = args[0];
-        args = args.slice(1);
-        args.unshift(progName, '--useLegacyWriteOps');
-    }
-
     return _runMongoProgram.apply(null, args);
 };
 
@@ -1593,11 +1587,6 @@ startMongoProgramNoConnect = function() {
                      '-p',
                      jsTestOptions().authPassword,
                      '--authenticationDatabase=admin');
-    }
-
-    if (progName == 'mongo' && !_useWriteCommandsDefault()) {
-        args = args.slice(1);
-        args.unshift(progName, '--useLegacyWriteOps');
     }
 
     return _startMongoProgram.apply(null, args);

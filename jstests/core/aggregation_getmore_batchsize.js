@@ -6,7 +6,6 @@
 (function() {
 'use strict';
 
-db.getMongo().forceReadMode("commands");
 var coll = db["aggregation_getmore_batchsize"];
 
 // Insert some data to query for

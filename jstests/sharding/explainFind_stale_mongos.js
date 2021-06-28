@@ -1,6 +1,6 @@
 /**
  * Tests that a stale mongos does not return a stale shardVersion error to the client for explain
- * find sent using the legacy query mode (it retries on the stale shardVersion error internally).
+ * of a find command.
  */
 (function() {
 "use strict";
@@ -38,8 +38,7 @@ if (clusterVersionInfo.isMixedVersion) {
 }
 
 jsTest.log("Run explain find on " + ns + " from the stale mongos");
-staleMongos.getDB(dbName).getMongo().forceReadMode("legacy");
-staleMongos.getDB(dbName).getCollection(collName).find({$query: {}, $explain: true}).next();
+staleMongos.getDB(dbName).getCollection(collName).explain().find().next();
 
 st.stop();
 })();

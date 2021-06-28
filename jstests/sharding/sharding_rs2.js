@@ -204,7 +204,6 @@ assert.lte(before.query + 10, after.query, "D3");
 // by shard key
 
 m = new Mongo(s.s.name);
-m.forceWriteMode("commands");
 
 s.printShardingStatus();
 

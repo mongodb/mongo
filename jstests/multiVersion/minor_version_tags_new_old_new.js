@@ -12,5 +12,5 @@ let nodes = [
     {binVersion: oldVersion},
     {binVersion: newVersion}
 ];
-new TagsTest({nodes: nodes, forceWriteMode: 'commands'}).run();
+new TagsTest({nodes: nodes}).run();
 }());

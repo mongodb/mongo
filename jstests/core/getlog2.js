@@ -62,9 +62,7 @@ assert.gt(query.log.length, 0, "no log lines");
 // Ensure that slow query is logged in detail.
 assert(contains(query.log, function(v) {
     print(v);
-    const opString = db.getMongo().useReadCommands() ? " find " : " query ";
-    const filterString = db.getMongo().useReadCommands() ? "filter:" : "command:";
-    return stringContains(v, opString) && stringContains(v, filterString) &&
+    return stringContains(v, " find ") && stringContains(v, "filter:") &&
         stringContains(v, "keysExamined:") && stringContains(v, "docsExamined:") &&
         v.indexOf("SENTINEL") != -1;
 }));

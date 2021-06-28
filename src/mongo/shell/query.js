@@ -106,7 +106,7 @@ DBQuery.prototype._exec = function() {
         assert.eq(0, this._numReturned);
         this._cursorSeen = 0;
 
-        if (this._mongo.useReadCommands() && this._canUseFindCommand()) {
+        if (this._canUseFindCommand()) {
             var canAttachReadPref = true;
             var findCmd = this._convertToCommand(canAttachReadPref);
             var cmdRes = this._db.runReadCommand(findCmd, null, this._options);
@@ -722,26 +722,20 @@ function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS, txnNumber) {
     // If the command result represents a change stream cursor, update our postBatchResumeToken.
     this._updatePostBatchResumeToken(cmdResult.cursor);
 
-    if (db.getMongo().useReadCommands()) {
-        this._useReadCommands = true;
-        this._cursorid = cmdResult.cursor.id;
-        this._batchSize = batchSize;
-        this._maxAwaitTimeMS = maxAwaitTimeMS;
-        this._txnNumber = txnNumber;
+    this._cursorid = cmdResult.cursor.id;
+    this._batchSize = batchSize;
+    this._maxAwaitTimeMS = maxAwaitTimeMS;
+    this._txnNumber = txnNumber;
 
-        this._ns = cmdResult.cursor.ns;
-        this._db = db;
-        this._collName = this._ns.substr(this._ns.indexOf(".") + 1);
+    this._ns = cmdResult.cursor.ns;
+    this._db = db;
+    this._collName = this._ns.substr(this._ns.indexOf(".") + 1);
 
-        if (cmdResult.cursor.id) {
-            // Note that setting this._cursorid to 0 should be accompanied by
-            // this._cursorHandle.zeroCursorId().
-            this._cursorHandle =
-                this._db.getMongo().cursorHandleFromId(cmdResult.cursor.ns, cmdResult.cursor.id);
-        }
-    } else {
-        this._cursor =
-            db.getMongo().cursorFromId(cmdResult.cursor.ns, cmdResult.cursor.id, batchSize);
+    if (cmdResult.cursor.id) {
+        // Note that setting this._cursorid to 0 should be accompanied by
+        // this._cursorHandle.zeroCursorId().
+        this._cursorHandle =
+            this._db.getMongo().cursorHandleFromId(cmdResult.cursor.ns, cmdResult.cursor.id);
     }
 }
 
@@ -751,10 +745,7 @@ DBCommandCursor.prototype = {};
  * Returns whether the cursor id is zero.
  */
 DBCommandCursor.prototype.isClosed = function() {
-    if (this._useReadCommands) {
-        return bsonWoCompare({_: this._cursorid}, {_: NumberLong(0)}) === 0;
-    }
-    return this._cursor.isClosed();
+    return bsonWoCompare({_: this._cursorid}, {_: NumberLong(0)}) === 0;
 };
 
 /**
@@ -765,9 +756,7 @@ DBCommandCursor.prototype.isExhausted = function() {
 };
 
 DBCommandCursor.prototype.close = function() {
-    if (!this._useReadCommands) {
-        this._cursor.close();
-    } else if (bsonWoCompare({_: this._cursorid}, {_: NumberLong(0)}) !== 0) {
+    if (bsonWoCompare({_: this._cursorid}, {_: NumberLong(0)}) !== 0) {
         var killCursorCmd = {
             killCursors: this._collName,
             cursors: [this._cursorid],
@@ -848,9 +837,7 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
     }
 };
 
-DBCommandCursor.prototype._hasNextUsingCommands = function() {
-    assert(this._useReadCommands);
-
+DBCommandCursor.prototype.hasNext = function() {
     if (!this._batch.length) {
         if (!this._cursorid.compare(NumberLong("0"))) {
             return false;
@@ -860,14 +847,6 @@ DBCommandCursor.prototype._hasNextUsingCommands = function() {
     }
 
     return this._batch.length > 0;
-};
-
-DBCommandCursor.prototype.hasNext = function() {
-    if (this._useReadCommands) {
-        return this._hasNextUsingCommands();
-    }
-
-    return this._batch.length || this._cursor.hasNext();
 };
 
 DBCommandCursor.prototype.next = function() {
@@ -880,30 +859,16 @@ DBCommandCursor.prototype.next = function() {
             this._resumeToken = (this._batch.length ? nextDoc._id : this._postBatchResumeToken);
         }
         return nextDoc;
-    } else if (this._useReadCommands) {
+    } else {
         // Have to call hasNext() here, as this is where we may issue a getMore in order to retrieve
         // the next batch of results.
         if (!this.hasNext())
             throw Error("error hasNext: false");
         return this._batch.pop();
-    } else {
-        if (!this._cursor.hasNext())
-            throw Error("error hasNext: false");
-
-        var ret = this._cursor.next();
-        if (ret.$err)
-            throw _getErrorWithCode(ret, "error: " + tojson(ret));
-        return ret;
     }
 };
 DBCommandCursor.prototype.objsLeftInBatch = function() {
-    if (this._useReadCommands) {
-        return this._batch.length;
-    } else if (this._batch.length) {
-        return this._batch.length;
-    } else {
-        return this._cursor.objsLeftInBatch();
-    }
+    return this._batch.length;
 };
 DBCommandCursor.prototype.getId = function() {
     return this._cursorid;

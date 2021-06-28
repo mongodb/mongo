@@ -124,29 +124,15 @@ assert(resultsEq(getIDS(res), getIDS(res2)));
 
 assert.throws(function() {
     const cursor = tc.find({"$text": {"$search": "member", $language: "spanglish"}});
-    if (db.getMongo().readMode() === "legacy") {
-        // In legacy read mode, calling next() will check if the response to the OP_QUERY message
-        // has an error.
-        cursor.next();
-    } else {
-        // In commands read mode, calling hasNext() will check if the find command returned an
-        // error. We intentionally do not call next() to avoid masking errors caused by the cursor
-        // exhausting all of its documents.
-        cursor.hasNext();
-    }
+    // Calling hasNext() will check if the find command returned an error. We intentionally do not
+    // call next() to avoid masking errors caused by the cursor exhausting all of its documents.
+    cursor.hasNext();
 });
 assert.doesNotThrow(function() {
     const cursor = tc.find({"$text": {"$search": "member", $language: "english"}});
-    if (db.getMongo().readMode() === "legacy") {
-        // In legacy read mode, calling next() will check if the response to the OP_QUERY message
-        // has an error.
-        cursor.next();
-    } else {
-        // In commands read mode, calling hasNext() will check if the find command returned an
-        // error. We intentionally do not call next() to avoid masking errors caused by the cursor
-        // exhausting all of its documents.
-        cursor.hasNext();
-    }
+    // Calling hasNext() will check if the find command returned an error. We intentionally do not
+    // call next() to avoid masking errors caused by the cursor exhausting all of its documents.
+    cursor.hasNext();
 });
 
 // -------------------------------------------- LIMIT RESULTS --------------------------------------

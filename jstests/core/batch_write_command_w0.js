@@ -25,11 +25,6 @@ function countEventually(collection, n) {
 var coll = db.getCollection("batch_write_w0");
 coll.drop();
 
-//
-// Ensures that mongod respects the batch write protocols for delete
-//
-assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands");
-
 // EACH TEST BELOW SHOULD BE SELF-CONTAINED, FOR EASIER DEBUGGING
 
 //

@@ -61,7 +61,6 @@ selector:
   - jstests/core/user_management_helpers.js
   # These tests use legacy read mode which does not use runCommand.
   - jstests/core/comment_field.js
-  - jstests/core/invalidated_legacy_cursors.js
   # These tests run applyOps which is not supported in serverless.
   - jstests/core/apply_ops1.js
   - jstests/core/apply_ops1.js

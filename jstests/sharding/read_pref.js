@@ -17,17 +17,10 @@ var PRI_TAG = {dc: 'ny'};
 var SEC_TAGS = [{dc: 'sf', s: "1"}, {dc: 'ma', s: "2"}, {dc: 'eu', s: "3"}, {dc: 'jp', s: "4"}];
 var NODES = SEC_TAGS.length + 1;
 
-var doTest = function(useDollarQuerySyntax) {
+var doTest = function() {
     var st = new ShardingTest({shards: {rs0: {nodes: NODES, oplogSize: 10, useHostName: true}}});
     var replTest = st.rs0;
     var primaryNode = replTest.getPrimary();
-
-    // The $-prefixed query syntax is only legal for compatibility mode reads, not for the
-    // find/getMore commands.
-    if (useDollarQuerySyntax && st.s.getDB("test").getMongo().useReadCommands()) {
-        st.stop();
-        return;
-    }
 
     var setupConf = function() {
         var replConf = primaryNode.getDB('local').system.replset.findOne();
@@ -107,19 +100,7 @@ var doTest = function(useDollarQuerySyntax) {
     });
 
     var getExplain = function(readPrefMode, readPrefTags) {
-        if (useDollarQuerySyntax) {
-            var readPrefObj = {mode: readPrefMode};
-
-            if (readPrefTags) {
-                readPrefObj.tags = readPrefTags;
-            }
-
-            return coll.find({$query: {}, $readPreference: readPrefObj, $explain: true})
-                .limit(-1)
-                .next();
-        } else {
-            return coll.find().readPref(readPrefMode, readPrefTags).explain("executionStats");
-        }
+        return coll.find().readPref(readPrefMode, readPrefTags).explain("executionStats");
     };
 
     var getExplainServer = function(explain) {
@@ -205,6 +186,5 @@ var doTest = function(useDollarQuerySyntax) {
     st.stop();
 };
 
-doTest(false);
-doTest(true);
+doTest();
 })();

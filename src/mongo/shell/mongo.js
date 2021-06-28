@@ -418,18 +418,6 @@ connect = function(url, user, pass, apiParameters) {
     return db;
 };
 
-/**
- * deprecated, use writeMode below
- *
- */
-Mongo.prototype.useWriteCommands = function() {
-    return (this.writeMode() != "legacy");
-};
-
-Mongo.prototype.forceWriteMode = function(mode) {
-    this._writeMode = mode;
-};
-
 Mongo.prototype.hasWriteCommands = function() {
     var hasWriteCommands = (this.getMinWireVersion() <= 2 && 2 <= this.getMaxWireVersion());
     return hasWriteCommands;
@@ -467,28 +455,6 @@ Mongo.prototype.writeMode = function() {
 };
 
 /**
- * Returns true if the shell is configured to use find/getMore commands rather than the C++ client.
- *
- * Currently, the C++ client will always use OP_QUERY find and OP_GET_MORE.
- */
-Mongo.prototype.useReadCommands = function() {
-    return (this.readMode() === "commands");
-};
-
-/**
- * For testing, forces the shell to use the readMode specified in 'mode'. Must be either "commands"
- * (use the find/getMore commands), "legacy" (use legacy OP_QUERY/OP_GET_MORE wire protocol reads),
- * or "compatibility" (auto-detect mode based on wire version).
- */
-Mongo.prototype.forceReadMode = function(mode) {
-    if (mode !== "commands" && mode !== "compatibility" && mode !== "legacy") {
-        throw new Error("Mode must be one of {commands, compatibility, legacy}, but got: " + mode);
-    }
-
-    this._readMode = mode;
-};
-
-/**
  * Get the readMode string (either "commands" for find/getMore commands, "legacy" for OP_QUERY find
  * and OP_GET_MORE, or "compatibility" for detecting based on wire version).
  */
@@ -520,22 +486,6 @@ Mongo.prototype.readMode = function() {
     }
 
     return this._readMode;
-};
-
-/**
- * Run a function while forcing a certain readMode, and then return the readMode to its original
- * setting afterwards. Passes this connection to the given function, and returns the function's
- * result.
- */
-Mongo.prototype._runWithForcedReadMode = function(forcedReadMode, fn) {
-    let origReadMode = this.readMode();
-    this.forceReadMode(forcedReadMode);
-    try {
-        var res = fn(this);
-    } finally {
-        this.forceReadMode(origReadMode);
-    }
-    return res;
 };
 
 //

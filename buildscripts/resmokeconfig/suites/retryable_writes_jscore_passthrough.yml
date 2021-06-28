@@ -19,7 +19,6 @@ selector:
   # These test run commands using legacy queries, which are not supported on sessions.
   - jstests/core/comment_field.js
   - jstests/core/exhaust.js
-  - jstests/core/invalidated_legacy_cursors.js
   - jstests/core/validate_cmd_ns.js
 
   # TODO SERVER-31242: findAndModify no-op retry should respect the fields option.

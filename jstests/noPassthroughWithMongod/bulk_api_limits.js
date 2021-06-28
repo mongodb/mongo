@@ -1,3 +1,4 @@
+(function() {
 var collectionName = "bulk_api_limits";
 var coll = db.getCollection(collectionName);
 coll.drop();
@@ -129,32 +130,6 @@ var executeTestsOrdered = function() {
     coll.remove({});
 };
 
-var buildVersion = parseInt(db.runCommand({buildInfo: 1}).versionArray.slice(0, 3).join(""), 10);
-// Save the existing useWriteCommands function
-var _useWriteCommands = coll.getMongo().useWriteCommands;
-
-//
-// Only execute write command tests if we have > 2.5.5 otherwise
-// execute the down converted version
-if (buildVersion >= 255) {
-    // Force the use of useWriteCommands
-    coll._mongo.useWriteCommands = function() {
-        return true;
-    };
-
-    // Execute tests using legacy operations
-    executeTestsUnordered();
-    executeTestsOrdered();
-}
-
-// Force the use of legacy commands
-coll._mongo.useWriteCommands = function() {
-    return false;
-};
-
-// Execute tests using legacy operations
 executeTestsUnordered();
 executeTestsOrdered();
-
-// Reset the function
-coll.getMongo().useWriteCommands = _useWriteCommands;
+}());

@@ -26,31 +26,27 @@ assert.commandWorked(priDB.test.insert({a: 1}, {writeConcern: {w: "majority"}}))
 
 const secDB = rst.getSecondary().getDB(jsTestName());
 
-for (let readMode of ["commands", "legacy"]) {
-    for (let readPref of readPrefs) {
-        for (let secondaryOk of [true, false]) {
-            const testType = {readMode: readMode, readPref: readPref, secondaryOk: secondaryOk};
+for (let readPref of readPrefs) {
+    for (let secondaryOk of [true, false]) {
+        const testType = {readPref: readPref, secondaryOk: secondaryOk};
 
-            secDB.getMongo().forceReadMode(readMode);
-            secDB.getMongo().setSecondaryOk(secondaryOk);
+        secDB.getMongo().setSecondaryOk(secondaryOk);
 
-            const cursor = (readPref ? secDB.test.find().readPref(readPref) : secDB.test.find());
+        const cursor = (readPref ? secDB.test.find().readPref(readPref) : secDB.test.find());
 
-            if (readPref === "primary" || (!readPref && !secondaryOk)) {
-                // Attempting to run the query throws an error of type NotPrimaryNoSecondaryOk.
-                const secondaryOkErr = assert.throws(() => cursor.itcount(), [], tojson(testType));
-                assert.commandFailedWithCode(secondaryOkErr, ErrorCodes.NotPrimaryNoSecondaryOk);
-            } else {
-                // Succeeds for all non-primary readPrefs, and for no readPref iff secondaryOk.
-                const docCount = assert.doesNotThrow(() => cursor.itcount(), [], tojson(testType));
-                assert.eq(docCount, 1);
-            }
+        if (readPref === "primary" || (!readPref && !secondaryOk)) {
+            // Attempting to run the query throws an error of type NotPrimaryNoSecondaryOk.
+            const secondaryOkErr = assert.throws(() => cursor.itcount(), [], tojson(testType));
+            assert.commandFailedWithCode(secondaryOkErr, ErrorCodes.NotPrimaryNoSecondaryOk);
+        } else {
+            // Succeeds for all non-primary readPrefs, and for no readPref iff secondaryOk.
+            const docCount = assert.doesNotThrow(() => cursor.itcount(), [], tojson(testType));
+            assert.eq(docCount, 1);
         }
     }
 }
 
 function assertNotPrimaryNoSecondaryOk(func) {
-    secDB.getMongo().forceReadMode("commands");
     secDB.getMongo().setSecondaryOk(false);
     secDB.getMongo().setReadPref("primary");
     const res = assert.throws(func);

@@ -20,8 +20,6 @@ load("jstests/libs/get_index_helpers.js");
 var coll = db.getCollection("batch_write_insert");
 coll.drop();
 
-assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands");
-
 var request;
 var result;
 var batch;

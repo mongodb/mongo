@@ -48,28 +48,6 @@ withPinnedCursor({
     failPointName: failPointName,
     assertEndCounts: true
 });
-
-// Test OP_GET_MORE (legacy read mode) against a mongod.
-failPointName = "waitWithPinnedCursorDuringGetMoreBatch";
-const db = conn.getDB("test");
-db.getMongo().forceReadMode("legacy");
-withPinnedCursor({
-    conn: conn,
-    sessionId: null,
-    db: db,
-    assertFunction: runTest,
-    runGetMoreFunc: function() {
-        db.getMongo().forceReadMode("legacy");
-        let cmdRes = {
-            "cursor": {"firstBatch": [], "id": cursorId, "ns": db.jstest_with_pinned_cursor},
-            "ok": 1
-        };
-        let cursor = new DBCommandCursor(db, cmdRes, 2);
-        cursor.itcount();
-    },
-    failPointName: failPointName,
-    assertEndCounts: true
-});
 MongoRunner.stopMongod(conn);
 
 // Sharded test
@@ -83,25 +61,6 @@ withPinnedCursor({
     runGetMoreFunc: function() {
         const response =
             assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName}));
-    },
-    failPointName: failPointName,
-    assertEndCounts: true
-});
-
-// Test OP_GET_MORE (legacy reead mode) against a mongos.
-withPinnedCursor({
-    conn: st.s,
-    sessionId: null,
-    db: st.s.getDB("test"),
-    assertFunction: runTest,
-    runGetMoreFunc: function() {
-        db.getMongo().forceReadMode("legacy");
-        let cmdRes = {
-            "cursor": {"firstBatch": [], "id": cursorId, "ns": db.jstest_with_pinned_cursor},
-            "ok": 1
-        };
-        let cursor = new DBCommandCursor(db, cmdRes, 2);
-        cursor.itcount();
     },
     failPointName: failPointName,
     assertEndCounts: true

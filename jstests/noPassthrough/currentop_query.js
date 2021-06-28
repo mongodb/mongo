@@ -55,9 +55,6 @@ function dropAndRecreateTestCollection() {
 
 /**
  * @param {connection} conn - The connection through which to run the test suite.
- * @param {string} readMode - The read mode to use for the parallel shell. This allows
- * testing currentOp() output for both OP_QUERY and OP_GET_MORE queries, as well as "find" and
- * "getMore" commands.
  * @params {function} currentOp - Function which takes a database object and a filter, and
  * returns an array of matching current operations. This allows us to test output for both the
  * currentOp command and the $currentOp aggregation stage.
@@ -68,7 +65,7 @@ function dropAndRecreateTestCollection() {
  * @params {boolean} localOps - if true, we expect currentOp to return operations running on a
  * mongoS itself rather than on the shards.
  */
-function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
+function runTests({conn, currentOp, truncatedOps, localOps}) {
     const testDB = conn.getDB("currentop_query");
     const coll = testDB.currentop_query;
     dropAndRecreateTestCollection();
@@ -123,15 +120,13 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
         });
 
         // Set the test configuration in TestData for the parallel shell test.
-        TestData.shellReadMode = readMode;
         TestData.currentOpTest = testObj.test;
         TestData.currentOpCollName = "currentop_query";
 
-        // Wrapper function which sets the readMode and DB before running the test function
+        // Wrapper function which sets DB before running the test function
         // found at TestData.currentOpTest.
         function doTest() {
             const testDB = db.getSiblingDB(TestData.currentOpCollName);
-            testDB.getMongo().forceReadMode(TestData.shellReadMode);
             TestData.currentOpTest(testDB);
         }
 
@@ -188,7 +183,6 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
         awaitShell();
         delete TestData.currentOpCollName;
         delete TestData.currentOpTest;
-        delete TestData.shellReadMode;
     }
 
     /**
@@ -339,21 +333,19 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
         //
         // Confirm currentOp contains collation for find command.
         //
-        if (readMode === "commands") {
-            confirmCurrentOpContents({
-                test: function(db) {
-                    assert.eq(db.currentop_query.find({a: 1})
-                                  .comment("currentop_query")
-                                  .collation({locale: "fr"})
-                                  .itcount(),
-                              1);
-                },
-                command: "find",
-                planSummary: "COLLSCAN",
-                currentOpFilter:
-                    {"command.comment": "currentop_query", "command.collation.locale": "fr"}
-            });
-        }
+        confirmCurrentOpContents({
+            test: function(db) {
+                assert.eq(db.currentop_query.find({a: 1})
+                              .comment("currentop_query")
+                              .collation({locale: "fr"})
+                              .itcount(),
+                          1);
+            },
+            command: "find",
+            planSummary: "COLLSCAN",
+            currentOpFilter:
+                {"command.comment": "currentop_query", "command.collation.locale": "fr"}
+        });
 
         //
         // Confirm currentOp content for the $geoNear aggregation stage.
@@ -438,76 +430,6 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
             });
 
             delete TestData.commandResult;
-        }
-
-        //
-        // Confirm that currentOp displays upconverted getMore and originatingCommand in the
-        // case of a legacy query.
-        //
-        if (readMode === "legacy") {
-            let filter = {
-                "command.getMore": {$gt: 0},
-                "command.collection": "currentop_query",
-                "command.batchSize": 2,
-                "cursor.originatingCommand.find": "currentop_query",
-                "cursor.originatingCommand.ntoreturn": 2,
-                "cursor.originatingCommand.comment": "currentop_query"
-            };
-
-            confirmCurrentOpContents({
-                test: function(db) {
-                    load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
-
-                    // Temporarily disable hanging yields so that we can iterate the first
-                    // batch.
-                    FixtureHelpers.runCommandOnEachPrimary({
-                        db: db.getSiblingDB("admin"),
-                        cmdObj: {configureFailPoint: "setYieldAllLocksHang", mode: "off"}
-                    });
-
-                    let cursor =
-                        db.currentop_query.find({}).comment("currentop_query").batchSize(2);
-
-                    // Exhaust the current batch so that the next request will force a getMore.
-                    while (cursor.objsLeftInBatch() > 0) {
-                        cursor.next();
-                    }
-
-                    // Set yields to hang so that we can check currentOp output.
-                    FixtureHelpers.runCommandOnEachPrimary({
-                        db: db.getSiblingDB("admin"),
-                        cmdObj: {
-                            configureFailPoint: "setYieldAllLocksHang",
-                            mode: "alwaysOn",
-                            data: {namespace: db.currentop_query.getFullName()}
-                        }
-                    });
-
-                    assert.eq(cursor.itcount(), 8);
-                },
-                operation: "getmore",
-                planSummary: "COLLSCAN",
-                currentOpFilter: filter
-            });
-        }
-
-        //
-        // Confirm that a legacy query whose filter contains a field named 'query' appears as
-        // expected in currentOp. This test ensures that upconverting a legacy query correctly
-        // identifies this as a user field rather than a wrapped filter spec.
-        //
-        if (readMode === "legacy") {
-            confirmCurrentOpContents({
-                test: function(db) {
-                    assert.eq(db.currentop_query.find({query: "foo", $comment: "currentop_query"})
-                                  .itcount(),
-                              0);
-                },
-                command: "find",
-                planSummary: "COLLSCAN",
-                currentOpFilter:
-                    {"command.filter.$comment": "currentop_query", "command.filter.query": "foo"}
-            });
         }
     }
 
@@ -657,27 +579,23 @@ function currentOpAgg(inputDB, filter, truncatedOps, localOps) {
 }
 
 for (let connType of [rsConn, mongosConn]) {
-    for (let readMode of ["commands", "legacy"]) {
-        for (let truncatedOps of [false, true]) {
-            for (let localOps of [false, true]) {
-                // Run all tests using the $currentOp aggregation stage.
-                runTests({
-                    conn: connType,
-                    readMode: readMode,
-                    currentOp: currentOpAgg,
-                    localOps: localOps,
-                    truncatedOps: truncatedOps
-                });
-            }
-            // Run tests using the currentOp command. The 'localOps' parameter is not supported.
+    for (let truncatedOps of [false, true]) {
+        for (let localOps of [false, true]) {
+            // Run all tests using the $currentOp aggregation stage.
             runTests({
                 conn: connType,
-                readMode: readMode,
-                currentOp: currentOpCommand,
-                localOps: false,
+                currentOp: currentOpAgg,
+                localOps: localOps,
                 truncatedOps: truncatedOps
             });
         }
+        // Run tests using the currentOp command. The 'localOps' parameter is not supported.
+        runTests({
+            conn: connType,
+            currentOp: currentOpCommand,
+            localOps: false,
+            truncatedOps: truncatedOps
+        });
     }
 }
 

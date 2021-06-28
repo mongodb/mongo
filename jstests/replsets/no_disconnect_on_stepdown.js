@@ -33,9 +33,6 @@ const coll = primaryDb[collname];
 // Never retry on network error, because this test needs to detect the network error.
 TestData.skipRetryOnNetworkError = true;
 
-// Legacy writes will still disconnect, so don't use them.
-primaryDataConn.forceWriteMode('commands');
-
 assert.commandWorked(coll.insert([
     {_id: 'update0', updateme: true},
     {_id: 'update1', updateme: true},
@@ -63,8 +60,7 @@ function runStepDownTest({description, failpoint, operation, errorCode}) {
     }));
 
     errorCode = errorCode || ErrorCodes.InterruptedDueToReplStateChange;
-    const writeCommand = `db.getMongo().forceWriteMode("commands");
-                              assert.commandFailedWithCode(${operation}, ${errorCode});
+    const writeCommand = `assert.commandFailedWithCode(${operation}, ${errorCode});
                               assert.commandWorked(db.adminCommand({ping:1}));`;
 
     const waitForShell = startParallelShell(writeCommand, primary.port);

@@ -22,9 +22,6 @@ try {
         getWriteConcern: function() {
             return null;
         },
-        useWriteCommands: function() {
-            return true;
-        },
         hasWriteCommands: function() {
             return true;
         },

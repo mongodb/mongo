@@ -1,7 +1,6 @@
 /**
  * Confirms that log output for each operation adheres to the expected, consistent format, including
- * query/write metrics where applicable, on both mongoD and mongoS and under both legacy and command
- * protocols.
+ * query/write metrics where applicable, on both mongoD and mongoS.
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
@@ -59,37 +58,25 @@ function dropAndRecreateTestCollection() {
 // corresponding output. Returns a pair of arrays [testsRun, logLines]; the former is the set of
 // test cases that were run, while the latter contains the logline for each test, or null if no
 // such logline was found.
-function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
+function runLoggingTests({db, slowMs, logLevel, sampleRate}) {
     dropAndRecreateTestCollection();
 
     const coll = db.test;
 
-    // Transparently handles assert.writeOK for legacy writes.
-    function assertWriteOK(writeResponse) {
-        if (!writeResponse) {
-            assert(db.getMongo().writeMode !== "commands");
-            assert(db.runCommand({getLastError: 1}).err == null);
-        } else {
-            assert.commandWorked(writeResponse);
-        }
-    }
-
     for (let i = 1; i <= 5; ++i) {
-        assertWriteOK(coll.insert({_id: i, a: i, loc: {type: "Point", coordinates: [i, i]}}));
-        assertWriteOK(coll.insert({_id: -i, a: -i, loc: {type: "Point", coordinates: [-i, -i]}}));
+        assert.commandWorked(
+            coll.insert({_id: i, a: i, loc: {type: "Point", coordinates: [i, i]}}));
+        assert.commandWorked(
+            coll.insert({_id: -i, a: -i, loc: {type: "Point", coordinates: [-i, -i]}}));
     }
-    assertWriteOK(coll.createIndex({loc: "2dsphere"}));
+    assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 
     const isMongos = FixtureHelpers.isMongos(db);
 
-    // Set the shell read/write mode.
-    db.getMongo().forceWriteMode(readWriteMode);
-    db.getMongo().forceReadMode(readWriteMode);
-
     // Build a string that identifies the parameters of this test run. Individual ops will
     // use this string as their comment where applicable, and we also print it to the logs.
-    const logFormatTestComment = (isMongos ? 'mongos' : 'mongod') + "_" + readWriteMode +
-        "_slowms:" + slowMs + "_logLevel:" + logLevel + "_sampleRate:" + sampleRate;
+    const logFormatTestComment = (isMongos ? 'mongos' : 'mongod') + "_slowms:" + slowMs +
+        "_logLevel:" + logLevel + "_sampleRate:" + sampleRate;
     jsTestLog(logFormatTestComment);
 
     // Set all logging parameters. If slowMs is null, we set a high threshold here so that
@@ -109,11 +96,6 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
                  ? ["docsExamined", "keysExamined", "keysInserted", "keysDeleted", "planSummary",
 					 "usedDisk", "hasSortStage"]
                  : ["nShards"]);
-
-    // Legacy operations do not produce a 'command: <name>' field in the log.
-    if (readWriteMode === "legacy") {
-        ignoreFields.push("command");
-    }
 
     function confirmLogContents(db, {test, logFields}, testIndex) {
         // Clear the log before running the test, to guarantee that we do not match against any
@@ -201,8 +183,7 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
                 command: "find",
                 find: coll.getName(),
                 comment: logFormatTestComment,
-                planSummary: isSBEEnabled && readWriteMode == "commands" ? "IXSCAN { _id: 1 }"
-                                                                         : "IDHACK",
+                planSummary: isSBEEnabled ? "IXSCAN { _id: 1 }" : "IDHACK",
                 cursorExhausted: 1,
                 keysExamined: 1,
                 docsExamined: 1,
@@ -249,7 +230,7 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
         },
         {
             test: function(db) {
-                assertWriteOK(db.test.update(
+                assert.commandWorked(db.test.update(
                     {a: 1, $comment: logFormatTestComment}, {$inc: {b: 1}}, {multi: true}));
             },
             logFields: (isMongos ? {
@@ -273,9 +254,9 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
         },
         {
             test: function(db) {
-                assertWriteOK(db.test.update({_id: 100, $comment: logFormatTestComment},
-                                             {$inc: {b: 1}},
-                                             {multi: true, upsert: true}));
+                assert.commandWorked(db.test.update({_id: 100, $comment: logFormatTestComment},
+                                                    {$inc: {b: 1}},
+                                                    {multi: true, upsert: true}));
             },
             logFields: (isMongos ? {
                 command: "update",
@@ -300,7 +281,7 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
         },
         {
             test: function(db) {
-                assertWriteOK(db.test.insert({z: 1, comment: logFormatTestComment}));
+                assert.commandWorked(db.test.insert({z: 1, comment: logFormatTestComment}));
             },
             logFields: {
                 command: "insert",
@@ -312,7 +293,7 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
         },
         {
             test: function(db) {
-                assertWriteOK(db.test.remove({z: 1, $comment: logFormatTestComment}));
+                assert.commandWorked(db.test.remove({z: 1, $comment: logFormatTestComment}));
             },
             logFields: (isMongos ? {
                 command: "delete",
@@ -372,12 +353,8 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
                 nShards: 1
             }
                                  : {command: "update", ns: `${db.getName()}.$cmd`})
-        }
-    ];
-
-    // Confirm log contains collation for find command.
-    if (readWriteMode === "commands") {
-        testList.push({
+        },
+        {
             test: function(db) {
                 assert.eq(db.test.find({_id: {$in: [1, 5]}})
                               .comment(logFormatTestComment)
@@ -396,8 +373,8 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
                 nreturned: 2,
                 nShards: 1
             }
-        });
-    }
+        }
+    ];
 
     // Confirm log content for getMore on both find and aggregate cursors.
     const originatingCommands = {
@@ -448,57 +425,45 @@ function getUnloggedTests(testsRun, logLines) {
 //
 
 for (let testDB of [shardDB, mongosDB]) {
-    for (let readWriteMode of ["commands", "legacy"]) {
-        // Test that all operations are logged when slowMs is < 0 and sampleRate is 1 at the
-        // default logLevel.
-        let [testsRun, logLines] = runLoggingTests(
-            {db: testDB, readWriteMode: readWriteMode, slowMs: -1, logLevel: 0, sampleRate: 1.0});
-        let unlogged = getUnloggedTests(testsRun, logLines);
-        assert.eq(unlogged.length, 0, () => tojson(unlogged));
+    // Test that all operations are logged when slowMs is < 0 and sampleRate is 1 at the
+    // default logLevel.
+    let [testsRun, logLines] =
+        runLoggingTests({db: testDB, slowMs: -1, logLevel: 0, sampleRate: 1.0});
+    let unlogged = getUnloggedTests(testsRun, logLines);
+    assert.eq(unlogged.length, 0, () => tojson(unlogged));
 
-        // Test that only some operations are logged when sampleRate is < 1 at the default
-        // logLevel, even when slowMs is < 0. The actual sample rate is probabilistic, and may
-        // therefore vary quite significantly from 0.5. However, we have already established
-        // that with sampleRate 1 *all* ops are logged, so here it is sufficient to confirm that
-        // some ops are not. We repeat the test 5 times to minimize the odds of failure.
-        let sampleRateTestsRun = 0, sampleRateTestsLogged = 0;
-        for (let i = 0; i < 5; i++) {
-            [testsRun, logLines] = runLoggingTests({
-                db: testDB,
-                readWriteMode: readWriteMode,
-                slowMs: -1,
-                logLevel: 0,
-                sampleRate: 0.5
-            });
-            unlogged = getUnloggedTests(testsRun, logLines);
-            sampleRateTestsLogged += (testsRun.length - unlogged.length);
-            sampleRateTestsRun += testsRun.length;
-        }
-        assert.betweenEx(0, sampleRateTestsLogged, sampleRateTestsRun);
-
-        // Test that only operations which exceed slowMs are logged when slowMs > 0 and
-        // sampleRate is 1, at the default logLevel. The given value of slowMs will be applied
-        // to every second op in the test, so only half of the ops should be logged.
-        [testsRun, logLines] = runLoggingTests({
-            db: testDB,
-            readWriteMode: readWriteMode,
-            slowMs: 1000000,
-            logLevel: 0,
-            sampleRate: 1.0
-        });
+    // Test that only some operations are logged when sampleRate is < 1 at the default
+    // logLevel, even when slowMs is < 0. The actual sample rate is probabilistic, and may
+    // therefore vary quite significantly from 0.5. However, we have already established
+    // that with sampleRate 1 *all* ops are logged, so here it is sufficient to confirm that
+    // some ops are not. We repeat the test 5 times to minimize the odds of failure.
+    let sampleRateTestsRun = 0, sampleRateTestsLogged = 0;
+    for (let i = 0; i < 5; i++) {
+        [testsRun, logLines] =
+            runLoggingTests({db: testDB, slowMs: -1, logLevel: 0, sampleRate: 0.5});
         unlogged = getUnloggedTests(testsRun, logLines);
-        assert.eq(unlogged.length, Math.floor(testsRun.length / 2), () => tojson(unlogged));
-
-        // Test that all operations are logged when logLevel is 1, regardless of sampleRate and
-        // slowMs. We pass 'null' for slowMs to signify that a high threshold should be set
-        // (such that, at logLevel 0, no operations would be logged) and that this value should
-        // be applied for all operations, rather than for every second op as in the case of the
-        // slowMs test.
-        [testsRun, logLines] = runLoggingTests(
-            {db: testDB, readWriteMode: readWriteMode, slowMs: null, logLevel: 1, sampleRate: 0.5});
-        unlogged = getUnloggedTests(testsRun, logLines);
-        assert.eq(unlogged.length, 0, () => tojson(unlogged));
+        sampleRateTestsLogged += (testsRun.length - unlogged.length);
+        sampleRateTestsRun += testsRun.length;
     }
+    assert.betweenEx(0, sampleRateTestsLogged, sampleRateTestsRun);
+
+    // Test that only operations which exceed slowMs are logged when slowMs > 0 and
+    // sampleRate is 1, at the default logLevel. The given value of slowMs will be applied
+    // to every second op in the test, so only half of the ops should be logged.
+    [testsRun, logLines] =
+        runLoggingTests({db: testDB, slowMs: 1000000, logLevel: 0, sampleRate: 1.0});
+    unlogged = getUnloggedTests(testsRun, logLines);
+    assert.eq(unlogged.length, Math.floor(testsRun.length / 2), () => tojson(unlogged));
+
+    // Test that all operations are logged when logLevel is 1, regardless of sampleRate and
+    // slowMs. We pass 'null' for slowMs to signify that a high threshold should be set
+    // (such that, at logLevel 0, no operations would be logged) and that this value should
+    // be applied for all operations, rather than for every second op as in the case of the
+    // slowMs test.
+    [testsRun, logLines] =
+        runLoggingTests({db: testDB, slowMs: null, logLevel: 1, sampleRate: 0.5});
+    unlogged = getUnloggedTests(testsRun, logLines);
+    assert.eq(unlogged.length, 0, () => tojson(unlogged));
 }
 st.stop();
 })();

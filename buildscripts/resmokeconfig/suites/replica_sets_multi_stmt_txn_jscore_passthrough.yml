@@ -153,7 +153,6 @@ selector:
   # SERVER-34772 Tailable Cursors are not allowed with snapshot readconcern.
   - jstests/core/awaitdata_getmore_cmd.js
   - jstests/core/getmore_cmd_maxtimems.js
-  - jstests/core/invalidated_legacy_cursors.js
   - jstests/core/tailable_cursor_invalidation.js
   - jstests/core/tailable_getmore_batch_size.js
 

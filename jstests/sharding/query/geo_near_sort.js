@@ -69,21 +69,19 @@ function testSortOrders(query, indexSpec) {
     assert.eq(res[0], docMinus2, tojson(res));
     assert.eq(res[1], doc1, tojson(res));
 
-    if (db.getMongo().useReadCommands()) {
-        // Test a $near/$nearSphere query sorted by {a: 1} with the case-insensitive collation.
-        res = coll.find(query).collation(caseInsensitive).sort({a: 1}).toArray();
-        assert.eq(res.length, 4, tojson(res));
-        assert.eq(res[0], doc2, tojson(res));
-        assert.eq(res[1], docMinus1, tojson(res));
-        assert.eq(res[2], doc1, tojson(res));
-        assert.eq(res[3], docMinus2, tojson(res));
+    // Test a $near/$nearSphere query sorted by {a: 1} with the case-insensitive collation.
+    res = coll.find(query).collation(caseInsensitive).sort({a: 1}).toArray();
+    assert.eq(res.length, 4, tojson(res));
+    assert.eq(res[0], doc2, tojson(res));
+    assert.eq(res[1], docMinus1, tojson(res));
+    assert.eq(res[2], doc1, tojson(res));
+    assert.eq(res[3], docMinus2, tojson(res));
 
-        // Test with a limit.
-        res = coll.find(query).collation(caseInsensitive).sort({a: 1}).limit(2).toArray();
-        assert.eq(res.length, 2, tojson(res));
-        assert.eq(res[0], doc2, tojson(res));
-        assert.eq(res[1], docMinus1, tojson(res));
-    }
+    // Test with a limit.
+    res = coll.find(query).collation(caseInsensitive).sort({a: 1}).limit(2).toArray();
+    assert.eq(res.length, 2, tojson(res));
+    assert.eq(res[0], doc2, tojson(res));
+    assert.eq(res[1], docMinus1, tojson(res));
 
     // Test a $near/$nearSphere query sorted by {b: 1}.
     res = coll.find(query).sort({b: 1}).toArray();

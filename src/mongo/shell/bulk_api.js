@@ -1047,112 +1047,6 @@ var _bulk_api_module = (function() {
             return db.runCommand(cmd);
         };
 
-        // Execute the operations, serially
-        var executeBatchWithLegacyOps = function(batch) {
-            var batchResult = {n: 0, writeErrors: [], upserted: []};
-
-            var extractedErr = null;
-
-            var totalToExecute = batch.operations.length;
-            // Run over all the operations
-            for (var i = 0; i < batch.operations.length; i++) {
-                if (batchResult.writeErrors.length > 0 && ordered)
-                    break;
-
-                var _legacyOp = new LegacyOp(batch.batchType, batch.operations[i], i);
-                executeLegacyOp(_legacyOp);
-
-                var result = executeGetLastError(collection.getDB(), {w: 1});
-                extractedErr = extractGLEErrors(result);
-
-                if (extractedErr.unknownError) {
-                    throw new WriteCommandError({
-                        ok: 0.0,
-                        code: extractedErr.unknownError.code,
-                        errmsg: extractedErr.unknownError.errmsg
-                    });
-                }
-
-                if (extractedErr.writeError != null) {
-                    // Create the emulated result set
-                    var errResult = {
-                        index: _legacyOp.index,
-                        code: extractedErr.writeError.code,
-                        errmsg: extractedErr.writeError.errmsg,
-                        op: batch.operations[_legacyOp.index]
-                    };
-
-                    batchResult.writeErrors.push(errResult);
-                } else if (_legacyOp.batchType == INSERT) {
-                    // Inserts don't give us "n" back, so we can only infer
-                    batchResult.n = batchResult.n + 1;
-                }
-
-                if (_legacyOp.batchType == UPDATE) {
-                    // Unfortunately v2.4 GLE does not include the upserted field when
-                    // the upserted _id is non-OID type.  We can detect this by the
-                    // updatedExisting field + an n of 1
-                    var upserted = result.upserted !== undefined ||
-                        (result.updatedExisting === false && result.n == 1);
-
-                    if (upserted) {
-                        batchResult.n = batchResult.n + 1;
-
-                        // If we don't have an upserted value, see if we can pull it from the update
-                        // or the
-                        // query
-                        if (result.upserted === undefined) {
-                            result.upserted = _legacyOp.operation.u._id;
-                            if (result.upserted === undefined) {
-                                result.upserted = _legacyOp.operation.q._id;
-                            }
-                        }
-
-                        batchResult.upserted.push({index: _legacyOp.index, _id: result.upserted});
-                    } else if (result.n) {
-                        batchResult.n = batchResult.n + result.n;
-                    }
-                }
-
-                if (_legacyOp.batchType == REMOVE && result.n) {
-                    batchResult.n = batchResult.n + result.n;
-                }
-            }
-
-            var needToEnforceWC = writeConcern != null &&
-                bsonWoCompare(writeConcern, {w: 1}) != 0 &&
-                bsonWoCompare(writeConcern, {w: 0}) != 0;
-
-            extractedErr = null;
-            if (needToEnforceWC &&
-                (batchResult.writeErrors.length == 0 ||
-                 (!ordered &&
-                  // not all errored.
-                  batchResult.writeErrors.length < batch.operations.length))) {
-                var hadError = batchResult.writeErrors.length > 0;
-                var lastErrorIndex = batchResult.writeErrors.length - 1;
-                var didAllOperationsFail = hadError &&
-                    batchResult.writeErrors[lastErrorIndex].index == (batch.operations.length - 1);
-
-                if (!didAllOperationsFail) {
-                    result = executeGetLastError(collection.getDB(), writeConcern);
-                    extractedErr = extractGLEErrors(result);
-
-                    if (extractedErr.unknownError) {
-                        // Report as a wc failure
-                        extractedErr.wcError = extractedErr.unknownError;
-                    }
-                }
-            }
-
-            if (extractedErr != null && extractedErr.wcError != null) {
-                bulkResult.writeConcernErrors.push(extractedErr.wcError);
-            }
-
-            // Merge the results
-            mergeBatchResults(batch, bulkResult, batchResult);
-        };
-
         //
         // Execute the batch
         this.execute = function(_writeConcern) {
@@ -1172,17 +1066,10 @@ var _bulk_api_module = (function() {
             // Total number of batches to execute
             var totalNumberToExecute = batches.length;
 
-            var useWriteCommands = collection.getMongo().useWriteCommands();
-
             // Execute all the batches
             for (var i = 0; i < batches.length; i++) {
                 // Execute the batch
-                if (collection.getMongo().hasWriteCommands() &&
-                    collection.getMongo().writeMode() == "commands") {
-                    executeBatch(batches[i]);
-                } else {
-                    executeBatchWithLegacyOps(batches[i]);
-                }
+                executeBatch(batches[i]);
 
                 // If we are ordered and have errors and they are
                 // not all replication errors terminate the operation

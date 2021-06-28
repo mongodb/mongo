@@ -179,19 +179,9 @@ function getServerStatus(conn) {
 let serverStatus = getServerStatus(testDB);
 verifyServerStatusFields(serverStatus);
 
-let newStatus;
-
-// Run a legacy query.
-primary.forceReadMode("legacy");
-assert.eq(testColl.find().itcount(), 1);
-newStatus = getServerStatus(testDB);
-verifyServerStatusChange(serverStatus, newStatus, "none", 1);
-primary.forceReadMode("commands");
-serverStatus = newStatus;
-
 // Run a command without a readConcern.
 assert.eq(testColl.find().itcount(), 1);
-newStatus = getServerStatus(testDB);
+let newStatus = getServerStatus(testDB);
 verifyServerStatusChange(serverStatus, newStatus, "none", 1);
 serverStatus = newStatus;
 

@@ -855,7 +855,7 @@ function runScenario(
 
         // Do any test-specific setup.
         if (typeof (test.setUp) === "function") {
-            conn._runWithForcedReadMode("commands", test.setUp);
+            test.setUp(conn);
         }
 
         // Get the command from the test case.

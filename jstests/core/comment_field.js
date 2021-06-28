@@ -140,28 +140,4 @@ runCommentParamTest({
     coll: coll,
     command: {explain: {aggregate: coll.getName(), pipeline: [], cursor: {}, comment: innerComment}}
 });
-
-//
-// Tests for Legacy query.
-//
-
-testDB.getMongo().forceReadMode("legacy");
-restartProfiler();
-
-// Verify that $comment meta-operator inside $query is not treated as a 'comment' field.
-assert.eq(testDB.coll.find({$query: {_id: 1, $comment: {a: 1}}}).itcount(), 1);
-profilerHasSingleMatchingEntryOrThrow({
-    profileDB: testDB,
-    filter: {"command.filter": {_id: 1, $comment: {a: 1}}, "command.comment": {$exists: false}}
-});
-
-// Verify that $comment at top level is treated as a 'comment' field.
-const expectedComment = {
-    commentName: "legacy_query"
-};
-assert.eq(testDB.coll.find({$query: {_id: 1}, $comment: expectedComment}).itcount(), 1);
-profilerHasSingleMatchingEntryOrThrow(
-    {profileDB: testDB, filter: {"command.comment": expectedComment}});
-
-testDB.getMongo().forceReadMode("commands");
 })();

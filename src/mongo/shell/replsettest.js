@@ -2112,16 +2112,13 @@ var ReplSetTest = function(opts) {
             var secondary = secondariesToCheck[index];
             var secondaryName = secondary.host;
 
-            var secondaryConfigVersion =
-                asCluster(secondary,
-                          () => secondary._runWithForcedReadMode(
-                              "commands",
-                              () => secondary.getDB("local")['system.replset']
-                                        .find()
-                                        .readConcern("local")
-                                        .limit(1)
-                                        .next()
-                                        .version));
+            var secondaryConfigVersion = asCluster(secondary,
+                                                   () => secondary.getDB("local")['system.replset']
+                                                             .find()
+                                                             .readConcern("local")
+                                                             .limit(1)
+                                                             .next()
+                                                             .version);
 
             if (primaryConfigVersion != secondaryConfigVersion) {
                 print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
@@ -2130,14 +2127,12 @@ var ReplSetTest = function(opts) {
 
                 if (secondaryConfigVersion > primaryConfigVersion) {
                     primary = self.getPrimary();
-                    primaryConfigVersion = primary._runWithForcedReadMode(
-                        "commands",
-                        () => primary.getDB("local")['system.replset']
-                                  .find()
-                                  .readConcern("local")
-                                  .limit(1)
-                                  .next()
-                                  .version);
+                    primaryConfigVersion = primary.getDB("local")['system.replset']
+                                               .find()
+                                               .readConcern("local")
+                                               .limit(1)
+                                               .next()
+                                               .version;
                     primaryName = primary.host;
 
                     print("ReplSetTest awaitReplication: optime for primary, " + primaryName +
@@ -2524,8 +2519,7 @@ var ReplSetTest = function(opts) {
                 }
 
                 try {
-                    return this.mongo._runWithForcedReadMode("commands",
-                                                             () => operation(this.cursor));
+                    return operation(this.cursor);
                 } catch (err) {
                     print("Error: " + name + " threw '" + err.message + "' on " + this.mongo.host);
                     // Occasionally, the capped collection will get truncated while we are iterating
@@ -2569,13 +2563,12 @@ var ReplSetTest = function(opts) {
             };
 
             this.getFirstDoc = function() {
-                return this.mongo._runWithForcedReadMode("commands",
-                                                         () => this.getOplogColl()
-                                                                   .find()
-                                                                   .sort({$natural: 1})
-                                                                   .readConcern("local")
-                                                                   .limit(-1)
-                                                                   .next());
+                return this.getOplogColl()
+                    .find()
+                    .sort({$natural: 1})
+                    .readConcern("local")
+                    .limit(-1)
+                    .next();
             };
 
             this.getOplogColl = function() {

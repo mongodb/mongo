@@ -30,15 +30,6 @@ explain = db.runCommand({
 assert.commandWorked(explain);
 assert.eq(2, explain.executionStats.nReturned);
 
-// Compatibility test for the $explain OP_QUERY flag. This can only run if find command is disabled.
-if (!db.getMongo().useReadCommands()) {
-    var explain = t.find({$query: {a: 4}, $explain: true}).limit(-1).next();
-    assert("queryPlanner" in explain);
-    assert("executionStats" in explain);
-    assert.eq(1, explain.executionStats.nReturned);
-    assert("allPlansExecution" in explain.executionStats);
-}
-
 // Invalid verbosity string.
 let error = assert.throws(function() {
     t.explain("foobar").find().finish();

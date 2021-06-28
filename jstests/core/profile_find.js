@@ -14,7 +14,6 @@ load("jstests/libs/profiler.js");
 var testDB = db.getSiblingDB("profile_find");
 assert.commandWorked(testDB.dropDatabase());
 var coll = testDB.getCollection("test");
-var isLegacyReadMode = (testDB.getMongo().readMode() === "legacy");
 
 testDB.setProfilingLevel(2);
 const profileEntryFilter = {
@@ -30,11 +29,7 @@ for (i = 0; i < 3; ++i) {
 }
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr"}}));
 
-if (!isLegacyReadMode) {
-    assert.eq(coll.find({a: 1}).collation({locale: "fr"}).limit(1).itcount(), 1);
-} else {
-    assert.neq(coll.findOne({a: 1}), null);
-}
+assert.eq(coll.find({a: 1}).collation({locale: "fr"}).limit(1).itcount(), 1);
 
 var profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
 
@@ -45,17 +40,10 @@ assert.eq(profileObj.nreturned, 1, profileObj);
 assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", profileObj);
 assert(profileObj.execStats.hasOwnProperty("stage"), profileObj);
 assert.eq(profileObj.command.filter, {a: 1}, profileObj);
-if (isLegacyReadMode) {
-    assert.eq(profileObj.command.ntoreturn, -1, profileObj);
-} else {
-    assert.eq(profileObj.command.limit, 1, profileObj);
-    assert.eq(
-        profileObj.protocol, getProfilerProtocolStringForCommand(testDB.getMongo()), profileObj);
-}
+assert.eq(profileObj.command.limit, 1, profileObj);
+assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(testDB.getMongo()), profileObj);
 
-if (!isLegacyReadMode) {
-    assert.eq(profileObj.command.collation, {locale: "fr"});
-}
+assert.eq(profileObj.command.collation, {locale: "fr"});
 assert.eq(profileObj.cursorExhausted, true, profileObj);
 assert(!profileObj.hasOwnProperty("cursorid"), profileObj);
 assert(profileObj.hasOwnProperty("responseLength"), profileObj);
