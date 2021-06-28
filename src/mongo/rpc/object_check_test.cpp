@@ -35,22 +35,21 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/object_check.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
 namespace {
 
 using namespace mongo;
+using std::begin;
+using std::end;
+using std::swap;
 
 TEST(DataTypeValidated, BSONValidationEnabled) {
-    using std::swap;
-
     bool wasEnabled = serverGlobalParams.objcheck;
     const auto setValidation = [&](bool enabled) { serverGlobalParams.objcheck = enabled; };
     ON_BLOCK_EXIT([=] { setValidation(wasEnabled); });
-
-    using std::begin;
-    using std::end;
 
     BSONObj valid = BSON("baz"
                          << "bar"
@@ -88,4 +87,39 @@ TEST(DataTypeValidated, BSONValidationEnabled) {
         ASSERT_OK(cdrc.readAndAdvanceNoThrow(&v));
     }
 }
+
+DEATH_TEST(ObjectCheck, BSONValidationEnabledWithCrashOnError, "50761") {
+    bool objcheckValue = serverGlobalParams.objcheck;
+    serverGlobalParams.objcheck = true;
+    ON_BLOCK_EXIT([=] { serverGlobalParams.objcheck = objcheckValue; });
+
+    bool crashOnErrorValue = serverGlobalParams.crashOnInvalidBSONError;
+    serverGlobalParams.crashOnInvalidBSONError = true;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.crashOnInvalidBSONError = crashOnErrorValue; });
+
+    BSONObj valid = BSON("baz"
+                         << "bar"
+                         << "garply"
+                         << BSON("foo"
+                                 << "bar"));
+    char buf[1024] = {0};
+    std::copy(valid.objdata(), valid.objdata() + valid.objsize(), begin(buf));
+
+    {
+        // mess up the data
+        DataRangeCursor drc(begin(buf), end(buf));
+        // skip past size so we don't trip any sanity checks.
+        drc.advanceNoThrow(4).transitional_ignore();  // skip size
+        while (drc.writeAndAdvanceNoThrow(0xFF).isOK())
+            ;
+    }
+
+    {
+        Validated<BSONObj> v;
+        ConstDataRangeCursor cdrc(begin(buf), end(buf));
+        // Crashes because of invalid BSON
+        cdrc.readAndAdvanceNoThrow(&v).ignore();
+    }
+}
+
 }  // namespace

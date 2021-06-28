@@ -12,6 +12,8 @@ executor:
       - ValidateCollections
   config:
     shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
       global_vars:
         TestData:
           # Other fuzzers test commands against replica sets with logical session ids.

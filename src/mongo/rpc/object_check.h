@@ -29,10 +29,14 @@
 
 #pragma once
 
+#include <algorithm>
+
 #include "mongo/base/data_type_validated.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/hex.h"
 
 // We do not use the rpc namespace here so we can specialize Validator.
 namespace mongo {
@@ -47,7 +51,24 @@ template <>
 struct Validator<BSONObj> {
 
     inline static Status validateLoad(const char* ptr, size_t length) {
-        return serverGlobalParams.objcheck ? validateBSON(ptr, length) : Status::OK();
+        if (!serverGlobalParams.objcheck) {
+            return Status::OK();
+        }
+
+        auto status = validateBSON(ptr, length);
+        if (serverGlobalParams.crashOnInvalidBSONError && !status.isOK()) {
+            std::string msg = "Invalid BSON was received: " + status.toString() +
+                // Using std::min with length so we do not max anything out in case the corruption
+                // is in the size of the object. The hex dump will be longer if needed.
+                ", beginning 5000 characters: " + std::string(ptr, std::min(length, (size_t)5000)) +
+                ", length: " + std::to_string(length) +
+                // Using std::min with hex dump length, too, to ensure we do not throw in hexdump()
+                // because of exceeded length and miss out on the core dump of the fassert below.
+                ", hex dump: " + hexdump(ptr, std::min(length, (size_t)(1000000 - 1)));
+            Status builtStatus(ErrorCodes::InvalidBSON, redact(msg));
+            fassertFailedWithStatus(50761, builtStatus);
+        }
+        return status;
     }
 
     static Status validateStore(const BSONObj& toStore);

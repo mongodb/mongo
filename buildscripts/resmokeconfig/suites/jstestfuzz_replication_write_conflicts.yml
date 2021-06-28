@@ -8,7 +8,10 @@ executor:
   archive:
     hooks:
       - ValidateCollections
-  config: {}
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
   hooks:
   - class: EnableSpuriousWriteConflicts
     shell_options:

@@ -72,6 +72,10 @@ struct ServerGlobalParams {
 
     bool objcheck = true;  // --objcheck
 
+    // Shell parameter, used for testing only, to tell the shell to crash on InvalidBSON errors.
+    // Can be paired with --objcheck so that extra BSON validation occurs.
+    bool crashOnInvalidBSONError = false;  // --crashOnInvalidBSONError
+
     int defaultProfile = 0;  // --profile
     boost::optional<BSONObj> defaultProfileFilter;
     int slowMS = 100;                      // --time in ms that is "slow"

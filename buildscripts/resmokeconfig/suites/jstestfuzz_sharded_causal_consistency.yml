@@ -12,6 +12,8 @@ executor:
   config:
     shell_options:
       eval: load("jstests/libs/override_methods/enable_causal_consistency.js")
+      crashOnInvalidBSONError: ""
+      objcheck: ""
       global_vars:
         TestData:
           runningWithCausalConsistency: true

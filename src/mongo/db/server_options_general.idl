@@ -164,6 +164,11 @@ configs:
         arg_vartype: Bool
         source: yaml
         hidden: true
+    crashOnInvalidBSONError:
+        description: "Crashes the shell if invalid BSON is returned from a call to the server. Must be paired with objcheck to provoke a BSON validation check."
+        arg_vartype: Switch
+        source: [ cli, ini ]
+        hidden: true
     enableExperimentalStorageDetailsCmd:
         description: 'EXPERIMENTAL (UNSUPPORTED). Enable command computing aggregate statistics on storage.'
         arg_vartype: Switch

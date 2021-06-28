@@ -102,6 +102,11 @@ configs:
     source: [ cli, ini ]
     conflicts: "objcheck"
     hidden: true
+  "crashOnInvalidBSONError":
+    description: "Crashes the shell if invalid BSON is returned from a call to the server. Must be paired with objcheck to provoke a BSON validation check."
+    arg_vartype: Switch
+    source: [ cli, ini ]
+    hidden: true
 
   "disableJavaScriptJIT":
     description: "disable the Javascript Just In Time compiler"

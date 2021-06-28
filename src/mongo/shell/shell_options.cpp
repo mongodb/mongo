@@ -131,6 +131,12 @@ Status storeMongoShellOptions(const moe::Environment& params,
         serverGlobalParams.objcheck = false;
     }
 
+    // Similar to 'objcheck' above, 'crashOnInvalidBSONError' must be common to both the server
+    // and shell for linking reasons.
+    if (params.count("crashOnInvalidBSONError")) {
+        serverGlobalParams.crashOnInvalidBSONError = true;
+    }
+
     if (params.count("port")) {
         shellGlobalParams.port = params["port"].as<string>();
     }

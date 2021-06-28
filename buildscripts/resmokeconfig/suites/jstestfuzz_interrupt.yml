@@ -14,6 +14,8 @@ executor:
         TestData:
           checkForInterruptFailpointChance: 0.05
       eval: load('jstests/libs/jstestfuzz/check_for_interrupt_hook.js')
+      crashOnInvalidBSONError: ""
+      objcheck: ""
   hooks:
   - class: FuzzerRestoreSettings
   - class: ValidateCollections

@@ -10,6 +10,8 @@ executor:
       - BackgroundInitialSync
   config:
     shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
       global_vars:
         TestData:
           ignoreCommandsIncompatibleWithInitialSync: true
