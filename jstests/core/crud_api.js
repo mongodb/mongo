@@ -46,14 +46,8 @@ var crudAPISpecTests = function crudAPISpecTests() {
     }
 
     function checkResultObject(first, second) {
-        // Only assert on the "modifiedCount" property when write commands are enabled
-        if (db.getMongo().writeMode() === 'commands') {
-            assert.docEq(first, second);
-        } else {
-            var overrideModifiedCount = {modifiedCount: undefined};
-            assert.docEq(Object.merge(first, overrideModifiedCount),
-                         Object.merge(second, overrideModifiedCount));
-        }
+        // Only assert on the "modifiedCount" property
+        assert.docEq(first, second);
     }
 
     // Setup executors

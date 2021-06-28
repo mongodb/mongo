@@ -2554,10 +2554,6 @@ var ReplSetTest = function(opts) {
                 // to time out since it may take a while to process each batch and a test may have
                 // changed "cursorTimeoutMillis" to a short time period.
                 this._cursorExhausted = false;
-                // Although this line sets the read concern, it does not need to be called via
-                // _runWithForcedReadMode() because it only creates the client-side cursor.  It's
-                // not until next()/hasNext() are called that the find command gets sent to the
-                // server.
                 this.cursor =
                     coll.find(query).sort({$natural: -1}).noCursorTimeout().readConcern("local");
             };

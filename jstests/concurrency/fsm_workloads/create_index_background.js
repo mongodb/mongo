@@ -137,9 +137,7 @@ var $config = (function() {
 
                     res = coll.update({x: Random.randInt(highest), tid: this.tid}, updateExpr);
                     assertAlways.commandWorked(res);
-                    if (db.getMongo().writeMode() === 'commands') {
-                        assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
-                    }
+                    assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
                     assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
                     assertWhenOwnColl.eq(res.nUpserted, 0, tojson(res));
                 }

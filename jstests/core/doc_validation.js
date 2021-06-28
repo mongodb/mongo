@@ -315,19 +315,13 @@ res = coll.insert({_id: 1, a: 2});
 // Verify that the document validation error attribute 'failingDocumentId' equals to the document
 // '_id' attribute.
 assertDocumentValidationFailure(res, coll);
-if (coll.getMongo().writeMode() === 'commands') {
-    const errorInfo = res.getWriteError().errInfo;
-    const expectedError = {
-        failingDocumentId: 1,
-        details: {
-            operatorName: "$eq",
-            specifiedAs: {a: 1},
-            reason: "comparison failed",
-            consideredValue: 2
-        }
-    };
-    assert.docEq(errorInfo, expectedError, tojson(res));
-}
+const errorInfo = res.getWriteError().errInfo;
+const expectedError = {
+    failingDocumentId: 1,
+    details:
+        {operatorName: "$eq", specifiedAs: {a: 1}, reason: "comparison failed", consideredValue: 2}
+};
+assert.docEq(errorInfo, expectedError, tojson(res));
 
 // Insert a valid document.
 assert.commandWorked(coll.insert({_id: 1, a: 1}));
@@ -349,18 +343,16 @@ for (const command of [updateCommand, findAndModifyCommand]) {
     // Verify that the document validation error attribute 'failingDocumentId' equals to the
     // document '_id' attribute.
     assertDocumentValidationFailure(res, coll);
-    if (coll.getMongo().writeMode() === 'commands') {
-        const errorInfo = (res instanceof WriteResult ? res.getWriteError() : res).errInfo;
-        const expectedError = {
-            failingDocumentId: 1,
-            details: {
-                operatorName: "$eq",
-                specifiedAs: {a: 1},
-                reason: "comparison failed",
-                consideredValue: 2
-            }
-        };
-        assert.docEq(errorInfo, expectedError, tojson(res));
-    }
+    const errorInfo = (res instanceof WriteResult ? res.getWriteError() : res).errInfo;
+    const expectedError = {
+        failingDocumentId: 1,
+        details: {
+            operatorName: "$eq",
+            specifiedAs: {a: 1},
+            reason: "comparison failed",
+            consideredValue: 2
+        }
+    };
+    assert.docEq(errorInfo, expectedError, tojson(res));
 }
 })();

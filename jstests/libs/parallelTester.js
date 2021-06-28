@@ -115,8 +115,6 @@ if (typeof _threadInject != "undefined") {
     // Helper class for running tests in parallel.  It assembles a set of tests
     // and then calls assert.parallelests to run them.
     ParallelTester = function() {
-        assert.neq(db.getMongo().writeMode(), "legacy", "wrong shell write mode");
-        assert.neq(db.getMongo().readMode(), "legacy", "wrong shell read mode");
         this.params = new Array();
     };
 

@@ -601,30 +601,6 @@ helloStatePrompt = function(helloReply) {
     return state + '> ';
 };
 
-if (typeof _useWriteCommandsDefault === "undefined") {
-    // We ensure the _useWriteCommandsDefault() function is always defined, in case the JavaScript
-    // engine is being used from someplace other than the mongo shell (e.g. map-reduce).
-    _useWriteCommandsDefault = function _useWriteCommandsDefault() {
-        return false;
-    };
-}
-
-if (typeof _writeMode === "undefined") {
-    // We ensure the _writeMode() function is always defined, in case the JavaScript engine is being
-    // used from someplace other than the mongo shell (e.g. map-reduce).
-    _writeMode = function _writeMode() {
-        return "commands";
-    };
-}
-
-if (typeof _readMode === "undefined") {
-    // We ensure the _readMode() function is always defined, in case the JavaScript engine is being
-    // used from someplace other than the mongo shell (e.g. map-reduce).
-    _readMode = function _readMode() {
-        return "legacy";
-    };
-}
-
 if (typeof _shouldRetryWrites === 'undefined') {
     // We ensure the _shouldRetryWrites() function is always defined, in case the JavaScript engine
     // is being used from someplace other than the mongo shell (e.g. map-reduce).
@@ -645,17 +621,6 @@ if (typeof _shouldUseImplicitSessions === 'undefined') {
 
 shellPrintHelper = function(x) {
     if (typeof (x) == "undefined") {
-        // Make sure that we have a db var before we use it
-        // TODO: This implicit calling of GLE can cause subtle, hard to track issues - remove?
-        if (__callLastError && typeof (db) != "undefined" && db.getMongo &&
-            db.getMongo().writeMode() == "legacy") {
-            __callLastError = false;
-            // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad
-            var err = db.getLastError(1);
-            if (err != null) {
-                print(err);
-            }
-        }
         return;
     }
 

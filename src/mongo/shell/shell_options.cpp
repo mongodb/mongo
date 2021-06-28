@@ -183,37 +183,8 @@ Status storeMongoShellOptions(const moe::Environment& params,
     if (params.count("files")) {
         shellGlobalParams.files = params["files"].as<vector<string>>();
     }
-    if (params.count("useLegacyWriteOps")) {
-        shellGlobalParams.writeMode = "legacy";
-    }
-    if (params.count("writeMode")) {
-        std::string mode = params["writeMode"].as<string>();
-        if (mode != "commands" && mode != "legacy" && mode != "compatibility") {
-            uasserted(17396, str::stream() << "Unknown writeMode option: " << mode);
-        }
-        shellGlobalParams.writeMode = mode;
-    }
-    if (params.count("readMode")) {
-        std::string mode = params["readMode"].as<string>();
-        if (mode != "commands" && mode != "compatibility" && mode != "legacy") {
-            uasserted(17397,
-                      str::stream() << "Unknown readMode option: '" << mode
-                                    << "'. Valid modes are: {commands, compatibility, legacy}");
-        }
-        shellGlobalParams.readMode = mode;
-    }
     if (params.count("disableImplicitSessions")) {
         shellGlobalParams.shouldUseImplicitSessions = false;
-    }
-    if (params.count("rpcProtocols")) {
-        std::string protos = params["rpcProtocols"].as<string>();
-        auto parsedRPCProtos = rpc::parseProtocolSet(protos);
-        if (!parsedRPCProtos.isOK()) {
-            uasserted(28653,
-                      str::stream() << "Unknown RPC Protocols: '" << protos
-                                    << "'. Valid values are {none, opQueryOnly, opMsgOnly, all}");
-        }
-        shellGlobalParams.rpcProtocols = parsedRPCProtos.getValue();
     }
 
     /* This is a bit confusing, here are the rules:

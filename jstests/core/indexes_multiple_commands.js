@@ -10,7 +10,6 @@
 'use strict';
 
 var coll = db.indexes_multiple_commands;
-var usingWriteCommands = db.getMongo().writeMode() === "commands";
 
 /**
  * Assert that the result of the index creation ('cmd') indicates that 'numIndexes' were
@@ -28,32 +27,19 @@ function assertIndexesCreated(cmd, numIndexes) {
         numIndexes = 1;
     }
 
-    if (usingWriteCommands) {
-        cmdResult = cmd();
-        if (numIndexes == 0) {
-            assert.commandFailedWithCode(cmdResult, ErrorCodes.IndexOptionsConflict);
-            return;
-        }
-
-        assert.commandWorked(cmdResult);
-        var isShardedNS = cmdResult.hasOwnProperty('raw');
-        if (isShardedNS) {
-            cmdResult = cmdResult['raw'][Object.getOwnPropertyNames(cmdResult['raw'])[0]];
-        }
-        assert.eq(
-            cmdResult.numIndexesAfter - cmdResult.numIndexesBefore, numIndexes, tojson(cmdResult));
-    } else {
-        var nIndexesBefore = coll.getIndexes().length;
-        cmdResult = cmd();
-        if (numIndexes == 0) {
-            assert.commandFailedWithCode(cmdResult, ErrorCodes.IndexOptionsConflict);
-            return;
-        }
-
-        assert.commandWorked(cmdResult);
-        var nIndexesAfter = coll.getIndexes().length;
-        assert.eq(nIndexesAfter - nIndexesBefore, numIndexes, tojson(coll.getIndexes()));
+    cmdResult = cmd();
+    if (numIndexes == 0) {
+        assert.commandFailedWithCode(cmdResult, ErrorCodes.IndexOptionsConflict);
+        return;
     }
+
+    assert.commandWorked(cmdResult);
+    var isShardedNS = cmdResult.hasOwnProperty('raw');
+    if (isShardedNS) {
+        cmdResult = cmdResult['raw'][Object.getOwnPropertyNames(cmdResult['raw'])[0]];
+    }
+    assert.eq(
+        cmdResult.numIndexesAfter - cmdResult.numIndexesBefore, numIndexes, tojson(cmdResult));
 }
 
 /**

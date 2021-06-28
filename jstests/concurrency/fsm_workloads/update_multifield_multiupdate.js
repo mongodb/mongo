@@ -26,9 +26,7 @@ var $config = extendWorkload($config, function($config, $super) {
             assertAlways.gte(res.nMatched, 0, tojson(res));
         }
 
-        if (db.getMongo().writeMode() === 'commands') {
-            assertWhenOwnColl.eq(res.nMatched, res.nModified, tojson(res));
-        }
+        assertWhenOwnColl.eq(res.nMatched, res.nModified, tojson(res));
 
         var docs = db[collName].find().toArray();
         docs.forEach(function(doc) {

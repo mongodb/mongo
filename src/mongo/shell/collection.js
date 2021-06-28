@@ -307,47 +307,31 @@ DBCollection.prototype.insert = function(obj, options) {
     var startTime =
         (typeof (_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
 
-    if (this.getMongo().writeMode() != "legacy") {
-        // Bit 1 of option flag is continueOnError. Bit 0 (stop on error) is the default.
-        var bulk = ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
-        var isMultiInsert = Array.isArray(obj);
+    // Bit 1 of option flag is continueOnError. Bit 0 (stop on error) is the default.
+    var bulk = ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
+    var isMultiInsert = Array.isArray(obj);
 
-        if (isMultiInsert) {
-            obj.forEach(function(doc) {
-                bulk.insert(doc);
-            });
-        } else {
-            bulk.insert(obj);
-        }
-
-        try {
-            result = bulk.execute(wc);
-            if (!isMultiInsert)
-                result = result.toSingleResult();
-        } catch (ex) {
-            if (ex instanceof BulkWriteError) {
-                result = isMultiInsert ? ex.toResult() : ex.toSingleResult();
-            } else if (ex instanceof WriteCommandError) {
-                result = ex;
-            } else {
-                // Other exceptions rethrown as-is.
-                throw ex;
-            }
-        }
+    if (isMultiInsert) {
+        obj.forEach(function(doc) {
+            bulk.insert(doc);
+        });
     } else {
-        if (typeof (obj._id) == "undefined" && !Array.isArray(obj)) {
-            var tmp = obj;  // don't want to modify input
-            obj = {_id: new ObjectId()};
-            for (var key in tmp) {
-                obj[key] = tmp[key];
-            }
+        bulk.insert(obj);
+    }
+
+    try {
+        result = bulk.execute(wc);
+        if (!isMultiInsert)
+            result = result.toSingleResult();
+    } catch (ex) {
+        if (ex instanceof BulkWriteError) {
+            result = isMultiInsert ? ex.toResult() : ex.toSingleResult();
+        } else if (ex instanceof WriteCommandError) {
+            result = ex;
+        } else {
+            // Other exceptions rethrown as-is.
+            throw ex;
         }
-
-        this.getMongo().insert(this._fullName, obj, flags);
-
-        // enforce write concern, if required
-        if (wc)
-            result = this.runCommand("getLastError", wc instanceof WriteConcern ? wc.toJSON() : wc);
     }
 
     this._lastID = obj._id;
@@ -402,46 +386,34 @@ DBCollection.prototype.remove = function(t, justOne) {
     var startTime =
         (typeof (_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
 
-    if (this.getMongo().writeMode() != "legacy") {
-        var bulk = this.initializeOrderedBulkOp();
+    var bulk = this.initializeOrderedBulkOp();
 
-        if (letParams) {
-            bulk.setLetParams(letParams);
-        }
-        var removeOp = bulk.find(query);
+    if (letParams) {
+        bulk.setLetParams(letParams);
+    }
+    var removeOp = bulk.find(query);
 
-        if (collation) {
-            removeOp.collation(collation);
-        }
+    if (collation) {
+        removeOp.collation(collation);
+    }
 
-        if (justOne) {
-            removeOp.removeOne();
-        } else {
-            removeOp.remove();
-        }
-
-        try {
-            result = bulk.execute(wc).toSingleResult();
-        } catch (ex) {
-            if (ex instanceof BulkWriteError) {
-                result = ex.toSingleResult();
-            } else if (ex instanceof WriteCommandError) {
-                result = ex;
-            } else {
-                // Other exceptions thrown
-                throw ex;
-            }
-        }
+    if (justOne) {
+        removeOp.removeOne();
     } else {
-        if (collation) {
-            throw new Error("collation requires use of write commands");
+        removeOp.remove();
+    }
+
+    try {
+        result = bulk.execute(wc).toSingleResult();
+    } catch (ex) {
+        if (ex instanceof BulkWriteError) {
+            result = ex.toSingleResult();
+        } else if (ex instanceof WriteCommandError) {
+            result = ex;
+        } else {
+            // Other exceptions thrown
+            throw ex;
         }
-
-        this.getMongo().remove(this._fullName, query, justOne);
-
-        // enforce write concern, if required
-        if (wc)
-            result = this.runCommand("getLastError", wc instanceof WriteConcern ? wc.toJSON() : wc);
     }
 
     this._printExtraInfo("Removed", startTime);
@@ -522,62 +494,45 @@ DBCollection.prototype.update = function(query, updateSpec, upsert, multi) {
     var startTime =
         (typeof (_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
 
-    if (this.getMongo().writeMode() != "legacy") {
-        var bulk = this.initializeOrderedBulkOp();
+    var bulk = this.initializeOrderedBulkOp();
 
-        if (letParams) {
-            bulk.setLetParams(letParams);
-        }
-        var updateOp = bulk.find(query);
+    if (letParams) {
+        bulk.setLetParams(letParams);
+    }
+    var updateOp = bulk.find(query);
 
-        if (hint) {
-            updateOp.hint(hint);
-        }
+    if (hint) {
+        updateOp.hint(hint);
+    }
 
-        if (upsert) {
-            updateOp = updateOp.upsert();
-        }
+    if (upsert) {
+        updateOp = updateOp.upsert();
+    }
 
-        if (collation) {
-            updateOp.collation(collation);
-        }
+    if (collation) {
+        updateOp.collation(collation);
+    }
 
-        if (arrayFilters) {
-            updateOp.arrayFilters(arrayFilters);
-        }
+    if (arrayFilters) {
+        updateOp.arrayFilters(arrayFilters);
+    }
 
-        if (multi) {
-            updateOp.update(updateSpec);
-        } else {
-            updateOp.updateOne(updateSpec);
-        }
-
-        try {
-            result = bulk.execute(wc).toSingleResult();
-        } catch (ex) {
-            if (ex instanceof BulkWriteError) {
-                result = ex.toSingleResult();
-            } else if (ex instanceof WriteCommandError) {
-                result = ex;
-            } else {
-                // Other exceptions thrown
-                throw ex;
-            }
-        }
+    if (multi) {
+        updateOp.update(updateSpec);
     } else {
-        if (collation) {
-            throw new Error("collation requires use of write commands");
-        }
+        updateOp.updateOne(updateSpec);
+    }
 
-        if (arrayFilters) {
-            throw new Error("arrayFilters requires use of write commands");
-        }
-
-        this.getMongo().update(this._fullName, query, updateSpec, upsert, multi);
-
-        // Enforce write concern, if required
-        if (wc) {
-            result = this.runCommand("getLastError", wc instanceof WriteConcern ? wc.toJSON() : wc);
+    try {
+        result = bulk.execute(wc).toSingleResult();
+    } catch (ex) {
+        if (ex instanceof BulkWriteError) {
+            result = ex.toSingleResult();
+        } else if (ex instanceof WriteCommandError) {
+            result = ex;
+        } else {
+            // Other exceptions thrown
+            throw ex;
         }
     }
 

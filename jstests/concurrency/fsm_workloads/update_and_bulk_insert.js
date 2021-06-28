@@ -23,9 +23,7 @@ var $config = (function() {
         update: function update(db, collName) {
             var res = db[collName].update({}, {$inc: {n: 1}}, {multi: true});
             assertAlways.lte(0, res.nMatched, tojson(res));
-            if (db.getMongo().writeMode() === 'commands') {
-                assertAlways.eq(res.nMatched, res.nModified, tojson(res));
-            }
+            assertAlways.eq(res.nMatched, res.nModified, tojson(res));
             assertAlways.eq(0, res.nUpserted, tojson(res));
         }
     };

@@ -32,9 +32,7 @@ var $config = extendWorkload($config, function($config, $super) {
         var res = db[collName].update(doc, {$inc: {unused: 0}}, {upsert: true});
         assertAlways.eq(0, res.nMatched, tojson(res));
         assertAlways.eq(1, res.nUpserted, tojson(res));
-        if (db.getMongo().writeMode() === 'commands') {
-            assertAlways.eq(0, res.nModified, tojson(res));
-        }
+        assertAlways.eq(0, res.nModified, tojson(res));
 
         this.nInserted += this.docsPerInsert;
     };

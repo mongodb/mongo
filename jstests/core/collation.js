@@ -1071,95 +1071,73 @@ assert.commandWorked(explainRes);
 planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
 assert.neq(null, planStage);
 
-if (db.getMongo().writeMode() === "commands") {
-    // Remove should return correct results when "simple" collation specified and collection has
-    // a default collation.
-    coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
-    writeRes = coll.remove({str: "FOO"}, {justOne: true, collation: {locale: "simple"}});
-    assert.commandWorked(writeRes);
-    assert.eq(0, writeRes.nRemoved);
+// Remove should return correct results when "simple" collation specified and collection has
+// a default collation.
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+writeRes = coll.remove({str: "FOO"}, {justOne: true, collation: {locale: "simple"}});
+assert.commandWorked(writeRes);
+assert.eq(0, writeRes.nRemoved);
 
-    // Remove on _id should return correct results when "simple" collation specified and
-    // collection has a default collation.
-    coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-    assert.commandWorked(coll.insert({_id: "foo"}));
-    writeRes = coll.remove({_id: "FOO"}, {justOne: true, collation: {locale: "simple"}});
-    assert.commandWorked(writeRes);
-    assert.eq(0, writeRes.nRemoved);
+// Remove on _id should return correct results when "simple" collation specified and
+// collection has a default collation.
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(coll.insert({_id: "foo"}));
+writeRes = coll.remove({_id: "FOO"}, {justOne: true, collation: {locale: "simple"}});
+assert.commandWorked(writeRes);
+assert.eq(0, writeRes.nRemoved);
 
-    // Remove on _id should use idhack stage when explicit query collation matches collection
-    // default.
-    coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-    explainRes =
-        coll.explain("executionStats").remove({_id: "foo"}, {collation: {locale: "en_US"}});
-    assert.commandWorked(explainRes);
-    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-    assert.neq(null, planStage);
+// Remove on _id should use idhack stage when explicit query collation matches collection
+// default.
+coll.drop();
+assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+explainRes = coll.explain("executionStats").remove({_id: "foo"}, {collation: {locale: "en_US"}});
+assert.commandWorked(explainRes);
+planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+assert.neq(null, planStage);
 
-    // Remove on _id should not use idhack stage when query collation does not match collection
-    // default.
-    coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-    explainRes =
-        coll.explain("executionStats").remove({_id: "foo"}, {collation: {locale: "fr_CA"}});
-    assert.commandWorked(explainRes);
-    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-    assert.eq(null, planStage);
-}
-
-if (db.getMongo().writeMode() !== "commands") {
-    // remove() shell helper should error if a collation is specified and the shell is not using
-    // write commands.
-    coll.drop();
-    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
-    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
-    assert.throws(function() {
-        coll.remove({str: "FOO"}, {justOne: true, collation: {locale: "en_US", strength: 2}});
-    });
-    assert.throws(function() {
-        coll.explain().remove({str: "FOO"},
-                              {justOne: true, collation: {locale: "en_US", strength: 2}});
-    });
-}
+// Remove on _id should not use idhack stage when query collation does not match collection
+// default.
+coll.drop();
+assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+explainRes = coll.explain("executionStats").remove({_id: "foo"}, {collation: {locale: "fr_CA"}});
+assert.commandWorked(explainRes);
+planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+assert.eq(null, planStage);
 
 //
 // Collation tests for update.
 //
 
-if (db.getMongo().writeMode() === "commands") {
-    // Update should succeed when collation specified and collection does not exist.
-    coll.drop();
-    assert.commandWorked(
-        coll.update({str: "foo"}, {$set: {other: 99}}, {multi: true, collation: {locale: "fr"}}));
+// Update should succeed when collation specified and collection does not exist.
+coll.drop();
+assert.commandWorked(
+    coll.update({str: "foo"}, {$set: {other: 99}}, {multi: true, collation: {locale: "fr"}}));
 
-    // Update should return correct results when collation specified.
-    coll.drop();
-    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
-    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
-    writeRes = coll.update({str: "FOO"},
-                           {$set: {other: 99}},
-                           {multi: true, collation: {locale: "en_US", strength: 2}});
-    assert.eq(2, writeRes.nModified);
+// Update should return correct results when collation specified.
+coll.drop();
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
+writeRes = coll.update(
+    {str: "FOO"}, {$set: {other: 99}}, {multi: true, collation: {locale: "en_US", strength: 2}});
+assert.eq(2, writeRes.nModified);
 
-    // Explain of update should return correct results when collation specified.
-    coll.drop();
-    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
-    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
-    explainRes = coll.explain("executionStats").update({str: "FOO"}, {$set: {other: 99}}, {
-        multi: true,
-        collation: {locale: "en_US", strength: 2}
-    });
-    assert.commandWorked(explainRes);
-    planStage = getPlanStage(explainRes.executionStats.executionStages, "UPDATE");
-    assert.neq(null, planStage);
-    assert.eq(2, planStage.nWouldModify);
-}
+// Explain of update should return correct results when collation specified.
+coll.drop();
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
+explainRes = coll.explain("executionStats").update({str: "FOO"}, {$set: {other: 99}}, {
+    multi: true,
+    collation: {locale: "en_US", strength: 2}
+});
+assert.commandWorked(explainRes);
+planStage = getPlanStage(explainRes.executionStats.executionStages, "UPDATE");
+assert.neq(null, planStage);
+assert.eq(2, planStage.nWouldModify);
 
 // Update should return correct results when no collation specified and collection has a default
 // collation.
@@ -1189,67 +1167,47 @@ assert.commandWorked(explainRes);
 planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
 assert.neq(null, planStage);
 
-if (db.getMongo().writeMode() === "commands") {
-    // Update should return correct results when "simple" collation specified and collection has
-    // a default collation.
-    coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
-    writeRes = coll.update({str: "FOO"}, {$set: {other: 99}}, {collation: {locale: "simple"}});
-    assert.commandWorked(writeRes);
-    assert.eq(0, writeRes.nModified);
+// Update should return correct results when "simple" collation specified and collection has
+// a default collation.
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
+writeRes = coll.update({str: "FOO"}, {$set: {other: 99}}, {collation: {locale: "simple"}});
+assert.commandWorked(writeRes);
+assert.eq(0, writeRes.nModified);
 
-    // Update on _id should return correct results when "simple" collation specified and
-    // collection has a default collation.
-    coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-    assert.commandWorked(coll.insert({_id: "foo"}));
-    writeRes = coll.update({_id: "FOO"}, {$set: {other: 99}}, {collation: {locale: "simple"}});
-    assert.commandWorked(writeRes);
-    assert.eq(0, writeRes.nModified);
+// Update on _id should return correct results when "simple" collation specified and
+// collection has a default collation.
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(coll.insert({_id: "foo"}));
+writeRes = coll.update({_id: "FOO"}, {$set: {other: 99}}, {collation: {locale: "simple"}});
+assert.commandWorked(writeRes);
+assert.eq(0, writeRes.nModified);
 
-    // Update on _id should use idhack stage when explicitly given query collation matches
-    // collection default.
-    coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-    explainRes = coll.explain("executionStats").update({_id: "foo"}, {$set: {other: 99}}, {
-        collation: {locale: "en_US"}
-    });
-    assert.commandWorked(explainRes);
-    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-    assert.neq(null, planStage);
+// Update on _id should use idhack stage when explicitly given query collation matches
+// collection default.
+coll.drop();
+assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+explainRes = coll.explain("executionStats").update({_id: "foo"}, {$set: {other: 99}}, {
+    collation: {locale: "en_US"}
+});
+assert.commandWorked(explainRes);
+planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+assert.neq(null, planStage);
 
-    // Update on _id should not use idhack stage when query collation does not match collection
-    // default.
-    coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-    explainRes = coll.explain("executionStats").update({_id: "foo"}, {$set: {other: 99}}, {
-        collation: {locale: "fr_CA"}
-    });
-    assert.commandWorked(explainRes);
-    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-    assert.eq(null, planStage);
-}
-
-if (db.getMongo().writeMode() !== "commands") {
-    // update() shell helper should error if a collation is specified and the shell is not using
-    // write commands.
-    coll.drop();
-    assert.commandWorked(coll.insert({_id: 1, str: "foo"}));
-    assert.commandWorked(coll.insert({_id: 2, str: "foo"}));
-    assert.throws(function() {
-        coll.update({str: "FOO"},
-                    {$set: {other: 99}},
-                    {multi: true, collation: {locale: "en_US", strength: 2}});
-    });
-    assert.throws(function() {
-        coll.explain().update({str: "FOO"},
-                              {$set: {other: 99}},
-                              {multi: true, collation: {locale: "en_US", strength: 2}});
-    });
-}
+// Update on _id should not use idhack stage when query collation does not match collection
+// default.
+coll.drop();
+assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+explainRes = coll.explain("executionStats").update({_id: "foo"}, {$set: {other: 99}}, {
+    collation: {locale: "fr_CA"}
+});
+assert.commandWorked(explainRes);
+planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+assert.eq(null, planStage);
 
 //
 // Collation tests for the $geoNear aggregation stage.

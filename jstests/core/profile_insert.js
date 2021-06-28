@@ -15,7 +15,6 @@ load("jstests/libs/profiler.js");
 var testDB = db.getSiblingDB("profile_insert");
 assert.commandWorked(testDB.dropDatabase());
 var coll = testDB.getCollection("test");
-var isWriteCommand = (db.getMongo().writeMode() === "commands");
 
 testDB.setProfilingLevel(2);
 
@@ -23,10 +22,7 @@ testDB.setProfilingLevel(2);
 // Test single insert.
 //
 var doc = {_id: 1};
-var result = coll.insert(doc);
-if (isWriteCommand) {
-    assert.commandWorked(result);
-}
+assert.commandWorked(coll.insert(doc));
 
 var profileObj = getLatestProfilerEntry(testDB);
 
@@ -34,13 +30,11 @@ assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
 assert.eq(profileObj.op, "insert", tojson(profileObj));
 assert.eq(profileObj.ninserted, 1, tojson(profileObj));
 assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
-if (isWriteCommand) {
-    assert.eq(profileObj.command.ordered, true, tojson(profileObj));
-    assert.eq(profileObj.protocol,
-              getProfilerProtocolStringForCommand(testDB.getMongo()),
-              tojson(profileObj));
-    assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
-}
+assert.eq(profileObj.command.ordered, true, tojson(profileObj));
+assert.eq(profileObj.protocol,
+          getProfilerProtocolStringForCommand(testDB.getMongo()),
+          tojson(profileObj));
+assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
 
 assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
@@ -58,23 +52,13 @@ var docArray = [{_id: 1}, {_id: 2}];
 var bulk = coll.initializeUnorderedBulkOp();
 bulk.insert(docArray[0]);
 bulk.insert(docArray[1]);
-result = bulk.execute();
-if (isWriteCommand) {
-    assert.commandWorked(result);
-}
+assert.commandWorked(bulk.execute());
 
 profileObj = getLatestProfilerEntry(testDB);
 
-if (isWriteCommand) {
-    assert.eq(profileObj.ninserted, 2, tojson(profileObj));
-    assert.eq(profileObj.keysInserted, 2, tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
-} else {
-    // Documents were inserted one at a time.
-    assert.eq(profileObj.ninserted, 1, tojson(profileObj));
-    assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
-}
+assert.eq(profileObj.ninserted, 2, tojson(profileObj));
+assert.eq(profileObj.keysInserted, 2, tojson(profileObj));
+assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
 //
 // Test insert options.
@@ -88,10 +72,8 @@ assert.commandWorked(coll.insert(doc, {writeConcern: {w: 1, wtimeout: wtimeout},
 
 profileObj = getLatestProfilerEntry(testDB);
 
-if (isWriteCommand) {
-    assert.eq(profileObj.command.ordered, false, tojson(profileObj));
-    assert.eq(profileObj.command.writeConcern.w, 1, tojson(profileObj));
-    assert.eq(profileObj.command.writeConcern.wtimeout, wtimeout, tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
-}
+assert.eq(profileObj.command.ordered, false, tojson(profileObj));
+assert.eq(profileObj.command.writeConcern.w, 1, tojson(profileObj));
+assert.eq(profileObj.command.writeConcern.wtimeout, wtimeout, tojson(profileObj));
+assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 })();

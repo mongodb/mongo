@@ -9,9 +9,6 @@ try {
     var commandsRan = [];
     var insertsRan = [];
     var mockMongo = {
-        writeMode: function() {
-            return "commands";
-        },
         getSecondaryOk: function() {
             return true;
         },
@@ -21,9 +18,6 @@ try {
         },
         getWriteConcern: function() {
             return null;
-        },
-        hasWriteCommands: function() {
-            return true;
         },
         getMinWireVersion: function() {
             return mongo.getMinWireVersion();

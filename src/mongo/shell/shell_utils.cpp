@@ -424,18 +424,6 @@ BSONObj replMonitorStats(const BSONObj& a, void* data) {
     return result.obj()[name].Obj().getOwned();
 }
 
-BSONObj useWriteCommandsDefault(const BSONObj& a, void* data) {
-    return BSON("" << shellGlobalParams.useWriteCommandsDefault);
-}
-
-BSONObj writeMode(const BSONObj&, void*) {
-    return BSON("" << shellGlobalParams.writeMode);
-}
-
-BSONObj readMode(const BSONObj&, void*) {
-    return BSON("" << shellGlobalParams.readMode);
-}
-
 BSONObj shouldRetryWrites(const BSONObj&, void* data) {
     return BSON("" << shellGlobalParams.shouldRetryWrites);
 }
@@ -496,9 +484,6 @@ void initializeEnterpriseScope(Scope& scope) {
 
 void initScope(Scope& scope) {
     // Need to define this method before JSFiles::utils is executed.
-    scope.injectNative("_useWriteCommandsDefault", useWriteCommandsDefault);
-    scope.injectNative("_writeMode", writeMode);
-    scope.injectNative("_readMode", readMode);
     scope.injectNative("_shouldRetryWrites", shouldRetryWrites);
     scope.injectNative("_shouldUseImplicitSessions", shouldUseImplicitSessions);
     scope.injectNative("_apiParameters", apiParameters);

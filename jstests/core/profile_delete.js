@@ -27,18 +27,14 @@ for (i = 0; i < 10; ++i) {
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
-assert.commandWorked(coll.remove({a: {$gte: 2}, b: {$gte: 2}},
-                                 db.getMongo().writeMode() === "commands"
-                                     ? {justOne: true, collation: {locale: "fr"}}
-                                     : {justOne: true}));
+assert.commandWorked(
+    coll.remove({a: {$gte: 2}, b: {$gte: 2}}, {justOne: true, collation: {locale: "fr"}}));
 
 var profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
 assert.eq(profileObj.op, "remove", tojson(profileObj));
-if (db.getMongo().writeMode() === "commands") {
-    assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
-}
+assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
 assert.eq(profileObj.ndeleted, 1, tojson(profileObj));
 assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
 assert.eq(profileObj.docsExamined, 1, tojson(profileObj));

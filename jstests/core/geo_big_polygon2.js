@@ -625,10 +625,7 @@ indexes.forEach(function(index) {
         assert.eq(p.nI, docArray.length, p.name + " intersects");
         // Update on matching docs
         let result = coll.update(q, {$set: {stored: ObjectId()}}, {multi: true});
-        // only check nModified if write commands are enabled
-        if (coll.getMongo().writeMode() == "commands") {
-            assert.eq(p.nI, result.nModified, `update ${p.name}; result: ${tojson(result)}`);
-        }
+        assert.eq(p.nI, result.nModified, `update ${p.name}; result: ${tojson(result)}`);
         // Remove & restore matching docs
         assert.eq(p.nI, coll.remove(q).nRemoved, "remove " + p.name);
         let bulk = coll.initializeUnorderedBulkOp();

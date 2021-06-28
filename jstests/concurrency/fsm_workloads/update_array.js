@@ -24,18 +24,14 @@ var $config = (function() {
             if (isMongod(db)) {
                 // The update should have succeeded if a matching document existed.
                 assertWhenOwnColl.contains(1, nModifiedPossibilities, tojson(res));
-                if (db.getMongo().writeMode() === 'commands') {
-                    assertWhenOwnColl.contains(res.nModified, nModifiedPossibilities, tojson(res));
-                }
+                assertWhenOwnColl.contains(res.nModified, nModifiedPossibilities, tojson(res));
             } else {
                 // On storage engines that do not support document-level concurrency, it is possible
                 // that the update will not update all matching documents. This can happen if
                 // another thread updated a target document during a yield, triggering an
                 // invalidation.
                 assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
-                if (db.getMongo().writeMode() === 'commands') {
-                    assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
-                }
+                assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
             }
         }
 

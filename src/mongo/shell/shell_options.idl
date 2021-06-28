@@ -135,19 +135,6 @@ configs:
     cpp_varname: shellGlobalParams.autoKillOp
     hidden: true
 
-  "useLegacyWriteOps":
-    description: "use legacy write ops instead of write commands"
-    arg_vartype: Switch
-    hidden: true
-  "writeMode":
-    description: "mode to determine how writes are done: commands, compatibility, legacy"
-    arg_vartype: String
-    hidden: true
-  "readMode":
-    description: "mode to determine how .find() querues are done: commands, compatibility, legacy"
-    arg_vartype: String
-    hidden: true
-
   "retryWrites":
     description: "automatically retry write operations upon transient network errors"
     arg_vartype: Switch
@@ -155,10 +142,6 @@ configs:
   "disableImplicitSessions":
     description: "do not automatically create and use implicit sessions"
     arg_vartype: Switch
-  "rpcProtocols":
-    description: " none, opQueryOnly, opMsgOnly, all"
-    arg_vartype: String
-    hidden: true
   "jsHeapLimitMB":
     description: "set the js scope's heap size limit"
     arg_vartype: Int

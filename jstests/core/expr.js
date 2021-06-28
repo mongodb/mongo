@@ -173,17 +173,15 @@ assert.throws(function() {
 });
 
 // $expr is not allowed in arrayFilters.
-if (db.getMongo().writeMode() === "commands") {
-    coll.drop();
-    assert.commandWorked(coll.insert({_id: 0, a: [{b: 5}]}));
-    assert.throws(function() {
-        coll.findAndModify({
-            query: {_id: 0},
-            update: {$set: {"a.$[i].b": 6}},
-            arrayFilters: [{"i.b": 5, $expr: {$eq: ["$i.b", 5]}}]
-        });
+coll.drop();
+assert.commandWorked(coll.insert({_id: 0, a: [{b: 5}]}));
+assert.throws(function() {
+    coll.findAndModify({
+        query: {_id: 0},
+        update: {$set: {"a.$[i].b": 6}},
+        arrayFilters: [{"i.b": 5, $expr: {$eq: ["$i.b", 5]}}]
     });
-}
+});
 
 //
 // $expr in the $geoNear stage.
@@ -309,13 +307,10 @@ assert.commandWorked(coll.insert({_id: 0, a: [{b: 5}]}));
 assert.writeError(coll.update({_id: 0}, {$pull: {a: {$expr: {$eq: ["$b", 5]}}}}));
 
 // $expr is not allowed in arrayFilters.
-if (db.getMongo().writeMode() === "commands") {
-    coll.drop();
-    assert.commandWorked(coll.insert({_id: 0, a: [{b: 5}]}));
-    assert.writeError(coll.update({_id: 0},
-                                  {$set: {"a.$[i].b": 6}},
-                                  {arrayFilters: [{"i.b": 5, $expr: {$eq: ["$i.b", 5]}}]}));
-}
+coll.drop();
+assert.commandWorked(coll.insert({_id: 0, a: [{b: 5}]}));
+assert.writeError(coll.update(
+    {_id: 0}, {$set: {"a.$[i].b": 6}}, {arrayFilters: [{"i.b": 5, $expr: {$eq: ["$i.b", 5]}}]}));
 
 // Any writes preceding the write that fails to parse are executed.
 coll.drop();

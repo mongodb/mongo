@@ -48,23 +48,20 @@ assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
 //
-// Confirm metrics for parameters that require "commands" mode.
+// Confirm metrics for parameters.
 //
+coll.drop();
+assert.commandWorked(coll.insert({_id: 0, a: [0]}));
 
-if (db.getMongo().writeMode() === "commands") {
-    coll.drop();
-    assert.commandWorked(coll.insert({_id: 0, a: [0]}));
+assert.commandWorked(coll.update(
+    {_id: 0}, {$set: {"a.$[i]": 1}}, {collation: {locale: "fr"}, arrayFilters: [{i: 0}]}));
 
-    assert.commandWorked(coll.update(
-        {_id: 0}, {$set: {"a.$[i]": 1}}, {collation: {locale: "fr"}, arrayFilters: [{i: 0}]}));
+profileObj = getLatestProfilerEntry(testDB);
 
-    profileObj = getLatestProfilerEntry(testDB);
-
-    assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
-    assert.eq(profileObj.op, "update", tojson(profileObj));
-    assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
-    assert.eq(profileObj.command.arrayFilters, [{i: 0}], tojson(profileObj));
-}
+assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
+assert.eq(profileObj.op, "update", tojson(profileObj));
+assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
+assert.eq(profileObj.command.arrayFilters, [{i: 0}], tojson(profileObj));
 
 //
 // Confirm metrics for multiple indexed document update.

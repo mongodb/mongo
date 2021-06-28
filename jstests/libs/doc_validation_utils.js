@@ -8,17 +8,15 @@
  */
 function assertDocumentValidationFailure(res, coll) {
     assert.commandFailedWithCode(res, ErrorCodes.DocumentValidationFailure, tojson(res));
-    if (coll.getMongo().writeMode() === "commands") {
-        if (res instanceof BulkWriteResult) {
-            const errors = res.getWriteErrors();
-            for (const error of errors) {
-                assert(error.hasOwnProperty("errInfo"), tojson(error));
-                assert.eq(typeof error["errInfo"], "object", tojson(error));
-            }
-        } else {
-            const error = res instanceof WriteResult ? res.getWriteError() : res;
+    if (res instanceof BulkWriteResult) {
+        const errors = res.getWriteErrors();
+        for (const error of errors) {
             assert(error.hasOwnProperty("errInfo"), tojson(error));
             assert.eq(typeof error["errInfo"], "object", tojson(error));
         }
+    } else {
+        const error = res instanceof WriteResult ? res.getWriteError() : res;
+        assert(error.hasOwnProperty("errInfo"), tojson(error));
+        assert.eq(typeof error["errInfo"], "object", tojson(error));
     }
 }

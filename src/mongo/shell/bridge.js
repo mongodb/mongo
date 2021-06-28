@@ -137,10 +137,7 @@ function MongoBridge(options) {
     function runBridgeCommand(conn, cmdName, cmdArgs) {
         // The wire version of this mongobridge is detected as the wire version of the corresponding
         // mongod or mongos process because the message is simply forwarded to that process.
-        // Commands to configure the mongobridge process must support being sent as an OP_QUERY
-        // message in order to handle when the mongobridge is a proxy for a mongos process or when
-        // --readMode=legacy is passed to the mongo shell. Create a new Object with 'cmdName' as the
-        // first key and $forBridge=true.
+        // Create a new Object with 'cmdName' as the first key and $forBridge=true.
         var cmdObj = {};
         cmdObj[cmdName] = 1;
         cmdObj.$forBridge = true;

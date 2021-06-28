@@ -42,14 +42,10 @@ var $config = (function() {
 
             assertAlways.contains(res.nMatched, [0, 1], tojson(res));
             if (res.nMatched === 0) {
-                if (ownedDB.getMongo().writeMode() === 'commands') {
-                    assertAlways.eq(0, res.nModified, tojson(res));
-                }
+                assertAlways.eq(0, res.nModified, tojson(res));
                 assertAlways.eq(1, res.nUpserted, tojson(res));
             } else {
-                if (ownedDB.getMongo().writeMode() === 'commands') {
-                    assertAlways.eq(1, res.nModified, tojson(res));
-                }
+                assertAlways.eq(1, res.nModified, tojson(res));
                 assertAlways.eq(0, res.nUpserted, tojson(res));
             }
         }

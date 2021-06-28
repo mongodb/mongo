@@ -44,27 +44,25 @@ res = t.insert([{_id: 1}, {_id: 2}]);
 assert.commandWorked(res);
 assert.eq(opCounters.insert + 2, newdb.serverStatus().opcounters.insert);
 
-// Test is not run when in compatibility mode as errors are not counted
-if (t.getMongo().writeMode() != "compatibility") {
-    // Single insert, with error.
-    opCounters = newdb.serverStatus().opcounters;
-    res = t.insert({_id: 0});
-    assert.writeError(res);
-    assert.eq(opCounters.insert + 1, newdb.serverStatus().opcounters.insert);
+// Single insert, with error.
+opCounters = newdb.serverStatus().opcounters;
+res = t.insert({_id: 0});
+assert.writeError(res);
+assert.eq(opCounters.insert + 1, newdb.serverStatus().opcounters.insert);
 
-    // Bulk insert, with error, ordered.
-    opCounters = newdb.serverStatus().opcounters;
-    res = t.insert([{_id: 3}, {_id: 3}, {_id: 4}]);
-    assert.writeError(res);
-    assert.eq(opCounters.insert + 2, newdb.serverStatus().opcounters.insert);
+// Bulk insert, with error, ordered.
+opCounters = newdb.serverStatus().opcounters;
+res = t.insert([{_id: 3}, {_id: 3}, {_id: 4}]);
+assert.writeError(res);
+assert.eq(opCounters.insert + 2, newdb.serverStatus().opcounters.insert);
 
-    // Bulk insert, with error, unordered.
-    var continueOnErrorFlag = 1;
-    opCounters = newdb.serverStatus().opcounters;
-    res = t.insert([{_id: 5}, {_id: 5}, {_id: 6}], continueOnErrorFlag);
-    assert.writeError(res);
-    assert.eq(opCounters.insert + 3, newdb.serverStatus().opcounters.insert);
-}
+// Bulk insert, with error, unordered.
+var continueOnErrorFlag = 1;
+opCounters = newdb.serverStatus().opcounters;
+res = t.insert([{_id: 5}, {_id: 5}, {_id: 6}], continueOnErrorFlag);
+assert.writeError(res);
+assert.eq(opCounters.insert + 3, newdb.serverStatus().opcounters.insert);
+
 //
 // 2. Update.
 //

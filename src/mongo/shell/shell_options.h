@@ -73,10 +73,7 @@ struct ShellGlobalParams {
     bool apiDeprecationErrors;
 
     bool autoKillOp = false;
-    bool useWriteCommandsDefault = true;
 
-    std::string writeMode = "commands";
-    std::string readMode = "commands";
     bool shouldRetryWrites = false;
     bool shouldUseImplicitSessions = true;
 

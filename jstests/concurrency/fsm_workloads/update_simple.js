@@ -67,9 +67,7 @@ var $config = (function() {
 
                 // We can't be sure nModified will be non-zero because we may have just set a key to
                 // its existing value
-                if (db.getMongo().writeMode() === 'commands') {
-                    assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
-                }
+                assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
             },
 
             setOrUnset: function setOrUnset(db, collName, set, numDocs) {

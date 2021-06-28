@@ -82,19 +82,15 @@ var $config = (function() {
                     // Storage engines will automatically retry any operations when there are
                     // conflicts, so we should always see a matching document.
                     assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));
-                    if (db.getMongo().writeMode() === 'commands') {
-                        assertWhenOwnColl.eq(res.nModified, 1, tojson(res));
-                    }
+                    assertWhenOwnColl.eq(res.nModified, 1, tojson(res));
                 } else {
                     // On storage engines that do not support document-level concurrency, it is
                     // possible that the query will not find the document. This can happen if
                     // another thread updated the target document during a yield, triggering an
                     // invalidation.
                     assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
-                    if (db.getMongo().writeMode() === 'commands') {
-                        assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
-                        assertAlways.eq(res.nModified, res.nMatched, tojson(res));
-                    }
+                    assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
+                    assertAlways.eq(res.nModified, res.nMatched, tojson(res));
                 }
             },
             multi: false,

@@ -26,12 +26,10 @@ var $config = (function() {
             assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
         }
 
-        if (db.getMongo().writeMode() === 'commands') {
-            // It's possible that we replaced the document with its current contents, making the
-            // update a no-op.
-            assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
-            assertAlways.lte(res.nModified, res.nMatched, tojson(res));
-        }
+        // It's possible that we replaced the document with its current contents, making the update
+        // a no-op.
+        assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
+        assertAlways.lte(res.nModified, res.nMatched, tojson(res));
     }
 
     // returns an update doc

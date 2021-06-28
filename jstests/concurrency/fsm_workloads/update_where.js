@@ -27,10 +27,8 @@ var $config = extendWorkload($config, function($config, $super) {
             {multi: true});
         assertAlways.commandWorked(res);
 
-        if (db.getMongo().writeMode() === 'commands') {
-            assertWhenOwnColl.gte(res.nModified, 0);
-            assertWhenOwnColl.lte(res.nModified, this.insertedDocuments);
-        }
+        assertWhenOwnColl.gte(res.nModified, 0);
+        assertWhenOwnColl.lte(res.nModified, this.insertedDocuments);
     };
 
     $config.transitions = {

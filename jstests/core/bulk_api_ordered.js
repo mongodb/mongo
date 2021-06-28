@@ -42,10 +42,7 @@ var result = bulkOp.execute();
 assert.eq(2, result.nInserted);
 assert.eq(2, result.nUpserted);
 assert.eq(5, result.nMatched);
-// only check nModified if write commands are enabled
-if (coll.getMongo().writeMode() == "commands") {
-    assert.eq(4, result.nModified);
-}
+assert.eq(4, result.nModified);
 assert.eq(2, result.nRemoved);
 var upserts = result.getUpsertedIds();
 assert.eq(2, upserts.length);

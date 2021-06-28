@@ -28,10 +28,8 @@ for (let i = 0; i < kNumDocs; i++) {
 
     const res = assert.commandWorked(coll.update({_id: i}, {$set: {x: i}}));
     assert.eq(res.nMatched, 1, tojson(res));
-    if (coll.getMongo().writeMode() == "commands") {
-        assert.eq(res.nModified, 0, tojson(res));
-        assert.eq(res.nUpserted, 0, tojson(res));
-    }
+    assert.eq(res.nModified, 0, tojson(res));
+    assert.eq(res.nUpserted, 0, tojson(res));
 
     assert.eq({_id: i, x: i}, coll.findOne({_id: i, x: i}), "No matching document for i = " + i);
 }
@@ -49,10 +47,8 @@ for (let i = 0; i < kNumDocs; i++) {
 
     const res = assert.commandWorked(coll.update({_id: i}, {$set: {x: i}}));
     assert.eq(res.nMatched, 0, tojson(res));
-    if (coll.getMongo().writeMode() == "commands") {
-        assert.eq(res.nModified, 0, tojson(res));
-        assert.eq(res.nUpserted, 0, tojson(res));
-    }
+    assert.eq(res.nModified, 0, tojson(res));
+    assert.eq(res.nUpserted, 0, tojson(res));
 
     assert.isnull(coll.findOne({_id: i}), "Unexpected matching document for i = " + i);
 }

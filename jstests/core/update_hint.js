@@ -161,8 +161,6 @@ function failedHintTest() {
 
 normalIndexTest();
 sparseIndexTest();
-if (coll.getMongo().writeMode() === "commands") {
-    shellHelpersTest();
-}
+shellHelpersTest();
 failedHintTest();
 })();

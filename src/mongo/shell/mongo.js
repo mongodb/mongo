@@ -418,74 +418,9 @@ connect = function(url, user, pass, apiParameters) {
     return db;
 };
 
-Mongo.prototype.hasWriteCommands = function() {
-    var hasWriteCommands = (this.getMinWireVersion() <= 2 && 2 <= this.getMaxWireVersion());
-    return hasWriteCommands;
-};
-
 Mongo.prototype.hasExplainCommand = function() {
     var hasExplain = (this.getMinWireVersion() <= 3 && 3 <= this.getMaxWireVersion());
     return hasExplain;
-};
-
-/**
- * {String} Returns the current mode set. Will be commands/legacy/compatibility
- *
- * Sends isMaster to determine if the connection is capable of using bulk write operations, and
- * caches the result.
- */
-
-Mongo.prototype.writeMode = function() {
-    if ('_writeMode' in this) {
-        return this._writeMode;
-    }
-
-    // get default from shell params
-    if (_writeMode)
-        this._writeMode = _writeMode();
-
-    // can't use "commands" mode unless server version is good.
-    if (this.hasWriteCommands()) {
-        // good with whatever is already set
-    } else if (this._writeMode == "commands") {
-        this._writeMode = "compatibility";
-    }
-
-    return this._writeMode;
-};
-
-/**
- * Get the readMode string (either "commands" for find/getMore commands, "legacy" for OP_QUERY find
- * and OP_GET_MORE, or "compatibility" for detecting based on wire version).
- */
-Mongo.prototype.readMode = function() {
-    // Get the readMode from the shell params if we don't have one yet.
-    if (typeof _readMode === "function" && !this.hasOwnProperty("_readMode")) {
-        this._readMode = _readMode();
-    }
-
-    if (this.hasOwnProperty("_readMode") && this._readMode !== "compatibility") {
-        // We already have determined our read mode. Just return it.
-        return this._readMode;
-    } else {
-        // We're in compatibility mode. Determine whether the server supports the find/getMore
-        // commands. If it does, use commands mode. If not, degrade to legacy mode.
-        try {
-            var hasReadCommands = (this.getMinWireVersion() <= 4 && 4 <= this.getMaxWireVersion());
-            if (hasReadCommands) {
-                this._readMode = "commands";
-            } else {
-                this._readMode = "legacy";
-            }
-        } catch (e) {
-            // We failed trying to determine whether the remote node supports the find/getMore
-            // commands. In this case, we keep _readMode as "compatibility" and the shell should
-            // issue legacy reads. Next time around we will issue another isMaster to try to
-            // determine the readMode decisively.
-        }
-    }
-
-    return this._readMode;
 };
 
 //
