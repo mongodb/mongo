@@ -79,6 +79,9 @@ parameters:
   - key: patch_compile_flags
     description: "Additional SCons flags to be applied during scons compile invocations in this patch"
 
+  - key: future_git_tag
+    description: "Future git tag to be added. If empty, we will use the most recent git tag instead."
+
 ## Some variables for convenience:
 variables:
 
@@ -207,7 +210,7 @@ variables:
   setup_group_can_fail_task: true
   setup_group:
   - command: manifest.load
-  - func: "git get project"
+  - func: "git get project and add git tag"
   - func: "set task expansion macros"
   - func: "f_expansions_write"
   - func: "kill processes"
@@ -292,7 +295,7 @@ variables:
   setup_group_can_fail_task: true
   setup_group:
     - command: manifest.load
-    - func: "git get project"
+    - func: "git get project and add git tag"
     - func: "set task expansion macros"
     - func: "f_expansions_write"
     - func: "kill processes"
@@ -450,6 +453,20 @@ functions:
       revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
         enterprise: ${enterprise_rev}
         wtdevelop: ${wtdevelop_rev}
+
+  "add git tag": &add_git_tag
+    command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/functions/add_git_tag.sh"
+      env:
+        future_git_tag: ${future_git_tag}
+
+  "git get project and add git tag":
+    - *f_expansions_write
+    - *git_get_project
+    - *add_git_tag
 
   "fetch artifacts": &fetch_artifacts
     command: s3.get
@@ -843,6 +860,7 @@ functions:
   - command: manifest.load
   - *git_get_project
   - *f_expansions_write
+  - *add_git_tag
   - *kill_processes
   - *cleanup_environment
   - *set_up_venv
@@ -855,6 +873,7 @@ functions:
   - command: manifest.load
   - *git_get_project
   - *f_expansions_write
+  - *add_git_tag
   - *kill_processes
   - *cleanup_environment
   - *set_up_venv
@@ -887,6 +906,7 @@ functions:
     - command: manifest.load
     - *git_get_project
     - *f_expansions_write
+    - *add_git_tag
     - *kill_processes
     - *cleanup_environment
     - *set_up_venv
@@ -925,6 +945,7 @@ functions:
     - command: manifest.load
     - *git_get_project
     - *f_expansions_write
+    - *add_git_tag
     - *kill_processes
     - *cleanup_environment
     - *set_up_venv
@@ -1030,6 +1051,7 @@ functions:
     - command: manifest.load
     - *git_get_project
     - *f_expansions_write
+    - *add_git_tag
     - *kill_processes
     - *cleanup_environment
     - *set_up_venv
@@ -1087,6 +1109,7 @@ functions:
     - command: manifest.load
     - *git_get_project
     - *f_expansions_write
+    - *add_git_tag
     - *kill_processes
     - *cleanup_environment
     - *set_up_venv
@@ -1285,6 +1308,7 @@ functions:
     - command: manifest.load
     - *git_get_project
     - *f_expansions_write
+    - *add_git_tag
     - *kill_processes
     - *cleanup_environment
     - *set_up_venv
@@ -1336,6 +1360,7 @@ functions:
     - command: manifest.load
     - *git_get_project
     - *f_expansions_write
+    - *add_git_tag
     - *kill_processes
     - *cleanup_environment
     - *set_up_venv
@@ -1388,6 +1413,7 @@ functions:
     - command: manifest.load
     - *git_get_project
     - *f_expansions_write
+    - *add_git_tag
     - *kill_processes
     - *cleanup_environment
     - *set_up_venv
@@ -2746,7 +2772,7 @@ tasks:
   depends_on: []
   commands:
     - command: manifest.load
-    - *git_get_project
+    - func: "git get project and add git tag"
     - *f_expansions_write
     - *kill_processes
     - *cleanup_environment
@@ -2796,7 +2822,7 @@ tasks:
         exec_timeout_secs: 2400
     - *f_expansions_write
     - command: manifest.load
-    - *git_get_project
+    - func: "git get project and add git tag"
     - *f_expansions_write
     - *kill_processes
     - *cleanup_environment
@@ -2815,7 +2841,7 @@ tasks:
         exec_timeout_secs: 2400
     - *f_expansions_write
     - command: manifest.load
-    - *git_get_project
+    - func: "git get project and add git tag"
     - *f_expansions_write
     - *kill_processes
     - *cleanup_environment
@@ -2834,7 +2860,7 @@ tasks:
         exec_timeout_secs: 2400
     - *f_expansions_write
     - command: manifest.load
-    - *git_get_project
+    - func: "git get project and add git tag"
     - *f_expansions_write
     - *kill_processes
     - *cleanup_environment
@@ -2853,7 +2879,7 @@ tasks:
         exec_timeout_secs: 2400
     - *f_expansions_write
     - command: manifest.load
-    - *git_get_project
+    - func: "git get project and add git tag"
     - *f_expansions_write
     - *kill_processes
     - *cleanup_environment
@@ -2868,7 +2894,7 @@ tasks:
   depends_on: []
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
@@ -2886,7 +2912,7 @@ tasks:
   tags: []
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
@@ -2901,7 +2927,7 @@ tasks:
   tags: []
   commands:
     - command: manifest.load
-    - *git_get_project
+    - func: "git get project and add git tag"
     - *f_expansions_write
     - *kill_processes
     - *cleanup_environment
@@ -2917,7 +2943,7 @@ tasks:
     - name: archive_dist_test_debug
   commands:
     - command: manifest.load
-    - *git_get_project
+    - func: "git get project and add git tag"
     - *f_expansions_write
     - *kill_processes
     - *cleanup_environment
@@ -2936,7 +2962,7 @@ tasks:
   tags: []
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
@@ -2976,7 +3002,7 @@ tasks:
   tags: []
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
@@ -3893,7 +3919,7 @@ tasks:
   patch_only: true
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
@@ -3907,7 +3933,7 @@ tasks:
   tags: []
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
@@ -4070,7 +4096,7 @@ tasks:
     - name: archive_dist_test_debug
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
@@ -4089,7 +4115,7 @@ tasks:
   tags: []
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
@@ -4350,7 +4376,7 @@ tasks:
   tags: ["integration", "standalone"]
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -4369,7 +4395,7 @@ tasks:
   tags: ["integration", "audit"]
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -4388,7 +4414,7 @@ tasks:
   tags: ["integration"]
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -4407,7 +4433,7 @@ tasks:
   tags: ["integration"]
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -4426,7 +4452,7 @@ tasks:
   tags: ["integration", "sharded"]
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - *f_expansions_write
   - func: "do setup"
   - func: "set up win mount script"
@@ -6050,7 +6076,7 @@ tasks:
   - name: archive_dist_test_debug
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
@@ -6124,7 +6150,7 @@ tasks:
   - name: package
   commands:
     - command: manifest.load
-    - *git_get_project
+    - func: "git get project and add git tag"
     - *f_expansions_write
     - *kill_processes
     - *cleanup_environment
@@ -6144,7 +6170,7 @@ tasks:
     - name: compile_dist_test
   commands:
     - command: manifest.load
-    - *git_get_project
+    - func: "git get project and add git tag"
     - *f_expansions_write
     - *kill_processes
     - *cleanup_environment
@@ -6303,7 +6329,7 @@ tasks:
   - name: replica_sets_jscore_passthrough
   commands:
     - command: manifest.load
-    - func: "git get project"
+    - func: "git get project and add git tag"
     - func: "f_expansions_write"
     - func: "kill processes"
     - func: "cleanup environment"
@@ -6334,7 +6360,7 @@ tasks:
   stepback: false
   commands:
     - command: manifest.load
-    - func: "git get project"
+    - func: "git get project and add git tag"
     - func: "f_expansions_write"
     - func: "kill processes"
     - func: "cleanup environment"
@@ -6921,7 +6947,7 @@ tasks:
   depends_on: []
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
@@ -6934,7 +6960,7 @@ tasks:
   depends_on: []
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
@@ -6947,7 +6973,7 @@ tasks:
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
   - command: manifest.load
-  - *git_get_project
+  - func: "git get project and add git tag"
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
@@ -6964,7 +6990,7 @@ tasks:
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
     - command: manifest.load
-    - *git_get_project
+    - func: "git get project and add git tag"
     - *f_expansions_write
     - *kill_processes
     - *cleanup_environment
@@ -7136,7 +7162,7 @@ task_groups:
   setup_group_can_fail_task: true
   setup_group:
     - command: manifest.load
-    - func: "git get project"
+    - func: "git get project and add git tag"
     - func: "set task expansion macros"
     - func: "f_expansions_write"
     - func: "kill processes"
@@ -7167,7 +7193,7 @@ task_groups:
   max_hosts: 1
   setup_group:
     - command: manifest.load
-    - func: "git get project"
+    - func: "git get project and add git tag"
     - func: "set task expansion macros"
     - func: "f_expansions_write"
     - func: "get buildnumber"
@@ -7193,7 +7219,7 @@ task_groups:
   max_hosts: 1
   setup_group:
     - command: manifest.load
-    - func: "git get project"
+    - func: "git get project and add git tag"
     - func: "set task expansion macros"
     - func: "f_expansions_write"
     - func: "get buildnumber"
