@@ -5,7 +5,6 @@
  * @tags: [
  *   assumes_no_implicit_collection_creation_after_drop,
  *   multiversion_incompatible,
- *   requires_find_command,
  *   requires_ttl_index,
  * ]
  */

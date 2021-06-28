@@ -1,9 +1,7 @@
 /**
  * Tests for the $$NOW and $$CLUSTER_TIME system variable on a sharded cluster.
  */
-// @tags: [
-//   requires_find_command,
-// ]
+
 (function() {
 "use strict";
 

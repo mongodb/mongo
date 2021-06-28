@@ -12,8 +12,6 @@
 //    expiring from the config.system.sessions collection. If the expiration date has been reached
 //    during a currently running operation, the logical session cache should vivify the session and
 //    replace it in the config.system.sessions collection.
-//
-//    @tags: [requires_find_command]
 
 (function() {
 "use strict";

@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   requires_fcv_49,
- *   requires_find_command,
  *   uses_atclustertime,
  * ]
  */

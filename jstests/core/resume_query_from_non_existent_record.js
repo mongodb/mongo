@@ -6,11 +6,10 @@
  * same node, since they rely on a record id which is assigned internally by a given node.
  *
  * @tags: [
- *  assumes_against_mongod_not_mongos,
- *  requires_find_command,
- *  requires_non_retryable_writes,
- *  multiversion_incompatible,
- *  tenant_migration_incompatible,
+ *   assumes_against_mongod_not_mongos,
+ *   multiversion_incompatible,
+ *   requires_non_retryable_writes,
+ *   tenant_migration_incompatible,
  * ]
  */
 

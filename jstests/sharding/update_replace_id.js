@@ -12,7 +12,6 @@
  * filter.
  *
  * @tags: [
- *   requires_find_command,
  *   uses_multi_shard_transactions,
  *   uses_transactions,
  * ]

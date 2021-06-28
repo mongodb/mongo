@@ -116,6 +116,7 @@ if (typeof _threadInject != "undefined") {
     // and then calls assert.parallelests to run them.
     ParallelTester = function() {
         assert.neq(db.getMongo().writeMode(), "legacy", "wrong shell write mode");
+        assert.neq(db.getMongo().readMode(), "legacy", "wrong shell read mode");
         this.params = new Array();
     };
 
@@ -236,33 +237,6 @@ if (typeof _threadInject != "undefined") {
             });
             return fileList;
         };
-
-        // The following tests cannot run when shell readMode is legacy.
-        if (db.getMongo().readMode() === "legacy") {
-            var requires_find_command = [
-                "apply_ops_system_dot_views.js",
-                "command_let_variables.js",
-                "doc_validation_error.js",
-                "merge_sort_collation.js",
-                "explode_for_sort_fetch.js",
-                "update_pipeline_shell_helpers.js",
-                "update_with_pipeline.js",
-                "verify_update_mods.js",
-                "views/dbref_projection.js",
-                "views/views_aggregation.js",
-                "views/views_change.js",
-                "views/views_drop.js",
-                "views/views_find.js",
-                "wildcard_index_collation.js"
-            ];
-            Object.assign(skipTests, makeKeys(requires_find_command));
-
-            // Time-series collections require support for views, so are incompatible with legacy
-            // readMode.
-            const timeseriesTestFiles =
-                getFilesRecursive('jstests/core/timeseries').map(f => ('timeseries/' + f.baseName));
-            Object.assign(skipTests, makeKeys(timeseriesTestFiles));
-        }
 
         // Transactions are not supported on standalone nodes so we do not run them here.
         let txnsTestFiles = getFilesRecursive("jstests/core/txns").map(f => ("txns/" + f.baseName));

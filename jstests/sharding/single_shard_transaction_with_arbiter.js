@@ -1,7 +1,9 @@
 /**
  * Tests that single shard transactions succeed against replica sets that contain arbiters.
  *
- * @tags: [uses_transactions, requires_find_command]
+ * @tags: [
+ *   uses_transactions,
+ * ]
  */
 
 (function() {

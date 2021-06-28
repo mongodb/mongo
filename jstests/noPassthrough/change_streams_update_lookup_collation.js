@@ -1,8 +1,10 @@
 // Tests that the update lookup of an unsharded change stream will use the collection-default
 // collation, regardless of the collation on the change stream.
 //
-// Collation is only supported with the find command, not with op query.
-// @tags: [requires_find_command, uses_change_streams, requires_majority_read_concern]
+// @tags: [
+//   requires_majority_read_concern,
+//   uses_change_streams,
+// ]
 (function() {
 "use strict";
 

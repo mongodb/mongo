@@ -502,9 +502,6 @@ var ReshardingTest = class {
         // shard would appear as extra documents.
         const tempColl = this._st.s.getCollection(this._tempNs);
         const localReadCursor = tempColl.find().sort({_id: 1});
-        // tempColl.find().readConcern("available") would be an error when the mongo shell is
-        // started with --readMode=legacy. We call runCommand() directly to avoid needing to tag
-        // every test which uses ReshardingTest with "requires_find_command".
         const availableReadCursor =
             new DBCommandCursor(tempColl.getDB(), assert.commandWorked(tempColl.runCommand("find", {
                 sort: {_id: 1},

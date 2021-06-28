@@ -1,10 +1,9 @@
 /**
  * Tests if queries against time-series collections in transactions work as expected.
  * @tags: [
- *     requires_fcv_49,
- *     requires_find_command,
- *     assumes_against_mongod_not_mongos,
- *     uses_transactions,
+ *   assumes_against_mongod_not_mongos,
+ *   requires_fcv_49,
+ *   uses_transactions,
  * ]
  */
 (function() {

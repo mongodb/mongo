@@ -2,10 +2,11 @@
  * Tests that the $$NOW and $$CLUSTER_TIME system variables can be used when performing updates on a
  * replica set.
  *
- * Tag this test as 'requires_find_command' to prevent it from running in the legacy passthroughs.
  * The 'requires_replication' tag prevents the test from running on variants with storage options
  * which cannot support a replica set.
- * @tags: [requires_find_command, requires_replication]
+ * @tags: [
+ *   requires_replication,
+ * ]
  */
 (function() {
 "use strict";

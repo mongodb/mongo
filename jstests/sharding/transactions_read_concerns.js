@@ -1,7 +1,6 @@
 // Verifies basic sharded transaction behavior with the supported read concern levels.
 //
 // @tags: [
-//   requires_find_command,
 //   requires_sharding,
 //   uses_multi_shard_transaction,
 //   uses_transactions,

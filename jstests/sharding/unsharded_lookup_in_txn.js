@@ -1,7 +1,10 @@
 /**
  * Test that $lookup within a sharded transaction reads from the correct snapshot.
- * @tags: [requires_find_command, requires_sharding, uses_multi_shard_transaction,
- *         uses_transactions]
+ * @tags: [
+ *   requires_sharding,
+ *   uses_multi_shard_transaction,
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";

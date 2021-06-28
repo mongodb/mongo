@@ -1,11 +1,11 @@
 /**
  * Test that we can use the $_resumeAfter and $_requestResumeToken options to resume a query.
  * @tags: [
- *  assumes_against_mongod_not_mongos,
- *  requires_find_command,
- *  requires_persistence,
- *  multiversion_incompatible,
- *  requires_getmore]
+ *   assumes_against_mongod_not_mongos,
+ *   multiversion_incompatible,
+ *   requires_getmore,
+ *   requires_persistence,
+ * ]
  */
 
 (function() {

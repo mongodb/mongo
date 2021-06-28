@@ -3,11 +3,10 @@
 // aware of the existing index fails.
 //
 // @tags: [
-//   requires_find_command,
+//   live_record_incompatible,
 //   requires_sharding,
 //   uses_multi_shard_transaction,
 //   uses_transactions,
-//   live_record_incompatible,
 // ]
 (function() {
 "use strict";

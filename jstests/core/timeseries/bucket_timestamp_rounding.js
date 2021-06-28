@@ -8,12 +8,11 @@
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
  *   # writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
- *   # Same goes for tenant migrations.
- *   tenant_migration_incompatible,
  *   does_not_support_transactions,
  *   requires_fcv_49,
- *   requires_find_command,
  *   requires_timeseries,
+ *   # Same goes for tenant migrations.
+ *   tenant_migration_incompatible,
  * ]
  */
 

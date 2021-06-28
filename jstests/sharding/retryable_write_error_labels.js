@@ -1,11 +1,7 @@
 /**
  * Test RetryableWriteError label in retryable writes and in transactions.
  *
- * The "requires_find_command" tag excludes this test from the op_query suites, which are
- * incompatible with implicit sessions.
- *
  * @tags: [
- *   requires_find_command,
  *   uses_transactions,
  * ]
  */

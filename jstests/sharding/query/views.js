@@ -1,6 +1,5 @@
 /**
  * Tests for expected behavior when querying a view that is based on a sharded collection.
- * @tags: [requires_find_command]
  */
 (function() {
 "use strict";

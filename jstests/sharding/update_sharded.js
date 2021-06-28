@@ -2,14 +2,9 @@
  * Test simple updates issued through mongos. Updates have different constraints through mongos,
  * since shard key is immutable.
  *
- * Updating a shard key in a single statement may use a multi shard transaction. Uses the
- * 'requires_find_command' tag to skip this test in sharding_op_query suite. Otherwise,
- * sessionDb.coll.find() will throw "Cannot run a legacy query on a session".
- *
  * @tags: [
- *  requires_find_command,
- *  uses_multi_shard_transaction,
- *  uses_transactions,
+ *   uses_multi_shard_transaction,
+ *   uses_transactions,
  * ]
  */
 (function() {

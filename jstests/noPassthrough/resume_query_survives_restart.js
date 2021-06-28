@@ -2,7 +2,9 @@
  * Test that we can use the $_resumeAfter and $_requestResumeToken options to resume a query
  * even after the node has been restarted.
  *
- * @tags: [requires_find_command,requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ * ]
  */
 
 (function() {

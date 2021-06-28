@@ -1,7 +1,9 @@
 /**
  * Test that trying to use $_resumeAfter and $_requestResumeToken options to resume a query fails
  * on mongos.
- * @tags: [multiversion_incompatible,requires_find_command]
+ * @tags: [
+ *   multiversion_incompatible,
+ * ]
  */
 
 (function() {

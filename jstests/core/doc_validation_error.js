@@ -2,8 +2,6 @@
  * Tests document validation errors with sample validators. Note that it uses some JSON Schemas from
  * schemastore.org.
  * @tags: [
- *   # Does not work with legacy shellWriteMode.
- *   requires_find_command,
  *   requires_fcv_49,
  * ]
  */

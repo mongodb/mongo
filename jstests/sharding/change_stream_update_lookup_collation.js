@@ -1,9 +1,7 @@
 // Tests that the post image update lookup will use the simple collation to do shard targeting, but
 // use the collection's default collation once it gets to the shards.
 //
-// Collation is only supported with the find command, not with op query.
 // @tags: [
-//   requires_find_command,
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]

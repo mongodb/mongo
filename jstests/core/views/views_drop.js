@@ -2,9 +2,8 @@
  * Tests the behavior of views when its backing collection is dropped, as well as the behavior of
  * system.views when views are dropped.
  * @tags: [
- *   assumes_unsharded_collection,
  *   assumes_superuser_permissions,
- *   requires_find_command,
+ *   assumes_unsharded_collection,
  * ]
  */
 (function() {

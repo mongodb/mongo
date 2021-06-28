@@ -2,11 +2,7 @@
  * Tests that existing whole-cluster, whole-db and single-collection $changeStreams correctly pick
  * up events on a newly-added shard when a new unsharded collection is created on it. Exercises the
  * fix for SERVER-42723.
- * Tagging as 'requires_find_command' to ensure that this test is not run in the legacy protocol
- * passthroughs. Legacy getMore fails in cases where it is run on a database or collection which
- * does not yet exist.
  * @tags: [
- *   requires_find_command,
  *   requires_sharding,
  *   uses_change_streams,
  * ]

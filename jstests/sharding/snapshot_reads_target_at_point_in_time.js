@@ -2,7 +2,6 @@
 //
 // @tags: [
 //   requires_fcv_47,
-//   requires_find_command,
 //   requires_persistence,
 //   requires_sharding,
 //   uses_multi_shard_transaction,

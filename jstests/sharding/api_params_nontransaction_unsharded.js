@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   multiversion_incompatible,
- *   requires_find_command,
  * ]
  */
 

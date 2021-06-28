@@ -2,13 +2,11 @@
  * Tests update and findAndModify command behavior with update modifiers.
  *
  * @tags: [
- * requires_fcv_47,
- * # The test is designed to work with an unsharded collection.
- * assumes_unsharded_collection,
- * # The coll.update command does not work with $set operator in compatibility write mode.
- * requires_find_command,
- * # Performs modifications that if repeated would fail the test.
- * requires_non_retryable_writes,
+ *   # The test is designed to work with an unsharded collection.
+ *   assumes_unsharded_collection,
+ *   requires_fcv_47,
+ *   # Performs modifications that if repeated would fail the test.
+ *   requires_non_retryable_writes,
  * ]
  */
 (function() {

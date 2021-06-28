@@ -2,11 +2,9 @@
  * Tests that the $$NOW and $$CLUSTER_TIME system variables can be used when performing updates on a
  * sharded cluster.
  *
- * Tag this test as 'requires_find_command' to prevent it from running in the legacy passthroughs.
  * The 'requires_sharding' tag prevents the test from running on variants with storage options which
  * cannot support a sharded cluster.
  * @tags: [
- *   requires_find_command,
  *   requires_sharding,
  * ]
  */

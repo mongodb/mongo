@@ -1,4 +1,7 @@
-// @tags: [uses_transactions, requires_find_command, uses_multi_shard_transaction]
+// @tags: [
+//   uses_multi_shard_transaction,
+//   uses_transactions,
+// ]
 (function() {
 
 "use strict";

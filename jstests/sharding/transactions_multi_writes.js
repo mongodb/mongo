@@ -2,10 +2,9 @@
  * Verifies multi-writes in transactions are sent with shard versions to only the targeted shards.
  *
  * @tags: [
- *  requires_find_command,
- *  requires_sharding,
- *  uses_multi_shard_transaction,
- *  uses_transactions,
+ *   requires_sharding,
+ *   uses_multi_shard_transaction,
+ *   uses_transactions,
  * ]
  */
 (function() {

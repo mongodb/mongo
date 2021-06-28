@@ -2,7 +2,6 @@
  * Tests that an updateLookup change stream on a sharded collection can be successfully opened
  * and read from on a shard mongoD. Exercises the fix for SERVER-44977.
  * @tags: [
- *   requires_find_command,
  *   uses_change_streams,
  * ]
  */

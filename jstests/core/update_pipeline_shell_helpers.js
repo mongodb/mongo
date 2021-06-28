@@ -1,14 +1,10 @@
 /**
  * Tests that each of the update shell helpers correctly validates pipeline-style update operations.
  *
- * This test is tagged as 'requires_find_command' to exclude it from the legacy passthroughs, since
- * pipeline syntax cannot be used for OP_UPDATE requests.
- *
  * @tags: [
- *   requires_find_command,
+ *   assumes_write_concern_unchanged,
  *   requires_multi_updates,
  *   requires_non_retryable_writes,
- *   assumes_write_concern_unchanged,
  * ]
  */
 (function() {

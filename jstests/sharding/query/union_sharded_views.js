@@ -1,8 +1,5 @@
 // Tests that $unionWith can successfully read from a view that is backed by a sharded collection.
-// @tags: [
-//   # Uses $unionWith
-//   requires_find_command,
-// ]
+
 (function() {
 "use strict";
 load("jstests/aggregation/extras/utils.js");  // For 'resultsEq'.

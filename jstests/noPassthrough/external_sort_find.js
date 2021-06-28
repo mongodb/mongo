@@ -1,12 +1,6 @@
 /**
  * Test that the find command can spill to disk while executing a blocking sort, if the client
  * explicitly allows disk usage.
- *
- * Must be run with read commands enabled, since legacy OP_QUERY reads do not support the
- * 'allowDiskUse' parameter.
- * @tags: [
- *   requires_find_command,
- * ]
  */
 (function() {
 "use strict";

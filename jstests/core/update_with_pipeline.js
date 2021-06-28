@@ -1,14 +1,9 @@
 /**
  * Tests execution of pipeline-style update.
- *
- * 'requires_find_command' needed to prevent this test from running with 'compatibility' write mode
- * as pipeline-style update is not supported by OP_UPDATE.
- *
  * @tags: [
- *   requires_find_command,
+ *   requires_fcv_50,
  *   requires_multi_updates,
  *   requires_non_retryable_writes,
- *   requires_fcv_50,
  * ]
  */
 (function() {

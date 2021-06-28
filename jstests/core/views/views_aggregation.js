@@ -5,7 +5,6 @@
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
- *   requires_find_command,
  *   requires_getmore,
  *   requires_non_retryable_commands,
  * ]

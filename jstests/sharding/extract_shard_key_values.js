@@ -3,7 +3,6 @@
 // contain an explicit null value for any missing fields.
 //
 // @tags: [
-//   requires_find_command,
 //   uses_multi_shard_transactions,
 //   uses_transactions,
 // ]

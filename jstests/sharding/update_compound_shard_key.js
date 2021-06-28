@@ -1,13 +1,9 @@
 /**
  * Tests to validate the functionality of update command in the presence of a compound shard key.
  *
- * Use the 'requires_find_command' tag to skip this test in sharding_op_query suite. Otherwise,
- * sessionDB.coll.find() will throw "Cannot run a legacy query on a session".
- *
  * @tags: [
- *  requires_find_command,
- *  uses_multi_shard_transaction,
- *  uses_transactions,
+ *   uses_multi_shard_transaction,
+ *   uses_transactions,
  * ]
  */
 (function() {

@@ -4,12 +4,11 @@
  * observation of a newly created system.* collection.
  *
  * @tags: [
- * assumes_read_preference_unchanged,
- * requires_fcv_50,
- * uses_change_streams,
- * requires_majority_read_concern,
- * requires_find_command,
- *]
+ *   assumes_read_preference_unchanged,
+ *   requires_fcv_50,
+ *   requires_majority_read_concern,
+ *   uses_change_streams,
+ * ]
  */
 (function() {
 "use strict";

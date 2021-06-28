@@ -2,8 +2,6 @@
 // variables for use in expressions within the command.
 // @tags: [
 //   requires_fcv_48,
-//   # Does not work with legacy shellWriteMode.
-//   requires_find_command,
 // ]
 //
 (function() {

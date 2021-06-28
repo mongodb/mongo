@@ -1,6 +1,5 @@
 // Tests the behaviour of an agg with $_requestReshardingResumeToken on an oplog which rolls over.
 // @tags: [
-//   requires_find_command,
 //   requires_journaling,
 //   requires_majority_read_concern,
 // ]

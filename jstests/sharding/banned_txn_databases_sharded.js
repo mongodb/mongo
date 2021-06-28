@@ -7,7 +7,6 @@
  *    database are allowed.
  *
  * @tags: [
- *   requires_find_command,
  *   uses_transactions,
  * ]
  */

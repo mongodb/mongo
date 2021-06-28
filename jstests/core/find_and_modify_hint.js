@@ -5,7 +5,6 @@
  *
  * @tags: [
  *   assumes_unsharded_collection,
- *   requires_find_command,
  *   requires_non_retryable_writes,
  * ]
  */

@@ -1,7 +1,9 @@
 // Tests the undocumented 'showMigrationEvents' option for change streams.
 //
-// This test is connecting directly to a shard, and change streams require the getMore command.
-// @tags: [requires_find_command, uses_change_streams, requires_majority_read_concern]
+// @tags: [
+//   requires_majority_read_concern,
+//   uses_change_streams,
+// ]
 (function() {
 'use strict';
 

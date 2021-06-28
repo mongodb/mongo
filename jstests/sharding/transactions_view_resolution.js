@@ -2,10 +2,9 @@
  * Tests mongos behavior when reading against views in a transaction.
  *
  * @tags: [
- *  requires_find_command,
- *  requires_sharding,
- *  uses_multi_shard_transaction,
- *  uses_transactions,
+ *   requires_sharding,
+ *   uses_multi_shard_transaction,
+ *   uses_transactions,
  * ]
  */
 (function() {

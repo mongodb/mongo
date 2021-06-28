@@ -5,8 +5,7 @@
  * TODO (SERVER-56171): Remove this test once 5.0 is last-lts.
  *
  * @tags: [
- *     requires_fcv_49,
- *     requires_find_command,
+ *   requires_fcv_49,
  * ]
  */
 (function() {

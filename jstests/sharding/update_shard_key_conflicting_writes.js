@@ -2,13 +2,9 @@
  * Test the write conflict behavior between updates to a document's shard key and other
  * updates/deletes.
  *
- * Use the 'requires_find_command' tag to skip this test in sharding_op_query suite. Otherwise,
- * sessionDB.coll.find() will throw "Cannot run a legacy query on a session".
- *
  * @tags: [
- *  requires_find_command,
- *  uses_multi_shard_transaction,
- *  uses_transactions,
+ *   uses_multi_shard_transaction,
+ *   uses_transactions,
  * ]
  */
 

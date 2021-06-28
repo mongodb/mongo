@@ -1,11 +1,8 @@
 /**
  * Tests to verify that hashed indexes obey collation rules.
  *
- * The tags below are necessary because collation requires that we use read/write commands rather
- * than legacy operations.
  * @tags: [
  *   assumes_unsharded_collection,
- *   requires_find_command,
  * ]
  */
 (function() {

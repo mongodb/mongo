@@ -12,7 +12,9 @@
  * sharded. If not sharded then the primary shard can perform the rewrite locally and execute
  * without having to round-trip back to mongos.
  *
- * @tags: [requires_find_command, requires_fcv_49]
+ * @tags: [
+ *   requires_fcv_49,
+ * ]
  */
 (function() {
 "use strict";
