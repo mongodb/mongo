@@ -1058,13 +1058,18 @@ DBCollection.prototype.getShardDistribution = function() {
 
     collStats.forEach(function(extShardStats) {
         // Extract and store only the relevant subset of the stats for this shard
+        var newVersion = config.collections.countDocuments(
+            {_id: extShardStats.ns, timestamp: {$exists: true}}, {limit: 1});
+        var collUuid = config.collections.findOne({_id: extShardStats.ns}).uuid;
         const shardStats = {
             shardId: extShardStats.shard,
             host: config.shards.findOne({_id: extShardStats.shard}).host,
             size: extShardStats.storageStats.size,
             count: extShardStats.storageStats.count,
-            numChunks:
-                config.chunks.countDocuments({ns: extShardStats.ns, shard: extShardStats.shard}),
+            numChunks: (newVersion ? config.chunks.countDocuments(
+                                         {uuid: collUuid, shard: extShardStats.shard})
+                                   : config.chunks.countDocuments(
+                                         {ns: extShardStats.ns, shard: extShardStats.shard})),
             avgObjSize: extShardStats.storageStats.avgObjSize
         };
 
