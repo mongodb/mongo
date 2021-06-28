@@ -61,11 +61,11 @@ class checkpoint_manager : public component {
     do_work() override final
     {
         debug_print("Running checkpoint", DEBUG_INFO);
-        testutil_check(_session->checkpoint(_session, nullptr));
+        testutil_check(_session->checkpoint(_session.get(), nullptr));
     }
 
     private:
-    WT_SESSION *_session = nullptr;
+    scoped_session _session;
 };
 
 } // namespace test_harness

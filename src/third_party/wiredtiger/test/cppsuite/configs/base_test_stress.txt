@@ -1,12 +1,6 @@
 # Used as a stress test for the framework.
 duration_seconds=600,
 cache_size_mb=2000,
-enable_logging=true,
-statistics_config=
-(
-    type=all,
-    enable_logging=true
-),
 checkpoint_manager=
 (
     enabled=true,
@@ -31,7 +25,7 @@ workload_generator=
 (
     populate_config=
     (
-        collection_count=200,
+        collection_count=100,
         key_count_per_collection=5000,
         key_size=100,
         thread_count=20,
@@ -40,28 +34,27 @@ workload_generator=
     insert_config=
     (
         key_size=100,
-        op_rate=1s,
+        op_rate=10ms,
         ops_per_transaction=(max=100,min=0),
-        thread_count=5,
+        thread_count=20,
         value_size=2000
     ),
     read_config=
     (
-        op_rate=1s,
-        ops_per_transaction=(max=2000,min=100),
-        thread_count=10
+        op_rate=3ms,
+        ops_per_transaction=(max=100,min=50),
+        thread_count=25
     ),
     update_config=
     (
         key_size=100,
         op_rate=15ms,
         ops_per_transaction=(max=100,min=20),
-        thread_count=10,
+        thread_count=20,
         value_size=2000
     )
 ),
-# Tracking is currently disabled as verification can't handle rollbacks.
 workload_tracking=
 (
-    enabled=false
+    enabled=true
 )

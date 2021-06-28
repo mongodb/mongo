@@ -44,7 +44,7 @@ class random_generator {
     instance()
     {
         static random_generator _instance;
-        return _instance;
+        return (_instance);
     }
 
     /* Generate a random string of a given length. */

@@ -39,8 +39,10 @@
 namespace test_harness {
 /*
  * The timestamp monitor class manages global timestamp state for all components in the test
- * harness. It also manages the global timestamps within WiredTiger. All timestamps are in seconds
- * unless specified otherwise.
+ * harness. It also manages the global timestamps within WiredTiger.
+ *
+ * The format of a timestamp is as follows, the first 32 bits represent the epoch time in seconds.
+ * The last 32 bits represent an increment for uniqueness.
  */
 class timestamp_manager : public component {
     public:
@@ -50,11 +52,17 @@ class timestamp_manager : public component {
     load() override final
     {
         component::load();
+        int64_t oldest_lag = _config->get_int(OLDEST_LAG);
+        testutil_assert(oldest_lag >= 0);
+        /* Cast and then shift left to match the seconds position. */
+        _oldest_lag = oldest_lag;
+        _oldest_lag <<= 32;
 
-        _oldest_lag = _config->get_int(OLDEST_LAG);
-        testutil_assert(_oldest_lag >= 0);
-        _stable_lag = _config->get_int(STABLE_LAG);
-        testutil_assert(_stable_lag >= 0);
+        int64_t stable_lag = _config->get_int(STABLE_LAG);
+        testutil_assert(stable_lag >= 0);
+        /* Cast and then shift left to match the seconds position. */
+        _stable_lag = stable_lag;
+        _stable_lag <<= 32;
     }
 
     void
@@ -65,7 +73,8 @@ class timestamp_manager : public component {
         wt_timestamp_t latest_ts_s;
 
         /* Timestamps are checked periodically. */
-        latest_ts_s = (get_next_ts() >> 32);
+        latest_ts_s = get_time_now_s();
+
         /*
          * Keep a time window between the latest and stable ts less than the max defined in the
          * configuration.
@@ -98,23 +107,19 @@ class timestamp_manager : public component {
     }
 
     /*
-     * Get a unique commit timestamp. The first 32 bits represent the epoch time in seconds. The
-     * last 32 bits represent an increment for uniqueness.
+     * Get a unique timestamp.
      */
     wt_timestamp_t
     get_next_ts()
     {
         uint64_t current_time = get_time_now_s();
-        _increment_ts.fetch_add(1);
-
-        current_time = (current_time << 32) | (_increment_ts & 0x00000000FFFFFFFF);
-        _latest_ts = current_time;
-
-        return (_latest_ts);
+        uint64_t increment = _increment_ts.fetch_add(1);
+        current_time |= (increment & 0x00000000FFFFFFFF);
+        return (current_time);
     }
 
     static const std::string
-    decimal_to_hex(int64_t value)
+    decimal_to_hex(uint64_t value)
     {
         std::stringstream ss;
         ss << std::hex << value;
@@ -123,23 +128,25 @@ class timestamp_manager : public component {
     }
 
     private:
+    /* Get the current time in seconds, bit shifted to the expected location. */
     uint64_t
     get_time_now_s() const
     {
         auto now = std::chrono::system_clock::now().time_since_epoch();
         uint64_t current_time_s =
-          static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(now).count());
+          static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(now).count())
+          << 32;
         return (current_time_s);
     }
 
     private:
     std::atomic<wt_timestamp_t> _increment_ts{0};
-    wt_timestamp_t _latest_ts = 0U, _oldest_ts = 0U, _stable_ts = 0U;
+    wt_timestamp_t _oldest_ts = 0U, _stable_ts = 0U;
     /*
      * _oldest_lag is the time window between the stable and oldest timestamps.
      * _stable_lag is the time window between the latest and stable timestamps.
      */
-    int64_t _oldest_lag = 0, _stable_lag = 0;
+    uint64_t _oldest_lag = 0U, _stable_lag = 0U;
 };
 } // namespace test_harness
 

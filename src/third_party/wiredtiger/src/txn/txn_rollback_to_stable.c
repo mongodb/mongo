@@ -8,8 +8,8 @@
 
 #include "wt_internal.h"
 
-#define WT_CHECK_RECOVERY_FLAG_TS_TXNID(session, txnid, durablets)           \
-    (durablets == WT_TS_NONE && F_ISSET(S2C(session), WT_CONN_RECOVERING) && \
+#define WT_CHECK_RECOVERY_FLAG_TS_TXNID(session, txnid, durablets)             \
+    ((durablets) == WT_TS_NONE && F_ISSET(S2C(session), WT_CONN_RECOVERING) && \
       (txnid) >= S2C(session)->recovery_ckpt_snap_min)
 
 /* Enable rollback to stable verbose messaging during recovery. */
@@ -1545,12 +1545,13 @@ __rollback_to_stable_btree_apply_all(WT_SESSION_IMPL *session, uint64_t rollback
     struct timespec rollback_timer;
     WT_CURSOR *cursor;
     WT_DECL_RET;
-    uint64_t rollback_count, rollback_msg_count, rollback_txnid;
+    uint64_t rollback_count, rollback_msg_count;
     const char *config, *uri;
 
     /* Initialize the verbose tracking timer. */
     __wt_epoch(session, &rollback_timer);
-    rollback_count = rollback_msg_count = rollback_txnid = 0;
+    rollback_count = 0;
+    rollback_msg_count = 0;
 
     WT_RET(__wt_metadata_cursor(session, &cursor));
     while ((ret = cursor->next(cursor)) == 0) {

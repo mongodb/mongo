@@ -705,6 +705,7 @@ designator
 dest
 destSize
 destructor
+destructors
 dev
 dh
 dhandle

@@ -43,12 +43,12 @@ extern "C" {
 namespace test_harness {
 /* Static statistic get function. */
 static void
-get_stat(WT_CURSOR *cursor, int stat_field, int64_t *valuep)
+get_stat(scoped_cursor &cursor, int stat_field, int64_t *valuep)
 {
     const char *desc, *pvalue;
-    cursor->set_key(cursor, stat_field);
-    testutil_check(cursor->search(cursor));
-    testutil_check(cursor->get_value(cursor, &desc, &pvalue, valuep));
+    cursor->set_key(cursor.get(), stat_field);
+    testutil_check(cursor->search(cursor.get()));
+    testutil_check(cursor->get_value(cursor.get(), &desc, &pvalue, valuep));
 }
 
 class statistic {
@@ -59,7 +59,7 @@ class statistic {
     }
 
     /* Check that the given statistic is within bounds. */
-    virtual void check(WT_CURSOR *cursor) = 0;
+    virtual void check(scoped_cursor &cursor) = 0;
 
     /* Suppress warning about destructor being non-virtual. */
     virtual ~statistic() {}
@@ -67,7 +67,7 @@ class statistic {
     bool
     enabled() const
     {
-        return _enabled;
+        return (_enabled);
     }
 
     protected:
@@ -82,9 +82,9 @@ class cache_limit_statistic : public statistic {
     }
 
     void
-    check(WT_CURSOR *cursor) override final
+    check(scoped_cursor &cursor) override final
     {
-        testutil_assert(cursor != nullptr);
+        testutil_assert(cursor.get() != nullptr);
         int64_t cache_bytes_image, cache_bytes_other, cache_bytes_max;
         double use_percent;
         /* Three statistics are required to compute cache use percentage. */
@@ -135,7 +135,7 @@ class db_size_statistic : public statistic {
 
     /* Don't need the stat cursor for this. */
     void
-    check(WT_CURSOR *) override final
+    check(scoped_cursor &) override final
     {
         const auto file_names = get_file_names();
 #ifndef _WIN32
@@ -217,7 +217,7 @@ class runtime_monitor : public component {
             _session = connection_manager::instance().create_session();
 
             /* Open our statistic cursor. */
-            _session->open_cursor(_session, STATISTICS_URI, nullptr, nullptr, &_cursor);
+            _cursor = _session.open_scoped_cursor(STATISTICS_URI);
 
             /* Load known statistics. */
             sub_config = _config->get_subconfig(STAT_CACHE_SIZE);
@@ -240,8 +240,8 @@ class runtime_monitor : public component {
     }
 
     private:
-    WT_CURSOR *_cursor = nullptr;
-    WT_SESSION *_session = nullptr;
+    scoped_session _session;
+    scoped_cursor _cursor;
     std::vector<statistic *> _stats;
     database &_database;
 };

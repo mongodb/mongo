@@ -33,9 +33,9 @@
 #include "test_harness/util/debug_utils.h"
 #include "test_harness/test.h"
 
+#include "base_test.cxx"
 #include "example_test.cxx"
 #include "hs_cleanup.cxx"
-#include "poc_test.cxx"
 
 std::string
 parse_configuration_from_file(const std::string &filename)
@@ -112,8 +112,8 @@ run_test(const std::string &test_name, const std::string &config)
 
     test_harness::debug_print("Configuration\t:" + config, DEBUG_TRACE);
 
-    if (test_name == "poc_test")
-        poc_test(config, test_name).run();
+    if (test_name == "base_test")
+        base_test(config, test_name).run();
     else if (test_name == "example_test")
         example_test(config, test_name).run();
     else if (test_name == "hs_cleanup")
@@ -134,7 +134,7 @@ main(int argc, char *argv[])
 {
     std::string cfg, config_filename, test_name, current_test_name;
     int64_t error_code = 0;
-    const std::vector<std::string> all_tests = {"example_test", "hs_cleanup", "poc_test"};
+    const std::vector<std::string> all_tests = {"example_test", "hs_cleanup", "base_test"};
 
     /* Set the program name for error messages. */
     (void)testutil_set_progname(argv);
@@ -200,7 +200,7 @@ main(int argc, char *argv[])
                 if (!config_filename.empty())
                     cfg = parse_configuration_from_file(config_filename);
                 else if (cfg.empty()) {
-                    config_filename = "configs/config_" + current_test_name + "_default.txt";
+                    config_filename = "configs/" + current_test_name + "_default.txt";
                     cfg = parse_configuration_from_file(config_filename);
                 }
 
@@ -214,7 +214,7 @@ main(int argc, char *argv[])
             if (!config_filename.empty())
                 cfg = parse_configuration_from_file(config_filename);
             else if (cfg.empty()) {
-                config_filename = "configs/config_" + test_name + "_default.txt";
+                config_filename = "configs/" + test_name + "_default.txt";
                 cfg = parse_configuration_from_file(config_filename);
             }
             error_code = run_test(current_test_name, cfg);

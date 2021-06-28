@@ -136,6 +136,13 @@ class configuration {
           [](WT_CONFIG_ITEM item) { return new configuration(item); });
     }
 
+    configuration *
+    get_optional_subconfig(const std::string &key)
+    {
+        return get<configuration *>(key, true, types::STRUCT, nullptr,
+          [](WT_CONFIG_ITEM item) { return new configuration(item); });
+    }
+
     private:
     static bool
     config_item_to_bool(const WT_CONFIG_ITEM item)

@@ -198,10 +198,10 @@ test_config = [
     Config('statistics_config', '', r'''
         Statistic configuration that is passed into wiredtiger on open.''',
         type='category', subconfig=[
-            Config('type', 'fast', r'''
+            Config('type', 'all', r'''
             The configuration that will get passed to wiredtiger to determine the style of
             statistics gathering'''),
-            Config('enable_logging', 'false', r'''
+            Config('enable_logging', 'true', r'''
             Configuration enabling or disabling statistics logging in the form of json logging.''',
             type='boolean')
         ]),
@@ -210,5 +210,5 @@ test_config = [
 methods = {
     'example_test' : Method(test_config),
     'hs_cleanup' : Method(test_config),
-    'poc_test' : Method(test_config),
+    'base_test' : Method(test_config),
 }

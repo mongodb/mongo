@@ -47,55 +47,44 @@ class hs_cleanup : public test {
     void
     update_operation(thread_context *tc) override final
     {
-        WT_CURSOR *cursor = nullptr;
         WT_DECL_RET;
         const char *key_tmp;
-        WT_SESSION *session = connection_manager::instance().create_session();
-        std::string collection_name = tc->database.get_collection_name(tc->id);
-        wt_timestamp_t ts;
+        scoped_session session = connection_manager::instance().create_session();
+        collection &coll = tc->database.get_collection(tc->id);
 
         /* In this test each thread gets a single collection. */
         testutil_assert(tc->database.get_collection_count() == tc->thread_count);
-        testutil_check(
-          session->open_cursor(session, collection_name.c_str(), nullptr, nullptr, &cursor));
+        scoped_cursor cursor = session.open_scoped_cursor(coll.name.c_str());
 
         /* We don't know the keyrange we're operating over here so we can't be much smarter here. */
         while (tc->running()) {
             tc->sleep();
-            ret = cursor->next(cursor);
+            ret = cursor->next(cursor.get());
             if (ret != 0) {
                 if (ret == WT_NOTFOUND) {
-                    testutil_check(cursor->reset(cursor));
+                    testutil_check(cursor->reset(cursor.get()));
                     continue;
                 } else
                     testutil_die(ret, "cursor->next() failed unexpectedly.");
             }
-            testutil_check(cursor->get_key(cursor, &key_tmp));
+            testutil_check(cursor->get_key(cursor.get(), &key_tmp));
 
             /* Start a transaction if possible. */
-            tc->transaction.try_begin(tc->session, "");
+            tc->transaction.try_begin(tc->session.get(), "");
 
-            ts = tc->timestamp_manager->get_next_ts();
-            if (tc->timestamp_manager->enabled())
-                tc->transaction.set_commit_timestamp(
-                  tc->session, timestamp_manager::decimal_to_hex(ts));
-
-            /* Update the record but take care to handle WT_ROLLBACK. */
-            ret = update(tc->tracking, cursor, collection_name, key_value_t(key_tmp).c_str(),
-              random_generator::instance().generate_string(tc->value_size).c_str(), ts,
-              tc->op_track_cursor);
-            /* Increment the current op count for the current transaction. */
-            tc->transaction.op_count++;
-            if (ret == WT_ROLLBACK)
-                tc->transaction.rollback(tc->session, "");
-            else if (ret != 0)
-                testutil_die(ret, "failed to update a key.");
+            /*
+             * The retrieved key needs to be passed inside the update function. However, the update
+             * API doesn't guarantee our buffer will still be valid once it is called, as such we
+             * copy the buffer and then pass it into the API.
+             */
+            if (!tc->update(cursor, coll.id, key_value_t(key_tmp)))
+                continue;
 
             /* Commit our transaction. */
-            tc->transaction.try_commit(tc->session, "");
+            tc->transaction.try_commit(tc->session.get(), "");
         }
         /* Ensure our last transaction is resolved. */
         if (tc->transaction.active())
-            tc->transaction.commit(tc->session, "");
+            tc->transaction.commit(tc->session.get(), "");
     }
 };

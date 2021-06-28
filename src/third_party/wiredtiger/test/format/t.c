@@ -218,8 +218,6 @@ main(int argc, char *argv[])
      * file, used when running checks.
      */
     if (g.reopen) {
-        if (config != NULL)
-            testutil_die(EINVAL, "-c incompatible with -R");
         if (access(g.home_config, R_OK) != 0)
             testutil_die(ENOENT, "%s", g.home_config);
         config = g.home_config;

@@ -65,7 +65,10 @@ class throttle {
         _ms = std::stoi(magnitude) * multiplier;
     }
 
-    explicit throttle(configuration *config) : throttle(config->get_string(OP_RATE)) {}
+    /* Use optional and default to 1s per op in case something doesn't define this. */
+    explicit throttle(configuration *config) : throttle(config->get_optional_string(OP_RATE, "1s"))
+    {
+    }
 
     /* Default to a second per operation. */
     throttle() : throttle("1s") {}

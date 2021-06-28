@@ -67,6 +67,10 @@ class test : public database_operation {
         _workload_generator = new workload_generator(_config->get_subconfig(WORKLOAD_GENERATOR),
           this, _timestamp_manager, _workload_tracking, _database);
         _thread_manager = new thread_manager();
+
+        _database.set_timestamp_manager(_timestamp_manager);
+        _database.set_workload_tracking(_workload_tracking);
+
         /*
          * Ordering is not important here, any dependencies between components should be resolved
          * internally by the components.
@@ -166,7 +170,6 @@ class test : public database_operation {
         }
 
         debug_print("SUCCESS", DEBUG_INFO);
-        connection_manager::instance().close();
     }
 
     /*
@@ -176,25 +179,25 @@ class test : public database_operation {
     workload_generator *
     get_workload_generator()
     {
-        return _workload_generator;
+        return (_workload_generator);
     }
 
     runtime_monitor *
     get_runtime_monitor()
     {
-        return _runtime_monitor;
+        return (_runtime_monitor);
     }
 
     timestamp_manager *
     get_timestamp_manager()
     {
-        return _timestamp_manager;
+        return (_timestamp_manager);
     }
 
     thread_manager *
     get_thread_manager()
     {
-        return _thread_manager;
+        return (_thread_manager);
     }
 
     private:
@@ -207,6 +210,18 @@ class test : public database_operation {
     timestamp_manager *_timestamp_manager = nullptr;
     workload_generator *_workload_generator = nullptr;
     workload_tracking *_workload_tracking = nullptr;
+    /*
+     * FIX-ME-Test-Framework: We can't put this code in the destructor of `test` since it will run
+     * before the destructors of each of our members (meaning that sessions will get closed after
+     * the connection gets closed). To work around this, we've added a member with a destructor that
+     * closes the connection.
+     */
+    struct connection_closer {
+        ~connection_closer()
+        {
+            connection_manager::instance().close();
+        }
+    } _connection_closer;
     database _database;
 };
 } // namespace test_harness
