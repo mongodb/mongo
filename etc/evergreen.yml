@@ -10752,7 +10752,8 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: .aggfuzzer .common
+    # TODO (SERVER-58125): Re-enable the timeseries fuzzer for EFT
+  - name: .aggfuzzer .common !.timeseries
   - name: aggregation
   - name: .auth !.multiversion !.audit !.sharding
   - name: .misc_js
