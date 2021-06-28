@@ -220,7 +220,12 @@ SemiFuture<void> ReshardingTxnCloner::run(
                    // due to a prepared transaction having been in progress.
                    if (!chainCtx->donorRecord) {
                        auto opCtx = factory.makeOperationContext(&cc());
+                       auto guard = makeGuard([&] {
+                           chainCtx->pipeline->dispose(opCtx.get());
+                           chainCtx->pipeline.reset();
+                       });
                        chainCtx->donorRecord = _getNextRecord(opCtx.get(), *chainCtx->pipeline);
+                       guard.dismiss();
                    }
 
                    if (!chainCtx->donorRecord) {
