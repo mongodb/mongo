@@ -70,15 +70,12 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(decrypt, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getClientRPCProtocols, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getServerRPCProtocols, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(insert, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isReplicaSetConnection, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_markNodeAsFailed, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(logout, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(remove, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(runCommand, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(runCommandWithMetadata, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setClientRPCProtocols, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(update, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getMinWireVersion, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getMaxWireVersion, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isReplicaSetMember, MongoExternalInfo),
@@ -383,144 +380,6 @@ void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     setCursor(scope, c, std::move(cursor), args);
 
     args.rval().setObjectOrNull(c);
-}
-
-void MongoBase::Functions::insert::call(JSContext* cx, JS::CallArgs args) {
-    auto scope = getScope(cx);
-
-    if (args.length() != 3)
-        uasserted(ErrorCodes::BadValue, "insert needs 3 args");
-
-    if (!args.get(1).isObject())
-        uasserted(ErrorCodes::BadValue, "attempted to insert a non-object");
-
-    ObjectWrapper o(cx, args.thisv());
-
-    if (o.hasField(InternedString::readOnly) && o.getBoolean(InternedString::readOnly))
-        uasserted(ErrorCodes::BadValue, "js db in read only mode");
-
-    auto conn = getConnection(args);
-
-    std::string ns = ValueWriter(cx, args.get(0)).toString();
-
-    int flags = ValueWriter(cx, args.get(2)).toInt32();
-
-    auto addId = [cx, scope](JS::HandleValue value) {
-        if (!value.isObject())
-            uasserted(ErrorCodes::BadValue, "attempted to insert a non-object type");
-
-        JS::RootedObject elementObj(cx, value.toObjectOrNull());
-
-        ObjectWrapper ele(cx, elementObj);
-
-        if (!ele.hasField(InternedString::_id)) {
-            JS::RootedValue value(cx);
-            scope->getProto<OIDInfo>().newInstance(&value);
-            ele.setValue(InternedString::_id, value);
-        }
-
-        return ValueWriter(cx, value).toBSON();
-    };
-
-    Message toSend;
-    if (args.get(1).isObject()) {
-        bool isArray;
-
-        if (!JS_IsArrayObject(cx, args.get(1), &isArray)) {
-            uasserted(ErrorCodes::BadValue, "Failure to check is object an array");
-        }
-
-        if (isArray) {
-            JS::RootedObject obj(cx, args.get(1).toObjectOrNull());
-            ObjectWrapper array(cx, obj);
-
-            std::vector<BSONObj> bos;
-
-            bool foundElement = false;
-
-            array.enumerate([&](JS::HandleId id) {
-                foundElement = true;
-
-                JS::RootedValue value(cx);
-                array.getValue(id, &value);
-
-                bos.push_back(addId(value));
-
-                return true;
-            });
-
-            if (!foundElement)
-                uasserted(ErrorCodes::BadValue, "attempted to insert an empty array");
-
-            toSend = makeInsertMessage(ns, bos.data(), bos.size(), flags);
-        } else {
-            toSend = makeInsertMessage(ns, addId(args.get(1)));
-        }
-    } else {
-        toSend = makeInsertMessage(ns, addId(args.get(1)));
-    }
-
-    invariant(!toSend.empty());
-    conn->say(toSend);
-
-    args.rval().setUndefined();
-}
-
-void MongoBase::Functions::remove::call(JSContext* cx, JS::CallArgs args) {
-    if (!(args.length() == 2 || args.length() == 3))
-        uasserted(ErrorCodes::BadValue, "remove needs 2 or 3 args");
-
-    if (!(args.get(1).isObject()))
-        uasserted(ErrorCodes::BadValue, "attempted to remove a non-object");
-
-    ObjectWrapper o(cx, args.thisv());
-
-    if (o.hasOwnField(InternedString::readOnly) && o.getBoolean(InternedString::readOnly))
-        uasserted(ErrorCodes::BadValue, "js db in read only mode");
-
-    auto conn = getConnection(args);
-    std::string ns = ValueWriter(cx, args.get(0)).toString();
-
-    BSONObj bson = ValueWriter(cx, args.get(1)).toBSON();
-
-    bool justOne = false;
-    if (args.length() > 2) {
-        justOne = args.get(2).toBoolean();
-    }
-
-    auto toSend = makeRemoveMessage(ns, bson, justOne ? RemoveOption_JustOne : 0);
-    conn->say(toSend);
-    args.rval().setUndefined();
-}
-
-void MongoBase::Functions::update::call(JSContext* cx, JS::CallArgs args) {
-    if (args.length() < 3)
-        uasserted(ErrorCodes::BadValue, "update needs at least 3 args");
-
-    if (!args.get(1).isObject())
-        uasserted(ErrorCodes::BadValue, "1st param to update has to be an object");
-
-    if (!args.get(2).isObject())
-        uasserted(ErrorCodes::BadValue, "2nd param to update has to be an object");
-
-    ObjectWrapper o(cx, args.thisv());
-
-    if (o.hasOwnField(InternedString::readOnly) && o.getBoolean(InternedString::readOnly))
-        uasserted(ErrorCodes::BadValue, "js db in read only mode");
-
-    auto conn = getConnection(args);
-    std::string ns = ValueWriter(cx, args.get(0)).toString();
-
-    BSONObj q1 = ValueWriter(cx, args.get(1)).toBSON();
-    BSONObj o1 = ValueWriter(cx, args.get(2)).toBSON();
-
-    bool upsert = args.length() > 3 && args.get(3).isBoolean() && args.get(3).toBoolean();
-    bool multi = args.length() > 4 && args.get(4).isBoolean() && args.get(4).toBoolean();
-
-    auto toSend = makeUpdateMessage(
-        ns, q1, o1, (upsert ? UpdateOption_Upsert : 0) | (multi ? UpdateOption_Multi : 0));
-    conn->say(toSend);
-    args.rval().setUndefined();
 }
 
 void MongoBase::Functions::auth::call(JSContext* cx, JS::CallArgs args) {

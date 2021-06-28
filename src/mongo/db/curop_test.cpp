@@ -222,12 +222,6 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
 
     // Append should include only the basic fields when just initialized.
     ASSERT_EQ(static_cast<size_t>(bs.nFields()), basicFields.size());
-
-    // 'reportString' should only contain basic fields.
-    std::string reportString = od.report(opCtx.get(), nullptr);
-    std::string expectedReportString = "query myDb.coll command: { a: 3 } numYields:0 0ms";
-
-    ASSERT_EQ(reportString, expectedReportString);
 }
 
 TEST(CurOpTest, ShouldNotReportFailpointMsgIfNotSet) {

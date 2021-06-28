@@ -54,24 +54,10 @@ void logCommandAuthzCheck(Client* client,
     invariant(client);
 }
 
-void logDeleteAuthzCheck(Client* client,
-                         const NamespaceString& ns,
-                         const BSONObj& pattern,
-                         ErrorCodes::Error result) {
-    invariant(client);
-}
-
 void logGetMoreAuthzCheck(Client* client,
                           const NamespaceString& ns,
                           long long cursorId,
                           ErrorCodes::Error result) {
-    invariant(client);
-}
-
-void logInsertAuthzCheck(Client* client,
-                         const NamespaceString& ns,
-                         const BSONObj& insertedObj,
-                         ErrorCodes::Error result) {
     invariant(client);
 }
 
@@ -86,16 +72,6 @@ void logQueryAuthzCheck(Client* client,
                         const NamespaceString& ns,
                         const BSONObj& query,
                         ErrorCodes::Error result) {
-    invariant(client);
-}
-
-void logUpdateAuthzCheck(Client* client,
-                         const NamespaceString& ns,
-                         const BSONObj& query,
-                         const write_ops::UpdateModification& update,
-                         bool isUpsert,
-                         bool isMulti,
-                         ErrorCodes::Error result) {
     invariant(client);
 }
 

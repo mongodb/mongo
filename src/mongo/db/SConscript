@@ -1256,7 +1256,6 @@ env.Library(
         'query/stage_builder_util.cpp',
         'query/wildcard_multikey_paths.cpp',
         'query/yield_policy_callbacks_impl.cpp',
-        'run_op_kill_cursors.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

@@ -75,7 +75,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/request_execution_context.h"
-#include "mongo/db/run_op_kill_cursors.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_factory.h"
@@ -2023,107 +2022,6 @@ DbResponse receivedQuery(OperationContext* opCtx,
     return dbResponse;
 }
 
-void receivedKillCursors(OperationContext* opCtx, const Message& m) {
-    globalOpCounters.gotKillCursorsDeprecated();
-
-    LastError::get(opCtx->getClient()).disable();
-    DbMessage dbmessage(m);
-    int n = dbmessage.pullInt();
-
-    static constexpr int kSoftKillLimit = 2000;
-    static constexpr int kHardKillLimit = 29999;
-
-    if (n > kHardKillLimit) {
-        LOGV2_ERROR(4615607,
-                    "Received killCursors, n={numCursors}",
-                    "Received killCursors, exceeded kHardKillLimit",
-                    "numCursors"_attr = n,
-                    "kHardKillLimit"_attr = kHardKillLimit);
-        uasserted(51250, "Must kill fewer than {} cursors"_format(kHardKillLimit));
-    }
-
-    if (n > kSoftKillLimit) {
-        LOGV2_WARNING(4615606,
-                      "Received killCursors, n={numCursors}",
-                      "Received killCursors, exceeded kSoftKillLimit",
-                      "numCursors"_attr = n,
-                      "kSoftKillLimit"_attr = kSoftKillLimit);
-    }
-
-    uassert(31289, str::stream() << "must kill at least 1 cursor, n=" << n, n >= 1);
-    massert(13658,
-            str::stream() << "bad kill cursors size: " << m.dataSize(),
-            m.dataSize() == 8 + (8 * n));
-
-    const char* cursorArray = dbmessage.getArray(n);
-    int found = runOpKillCursors(opCtx, static_cast<size_t>(n), cursorArray);
-
-    if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(1)) || found != n) {
-        LOGV2_DEBUG(21967,
-                    found == n ? 1 : 0,
-                    "killCursors: found {found} of {numCursors}",
-                    "killCursors found fewer cursors to kill than requested",
-                    "found"_attr = found,
-                    "numCursors"_attr = n);
-    }
-}
-
-void receivedInsert(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
-    auto insertOp = InsertOp::parseLegacy(m);
-    invariant(insertOp.getNamespace() == nsString);
-
-    globalOpCounters.gotInsertsDeprecated(insertOp.getDocuments().size());
-
-    for (const auto& obj : insertOp.getDocuments()) {
-        Status status = auth::checkAuthForInsert(
-            AuthorizationSession::get(opCtx->getClient()), opCtx, nsString);
-        audit::logInsertAuthzCheck(opCtx->getClient(), nsString, obj, status.code());
-        uassertStatusOK(status);
-    }
-    ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nsString.db().toString());
-    write_ops_exec::performInserts(opCtx, insertOp);
-}
-
-void receivedUpdate(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
-    globalOpCounters.gotUpdateDeprecated();
-    auto updateOp = UpdateOp::parseLegacy(m);
-    auto& singleUpdate = updateOp.getUpdates()[0];
-    invariant(updateOp.getNamespace() == nsString);
-
-    Status status = auth::checkAuthForUpdate(AuthorizationSession::get(opCtx->getClient()),
-                                             opCtx,
-                                             nsString,
-                                             singleUpdate.getQ(),
-                                             singleUpdate.getU(),
-                                             singleUpdate.getUpsert());
-    audit::logUpdateAuthzCheck(opCtx->getClient(),
-                               nsString,
-                               singleUpdate.getQ(),
-                               singleUpdate.getU(),
-                               singleUpdate.getUpsert(),
-                               singleUpdate.getMulti(),
-                               status.code());
-    uassertStatusOK(status);
-
-    ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nsString.db().toString());
-    write_ops_exec::performUpdates(opCtx, updateOp);
-}
-
-void receivedDelete(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
-    globalOpCounters.gotDeleteDeprecated();
-    auto deleteOp = DeleteOp::parseLegacy(m);
-    auto& singleDelete = deleteOp.getDeletes()[0];
-    invariant(deleteOp.getNamespace() == nsString);
-
-    Status status = auth::checkAuthForDelete(
-        AuthorizationSession::get(opCtx->getClient()), opCtx, nsString, singleDelete.getQ());
-    audit::logDeleteAuthzCheck(opCtx->getClient(), nsString, singleDelete.getQ(), status.code());
-    uassertStatusOK(status);
-
-    ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nsString.db().toString());
-    write_ops_exec::performDeletes(opCtx, deleteOp);
-}
-
 DbResponse receivedGetMore(OperationContext* opCtx,
                            const Message& m,
                            CurOp& curop,
@@ -2264,39 +2162,34 @@ struct FireAndForgetOpRunner : SynchronousOpRunner {
 struct KillCursorsOpRunner : FireAndForgetOpRunner {
     using FireAndForgetOpRunner::FireAndForgetOpRunner;
     void runAndForget() override {
-        executionContext->currentOp().ensureStarted();
-        executionContext->slowMsOverride = 10;
-        receivedKillCursors(executionContext->getOpCtx(), executionContext->getMessage());
+        globalOpCounters.gotKillCursorsDeprecated();
+        uasserted(5745703, "OP_KILL_CURSORS is no longer supported");
     }
 };
 
 struct InsertOpRunner : FireAndForgetOpRunner {
     using FireAndForgetOpRunner::FireAndForgetOpRunner;
     void runAndForget() override {
-        executionContext->assertValidNsString();
-        receivedInsert(executionContext->getOpCtx(),
-                       executionContext->nsString(),
-                       executionContext->getMessage());
+        auto insertOp = InsertOp::parseLegacy(executionContext->getMessage());
+        const auto nDocs = insertOp.getDocuments().size();
+        globalOpCounters.gotInsertsDeprecated(nDocs);
+        uasserted(5745702, "OP_INSERT is no longer supported");
     }
 };
 
 struct UpdateOpRunner : FireAndForgetOpRunner {
     using FireAndForgetOpRunner::FireAndForgetOpRunner;
     void runAndForget() override {
-        executionContext->assertValidNsString();
-        receivedUpdate(executionContext->getOpCtx(),
-                       executionContext->nsString(),
-                       executionContext->getMessage());
+        globalOpCounters.gotUpdateDeprecated();
+        uasserted(5745701, "OP_UPDATE is no longer supported");
     }
 };
 
 struct DeleteOpRunner : FireAndForgetOpRunner {
     using FireAndForgetOpRunner::FireAndForgetOpRunner;
     void runAndForget() override {
-        executionContext->assertValidNsString();
-        receivedDelete(executionContext->getOpCtx(),
-                       executionContext->nsString(),
-                       executionContext->getMessage());
+        globalOpCounters.gotDeleteDeprecated();
+        uasserted(5745700, "OP_DELETE is no longer supported");
     }
 };
 
@@ -2339,31 +2232,8 @@ std::unique_ptr<HandleRequest::OpRunner> HandleRequest::makeOpRunner() {
 }
 
 DbResponse FireAndForgetOpRunner::runSync() {
-    try {
-        warnDeprecation(executionContext->client(), networkOpToString(executionContext->op()));
-        runAndForget();
-    } catch (const AssertionException& ue) {
-        LastError::get(executionContext->client()).setLastError(ue.code(), ue.reason());
-        LOGV2_DEBUG(21969,
-                    3,
-                    "Caught Assertion in {networkOp}, continuing: {error}",
-                    "Assertion in fire-and-forget operation",
-                    "networkOp"_attr = networkOpToString(executionContext->op()),
-                    "error"_attr = redact(ue));
-        executionContext->currentOp().debug().errInfo = ue.toStatus();
-    }
-    // A NotWritablePrimary error can be set either within
-    // receivedInsert/receivedUpdate/receivedDelete or within the AssertionException handler above.
-    // Either way, we want to throw an exception here, which will cause the client to be
-    // disconnected.
-    if (LastError::get(executionContext->client()).hadNotPrimaryError()) {
-        notPrimaryLegacyUnackWrites.increment();
-        uasserted(ErrorCodes::NotWritablePrimary,
-                  str::stream() << "Not-master error while processing '"
-                                << networkOpToString(executionContext->op()) << "' operation  on '"
-                                << executionContext->nsString() << "' namespace via legacy "
-                                << "fire-and-forget command execution.");
-    }
+    warnDeprecation(executionContext->client(), networkOpToString(executionContext->op()));
+    runAndForget();
     return {};
 }
 

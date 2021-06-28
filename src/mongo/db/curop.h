@@ -164,8 +164,6 @@ public:
 
     OpDebug() = default;
 
-    std::string report(OperationContext* opCtx, const SingleThreadedLockStats* lockStats) const;
-
     void report(OperationContext* opCtx,
                 const SingleThreadedLockStats* lockStats,
                 const ResourceConsumption::OperationMetrics* operationMetrics,

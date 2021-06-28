@@ -70,19 +70,16 @@ TEST(OpLegacy, DeprecatedWriteOpsCounters) {
     const BSONObj query = fromjson("{a: {$lt: 42}}");
     const BSONObj update = fromjson("{$set: {b: 2}}");
 
-    // Issue the requests.
-    // After we start closing the connection on messages with deprecated op codes, replace the
-    // `conn->say(opInsert);` with:
-    // Message ignore;
-    // ASSERT_THROWS(conn->call(opInsert, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
+    // Issue the requests. They are expected to fail but should still be counted.
+    Message ignore;
     auto opInsert = makeInsertMessage(ns, insert, 2, 0 /*continue on error*/);
-    conn->say(opInsert);
+    ASSERT_THROWS(conn->call(opInsert, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
 
     auto opUpdate = makeUpdateMessage(ns, query, update, 0 /*no upsert, no multi*/);
-    conn->say(opUpdate);
+    ASSERT_THROWS(conn->call(opUpdate, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
 
     auto opDelete = makeRemoveMessage(ns, query, 0 /*limit*/);
-    conn->say(opDelete);
+    ASSERT_THROWS(conn->call(opDelete, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
 
     // Check the opcounters after running the deprecated operations.
     BSONObj serverStatusReply;
@@ -90,24 +87,12 @@ TEST(OpLegacy, DeprecatedWriteOpsCounters) {
 
     ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "insert") + 2,
               getDeprecatedOpCount(serverStatusReply, "insert"));
-    if (isStandaloneMongod(conn.get())) {
-        ASSERT_EQ(getOpCount(serverStatusReplyPrior, "insert") + 2,
-                  getOpCount(serverStatusReply, "insert"));
-    }
 
     ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "update") + 1,
               getDeprecatedOpCount(serverStatusReply, "update"));
-    if (isStandaloneMongod(conn.get())) {
-        ASSERT_EQ(getOpCount(serverStatusReplyPrior, "update") + 1,
-                  getOpCount(serverStatusReply, "update"));
-    }
 
     ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "delete") + 1,
               getDeprecatedOpCount(serverStatusReply, "delete"));
-    if (isStandaloneMongod(conn.get())) {
-        ASSERT_EQ(getOpCount(serverStatusReplyPrior, "delete") + 1,
-                  getOpCount(serverStatusReply, "delete"));
-    }
 
     ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "total") + 2 + 1 + 1,
               getDeprecatedOpCount(serverStatusReply, "total"));
@@ -145,7 +130,8 @@ TEST(OpLegacy, DeprecatedReadOpsCounters) {
     ASSERT(conn->call(opGetMore, replyGetMore));
 
     auto opKillCursors = makeKillCursorsMessage(cursorId);
-    conn->say(opKillCursors);
+    Message ignore;
+    ASSERT_THROWS(conn->call(opKillCursors, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
 
     // Check the opcounters after running the deprecated operations.
     BSONObj serverStatusReply;
@@ -220,6 +206,15 @@ void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeveri
     // Build the deprecated requests and the getLog command.
     const std::string ns = "test.exerciseDeprecatedOps";
 
+    // Insert some docs into the collection so even though the legacy write ops are failing we can
+    // still test getMore, killCursors and query.
+    BSONObj data = fromjson(R"({
+        insert: "exerciseDeprecatedOps",
+        documents: [ {a: 1},{a: 2},{a: 3},{a: 4},{a: 5},{a: 6},{a: 7} ]
+    })");
+    BSONObj ignoreResponse;
+    ASSERT(conn->runCommand("test", data, ignoreResponse));
+
     const BSONObj doc1 = fromjson("{a: 1}");
     const BSONObj doc2 = fromjson("{a: 2}");
     const BSONObj insert[2] = {doc1, doc2};
@@ -230,19 +225,20 @@ void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeveri
     auto opDelete = makeRemoveMessage(ns, query, 0 /*limit*/);
     auto opQuery = makeQueryMessage(
         ns, query, 2 /*nToReturn*/, 0 /*nToSkip*/, nullptr /*fieldsToReturn*/, 0 /*queryOptions*/);
+    Message ignore;
 
     // The first deprecated call after adding a suppression is still logged with elevated severity
     // and after it the suppression kicks in. Any deprecated op can be used to start the suppression
     // period, here we chose getLastError.
     ASSERT_EQ("", getLastError(conn));
 
-    conn->say(opInsert);
+    ASSERT_THROWS(conn->call(opInsert, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
     ASSERT(wasLogged(conn, "insert", expectedSeverity));
 
     ASSERT_EQ("", getLastError(conn));
     ASSERT(wasLogged(conn, "getLastError", expectedSeverity));
 
-    conn->say(opUpdate);
+    ASSERT_THROWS(conn->call(opUpdate, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
     ASSERT(wasLogged(conn, "update", expectedSeverity));
 
     Message replyQuery;
@@ -258,10 +254,10 @@ void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeveri
     ASSERT(wasLogged(conn, "getmore", expectedSeverity));
 
     auto opKillCursors = makeKillCursorsMessage(cursorId);
-    conn->say(opKillCursors);
+    ASSERT_THROWS(conn->call(opKillCursors, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
     ASSERT(wasLogged(conn, "killcursors", expectedSeverity));
 
-    conn->say(opDelete);
+    ASSERT_THROWS(conn->call(opDelete, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
     ASSERT(wasLogged(conn, "remove", expectedSeverity));
 }
 

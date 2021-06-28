@@ -403,9 +403,6 @@ enum InsertOptions {
  * Builds a legacy OP_INSERT message.
  */
 Message makeInsertMessage(StringData ns, const BSONObj* objs, size_t count, int flags = 0);
-inline Message makeInsertMessage(StringData ns, const BSONObj& obj, int flags = 0) {
-    return makeInsertMessage(ns, &obj, 1, flags);
-}
 
 enum UpdateOptions {
     /** Upsert - that is, insert the item if no matching item is found. */

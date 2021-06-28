@@ -405,7 +405,7 @@ TEST(LegacyWriteOpsParsers, SingleInsert) {
     const BSONObj obj = BSON("x" << 1);
     for (bool continueOnError : {false, true}) {
         auto message =
-            makeInsertMessage(ns, obj, continueOnError ? InsertOption_ContinueOnError : 0);
+            makeInsertMessage(ns, &obj, 1, continueOnError ? InsertOption_ContinueOnError : 0);
         const auto op = InsertOp::parseLegacy(message);
         ASSERT_EQ(op.getNamespace().ns(), ns);
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());

@@ -44,6 +44,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/warn_deprecated_wire_ops.h"
@@ -221,24 +222,6 @@ struct GetMoreOpRunner final : public OpRunner {
     }
 };
 
-struct KillCursorsOpRunner final : public OpRunner {
-    using OpRunner::OpRunner;
-    DbResponse runOperation() override {
-        warnDeprecation(*hr->rec->getOpCtx()->getClient(), networkOpToString(hr->op));
-        Strategy::killCursors(hr->rec->getOpCtx(), &hr->rec->getDbMessage());  // No Response.
-        return {};
-    }
-};
-
-struct WriteOpRunner final : public OpRunner {
-    using OpRunner::OpRunner;
-    DbResponse runOperation() override {
-        warnDeprecation(*hr->rec->getOpCtx()->getClient(), networkOpToString(hr->op));
-        Strategy::writeOp(hr->rec);  // No Response.
-        return {};
-    }
-};
-
 Future<DbResponse> HandleRequest::handleRequest() {
     switch (op) {
         case dbQuery:
@@ -250,11 +233,23 @@ Future<DbResponse> HandleRequest::handleRequest() {
         case dbGetMore:
             return std::make_unique<GetMoreOpRunner>(shared_from_this())->run();
         case dbKillCursors:
-            return std::make_unique<KillCursorsOpRunner>(shared_from_this())->run();
-        case dbInsert:
+            globalOpCounters.gotKillCursorsDeprecated();
+            warnDeprecation(*(rec->getOpCtx()->getClient()), networkOpToString(op));
+            uasserted(5745707, "OP_KILL_CURSORS is no longer supported");
+        case dbInsert: {
+            auto opInsert = InsertOp::parseLegacy(rec->getMessage());
+            globalOpCounters.gotInsertsDeprecated(opInsert.getDocuments().size());
+            warnDeprecation(*(rec->getOpCtx()->getClient()), networkOpToString(op));
+            uasserted(5745706, "OP_INSERT is no longer supported");
+        }
         case dbUpdate:
+            globalOpCounters.gotUpdateDeprecated();
+            warnDeprecation(*(rec->getOpCtx()->getClient()), networkOpToString(op));
+            uasserted(5745705, "OP_UPDATE is no longer supported");
         case dbDelete:
-            return std::make_unique<WriteOpRunner>(shared_from_this())->run();
+            globalOpCounters.gotDeleteDeprecated();
+            warnDeprecation(*(rec->getOpCtx()->getClient()), networkOpToString(op));
+            uasserted(5745704, "OP_DELETE is no longer supported");
         default:
             MONGO_UNREACHABLE;
     }
