@@ -103,57 +103,6 @@ void CollectionMetadata::throwIfReshardingInProgress(NamespaceString const& nss)
     }
 }
 
-bool CollectionMetadata::disallowWritesForResharding(const UUID& currentCollectionUUID) const {
-    if (!isSharded())
-        return false;
-
-    const auto& reshardingFields = getReshardingFields();
-    if (!reshardingFields)
-        return false;
-
-    switch (reshardingFields->getState()) {
-        case CoordinatorStateEnum::kUnused:
-        case CoordinatorStateEnum::kInitializing:
-        case CoordinatorStateEnum::kPreparingToDonate:
-        case CoordinatorStateEnum::kCloning:
-        case CoordinatorStateEnum::kApplying:
-            return false;
-        case CoordinatorStateEnum::kBlockingWrites:
-            // Only return true if this is also the donor shard.
-            return reshardingFields->getDonorFields() != boost::none;
-        case CoordinatorStateEnum::kAborting:
-            return false;
-        case CoordinatorStateEnum::kCommitting:
-            break;
-        case CoordinatorStateEnum::kDone:
-            return false;
-    }
-
-    const auto& recipientFields = reshardingFields->getRecipientFields();
-    uassert(5325800,
-            "Missing 'recipientFields' in collection metadata for resharding operation that has "
-            "decision persisted",
-            recipientFields);
-
-    const auto& originalUUID = recipientFields->getSourceUUID();
-    const auto& reshardingUUID = reshardingFields->getReshardingUUID();
-
-    if (currentCollectionUUID == originalUUID) {
-        // This shard must be both a donor and recipient. Neither the drop or renameCollection have
-        // happened yet. Writes should continue to be disallowed.
-        return true;
-    } else if (currentCollectionUUID == reshardingUUID) {
-        // The renameCollection has happened. Writes no longer need be disallowed on this shard.
-        return false;
-    }
-
-    uasserted(ErrorCodes::InvalidUUID,
-              "Expected collection to have either the original UUID {} or the resharding UUID {}, "
-              "but the collection instead has UUID {}"_format(originalUUID.toString(),
-                                                              reshardingUUID.toString(),
-                                                              currentCollectionUUID.toString()));
-}
-
 BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
     BSONObj key;
 

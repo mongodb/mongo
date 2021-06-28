@@ -57,10 +57,6 @@ public:
         return _impl->get().isSharded();
     }
 
-    bool disallowWritesForResharding(const UUID& currentCollectionUUID) const {
-        return _impl->get().disallowWritesForResharding(currentCollectionUUID);
-    }
-
     bool isValidKey(const BSONObj& key) const {
         return _impl->get().isValidKey(key);
     }
