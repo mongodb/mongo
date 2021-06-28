@@ -25,9 +25,10 @@ env.Library(
 )
 
 env.Library(
-    target='simple8b',
+    target='type_compressor',
     source=[
         'simple8b.cpp',
+        'simple8b_type_util.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -41,12 +42,13 @@ env.CppUnitTest(
         'bson_extract_test.cpp',
         'builder_test.cpp',
         'bitstream_builder_test.cpp',
-        'simple8b_test.cpp'
+        'simple8b_test.cpp', 
+        'simple8b_type_util_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'bitstream_builder',
         'bson_extract',
-        'simple8b',
+        'type_compressor', 
     ],
 )
