@@ -737,14 +737,6 @@ class RunPlugin(PluginInterface):
         parser.add_argument("--mongo", dest="mongo_executable", metavar="PATH",
                             help="The path to the mongo shell executable for resmoke.py to use.")
 
-        parser.add_argument("--shellReadMode", action="store", dest="shell_read_mode",
-                            choices=("commands", "compatibility", "legacy"), metavar="READ_MODE",
-                            help="The read mode used by the mongo shell.")
-
-        parser.add_argument("--shellWriteMode", action="store", dest="shell_write_mode",
-                            choices=("commands", "compatibility", "legacy"), metavar="WRITE_MODE",
-                            help="The write mode used by the mongo shell.")
-
         parser.add_argument(
             "--shuffle", action="store_const", const="on", dest="shuffle",
             help=("Randomizes the order in which tests are executed. This is equivalent"

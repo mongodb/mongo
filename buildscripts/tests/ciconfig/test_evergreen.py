@@ -84,14 +84,11 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(task_dict, task.raw)
 
     def test_resmoke_args(self):
-        task_commands = [{
-            "func": "run tests",
-            "vars": {"resmoke_args": "--suites=core --shellWriteMode=commands"}
-        }]
+        task_commands = [{"func": "run tests", "vars": {"resmoke_args": "--suites=core"}}]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        self.assertEqual("--suites=core --shellWriteMode=commands", task.resmoke_args)
+        self.assertEqual("--suites=core", task.resmoke_args)
         self.assertEqual("core", task.resmoke_suite)
 
     def test_resmoke_suite(self):
@@ -99,8 +96,7 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         task_dict = {
             "name":
                 "jsCore", "commands": [{
-                    "func": "run tests",
-                    "vars": {"resmoke_args": "--suites={} --shellWriteMode=commands".format(suite)}
+                    "func": "run tests", "vars": {"resmoke_args": "--suites={}".format(suite)}
                 }]
         }
         task = _evergreen.Task(task_dict)
@@ -110,11 +106,10 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_resmoke_suite_multiple(self):
         task_dict = {
             "name":
-                "jsCore",
-            "commands": [{
-                "func": "run tests",
-                "vars": {"resmoke_args": "--suites=core --suites=core2--shellWriteMode=commands"}
-            }]
+                "jsCore", "commands": [{
+                    "func": "run tests",
+                    "vars": {"resmoke_args": "--suites=core --suites=core2--installDir=/bin"}
+                }]
         }
         task = _evergreen.Task(task_dict)
 
@@ -126,7 +121,7 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
             "name":
                 "jsCore", "commands": [{
                     "func": "run tests",
-                    "vars": {"resmoke_args": "--suites=core,core2--shellWriteMode=commands"}
+                    "vars": {"resmoke_args": "--suites=core,core2--installDir=/bin"}
                 }]
         }
         task = _evergreen.Task(task_dict)
@@ -135,10 +130,7 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
             self.assertIsNone(task.resmoke_suite)
 
     def test_is_run_tests_task(self):
-        task_commands = [{
-            "func": "run tests",
-            "vars": {"resmoke_args": "--suites=core --shellWriteMode=commands"}
-        }]
+        task_commands = [{"func": "run tests", "vars": {"resmoke_args": "--suites=core"}}]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
@@ -146,10 +138,7 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertFalse(task.is_generate_resmoke_task)
 
     def test_run_tests_command(self):
-        task_commands = [{
-            "func": "run tests",
-            "vars": {"resmoke_args": "--suites=core --shellWriteMode=commands"}
-        }]
+        task_commands = [{"func": "run tests", "vars": {"resmoke_args": "--suites=core"}}]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
@@ -160,8 +149,7 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         task_commands = [{"func": "do multiversion setup"},
                          {
                              "func": "run tests", "vars": {
-                                 "require_multiversion": True,
-                                 "resmoke_args": "--suites=core --shellWriteMode=commands"
+                                 "require_multiversion": True, "resmoke_args": "--suites=core"
                              }
                          }]
         task_dict = {"name": "jsCore", "commands": task_commands}
@@ -171,10 +159,7 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(require_multiversion, task.require_multiversion)
 
     def test_run_tests_no_multiversion(self):
-        task_commands = [{
-            "func": "run tests",
-            "vars": {"resmoke_args": "--suites=core --shellWriteMode=commands"}
-        }]
+        task_commands = [{"func": "run tests", "vars": {"resmoke_args": "--suites=core"}}]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
@@ -184,19 +169,19 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_resmoke_args_gen(self):
         task_commands = [{
-            "func": "generate resmoke tasks", "vars": {"resmoke_args": "--shellWriteMode=commands"}
+            "func": "generate resmoke tasks", "vars": {"resmoke_args": "--installDir=/bin"}
         }]
         task_dict = {"name": "jsCore_gen", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        self.assertEqual("--suites=jsCore --shellWriteMode=commands", task.resmoke_args)
+        self.assertEqual("--suites=jsCore --installDir=/bin", task.resmoke_args)
         self.assertEqual("jsCore", task.resmoke_suite)
 
     def test_is_generate_resmoke_task(self):
         task_name = "core"
         task_commands = [{
             "func": "generate resmoke tasks",
-            "vars": {"task": task_name, "resmoke_args": "--shellWriteMode=commands"}
+            "vars": {"task": task_name, "resmoke_args": "--installDir=/bin"}
         }]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
@@ -206,7 +191,7 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_generate_resmoke_tasks_command(self):
         task_commands = [{
-            "func": "generate resmoke tasks", "vars": {"resmoke_args": "--shellWriteMode=commands"}
+            "func": "generate resmoke tasks", "vars": {"resmoke_args": "--installDir=/bin"}
         }]
         task_dict = {"name": "jsCore_gen", "commands": task_commands}
         task = _evergreen.Task(task_dict)
@@ -218,14 +203,13 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         task_name = "jsCore"
         suite_name = "core"
         task_commands = [{
-            "func": "generate resmoke tasks", "vars": {
-                "task": task_name, "suite": suite_name, "resmoke_args": "--shellWriteMode=commands"
-            }
+            "func": "generate resmoke tasks",
+            "vars": {"task": task_name, "suite": suite_name, "resmoke_args": "--installDir=/bin"}
         }]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        self.assertEqual("--suites=core --shellWriteMode=commands", task.resmoke_args)
+        self.assertEqual("--suites=core --installDir=/bin", task.resmoke_args)
         self.assertEqual("core", task.resmoke_suite)
 
     def test_tags_with_no_tags(self):
@@ -233,7 +217,7 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
             "name": "jsCore",
             "commands": [{
                 "func": "run tests",
-                "vars": {"resmoke_args": "--suites=core --shellWriteMode=commands"}
+                "vars": {"resmoke_args": "--suites=core"}
             }]
         }  # yapf: disable
         task = _evergreen.Task(task_dict)
@@ -246,7 +230,7 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
             "tags": ["tag 0", "tag 1", "tag 2"],
             "commands": [{
                 "func": "run tests",
-                "vars": {"resmoke_args": "--suites=core --shellWriteMode=commands"}
+                "vars": {"resmoke_args": "--suites=core"}
             }]
         }  # yapf: disable
         task = _evergreen.Task(task_dict)
@@ -261,7 +245,7 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         suite_name = "core"
         task_commands = [{
             "func": "generate resmoke tasks",
-            "vars": {"suite": suite_name, "resmoke_args": "--shellWriteMode=commands"}
+            "vars": {"suite": suite_name, "resmoke_args": "--installDir=/bin"}
         }]
         task_dict = {"name": task_name, "commands": task_commands}
         task = _evergreen.Task(task_dict)
@@ -274,7 +258,7 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         task_name = "core"
         task_commands = [{
             "func": "generate resmoke tasks", "vars": {
-                "task": task_name, "resmoke_args": "--shellWriteMode=commands",
+                "task": task_name, "resmoke_args": "--installDir=/bin",
                 "require_multiversion": require_multiversion
             }
         }]
@@ -287,7 +271,7 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         task_name = "core"
         task_commands = [{
             "func": "generate resmoke tasks",
-            "vars": {"task": task_name, "resmoke_args": "--shellWriteMode=commands"}
+            "vars": {"task": task_name, "resmoke_args": "--installDir=/bin"}
         }]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
@@ -298,9 +282,8 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         task_name = "jsCore"
         suite_name = "core"
         task_commands = [{
-            "func": "generate resmoke tasks", "vars": {
-                "task": task_name, "suite": suite_name, "resmoke_args": "--shellWriteMode=commands"
-            }
+            "func": "generate resmoke tasks",
+            "vars": {"task": task_name, "suite": suite_name, "resmoke_args": "--installDir=/bin"}
         }]
         task_dict = {"name": task_name, "commands": task_commands}
         task = _evergreen.Task(task_dict)

@@ -90,8 +90,6 @@ DEFAULTS = {
     "service_executor": None,
     "shell_conn_string": None,
     "shell_port": None,
-    "shell_read_mode": None,
-    "shell_write_mode": None,
     "shuffle": None,
     "spawn_using": None,
     "stagger_jobs": None,
@@ -439,12 +437,6 @@ SERVICE_EXECUTOR = None
 # If set, resmoke will override the default fixture and connect to the fixture specified by this
 # connection string instead.
 SHELL_CONN_STRING = None
-
-# If set, then mongo shells started by resmoke.py will use the specified read mode.
-SHELL_READ_MODE = None
-
-# If set, then mongo shells started by resmoke.py will use the specified write mode.
-SHELL_WRITE_MODE = None
 
 # If true, then the order the tests run in is randomized. Otherwise the tests will run in
 # alphabetical (case-insensitive) order.

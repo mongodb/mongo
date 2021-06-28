@@ -47,8 +47,7 @@ def mock_resmoke_config_file(test_list, filename):
                         "TestData": {
                             "roleGraphInvalidationIsFatal": True,
                         }
-                    },
-                    "readMode": "commands",
+                    }
                 }
             }
         }
