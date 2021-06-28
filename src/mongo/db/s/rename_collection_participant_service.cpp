@@ -94,15 +94,6 @@ void renameOrDropTarget(OperationContext* opCtx,
         }
     }
 
-    {
-        // Clear CollectionShardingRuntime entry for the toNss collection.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        Lock::DBLock dbLock(opCtx, toNss.db(), MODE_IX);
-        Lock::CollectionLock collLock(opCtx, toNss, MODE_IX);
-        auto* csr = CollectionShardingRuntime::get(opCtx, toNss);
-        csr->clearFilteringMetadata(opCtx);
-    }
-
     try {
         validateAndRunRenameCollection(opCtx, fromNss, toNss, options);
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
@@ -296,6 +287,27 @@ SemiFuture<void> RenameParticipantInstance::run(
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
 
+                // Clear the CollectionShardingRuntime entry
+                auto clearFilteringMetadata = [&](const NamespaceString& nss) {
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+                    Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+                    auto* csr = CollectionShardingRuntime::get(opCtx, nss);
+                    csr->clearFilteringMetadata(opCtx);
+                };
+                clearFilteringMetadata(fromNss());
+                clearFilteringMetadata(toNss());
+
+                // Force the refresh of the catalog cache for both source and destination
+                // collections to purge outdated information
+                const auto catalog = Grid::get(opCtx)->catalogCache();
+                uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, fromNss()));
+                uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, toNss()));
+                CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, fromNss());
+                CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, toNss());
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+
                 // Release source/target critical sections
                 const auto reason =
                     BSON("command"
@@ -306,9 +318,6 @@ SemiFuture<void> RenameParticipantInstance::run(
                     opCtx, fromNss(), reason, ShardingCatalogClient::kLocalWriteConcern);
                 service->releaseRecoverableCriticalSection(
                     opCtx, toNss(), reason, ShardingCatalogClient::kMajorityWriteConcern);
-
-                Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(fromNss());
-                Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(toNss());
 
                 LOGV2(5515107, "CRUD unblocked", "fromNs"_attr = fromNss(), "toNs"_attr = toNss());
             }))

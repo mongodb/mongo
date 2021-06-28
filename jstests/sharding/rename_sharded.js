@@ -50,6 +50,17 @@ function testRename(st, dbName, toNs, dropTarget, mustFail) {
     const toColl = mongos.getCollection(toNs);
     assert.eq(db.to.find({x: 0}).itcount(), 1, 'Expected exactly one document on the shard');
     assert.eq(toColl.find({x: 2}).itcount(), 1, 'Expected exactly one document on the shard');
+
+    // Validate the correctness of the collections metadata in the catalog cache on shards
+    for (let db of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {
+        // Validate that the source collection metadata has been cleaned up
+        assert.eq(db['cache.collections'].countDocuments({_id: fromNs}), 0);
+        assert(!db['cache.chunks.' + fromNs].exists());
+
+        // Validate that the target collection metadata has been downloaded
+        assert.eq(db['cache.collections'].countDocuments({_id: toNs}), 1);
+        assert(db['cache.chunks.' + toNs].exists());
+    }
 }
 
 // Never use the third shard, but leave it in order to indirectly check that rename participants
