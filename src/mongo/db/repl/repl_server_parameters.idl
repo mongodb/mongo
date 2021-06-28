@@ -569,3 +569,9 @@ feature_flags:
         cpp_varname: feature_flags::gDefaultRCLocal
         default: true
         version: 5.0
+
+    featureFlagFileCopyBasedInitialSync:
+        description: >-
+            When enabled, file copy based initial sync will be supported in Enterprise Server.
+        cpp_varname: feature_flags::gFileCopyBasedInitialSync
+        default: false
