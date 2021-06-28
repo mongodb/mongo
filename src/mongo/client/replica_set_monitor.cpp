@@ -1053,13 +1053,12 @@ void Node::update(const IsMasterReply& reply, bool verbose) {
     invariant(host == reply.host);
     invariant(reply.ok);
 
-    verbose |= isMaster != reply.isMaster || opTime != reply.opTime ||
-        lastWriteDate != reply.lastWriteDate;
+    verbose |= isMaster != reply.isMaster;
     if (verbose) {
-        log() << "Updating host " << host << " state based on ismaster reply from ReplicaSet "
-              << reply.setName << ". Self is primary: " << reply.isMaster
-              << ", primary is: " << reply.primary << ", election ID: " << reply.electionId
-              << ", ReplicaSet version: " << reply.configVersion;
+        LOG(1) << "Updating host " << host << " state based on ismaster reply from ReplicaSet "
+               << reply.setName << ". Self is primary: " << reply.isMaster
+               << ", primary is: " << reply.primary << ", election ID: " << reply.electionId
+               << ", ReplicaSet version: " << reply.configVersion;
     } else {
         LOG(3) << "Refreshing host " << host << " based on ismaster reply: " << reply.raw;
     }
