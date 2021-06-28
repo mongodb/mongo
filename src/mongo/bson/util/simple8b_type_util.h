@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <array>
+#include <boost/optional.hpp>
 #include <cstdint>
 
 namespace mongo {
@@ -41,7 +43,22 @@ public:
     // These methods are for encoding a signed integer with simple8b. They move the signed bit from
     // the most significant bit position to the least significant bit to provide the ability to
     // store as an unsigned integer
+    // the most significant bit position to the least significant bit and call simple8b as an
+    // unsigned integer.
     static uint64_t encodeInt64(int64_t val);
     static int64_t decodeInt64(uint64_t val);
+
+    // These methods add floating point support for encoding and decoding with simple8b up to 8
+    // decimal digits. They work by multiplying the floating point value by a multiple of 10 and
+    // rounding to the nearest integer. They return a option that will not be valid in the case of a
+    // value being greater than 8 decimal digits. Additionally, they will return a boost::none in
+    // the case where lossless encoding is not feasible.
+    static boost::optional<uint8_t> calculateDecimalShiftMultiplier(double val);
+    static boost::optional<uint64_t> encodeDouble(double val, uint8_t scaleIndex);
+    static double decodeDouble(uint64_t val, uint8_t scaleIndex);
+
+    // Array is a double as it will always be multiplied by a double and we don't want to do an
+    // extra cast for
+    static constexpr std::array<double, 5> kScaleMultiplier = {1, 10, 100, 10000, 100000000};
 };
 }  // namespace mongo
