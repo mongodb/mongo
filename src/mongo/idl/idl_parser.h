@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/type_traits.h"
 
@@ -134,6 +135,79 @@ T preparsedValue(A&&... args) {
     using preparsed_value_adl_barrier::idlPreparsedValue;
     return idlPreparsedValue(stdx::type_identity<T>{}, std::forward<A>(args)...);
 }
+
+/** Support routines for IDL-generated comparison operators */
+namespace relop {
+
+template <typename T>
+struct BasicOrderOps;
+
+template <typename T>
+struct Ordering {
+    friend bool operator==(const Ordering& a, const Ordering& b) {
+        return BasicOrderOps<T>{}.equal(a._v, b._v);
+    }
+    friend bool operator<(const Ordering& a, const Ordering& b) {
+        return BasicOrderOps<T>{}.less(a._v, b._v);
+    }
+    friend bool operator!=(const Ordering& a, const Ordering& b) {
+        return !(a == b);
+    }
+    friend bool operator>(const Ordering& a, const Ordering& b) {
+        return b < a;
+    }
+    friend bool operator<=(const Ordering& a, const Ordering& b) {
+        return !(a > b);
+    }
+    friend bool operator>=(const Ordering& a, const Ordering& b) {
+        return !(a < b);
+    }
+
+    const T& _v;
+};
+template <typename T>
+Ordering(const T&)->Ordering<T>;
+
+/** fallback case */
+template <typename T>
+struct BasicOrderOps {
+    bool equal(const T& a, const T& b) const {
+        return a == b;
+    }
+    bool less(const T& a, const T& b) const {
+        return a < b;
+    }
+};
+
+template <>
+struct BasicOrderOps<BSONObj> {
+    bool equal(const BSONObj& a, const BSONObj& b) const {
+        return _cmp(a, b) == 0;
+    }
+
+    bool less(const BSONObj& a, const BSONObj& b) const {
+        return _cmp(a, b) < 0;
+    }
+
+private:
+    int _cmp(const BSONObj& a, const BSONObj& b) const {
+        return SimpleBSONObjComparator::kInstance.compare(a, b);
+    }
+};
+
+/** Disengaged optionals precede engaged optionals. */
+template <typename T>
+struct BasicOrderOps<boost::optional<T>> {
+    bool equal(const boost::optional<T>& a, const boost::optional<T>& b) const {
+        return (!a || !b) ? (!!a == !!b) : (Ordering{*a} == Ordering{*b});
+    }
+
+    bool less(const boost::optional<T>& a, const boost::optional<T>& b) const {
+        return (!a || !b) ? (!!a < !!b) : (Ordering{*a} < Ordering{*b});
+    }
+};
+
+}  // namespace relop
 
 }  // namespace idl
 

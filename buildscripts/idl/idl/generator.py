@@ -123,51 +123,6 @@ def _get_bson_type_check(bson_element, ctxt_name, ast_type):
         return '%s.checkAndAssertTypes(%s, %s)' % (ctxt_name, bson_element, type_list)
 
 
-def _get_comparison(field, rel_op, left, right):
-    # type: (ast.Field, str, str, str) -> str
-    """Generate a comparison for a field."""
-    name = _get_field_member_name(field)
-    if "BSONObj" not in field.type.cpp_type:
-        return "%s.%s %s %s.%s" % (left, name, rel_op, right, name)
-
-    access = name
-    if field.optional:
-        access = name + ".get()"
-
-    comp = "(SimpleBSONObjComparator::kInstance.compare(%s.%s, %s.%s) %s 0)" % (left, access, right,
-                                                                                access, rel_op)
-
-    # boost::optional implements the various operator comparisons but we need to reimplement them
-    # for BSONObj
-    if field.optional:
-        if rel_op == "==":
-            # optional values are equal if they do not contain values otherwise compare the values
-            pred = "( (static_cast<bool>(${left}.${name}) == static_cast<bool>(${right}.${name}))" +\
-                " && (!static_cast<bool>(${left}.${name}) || ${comp}) )"
-        elif rel_op == "!=":
-            pred = "( (static_cast<bool>(${left}.${name}) != static_cast<bool>(${right}.${name}))" +\
-                " && (static_cast<bool>(${left}.${name}) && ${comp}) )"
-        elif rel_op == "<":
-            pred = "( static_cast<bool>(${right}.${name}) && (!static_cast<bool>(${left}.${name})" +\
-                " || ${comp}) )"
-
-        comp = common.template_args(pred, name=name, comp=comp, left=left, right=right)
-
-    return comp
-
-
-def _get_comparison_less(fields):
-    # type: (List[ast.Field]) -> str
-    """Generate a less than comparison for a list of fields recursively."""
-    field = fields[0]
-    if len(fields) == 1:
-        return _get_comparison(field, "<", "left", "right")
-
-    return "%s || (!(%s) && (%s))" % (_get_comparison(field, "<", "left", "right"),
-                                      _get_comparison(field, "<", "right", "left"),
-                                      _get_comparison_less(fields[1:]))
-
-
 def _get_all_fields(struct):
     # type: (ast.Struct) -> List[ast.Field]
     """Get a list of all the fields, including the command field."""
@@ -791,44 +746,23 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # type: (ast.Struct) -> None
         """Generate comparison operators declarations for the type."""
         # pylint: disable=invalid-name
-        sorted_fields = sorted([
-            field for field in struct.fields if (not field.ignore) and field.comparison_order != -1
-        ], key=lambda f: f.comparison_order)
 
-        for rel_op in [('==', " && "), ('!=', " || ")]:
-            self.write_empty_line()
-            decl = common.template_args(
-                "friend bool operator${rel_op}(const ${class_name}& left, const ${class_name}& right) {",
-                rel_op=rel_op[0], class_name=common.title_case(struct.name))
+        with self._block("auto _relopTuple() const {", "}"):
+            sorted_fields = sorted([
+                field
+                for field in struct.fields if (not field.ignore) and field.comparison_order != -1
+            ], key=lambda f: f.comparison_order)
+            self._writer.write_line("return std::tuple({});".format(", ".join(
+                map(lambda f: "idl::relop::Ordering{{{}}}".format(_get_field_member_name(f)),
+                    sorted_fields))))
 
-            with self._block(decl, "}"):
-                self._writer.write_line('return %s;' % (rel_op[1].join(
-                    [_get_comparison(field, rel_op[0], "left", "right")
-                     for field in sorted_fields])))
-
-        decl = common.template_args(
-            "friend bool operator<(const ${class_name}& left, const ${class_name}& right) {",
-            class_name=common.title_case(struct.name))
-        with self._block(decl, "}"):
-            self._writer.write_line("return %s;" % (_get_comparison_less(sorted_fields)))
-
-        decl = common.template_args(
-            "friend bool operator>(const ${class_name}& left, const ${class_name}& right) {",
-            class_name=common.title_case(struct.name))
-        with self._block(decl, "}"):
-            self._writer.write_line('return right < left;')
-
-        decl = common.template_args(
-            "friend bool operator<=(const ${class_name}& left, const ${class_name}& right) {",
-            class_name=common.title_case(struct.name))
-        with self._block(decl, "}"):
-            self._writer.write_line('return !(right < left);')
-
-        decl = common.template_args(
-            "friend bool operator>=(const ${class_name}& left, const ${class_name}& right) {",
-            class_name=common.title_case(struct.name))
-        with self._block(decl, "}"):
-            self._writer.write_line('return !(left < right);')
+        for op in ['==', '!=', '<', '>', '<=', '>=']:
+            with self._block(
+                    common.template_args(
+                        "friend bool operator${op}(const ${cls}& a, const ${cls}& b) {", op=op,
+                        cls=common.title_case(struct.name)), "}"):
+                self._writer.write_line(
+                    common.template_args('return a._relopTuple() ${op} b._relopTuple();', op=op))
 
         self.write_empty_line()
 
@@ -1146,10 +1080,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                             self.gen_getter(struct, field)
                             if not struct.immutable and not field.chained_struct_field:
                                 self.gen_setter(field)
-
-                    if struct.generate_comparison_operators:
-                        self.gen_comparison_operators_declarations(struct)
-
                     self.write_unindented_line('protected:')
                     self.gen_protected_serializer_methods(struct)
 
@@ -1161,6 +1091,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                                 self.gen_validators(field)
 
                     self.write_unindented_line('private:')
+
+                    if struct.generate_comparison_operators:
+                        self.gen_comparison_operators_declarations(struct)
 
                     # Write command member variables
                     if isinstance(struct, ast.Command):
