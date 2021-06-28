@@ -33,6 +33,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/drop_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 
@@ -69,6 +70,9 @@ public:
             auto* csr = CollectionShardingRuntime::get(opCtx, nss);
             csr->clearFilteringMetadata(opCtx);
         }
+
+        // Evict cache entry for memory optimization
+        Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss);
 
         return result;
     }

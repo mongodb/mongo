@@ -104,7 +104,7 @@ Methods that will mark routing table cache information as stale (sharded collect
 
 * [invalidateShardOrEntireCollectionEntryForShardedCollection](https://github.com/mongodb/mongo/blob/62d9485657717bf61fbb870cb3d09b52b1a614dd/src/mongo/s/catalog_cache.h#L226-L236)
 * [invalidateEntriesThatReferenceShard](https://github.com/mongodb/mongo/blob/62d9485657717bf61fbb870cb3d09b52b1a614dd/src/mongo/s/catalog_cache.h#L270-L274)
-* [purgeCollection](https://github.com/mongodb/mongo/blob/62d9485657717bf61fbb870cb3d09b52b1a614dd/src/mongo/s/catalog_cache.h#L276-L280)
+* [invalidateCollectionEntry_LINEARIZABLE](https://github.com/mongodb/mongo/blob/32fe49396dec58836033bca67ad1360b1a80f03c/src/mongo/s/catalog_cache.h#L211-L216)
 
 Methods that will mark routing table cache information as stale (database).
 
