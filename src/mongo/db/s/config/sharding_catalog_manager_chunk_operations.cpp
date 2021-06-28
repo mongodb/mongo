@@ -927,7 +927,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
         }
         queryBuilder << ChunkType::shard(shardId.toString());
         queryBuilder << ChunkType::min(BSON("$gte" << chunkRange.getMin()));
-        queryBuilder << ChunkType::max(BSON("$lte" << chunkRange.getMax()));
+        queryBuilder << ChunkType::min(BSON("$lt" << chunkRange.getMax()));
         return queryBuilder.obj();
     }();
 
