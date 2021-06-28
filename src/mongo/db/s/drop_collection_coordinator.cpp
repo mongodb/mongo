@@ -93,6 +93,30 @@ boost::optional<BSONObj> DropCollectionCoordinator::reportForCurrentOp(
     return bob.obj();
 }
 
+DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
+                                                           const NamespaceString& nss) {
+    DropReply result;
+    uassertStatusOK(dropCollection(
+        opCtx, nss, &result, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+
+    {
+        // Clear the CollectionShardingRuntime entry
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+        auto* csr = CollectionShardingRuntime::get(opCtx, nss);
+        csr->clearFilteringMetadata(opCtx);
+    }
+
+    // Force the refresh of the catalog cache to purge outdated information
+    const auto catalog = Grid::get(opCtx)->catalogCache();
+    uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, nss));
+    CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
+    repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
+    return result;
+}
+
 void DropCollectionCoordinator::_enterPhase(Phase newPhase) {
     StateDoc newDoc(_doc);
     newDoc.setPhase(newPhase);

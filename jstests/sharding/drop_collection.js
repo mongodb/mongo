@@ -328,5 +328,29 @@ jsTest.log("Test that dropping a sharded collection, relevant events are properl
     assert.gte(1, endLogCount, "dropCollection end event not found in changelog");
 }
 
+jsTest.log("Test that dropping a sharded collection, the cached metadata on shards is cleaned up");
+{
+    // Create a sharded collection
+    const db = getNewDb();
+    const coll = db['shardedColl'];
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+
+    // Distribute the chunks among the shards
+    assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
+    assert.commandWorked(coll.insert({_id: 10}));
+    assert.commandWorked(coll.insert({_id: -10}));
+
+    // Drop the collection
+    assert.commandWorked(db.runCommand({drop: coll.getName()}));
+
+    // Verify that the cached metadata on shards is cleaned up
+    for (let configDb of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {
+        assert.eq(configDb['cache.collections'].countDocuments({_id: coll.getFullName()}), 0);
+        assert(!configDb['cache.chunks.' + coll.getFullName()].exists());
+    }
+}
+
 st.stop();
 })();
