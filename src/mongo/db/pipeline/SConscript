@@ -49,7 +49,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/query/explain_options',
+        '$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers',
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/storage/storage_options',
@@ -198,6 +198,7 @@ env.Library(
         'lite_parsed_pipeline.cpp',
         ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers',
         '$BUILD_DIR/mongo/db/stats/counters',
         'aggregation_request_helper',
     ]

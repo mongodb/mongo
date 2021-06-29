@@ -52,7 +52,7 @@ DocumentSourceRedact::DocumentSourceRedact(const intrusive_ptr<ExpressionContext
 REGISTER_DOCUMENT_SOURCE(redact,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceRedact::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
+                         AllowedWithApiStrict::kAlways);
 
 const char* DocumentSourceRedact::getSourceName() const {
     return kStageName.rawData();

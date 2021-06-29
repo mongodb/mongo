@@ -113,8 +113,8 @@ env.Library(
         "$BUILD_DIR/mongo/util/fail_point",
         "collation/collator_factory_icu",
         "collation/collator_icu",
+        "common_query_enums_and_helpers",
         "datetime/init_timezone_data",
-        "explain_options",
         "query_planner",
         "query_request",
     ],
@@ -124,14 +124,19 @@ env.Library(
 )
 
 env.Library(
-    target="explain_options",
+    target="common_query_enums_and_helpers",
     source=[
+        "allowed_contexts.cpp",
         "explain_options.cpp",
         "explain_verbosity.idl"
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/api_parameters",
         "$BUILD_DIR/mongo/idl/idl_parser",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/transport/transport_layer_common",
     ],
 )
 
@@ -372,7 +377,7 @@ env.CppUnitTest(
         "collation/collator_factory_mock",
         "collation/collator_interface_mock",
         "command_request_response",
-        "explain_options",
+        "common_query_enums_and_helpers",
         "hint_parser",
         "map_reduce_output_format",
         "query_common",

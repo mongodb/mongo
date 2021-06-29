@@ -112,7 +112,7 @@ std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp
 REGISTER_DOCUMENT_SOURCE(graphLookup,
                          DocumentSourceGraphLookUp::LiteParsed::parse,
                          DocumentSourceGraphLookUp::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
+                         AllowedWithApiStrict::kAlways);
 
 const char* DocumentSourceGraphLookUp::getSourceName() const {
     return kStageName.rawData();

@@ -44,7 +44,7 @@ using boost::intrusive_ptr;
 REGISTER_DOCUMENT_SOURCE(operationMetrics,
                          DocumentSourceOperationMetrics::LiteParsed::parse,
                          DocumentSourceOperationMetrics::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1);
+                         AllowedWithApiStrict::kNeverInVersion1);
 
 const char* DocumentSourceOperationMetrics::getSourceName() const {
     return kStageName.rawData();

@@ -50,7 +50,7 @@ DocumentSourceLimit::DocumentSourceLimit(const intrusive_ptr<ExpressionContext>&
 REGISTER_DOCUMENT_SOURCE(limit,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceLimit::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
+                         AllowedWithApiStrict::kAlways);
 
 constexpr StringData DocumentSourceLimit::kStageName;
 

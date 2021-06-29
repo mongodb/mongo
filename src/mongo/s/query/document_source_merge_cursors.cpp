@@ -41,7 +41,7 @@ namespace mongo {
 REGISTER_DOCUMENT_SOURCE(mergeCursors,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceMergeCursors::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kInternal);
+                         AllowedWithApiStrict::kInternal);
 
 constexpr StringData DocumentSourceMergeCursors::kStageName;
 

@@ -110,6 +110,8 @@ intrusive_ptr<Expression> Expression::parseObject(ExpressionContext* const expCt
 namespace {
 struct ParserRegistration {
     Parser parser;
+    AllowedWithApiStrict allowedWithApiStrict;
+    AllowedWithClientType allowedWithClientType;
     boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion;
 };
 
@@ -171,12 +173,15 @@ StringMap<ParserRegistration> parserMap;
 void Expression::registerExpression(
     string key,
     Parser parser,
+    AllowedWithApiStrict allowedWithApiStrict,
+    AllowedWithClientType allowedWithClientType,
     boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion) {
     auto op = parserMap.find(key);
     massert(17064,
             str::stream() << "Duplicate expression (" << key << ") registered.",
             op == parserMap.end());
-    parserMap[key] = {parser, requiredMinVersion};
+    parserMap[key] =
+        ParserRegistration{parser, allowedWithApiStrict, allowedWithClientType, requiredMinVersion};
     // Add this expression to the global map of operator counters for expressions.
     operatorCountersExpressions.addExpressionCounter(key);
 }
@@ -210,6 +215,14 @@ intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const e
                           << " for more information.",
             !expCtx->maxFeatureCompatibilityVersion || !entry.requiredMinVersion ||
                 (*entry.requiredMinVersion <= *expCtx->maxFeatureCompatibilityVersion));
+
+    if (expCtx->opCtx) {
+        // Only confirm API versioning if in a user operation, and not parsing a collection
+        // validator. Instead we perform checks for validators at time of access in subsequent
+        // insert/update.
+        assertLanguageFeatureIsAllowed(
+            expCtx->opCtx, opName, entry.allowedWithApiStrict, entry.allowedWithClientType);
+    }
 
     // Increment the global counter for this expression.
     operatorCountersExpressions.incrementExpressionCounter(opName);
@@ -254,19 +267,19 @@ bool Expression::isExpressionName(StringData name) {
 
 /* ------------------------- Register Date Expressions ----------------------------- */
 
-REGISTER_EXPRESSION(dayOfMonth, ExpressionDayOfMonth::parse);
-REGISTER_EXPRESSION(dayOfWeek, ExpressionDayOfWeek::parse);
-REGISTER_EXPRESSION(dayOfYear, ExpressionDayOfYear::parse);
-REGISTER_EXPRESSION(hour, ExpressionHour::parse);
-REGISTER_EXPRESSION(isoDayOfWeek, ExpressionIsoDayOfWeek::parse);
-REGISTER_EXPRESSION(isoWeek, ExpressionIsoWeek::parse);
-REGISTER_EXPRESSION(isoWeekYear, ExpressionIsoWeekYear::parse);
-REGISTER_EXPRESSION(millisecond, ExpressionMillisecond::parse);
-REGISTER_EXPRESSION(minute, ExpressionMinute::parse);
-REGISTER_EXPRESSION(month, ExpressionMonth::parse);
-REGISTER_EXPRESSION(second, ExpressionSecond::parse);
-REGISTER_EXPRESSION(week, ExpressionWeek::parse);
-REGISTER_EXPRESSION(year, ExpressionYear::parse);
+REGISTER_STABLE_EXPRESSION(dayOfMonth, ExpressionDayOfMonth::parse);
+REGISTER_STABLE_EXPRESSION(dayOfWeek, ExpressionDayOfWeek::parse);
+REGISTER_STABLE_EXPRESSION(dayOfYear, ExpressionDayOfYear::parse);
+REGISTER_STABLE_EXPRESSION(hour, ExpressionHour::parse);
+REGISTER_STABLE_EXPRESSION(isoDayOfWeek, ExpressionIsoDayOfWeek::parse);
+REGISTER_STABLE_EXPRESSION(isoWeek, ExpressionIsoWeek::parse);
+REGISTER_STABLE_EXPRESSION(isoWeekYear, ExpressionIsoWeekYear::parse);
+REGISTER_STABLE_EXPRESSION(millisecond, ExpressionMillisecond::parse);
+REGISTER_STABLE_EXPRESSION(minute, ExpressionMinute::parse);
+REGISTER_STABLE_EXPRESSION(month, ExpressionMonth::parse);
+REGISTER_STABLE_EXPRESSION(second, ExpressionSecond::parse);
+REGISTER_STABLE_EXPRESSION(week, ExpressionWeek::parse);
+REGISTER_STABLE_EXPRESSION(year, ExpressionYear::parse);
 
 /* ----------------------- ExpressionAbs ---------------------------- */
 
@@ -286,7 +299,7 @@ Value ExpressionAbs::evaluateNumericArg(const Value& numericArg) const {
     }
 }
 
-REGISTER_EXPRESSION(abs, ExpressionAbs::parse);
+REGISTER_STABLE_EXPRESSION(abs, ExpressionAbs::parse);
 const char* ExpressionAbs::getOpName() const {
     return "$abs";
 }
@@ -400,7 +413,7 @@ Value ExpressionAdd::evaluate(const Document& root, Variables* variables) const 
     }
 }
 
-REGISTER_EXPRESSION(add, ExpressionAdd::parse);
+REGISTER_STABLE_EXPRESSION(add, ExpressionAdd::parse);
 const char* ExpressionAdd::getOpName() const {
     return "$add";
 }
@@ -422,7 +435,7 @@ Value ExpressionAllElementsTrue::evaluate(const Document& root, Variables* varia
     return Value(true);
 }
 
-REGISTER_EXPRESSION(allElementsTrue, ExpressionAllElementsTrue::parse);
+REGISTER_STABLE_EXPRESSION(allElementsTrue, ExpressionAllElementsTrue::parse);
 const char* ExpressionAllElementsTrue::getOpName() const {
     return "$allElementsTrue";
 }
@@ -496,7 +509,7 @@ Value ExpressionAnd::evaluate(const Document& root, Variables* variables) const 
     return Value(true);
 }
 
-REGISTER_EXPRESSION(and, ExpressionAnd::parse);
+REGISTER_STABLE_EXPRESSION(and, ExpressionAnd::parse);
 const char* ExpressionAnd::getOpName() const {
     return "$and";
 }
@@ -518,7 +531,7 @@ Value ExpressionAnyElementTrue::evaluate(const Document& root, Variables* variab
     return Value(false);
 }
 
-REGISTER_EXPRESSION(anyElementTrue, ExpressionAnyElementTrue::parse);
+REGISTER_STABLE_EXPRESSION(anyElementTrue, ExpressionAnyElementTrue::parse);
 const char* ExpressionAnyElementTrue::getOpName() const {
     return "$anyElementTrue";
 }
@@ -609,7 +622,7 @@ Value ExpressionArrayElemAt::evaluate(const Document& root, Variables* variables
     return arrayElemAt(this, array, indexArg);
 }
 
-REGISTER_EXPRESSION(arrayElemAt, ExpressionArrayElemAt::parse);
+REGISTER_STABLE_EXPRESSION(arrayElemAt, ExpressionArrayElemAt::parse);
 const char* ExpressionArrayElemAt::getOpName() const {
     return "$arrayElemAt";
 }
@@ -621,7 +634,7 @@ Value ExpressionFirst::evaluate(const Document& root, Variables* variables) cons
     return arrayElemAt(this, array, Value(0));
 }
 
-REGISTER_EXPRESSION(first, ExpressionFirst::parse);
+REGISTER_STABLE_EXPRESSION(first, ExpressionFirst::parse);
 
 const char* ExpressionFirst::getOpName() const {
     return "$first";
@@ -634,7 +647,7 @@ Value ExpressionLast::evaluate(const Document& root, Variables* variables) const
     return arrayElemAt(this, array, Value(-1));
 }
 
-REGISTER_EXPRESSION(last, ExpressionLast::parse);
+REGISTER_STABLE_EXPRESSION(last, ExpressionLast::parse);
 
 const char* ExpressionLast::getOpName() const {
     return "$last";
@@ -668,7 +681,7 @@ Value ExpressionObjectToArray::evaluate(const Document& root, Variables* variabl
     return Value(output);
 }
 
-REGISTER_EXPRESSION(objectToArray, ExpressionObjectToArray::parse);
+REGISTER_STABLE_EXPRESSION(objectToArray, ExpressionObjectToArray::parse);
 const char* ExpressionObjectToArray::getOpName() const {
     return "$objectToArray";
 }
@@ -779,14 +792,14 @@ Value ExpressionArrayToObject::evaluate(const Document& root, Variables* variabl
     return output.freezeToValue();
 }
 
-REGISTER_EXPRESSION(arrayToObject, ExpressionArrayToObject::parse);
+REGISTER_STABLE_EXPRESSION(arrayToObject, ExpressionArrayToObject::parse);
 const char* ExpressionArrayToObject::getOpName() const {
     return "$arrayToObject";
 }
 
 /* ------------------------- ExpressionBsonSize -------------------------- */
 
-REGISTER_EXPRESSION(bsonSize, ExpressionBsonSize::parse);
+REGISTER_STABLE_EXPRESSION(bsonSize, ExpressionBsonSize::parse);
 
 Value ExpressionBsonSize::evaluate(const Document& root, Variables* variables) const {
     Value arg = _children[0]->evaluate(root, variables);
@@ -818,7 +831,7 @@ Value ExpressionCeil::evaluateNumericArg(const Value& numericArg) const {
     }
 }
 
-REGISTER_EXPRESSION(ceil, ExpressionCeil::parse);
+REGISTER_STABLE_EXPRESSION(ceil, ExpressionCeil::parse);
 const char* ExpressionCeil::getOpName() const {
     return "$ceil";
 }
@@ -881,13 +894,13 @@ struct BoundOp {
 };
 }  // namespace
 
-REGISTER_EXPRESSION(cmp, BoundOp{ExpressionCompare::CMP});
-REGISTER_EXPRESSION(eq, BoundOp{ExpressionCompare::EQ});
-REGISTER_EXPRESSION(gt, BoundOp{ExpressionCompare::GT});
-REGISTER_EXPRESSION(gte, BoundOp{ExpressionCompare::GTE});
-REGISTER_EXPRESSION(lt, BoundOp{ExpressionCompare::LT});
-REGISTER_EXPRESSION(lte, BoundOp{ExpressionCompare::LTE});
-REGISTER_EXPRESSION(ne, BoundOp{ExpressionCompare::NE});
+REGISTER_STABLE_EXPRESSION(cmp, BoundOp{ExpressionCompare::CMP});
+REGISTER_STABLE_EXPRESSION(eq, BoundOp{ExpressionCompare::EQ});
+REGISTER_STABLE_EXPRESSION(gt, BoundOp{ExpressionCompare::GT});
+REGISTER_STABLE_EXPRESSION(gte, BoundOp{ExpressionCompare::GTE});
+REGISTER_STABLE_EXPRESSION(lt, BoundOp{ExpressionCompare::LT});
+REGISTER_STABLE_EXPRESSION(lte, BoundOp{ExpressionCompare::LTE});
+REGISTER_STABLE_EXPRESSION(ne, BoundOp{ExpressionCompare::NE});
 
 intrusive_ptr<Expression> ExpressionCompare::parse(ExpressionContext* const expCtx,
                                                    BSONElement bsonExpr,
@@ -978,7 +991,7 @@ Value ExpressionConcat::evaluate(const Document& root, Variables* variables) con
     return Value(result.str());
 }
 
-REGISTER_EXPRESSION(concat, ExpressionConcat::parse);
+REGISTER_STABLE_EXPRESSION(concat, ExpressionConcat::parse);
 const char* ExpressionConcat::getOpName() const {
     return "$concat";
 }
@@ -1006,7 +1019,7 @@ Value ExpressionConcatArrays::evaluate(const Document& root, Variables* variable
     return Value(std::move(values));
 }
 
-REGISTER_EXPRESSION(concatArrays, ExpressionConcatArrays::parse);
+REGISTER_STABLE_EXPRESSION(concatArrays, ExpressionConcatArrays::parse);
 const char* ExpressionConcatArrays::getOpName() const {
     return "$concatArrays";
 }
@@ -1051,7 +1064,7 @@ intrusive_ptr<Expression> ExpressionCond::parse(ExpressionContext* const expCtx,
     return ret;
 }
 
-REGISTER_EXPRESSION(cond, ExpressionCond::parse);
+REGISTER_STABLE_EXPRESSION(cond, ExpressionCond::parse);
 const char* ExpressionCond::getOpName() const {
     return "$cond";
 }
@@ -1092,8 +1105,8 @@ Value ExpressionConstant::serialize(bool explain) const {
     return serializeConstant(_value);
 }
 
-REGISTER_EXPRESSION(const, ExpressionConstant::parse);
-REGISTER_EXPRESSION(literal, ExpressionConstant::parse);  // alias
+REGISTER_STABLE_EXPRESSION(const, ExpressionConstant::parse);
+REGISTER_STABLE_EXPRESSION(literal, ExpressionConstant::parse);  // alias
 const char* ExpressionConstant::getOpName() const {
     return "$const";
 }
@@ -1131,7 +1144,7 @@ boost::optional<TimeZone> makeTimeZone(const TimeZoneDatabase* tzdb,
 }  // namespace
 
 
-REGISTER_EXPRESSION(dateFromParts, ExpressionDateFromParts::parse);
+REGISTER_STABLE_EXPRESSION(dateFromParts, ExpressionDateFromParts::parse);
 intrusive_ptr<Expression> ExpressionDateFromParts::parse(ExpressionContext* const expCtx,
                                                          BSONElement expr,
                                                          const VariablesParseState& vps) {
@@ -1469,7 +1482,7 @@ void ExpressionDateFromParts::_doAddDependencies(DepsTracker* deps) const {
 
 /* ---------------------- ExpressionDateFromString --------------------- */
 
-REGISTER_EXPRESSION(dateFromString, ExpressionDateFromString::parse);
+REGISTER_STABLE_EXPRESSION(dateFromString, ExpressionDateFromString::parse);
 intrusive_ptr<Expression> ExpressionDateFromString::parse(ExpressionContext* const expCtx,
                                                           BSONElement expr,
                                                           const VariablesParseState& vps) {
@@ -1652,7 +1665,7 @@ void ExpressionDateFromString::_doAddDependencies(DepsTracker* deps) const {
 
 /* ---------------------- ExpressionDateToParts ----------------------- */
 
-REGISTER_EXPRESSION(dateToParts, ExpressionDateToParts::parse);
+REGISTER_STABLE_EXPRESSION(dateToParts, ExpressionDateToParts::parse);
 intrusive_ptr<Expression> ExpressionDateToParts::parse(ExpressionContext* const expCtx,
                                                        BSONElement expr,
                                                        const VariablesParseState& vps) {
@@ -1800,7 +1813,7 @@ void ExpressionDateToParts::_doAddDependencies(DepsTracker* deps) const {
 
 /* ---------------------- ExpressionDateToString ----------------------- */
 
-REGISTER_EXPRESSION(dateToString, ExpressionDateToString::parse);
+REGISTER_STABLE_EXPRESSION(dateToString, ExpressionDateToString::parse);
 intrusive_ptr<Expression> ExpressionDateToString::parse(ExpressionContext* const expCtx,
                                                         BSONElement expr,
                                                         const VariablesParseState& vps) {
@@ -1949,6 +1962,8 @@ void ExpressionDateToString::_doAddDependencies(DepsTracker* deps) const {
 // TODO SERVER-53028: make the expression to be available for any FCV when 5.0 becomes last-lts.
 REGISTER_EXPRESSION_WITH_MIN_VERSION(dateDiff,
                                      ExpressionDateDiff::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
                                      ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
 
 ExpressionDateDiff::ExpressionDateDiff(ExpressionContext* const expCtx,
@@ -2129,7 +2144,7 @@ StatusWith<Value> ExpressionDivide::apply(Value lhs, Value rhs) {
     }
 }
 
-REGISTER_EXPRESSION(divide, ExpressionDivide::parse);
+REGISTER_STABLE_EXPRESSION(divide, ExpressionDivide::parse);
 const char* ExpressionDivide::getOpName() const {
     return "$divide";
 }
@@ -2144,7 +2159,7 @@ Value ExpressionExp::evaluateNumericArg(const Value& numericArg) const {
     return Value(exp(numericArg.coerceToDouble()));
 }
 
-REGISTER_EXPRESSION(exp, ExpressionExp::parse);
+REGISTER_STABLE_EXPRESSION(exp, ExpressionExp::parse);
 const char* ExpressionExp::getOpName() const {
     return "$exp";
 }
@@ -2465,7 +2480,7 @@ std::unique_ptr<Expression> ExpressionFieldPath::copyWithSubstitution(
 
 /* ------------------------- ExpressionFilter ----------------------------- */
 
-REGISTER_EXPRESSION(filter, ExpressionFilter::parse);
+REGISTER_STABLE_EXPRESSION(filter, ExpressionFilter::parse);
 intrusive_ptr<Expression> ExpressionFilter::parse(ExpressionContext* const expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn) {
@@ -2584,14 +2599,14 @@ Value ExpressionFloor::evaluateNumericArg(const Value& numericArg) const {
     }
 }
 
-REGISTER_EXPRESSION(floor, ExpressionFloor::parse);
+REGISTER_STABLE_EXPRESSION(floor, ExpressionFloor::parse);
 const char* ExpressionFloor::getOpName() const {
     return "$floor";
 }
 
 /* ------------------------- ExpressionLet ----------------------------- */
 
-REGISTER_EXPRESSION(let, ExpressionLet::parse);
+REGISTER_STABLE_EXPRESSION(let, ExpressionLet::parse);
 intrusive_ptr<Expression> ExpressionLet::parse(ExpressionContext* const expCtx,
                                                BSONElement expr,
                                                const VariablesParseState& vpsIn) {
@@ -2705,7 +2720,7 @@ void ExpressionLet::_doAddDependencies(DepsTracker* deps) const {
 
 /* ------------------------- ExpressionMap ----------------------------- */
 
-REGISTER_EXPRESSION(map, ExpressionMap::parse);
+REGISTER_STABLE_EXPRESSION(map, ExpressionMap::parse);
 intrusive_ptr<Expression> ExpressionMap::parse(ExpressionContext* const expCtx,
                                                BSONElement expr,
                                                const VariablesParseState& vpsIn) {
@@ -2845,7 +2860,7 @@ Expression::ComputedPaths ExpressionMap::getComputedPaths(const std::string& exp
 
 /* ------------------------- ExpressionMeta ----------------------------- */
 
-REGISTER_EXPRESSION(meta, ExpressionMeta::parse);
+REGISTER_STABLE_EXPRESSION(meta, ExpressionMeta::parse);
 
 namespace {
 const std::string textScoreName = "textScore";
@@ -3018,7 +3033,7 @@ Value ExpressionMod::evaluate(const Document& root, Variables* variables) const 
     }
 }
 
-REGISTER_EXPRESSION(mod, ExpressionMod::parse);
+REGISTER_STABLE_EXPRESSION(mod, ExpressionMod::parse);
 const char* ExpressionMod::getOpName() const {
     return "$mod";
 }
@@ -3115,7 +3130,7 @@ Value ExpressionMultiply::evaluate(const Document& root, Variables* variables) c
     return state.getValue();
 }
 
-REGISTER_EXPRESSION(multiply, ExpressionMultiply::parse);
+REGISTER_STABLE_EXPRESSION(multiply, ExpressionMultiply::parse);
 const char* ExpressionMultiply::getOpName() const {
     return "$multiply";
 }
@@ -3138,7 +3153,7 @@ Value ExpressionIfNull::evaluate(const Document& root, Variables* variables) con
     return Value();
 }
 
-REGISTER_EXPRESSION(ifNull, ExpressionIfNull::parse);
+REGISTER_STABLE_EXPRESSION(ifNull, ExpressionIfNull::parse);
 const char* ExpressionIfNull::getOpName() const {
     return "$ifNull";
 }
@@ -3161,7 +3176,7 @@ Value ExpressionIn::evaluate(const Document& root, Variables* variables) const {
     return Value(false);
 }
 
-REGISTER_EXPRESSION(in, ExpressionIn::parse);
+REGISTER_STABLE_EXPRESSION(in, ExpressionIn::parse);
 const char* ExpressionIn::getOpName() const {
     return "$in";
 }
@@ -3310,7 +3325,7 @@ intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
     return this;
 }
 
-REGISTER_EXPRESSION(indexOfArray, ExpressionIndexOfArray::parse);
+REGISTER_STABLE_EXPRESSION(indexOfArray, ExpressionIndexOfArray::parse);
 const char* ExpressionIndexOfArray::getOpName() const {
     return "$indexOfArray";
 }
@@ -3375,7 +3390,7 @@ Value ExpressionIndexOfBytes::evaluate(const Document& root, Variables* variable
     return Value(static_cast<int>(position));
 }
 
-REGISTER_EXPRESSION(indexOfBytes, ExpressionIndexOfBytes::parse);
+REGISTER_STABLE_EXPRESSION(indexOfBytes, ExpressionIndexOfBytes::parse);
 const char* ExpressionIndexOfBytes::getOpName() const {
     return "$indexOfBytes";
 }
@@ -3463,7 +3478,7 @@ Value ExpressionIndexOfCP::evaluate(const Document& root, Variables* variables) 
     return Value(-1);
 }
 
-REGISTER_EXPRESSION(indexOfCP, ExpressionIndexOfCP::parse);
+REGISTER_STABLE_EXPRESSION(indexOfCP, ExpressionIndexOfCP::parse);
 const char* ExpressionIndexOfCP::getOpName() const {
     return "$indexOfCP";
 }
@@ -3484,7 +3499,7 @@ Value ExpressionLn::evaluateNumericArg(const Value& numericArg) const {
     return Value(std::log(argDouble));
 }
 
-REGISTER_EXPRESSION(ln, ExpressionLn::parse);
+REGISTER_STABLE_EXPRESSION(ln, ExpressionLn::parse);
 const char* ExpressionLn::getOpName() const {
     return "$ln";
 }
@@ -3528,7 +3543,7 @@ Value ExpressionLog::evaluate(const Document& root, Variables* variables) const 
     return Value(std::log(argDouble) / std::log(baseDouble));
 }
 
-REGISTER_EXPRESSION(log, ExpressionLog::parse);
+REGISTER_STABLE_EXPRESSION(log, ExpressionLog::parse);
 const char* ExpressionLog::getOpName() const {
     return "$log";
 }
@@ -3550,7 +3565,7 @@ Value ExpressionLog10::evaluateNumericArg(const Value& numericArg) const {
     return Value(std::log10(argDouble));
 }
 
-REGISTER_EXPRESSION(log10, ExpressionLog10::parse);
+REGISTER_STABLE_EXPRESSION(log10, ExpressionLog10::parse);
 const char* ExpressionLog10::getOpName() const {
     return "$log10";
 }
@@ -3687,7 +3702,7 @@ Value ExpressionNot::evaluate(const Document& root, Variables* variables) const 
     return Value(!b);
 }
 
-REGISTER_EXPRESSION(not, ExpressionNot::parse);
+REGISTER_STABLE_EXPRESSION(not, ExpressionNot::parse);
 const char* ExpressionNot::getOpName() const {
     return "$not";
 }
@@ -3757,7 +3772,7 @@ intrusive_ptr<Expression> ExpressionOr::optimize() {
     return pE;
 }
 
-REGISTER_EXPRESSION(or, ExpressionOr::parse);
+REGISTER_STABLE_EXPRESSION(or, ExpressionOr::parse);
 const char* ExpressionOr::getOpName() const {
     return "$or";
 }
@@ -3979,7 +3994,7 @@ Value ExpressionPow::evaluate(const Document& root, Variables* variables) const 
     return formatResult(computeWithRepeatedMultiplication(baseLong, expLong));
 }
 
-REGISTER_EXPRESSION(pow, ExpressionPow::parse);
+REGISTER_STABLE_EXPRESSION(pow, ExpressionPow::parse);
 const char* ExpressionPow::getOpName() const {
     return "$pow";
 }
@@ -4041,14 +4056,14 @@ Value ExpressionRange::evaluate(const Document& root, Variables* variables) cons
     return Value(output);
 }
 
-REGISTER_EXPRESSION(range, ExpressionRange::parse);
+REGISTER_STABLE_EXPRESSION(range, ExpressionRange::parse);
 const char* ExpressionRange::getOpName() const {
     return "$range";
 }
 
 /* ------------------------ ExpressionReduce ------------------------------ */
 
-REGISTER_EXPRESSION(reduce, ExpressionReduce::parse);
+REGISTER_STABLE_EXPRESSION(reduce, ExpressionReduce::parse);
 intrusive_ptr<Expression> ExpressionReduce::parse(ExpressionContext* const expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps) {
@@ -4224,7 +4239,7 @@ intrusive_ptr<Expression> ExpressionReplaceBase::optimize() {
 
 /* ------------------------ ExpressionReplaceOne ------------------------ */
 
-REGISTER_EXPRESSION(replaceOne, ExpressionReplaceOne::parse);
+REGISTER_STABLE_EXPRESSION(replaceOne, ExpressionReplaceOne::parse);
 
 intrusive_ptr<Expression> ExpressionReplaceOne::parse(ExpressionContext* const expCtx,
                                                       BSONElement expr,
@@ -4255,7 +4270,7 @@ Value ExpressionReplaceOne::_doEval(StringData input,
 
 /* ------------------------ ExpressionReplaceAll ------------------------ */
 
-REGISTER_EXPRESSION(replaceAll, ExpressionReplaceAll::parse);
+REGISTER_STABLE_EXPRESSION(replaceAll, ExpressionReplaceAll::parse);
 
 intrusive_ptr<Expression> ExpressionReplaceAll::parse(ExpressionContext* const expCtx,
                                                       BSONElement expr,
@@ -4321,7 +4336,7 @@ Value ExpressionReverseArray::evaluate(const Document& root, Variables* variable
     return Value(array);
 }
 
-REGISTER_EXPRESSION(reverseArray, ExpressionReverseArray::parse);
+REGISTER_STABLE_EXPRESSION(reverseArray, ExpressionReverseArray::parse);
 const char* ExpressionReverseArray::getOpName() const {
     return "$reverseArray";
 }
@@ -4368,7 +4383,7 @@ Value ExpressionSetDifference::evaluate(const Document& root, Variables* variabl
     return Value(std::move(returnVec));
 }
 
-REGISTER_EXPRESSION(setDifference, ExpressionSetDifference::parse);
+REGISTER_STABLE_EXPRESSION(setDifference, ExpressionSetDifference::parse);
 const char* ExpressionSetDifference::getOpName() const {
     return "$setDifference";
 }
@@ -4410,7 +4425,7 @@ Value ExpressionSetEquals::evaluate(const Document& root, Variables* variables) 
     return Value(true);
 }
 
-REGISTER_EXPRESSION(setEquals, ExpressionSetEquals::parse);
+REGISTER_STABLE_EXPRESSION(setEquals, ExpressionSetEquals::parse);
 const char* ExpressionSetEquals::getOpName() const {
     return "$setEquals";
 }
@@ -4454,7 +4469,7 @@ Value ExpressionSetIntersection::evaluate(const Document& root, Variables* varia
     return Value(vector<Value>(currentIntersection.begin(), currentIntersection.end()));
 }
 
-REGISTER_EXPRESSION(setIntersection, ExpressionSetIntersection::parse);
+REGISTER_STABLE_EXPRESSION(setIntersection, ExpressionSetIntersection::parse);
 const char* ExpressionSetIntersection::getOpName() const {
     return "$setIntersection";
 }
@@ -4546,7 +4561,7 @@ intrusive_ptr<Expression> ExpressionSetIsSubset::optimize() {
     return optimized;
 }
 
-REGISTER_EXPRESSION(setIsSubset, ExpressionSetIsSubset::parse);
+REGISTER_STABLE_EXPRESSION(setIsSubset, ExpressionSetIsSubset::parse);
 const char* ExpressionSetIsSubset::getOpName() const {
     return "$setIsSubset";
 }
@@ -4571,7 +4586,7 @@ Value ExpressionSetUnion::evaluate(const Document& root, Variables* variables) c
     return Value(vector<Value>(unionedSet.begin(), unionedSet.end()));
 }
 
-REGISTER_EXPRESSION(setUnion, ExpressionSetUnion::parse);
+REGISTER_STABLE_EXPRESSION(setUnion, ExpressionSetUnion::parse);
 const char* ExpressionSetUnion::getOpName() const {
     return "$setUnion";
 }
@@ -4583,7 +4598,7 @@ Value ExpressionIsArray::evaluate(const Document& root, Variables* variables) co
     return Value(argument.isArray());
 }
 
-REGISTER_EXPRESSION(isArray, ExpressionIsArray::parse);
+REGISTER_STABLE_EXPRESSION(isArray, ExpressionIsArray::parse);
 const char* ExpressionIsArray::getOpName() const {
     return "$isArray";
 }
@@ -4669,7 +4684,7 @@ Value ExpressionSlice::evaluate(const Document& root, Variables* variables) cons
     return Value(vector<Value>(array.begin() + start, array.begin() + end));
 }
 
-REGISTER_EXPRESSION(slice, ExpressionSlice::parse);
+REGISTER_STABLE_EXPRESSION(slice, ExpressionSlice::parse);
 const char* ExpressionSlice::getOpName() const {
     return "$slice";
 }
@@ -4686,7 +4701,7 @@ Value ExpressionSize::evaluate(const Document& root, Variables* variables) const
     return Value::createIntOrLong(array.getArray().size());
 }
 
-REGISTER_EXPRESSION(size, ExpressionSize::parse);
+REGISTER_STABLE_EXPRESSION(size, ExpressionSize::parse);
 const char* ExpressionSize::getOpName() const {
     return "$size";
 }
@@ -4736,7 +4751,7 @@ Value ExpressionSplit::evaluate(const Document& root, Variables* variables) cons
     return Value(std::move(output));
 }
 
-REGISTER_EXPRESSION(split, ExpressionSplit::parse);
+REGISTER_STABLE_EXPRESSION(split, ExpressionSplit::parse);
 const char* ExpressionSplit::getOpName() const {
     return "$split";
 }
@@ -4758,7 +4773,7 @@ Value ExpressionSqrt::evaluateNumericArg(const Value& numericArg) const {
     return Value(sqrt(argDouble));
 }
 
-REGISTER_EXPRESSION(sqrt, ExpressionSqrt::parse);
+REGISTER_STABLE_EXPRESSION(sqrt, ExpressionSqrt::parse);
 const char* ExpressionSqrt::getOpName() const {
     return "$sqrt";
 }
@@ -4782,7 +4797,7 @@ Value ExpressionStrcasecmp::evaluate(const Document& root, Variables* variables)
         return Value(-1);
 }
 
-REGISTER_EXPRESSION(strcasecmp, ExpressionStrcasecmp::parse);
+REGISTER_STABLE_EXPRESSION(strcasecmp, ExpressionStrcasecmp::parse);
 const char* ExpressionStrcasecmp::getOpName() const {
     return "$strcasecmp";
 }
@@ -4841,8 +4856,8 @@ Value ExpressionSubstrBytes::evaluate(const Document& root, Variables* variables
 }
 
 // $substr is deprecated in favor of $substrBytes, but for now will just parse into a $substrBytes.
-REGISTER_EXPRESSION(substrBytes, ExpressionSubstrBytes::parse);
-REGISTER_EXPRESSION(substr, ExpressionSubstrBytes::parse);
+REGISTER_STABLE_EXPRESSION(substrBytes, ExpressionSubstrBytes::parse);
+REGISTER_STABLE_EXPRESSION(substr, ExpressionSubstrBytes::parse);
 const char* ExpressionSubstrBytes::getOpName() const {
     return "$substrBytes";
 }
@@ -4915,7 +4930,7 @@ Value ExpressionSubstrCP::evaluate(const Document& root, Variables* variables) c
     return Value(std::string(str, startIndexBytes, endIndexBytes - startIndexBytes));
 }
 
-REGISTER_EXPRESSION(substrCP, ExpressionSubstrCP::parse);
+REGISTER_STABLE_EXPRESSION(substrCP, ExpressionSubstrCP::parse);
 const char* ExpressionSubstrCP::getOpName() const {
     return "$substrCP";
 }
@@ -4944,7 +4959,7 @@ Value ExpressionStrLenBytes::evaluate(const Document& root, Variables* variables
     return strLenBytes(str.getStringData());
 }
 
-REGISTER_EXPRESSION(strLenBytes, ExpressionStrLenBytes::parse);
+REGISTER_STABLE_EXPRESSION(strLenBytes, ExpressionStrLenBytes::parse);
 const char* ExpressionStrLenBytes::getOpName() const {
     return "$strLenBytes";
 }
@@ -4970,7 +4985,7 @@ Value ExpressionBinarySize::evaluate(const Document& root, Variables* variables)
     return Value(binData.length);
 }
 
-REGISTER_EXPRESSION(binarySize, ExpressionBinarySize::parse);
+REGISTER_STABLE_EXPRESSION(binarySize, ExpressionBinarySize::parse);
 
 const char* ExpressionBinarySize::getOpName() const {
     return "$binarySize";
@@ -4996,7 +5011,7 @@ Value ExpressionStrLenCP::evaluate(const Document& root, Variables* variables) c
     return Value(static_cast<int>(strLen));
 }
 
-REGISTER_EXPRESSION(strLenCP, ExpressionStrLenCP::parse);
+REGISTER_STABLE_EXPRESSION(strLenCP, ExpressionStrLenCP::parse);
 const char* ExpressionStrLenCP::getOpName() const {
     return "$strLenCP";
 }
@@ -5050,14 +5065,14 @@ StatusWith<Value> ExpressionSubtract::apply(Value lhs, Value rhs) {
     }
 }
 
-REGISTER_EXPRESSION(subtract, ExpressionSubtract::parse);
+REGISTER_STABLE_EXPRESSION(subtract, ExpressionSubtract::parse);
 const char* ExpressionSubtract::getOpName() const {
     return "$subtract";
 }
 
 /* ------------------------- ExpressionSwitch ------------------------------ */
 
-REGISTER_EXPRESSION(switch, ExpressionSwitch::parse);
+REGISTER_STABLE_EXPRESSION(switch, ExpressionSwitch::parse);
 
 Value ExpressionSwitch::evaluate(const Document& root, Variables* variables) const {
     for (auto&& branch : _branches) {
@@ -5201,7 +5216,7 @@ Value ExpressionToLower::evaluate(const Document& root, Variables* variables) co
     return Value(str);
 }
 
-REGISTER_EXPRESSION(toLower, ExpressionToLower::parse);
+REGISTER_STABLE_EXPRESSION(toLower, ExpressionToLower::parse);
 const char* ExpressionToLower::getOpName() const {
     return "$toLower";
 }
@@ -5215,16 +5230,16 @@ Value ExpressionToUpper::evaluate(const Document& root, Variables* variables) co
     return Value(str);
 }
 
-REGISTER_EXPRESSION(toUpper, ExpressionToUpper::parse);
+REGISTER_STABLE_EXPRESSION(toUpper, ExpressionToUpper::parse);
 const char* ExpressionToUpper::getOpName() const {
     return "$toUpper";
 }
 
 /* -------------------------- ExpressionTrim ------------------------------ */
 
-REGISTER_EXPRESSION(trim, ExpressionTrim::parse);
-REGISTER_EXPRESSION(ltrim, ExpressionTrim::parse);
-REGISTER_EXPRESSION(rtrim, ExpressionTrim::parse);
+REGISTER_STABLE_EXPRESSION(trim, ExpressionTrim::parse);
+REGISTER_STABLE_EXPRESSION(ltrim, ExpressionTrim::parse);
+REGISTER_STABLE_EXPRESSION(rtrim, ExpressionTrim::parse);
 
 intrusive_ptr<Expression> ExpressionTrim::parse(ExpressionContext* const expCtx,
                                                 BSONElement expr,
@@ -5534,7 +5549,7 @@ Value ExpressionRound::evaluate(const Document& root, Variables* variables) cons
         root, _children, getOpName(), Decimal128::kRoundTiesToEven, &std::round, variables);
 }
 
-REGISTER_EXPRESSION(round, ExpressionRound::parse);
+REGISTER_STABLE_EXPRESSION(round, ExpressionRound::parse);
 const char* ExpressionRound::getOpName() const {
     return "$round";
 }
@@ -5550,7 +5565,7 @@ intrusive_ptr<Expression> ExpressionTrunc::parse(ExpressionContext* const expCtx
     return ExpressionRangedArity<ExpressionTrunc, 1, 2>::parse(expCtx, elem, vps);
 }
 
-REGISTER_EXPRESSION(trunc, ExpressionTrunc::parse);
+REGISTER_STABLE_EXPRESSION(trunc, ExpressionTrunc::parse);
 const char* ExpressionTrunc::getOpName() const {
     return "$trunc";
 }
@@ -5562,7 +5577,7 @@ Value ExpressionType::evaluate(const Document& root, Variables* variables) const
     return Value(StringData(typeName(val.getType())));
 }
 
-REGISTER_EXPRESSION(type, ExpressionType::parse);
+REGISTER_STABLE_EXPRESSION(type, ExpressionType::parse);
 const char* ExpressionType::getOpName() const {
     return "$type";
 }
@@ -5574,7 +5589,7 @@ Value ExpressionIsNumber::evaluate(const Document& root, Variables* variables) c
     return Value(val.numeric());
 }
 
-REGISTER_EXPRESSION(isNumber, ExpressionIsNumber::parse);
+REGISTER_STABLE_EXPRESSION(isNumber, ExpressionIsNumber::parse);
 
 const char* ExpressionIsNumber::getOpName() const {
     return "$isNumber";
@@ -5582,7 +5597,7 @@ const char* ExpressionIsNumber::getOpName() const {
 
 /* -------------------------- ExpressionZip ------------------------------ */
 
-REGISTER_EXPRESSION(zip, ExpressionZip::parse);
+REGISTER_STABLE_EXPRESSION(zip, ExpressionZip::parse);
 intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
                                                BSONElement expr,
                                                const VariablesParseState& vps) {
@@ -6190,18 +6205,19 @@ Expression::Parser makeConversionAlias(const StringData shortcutName, BSONType t
 
 }  // namespace
 
-REGISTER_EXPRESSION(convert, ExpressionConvert::parse);
+REGISTER_STABLE_EXPRESSION(convert, ExpressionConvert::parse);
 
 // Also register shortcut expressions like $toInt, $toString, etc. which can be used as a shortcut
 // for $convert without an 'onNull' or 'onError'.
-REGISTER_EXPRESSION(toString, makeConversionAlias("$toString"_sd, BSONType::String));
-REGISTER_EXPRESSION(toObjectId, makeConversionAlias("$toObjectId"_sd, BSONType::jstOID));
-REGISTER_EXPRESSION(toDate, makeConversionAlias("$toDate"_sd, BSONType::Date));
-REGISTER_EXPRESSION(toDouble, makeConversionAlias("$toDouble"_sd, BSONType::NumberDouble));
-REGISTER_EXPRESSION(toInt, makeConversionAlias("$toInt"_sd, BSONType::NumberInt));
-REGISTER_EXPRESSION(toLong, makeConversionAlias("$toLong"_sd, BSONType::NumberLong));
-REGISTER_EXPRESSION(toDecimal, makeConversionAlias("$toDecimal"_sd, BSONType::NumberDecimal));
-REGISTER_EXPRESSION(toBool, makeConversionAlias("$toBool"_sd, BSONType::Bool));
+REGISTER_STABLE_EXPRESSION(toString, makeConversionAlias("$toString"_sd, BSONType::String));
+REGISTER_STABLE_EXPRESSION(toObjectId, makeConversionAlias("$toObjectId"_sd, BSONType::jstOID));
+REGISTER_STABLE_EXPRESSION(toDate, makeConversionAlias("$toDate"_sd, BSONType::Date));
+REGISTER_STABLE_EXPRESSION(toDouble, makeConversionAlias("$toDouble"_sd, BSONType::NumberDouble));
+REGISTER_STABLE_EXPRESSION(toInt, makeConversionAlias("$toInt"_sd, BSONType::NumberInt));
+REGISTER_STABLE_EXPRESSION(toLong, makeConversionAlias("$toLong"_sd, BSONType::NumberLong));
+REGISTER_STABLE_EXPRESSION(toDecimal,
+                           makeConversionAlias("$toDecimal"_sd, BSONType::NumberDecimal));
+REGISTER_STABLE_EXPRESSION(toBool, makeConversionAlias("$toBool"_sd, BSONType::Bool));
 
 boost::intrusive_ptr<Expression> ExpressionConvert::create(ExpressionContext* const expCtx,
                                                            boost::intrusive_ptr<Expression> input,
@@ -6724,7 +6740,7 @@ ExpressionRegex::getConstantPatternAndOptions() const {
 
 /* -------------------------- ExpressionRegexFind ------------------------------ */
 
-REGISTER_EXPRESSION(regexFind, ExpressionRegexFind::parse);
+REGISTER_STABLE_EXPRESSION(regexFind, ExpressionRegexFind::parse);
 boost::intrusive_ptr<Expression> ExpressionRegexFind::parse(ExpressionContext* const expCtx,
                                                             BSONElement expr,
                                                             const VariablesParseState& vpsIn) {
@@ -6744,7 +6760,7 @@ Value ExpressionRegexFind::evaluate(const Document& root, Variables* variables) 
 
 /* -------------------------- ExpressionRegexFindAll ------------------------------ */
 
-REGISTER_EXPRESSION(regexFindAll, ExpressionRegexFindAll::parse);
+REGISTER_STABLE_EXPRESSION(regexFindAll, ExpressionRegexFindAll::parse);
 boost::intrusive_ptr<Expression> ExpressionRegexFindAll::parse(ExpressionContext* const expCtx,
                                                                BSONElement expr,
                                                                const VariablesParseState& vpsIn) {
@@ -6805,7 +6821,7 @@ Value ExpressionRegexFindAll::evaluate(const Document& root, Variables* variable
 
 /* -------------------------- ExpressionRegexMatch ------------------------------ */
 
-REGISTER_EXPRESSION(regexMatch, ExpressionRegexMatch::parse);
+REGISTER_STABLE_EXPRESSION(regexMatch, ExpressionRegexMatch::parse);
 boost::intrusive_ptr<Expression> ExpressionRegexMatch::parse(ExpressionContext* const expCtx,
                                                              BSONElement expr,
                                                              const VariablesParseState& vpsIn) {
@@ -6822,7 +6838,7 @@ Value ExpressionRegexMatch::evaluate(const Document& root, Variables* variables)
 }
 
 /* -------------------------- ExpressionRandom ------------------------------ */
-REGISTER_EXPRESSION(rand, ExpressionRandom::parse);
+REGISTER_STABLE_EXPRESSION(rand, ExpressionRandom::parse);
 
 static thread_local PseudoRandom threadLocalRNG(SecureRandom().nextInt64());
 
@@ -6867,7 +6883,7 @@ Value ExpressionRandom::serialize(const bool explain) const {
 }
 
 /* ------------------------- ExpressionToHashedIndexKey -------------------------- */
-REGISTER_EXPRESSION(toHashedIndexKey, ExpressionToHashedIndexKey::parse);
+REGISTER_STABLE_EXPRESSION(toHashedIndexKey, ExpressionToHashedIndexKey::parse);
 
 boost::intrusive_ptr<Expression> ExpressionToHashedIndexKey::parse(ExpressionContext* const expCtx,
                                                                    BSONElement expr,
@@ -7008,6 +7024,8 @@ Value ExpressionDateArithmetics::evaluate(const Document& root, Variables* varia
 
 REGISTER_EXPRESSION_WITH_MIN_VERSION(dateAdd,
                                      ExpressionDateAdd::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
                                      ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
 
 boost::intrusive_ptr<Expression> ExpressionDateAdd::parse(ExpressionContext* const expCtx,
@@ -7033,6 +7051,8 @@ Value ExpressionDateAdd::evaluateDateArithmetics(Date_t date,
 
 REGISTER_EXPRESSION_WITH_MIN_VERSION(dateSubtract,
                                      ExpressionDateSubtract::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
                                      ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
 
 boost::intrusive_ptr<Expression> ExpressionDateSubtract::parse(ExpressionContext* const expCtx,
@@ -7061,6 +7081,8 @@ Value ExpressionDateSubtract::evaluateDateArithmetics(Date_t date,
 // TODO SERVER-53028: make the expression to be available for any FCV when 5.0 becomes last-lts.
 REGISTER_EXPRESSION_WITH_MIN_VERSION(dateTrunc,
                                      ExpressionDateTrunc::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
                                      ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
 
 ExpressionDateTrunc::ExpressionDateTrunc(ExpressionContext* const expCtx,
@@ -7485,7 +7507,11 @@ Value ExpressionTsSecond::evaluate(const Document& root, Variables* variables) c
     return Value(static_cast<long long>(operand.getTimestamp().getSecs()));
 }
 
-REGISTER_EXPRESSION(tsSecond, ExpressionTsSecond::parse);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(tsSecond,
+                                     ExpressionTsSecond::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
 
 /* ------------------------- ExpressionTsIncrement ----------------------------- */
 
@@ -7504,7 +7530,11 @@ Value ExpressionTsIncrement::evaluate(const Document& root, Variables* variables
     return Value(static_cast<long long>(operand.getTimestamp().getInc()));
 }
 
-REGISTER_EXPRESSION(tsIncrement, ExpressionTsIncrement::parse);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(tsIncrement,
+                                     ExpressionTsIncrement::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
 
 MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
 MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())

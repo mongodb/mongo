@@ -77,14 +77,14 @@ REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(
     setWindowFields,
     LiteParsedDocumentSourceDefault::parse,
     document_source_set_window_fields::createFromBson,
-    LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithApiStrict::kNeverInVersion1,
     ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
 
 REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(
     _internalSetWindowFields,
     LiteParsedDocumentSourceDefault::parse,
     DocumentSourceInternalSetWindowFields::createFromBson,
-    LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1,
+    AllowedWithApiStrict::kNeverInVersion1,
     ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
 
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFromBson(

@@ -43,7 +43,7 @@ using boost::intrusive_ptr;
 
 REGISTER_ACCUMULATOR(mergeObjects,
                      genericParseSingleExpressionAccumulator<AccumulatorMergeObjects>);
-REGISTER_EXPRESSION(mergeObjects, ExpressionFromAccumulator<AccumulatorMergeObjects>::parse);
+REGISTER_STABLE_EXPRESSION(mergeObjects, ExpressionFromAccumulator<AccumulatorMergeObjects>::parse);
 
 const char* AccumulatorMergeObjects::getOpName() const {
     return "$mergeObjects";

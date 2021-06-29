@@ -77,11 +77,11 @@ Document ReplaceRootTransformation::applyTransformation(const Document& input) {
 REGISTER_DOCUMENT_SOURCE(replaceRoot,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceReplaceRoot::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
+                         AllowedWithApiStrict::kAlways);
 REGISTER_DOCUMENT_SOURCE(replaceWith,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceReplaceRoot::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
+                         AllowedWithApiStrict::kAlways);
 
 intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {

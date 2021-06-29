@@ -31,7 +31,7 @@
 
 namespace mongo {
 
-REGISTER_EXPRESSION(function, ExpressionFunction::parse);
+REGISTER_STABLE_EXPRESSION(function, ExpressionFunction::parse);
 
 ExpressionFunction::ExpressionFunction(ExpressionContext* const expCtx,
                                        boost::intrusive_ptr<Expression> passedArgs,

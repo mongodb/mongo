@@ -47,7 +47,7 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 REGISTER_ACCUMULATOR(sum, genericParseSingleExpressionAccumulator<AccumulatorSum>);
-REGISTER_EXPRESSION(sum, ExpressionFromAccumulator<AccumulatorSum>::parse);
+REGISTER_STABLE_EXPRESSION(sum, ExpressionFromAccumulator<AccumulatorSum>::parse);
 REGISTER_REMOVABLE_WINDOW_FUNCTION(sum, AccumulatorSum, WindowFunctionSum);
 REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
     count, parseCountAccumulator, ServerGlobalParams::FeatureCompatibility::Version::kVersion50);

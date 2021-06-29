@@ -44,7 +44,7 @@ namespace mongo {
 REGISTER_DOCUMENT_SOURCE(collStats,
                          DocumentSourceCollStats::LiteParsed::parse,
                          DocumentSourceCollStats::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kSometimes);
+                         AllowedWithApiStrict::kSometimes);
 
 void DocumentSourceCollStats::LiteParsed::assertPermittedInAPIVersion(
     const APIParameters& apiParameters) const {

@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/sort_pattern.h"
@@ -67,16 +68,21 @@ class DocumentSource;
  * Registers a Parser so it can be called from parseExpression and friends.
  *
  * As an example, if your expression looks like {"$foo": [1,2,3]} you would add this line:
- * REGISTER_EXPRESSION(foo, ExpressionFoo::parse);
+ * REGISTER_STABLE_EXPRESSION(foo, ExpressionFoo::parse);
  *
- * An expression registered this way can be used in any featureCompatibilityVersion.
+ * An expression registered this way can be used in any featureCompatibilityVersion and will be
+ * considered part of the stable API.
  */
-#define REGISTER_EXPRESSION(key, parser)                                 \
-    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,            \
-                              ("BeginExpressionRegistration"),           \
-                              ("EndExpressionRegistration"))             \
-    (InitializerContext*) {                                              \
-        Expression::registerExpression("$" #key, (parser), boost::none); \
+#define REGISTER_STABLE_EXPRESSION(key, parser)                       \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,         \
+                              ("BeginExpressionRegistration"),        \
+                              ("EndExpressionRegistration"))          \
+    (InitializerContext*) {                                           \
+        Expression::registerExpression("$" #key,                      \
+                                       (parser),                      \
+                                       AllowedWithApiStrict::kAlways, \
+                                       AllowedWithClientType::kAny,   \
+                                       boost::none);                  \
     }
 
 /**
@@ -87,16 +93,22 @@ class DocumentSource;
  * feature_flags::gFoo and version >= X, you would add this line:
  * REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION_WITH_MIN_VERSION(
  *     foo, ExpressionFoo::parse, feature_flags::gFoo, X);
+ *
+ * Expressions registered in this way will not be included in the stable API.
  */
-#define REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION_WITH_MIN_VERSION(            \
-    key, parser, featureFlag, minVersion)                                     \
-    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                 \
-                              ("BeginExpressionRegistration"),                \
-                              ("EndExpressionRegistration"))                  \
-    (InitializerContext*) {                                                   \
-        if (featureFlag.isEnabledAndIgnoreFCV()) {                            \
-            Expression::registerExpression("$" #key, (parser), (minVersion)); \
-        }                                                                     \
+#define REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION_WITH_MIN_VERSION(                 \
+    key, parser, featureFlag, minVersion)                                          \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                      \
+                              ("BeginExpressionRegistration"),                     \
+                              ("EndExpressionRegistration"))                       \
+    (InitializerContext*) {                                                        \
+        if (featureFlag.isEnabledAndIgnoreFCV()) {                                 \
+            Expression::registerExpression("$" #key,                               \
+                                           (parser),                               \
+                                           AllowedWithApiStrict::kNeverInVersion1, \
+                                           AllowedWithClientType::kAny,            \
+                                           (minVersion));                          \
+        }                                                                          \
     }
 
 /**
@@ -106,28 +118,43 @@ class DocumentSource;
  *
  * As an example, if your expression looks like {"$foo": [1,2,3]}, and can only be used in a feature
  * compatibility version >= X, you would add this line:
- * REGISTER_EXPRESSION_WITH_MIN_VERSION(foo, ExpressionFoo::parse, X);
+ * REGISTER_EXPRESSION_WITH_MIN_VERSION(
+ *  foo,
+ *  ExpressionFoo::parse,
+ *  AllowedWithApiStrict::kNeverInVersion1,
+ *  AllowedWithClientType::kAny,
+ *  X);
+ *
+ * Generally new language features should be excluded from the stable API for a stabilization period
+ * to allow for incorporating feedback or fixing accidental semantics bugs.
+ *
+ * If 'allowedWithApiStrict' is set to 'kSometimes', this expression is expected to register its own
+ * parser and enforce the 'sometimes' behavior during that invocation. No extra validation will be
+ * done here.
  */
-#define REGISTER_EXPRESSION_WITH_MIN_VERSION(key, parser, minVersion)     \
-    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,             \
-                              ("BeginExpressionRegistration"),            \
-                              ("EndExpressionRegistration"))              \
-    (InitializerContext*) {                                               \
-        Expression::registerExpression("$" #key, (parser), (minVersion)); \
+#define REGISTER_EXPRESSION_WITH_MIN_VERSION(                                               \
+    key, parser, allowedWithApiStrict, allowedClientType, minVersion)                       \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                               \
+                              ("BeginExpressionRegistration"),                              \
+                              ("EndExpressionRegistration"))                                \
+    (InitializerContext*) {                                                                 \
+        Expression::registerExpression(                                                     \
+            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (minVersion)); \
     }
 
 /**
  * Registers a Parser only if test commands are enabled. Use this if your expression is only used
  * for testing purposes.
  */
-#define REGISTER_TEST_EXPRESSION(key, parser)                                \
-    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                \
-                              ("BeginExpressionRegistration"),               \
-                              ("EndExpressionRegistration"))                 \
-    (InitializerContext*) {                                                  \
-        if (getTestCommandsEnabled()) {                                      \
-            Expression::registerExpression("$" #key, (parser), boost::none); \
-        }                                                                    \
+#define REGISTER_TEST_EXPRESSION(key, allowedWithApiStrict, allowedClientType, parser)         \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                                  \
+                              ("BeginExpressionRegistration"),                                 \
+                              ("EndExpressionRegistration"))                                   \
+    (InitializerContext*) {                                                                    \
+        if (getTestCommandsEnabled()) {                                                        \
+            Expression::registerExpression(                                                    \
+                "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), boost::none); \
+        }                                                                                      \
     }
 
 class Expression : public RefCountable {
@@ -295,6 +322,8 @@ public:
     static void registerExpression(
         std::string key,
         Parser parser,
+        AllowedWithApiStrict allowedWithApiStrict,
+        AllowedWithClientType allowedWithClientType,
         boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion);
 
     const auto& getChildren() const {
@@ -452,7 +481,7 @@ public:
 
 /**
  * Used to make Accumulators available as Expressions, e.g., to make $sum available as an Expression
- * use "REGISTER_EXPRESSION(sum, ExpressionAccumulator<AccumulatorSum>::parse);".
+ * use "REGISTER_STABLE_EXPRESSION(sum, ExpressionAccumulator<AccumulatorSum>::parse);".
  */
 template <typename AccumulatorState>
 class ExpressionFromAccumulator
