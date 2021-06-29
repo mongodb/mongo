@@ -765,8 +765,18 @@ void NetworkInterfaceTL::RequestManager::trySend(
         }
     }
 
-    if (request->timeout != RemoteCommandRequest::kNoTimeout &&
-        WireSpec::instance().get()->isInternalClient) {
+    // We're only going to set the maxTimeMSOpOnly field on the cmdObj if:
+    // 1) We're an internal client
+    // 2) This request has a timeout
+    // 3) The cluster is on FCV 5.0 OR this is a hedged operation.
+    // Nodes on 4.4 can make use of the internal timeout for hedged requests,
+    // but aren't smart enough to ignore it for "hello" commands, so we elide it.
+    bool fcvAtLeast50 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+            ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
+    bool shouldSetMaxTimeMSOpOnly = request->timeout != RemoteCommandRequest::kNoTimeout &&
+        WireSpec::instance().get()->isInternalClient && (fcvAtLeast50 || requestState->isHedge);
+    if (shouldSetMaxTimeMSOpOnly) {
         LOGV2_DEBUG(4924402,
                     2,
                     "Set maxTimeMSOpOnly for request",
