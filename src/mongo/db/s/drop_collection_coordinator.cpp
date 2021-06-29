@@ -92,18 +92,17 @@ void DropCollectionCoordinator::_updateStateDocument(StateDoc&& newDoc) {
 
 DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                                                            const NamespaceString& nss) {
-    DropReply result;
-    uassertStatusOK(dropCollection(
-        opCtx, nss, &result, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
-
     {
-        // Clear the CollectionShardingRuntime entry
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        // Clear CollectionShardingRuntime entry
         Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         auto* csr = CollectionShardingRuntime::get(opCtx, nss);
         csr->clearFilteringMetadata(opCtx);
     }
+
+    DropReply result;
+    uassertStatusOK(dropCollection(
+        opCtx, nss, &result, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
 
     // Force the refresh of the catalog cache to purge outdated information
     const auto catalog = Grid::get(opCtx)->catalogCache();
