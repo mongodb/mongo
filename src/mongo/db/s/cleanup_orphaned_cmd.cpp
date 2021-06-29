@@ -133,7 +133,8 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
               "collectionUUID"_attr = *collectionUuid,
               "numRemainingDeletionTasks"_attr = numRemainingDeletionTasks);
 
-        auto status = CollectionShardingRuntime::waitForClean(opCtx, ns, *collectionUuid, *range);
+        auto status = CollectionShardingRuntime::waitForClean(
+            opCtx, ns, *collectionUuid, *range, Milliseconds::max());
 
         if (!status.isOK()) {
             *errMsg = status.reason();

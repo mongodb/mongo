@@ -990,8 +990,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
               "range"_attr = redact(range.toString()),
               "migrationId"_attr = _migrationId->toBSON());
 
+        auto waitTime = Milliseconds(receiveChunkWaitForRangeDeleterTimeoutMS.load());
         auto status = CollectionShardingRuntime::waitForClean(
-            outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
+            outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range, waitTime);
 
         if (!status.isOK()) {
             _setStateFail(redact(status.toString()));

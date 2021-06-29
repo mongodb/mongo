@@ -235,7 +235,11 @@ SharedSemiFuture<void> CollectionShardingRuntime::cleanUpRange(ChunkRange const&
 Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const UUID& collectionUuid,
-                                               ChunkRange orphanRange) {
+                                               ChunkRange orphanRange,
+                                               Milliseconds waitTimeout) {
+    auto rangeDeletionWaitDeadline = waitTimeout == Milliseconds::max()
+        ? Date_t::max()
+        : opCtx->getServiceContext()->getFastClockSource()->now() + waitTimeout;
     while (true) {
         boost::optional<SharedSemiFuture<void>> stillScheduled;
 
@@ -271,16 +275,19 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                       "Waiting for deletion of orphans",
                       "namespace"_attr = nss.ns(),
                       "orphanRange"_attr = orphanRange);
-
-        Status result = stillScheduled->getNoThrow(opCtx);
-
-        // Swallow RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist error since the
-        // collection could either never exist or get dropped directly from the shard after
-        // the range deletion task got scheduled.
-        if (!result.isOK() &&
-            result != ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist) {
-            return result.withContext(str::stream() << "Failed to delete orphaned " << nss.ns()
-                                                    << " range " << orphanRange.toString());
+        try {
+            opCtx->runWithDeadline(rangeDeletionWaitDeadline, ErrorCodes::ExceededTimeLimit, [&] {
+                stillScheduled->get(opCtx);
+            });
+        } catch (const DBException& ex) {
+            auto result = ex.toStatus();
+            // Swallow RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist error since the
+            // collection could either never exist or get dropped directly from the shard after
+            // the range deletion task got scheduled.
+            if (result != ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist) {
+                return result.withContext(str::stream() << "Failed to delete orphaned " << nss.ns()
+                                                        << " range " << orphanRange.toString());
+            }
         }
     }
 
