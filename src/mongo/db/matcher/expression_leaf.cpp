@@ -45,6 +45,7 @@
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/regex_util.h"
+#include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -305,7 +306,38 @@ ModMatchExpression::ModMatchExpression(StringData path,
 bool ModMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     if (!e.isNumber())
         return false;
-    return overflow::safeMod(truncateToLong(e), _divisor) == _remainder;
+    long long dividend;
+    if (e.type() == BSONType::NumberDouble) {
+        auto dividendDouble = e.Double();
+
+        // If dividend is NaN or Infinity, then there is no match.
+        if (!std::isfinite(dividendDouble)) {
+            return false;
+        }
+        auto dividendLong = representAs<long long>(std::trunc(dividendDouble));
+        uassert(5732100,
+                str::stream() << "dividend value cannot be represented as a 64-bit integer: "
+                              << e.toString(false),
+                dividendLong);
+        dividend = *dividendLong;
+    } else if (e.type() == BSONType::NumberDecimal) {
+        auto dividendDecimal = e.Decimal();
+
+        // If dividend is NaN or Infinity, then there is no match.
+        if (!dividendDecimal.isFinite()) {
+            return false;
+        }
+        auto dividendLong =
+            representAs<long long>(dividendDecimal.round(Decimal128::kRoundTowardZero));
+        uassert(5732101,
+                str::stream() << "dividend value cannot be represented as a 64-bit integer: "
+                              << e.toString(false),
+                dividendLong);
+        dividend = *dividendLong;
+    } else {
+        dividend = e.numberLong();
+    }
+    return overflow::safeMod(dividend, _divisor) == _remainder;
 }
 
 void ModMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {

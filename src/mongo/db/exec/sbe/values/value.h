@@ -250,6 +250,8 @@ std::pair<TypeTags, Value> compareValue(
 
 bool isNaN(TypeTags tag, Value val);
 
+bool isInfinity(TypeTags tag, Value val);
+
 /**
  * A simple hash combination.
  */

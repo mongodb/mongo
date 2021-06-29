@@ -1644,25 +1644,38 @@ public:
         // The mod function returns the result of the mod operation between the operand and
         // given divisor, so construct an expression to then compare the result of the operation
         // to the given remainder.
-        auto makePredicate = [expr](sbe::value::SlotId inputSlot,
-                                    EvalStage inputStage) -> EvalExprStagePair {
+        auto makePredicate = [expr, context = _context](sbe::value::SlotId inputSlot,
+                                                        EvalStage inputStage) -> EvalExprStagePair {
+            auto frameId = context->state.frameId();
+            sbe::EVariable dividend{inputSlot};
+            sbe::EVariable dividendConvertedToNumberInt64{frameId, 0};
             auto truncatedArgument = sbe::makeE<sbe::ENumericConvert>(
-                sbe::makeE<sbe::EFunction>("trunc",
-                                           sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot))),
-                sbe::value::TypeTags::NumberInt64);
-
-            return {makeFillEmptyFalse(makeBinaryOp(
-                        sbe::EPrimBinary::eq,
-                        sbe::makeE<sbe::EFunction>(
-                            "mod",
-                            sbe::makeEs(std::move(truncatedArgument),
-                                        sbe::makeE<sbe::EConstant>(
-                                            sbe::value::TypeTags::NumberInt64,
-                                            sbe::value::bitcastFrom<int64_t>(expr->getDivisor())))),
-                        sbe::makeE<sbe::EConstant>(
-                            sbe::value::TypeTags::NumberInt64,
-                            sbe::value::bitcastFrom<int64_t>(expr->getRemainder())))),
-                    std::move(inputStage)};
+                makeFunction("trunc"_sd, dividend.clone()), sbe::value::TypeTags::NumberInt64);
+            auto modExpression = buildMultiBranchConditional(
+                CaseValuePair{
+                    generateNullOrMissing(dividendConvertedToNumberInt64),
+                    sbe::makeE<sbe::EFail>(ErrorCodes::Error{5732102},
+                                           "cannot represent dividend as a 64-bit integer"_sd)},
+                makeFillEmptyFalse(makeBinaryOp(
+                    sbe::EPrimBinary::eq,
+                    makeFunction(
+                        "mod"_sd,
+                        dividendConvertedToNumberInt64.clone(),
+                        makeConstant(sbe::value::TypeTags::NumberInt64,
+                                     sbe::value::bitcastFrom<int64_t>(expr->getDivisor()))),
+                    makeConstant(sbe::value::TypeTags::NumberInt64,
+                                 sbe::value::bitcastFrom<int64_t>(expr->getRemainder())))));
+            return {
+                makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                             makeNot(makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                  generateNonNumericCheck(dividend),
+                                                  makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                               generateNaNCheck(dividend),
+                                                               generateInfinityCheck(dividend)))),
+                             sbe::makeE<sbe::ELocalBind>(frameId,
+                                                         sbe::makeEs(std::move(truncatedArgument)),
+                                                         std::move(modExpression))),
+                std::move(inputStage)};
         };
 
         generatePredicate(_context,

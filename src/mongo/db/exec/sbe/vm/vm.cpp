@@ -122,6 +122,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // isBinData
     0,  // isDate
     0,  // isNaN
+    0,  // isInfinity
     0,  // isRecordId
     0,  // isMinKey
     0,  // isMaxKey
@@ -382,6 +383,10 @@ void CodeFragment::appendIsDate() {
 
 void CodeFragment::appendIsNaN() {
     appendSimpleInstruction(Instruction::isNaN);
+}
+
+void CodeFragment::appendIsInfinity() {
+    appendSimpleInstruction(Instruction::isInfinity);
 }
 
 void CodeFragment::appendIsRecordId() {
@@ -4160,6 +4165,18 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                                  value::bitcastFrom<bool>(value::isNaN(tag, val)));
                     }
 
+                    if (owned) {
+                        value::releaseValue(tag, val);
+                    }
+                    break;
+                }
+                case Instruction::isInfinity: {
+                    auto [owned, tag, val] = getFromStack(0);
+                    if (tag != value::TypeTags::Nothing) {
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(value::isInfinity(tag, val)));
+                    }
                     if (owned) {
                         value::releaseValue(tag, val);
                     }

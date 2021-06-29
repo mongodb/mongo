@@ -257,6 +257,7 @@ struct Instruction {
         isBinData,
         isDate,
         isNaN,
+        isInfinity,
         isRecordId,
         isMinKey,
         isMaxKey,
@@ -468,6 +469,7 @@ public:
     void appendIsBinData();
     void appendIsDate();
     void appendIsNaN();
+    void appendIsInfinity();
     void appendIsRecordId();
     void appendIsMinKey() {
         appendSimpleInstruction(Instruction::isMinKey);

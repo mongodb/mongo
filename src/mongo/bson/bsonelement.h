@@ -789,7 +789,21 @@ public:
     std::string _asCode() const;
 
     bool coerce(std::string* out) const;
+
+    /**
+     * Coerces the value to an int. If the value type is NumberDouble, the value is rounded to
+     * a closest integer towards zero. If the value type is NumberDecimal, the value is rounded to a
+     * closest integer, but ties are rounded to an even integer. Returns false, if the value cannot
+     * be coerced.
+     */
     bool coerce(int* out) const;
+
+    /**
+     * Coerces the value to a long long. If the value type is NumberDouble, the value is rounded to
+     * a closest integer towards zero. If the value type is NumberDecimal, the value is rounded to a
+     * closest integer, but ties are rounded to an even integer. Returns false, if the value cannot
+     * be coerced.
+     */
     bool coerce(long long* out) const;
     bool coerce(double* out) const;
     bool coerce(bool* out) const;
@@ -1028,14 +1042,15 @@ inline long long BSONElement::safeNumberLong() const {
 }
 
 /**
- * Attempt to coerce the BSONElement to a primitive type.
- * For integral targets, we do additional checking that the
- * source file is a finite real number and fits within the
- * target type.
+ * Attempt to coerce the BSONElement to a primitive type. For integral targets, we do additional
+ * checking that the source number is a finite real number and fits within the target type after
+ * rounding to the closest integer towards zero. Note that for NumberDecimal types the real number
+ * rounding behavior of this method is different from one employed by 'coerce'.
  */
 template <typename T>
 Status BSONElement::tryCoerce(T* out) const {
     if constexpr (std::is_integral<T>::value && !std::is_same<bool, T>::value) {
+        long long val;
         if (type() == NumberDouble) {
             double d = numberDouble();
             if (!std::isfinite(d)) {
@@ -1044,22 +1059,26 @@ Status BSONElement::tryCoerce(T* out) const {
             if ((d > std::numeric_limits<T>::max()) || (d < std::numeric_limits<T>::lowest())) {
                 return {ErrorCodes::BadValue, "Out of bounds coercing to integral value"};
             }
+            val = static_cast<long long>(d);
         } else if (type() == NumberDecimal) {
             Decimal128 d = numberDecimal();
             if (!d.isFinite()) {
                 return {ErrorCodes::BadValue, "Unable to coerce NaN/Inf to integral type"};
             }
+            d = d.round(Decimal128::RoundingMode::kRoundTowardZero);
             if (d.isGreater(Decimal128(std::numeric_limits<T>::max())) ||
                 d.isLess(Decimal128(std::numeric_limits<T>::lowest()))) {
                 return {ErrorCodes::BadValue, "Out of bounds coercing to integral value"};
             }
+            uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+            val = d.toLongExact(&signalingFlags);
+            tassert(5732103,
+                    "decimal128 number exact conversion to long failed",
+                    Decimal128::SignalingFlag::kNoFlag == signalingFlags);
         } else if (type() == mongo::Bool) {
             *out = Bool();
             return Status::OK();
-        }
-
-        long long val;
-        if (!coerce(&val)) {
+        } else if (!coerce(&val)) {
             return {ErrorCodes::BadValue, "Unable to coerce value to integral type"};
         }
 

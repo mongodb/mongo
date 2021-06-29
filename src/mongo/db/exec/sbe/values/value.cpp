@@ -1164,6 +1164,11 @@ bool isNaN(TypeTags tag, Value val) {
         (tag == TypeTags::NumberDecimal && bitcastTo<Decimal128>(val).isNaN());
 }
 
+bool isInfinity(TypeTags tag, Value val) {
+    return (tag == TypeTags::NumberDouble && std::isinf(bitcastTo<double>(val))) ||
+        (tag == TypeTags::NumberDecimal && bitcastTo<Decimal128>(val).isInfinite());
+}
+
 void ArraySet::push_back(TypeTags tag, Value val) {
     if (tag != TypeTags::Nothing) {
         ValueGuard guard{tag, val};

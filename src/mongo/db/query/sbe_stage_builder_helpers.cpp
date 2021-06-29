@@ -138,6 +138,10 @@ std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var) {
     return makeFunction("isNaN", var.clone());
 }
 
+std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& var) {
+    return makeFunction("isInfinity"_sd, var.clone());
+}
+
 std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable& var) {
     return makeBinaryOp(sbe::EPrimBinary::EPrimBinary::lessEq,
                         var.clone(),

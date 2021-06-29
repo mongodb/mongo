@@ -95,6 +95,11 @@ std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable&
 std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var);
 
 /**
+ * Generates an EExpression that checks if the input expression is a numeric Infinity.
+ */
+std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& var);
+
+/**
  * Generates an EExpression that checks if the input expression is a non-positive number (i.e. <= 0)
  * _assuming that_ it has already been verified to be numeric.
  */
