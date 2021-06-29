@@ -665,8 +665,6 @@ public:
         status = args.initialize(cmdObj);
         if (status.isOK()) {
             status = replCoord->processReplSetUpdatePosition(args);
-
-            // TODO convert to uassertStatusOK once SERVER-34806 is done.
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         } else {
             // Parsing error from UpdatePositionArgs.
