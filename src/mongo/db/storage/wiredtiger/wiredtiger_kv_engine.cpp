@@ -379,8 +379,9 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     }
 
     if (kDebugBuild) {
-        // Enable debug write-ahead logging for all tables under debug build.
-        ss << "debug_mode=(table_logging=true,";
+        // Enable debug write-ahead logging for all tables under debug build. Do not abort the
+        // process when corruption is found in debug builds, which supports increased test coverage.
+        ss << "debug_mode=(table_logging=true,corruption_abort=false,";
         // For select debug builds, support enabling WiredTiger eviction debug mode. This uses
         // more aggressive eviction tactics, but may have a negative performance impact.
         if (gWiredTigerEvictionDebugMode) {
