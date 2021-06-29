@@ -25,11 +25,6 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 
-# This IDL file describes the BSON format for ElectionMetrics,
-# ElectionCandidateMetrics and ElectionParticipantMetrics, and
-# handles the serialization to and deserialization from their BSON
-# representations for those classes.
-
 global:
     cpp_namespace: "mongo"
     cpp_includes:
