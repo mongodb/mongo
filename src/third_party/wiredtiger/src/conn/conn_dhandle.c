@@ -609,8 +609,6 @@ err:
         /*
          * We want to close the Btree for an object that lives in the local directory. It will
          * actually be part of the corresponding tiered Btree.
-         *
-         * TODO: tiered: need a flag in the dhandle to indicate it's a file and an object.
          */
         if (dhandle->type == WT_DHANDLE_TYPE_BTREE && WT_SUFFIX_MATCH(dhandle->name, ".wtobj"))
             WT_TRET(__wt_btree_close(session));

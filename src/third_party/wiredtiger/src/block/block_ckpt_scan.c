@@ -227,7 +227,7 @@ __wt_block_checkpoint_last(WT_SESSION_IMPL *session, WT_BLOCK *block, char **met
     *metadatap = *checkpoint_listp = NULL;
     WT_RET(__wt_buf_init(session, checkpoint, WT_BLOCK_CHECKPOINT_BUFFER));
 
-    /* TODO: tiered: scan all object IDs. */
+    /* Tiered tables aren't supported yet. */
     objectid = 0;
 
     /*

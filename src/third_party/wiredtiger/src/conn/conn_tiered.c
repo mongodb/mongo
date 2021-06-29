@@ -42,10 +42,6 @@ __flush_tier_wait(WT_SESSION_IMPL *session)
      * It may be worthwhile looking at the add and decrement values and make choices of whether to
      * yield or wait based on how much of the workload has been performed. Flushing operations could
      * take a long time so yielding may not be effective.
-     *
-     * TODO: We should consider a maximum wait value as a configuration setting. If we add one, then
-     * this function returns an int and this loop would check how much time we've waited and break
-     * out with EBUSY.
      */
     while (!WT_FLUSH_STATE_DONE(conn->flush_state)) {
         if (++yield_count < WT_THOUSAND)
@@ -80,7 +76,8 @@ __flush_tier_once(WT_SESSION_IMPL *session, uint32_t flags)
     S2C(session)->flush_state = 0;
 
     /*
-     * XXX: Is it sufficient to walk the metadata cursor? If it is, why doesn't checkpoint do that?
+     * Walk the metadata cursor to find tiered tables to flush. This should be optimized to avoid
+     * flushing tables that haven't changed.
      */
     WT_RET(__wt_metadata_cursor(session, &cursor));
     while (cursor->next(cursor) == 0) {

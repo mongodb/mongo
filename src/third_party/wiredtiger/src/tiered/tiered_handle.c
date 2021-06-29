@@ -392,11 +392,7 @@ __tiered_switch(WT_SESSION_IMPL *session, const char *config)
     /* Create the object: entry in the metadata. */
     if (need_object) {
         WT_ERR(__tiered_create_object(session, tiered));
-#if 1
         WT_ERR(__wt_tiered_put_flush(session, tiered));
-#else
-        WT_ERR(__wt_tier_flush(session, tiered, tiered->current_id));
-#endif
     }
 
     /* We always need to create a local object. */
@@ -494,10 +490,8 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_TIERED *tiered;
-#if 1
     WT_TIERED_WORK_UNIT *entry;
     uint32_t unused;
-#endif
     char *metaconf;
     const char *obj_cfg[] = {WT_CONFIG_BASE(session, object_meta), NULL, NULL};
     const char **tiered_cfg, *config;
@@ -611,9 +605,6 @@ __wt_tiered_close(WT_SESSION_IMPL *session)
 int
 __wt_tiered_discard(WT_SESSION_IMPL *session, WT_TIERED *tiered)
 {
-#if 0
-    WT_DATA_HANDLE *dhandle;
-#endif
     uint32_t i;
 
     __wt_free(session, tiered->key_format);
@@ -626,14 +617,6 @@ __wt_tiered_discard(WT_SESSION_IMPL *session, WT_TIERED *tiered)
      * close the other dhandles may be closed and freed before this dhandle. So just free the names.
      */
     for (i = 0; i < WT_TIERED_MAX_TIERS; i++) {
-#if 0
-	dhandle = tiered->tiers[i].tier;
-        /*
-         * XXX We cannot decrement on connection close but we need to decrement on sweep close or
-         * other individual close.
-         */
-        (void)__wt_atomic_subi32(&dhandle->session_inuse, 1);
-#endif
         if (tiered->tiers[i].name != NULL)
             __wt_free(session, tiered->tiers[i].name);
     }

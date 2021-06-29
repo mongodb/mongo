@@ -128,9 +128,6 @@ struct __wt_tiered {
     uint32_t current_id; /* Current object id number */
     uint32_t next_id;    /* Next object number */
 
-    WT_COLLATOR *collator; /* TODO: handle custom collation */
-    /* TODO: What about compression, encryption, etc? Do we need to worry about that here? */
-
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TIERED_FLAG_UNUSED 0x1u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
