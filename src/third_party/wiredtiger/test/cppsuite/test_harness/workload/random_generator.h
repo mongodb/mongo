@@ -43,7 +43,7 @@ class random_generator {
     static random_generator &
     instance()
     {
-        static random_generator _instance;
+        thread_local random_generator _instance;
         return (_instance);
     }
 
