@@ -1229,10 +1229,8 @@ Status performAtomicTimeseriesWrites(
         invariant(op.getUpdates().size() == 1);
         auto& update = op.getUpdates().front();
 
-        // TODO (SERVER-56270): Remove handling for non-clustered time-series collections.
-        auto recordId = coll->isClustered()
-            ? record_id_helpers::keyForOID(update.getQ()["_id"].OID())
-            : Helpers::findOne(opCtx, *coll, update.getQ(), false);
+        invariant(coll->isClustered());
+        auto recordId = record_id_helpers::keyForOID(update.getQ()["_id"].OID());
 
         auto original = coll->docFor(opCtx, recordId);
         auto [updated, indexesAffected] =
