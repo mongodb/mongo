@@ -1382,9 +1382,10 @@ __checkpoint_lock_dirty_tree(
 
     btree = S2BT(session);
     ckpt = ckptbase = NULL;
-    dhandle = session->dhandle;
     ckpt_bytes_allocated = 0;
+    dhandle = session->dhandle;
     name_alloc = NULL;
+    seen_ckpt_add = false;
 
     /*
      * Only referenced in diagnostic builds and gcc 5.1 isn't satisfied with wrapping the entire
@@ -1520,7 +1521,6 @@ __checkpoint_lock_dirty_tree(
      * If we decided to skip checkpointing, we need to remove the new checkpoint entry we might have
      * appended to the list.
      */
-    seen_ckpt_add = false;
     if (F_ISSET(btree, WT_BTREE_SKIP_CKPT)) {
         WT_CKPT_FOREACH_NAME_OR_ORDER (ckptbase, ckpt) {
             /* Checkpoint(s) to be added are always at the end of the list. */
