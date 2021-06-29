@@ -62,6 +62,10 @@ namespace mongo {
 using repl::UnreplicatedWritesBlock;
 
 Lock::ResourceMutex FeatureCompatibilityVersion::fcvLock("featureCompatibilityVersionLock");
+// lastFCVUpdateTimestamp contains the latest oplog entry timestamp which updated the FCV.
+// It is reset on rollback.
+Timestamp lastFCVUpdateTimestamp;
+SimpleMutex lastFCVUpdateTimestampMutex;
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeAbortingRunningTransactionsOnFCVDowngrade);
 
@@ -162,7 +166,7 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
     }
 
     opCtx->recoveryUnit()->onCommit(
-        [opCtx, newVersion](boost::optional<Timestamp>) { _setVersion(opCtx, newVersion); });
+        [opCtx, newVersion](boost::optional<Timestamp> ts) { _setVersion(opCtx, newVersion, ts); });
 }
 
 void FeatureCompatibilityVersion::updateMinWireVersion() {
@@ -186,7 +190,17 @@ void FeatureCompatibilityVersion::updateMinWireVersion() {
 }
 
 void FeatureCompatibilityVersion::_setVersion(
-    OperationContext* opCtx, ServerGlobalParams::FeatureCompatibility::Version newVersion) {
+    OperationContext* opCtx,
+    ServerGlobalParams::FeatureCompatibility::Version newVersion,
+    boost::optional<Timestamp> commitTs) {
+    // We set the last FCV update timestamp before setting the new FCV, to make sure we never
+    // read an FCV that is not stable.  We might still read a stale one.
+    {
+        stdx::lock_guard lk(lastFCVUpdateTimestampMutex);
+        if (commitTs && *commitTs > lastFCVUpdateTimestamp) {
+            lastFCVUpdateTimestamp = *commitTs;
+        }
+    }
     serverGlobalParams.featureCompatibility.setVersion(newVersion);
     updateMinWireVersion();
 
@@ -229,7 +243,10 @@ void FeatureCompatibilityVersion::onReplicationRollback(OperationContext* opCtx)
                   << FeatureCompatibilityVersionParser::toString(memoryFcv) << "' to '"
                   << FeatureCompatibilityVersionParser::toString(diskFcv)
                   << "' as part of rollback.";
-            _setVersion(opCtx, diskFcv);
+            _setVersion(opCtx, diskFcv, boost::none);
+            // The rollback FCV is already in the stable snapshot.
+            stdx::lock_guard lk(lastFCVUpdateTimestampMutex);
+            lastFCVUpdateTimestamp = Timestamp();
         }
     }
 }
@@ -301,7 +318,7 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
             featureCompatibilityVersionBuilder.append(
                 FeatureCompatibilityVersionParser::kVersionField,
                 FeatureCompatibilityVersionParser::kVersion42);
-            return;
+            break;
         case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42:
             featureCompatibilityVersionBuilder.append(
                 FeatureCompatibilityVersionParser::kVersionField,
@@ -322,11 +339,35 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
             featureCompatibilityVersionBuilder.append(
                 FeatureCompatibilityVersionParser::kVersionField,
                 FeatureCompatibilityVersionParser::kVersion40);
-            return;
+            break;
         case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault40Behavior:
             // getVersion() does not return this value.
             MONGO_UNREACHABLE;
     }
+    // If the FCV has been recently set to the fully upgraded FCV but is not part of the majority
+    // snapshot, then if we do a binary upgrade, we may see the old FCV at startup.
+    // It is not safe to do oplog application on the new binary at that point.  So we make sure
+    // that when we report the FCV, it is in the majority snapshot.
+    // (The same consideration applies at downgrade, where if a recently-set fully downgraded FCV
+    // is not part of the majority snapshot, the downgraded binary will see the upgrade FCV and
+    // fail.)
+    const auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
+    const bool isReplSet = replCoordinator &&
+        replCoordinator->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    auto neededMajorityTimestamp = [] {
+        stdx::lock_guard lk(lastFCVUpdateTimestampMutex);
+        return lastFCVUpdateTimestamp;
+    }();
+    if (isReplSet && !neededMajorityTimestamp.isNull()) {
+        auto status = replCoordinator->awaitTimestampCommitted(opCtx, neededMajorityTimestamp);
+        // If majority reads are not supported, we will take a full snapshot on clean shutdown
+        // and the new FCV will be included, so upgrade is possible.
+        if (status.code() != ErrorCodes::CommandNotSupported)
+            uassertStatusOK(
+                status.withContext("Most recent 'featureCompatibilityVersion' was not in the "
+                                   "majority snapshot on this node"));
+    }
+    return;
 }
 
 Status FeatureCompatibilityVersionParameter::setFromString(const std::string&) {
