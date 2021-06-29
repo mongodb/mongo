@@ -2279,9 +2279,13 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
         }
     }
 
-#ifdef SSL_OP_NO_RENEGOTIATION
-    options |= SSL_OP_NO_RENEGOTIATION;
+#ifndef SSL_OP_NO_RENEGOTIATION
+#define SSL_OP_NO_RENEGOTIATION 0x40000000U
 #endif
+    if (OpenSSL_version_num() >= 0x10100080) {
+        /* SSL_OP_NO_RENEGOTIATION added in 1.1.0h (0x10100080) */
+        options |= SSL_OP_NO_RENEGOTIATION;
+    }
 
     ::SSL_CTX_set_options(context, options);
 
