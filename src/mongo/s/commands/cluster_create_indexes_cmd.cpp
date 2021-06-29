@@ -106,9 +106,12 @@ public:
         std::string errmsg;
         const bool ok =
             appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses)).responseOK;
-        if (!errmsg.empty()) {
-            CommandHelpers::appendSimpleCommandStatus(output, ok, errmsg);
+        CommandHelpers::appendSimpleCommandStatus(output, ok, errmsg);
+
+        if (ok) {
+            LOGV2(5706400, "Indexes created", "namespace"_attr = nss);
         }
+
         return ok;
     }
 
