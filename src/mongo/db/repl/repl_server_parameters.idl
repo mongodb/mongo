@@ -531,6 +531,15 @@ server_parameters:
         cpp_varname: enableReconfigRollbackCommittedWritesCheck
         default: true
 
+    initialSyncMethod:
+        description: >-
+            Specifies which method of initial sync to use. Valid options are: fileCopyBased,
+            logical.
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: initialSyncMethod
+        default: "fileCopyBased"
+
 feature_flags:
     featureFlagTenantMigrations:
         description: >-
