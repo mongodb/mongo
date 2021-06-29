@@ -685,6 +685,13 @@ void ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasCha
         return;
     }
 
+    // Make sure that by the end of the execution of this refresh all the state data is cleared.
+    ON_BLOCK_EXIT([&] {
+        _remoteShardVersions.clear();
+        _remoteDbVersion = boost::none;
+        _needsTargetingRefresh = false;
+    });
+
     //
     // Get the latest metadata information from the cache if there were issues
     //
@@ -702,10 +709,6 @@ void ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasCha
     //
 
     if (_needsTargetingRefresh) {
-        _remoteShardVersions.clear();
-        _remoteDbVersion = boost::none;
-        _needsTargetingRefresh = false;
-
         // If we couldn't target, we might need to refresh if we haven't remotely refreshed
         // the metadata since we last got it from the cache.
 
@@ -732,9 +735,6 @@ void ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasCha
                     "ChunkManagerTargeter shard versions comparison",
                     "result"_attr = static_cast<int>(result));
 
-        // Reset the versions
-        _remoteShardVersions.clear();
-
         if (result == CompareResult_Unknown || result == CompareResult_LT) {
             // Our current shard versions aren't all comparable to the old versions, maybe drop
             _refreshShardVersionNow(opCtx);
@@ -753,9 +753,6 @@ void ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasCha
                     "ChunkManagerTargeter database versions comparison result: {result}",
                     "ChunkManagerTargeter database versions comparison",
                     "result"_attr = static_cast<int>(result));
-
-        // Reset the version
-        _remoteDbVersion = boost::none;
 
         if (result == CompareResult_Unknown || result == CompareResult_LT) {
             // Our current db version isn't always comparable to the old version, it may have been
