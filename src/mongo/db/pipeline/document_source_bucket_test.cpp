@@ -54,11 +54,22 @@ using std::vector;
 
 class BucketReturnsGroupAndSort : public AggregationContextFixture {
 public:
-    void testCreateFromBsonResult(BSONObj bucketSpec, Value expectedGroupExplain) {
+    void testCreateFromBsonResult(BSONObj bucketSpec,
+                                  Value expectedGroupExplain,
+                                  bool toOptimize = false) {
         list<intrusive_ptr<DocumentSource>> result =
             DocumentSourceBucket::createFromBson(bucketSpec.firstElement(), getExpCtx());
 
         ASSERT_EQUALS(result.size(), 2UL);
+
+        if (toOptimize) {
+            std::transform(result.begin(),
+                           result.end(),
+                           result.begin(),
+                           [](intrusive_ptr<DocumentSource> d) -> intrusive_ptr<DocumentSource> {
+                               return (*d).optimize();
+                           });
+        }
 
         const auto* groupStage = dynamic_cast<DocumentSourceGroup*>(result.front().get());
         ASSERT(groupStage);
@@ -83,6 +94,68 @@ public:
         ASSERT_VALUE_EQ(sortExplain["$sort"], expectedSortExplain);
     }
 };
+
+TEST_F(BucketReturnsGroupAndSort,
+       BucketWithAllConstantsAndGroupByConstIsCorrectlyOptimizedAfterSwitch) {
+    const auto spec = fromjson(
+        "{$bucket : {groupBy : {$const : 6}, boundaries : [ 1, 5, 8 ], default : 'other'}}");
+
+    auto expectedGroupWithOpt = Value(fromjson("{_id: {$const: 5}, count: {$sum: {$const: 1}}}"));
+
+    testCreateFromBsonResult(spec, expectedGroupWithOpt, true);
+}
+
+TEST_F(BucketReturnsGroupAndSort,
+       BucketWithAllConstantFalsesAndGroupByConstIsCorrectlyOptimizedAfterSwitch) {
+    const auto spec = fromjson(
+        "{$bucket : {groupBy : {$const : 9}, boundaries : [ 1, 5, 8 ], default : 'other'}}");
+
+    auto expectedGroupWithOpt =
+        Value(fromjson("{_id: {$const: 'other'}, count: {$sum: {$const: 1}}}"));
+
+    testCreateFromBsonResult(spec, expectedGroupWithOpt, true);
+}
+
+TEST_F(BucketReturnsGroupAndSort,
+       BucketWithAllConstantFalsesAndNoDefaultThrowsUassertErrorWhenOptimized) {
+    const auto spec = fromjson("{$bucket : {groupBy : {$const : 9}, boundaries : [ 1, 5, 8 ]}}");
+
+    list<intrusive_ptr<DocumentSource>> result =
+        DocumentSourceBucket::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_EQUALS(result.size(), 2UL);
+
+    list<intrusive_ptr<DocumentSource>> result_opt;
+    result_opt.resize(result.size());
+
+    ASSERT_THROWS_CODE(
+        std::transform(result.begin(),
+                       result.end(),
+                       result_opt.begin(),
+                       [](intrusive_ptr<DocumentSource> d) -> intrusive_ptr<DocumentSource> {
+                           return (*d).optimize();
+                       }),
+        AssertionException,
+        40069);
+}
+
+TEST_F(BucketReturnsGroupAndSort, BucketWithAllConstantsIsCorrectlyOptimizedAfterSwitch) {
+    const auto spec = fromjson(
+        "{$bucket : {groupBy : {$add: [2, 4]}, boundaries : [ 1, 5, 8 ], default : 'other'}}");
+
+    auto expectedGroupWithOpt = Value(fromjson("{_id: {$const: 5}, count: {$sum: {$const: 1}}}"));
+
+    testCreateFromBsonResult(spec, expectedGroupWithOpt, true);
+}
+
+TEST_F(BucketReturnsGroupAndSort,
+       BucketWithAllConstantsAndNoDefaultIsCorrectlyOptimizedAfterSwitch) {
+    const auto spec = fromjson("{$bucket : {groupBy : {$add: [2, 4]}, boundaries : [ 1, 5, 8 ]}}");
+
+    auto expectedGroupWithOpt = Value(fromjson("{_id: {$const: 5}, count: {$sum: {$const: 1}}}"));
+
+    testCreateFromBsonResult(spec, expectedGroupWithOpt, true);
+}
 
 TEST_F(BucketReturnsGroupAndSort, BucketUsesDefaultOutputWhenNoOutputSpecified) {
     const auto spec =
