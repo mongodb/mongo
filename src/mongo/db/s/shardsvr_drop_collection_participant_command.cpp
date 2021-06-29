@@ -73,6 +73,8 @@ public:
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
+
             try {
                 DropCollectionCoordinator::dropCollectionLocally(opCtx, ns());
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
