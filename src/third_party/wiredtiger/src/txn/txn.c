@@ -1714,6 +1714,20 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
      */
     if (!readonly)
         WT_IGNORE_RET(__wt_cache_eviction_check(session, false, false, NULL));
+
+    /*
+     * Stable timestamp cannot be concurrently increased greater than or equal to the prepared
+     * transaction's durable timestamp. Otherwise, checkpoint may only write partial updates of the
+     * transaction.
+     */
+    if (prepare && txn->durable_timestamp <= txn_global->stable_timestamp) {
+        WT_ERR(__wt_verbose_dump_sessions(session, true));
+        WT_ERR_PANIC(session, WT_PANIC,
+          "Stable timestamp is increased greater than or equal to the committing prepared "
+          "transaction's "
+          "durable timestamp");
+    }
+
     return (0);
 
 err:

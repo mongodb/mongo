@@ -139,6 +139,12 @@ typedef struct {
      * that requires locking out transactional ops that set a timestamp.
      */
     RWLOCK ts_lock;
+    /*
+     * Lock to prevent the stable timestamp from moving during the commit of prepared transactions.
+     * Otherwise, it may panic if the stable timestamp is moved to greater than or equal to the
+     * prepared transaction's durable timestamp when it is committing.
+     */
+    RWLOCK prepare_commit_lock;
 
     uint64_t timestamp;        /* Counter for timestamps */
     uint64_t oldest_timestamp; /* Last timestamp used for oldest */
@@ -427,8 +433,8 @@ int snap_repeat_txn(WT_CURSOR *, TINFO *);
 void snap_repeat_update(TINFO *, bool);
 void snap_track(TINFO *, thread_op);
 void timestamp_init(void);
-void timestamp_once(bool, bool);
-void timestamp_teardown(void);
+void timestamp_once(WT_SESSION *, bool, bool);
+void timestamp_teardown(WT_SESSION *);
 int trace_config(const char *);
 void trace_init(void);
 void trace_ops_init(TINFO *);

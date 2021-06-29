@@ -270,10 +270,6 @@ operations(u_int ops_seconds, bool lastrun)
     tinfo_init();
     trace_msg("%s", "=============== thread ops start");
 
-    /* Initialize locks to single-thread backups, failures, and timestamp updates. */
-    lock_init(session, &g.backup_lock);
-    lock_init(session, &g.ts_lock);
-
     for (i = 0; i < g.c_threads; ++i) {
         tinfo = tinfo_list[i];
         testutil_check(__wt_thread_create(NULL, &tinfo->tid, ops, tinfo));
@@ -382,9 +378,6 @@ operations(u_int ops_seconds, bool lastrun)
         testutil_check(__wt_thread_join(NULL, &timestamp_tid));
     g.workers_finished = false;
 
-    lock_destroy(session, &g.backup_lock);
-    lock_destroy(session, &g.ts_lock);
-
     trace_msg("%s", "=============== thread ops stop");
 
     /*
@@ -398,7 +391,7 @@ operations(u_int ops_seconds, bool lastrun)
 
     if (lastrun) {
         tinfo_teardown();
-        timestamp_teardown();
+        timestamp_teardown(session);
     }
 
     testutil_check(session->close(session, NULL));
@@ -506,6 +499,9 @@ commit_transaction(TINFO *tinfo, bool prepared)
 
     ts = 0; /* -Wconditional-uninitialized */
     if (g.c_txn_timestamps) {
+        if (prepared)
+            lock_readlock(session, &g.prepare_commit_lock);
+
         /* Lock out the oldest timestamp update. */
         lock_writelock(session, &g.ts_lock);
 
@@ -519,8 +515,11 @@ commit_transaction(TINFO *tinfo, bool prepared)
         }
 
         lock_writeunlock(session, &g.ts_lock);
-    }
-    testutil_check(session->commit_transaction(session, NULL));
+        testutil_check(session->commit_transaction(session, NULL));
+        if (prepared)
+            lock_readunlock(session, &g.prepare_commit_lock);
+    } else
+        testutil_check(session->commit_transaction(session, NULL));
 
     /* Remember our oldest commit timestamp. */
     tinfo->commit_ts = ts;
