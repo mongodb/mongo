@@ -108,17 +108,23 @@ private:
     void projectField(value::Object* obj, size_t idx);
     void projectField(UniqueBSONObjBuilder* bob, size_t idx);
 
-    bool isFieldRestricted(const StringMapHashedKey& key) const {
-        return _fieldSet.count(key) == (*_fieldBehavior == FieldBehavior::keep ? 0 : 1);
-    }
+    bool isFieldProjectedOrRestricted(const StringMapHashedKey& key) const {
+        bool foundKey = false;
+        bool projected = false;
+        bool restricted = false;
 
-    void resetAlreadyProjected() {
-        if (!_alreadyProjected.empty()) {
-            std::memset(_alreadyProjected.data(),
-                        0,
-                        _alreadyProjected.size() *
-                            sizeof(typename decltype(_alreadyProjected)::value_type));
+        if (!_allFieldsMap.empty()) {
+            if (auto it = _allFieldsMap.find(key); it != _allFieldsMap.end()) {
+                foundKey = true;
+                projected = it->second != std::numeric_limits<size_t>::max();
+                restricted = *_fieldBehavior != FieldBehavior::keep;
+            }
         }
+        if (!foundKey) {
+            restricted = *_fieldBehavior == FieldBehavior::keep;
+        }
+
+        return projected || restricted;
     }
 
     void produceObject();
@@ -132,15 +138,11 @@ private:
     const bool _forceNewObject;
     const bool _returnOldObject;
 
-    StringSet _fieldSet;
-    StringMap<size_t> _projectFieldsMap;
+    StringMap<size_t> _allFieldsMap;
 
     std::vector<std::pair<std::string, value::SlotAccessor*>> _projects;
 
     value::OwnedValueAccessor _obj;
-
-    // Reset to all 0's on each call to getNext(). Kept here to avoid repeated allocations.
-    std::vector<char> _alreadyProjected;
 
     value::SlotAccessor* _root{nullptr};
 

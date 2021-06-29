@@ -82,18 +82,18 @@ void MakeObjStageBase<O>::prepare(CompileCtx& ctx) {
         _root = _children[0]->getAccessor(ctx, *_rootSlot);
     }
     for (auto& p : _fields) {
-        auto [it, inserted] = _fieldSet.emplace(p);
+        // Mark the values from _fields with 'std::numeric_limits<size_t>::max()'.
+        auto [it, inserted] = _allFieldsMap.emplace(p, std::numeric_limits<size_t>::max());
         uassert(4822818, str::stream() << "duplicate field: " << p, inserted);
     }
 
     for (size_t idx = 0; idx < _projectFields.size(); ++idx) {
         auto& p = _projectFields[idx];
-
-        auto [it, inserted] = _projectFieldsMap.emplace(p, idx);
+        // Mark the values from _projectFields with their corresponding index.
+        auto [it, inserted] = _allFieldsMap.emplace(p, idx);
         uassert(4822819, str::stream() << "duplicate field: " << p, inserted);
         _projects.emplace_back(p, _children[0]->getAccessor(ctx, _projectVars[idx]));
     }
-    _alreadyProjected.resize(_projectFields.size());
 
     _compiled = true;
 }
@@ -138,91 +138,79 @@ template <>
 void MakeObjStageBase<MakeObjOutputType::object>::produceObject() {
     auto [tag, val] = value::makeNewObject();
     auto obj = value::getObjectView(val);
-    resetAlreadyProjected();
 
     _obj.reset(tag, val);
 
     if (_root) {
         auto [tag, val] = _root->getViewOfValue();
 
+        size_t computedFieldsSize = _projectFields.size();
+        size_t projectedFieldsSize = _fields.size();
+        size_t nFieldsNeededIfInclusion = projectedFieldsSize;
         if (tag == value::TypeTags::bsonObject) {
-            size_t nFieldsNeededIfInclusion = _projects.size() + _fieldSet.size();
-            auto be = value::bitcastTo<const char*>(val);
-            auto size = ConstDataView(be).read<LittleEndian<uint32_t>>();
-            auto end = be + size;
-            // Simple heuristic to determine number of fields.
-            obj->reserve(size / 16);
-            // Skip document length.
-            be += 4;
-            while (*be != 0) {
-                auto sv = bson::fieldNameView(be);
-                auto key = StringMapHasher{}.hashed_key(StringData(sv));
+            if (!(nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep)) {
+                auto be = value::bitcastTo<const char*>(val);
+                auto size = ConstDataView(be).read<LittleEndian<uint32_t>>();
+                auto end = be + size;
 
-                bool projected = false;
+                // Simple heuristic to determine number of fields.
+                size_t approximatedNumFieldsInRoot = (size / 16);
+                // If the field behaviour is 'keep', then we know that the output will have
+                // 'projectedFieldsSize + computedFieldsSize' fields. Otherwise, we use the
+                // approximated number of fields in the root document and then add
+                // 'projectedFieldsSize' to it to achieve a better approximation (Note: we don't
+                // subtract 'computedFieldsSize' from the result in the latter case, as it might
+                // lead to a negative number)
+                size_t numOutputFields = _fieldBehavior == FieldBehavior::keep
+                    ? projectedFieldsSize + computedFieldsSize
+                    : approximatedNumFieldsInRoot + projectedFieldsSize;
+                obj->reserve(numOutputFields);
+                // Skip document length.
+                be += 4;
+                while (*be != 0) {
+                    auto sv = bson::fieldNameView(be);
+                    auto key = StringMapHasher{}.hashed_key(StringData(sv));
 
-                // This is an extremely hot path and our benchmarks have shown that
-                // checking whether the projected fields map is empty before doing the lookup
-                // can make a big impact for the common case where there are no projected fields.
-                if (!_projectFieldsMap.empty()) {
-                    if (auto it = _projectFieldsMap.find(key); it != _projectFieldsMap.end()) {
-                        projectField(obj, it->second);
-                        _alreadyProjected[it->second] = true;
+                    if (!isFieldProjectedOrRestricted(key)) {
+                        auto [tag, val] = bson::convertFrom<true>(be, end, sv.size());
+                        auto [copyTag, copyVal] = value::copyValue(tag, val);
+                        obj->push_back(sv, copyTag, copyVal);
                         --nFieldsNeededIfInclusion;
-                        projected = true;
                     }
-                }
 
-                if (!projected && !isFieldRestricted(key)) {
-                    auto [tag, val] = bson::convertFrom<true>(be, end, sv.size());
-                    auto [copyTag, copyVal] = value::copyValue(tag, val);
-                    obj->push_back(sv, copyTag, copyVal);
-                    --nFieldsNeededIfInclusion;
-                }
+                    if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
+                        break;
+                    }
 
-                if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
-                    return;
+                    be = bson::advance(be, sv.size());
                 }
-
-                be = bson::advance(be, sv.size());
             }
         } else if (tag == value::TypeTags::Object) {
-            size_t nFieldsNeededIfInclusion = _projectFieldsMap.size() + _fieldSet.size();
-            auto objRoot = value::getObjectView(val);
-            obj->reserve(objRoot->size());
-            for (size_t idx = 0; idx < objRoot->size(); ++idx) {
-                auto sv = objRoot->field(idx);
-                auto key = StringMapHasher{}.hashed_key(StringData(sv));
+            if (!(nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep)) {
+                auto objRoot = value::getObjectView(val);
+                auto numOutputFields = _fieldBehavior == FieldBehavior::keep
+                    ? projectedFieldsSize + computedFieldsSize
+                    : objRoot->size() + projectedFieldsSize;
+                obj->reserve(numOutputFields);
+                for (size_t idx = 0; idx < objRoot->size(); ++idx) {
+                    auto sv = objRoot->field(idx);
+                    auto key = StringMapHasher{}.hashed_key(StringData(sv));
 
-                bool projected = false;
-
-                // This is an extremely hot path and our benchmarks have shown that
-                // checking whether the projected fields map is empty before doing the lookup
-                // can make a big impact for the common case where there are no projected fields.
-                if (!_projectFieldsMap.empty()) {
-                    if (auto it = _projectFieldsMap.find(key); it != _projectFieldsMap.end()) {
-                        projectField(obj, it->second);
-                        _alreadyProjected[it->second] = true;
+                    if (!isFieldProjectedOrRestricted(key)) {
+                        auto [tag, val] = objRoot->getAt(idx);
+                        auto [copyTag, copyVal] = value::copyValue(tag, val);
+                        obj->push_back(sv, copyTag, copyVal);
                         --nFieldsNeededIfInclusion;
-                        projected = true;
                     }
-                }
 
-                if (!projected && !isFieldRestricted(key)) {
-                    auto [tag, val] = objRoot->getAt(idx);
-                    auto [copyTag, copyVal] = value::copyValue(tag, val);
-                    obj->push_back(sv, copyTag, copyVal);
-                    --nFieldsNeededIfInclusion;
-                }
-
-                if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
-                    return;
+                    if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
+                        return;
+                    }
                 }
             }
         } else {
             for (size_t idx = 0; idx < _projects.size(); ++idx) {
-                if (!_alreadyProjected[idx]) {
-                    projectField(obj, idx);
-                }
+                projectField(obj, idx);
             }
             // If the result is non empty object return it.
             if (obj->size() || _forceNewObject) {
@@ -239,16 +227,13 @@ void MakeObjStageBase<MakeObjOutputType::object>::produceObject() {
         }
     }
     for (size_t idx = 0; idx < _projects.size(); ++idx) {
-        if (!_alreadyProjected[idx]) {
-            projectField(obj, idx);
-        }
+        projectField(obj, idx);
     }
 }
 
 template <>
 void MakeObjStageBase<MakeObjOutputType::bsonObject>::produceObject() {
     UniqueBSONObjBuilder bob;
-    resetAlreadyProjected();
 
     auto finish = [this, &bob]() {
         bob.doneFast();
@@ -259,77 +244,51 @@ void MakeObjStageBase<MakeObjOutputType::bsonObject>::produceObject() {
     if (_root) {
         auto [tag, val] = _root->getViewOfValue();
 
+        size_t nFieldsNeededIfInclusion = _fields.size();
         if (tag == value::TypeTags::bsonObject) {
-            size_t nFieldsNeededIfInclusion = _projects.size() + _fieldSet.size();
-            auto be = value::bitcastTo<const char*>(val);
-            // Skip document length.
-            be += 4;
-            while (*be != 0) {
-                auto sv = bson::fieldNameView(be);
-                auto key = StringMapHasher{}.hashed_key(StringData(sv));
+            if (!(nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep)) {
+                auto be = value::bitcastTo<const char*>(val);
+                // Skip document length.
+                be += 4;
+                while (*be != 0) {
+                    auto sv = bson::fieldNameView(be);
+                    auto key = StringMapHasher{}.hashed_key(StringData(sv));
 
-                bool projected = false;
+                    auto nextBe = bson::advance(be, sv.size());
 
-                // This is an extremely hot path and our benchmarks have shown that
-                // checking whether the projected fields map is empty before doing the lookup
-                // can make a big impact for the common case where there are no projected fields.
-                if (!_projectFieldsMap.empty()) {
-                    if (auto it = _projectFieldsMap.find(key); it != _projectFieldsMap.end()) {
-                        projected = true;
-                        projectField(&bob, it->second);
-                        _alreadyProjected[it->second] = true;
+                    if (!isFieldProjectedOrRestricted(key)) {
+                        bob.append(BSONElement(
+                            be, sv.size() + 1, nextBe - be, BSONElement::CachedSizeTag{}));
                         --nFieldsNeededIfInclusion;
                     }
-                }
 
-                if (!projected && !isFieldRestricted(key)) {
-                    bob.append(BSONElement(be, sv.size() + 1, -1, BSONElement::CachedSizeTag{}));
-                    --nFieldsNeededIfInclusion;
-                }
+                    if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
+                        break;
+                    }
 
-                if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
-                    finish();
-                    return;
+                    be = nextBe;
                 }
-
-                be = bson::advance(be, sv.size());
             }
         } else if (tag == value::TypeTags::Object) {
-            auto objRoot = value::getObjectView(val);
-            size_t nFieldsNeededIfInclusion = _projectFieldsMap.size() + _fieldSet.size();
-            for (size_t idx = 0; idx < objRoot->size(); ++idx) {
-                auto key = StringMapHasher{}.hashed_key(StringData(objRoot->field(idx)));
+            if (!(nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep)) {
+                auto objRoot = value::getObjectView(val);
+                for (size_t idx = 0; idx < objRoot->size(); ++idx) {
+                    auto key = StringMapHasher{}.hashed_key(StringData(objRoot->field(idx)));
 
-                bool projected = false;
-
-                // This is an extremely hot path and our benchmarks have shown that
-                // checking whether the projected fields map is empty before doing the lookup
-                // can make a big impact for the common case where there are no projected fields.
-                if (!_projectFieldsMap.empty()) {
-                    if (auto it = _projectFieldsMap.find(key); it != _projectFieldsMap.end()) {
-                        projected = true;
-                        projectField(&bob, it->second);
-                        _alreadyProjected[it->second] = true;
+                    if (!isFieldProjectedOrRestricted(key)) {
+                        auto [tag, val] = objRoot->getAt(idx);
+                        bson::appendValueToBsonObj(bob, objRoot->field(idx), tag, val);
                         --nFieldsNeededIfInclusion;
                     }
-                }
 
-                if (!projected && !isFieldRestricted(key)) {
-                    auto [tag, val] = objRoot->getAt(idx);
-                    bson::appendValueToBsonObj(bob, objRoot->field(idx), tag, val);
-                    --nFieldsNeededIfInclusion;
-                }
-
-                if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
-                    finish();
-                    return;
+                    if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
+                        break;
+                    }
                 }
             }
         } else {
             for (size_t idx = 0; idx < _projects.size(); ++idx) {
-                if (!_alreadyProjected[idx]) {
-                    projectField(&bob, idx);
-                }
+                projectField(&bob, idx);
             }
             // If the result is non empty object return it.
             if (!bob.asTempObj().isEmpty() || _forceNewObject) {
@@ -348,9 +307,7 @@ void MakeObjStageBase<MakeObjOutputType::bsonObject>::produceObject() {
         }
     }
     for (size_t idx = 0; idx < _projects.size(); ++idx) {
-        if (!_alreadyProjected[idx]) {
-            projectField(&bob, idx);
-        }
+        projectField(&bob, idx);
     }
     finish();
 }

@@ -94,14 +94,15 @@ assert.eq(out, [
     {_id: 4, a: [[{b: [1, 2, 3]}], {b: [2]}, 1, null, {}]},
 ]);
 
-function testSingleDocument(projection, input, expectedOutput, deleteId = true) {
+function testSingleDocument(
+    projection, input, expectedOutput, deleteId = true, assertFn = assert.eq) {
     assert(t.drop());
     assert.commandWorked(t.insert(input));
     const actualOutput = t.findOne({}, projection);
     if (deleteId) {
         delete actualOutput._id;
     }
-    assert.eq(actualOutput, expectedOutput);
+    assertFn(actualOutput, expectedOutput);
 }
 
 // Test nesting objects and arrays.
@@ -110,7 +111,8 @@ testSingleDocument({'a.b.c.d.e': {$slice: [1, 1]}},
                    {a: [{b: [{c: [{d: [{e: [2]}]}]}]}]});
 
 // Test that inclusion, exclusion and expression projections have unlimited array depth in queries
-// with $slice.
+// with $slice. We use docEq() for this assertion in particular because of field ordering
+// differences between the classic engine and SBE.
 testSingleDocument({a: {b: {c: {$slice: [1, 1]}, d: 1}}},
                    {
                        a: [
@@ -127,7 +129,9 @@ testSingleDocument({a: {b: {c: {$slice: [1, 1]}, d: 1}}},
                            {b: [{c: [2], d: 123}, {c: [5], d: 456}]},
                            {b: [[{c: [1, 2, 3], d: 123}], [{c: [4, 5, 6], d: 456}]]}
                        ]
-                   });
+                   },
+                   true,
+                   assert.docEq);
 
 testSingleDocument({a: {b: {c: {$slice: [1, 1]}, d: 0}}},
                    {
@@ -147,6 +151,8 @@ testSingleDocument({a: {b: {c: {$slice: [1, 1]}, d: 0}}},
                        ]
                    });
 
+// We use docEq() for this assertion in particular because of field ordering differences between the
+// classic engine and SBE.
 testSingleDocument({a: {b: {c: {$slice: [1, 1]}, d: {$add: [1, 2, 3]}}}},
                    {
                        a: [
@@ -163,8 +169,12 @@ testSingleDocument({a: {b: {c: {$slice: [1, 1]}, d: {$add: [1, 2, 3]}}}},
                            {b: [{c: [2], d: 6}, {c: [5], d: 6}]},
                            {b: [[{c: [1, 2, 3], d: 6}], [{c: [4, 5, 6], d: 6}]]}
                        ]
-                   });
+                   },
+                   true,
+                   assert.docEq);
 
+// We use docEq() for this assertion in particular because of field ordering differences between the
+// classic engine and SBE.
 testSingleDocument({a: {b: {c: {$slice: [1, 1]}, d: {$add: [{$abs: "$e"}, -4]}}}},
                    {
                        a: [
@@ -182,7 +192,9 @@ testSingleDocument({a: {b: {c: {$slice: [1, 1]}, d: {$add: [{$abs: "$e"}, -4]}}}
                            {b: [{c: [2], d: 6}, {c: [5], d: 6}]},
                            {b: [[{c: [1, 2, 3], d: 6}], [{c: [4, 5, 6], d: 6}]]}
                        ]
-                   });
+                   },
+                   true,
+                   assert.docEq);
 
 // Test multiple $slice operators in the same projection.
 testSingleDocument({a: {b: {c: {$slice: [1, 1]}, d: {$slice: -1}}}},
@@ -239,7 +251,10 @@ testSingleDocument({a: {b: {$slice: [1, 1]}}, c: {d: {$slice: -1}}},
 // Case when path for $slice contains object.
 testSingleDocument({a: {$slice: 1}}, {a: {c: 123}}, {a: {c: 123}});
 
-testSingleDocument({a: {$slice: 1}, d: 1}, {a: {c: 123}, d: 456}, {a: {c: 123}, d: 456});
+// we use docEq() for this assertion in particular because of field ordering differences between the
+// classic engine and SBE.
+testSingleDocument(
+    {a: {$slice: 1}, d: 1}, {a: {c: 123}, d: 456}, {a: {c: 123}, d: 456}, true, assert.docEq);
 
 testSingleDocument({a: {$slice: 1}, d: 0}, {a: {c: 123}, d: 456}, {a: {c: 123}});
 
@@ -255,9 +270,13 @@ testSingleDocument({'a.b.c': {$slice: 1}},
                    {a: [[[{b: [[[{c: [1, 2, 3]}]]]}]]]},
                    {a: [[[{b: [[[{c: [1, 2, 3]}]]]}]]]});
 
+// We use docEq() for this assertion in particular because of field ordering differences between the
+// classic engine and SBE.
 testSingleDocument({'a.b.c': {$slice: 1}, d: 1},
                    {a: [[[{b: [[[{c: [1, 2, 3]}]]]}]]], d: 456},
-                   {a: [[[{b: [[[{c: [1, 2, 3]}]]]}]]], d: 456});
+                   {a: [[[{b: [[[{c: [1, 2, 3]}]]]}]]], d: 456},
+                   true,
+                   assert.docEq);
 
 testSingleDocument({'a.b.c': {$slice: 1}, d: 0},
                    {a: [[[{b: [[[{c: [1, 2, 3]}]]]}]]], d: 456},

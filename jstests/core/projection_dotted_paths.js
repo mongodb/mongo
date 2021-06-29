@@ -44,7 +44,7 @@ assert(isIndexOnly(db, getWinningPlan(explain.queryPlanner)));
 // Project exactly the set of fields in the index but also include _id. Verify that the
 // projection is computed correctly and that the plan cannot be covered.
 resultDoc = coll.findOne({a: 1}, {_id: 1, a: 1, "b.c": 1, "b.d": 1, c: 1});
-assert.eq(resultDoc, {_id: 1, a: 1, b: {c: 1, d: 1}, c: 1});
+assert.docEq(resultDoc, {_id: 1, a: 1, b: {c: 1, d: 1}, c: 1});
 explain = coll.find({a: 1}, {_id: 0, "b.c": 1, c: 1}).explain("queryPlanner");
 explain = coll.find({a: 1}, {_id: 1, a: 1, "b.c": 1, "b.d": 1, c: 1}).explain("queryPlanner");
 assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
@@ -52,7 +52,7 @@ assert(!isIndexOnly(db, getWinningPlan(explain.queryPlanner)));
 
 // Project a not-indexed field that exists in the collection. The plan should not be covered.
 resultDoc = coll.findOne({a: 1}, {_id: 0, "b.c": 1, "b.e": 1, c: 1});
-assert.eq(resultDoc, {b: {c: 1, e: 1}, c: 1});
+assert.docEq(resultDoc, {b: {c: 1, e: 1}, c: 1});
 explain = coll.find({a: 1}, {_id: 0, "b.c": 1, "b.e": 1, c: 1}).explain("queryPlanner");
 assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
 assert(!isIndexOnly(db, getWinningPlan(explain.queryPlanner)));
@@ -60,14 +60,14 @@ assert(!isIndexOnly(db, getWinningPlan(explain.queryPlanner)));
 // Project a not-indexed field that does not exist in the collection. The plan should not be
 // covered.
 resultDoc = coll.findOne({a: 1}, {_id: 0, "b.c": 1, "b.z": 1, c: 1});
-assert.eq(resultDoc, {b: {c: 1}, c: 1});
+assert.docEq(resultDoc, {b: {c: 1}, c: 1});
 explain = coll.find({a: 1}, {_id: 0, "b.c": 1, "b.z": 1, c: 1}).explain("queryPlanner");
 assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
 assert(!isIndexOnly(db, getWinningPlan(explain.queryPlanner)));
 
 // Verify that the correct projection is computed with an idhack query.
 resultDoc = coll.findOne({_id: 1}, {_id: 0, "b.c": 1, "b.e": 1, c: 1});
-assert.eq(resultDoc, {b: {c: 1, e: 1}, c: 1});
+assert.docEq(resultDoc, {b: {c: 1, e: 1}, c: 1});
 explain = coll.find({_id: 1}, {_id: 0, "b.c": 1, "b.e": 1, c: 1}).explain("queryPlanner");
 if (isSBEEnabled) {
     assert(isIxscan(db, getWinningPlan(explain.queryPlanner)), explain);
