@@ -79,7 +79,7 @@ for (let node of rst.nodeList()) {
                           "jstests/libs/trusted-ca.pem",
                           "--eval",
                           `assert.commandWorked(db.adminCommand({replSetTestEgress: 1, target: "${
-                              target}"}));`));
+                              target}", timeoutSecs: NumberInt(15)}));`));
         }
     }
 }
