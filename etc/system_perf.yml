@@ -1261,6 +1261,26 @@ buildvariants:
       - name: industry_benchmarks
       - name: linkbench
 
+  - name: linux-shard-lite-read-concern-available
+    display_name: Linux Shard Lite ReadConcern Available
+    batchtime: 10080 # 7 days
+    modules: *modules
+    expansions:
+      mongodb_setup: shard-lite-read-concern-available
+      infrastructure_provisioning: shard-lite
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on: *_compile_amazon2
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: linkbench
+
   - name: linux-shard-lite-all-feature-flags
     display_name: Linux Shard Lite (all feature flags)
     batchtime: 10080  # 7 days
