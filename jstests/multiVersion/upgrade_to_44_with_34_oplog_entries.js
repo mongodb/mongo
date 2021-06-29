@@ -19,21 +19,32 @@ for (let i = 0; i < 10000; i++) {
 }
 bulk.execute();
 
+function waitForFCV(rst, fcv) {
+    rst.awaitReplication();
+    for (let n of rst.nodes) {
+        checkFCV(n.getDB("admin"), fcv);
+    }
+}
+
 rst.upgradeSet({binVersion: "3.6"});
 assert.commandWorked(
     rst.getPrimary().getDB(dbName).adminCommand({setFeatureCompatibilityVersion: "3.6"}));
+waitForFCV(rst, "3.6");
 
 rst.upgradeSet({binVersion: "4.0"});
 assert.commandWorked(
     rst.getPrimary().getDB(dbName).adminCommand({setFeatureCompatibilityVersion: "4.0"}));
+waitForFCV(rst, "4.0");
 
 rst.upgradeSet({binVersion: "4.2"});
 assert.commandWorked(
     rst.getPrimary().getDB(dbName).adminCommand({setFeatureCompatibilityVersion: "4.2"}));
+waitForFCV(rst, "4.2");
 
 rst.upgradeSet({binVersion: "latest"});
 assert.commandWorked(
     rst.getPrimary().getDB(dbName).adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+waitForFCV(rst, latestFCV);
 
 rst.stopSet();
 })();
