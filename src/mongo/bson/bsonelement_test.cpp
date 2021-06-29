@@ -30,7 +30,9 @@
 #include "mongo/platform/basic.h"
 
 #include <array>
+#include <cmath>
 #include <fmt/format.h>
+#include <limits>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -378,5 +380,52 @@ TEST(BSONElementIntegerParseTest, ParseIntegerElementToLongAcceptsThree) {
     ASSERT_EQ(result.getValue(), 3LL);
 }
 
+TEST(BSONElementTryCoeceToLongLongTest, CoerceSucceeds) {
+    struct TestCase {
+        BSONObj inputDocument;
+        long long expectedResult;
+    };
+    std::vector<TestCase> testCases{
+        {BSON("" << 3.0), 3},
+        {BSON("" << 4.5), 4},
+        {BSON("" << 5.5000001), 5},
+        {BSON("" << -5.5), -5},
+        {BSON("" << -5.500001), -5},
+        {BSON("" << (-std::exp2(63))), std::numeric_limits<long long>::min()},
+        {BSON("" << 36028797018963968.0), 36028797018963968LL},  // Representable integer in double.
+        {BSON("" << Decimal128{"5.6"}), 5},
+        {BSON("" << Decimal128{"5.5"}), 5},
+        {BSON("" << Decimal128{"-1.5"}), -1},
+        {BSON("" << Decimal128{"-1.500001"}), -1},
+        {BSON("" << Decimal128{"9223372036854775807.5"}), std::numeric_limits<long long>::max()},
+        {BSON("" << Decimal128{"-9223372036854775808.99"}), std::numeric_limits<long long>::min()}};
+    for (auto&& testCase : testCases) {
+        long long number;
+        auto result = testCase.inputDocument.firstElement().tryCoerce(&number);
+        ASSERT_OK(result);
+        ASSERT_EQUALS(number, testCase.expectedResult)
+            << " for input document " << testCase.inputDocument.toString();
+    }
+}
+
+TEST(BSONElementTryCoeceToLongLongTest, CoerceFails) {
+    std::vector<BSONObj> testCases{BSON("" << std::numeric_limits<double>::quiet_NaN()),
+                                   BSON("" << std::numeric_limits<double>::infinity()),
+                                   BSON("" << -std::numeric_limits<double>::quiet_NaN()),
+                                   BSON("" << -std::numeric_limits<double>::infinity()),
+                                   BSON("" << (std::exp2(63) + (1 << 11))),
+                                   BSON("" << -std::exp2(63) - (1 << 11)),
+                                   BSON("" << Decimal128::kPositiveNaN),
+                                   BSON("" << Decimal128::kPositiveInfinity),
+                                   BSON("" << Decimal128::kNegativeNaN),
+                                   BSON("" << Decimal128::kNegativeInfinity),
+                                   BSON("" << Decimal128{"9223372036854775808.5"}),
+                                   BSON("" << Decimal128{"-9223372036854775809.99"})};
+    for (auto&& testCase : testCases) {
+        long long number;
+        auto result = testCase.firstElement().tryCoerce(&number);
+        ASSERT_NOT_OK(result) << " for input document " << testCase.toString();
+    }
+}
 }  // namespace
 }  // namespace mongo
