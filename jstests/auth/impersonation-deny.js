@@ -1,4 +1,5 @@
 // Test that manually inserted impersonation can't escalate privileges.
+// @tags: [requires_replication]
 
 (function() {
 'use strict';
