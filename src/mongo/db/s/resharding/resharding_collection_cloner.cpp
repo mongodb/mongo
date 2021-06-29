@@ -334,7 +334,12 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                }
 
                auto opCtx = factory.makeOperationContext(&cc());
+               auto guard = makeGuard([&] {
+                   chainCtx->pipeline->dispose(opCtx.get());
+                   chainCtx->pipeline.reset();
+               });
                chainCtx->moreToCome = doOneBatch(opCtx.get(), *chainCtx->pipeline);
+               guard.dismiss();
            })
         .onTransientError([this](const Status& status) {
             LOGV2(5269300,
