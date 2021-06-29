@@ -210,7 +210,12 @@ SemiFuture<TenantOplogBatch> TenantOplogBatcher::_scheduleNextBatch(WithLock, Ba
         _executor->scheduleWork([this, limits, taskCompletionPromise, self = shared_from_this()](
                                     const executor::TaskExecutor::CallbackArgs& args) {
             if (!args.status.isOK()) {
+                stdx::lock_guard lk(_mutex);
+                _batchRequested = false;
                 taskCompletionPromise->setError(args.status);
+                if (_isShuttingDown_inlock()) {
+                    _transitionToComplete_inlock();
+                }
                 return;
             }
 
