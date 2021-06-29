@@ -3153,32 +3153,6 @@ var ReplSetTest = function(opts) {
                   (new Date() - startTime) + "ms for " + this.nodes.length + " nodes.");
         }
 
-        // Make shutdown faster in tests, especially when election handoff has no viable candidate.
-        // Ignore errors from setParameter, since this parameter does not exist before 4.1.10 or
-        // after 4.4.
-        // TODO(SERVER-47797): Remove reference to waitForStepDownOnNonCommandShutdown.
-        if (_callHello()) {
-            asCluster(this._liveNodes, () => {
-                for (let node of this._liveNodes) {
-                    let res;
-                    try {
-                        res = node.adminCommand({
-                            setParameter: 1,
-                            waitForStepDownOnNonCommandShutdown: false,
-                        });
-                    } catch (e) {
-                        print("Failed to set waitForStepDownOnNonCommandShutdown.");
-                        print(e);
-                    }
-                    if (res && res.ok === 0 &&
-                        !res.errmsg.includes("attempted to set unrecognized parameter")) {
-                        print("Failed to set waitForStepDownOnNonCommandShutdown.");
-                        printjson(res);
-                    }
-                }
-            });
-        }
-
         let startTime = new Date();  // Measure the execution time of shutting down nodes.
 
         // Optionally validate collections on all nodes. Parallel validation depends on use of the

@@ -307,14 +307,10 @@ class MongodLauncher(object):
         # The default time for stepdown and quiesce mode in response to SIGTERM is 15 seconds. Reduce
         # this to 100ms for faster shutdown. On branches 4.4 and earlier, there is no quiesce mode, but
         # the default time for stepdown is 10 seconds.
-        # TODO(SERVER-47797): Remove reference to waitForStepDownOnNonCommandShutdown.
         if ("replSet" in mongod_options
-                and "waitForStepDownOnNonCommandShutdown" not in suite_set_parameters
-                and "shutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters):
-            if executable == self.config.LAST_LTS_MONGOD_BINARY:
-                suite_set_parameters["waitForStepDownOnNonCommandShutdown"] = False
-            else:
-                suite_set_parameters["shutdownTimeoutMillisForSignaledShutdown"] = 100
+                and "shutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters
+                and executable != self.config.LAST_LTS_MONGOD_BINARY):
+            suite_set_parameters["shutdownTimeoutMillisForSignaledShutdown"] = 100
 
         if "enableFlowControl" not in suite_set_parameters and self.config.FLOW_CONTROL is not None:
             suite_set_parameters["enableFlowControl"] = (self.config.FLOW_CONTROL == "on")
