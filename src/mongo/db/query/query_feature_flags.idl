@@ -55,3 +55,8 @@ feature_flags:
       description: "Feature flag for allowing SBE $group and $lookup"
       cpp_varname: gFeatureFlagSBEGroupAndLookup
       default: false
+
+    featureFlagExactTopNAccumulator:
+      description: "Feature flag for allowing use of topN family of accumulators"
+      cpp_varname: gFeatureFlagExactTopNAccumulator
+      default: false
