@@ -127,9 +127,11 @@ private:
     /**
      * Set the FCV to newVersion, making sure to close any outgoing connections with incompatible
      * servers and closing open transactions if necessary.
+     * If the commitTimestamp is set, advances the lastFCVUpdateTimestamp to it.
      */
     static void _setVersion(OperationContext* opCtx,
-                            ServerGlobalParams::FeatureCompatibility::Version newVersion);
+                            ServerGlobalParams::FeatureCompatibility::Version newVersion,
+                            boost::optional<Timestamp> commitTimestamp);
 };
 
 

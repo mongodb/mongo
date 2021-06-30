@@ -13,6 +13,7 @@
     'use strict';
 
     load('jstests/libs/get_index_helpers.js');
+    load('jstests/libs/feature_compatibility_version.js');
     load('jstests/multiVersion/libs/multi_rs.js');
     load('jstests/multiVersion/libs/verify_versions.js');
 
@@ -302,6 +303,14 @@
             assert.commandWorked(primaryAdminDB.runCommand(
                 {setFeatureCompatibilityVersion: version.featureCompatibilityVersion}));
             rst.awaitReplication();
+            // Make sure we reach the new featureCompatibilityVersion in the committed snapshot on
+            // on all nodes before continuing to upgrade.
+            // checkFCV does not work for version 3.4 (and below)
+            if (version.featureCompatibilityVersion != '3.4') {
+                for (let n of rst.nodes) {
+                    checkFCV(n.getDB("admin"), version.featureCompatibilityVersion);
+                }
+            }
         }
     }
 
