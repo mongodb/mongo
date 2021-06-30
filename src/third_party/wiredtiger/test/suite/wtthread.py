@@ -43,6 +43,20 @@ class checkpoint_thread(threading.Thread):
             sess.checkpoint()
         sess.close()
 
+class flush_tier_thread(threading.Thread):
+    def __init__(self, conn, done):
+        self.conn = conn
+        self.done = done
+        threading.Thread.__init__(self)
+
+    def run(self):
+        sess = self.conn.open_session()
+        while not self.done.isSet():
+            # Sleep for 25 milliseconds.
+            time.sleep(0.0025)
+            sess.flush_tier()
+        sess.close()
+
 class backup_thread(threading.Thread):
     def __init__(self, conn, backup_dir, done):
         self.backup_dir = backup_dir
