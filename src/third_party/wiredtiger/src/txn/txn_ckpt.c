@@ -1318,8 +1318,18 @@ __checkpoint_lock_dirty_tree_int(WT_SESSION_IMPL *session, bool is_checkpoint, b
      * checkpoint.
      */
     WT_RET(__checkpoint_mark_skip(session, ckptbase, force));
-    if (F_ISSET(btree, WT_BTREE_SKIP_CKPT))
+    if (F_ISSET(btree, WT_BTREE_SKIP_CKPT)) {
+        /*
+         * If we decide to skip checkpointing, clear the delete flag on the checkpoints. The list of
+         * checkpoints will be cached for a future access. Which checkpoints need to be deleted can
+         * change in the meanwhile.
+         */
+        WT_CKPT_FOREACH (ckptbase, ckpt)
+            if (F_ISSET(ckpt, WT_CKPT_DELETE))
+                F_CLR(ckpt, WT_CKPT_DELETE);
         return (0);
+    }
+
     /*
      * Lock the checkpoints that will be deleted.
      *
@@ -1462,17 +1472,7 @@ __checkpoint_lock_dirty_tree(
     WT_BTREE_CLEAN_CKPT(session, btree, 0);
     F_CLR(btree, WT_BTREE_OBSOLETE_PAGES);
 
-    /*
-     * Get the list of checkpoints for this file: We try to cache the ckptlist between the
-     * checkpoints. But there might not be one, as there are operations that can invalidate a
-     * ckptlist. So, use a cached ckptlist if there is one. Otherwise go through slow path of
-     * re-generating the ckptlist by reading the metadata. Also, we avoid using a cached checkpoint
-     * list for metadata.
-     */
-    if (WT_IS_METADATA(dhandle) ||
-      __wt_meta_saved_ckptlist_get(session, dhandle->name, &ckptbase) != 0)
-        WT_ERR(
-          __wt_meta_ckptlist_get(session, dhandle->name, true, &ckptbase, &ckpt_bytes_allocated));
+    WT_ERR(__wt_meta_ckptlist_get(session, dhandle->name, true, &ckptbase, &ckpt_bytes_allocated));
 
     /* We may be dropping specific checkpoints, check the configuration. */
     if (cfg != NULL) {
@@ -1539,7 +1539,8 @@ __checkpoint_lock_dirty_tree(
         /* It is possible that we do not have any checkpoint in the list. */
 err:
         __wt_meta_ckptlist_free(session, &ckptbase);
-        __wt_meta_saved_ckptlist_free(session);
+        btree->ckpt = NULL;
+        btree->ckpt_bytes_allocated = 0;
     }
 skip:
     __wt_free(session, name_alloc);
