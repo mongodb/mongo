@@ -505,6 +505,62 @@ TEST_F(BucketUnpackerTest, ExtractSingleMeasurement) {
     ASSERT_DOCUMENT_EQ(next, expected);
 }
 
+TEST_F(BucketUnpackerTest, ExtractSingleMeasurementIncludeBucketIdRowIndex) {
+    std::set<std::string> fields{
+        "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
+    auto spec = BucketSpec{
+        kUserDefinedTimeName.toString(), kUserDefinedMetaName.toString(), std::move(fields)};
+    spec.includeBucketIdAndRowIndex = true;
+    auto unpacker = BucketUnpacker{std::move(spec), BucketUnpacker::Behavior::kInclude};
+
+    auto d1 = dateFromISOString("2020-02-17T00:00:00.000Z").getValue();
+    auto d2 = dateFromISOString("2020-02-17T01:00:00.000Z").getValue();
+    auto d3 = dateFromISOString("2020-02-17T02:00:00.000Z").getValue();
+    auto bucket = BSON("meta" << BSON("m1" << 999 << "m2" << 9999) << "data"
+                              << BSON("_id" << BSON("0" << 1 << "1" << 2 << "2" << 3) << "time"
+                                            << BSON("0" << d1 << "1" << d2 << "2" << d3) << "a"
+                                            << BSON("0" << 1 << "1" << 2 << "2" << 3) << "b"
+                                            << BSON("1" << 1 << "2" << 2))
+                              << "_id" << 0);
+
+    unpacker.reset(std::move(bucket));
+
+    auto next = unpacker.extractSingleMeasurement(0);
+    auto expected = Document{
+        {"bucketId", 0},
+        {"rowIndex", 0},
+        {"rowData",
+         Document{
+             {"myMeta", Document{{"m1", 999}, {"m2", 9999}}}, {"_id", 1}, {"time", d1}, {"a", 1}}}};
+    ASSERT_DOCUMENT_EQ(next, expected);
+
+    next = unpacker.extractSingleMeasurement(2);
+    expected = Document{{"bucketId", 0},
+                        {"rowIndex", 2},
+                        {"rowData",
+                         Document{{"myMeta", Document{{"m1", 999}, {"m2", 9999}}},
+                                  {"_id", 3},
+                                  {"time", d3},
+                                  {"a", 3},
+                                  {"b", 2}}}};
+    ASSERT_DOCUMENT_EQ(next, expected);
+
+    next = unpacker.extractSingleMeasurement(1);
+    expected = Document{{"bucketId", 0},
+                        {"rowIndex", 1},
+                        {"rowData",
+                         Document{{"myMeta", Document{{"m1", 999}, {"m2", 9999}}},
+                                  {"_id", 2},
+                                  {"time", d2},
+                                  {"a", 2},
+                                  {"b", 1}}}};
+    ASSERT_DOCUMENT_EQ(next, expected);
+
+    // Can we extract the middle element again?
+    next = unpacker.extractSingleMeasurement(1);
+    ASSERT_DOCUMENT_EQ(next, expected);
+}
+
 TEST_F(BucketUnpackerTest, ExtractSingleMeasurementSparse) {
     std::set<std::string> fields{
         "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
@@ -532,6 +588,54 @@ TEST_F(BucketUnpackerTest, ExtractSingleMeasurementSparse) {
     next = unpacker.extractSingleMeasurement(0);
     expected = Document{
         {"myMeta", Document{{"m1", 999}, {"m2", 9999}}}, {"_id", 1}, {"time", d1}, {"a", 1}};
+    ASSERT_DOCUMENT_EQ(next, expected);
+
+    // Can we extract the same element twice in a row?
+    next = unpacker.extractSingleMeasurement(0);
+    ASSERT_DOCUMENT_EQ(next, expected);
+
+    next = unpacker.extractSingleMeasurement(0);
+    ASSERT_DOCUMENT_EQ(next, expected);
+}
+
+TEST_F(BucketUnpackerTest, ExtractSingleMeasurementSparseIncludeBucketIdRowIndex) {
+    std::set<std::string> fields{
+        "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
+    auto spec = BucketSpec{
+        kUserDefinedTimeName.toString(), kUserDefinedMetaName.toString(), std::move(fields)};
+    spec.includeBucketIdAndRowIndex = true;
+    auto unpacker = BucketUnpacker{std::move(spec), BucketUnpacker::Behavior::kInclude};
+
+    auto d1 = dateFromISOString("2020-02-17T00:00:00.000Z").getValue();
+    auto d2 = dateFromISOString("2020-02-17T01:00:00.000Z").getValue();
+    auto bucket = BSON("meta" << BSON("m1" << 999 << "m2" << 9999) << "data"
+                              << BSON("_id" << BSON("0" << 1 << "1" << 2) << "time"
+                                            << BSON("0" << d1 << "1" << d2) << "a" << BSON("0" << 1)
+                                            << "b" << BSON("1" << 1))
+                              << "_id" << 0);
+
+    unpacker.reset(std::move(bucket));
+    auto next = unpacker.extractSingleMeasurement(1);
+    auto expected = Document{{{"bucketId", 0},
+                              {"rowIndex", 1},
+                              {"rowData",
+                               Document{{"myMeta", Document{{"m1", 999}, {"m2", 9999}}},
+                                        {"_id", 2},
+                                        {"time", d2},
+                                        {"b", 1}}}}};
+    ASSERT_DOCUMENT_EQ(next, expected);
+
+    // Can we extract the same element again?
+    next = unpacker.extractSingleMeasurement(1);
+    ASSERT_DOCUMENT_EQ(next, expected);
+
+    next = unpacker.extractSingleMeasurement(0);
+    expected = Document{
+        {"bucketId", 0},
+        {"rowIndex", 0},
+        {"rowData",
+         Document{
+             {"myMeta", Document{{"m1", 999}, {"m2", 9999}}}, {"_id", 1}, {"time", d1}, {"a", 1}}}};
     ASSERT_DOCUMENT_EQ(next, expected);
 
     // Can we extract the same element twice in a row?

@@ -206,6 +206,15 @@ Document BucketUnpacker::getNext() {
         measurement.addField(name, Value{_computedMetaProjections[name]});
     }
 
+    if (_spec.includeBucketIdAndRowIndex) {
+        MutableDocument nestedMeasurement{};
+        nestedMeasurement.addField("bucketId", Value{_bucket[timeseries::kBucketIdFieldName]});
+        int rowIndex;
+        uassertStatusOK(NumberParser()(currentIdx, &rowIndex));
+        nestedMeasurement.addField("rowIndex", Value{rowIndex});
+        nestedMeasurement.addField("rowData", measurement.freezeToValue());
+        return nestedMeasurement.freeze();
+    }
     return measurement.freeze();
 }
 
@@ -241,6 +250,13 @@ Document BucketUnpacker::extractSingleMeasurement(int j) {
         measurement.addField(name, Value{_computedMetaProjections[name]});
     }
 
+    if (_spec.includeBucketIdAndRowIndex) {
+        MutableDocument nestedMeasurement{};
+        nestedMeasurement.addField("bucketId", Value{_bucket[timeseries::kBucketIdFieldName]});
+        nestedMeasurement.addField("rowIndex", Value{j});
+        nestedMeasurement.addField("rowData", measurement.freezeToValue());
+        return nestedMeasurement.freeze();
+    }
     return measurement.freeze();
 }
 }  // namespace mongo
