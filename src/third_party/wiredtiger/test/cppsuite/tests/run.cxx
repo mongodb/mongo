@@ -93,13 +93,6 @@ print_help()
     std::cout << "\t-t Test name to be executed." << std::endl;
 }
 
-void
-value_missing_error(const std::string &str)
-{
-    test_harness::debug_print(
-      "Value missing for option " + str + ".\nTry './run -h' for more information.", DEBUG_ERROR);
-}
-
 /*
  * Run a specific test.
  * - test_name: specifies which test to run.
@@ -157,35 +150,28 @@ main(int argc, char *argv[])
                 error_code = -1;
             } else if ((i + 1) < argc)
                 cfg = argv[++i];
-            else {
-                value_missing_error(argv[i]);
+            else
                 error_code = -1;
-            }
         } else if (std::string(argv[i]) == "-f") {
             if (!cfg.empty()) {
                 test_harness::debug_print("Option -f cannot be used with -C", DEBUG_ERROR);
                 error_code = -1;
             } else if ((i + 1) < argc)
                 config_filename = argv[++i];
-            else {
-                value_missing_error(argv[i]);
+            else
                 error_code = -1;
-            }
         } else if (std::string(argv[i]) == "-t") {
             if ((i + 1) < argc)
                 test_name = argv[++i];
-            else {
-                value_missing_error(argv[i]);
+            else
                 error_code = -1;
-            }
         } else if (std::string(argv[i]) == "-l") {
             if ((i + 1) < argc)
                 test_harness::_trace_level = std::stoi(argv[++i]);
-            else {
-                value_missing_error(argv[i]);
+            else
                 error_code = -1;
-            }
-        }
+        } else
+            error_code = -1;
     }
 
     if (error_code == 0) {
@@ -222,7 +208,9 @@ main(int argc, char *argv[])
 
         if (error_code != 0)
             test_harness::debug_print("Test " + current_test_name + " failed.", DEBUG_ERROR);
-    }
+    } else
+        test_harness::debug_print("Invalid command line arguments supplied. Try './run -h' "
+          "for help.", DEBUG_ERROR);
 
     return (error_code);
 }
