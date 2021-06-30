@@ -51,6 +51,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/all_database_cloner.h"
 #include "mongo/db/repl/initial_sync_state.h"
+#include "mongo/db/repl/initial_syncer_factory.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
@@ -203,8 +204,29 @@ void pauseAtInitialSyncFuzzerSyncronizationPoints(std::string msg) {
 
 }  // namespace
 
+ServiceContext::ConstructorActionRegisterer initialSyncerRegisterer(
+    "InitialSyncerRegisterer",
+    {"InitialSyncerFactoryRegisterer"} /* dependency list */,
+    [](ServiceContext* service) {
+        InitialSyncerFactory::get(service)->registerInitialSyncer(
+            "logical",
+            [](InitialSyncerInterface::Options opts,
+               std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
+               ThreadPool* writerPool,
+               StorageInterface* storage,
+               ReplicationProcess* replicationProcess,
+               const InitialSyncerInterface::OnCompletionFn& onCompletion) {
+                return std::make_unique<InitialSyncer>(opts,
+                                                       std::move(dataReplicatorExternalState),
+                                                       writerPool,
+                                                       storage,
+                                                       replicationProcess,
+                                                       onCompletion);
+            });
+    });
+
 InitialSyncer::InitialSyncer(
-    InitialSyncerOptions opts,
+    InitialSyncerInterface::Options opts,
     std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
     ThreadPool* writerPool,
     StorageInterface* storage,
@@ -2095,7 +2117,7 @@ void InitialSyncer::_shutdownComponent_inlock(Component& component) {
 StatusWith<std::vector<OplogEntry>> InitialSyncer::_getNextApplierBatch_inlock() {
     // If the fail-point is active, delay the apply batch by returning an empty batch so that
     // _getNextApplierBatchCallback() will reschedule itself at a later time.
-    // See InitialSyncerOptions::getApplierBatchCallbackRetryWait.
+    // See InitialSyncerInterface::Options::getApplierBatchCallbackRetryWait.
     if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
         return std::vector<OplogEntry>();
     }

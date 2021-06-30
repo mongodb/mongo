@@ -397,7 +397,7 @@ protected:
 
         _myLastOpTime = OpTime({3, 0}, 1);
 
-        InitialSyncerOptions options;
+        InitialSyncerInterface::Options options;
         options.initialSyncRetryWait = Milliseconds(1);
         options.getMyLastOptime = [this]() { return _myLastOpTime; };
         options.setMyLastOptime = [this](const OpTimeAndWallTime& opTimeAndWallTime) {
@@ -511,8 +511,8 @@ protected:
     std::shared_ptr<TaskExecutorMock> _executorProxy;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _clonerExecutor;
 
-    InitialSyncerOptions _options;
-    InitialSyncerOptions::SetMyLastOptimeFn _setMyLastOptime;
+    InitialSyncerInterface::Options _options;
+    InitialSyncerInterface::Options::SetMyLastOptimeFn _setMyLastOptime;
     OpTime _myLastOpTime;
     Date_t _myLastWallTime;
     std::unique_ptr<SyncSourceSelectorMock> _syncSourceSelector;
@@ -688,7 +688,7 @@ void InitialSyncerTest::processSuccessfulFCVFetcherResponse(std::vector<BSONObj>
 }
 
 TEST_F(InitialSyncerTest, InvalidConstruction) {
-    InitialSyncerOptions options;
+    InitialSyncerInterface::Options options;
     options.getMyLastOptime = []() { return OpTime(); };
     options.setMyLastOptime = [](const OpTimeAndWallTime&) {};
     options.resetOptimes = []() {};

@@ -44,6 +44,7 @@
 #include "mongo/db/repl/callback_completion_guard.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/initial_sync_shared_data.h"
+#include "mongo/db/repl/initial_syncer_interface.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
@@ -77,39 +78,6 @@ struct MemberState;
 class ReplicationProcess;
 class StorageInterface;
 
-struct InitialSyncerOptions {
-    /** Function to return optime of last operation applied on this node */
-    using GetMyLastOptimeFn = std::function<OpTime()>;
-
-    /** Function to update optime of last operation applied on this node */
-    using SetMyLastOptimeFn = std::function<void(const OpTimeAndWallTime&)>;
-
-    /** Function to reset all optimes on this node (e.g. applied & durable). */
-    using ResetOptimesFn = std::function<void()>;
-
-    /** Function to sets this node into a specific follower mode. */
-    using SetFollowerModeFn = std::function<bool(const MemberState&)>;
-
-    // Retry values
-    Milliseconds syncSourceRetryWait{1000};
-    Milliseconds initialSyncRetryWait{1000};
-
-    // InitialSyncer waits this long before retrying getApplierBatchCallback() if there are
-    // currently no operations available to apply or if the 'rsSyncApplyStop' failpoint is active.
-    // This default value is based on the duration in OplogBatcher::run().
-    Milliseconds getApplierBatchCallbackRetryWait{1000};
-
-    GetMyLastOptimeFn getMyLastOptime;
-    SetMyLastOptimeFn setMyLastOptime;
-    ResetOptimesFn resetOptimes;
-
-    SyncSourceSelector* syncSourceSelector = nullptr;
-
-    // The oplog fetcher will restart the oplog tailing query this many times on non-cancellation
-    // failures.
-    std::uint32_t oplogFetcherMaxFetcherRestarts = 0;
-};
-
 /**
  * The initial syncer provides services to keep collection in sync by replicating
  * changes via an oplog source to the local system storage.
@@ -121,16 +89,11 @@ struct InitialSyncerOptions {
  * Entry Points:
  *      -- startup: Start initial sync.
  */
-class InitialSyncer {
+class InitialSyncer : public InitialSyncerInterface {
     InitialSyncer(const InitialSyncer&) = delete;
     InitialSyncer& operator=(const InitialSyncer&) = delete;
 
 public:
-    /**
-     * Callback function to report last applied optime of initial sync.
-     */
-    typedef std::function<void(const StatusWith<OpTimeAndWallTime>& lastApplied)> OnCompletionFn;
-
     /**
      * Callback completion guard for initial syncer.
      */
@@ -190,7 +153,7 @@ public:
         void append(BSONObjBuilder* builder) const;
     };
 
-    InitialSyncer(InitialSyncerOptions opts,
+    InitialSyncer(InitialSyncerInterface::Options opts,
                   std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
                   ThreadPool* writerPool,
                   StorageInterface* storage,
@@ -204,36 +167,20 @@ public:
      */
     bool isActive() const;
 
-    /**
-     * Starts initial sync process, with the provided number of attempts
-     */
-    Status startup(OperationContext* opCtx, std::uint32_t maxAttempts) noexcept;
+    Status startup(OperationContext* opCtx, std::uint32_t maxAttempts) noexcept final;
 
-    /**
-     * Shuts down replication if "start" has been called, and blocks until shutdown has completed.
-     */
-    Status shutdown();
+    Status shutdown() final;
 
-    /**
-     * Block until inactive.
-     */
-    void join();
+    void join() final;
 
     /**
      * Returns internal state in a loggable format.
      */
     std::string getDiagnosticString() const;
 
-    /**
-     * Returns stats about the progress of initial sync. If initial sync is not in progress it
-     * returns an empty BSON object.
-     */
-    BSONObj getInitialSyncProgress() const;
+    BSONObj getInitialSyncProgress() const final;
 
-    /**
-     * Cancels the current initial sync attempt if the initial syncer is active.
-     */
-    void cancelCurrentAttempt();
+    void cancelCurrentAttempt() final;
 
     /**
      *
@@ -682,7 +629,7 @@ private:
     //      _mutex or be in a callback in _exec to read.
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("InitialSyncer::_mutex");           // (S)
-    const InitialSyncerOptions _opts;                                           // (R)
+    const InitialSyncerInterface::Options _opts;                                // (R)
     std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (R)
     std::shared_ptr<executor::TaskExecutor> _exec;                              // (R)
     std::unique_ptr<executor::ScopedTaskExecutor> _attemptExec;                 // (X)

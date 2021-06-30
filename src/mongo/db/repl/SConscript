@@ -1149,6 +1149,7 @@ env.Library(
     target='initial_syncer',
     source=[
         'initial_syncer.cpp',
+        'initial_syncer_factory.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',

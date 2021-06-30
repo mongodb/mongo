@@ -268,9 +268,9 @@ ReplicationCoordinator::Mode getReplicationModeFromSettings(const ReplSettings& 
     return ReplicationCoordinator::modeNone;
 }
 
-InitialSyncerOptions createInitialSyncerOptions(
+InitialSyncerInterface::Options createInitialSyncerOptions(
     ReplicationCoordinator* replCoord, ReplicationCoordinatorExternalState* externalState) {
-    InitialSyncerOptions options;
+    InitialSyncerInterface::Options options;
     options.getMyLastOptime = [replCoord]() { return replCoord->getMyLastAppliedOpTime(); };
     options.setMyLastOptime = [replCoord,
                                externalState](const OpTimeAndWallTime& opTimeAndWallTime) {
