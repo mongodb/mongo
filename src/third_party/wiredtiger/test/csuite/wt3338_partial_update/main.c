@@ -127,7 +127,9 @@ slow_apply_api(WT_ITEM *orig)
 
     /* Mess up anything not initialized in the buffers. */
     memset((uint8_t *)ta->mem + ta->size, 0xff, ta->memsize - ta->size);
-    memset((uint8_t *)tb->mem, 0xff, tb->memsize);
+
+    if (tb->memsize > 0)
+        memset((uint8_t *)tb->mem, 0xff, tb->memsize);
 
     /*
      * Process the entries to figure out how large a buffer we need. This is a bit pessimistic
