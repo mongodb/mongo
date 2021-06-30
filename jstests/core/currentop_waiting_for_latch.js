@@ -9,19 +9,27 @@
 
 const adminDB = db.getSiblingDB("admin");
 
+// This test causes an extra thread with a self-contended lock to be created so that currentOp can
+// observe its DiagnosticInfo. This mutex is test-only, and is at a lower level than the
+// SessionCatalog's mutex, so we pass 'idleSessions: false' to avoid scanning idle sessions during
+// currentOp and hitting a latch violation.
 const getCurrentOp = function() {
     jsTestLog("Getting $currentOp");
-    let result =
-        adminDB
-            .aggregate(
-                [
-                    {
-                        $currentOp:
-                            {allUsers: true, idleConnections: true, localOps: true, backtrace: true}
-                    },
-                ],
-                {readConcern: {level: "local"}})
-            .toArray();
+    let result = adminDB
+                     .aggregate(
+                         [
+                             {
+                                 $currentOp: {
+                                     allUsers: true,
+                                     idleConnections: true,
+                                     idleSessions: false,
+                                     localOps: true,
+                                     backtrace: true
+                                 }
+                             },
+                         ],
+                         {readConcern: {level: "local"}})
+                     .toArray();
     assert(result);
     return result;
 };

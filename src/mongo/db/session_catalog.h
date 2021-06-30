@@ -155,7 +155,7 @@ private:
 
     // Protects the state below
     mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "SessionCatalog::_mutex");
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(4), "SessionCatalog::_mutex");
 
     // Owns the Session objects for all current Sessions.
     SessionRuntimeInfoMap _sessions;
