@@ -1770,7 +1770,9 @@ buildvariants:
       - name: change_streams_latency
       - name: snapshot_reads
       - name: secondary_reads
+      - name: tpcc
       - name: linkbench
+      - name: linkbench2
 
   - name: renew-ssl-cert
     display_name: Renew SSL Cert
