@@ -791,6 +791,19 @@ void NetworkInterfaceTL::RequestManager::trySend(
                 "requestId"_attr = requestState->request->id,
                 "target"_attr = requestState->request->target);
 
+    // An attempt to avoid sending a request after its command has been canceled or already executed
+    // using another connection. Just a best effort to mitigate unnecessary resource consumption if
+    // possible, and allow deterministic cancellation of requests in testing.
+    if (cmdState->finishLine.isReady()) {
+        LOGV2_DEBUG(5813901,
+                    2,
+                    "Skipping request as it has already been fulfilled or canceled",
+                    "requestId"_attr = requestState->request->id,
+                    "target"_attr = requestState->request->target);
+        requestState->returnConnection(Status::OK());
+        return;
+    }
+
     if (auto counters = cmdState->interface->_counters) {
         counters->recordSent();
     }
