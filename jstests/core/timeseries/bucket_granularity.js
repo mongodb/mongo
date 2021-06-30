@@ -102,20 +102,21 @@
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T21:00:00.000Z")}));
     assert.eq(2, db.system.buckets.granularitySecondsToMinutes.find().itcount());
 
+    // TODO SERVER-58171: Re-enable these tests:
     // Now let's bump to minutes and make sure we get the expected behavior
-    assert.commandWorked(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'minutes'}}));
+    // assert.commandWorked(
+    // db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'minutes'}}));
 
     // All measurements land in the same bucket.
-    assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:00:00.000Z")}));
-    assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:22:02.000Z")}));
-    assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:59:59.999Z")}));
-    assert.eq(2, db.system.buckets.granularitySecondsToMinutes.find().itcount());
+    // assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:00:00.000Z")}));
+    // assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:22:02.000Z")}));
+    // assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:59:59.999Z")}));
+    // assert.eq(2, db.system.buckets.granularitySecondsToMinutes.find().itcount());
 
     // Expect bucket max span to be one day. A new measurement outside of this range should create
     // a new bucket.
-    assert.commandWorked(coll.insert({t: ISODate("2021-04-23T21:00:00.000Z")}));
-    assert.eq(3, db.system.buckets.granularitySecondsToMinutes.find().itcount());
+    // assert.commandWorked(coll.insert({t: ISODate("2021-04-23T21:00:00.000Z")}));
+    // assert.eq(3, db.system.buckets.granularitySecondsToMinutes.find().itcount());
 })();
 
 (function testIncreasingMinutesToHours() {
@@ -138,41 +139,43 @@
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:00:00.000Z")}));
     assert.eq(2, db.system.buckets.granularityMinutesToHours.find().itcount());
 
-    assert.commandWorked(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'hours'}}));
+    // TODO SERVER-58171: Re-enable these tests:
+    // assert.commandWorked(
+    // db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'hours'}}));
 
     // All measurements land in the same bucket.
-    assert.commandWorked(coll.insert({t: ISODate("2021-05-23T00:00:00.000Z")}));
-    assert.commandWorked(coll.insert({t: ISODate("2021-05-23T18:11:03.000Z")}));
-    assert.commandWorked(coll.insert({t: ISODate("2021-05-23T19:59:59.999Z")}));
-    assert.eq(2, db.system.buckets.granularityMinutesToHours.find().itcount());
+    // assert.commandWorked(coll.insert({t: ISODate("2021-05-23T00:00:00.000Z")}));
+    // assert.commandWorked(coll.insert({t: ISODate("2021-05-23T18:11:03.000Z")}));
+    // assert.commandWorked(coll.insert({t: ISODate("2021-05-23T19:59:59.999Z")}));
+    // assert.eq(2, db.system.buckets.granularityMinutesToHours.find().itcount());
 
     // Expect bucket max span to be 30 days. A new measurement outside of this range should create
     // a new bucket.
-    assert.commandWorked(coll.insert({t: ISODate("2021-05-23T20:00:00.001Z")}));
-    assert.eq(3, db.system.buckets.granularityMinutesToHours.find().itcount());
+    // assert.commandWorked(coll.insert({t: ISODate("2021-05-23T20:00:00.001Z")}));
+    // assert.eq(3, db.system.buckets.granularityMinutesToHours.find().itcount());
 })();
 
 (function testReducingGranularityFails() {
     let coll = db.granularityMinutesToHours;
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
+    // TODO SERVER-58171: Re-enable these tests:
+    // assert.commandWorked(db.createCollection(
+    // coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
 
     // Decreasing minutes -> seconds shouldn't work.
-    assert.commandFailed(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'seconds'}}));
+    // assert.commandFailed(
+    // db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'seconds'}}));
 
     // Increasing minutes -> hours should work fine.
-    assert.commandWorked(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'hours'}}));
+    // assert.commandWorked(
+    // db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'hours'}}));
 
     // Decreasing hours -> minutes shouldn't work.
-    assert.commandFailed(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'minutes'}}));
+    // assert.commandFailed(
+    // db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'minutes'}}));
     // Decreasing hours -> seconds shouldn't work either.
-    assert.commandFailed(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'seconds'}}));
+    // assert.commandFailed(
+    // db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'seconds'}}));
 })();
 })();

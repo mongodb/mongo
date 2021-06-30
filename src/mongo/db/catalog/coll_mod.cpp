@@ -369,16 +369,9 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             if (e.Obj().hasField("granularity")) {
-                BSONElement elem = e.Obj().getField("granularity");
-                BucketGranularityEnum target = BucketGranularity_parse(
-                    IDLParserErrorContext("BucketGranularity"), elem.valueStringData());
-                if (!isValidTimeseriesGranularityTransition(tsOptions->getGranularity(), target)) {
-                    return Status(
-                        ErrorCodes::InvalidOptions,
-                        str::stream()
-                            << "Invalid transition for timeseries.granularity. Can only transition "
-                               "from 'seconds' to 'minutes' or 'minutes' to 'hours'.");
-                }
+                // TODO: SERVER-58171 Re-enable this feature
+                return Status(ErrorCodes::InvalidOptions,
+                              "Changing timeseries 'granularity' is not allowed");
             }
 
             cmr.timeseries = e;
