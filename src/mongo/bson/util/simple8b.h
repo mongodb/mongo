@@ -66,6 +66,23 @@ public:
      */
     void skip();
 
+    /**
+     * Stores all values in _pendingValues into _buffered even if the Simple8b word will not be
+     * optimal and use a larger selector than necessary because we don't have enough integers
+     * to use one with more slots.
+     */
+    void flush();
+
+    /**
+     * Returns the underlying binary encoding in _buffered.
+     */
+    char* data();
+
+    /**
+     * Returns the number of bytes in the binary buffer returned by the function, data().
+     */
+    size_t len();
+
 private:
     /**
      * Tests if a value with numBits would fit inside the current simple8b word.

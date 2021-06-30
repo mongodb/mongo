@@ -29,6 +29,7 @@
 
 #include "mongo/bson/util/simple8b.h"
 
+#include "mongo/base/data_type_endian.h"
 #include "mongo/platform/bits.h"
 
 namespace mongo {
@@ -79,13 +80,12 @@ std::vector<Simple8b::Value> Simple8b::getAllInts() {
     std::vector<Simple8b::Value> values;
 
     // Add integers in the BufBuilder first.
-    SharedBuffer sb = _buffer.release();
-    uint64_t* buf = reinterpret_cast<uint64_t*>(sb.get());
+    uint64_t* buf = reinterpret_cast<uint64_t*>(_buffer.buf());
 
     size_t numBufWords = _buffer.len() / 8;  // 8 chars in a Simple8b word.
     uint32_t index = 0;
     for (size_t i = 0; i < numBufWords; i++) {
-        uint64_t simple8bWord = *buf;
+        uint64_t simple8bWord = LittleEndian<uint64_t>::load(*buf);
         _decode(simple8bWord, &index, &values);
 
         buf++;
@@ -122,9 +122,10 @@ bool Simple8b::append(uint64_t value) {
         // word(s) with no unused buckets until the new value can be added to _pendingValues. Then
         // add the Simple8b word(s) to the buffer. Finally add the new integer and update any global
         // variables.
+
         do {
             uint64_t simple8bWord = _encodeLargestPossibleWord();
-            _buffer.appendNum(simple8bWord);
+            _buffer.appendNum(tagLittleEndian(simple8bWord));
         } while (!_doesIntegerFitInCurrentWord(valueNumBits));
 
         _pendingValues.push_back({false, value});
@@ -140,16 +141,28 @@ void Simple8b::skip() {
     _pendingValues.push_back({true, 0});
 }
 
-bool Simple8b::_doesIntegerFitInCurrentWord(uint8_t numBits) const {
-    uint8_t numBitsWithNewInt = std::max(_currMaxBitLen, numBits);
+void Simple8b::flush() {
+    while (!_pendingValues.empty()) {
+        uint64_t simple8bWord = _encodeLargestPossibleWord();
+        _buffer.appendNum(tagLittleEndian(simple8bWord));
+    }
+}
 
-    uint8_t newPendingValueSize = _pendingValues.size() + 1;
-    numBitsWithNewInt *= newPendingValueSize;
+char* Simple8b::data() {
+    return _buffer.buf();
+}
+
+size_t Simple8b::len() {
+    return _buffer.len();  // Number of hex characters in a char.
+}
+
+bool Simple8b::_doesIntegerFitInCurrentWord(uint8_t numBits) const {
+    uint64_t numBitsWithValue = std::max(_currMaxBitLen, numBits) * (_pendingValues.size() + 1);
 
     // We can compare with kDataBits in all cases even when we have fewer data bits in the case
     // of selector 7 and 8. Because their slot size is not divisible with 60 and uses the closest
     // smaller integer. One more would be strictly more than 60 making this comparison safe.
-    return kDataBits >= numBitsWithNewInt;
+    return kDataBits >= numBitsWithValue;
 }
 
 int64_t Simple8b::_encodeLargestPossibleWord() {
