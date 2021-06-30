@@ -57,9 +57,6 @@ class ServiceExecutorFixed final : public ServiceExecutor,
                                    public std::enable_shared_from_this<ServiceExecutorFixed> {
     static constexpr auto kDiagnosticLogLevel = 3;
 
-    static const inline auto kInShutdown =
-        Status(ErrorCodes::ServiceExecutorInShutdown, "ServiceExecutorFixed is not running");
-
 public:
     explicit ServiceExecutorFixed(ServiceContext* ctx, ThreadPool::Limits limits);
     explicit ServiceExecutorFixed(ThreadPool::Limits limits)
@@ -70,7 +67,6 @@ public:
 
     Status start() override;
     Status shutdown(Milliseconds timeout) override;
-    void join() noexcept;
 
     Status scheduleTask(Task task, ScheduleFlags flags) override;
     void schedule(OutOfLineExecutor::Task task) override {
@@ -95,53 +91,37 @@ public:
     int getRecursionDepthForExecutorThread() const;
 
 private:
+    enum class State { kNotStarted, kRunning, kStopping, kStopped };
+
     // Maintains the execution state (e.g., recursion depth) for executor threads
     class ExecutorThreadContext;
 
-    void _checkForShutdown(WithLock);
-    void _beginShutdown(WithLock);
+    struct Stats;
+
+    struct Waiter {
+        SessionHandle session;
+        OutOfLineExecutor::Task onCompletionCallback;
+    };
+
+    const std::string& _name() const;
+
+    /** Requires `_mutex` locked. */
+    void _checkForShutdown();
+
+    /** Requires `_mutex` locked. */
+    void _beginShutdown();
+
     void _schedule(OutOfLineExecutor::Task task) noexcept;
 
-    auto _threadsRunning() const {
-        auto ended = _stats.threadsEnded.load();
-        auto started = _stats.threadsStarted.loadRelaxed();
-        return started - ended;
-    }
+    void _finalize() noexcept;
 
-    auto _tasksRunning() const {
-        auto ended = _stats.tasksEnded.load();
-        auto started = _stats.tasksStarted.loadRelaxed();
-        return started - ended;
-    }
+    /** Requires `_mutex` locked by `lk`. */
+    bool _waitForStop(stdx::unique_lock<Mutex>& lk, boost::optional<Milliseconds> timeout);
 
-    auto _tasksLeft() const {
-        auto ended = _stats.tasksEnded.load();
-        auto scheduled = _stats.tasksScheduled.loadRelaxed();
-        return scheduled - ended;
-    }
+    /** `_state` transitions: kNotStarted -> kRunning -> kStopping -> kStopped */
+    State _state = State::kNotStarted;
 
-    auto _tasksWaiting() const {
-        auto ended = _stats.waitersEnded.load();
-        auto started = _stats.waitersStarted.loadRelaxed();
-        return started - ended;
-    }
-
-    auto _tasksTotal() const {
-        return _tasksRunning() + _tasksWaiting();
-    }
-
-    struct Stats {
-        AtomicWord<size_t> threadsStarted{0};
-        AtomicWord<size_t> threadsEnded{0};
-
-        AtomicWord<size_t> tasksScheduled{0};
-        AtomicWord<size_t> tasksStarted{0};
-        AtomicWord<size_t> tasksEnded{0};
-
-        AtomicWord<size_t> waitersStarted{0};
-        AtomicWord<size_t> waitersEnded{0};
-    };
-    Stats _stats;
+    std::unique_ptr<Stats> _stats;
 
     ServiceContext* const _svcCtx;
 
@@ -150,21 +130,10 @@ private:
     stdx::condition_variable _shutdownCondition;
     SharedPromise<void> _shutdownComplete;
 
-    /**
-     * State transition diagram: kNotStarted ---> kRunning ---> kStopping ---> kStopped
-     */
-    enum State { kNotStarted, kRunning, kStopping, kStopped } _state = kNotStarted;
-    bool _isJoined = false;
-
     ThreadPool::Options _options;
     std::shared_ptr<ThreadPool> _threadPool;
 
-    struct Waiter {
-        SessionHandle session;
-        OutOfLineExecutor::Task onCompletionCallback;
-    };
-    using WaiterList = std::list<Waiter>;
-    WaiterList _waiters;
+    std::list<Waiter> _waiters;
 
     static thread_local std::unique_ptr<ExecutorThreadContext> _executorContext;
 };
