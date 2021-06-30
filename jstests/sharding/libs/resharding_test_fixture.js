@@ -183,6 +183,15 @@ var ReshardingTest = class {
         const sourceCollection = this._st.s.getCollection(ns);
         const sourceDB = sourceCollection.getDB();
 
+        assert.commandWorked(sourceDB.adminCommand({enableSharding: sourceDB.getName()}));
+
+        // mongos won't know about the temporary resharding collection and will therefore assume the
+        // collection is unsharded. We configure one of the recipient shards to be the primary shard
+        // for the database so mongos still ends up routing operations to a shard which owns the
+        // temporary resharding collection.
+        this._st.ensurePrimaryShard(sourceDB.getName(), primaryShardName);
+        this._primaryShardName = primaryShardName;
+
         CreateShardedCollectionUtil.shardCollectionWithChunks(
             sourceCollection, shardKeyPattern, chunks);
 
@@ -191,13 +200,6 @@ var ReshardingTest = class {
         const sourceCollectionUUIDString = extractUUIDFromObject(this._sourceCollectionUUID);
 
         this._tempNs = `${sourceDB.getName()}.system.resharding.${sourceCollectionUUIDString}`;
-
-        // mongos won't know about the temporary resharding collection and will therefore assume the
-        // collection is unsharded. We configure one of the recipient shards to be the primary shard
-        // for the database so mongos still ends up routing operations to a shard which owns the
-        // temporary resharding collection.
-        this._st.ensurePrimaryShard(sourceDB.getName(), primaryShardName);
-        this._primaryShardName = primaryShardName;
 
         return sourceCollection;
     }
