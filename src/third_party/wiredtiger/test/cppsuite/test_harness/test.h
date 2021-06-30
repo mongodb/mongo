@@ -160,13 +160,19 @@ class test : public database_operation {
         /* End the test by calling finish on all known components. */
         for (const auto &it : _components)
             it->finish();
+
+        debug_print(
+          "Joining all component threads.\n This could take a while as we need to wait"
+          " for all components to finish their current loop.",
+          DEBUG_INFO);
         _thread_manager->join();
 
         /* Validation stage. */
         if (_workload_tracking->enabled()) {
             workload_validation wv;
             wv.validate(_workload_tracking->get_operation_table_name(),
-              _workload_tracking->get_schema_table_name(), _workload_generator->get_database());
+              _workload_tracking->get_schema_table_name(),
+              _workload_generator->get_database().get_collection_ids());
         }
 
         debug_print("SUCCESS", DEBUG_INFO);

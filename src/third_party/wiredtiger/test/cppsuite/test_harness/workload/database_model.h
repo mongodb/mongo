@@ -44,20 +44,6 @@ namespace test_harness {
 /* Key/Value type. */
 typedef std::string key_value_t;
 
-/* Representation of key states. */
-struct key_t {
-    bool exists;
-};
-
-/* Representation of a value. */
-struct value_t {
-    key_value_t value;
-};
-
-/*
- * FIX-ME-Test-Framework: Separate this into two separate objects one for verification and for
- * database operations.
- */
 /* A collection is made of mapped key value objects. */
 class collection {
     public:
@@ -71,9 +57,8 @@ class collection {
     collection &operator=(const collection &) = delete;
 
     uint64_t
-    get_key_count()
+    get_key_count() const
     {
-        std::lock_guard<std::mutex> lg(_mtx);
         return (_key_count);
     }
 
@@ -90,60 +75,17 @@ class collection {
      * The set of keys should always be contiguous such that other threads calling get_key_count
      * will always know that the keys in existence are 0 -> _key_count - 1.
      */
-    uint64_t
+    void
     increase_key_count(uint64_t increment)
     {
-        std::lock_guard<std::mutex> lg(_mtx);
         _key_count += increment;
-        return (_key_count);
     }
 
-    std::map<key_value_t, key_t>
-    get_keys()
-    {
-        std::lock_guard<std::mutex> lg(_mtx);
-        return (keys);
-    }
-
-    value_t
-    get_record(const char *key)
-    {
-        std::lock_guard<std::mutex> lg(_mtx);
-        return (values.at(key));
-    }
-
-    void
-    insert_record(const char *key, const char *value)
-    {
-        std::lock_guard<std::mutex> lg(_mtx);
-        keys[key].exists = true;
-        value_t v;
-        v.value = key_value_t(value);
-        values.emplace(key_value_t(key), v);
-    }
-
-    void
-    update_record(const char *key, const char *value)
-    {
-        std::lock_guard<std::mutex> lg(_mtx);
-        values.at(key).value = key_value_t(value);
-    }
-
-    void
-    delete_record(const char *key)
-    {
-        std::lock_guard<std::mutex> lg(_mtx);
-        keys.at(key).exists = false;
-    }
-
-    std::map<key_value_t, key_t> keys = {};
-    std::map<key_value_t, value_t> values = {};
     const std::string name;
     const uint64_t id;
 
     private:
-    std::mutex _mtx;
-    uint64_t _key_count;
+    std::atomic<uint64_t> _key_count{0};
 };
 
 /* Representation of the collections in memory. */
@@ -202,6 +144,7 @@ class database {
         return (_collections.size());
     }
 
+    /* FIX-ME-Test-Framework: Replace usages of this with get_collection_ids. */
     std::vector<std::string>
     get_collection_names()
     {
@@ -212,6 +155,18 @@ class database {
             collection_names.push_back(it.second.name);
 
         return (collection_names);
+    }
+
+    std::vector<uint64_t>
+    get_collection_ids()
+    {
+        std::lock_guard<std::mutex> lg(_mtx);
+        std::vector<uint64_t> collection_ids;
+
+        for (auto const &it : _collections)
+            collection_ids.push_back(it.first);
+
+        return (collection_ids);
     }
 
     static std::string
