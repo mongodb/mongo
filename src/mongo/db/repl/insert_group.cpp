@@ -137,20 +137,21 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
         // application of an individual op.
         static constexpr char message[] =
             "Error applying inserts in bulk. Trying first insert as a lone insert";
-        auto status = exceptionToStatus().withContext(
-            str::stream() << message << ". Grouped inserts: " << redact(groupedInserts.toBSON())
-                          << ". First insert: " << redact(entry.getRaw()));
+        auto status = exceptionToStatus();
 
         // It's not an error during initial sync to encounter DuplicateKey errors.
-        if (Mode::kInitialSync == _mode && ErrorCodes::DuplicateKey == status) {
+        if (Mode::kInitialSync == _mode &&
+            (ErrorCodes::DuplicateKey == status || ErrorCodes::NamespaceNotFound == status)) {
             LOGV2_DEBUG(21203,
                         2,
                         message,
+                        "error"_attr = redact(status),
                         "groupedInserts"_attr = redact(groupedInserts.toBSON()),
                         "firstInsert"_attr = redact(entry.getRaw()));
         } else {
             LOGV2_ERROR(21204,
                         message,
+                        "error"_attr = redact(status),
                         "groupedInserts"_attr = redact(groupedInserts.toBSON()),
                         "firstInsert"_attr = redact(entry.getRaw()));
         }
