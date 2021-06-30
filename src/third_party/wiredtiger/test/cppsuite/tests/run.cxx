@@ -194,7 +194,7 @@ main(int argc, char *argv[])
                     current_cfg = parse_configuration_from_file(config_filename);
                 else if (cfg.empty())
                     current_cfg =
-                      parse_configuration_from_file(get_default_config_path(config_filename));
+                      parse_configuration_from_file(get_default_config_path(current_test_name));
                 else
                     current_cfg = cfg;
 
