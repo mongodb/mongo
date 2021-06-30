@@ -47,6 +47,84 @@ or **majority**. If **majority** is specified, the write waits for that write to
 **committed snapshot** as well, so that it can be read with `readConcern: { level: majority }`
 reads. (If this last sentence made no sense, come back to it at the end).
 
+###  Default Write Concern
+
+If a write operation does not explicitly specify a write concern, the server will use a default
+write concern. This default write concern will be defined by either the
+**cluster-wide write concern**, explicitly set by the user, or the
+**implicit default write concern**, implicitly set by the
+server based on replica set configuration.
+
+####  Cluster-Wide Write Concern
+
+Users can set the cluster-wide write concern (CWWC) using the
+[`setDefaultRWConcern`](https://docs.mongodb.com/manual/reference/command/setDefaultRWConcern/)
+command. Setting the CWWC will cause the implicit default write concern to
+no longer take effect. Once a user sets a CWWC, we disallow unsetting it. The reasoning
+behind this is explored in the section
+[Implicit Default Write Concern and Sharded Clusters](#implicit-default-write-concern-and-sharded-clusters).
+
+On sharded clusters, the CWWC will be stored on config servers. Shard servers themselves do not
+store the CWWC. Instead, mongos polls the config server and applies the default write concern to
+requests it forwards to shards.
+
+####  Implicit Default Write Concern
+
+If there is no cluster-wide default write concern set, the server will set the default. This is
+known as the implicit default write concern (IDWC). For most cases, the IDWC will default to
+`{w: "majority")`.
+
+The IDWC is calculated on startup using the **Default Write Concern Formula (DWCF)**:
+
+`implicitDefaultWriteConcern = if [(#arbiters > 0) AND (#arbiters >= ½(#voting nodes) - 1)] then {w:1} else {w:majority}`
+
+In replica sets with arbiters, there are cases where the set can lose a majority of data-bearing
+nodes, but the primary would stay primary due to arbiters' votes. The primary is unable to fulfill
+majority writes, as it cannot reach a majority of data-bearing nodes. To prevent the primary from
+hanging while trying to acknowledge majority writes, the server will set the implicit default to
+`{w: 1}`.
+
+As an example, if we have a PSA replica set, and the secondary goes down, the primary cannot
+successfully acknowledge a majority write. However, the primary will remain primary with the
+arbiter's vote. In this case, the DWCF will have preemptively set the IDWC to `{w: 1}`
+so the user can still perform writes to the replica set.
+
+ #### Implicit Default Write Concern and Sharded Clusters
+
+For sharded clusters, the implicit default write concern will always be `{w: "majority"}`.
+As mentioned above, mongos will send the default write concern with all requests that it forwards
+to shards, which means the default write concern on shards will always be consistent in the
+cluster. We don't want to specify `{w: "majority"}` for shard replica sets
+that can keep a primary due to an arbiter's vote, but lose the ability to acknowledge majority
+writes if a majority of data-bearing nodes goes down. So if the result of the DWCF for any replica
+set in the cluster is `{w: 1`}`, we require the cluster to set a CWWC. Once set, we disallow
+unsetting it so we can prevent PSA shards from implicitly defaulting to `{w: "majority"}` for
+reasons mentioned above. However, if a user decides to set the CWWC to `{w: "majority"}`
+for a PSA set, they may do so. We assume that in this case the user understands
+the tradeoffs they are making.
+
+We will fassert shard servers on startup if no CWWC is set and
+the result of the default write concern formula is `{w: 1}`. Similarly, we will also fail any
+`addShard` command that attempts to add a shard replica set with a default write concern of
+`{w: 1}` when CWWC is unset. This is because we want to maintain a consistent implicit default of
+`{w: "majority"}` across the cluster, but we do not want to specify that for PSA sets for reasons
+listed above.
+
+####  Replica Set Reconfigs and Default Write Concern
+
+A replica set reconfig will recalculate the default write concern using the Default Write Concern
+Formula if CWWC is not set. If the new value of the implicit default write concern is different
+from the old value, we will fail the reconfig. Users must set a CWWC before issuing a reconfig
+that would change the IDWC.
+
+#### Force Reconfigs
+
+As an important note, we will also fail force reconfigs that may change
+the IDWC. In cases where a replica set is facing degraded performance and cannot satisfy a
+majority write concern needed to set the CWWC, users can run
+`setDefaultRWConcern` with write concern `{w: 1}` instead of making it a majority write so that
+setting CWWC does not get in the way of being able to do a force reconfig.
+
 ## Life as a Secondary
 
 In general, secondaries just choose a node to sync from, their **sync source**, and then pull
