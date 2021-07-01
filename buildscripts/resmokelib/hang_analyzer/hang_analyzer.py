@@ -21,6 +21,8 @@ import getpass
 import psutil
 import distro
 
+from buildscripts.resmokelib import config as resmoke_core_config
+
 from buildscripts.resmokelib.hang_analyzer import extractor
 from buildscripts.resmokelib.hang_analyzer import dumper
 from buildscripts.resmokelib.hang_analyzer import process
@@ -54,6 +56,7 @@ class HangAnalyzer(Subcommand):
 
         self._configure_processes()
         self._setup_logging(logger)
+        self.debug_symbols_url = self._configure_debug_symbols_download()
 
     def execute(self):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
         """
@@ -65,7 +68,7 @@ class HangAnalyzer(Subcommand):
 
         self._log_system_info()
 
-        extractor.extract_debug_symbols(self.root_logger)
+        extractor.extract_debug_symbols(self.root_logger, self.debug_symbols_url)
         dumpers = dumper.get_dumpers(self.root_logger, self.options.debugger_output)
 
         processes = process_list.get_processes(self.process_ids, self.interesting_processes,
@@ -155,6 +158,17 @@ class HangAnalyzer(Subcommand):
         if trapped_exceptions:
             raise RuntimeError(
                 "Exceptions were thrown while dumping. There may still be some valid dumps.")
+
+    def _configure_debug_symbols_download(self):
+        resmoke_constructed_url = resmoke_core_config.DEBUG_SYMBOLS_URL
+        user_configured_url = self.options.debug_symbols_url
+        if resmoke_constructed_url and user_configured_url:
+            raise ValueError("The debug symbols URL has to be either generated, "
+                             "or passed in through the command line, but not both. "
+                             "resmoke_constructed_url: %s, user_configured_url: %s" %
+                             (resmoke_constructed_url, user_configured_url))
+
+        return resmoke_constructed_url or user_configured_url
 
     def _configure_processes(self):
         if self.options.debugger_output is None:
@@ -254,3 +268,5 @@ class HangAnalyzerPlugin(PluginInterface):
         parser.add_argument('-k', '--kill-processes', dest='kill_processes', action="store_true",
                             default=False,
                             help="Kills the analyzed processes after analysis completes.")
+        parser.add_argument('-ds', '--debug-symbols-url', dest='debug_symbols_url', metavar="URL",
+                            type=str, default=None)

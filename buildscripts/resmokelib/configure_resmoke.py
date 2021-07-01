@@ -328,8 +328,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
             return url
         return None
 
-    if _config.DEBUG_SYMBOL_PATCH_URL is None:
-        _config.DEBUG_SYMBOL_PATCH_URL = calculate_debug_symbol_url()
+    _config.DEBUG_SYMBOLS_URL = calculate_debug_symbol_url()
 
     # Archival options. Archival is enabled only when running on evergreen.
     if not _config.EVERGREEN_TASK_ID:

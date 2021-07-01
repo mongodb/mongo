@@ -145,6 +145,9 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
         "wiredTigerCollectionConfigString": (config.WT_COLL_CONFIG, ""),
         "wiredTigerEngineConfigString": (config.WT_ENGINE_CONFIG, ""),
         "wiredTigerIndexConfigString": (config.WT_INDEX_CONFIG, ""),
+
+        # Evergreen variables.
+        "evergreenDebugSymbolsUrl": (config.DEBUG_SYMBOLS_URL, ""),
     }
 
     test_data = global_vars.get("TestData", {}).copy()

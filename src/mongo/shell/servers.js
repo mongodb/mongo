@@ -151,6 +151,10 @@ function runHangAnalyzer(pids) {
     const args =
         ['python', scriptPath, 'hang-analyzer', '-k', '-o', 'file', '-o', 'stdout', '-d', pids];
 
+    if (jsTest.options().evergreenDebugSymbolsUrl) {
+        args.push('-ds', jsTest.options().evergreenDebugSymbolsUrl);
+    }
+
     // Enable core dumps if not an ASAN build.
     if (!_isAddressSanitizerActive()) {
         args.push('-c');
