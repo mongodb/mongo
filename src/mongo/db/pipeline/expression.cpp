@@ -3616,10 +3616,11 @@ Value ExpressionRange::evaluate(const Document& root, Variables* variables) cons
                           << endVal.toString(),
             endVal.integral());
 
-    int current = startVal.coerceToInt();
-    int end = endVal.coerceToInt();
+    // Cast to broader type 'int64_t' to prevent overflow during loop.
+    int64_t current = startVal.coerceToInt();
+    int64_t end = endVal.coerceToInt();
 
-    int step = 1;
+    int64_t step = 1;
     if (_children.size() == 3) {
         // A step was specified by the user.
         Value stepVal(_children[2]->evaluate(root, variables));
@@ -3641,11 +3642,11 @@ Value ExpressionRange::evaluate(const Document& root, Variables* variables) cons
     std::vector<Value> output;
 
     while ((step > 0 ? current < end : current > end)) {
-        output.push_back(Value(current));
+        output.push_back(Value(static_cast<int>(current)));
         current += step;
     }
 
-    return Value(output);
+    return Value(std::move(output));
 }
 
 REGISTER_EXPRESSION(range, ExpressionRange::parse);
