@@ -36,7 +36,7 @@ const runRollbackTo = function(rollbackEndFailPoints) {
             1,  // rollbackEndFailPointsIteration
             ["setYieldAllLocksHang", "hangDuringIndexBuildDrainYield"],
             ["collection scan", "drain writes"],
-            [{numScannedAferResume: 6}, {skippedPhaseLogID: 20392}],
+            [{numScannedAfterResume: 6}, {skippedPhaseLogID: 20392}],
             [{a: 11, b: 11}, {a: 12, b: 12}],
             sideWrites);
     };
