@@ -561,7 +561,7 @@ public:
     }
 
     NoLimitSorter(const std::string& fileName,
-                  const std::vector<SorterRange> ranges,
+                  const std::vector<SorterRange>& ranges,
                   const SortOptions& opts,
                   const Comparator& comp,
                   const Settings& settings = Settings())
@@ -1202,7 +1202,7 @@ template <typename Key, typename Value>
 template <typename Comparator>
 Sorter<Key, Value>* Sorter<Key, Value>::makeFromExistingRanges(
     const std::string& fileName,
-    const std::vector<SorterRange> ranges,
+    const std::vector<SorterRange>& ranges,
     const SortOptions& opts,
     const Comparator& comp,
     const Settings& settings) {

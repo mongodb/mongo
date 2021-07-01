@@ -264,7 +264,7 @@ public:
 
     template <typename Comparator>
     static Sorter* makeFromExistingRanges(const std::string& fileName,
-                                          const std::vector<SorterRange> ranges,
+                                          const std::vector<SorterRange>& ranges,
                                           const SortOptions& opts,
                                           const Comparator& comp,
                                           const Settings& settings = Settings());
@@ -404,7 +404,7 @@ private:
         const SortOptions& opts, const Comparator& comp, const Settings& settings);            \
     template ::mongo::Sorter<Key, Value>* ::mongo::Sorter<Key, Value>::makeFromExistingRanges< \
         Comparator>(const std::string& fileName,                                               \
-                    const std::vector<SorterRange> ranges,                                     \
+                    const std::vector<SorterRange>& ranges,                                    \
                     const SortOptions& opts,                                                   \
                     const Comparator& comp,                                                    \
                     const Settings& settings);
