@@ -20,7 +20,6 @@ selector:
   - jstests/sharding/max_time_ms_enforced_on_shard.js
   # TODO SERVER-46040: Enable when SERVER-46040 is backported
   - jstests/sharding/drop_indexes_with_stale_config_error.js
-  # TODO SERVER-54507: Enable when SERVER-54507 is backported
   - jstests/sharding/query/merge_write_concern.js
 
   # This tag file can be created using ./buildscripts/evergreen_gen_multiversion_tests.py
