@@ -42,13 +42,13 @@ custom_extract1(WT_EXTRACTOR *extractor, WT_SESSION *session, const WT_ITEM *key
   const WT_ITEM *value, WT_CURSOR *result_cursor)
 {
     WT_ITEM item;
-    int32_t v1;
+    int64_t v1;
 
     (void)extractor;
     (void)key;
     testutil_check(wiredtiger_struct_unpack(session, value->data, value->size, "u", &item));
 
-    v1 = ((int *)item.data)[0];
+    v1 = ((int64_t *)item.data)[0];
     item.data = &v1;
     item.size = sizeof(v1);
 
@@ -61,13 +61,13 @@ custom_extract2(WT_EXTRACTOR *extractor, WT_SESSION *session, const WT_ITEM *key
   const WT_ITEM *value, WT_CURSOR *result_cursor)
 {
     WT_ITEM item;
-    int32_t v2;
+    int64_t v2;
 
     (void)extractor;
     (void)key;
     testutil_check(wiredtiger_struct_unpack(session, value->data, value->size, "u", &item));
 
-    v2 = ((int *)item.data)[1];
+    v2 = ((int64_t *)item.data)[1];
     item.data = &v2;
     item.size = sizeof(v2);
 
@@ -86,7 +86,7 @@ main(int argc, char *argv[])
     WT_CURSOR *cursor1, *cursor2, *jcursor;
     WT_ITEM k, v;
     WT_SESSION *session;
-    int32_t key, val[2];
+    int64_t key, val[2];
     int i, ret;
 
     opts = &_opts;
