@@ -75,6 +75,13 @@ private:
 
     void _enterPhase(Phase newPhase);
 
+    void _dropShardedCollection(OperationContext* opCtx,
+                                const CollectionType& coll,
+                                std::shared_ptr<executor::ScopedTaskExecutor> executor);
+
+    void _performNoopRetryableWriteOnParticipants(
+        OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor);
+
     DropDatabaseCoordinatorDocument _doc;
     StringData _dbName;
 };

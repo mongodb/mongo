@@ -1777,7 +1777,7 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
                                                          false /* multi */),
                     txnNumber);
                 const auto numDocsModified = UpdateOp::parseResponse(res).getN();
-                uassert(5720400,
+                uassert(ErrorCodes::ConflictingOperationInProgress,
                         str::stream() << "Expected to match one doc for query " << query
                                       << " but matched " << numDocsModified,
                         numDocsModified == 1);

@@ -36,6 +36,8 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -120,6 +122,22 @@ void deleteCollection(OperationContext* opCtx, const NamespaceString& nss, const
         CollectionType::ConfigNS,
         BSON(CollectionType::kNssFieldName << nss.ns() << CollectionType::kUuidFieldName << uuid),
         ShardingCatalogClient::kMajorityWriteConcern));
+}
+
+write_ops::UpdateCommandRequest buildNoopWriteRequestCommand() {
+    write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace);
+    auto queryFilter = BSON("_id"
+                            << "shardingDDLCoordinatorRecoveryDoc");
+    auto updateModification =
+        write_ops::UpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$inc" << BSON("noopWriteCount" << 1))));
+
+    write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
+    updateEntry.setMulti(false);
+    updateEntry.setUpsert(true);
+    updateOp.setUpdates({updateEntry});
+
+    return updateOp;
 }
 
 }  // namespace
@@ -389,10 +407,17 @@ void stopMigrations(OperationContext* opCtx,
                                              // version to be bumped), it is safe to be retried.
         );
 
-    uassertStatusOKWithContext(
-        Shard::CommandResponse::getEffectiveStatus(std::move(swSetAllowMigrationsResult)),
-        str::stream() << "Error setting allowMigrations to false for collection "
-                      << nss.toString());
+
+    try {
+        uassertStatusOKWithContext(
+            Shard::CommandResponse::getEffectiveStatus(std::move(swSetAllowMigrationsResult)),
+            str::stream() << "Error setting allowMigrations to false for collection "
+                          << nss.toString());
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
+        // Collection no longer exists
+    } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
+        // Collection metadata was concurrently dropped
+    }
 }
 
 boost::optional<UUID> getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss) {
@@ -404,17 +429,7 @@ void performNoopRetryableWriteOnShards(OperationContext* opCtx,
                                        const std::vector<ShardId>& shardIds,
                                        const OperationSessionInfo& osi,
                                        const std::shared_ptr<executor::TaskExecutor>& executor) {
-    write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace);
-    auto queryFilter = BSON("_id"
-                            << "shardingDDLCoordinatorRecoveryDoc");
-    auto updateModification =
-        write_ops::UpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
-            BSON("$inc" << BSON("noopWriteCount" << 1))));
-
-    write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
-    updateEntry.setMulti(false);
-    updateEntry.setUpsert(true);
-    updateOp.setUpdates({updateEntry});
+    const auto updateOp = buildNoopWriteRequestCommand();
 
     sharding_ddl_util::sendAuthenticatedCommandToShards(
         opCtx,
@@ -422,6 +437,46 @@ void performNoopRetryableWriteOnShards(OperationContext* opCtx,
         CommandHelpers::appendMajorityWriteConcern(updateOp.toBSON(osi.toBSON())),
         shardIds,
         executor);
+}
+
+void performNoopMajorityWriteLocally(OperationContext* opCtx) {
+    const auto updateOp = buildNoopWriteRequestCommand();
+
+    DBDirectClient client(opCtx);
+    const auto commandResponse =
+        client.runCommand(OpMsgRequest::fromDBAndBody(updateOp.getDbName(), updateOp.toBSON({})));
+
+    const auto commandReply = commandResponse->getCommandReply();
+    uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
+
+    WriteConcernResult ignoreResult;
+    const WriteConcernOptions majorityWriteConcern{
+        WriteConcernOptions::kMajority,
+        WriteConcernOptions::SyncMode::UNSET,
+        WriteConcernOptions::kWriteConcernTimeoutSharding};
+    auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, majorityWriteConcern, &ignoreResult));
+}
+
+void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const std::vector<ShardId>& shardIds,
+                                                  std::shared_ptr<executor::TaskExecutor> executor,
+                                                  const OperationSessionInfo& osi) {
+    const ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
+    const auto cmdObj =
+        CommandHelpers::appendMajorityWriteConcern(dropCollectionParticipant.toBSON({}));
+
+    try {
+        sharding_ddl_util::sendAuthenticatedCommandToShards(
+            opCtx, nss.db(), cmdObj.addFields(osi.toBSON()), shardIds, executor);
+    } catch (const ExceptionFor<ErrorCodes::NotARetryableWriteCommand>&) {
+        // Older 5.0 binaries don't support running the _shardsvrDropCollectionParticipant
+        // command as a retryable write yet. In that case, retry without attaching session
+        // info.
+        sharding_ddl_util::sendAuthenticatedCommandToShards(
+            opCtx, nss.db(), cmdObj, shardIds, executor);
+    }
 }
 
 }  // namespace sharding_ddl_util

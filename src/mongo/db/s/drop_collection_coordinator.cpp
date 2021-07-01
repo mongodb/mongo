@@ -42,31 +42,6 @@
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
-namespace {
-
-void sendDropCollectionParticipantCommandToShards(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    const OperationSessionInfo& osi) {
-    const ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
-    const auto cmdObj =
-        CommandHelpers::appendMajorityWriteConcern(dropCollectionParticipant.toBSON({}));
-
-    try {
-        sharding_ddl_util::sendAuthenticatedCommandToShards(
-            opCtx, nss.db(), cmdObj.addFields(osi.toBSON()), shardIds, executor);
-    } catch (const ExceptionFor<ErrorCodes::NotARetryableWriteCommand>&) {
-        // Older 5.0 binaries don't support running the _shardsvrDropCollectionParticipant
-        // command as a retryable write yet. In that case, retry without attaching session
-        // info.
-        sharding_ddl_util::sendAuthenticatedCommandToShards(
-            opCtx, nss.db(), cmdObj, shardIds, executor);
-    }
-}
-
-}  // namespace
 
 DropCollectionCoordinator::DropCollectionCoordinator(ShardingDDLCoordinatorService* service,
                                                      const BSONObj& initialState)
@@ -193,7 +168,10 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                if (_recoveredFromDisk) {
+                if (!_firstExecution) {
+                    // Perform a noop write on the participants in order to advance the txnNumber
+                    // for this coordinator's lsid so that requests with older txnNumbers can no
+                    // longer execute.
                     _performNoopRetryableWriteOnParticipants(opCtx, **executor);
                 }
 
@@ -220,7 +198,7 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                 _doc = _updateSession(opCtx, _doc);
 
                 const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-                sendDropCollectionParticipantCommandToShards(
+                sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
                     opCtx, nss(), {primaryShardId}, **executor, getCurrentSession(_doc));
 
                 // We need to send the drop to all the shards because both movePrimary and
@@ -231,7 +209,7 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                     std::remove(participants.begin(), participants.end(), primaryShardId),
                     participants.end());
 
-                sendDropCollectionParticipantCommandToShards(
+                sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
                     opCtx, nss(), participants, **executor, getCurrentSession(_doc));
 
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());
