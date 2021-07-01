@@ -69,7 +69,7 @@ public:
      */
     template <TrialRunMetric metric>
     bool trackProgress(size_t metricIncrement) {
-        static_assert(metric >= 0 && metric < sizeof(_metrics));
+        static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
 
         if (_done) {
             return true;
@@ -82,8 +82,20 @@ public:
         return _done;
     }
 
+    template <TrialRunMetric metric>
+    size_t getMetric() {
+        static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
+        return _metrics[metric];
+    }
+
+    template <TrialRunMetric metric>
+    void setMaxMetric(size_t newMax) {
+        static_assert(metric >= 0 && metric < sizeof(_maxMetrics) / sizeof(size_t));
+        _maxMetrics[metric] = newMax;
+    }
+
 private:
-    const size_t _maxMetrics[TrialRunMetric::kLastElem];
+    size_t _maxMetrics[TrialRunMetric::kLastElem];
     size_t _metrics[TrialRunMetric::kLastElem]{0};
     bool _done{false};
 };
