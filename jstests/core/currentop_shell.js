@@ -10,8 +10,6 @@
  *   # node and the expected command is run on another, the latter will not show up in the
  *   # currentOp results.
  *   assumes_read_preference_unchanged,
- *   # The aggregation stage $currentOp cannot run with a readConcern other than 'local'
- *   assumes_read_concern_unchanged,
  * ]
  */
 
@@ -95,16 +93,16 @@ res = db.adminCommand({currentOp: true, "ns": "test.currentOp_cursor"});
 
 if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
     // Assert currentOp truncation behavior for each shard in the cluster.
-    assert(res.inprog.length >= 1);
+    assert(res.inprog.length >= 1, res);
     res.inprog.forEach((result) => {
-        assert.eq(result.op, "getmore");
-        assert(result.cursor.originatingCommand.hasOwnProperty("$truncated"));
+        assert.eq(result.op, "getmore", result);
+        assert(result.cursor.originatingCommand.hasOwnProperty("$truncated"), result);
     });
 } else {
     // Assert currentOp truncation behavior for unsharded collections.
-    assert.eq(res.inprog.length, 1);
-    assert.eq(res.inprog[0].op, "command");
-    assert(res.inprog[0].command.hasOwnProperty("$truncated"));
+    assert.eq(res.inprog.length, 1, res);
+    assert.eq(res.inprog[0].op, "command", res);
+    assert(res.inprog[0].command.hasOwnProperty("$truncated"), res);
 }
 
 const log = FixtureHelpers.getPrimaryForNodeHostingDatabase(db).adminCommand({getLog: "global"});
@@ -121,14 +119,14 @@ const shellHelperTest = startShellWithOp("currentOp_shell");
 res = db.currentOp({"ns": "test.currentOp_cursor"});
 
 if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
-    assert(res.inprog.length >= 1);
+    assert(res.inprog.length >= 1, res);
     res.inprog.forEach((result) => {
-        assert.eq(result.op, "getmore");
-        assert(!result.cursor.originatingCommand.hasOwnProperty("$truncated"));
+        assert.eq(result.op, "getmore", result);
+        assert(!result.cursor.originatingCommand.hasOwnProperty("$truncated"), result);
     });
 } else {
-    assert.eq(res.inprog.length, 1);
-    assert(!res.inprog[0].command.hasOwnProperty("$truncated"));
+    assert.eq(res.inprog.length, 1, res);
+    assert(!res.inprog[0].command.hasOwnProperty("$truncated"), res);
 }
 
 res.inprog.forEach((op) => {

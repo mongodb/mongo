@@ -316,7 +316,7 @@ selector:
   - assumes_unsharded_collection
   - cannot_create_unique_index_when_using_hashed_shard_key
 
-  # The next three tags correspond to the special errors thrown by the
+  # The next five tags correspond to the special errors thrown by the
   # fail_unclean_shutdown_incompatible_commands.js override when it refuses to run commands that are
   # inaccurate after an unclean shutdown. Above each tag is the message that causes the tag to be
   # warranted.
@@ -329,6 +329,8 @@ selector:
   - requires_collstats
   # "Cowardly fail if unbounded dataSize is run with a mongod that had an unclean shutdown: ..."
   - requires_datasize
+  # "Cowardly fail if startParallelShell is run with a mongod that had an unclean shutdown: ..."
+  - uses_parallel_shell
   # system.profile collection doesn't exist on mongos. Also, transactions are not allowed to operate
   # on capped collections.
   - requires_profiling

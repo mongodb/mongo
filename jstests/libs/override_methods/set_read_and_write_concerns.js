@@ -87,6 +87,11 @@ function runCommandWithReadAndWriteConcerns(
             shouldForceWriteConcern = false;
         }
 
+        if (OverrideHelpers.isAggregationWithCurrentOpStage(commandName, commandObjUnwrapped)) {
+            // The $currentOp stage can only be used with readConcern={level: "local"}.
+            shouldForceReadConcern = false;
+        }
+
         if (commandObjUnwrapped.explain) {
             // Attempting to specify a readConcern while explaining an aggregation would always
             // return an error prior to SERVER-30582 and it otherwise only compatible with

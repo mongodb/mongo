@@ -117,6 +117,16 @@ function runCommandWithReadPreferenceSecondary(
         shouldForceReadPreference = false;
     }
 
+    if (commandName === "aggregate") {
+        if (OverrideHelpers.isAggregationWithCurrentOpStage(commandName, commandObjUnwrapped)) {
+            // Setting read preference secondary for an aggregation with $currentOp doesn't make
+            // much sense, since there's no guarantee *which* secondary you get results from. We
+            // will mirror the currentOp server command behavior here and maintain original read
+            // preference.
+            shouldForceReadPreference = false;
+        }
+    }
+
     if (TestData.doNotOverrideReadPreference) {
         // Use this TestData flag to allow certain runCommands to be exempted from
         // setting secondary read preference.

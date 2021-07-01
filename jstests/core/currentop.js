@@ -2,13 +2,10 @@
  * Tests that long-running operations show up in currentOp and report the locks they are holding.
  *
  * @tags: [
- *   assumes_read_preference_unchanged,
  *   assumes_superuser_permissions,
  *   # fsync command is not available on embedded
  *   incompatible_with_embedded,
  *   uses_parallel_shell,
- *   # The aggregation stage $currentOp cannot run with a readConcern other than 'local'
- *   assumes_read_concern_unchanged
  * ]
  */
 

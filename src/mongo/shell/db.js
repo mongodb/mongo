@@ -880,15 +880,9 @@ DB.prototype.currentOpCursor = function(arg) {
 
     // The legacy db.currentOp() shell helper ignored any explicitly set read preference and used
     // the default, with the ability to also run on secondaries. To preserve this behavior we will
-    // temporarily set the session's read preference to "primaryPreferred".
-    const session = this.getSession();
-    const readPreference = session.getOptions().getReadPreference();
-    try {
-        session.getOptions().setReadPreference({mode: "primaryPreferred"});
-        return this.getSiblingDB("admin").aggregate(pipeline);
-    } finally {
-        session.getOptions().setReadPreference(readPreference);
-    }
+    // run the aggregate with read preference "primaryPreferred".
+    return this.getSiblingDB("admin").aggregate(pipeline,
+                                                {"$readPreference": {"mode": "primaryPreferred"}});
 };
 
 DB.prototype.killOp = function(op) {
