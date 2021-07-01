@@ -5,10 +5,7 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");
-load("jstests/libs/sbe_util.js");
 load("jstests/libs/sbe_assert_error_override.js");
-
-const isSBEEnabled = checkSBEEnabled(db);
 
 const coll = db.range;
 coll.drop();
@@ -181,23 +178,24 @@ assert.commandWorked(coll.insert([
     {city: "San Jose", distance: NumberInt(100)},
 ]));
 
-// Testing overflow errors. Cannot be ran on the classic engine due to `SERVER-57983`.
-if (isSBEEnabled) {
-    const overflowRangeExpectedResult = [{"city": "San Jose", "Rest stops": [100, 1073741924]}];
+// Testing overflow errors due to $range start and end taking int32 values.
+// Example: {$range: [100, 2147483647, 1073741824]}
+// Output will OOM because array will look like this:
+// [ 100, 1073741924, -2147483548, -1073741724, 100, 1073741924, -2147483548, -1073741724, 100, … so
+// on and so forth ]
+const overflowRangeExpectedResult = [{"city": "San Jose", "Rest stops": [100, 1073741924]}];
 
-    const overflowRangeResult =
-        coll.aggregate([{
-                $project: {
-                    _id: 0,
-                    city: 1,
-                    "Rest stops":
-                        {$range: ["$distance", NumberInt(2147483647), NumberInt(1073741824)]}
-                }
-            }])
-            .toArray();
+const overflowRangeResult =
+    coll.aggregate([{
+            $project: {
+                _id: 0,
+                city: 1,
+                "Rest stops": {$range: ["$distance", NumberInt(2147483647), NumberInt(1073741824)]}
+            }
+        }])
+        .toArray();
 
-    assert(arrayEq(overflowRangeExpectedResult, overflowRangeResult));
-}
+assert(arrayEq(overflowRangeExpectedResult, overflowRangeResult));
 
 // Testing int32 representable errors (Arguments to $range must be int32 representable).
 let pipeline;
