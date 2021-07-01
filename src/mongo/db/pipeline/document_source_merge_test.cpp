@@ -178,6 +178,20 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsNotStringAndNotObject) {
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51178);
 }
 
+TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsNullish) {
+    auto spec = BSON("$merge" << BSON("into" << BSONNULL));
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51178);
+
+    spec = BSON("$merge" << BSON("into" << BSONUndefined));
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51178);
+}
+
+TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsAnEmptyString) {
+    auto spec = BSON("$merge" << BSON("into"
+                                      << ""));
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 5786800);
+}
+
 TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsObjectWithInvalidFields) {
     auto spec = BSON("$merge" << BSON("into" << BSON("a"
                                                      << "b")));
@@ -199,10 +213,18 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsObjectWithInvalidFields) {
 TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsObjectWithEmptyCollectionName) {
     auto spec = BSON("$merge" << BSON("into" << BSON("coll"
                                                      << "")));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::InvalidNamespace);
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 5786801);
 
     spec = BSON("$merge" << BSON("into" << BSONObj()));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::InvalidNamespace);
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 5786801);
+}
+
+TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsObjectWithNullishCollection) {
+    auto spec = BSON("$merge" << BSON("into" << BSON("coll" << BSONNULL)));
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 5786801);
+
+    spec = BSON("$merge" << BSON("into" << BSON("coll" << BSONUndefined)));
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 5786801);
 }
 
 TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsNotAValidUserCollection) {
@@ -263,6 +285,29 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfDbIsNotAValidDatabaseName) {
                                                      << "db"
                                                      << ".test")));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::InvalidNamespace);
+}
+
+TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsObjectWithDbSpecifiedAndNoColl) {
+    auto targetDb = "target_db";
+    auto spec = BSON("$merge" << BSON("into" << BSON("db" << targetDb)));
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 5786801);
+}
+
+TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsObjectWithDbSpecifiedAndEmptyColl) {
+    auto targetDb = "target_db";
+    auto spec = BSON("$merge" << BSON("into" << BSON("coll"
+                                                     << ""
+                                                     << "db" << targetDb)));
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 5786801);
+}
+
+TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsObjectWithDbSpecifiedAndNullishColl) {
+    auto targetDb = "target_db";
+    auto spec = BSON("$merge" << BSON("into" << BSON("coll" << BSONNULL << "db" << targetDb)));
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 5786801);
+
+    spec = BSON("$merge" << BSON("into" << BSON("coll" << BSONUndefined << "db" << targetDb)));
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 5786801);
 }
 
 TEST_F(DocumentSourceMergeTest, FailsToParseIfWhenMatchedModeIsNotStringOrArray) {

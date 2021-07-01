@@ -48,11 +48,20 @@ NamespaceString mergeTargetNssParseFromBSON(const BSONElement& elem) {
             elem.type() == BSONType::String || elem.type() == BSONType::Object);
 
     if (elem.type() == BSONType::String) {
+        uassert(5786800,
+                "{} 'into' field cannot be an empty string"_format(DocumentSourceMerge::kStageName),
+                !elem.valueStringData().empty());
         return {"", elem.valueStringData()};
     }
 
     auto spec = NamespaceSpec::parse({elem.fieldNameStringData()}, elem.embeddedObject());
-    return {spec.getDb().value_or(""), spec.getColl().value_or("")};
+    auto coll = spec.getColl();
+    uassert(5786801,
+            "{} 'into' field must specify a 'coll' that is not empty, null or undefined"_format(
+                DocumentSourceMerge::kStageName),
+            coll && !coll->empty());
+
+    return {spec.getDb().value_or(""), *coll};
 }
 
 void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,
