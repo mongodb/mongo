@@ -246,7 +246,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                   "error"_attr = status);
         })
         .onUnrecoverableError([](const Status& status) {})
-        .until([](const Status& status) { return status.isOK(); })
+        .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, abortToken)
         .onError([this, executor, abortToken](Status status) {
             if (abortToken.isCanceled()) {
@@ -282,7 +282,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                           "error"_attr = status);
                 })
                 .onUnrecoverableError([](const Status& status) {})
-                .until([](const Status& status) { return status.isOK(); })
+                .until<Status>([](const Status& status) { return status.isOK(); })
                 .on(**executor, abortToken);
         })
         .onCompletion([this, executor, abortToken](Status status) {
@@ -322,7 +322,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
                   "error"_attr = status);
         })
         .onUnrecoverableError([](const Status& status) {})
-        .until([](const Status& status) { return status.isOK(); })
+        .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, abortToken)
         .then([this, abortToken] {
             return future_util::withCancellation(_coordinatorHasDecisionPersisted.getFuture(),
@@ -379,7 +379,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                   "error"_attr = status);
         })
         .onUnrecoverableError([](const Status& status) {})
-        .until([](const Status& status) { return status.isOK(); })
+        .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, stepdownToken);
 }
 

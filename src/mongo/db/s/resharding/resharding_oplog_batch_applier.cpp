@@ -95,7 +95,7 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                 "Operation-fatal error for resharding while applying oplog entry from donor shard",
                 "error"_attr = redact(status));
         })
-        .until([chainCtx](const Status& status) {
+        .template until<Status>([chainCtx](const Status& status) {
             return status.isOK() && chainCtx->nextToApply >= chainCtx->batch.size();
         })
         .on(std::move(executor), cancelToken)
