@@ -602,13 +602,13 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             // an unclean shutdown before a checkpoint is taken, the subsequent startup recovery can
             // see the now-dropped ident referenced by the old index catalog entry.
             //
-            // TODO (SERVER-56639): Remove this exception once all catalog writes are timestamped.
-            invariant(
-                engineIdents.find(indexIdent) != engineIdents.end() ||
-                    (indexMetaData.buildUUID && lastShutdownState == LastShutdownState::kUnclean),
-                str::stream() << "Failed to find an index data table matching " << indexIdent
-                              << " for durable index catalog entry " << indexMetaData.spec
-                              << " in collection " << coll);
+            // TODO (SERVER-56639): Remove this relaxation once index ident drops for startup
+            // recovery are timestamped.
+            invariant(engineIdents.find(indexIdent) != engineIdents.end() ||
+                          lastShutdownState == LastShutdownState::kUnclean,
+                      str::stream() << "Failed to find an index data table matching " << indexIdent
+                                    << " for durable index catalog entry " << indexMetaData.spec
+                                    << " in collection " << coll);
 
             // Any index build with a UUID is an unfinished two-phase build and must be restarted.
             // There are no special cases to handle on primaries or secondaries. An index build may
