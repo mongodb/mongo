@@ -39,6 +39,11 @@ TimeseriesTest.run((insert) => {
     // Query on a single field that is not the metaField using dot notation.
     assert.commandFailedWithCode(coll.remove({"measurement.A": "cpu"}), ErrorCodes.InvalidOptions);
 
+    // Compound query on the metaField using dot notation.
+    assert.commandFailedWithCode(
+        coll.remove({"$and": [{[metaFieldName + ".b"]: "B"}, {[metaFieldName + ".a"]: "A"}]}),
+        ErrorCodes.IllegalOperation);
+
     // Multiple queries on a single field that is the metaField.
     assert.commandFailedWithCode(testDB.runCommand({
         delete: coll.getName(),

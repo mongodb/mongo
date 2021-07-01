@@ -47,6 +47,12 @@ TimeseriesTest.run((insert) => {
                     {$set: {[metaFieldName]: {b: "C"}}}),
         ErrorCodes.IllegalOperation);
 
+    // Compound query on the metaField using dot notation.
+    assert.commandFailedWithCode(
+        coll.update({"$and": [{[metaFieldName + ".b"]: "B"}, {[metaFieldName + ".a"]: "A"}]},
+                    {$set: {[metaFieldName]: {b: "C"}}}),
+        ErrorCodes.IllegalOperation);
+
     // Query on a single field that is the metaField.
     assert.commandFailedWithCode(
         coll.update({[metaFieldName]: {a: "A", b: "B"}}, {$set: {[metaFieldName]: {b: "C"}}}),

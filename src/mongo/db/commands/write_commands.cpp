@@ -142,11 +142,14 @@ bool isTimeseriesMetadataOnlyQuery(OperationContext* opCtx,
         rawPipeline.push_back(BSON("$match" << opEntry.getQ()));
     }
     DepsTracker dependencies = Pipeline::parse(rawPipeline, expCtx)->getDependencies({});
-
-    StringData queryField(*dependencies.fields.begin());
-    return dependencies.fields.size() == 1 &&
-        queryField.substr(0, queryField.find('.')) == timeseriesOptions->getMetaField();
-}
+    return std::all_of(dependencies.fields.begin(),
+                       dependencies.fields.end(),
+                       [&timeseriesOptions](const auto& dependency) {
+                           StringData queryField(dependency);
+                           return queryField.substr(0, queryField.find('.')) ==
+                               timeseriesOptions->getMetaField();
+                       });
+}  // namespace
 
 // Default for control.version in time-series bucket collection.
 const int kTimeseriesControlVersion = 1;
@@ -1411,7 +1414,7 @@ public:
         void _performTimeseriesDeletes(OperationContext* opCtx,
                                        write_ops::DeleteCommandReply* deleteReply) const {
             uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "Cannot perform an update on a time-series collection "
+                    str::stream() << "Cannot perform a delete on a time-series collection "
                                      "when querying on a field that is not the metaField: "
                                   << ns(),
                     isTimeseriesMetadataOnlyQuery(opCtx, ns(), request().getDeletes()));
