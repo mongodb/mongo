@@ -57,7 +57,7 @@ ResumableIndexBuildTest.run(
     [{name: "hangIndexBuildDuringCollectionScanPhaseAfterInsertion", logIdWithBuildUUID: 20386}],
     /*iteration=*/0,
     ["collection scan"],
-    [{numScannedAferResume: 2}]);
+    [{numScannedAfterResume: 2}]);
 
 rst.stopSet();
 })();

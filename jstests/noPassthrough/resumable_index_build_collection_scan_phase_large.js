@@ -44,7 +44,7 @@ ResumableIndexBuildTest.run(
     // Each document is at least 1 MB, so the index build must have spilled to disk by this point.
     maxIndexBuildMemoryUsageMB,
     ["collection scan"],
-    [{numScannedAferResume: numDocuments - maxIndexBuildMemoryUsageMB}]);
+    [{numScannedAfterResume: numDocuments - maxIndexBuildMemoryUsageMB}]);
 
 rst.stopSet();
 })();

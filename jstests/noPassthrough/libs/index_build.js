@@ -575,14 +575,14 @@ const ResumableIndexBuildTest = class {
 
             const resumeCheck = resumeChecks[resumeChecks.length === 1 ? 0 : i];
 
-            if (resumeCheck.numScannedAferResume) {
+            if (resumeCheck.numScannedAfterResume) {
                 // Ensure that the resumed index build resumed the collection scan from the correct
                 // location.
                 checkLog.containsJson(conn, 20391, {
                     buildUUID: function(uuid) {
                         return uuid["uuid"]["$uuid"] === buildUUIDs[i];
                     },
-                    totalRecords: resumeCheck.numScannedAferResume
+                    totalRecords: resumeCheck.numScannedAfterResume
                 });
             } else if (resumeCheck.skippedPhaseLogID) {
                 // Ensure that the resumed index build does not perform a phase that it already
@@ -595,7 +595,7 @@ const ResumableIndexBuildTest = class {
                        "Found log " + resumeCheck.skippedPhaseLogID + " for index build " +
                            buildUUIDs[i] + " when this phase should not have run after resuming");
             } else {
-                assert(false, "Must specify one of numScannedAferResume and skippedPhaseLogID");
+                assert(false, "Must specify one of numScannedAfterResume and skippedPhaseLogID");
             }
         }
     }
@@ -622,7 +622,7 @@ const ResumableIndexBuildTest = class {
      *   case all index builds will be expected to resume from that phase, or it must be exactly
      *   the length of 'indexSpecs'.
      *
-     * 'resumeChecks' is an array of objects that contain exactly one of 'numScannedAferResume' and
+     * 'resumeChecks' is an array of objects that contain exactly one of 'numScannedAfterResume' and
      *   'skippedPhaseLogID'. The former is used to verify that the index build scanned the
      *   expected number of documents in the collection scan after resuming. The latter is used for
      *   phases which do not perform a collection scan after resuming, to verify that the index

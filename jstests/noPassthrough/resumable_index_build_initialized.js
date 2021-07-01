@@ -33,7 +33,7 @@ const runTests = function(docs, indexSpecsFlat, collNameSuffix) {
             [{name: "hangIndexBuildBeforeWaitingUntilMajorityOpTime", logIdWithBuildUUID: 4940901}],
             {},
             ["initialized"],
-            [{numScannedAferResume: 1}]);
+            [{numScannedAfterResume: 1}]);
     };
 
     runTest([[indexSpecsFlat[0]]]);

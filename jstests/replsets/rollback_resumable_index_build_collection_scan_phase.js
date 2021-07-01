@@ -38,7 +38,7 @@ const runRollbackTo = function(rollbackEndFailPointName, rollbackEndFailPointLog
                 0,  // rollbackEndFailPointsIteration
                 ["setYieldAllLocksHang", "setYieldAllLocksHangSecond"],
                 ["collection scan"],
-                [{numScannedAferResume: 1}],
+                [{numScannedAfterResume: 1}],
                 [{a: 6}, {a: 7}]);
         };
 

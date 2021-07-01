@@ -54,7 +54,7 @@ const runRollbackTo = function(rollbackEndFailPointName, rollbackEndFailPointLog
         // The collection scan will scan one additional document past the point specified above due
         // to locks needing to be yielded before the rollback can occur. Thus, we subtract 1 from
         // the difference.
-        [{numScannedAferResume: numDocuments - maxIndexBuildMemoryUsageMB - 1}],
+        [{numScannedAfterResume: numDocuments - maxIndexBuildMemoryUsageMB - 1}],
         [{a: 1}, {a: 2}],
         [],
         {skipDataConsistencyChecks: true});

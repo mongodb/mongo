@@ -64,35 +64,35 @@ runTests(
         {name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386}
     ],
     ["initialized", "collection scan"],
-    [{numScannedAferResume: 6}, {numScannedAferResume: 5}]);
+    [{numScannedAfterResume: 6}, {numScannedAfterResume: 5}]);
 runTests(
     [
         {name: "hangIndexBuildBeforeWaitingUntilMajorityOpTime", logIdWithBuildUUID: 4940901},
         {name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400}
     ],
     ["initialized", "bulk load"],
-    [{numScannedAferResume: 6}, {skippedPhaseLogID: 20391}]);
+    [{numScannedAfterResume: 6}, {skippedPhaseLogID: 20391}]);
 runTests(
     [
         {name: "hangIndexBuildBeforeWaitingUntilMajorityOpTime", logIdWithBuildUUID: 4940901},
         {name: "hangIndexBuildDuringDrainWritesPhase", logIdWithIndexName: 4841800}
     ],
     ["initialized", "drain writes"],
-    [{numScannedAferResume: 6}, {skippedPhaseLogID: 20392}]);
+    [{numScannedAfterResume: 6}, {skippedPhaseLogID: 20392}]);
 runTests(
     [
         {name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386},
         {name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400}
     ],
     ["collection scan", "bulk load"],
-    [{numScannedAferResume: 5}, {skippedPhaseLogID: 20391}]);
+    [{numScannedAfterResume: 5}, {skippedPhaseLogID: 20391}]);
 runTests(
     [
         {name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386},
         {name: "hangIndexBuildDuringDrainWritesPhase", logIdWithIndexName: 4841800}
     ],
     ["collection scan", "drain writes"],
-    [{numScannedAferResume: 5}, {skippedPhaseLogID: 20392}]);
+    [{numScannedAfterResume: 5}, {skippedPhaseLogID: 20392}]);
 runTests(
     [
         {name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400},

@@ -36,7 +36,7 @@ const runTests = function(docs, indexSpecsFlat, collNameSuffix) {
             }],
             iteration,
             ["collection scan"],
-            [{numScannedAferResume: 2 - iteration}]);
+            [{numScannedAfterResume: 2 - iteration}]);
     };
 
     runTest([[indexSpecsFlat[0]]], 0);
