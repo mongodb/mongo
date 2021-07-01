@@ -188,6 +188,8 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken);
 
+    void _writeStrictConsistencyOplog();
+
     void _renameTemporaryReshardingCollection();
 
     void _cleanupReshardingCollections(bool aborted);

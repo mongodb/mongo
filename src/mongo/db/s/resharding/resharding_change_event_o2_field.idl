@@ -43,6 +43,7 @@ enums:
         type: string
         values:
             kReshardBegin: "reshardBegin"
+            kReshardDoneCatchUp: "reshardDoneCatchUp"
 
 structs:
     ReshardingChangeEventO2Field:
