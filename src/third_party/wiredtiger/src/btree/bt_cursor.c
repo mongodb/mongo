@@ -394,7 +394,11 @@ __cursor_row_search(WT_CURSOR_BTREE *cbt, bool insert, WT_REF *leaf, bool *leaf_
 static inline int
 __cursor_col_modify(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
 {
+#ifdef HAVE_DIAGNOSTIC
+    return (__wt_col_modify(cbt, cbt->iface.recno, value, NULL, modify_type, false, false));
+#else
     return (__wt_col_modify(cbt, cbt->iface.recno, value, NULL, modify_type, false));
+#endif
 }
 
 /*
@@ -404,7 +408,11 @@ __cursor_col_modify(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
 static inline int
 __cursor_row_modify(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
 {
+#ifdef HAVE_DIAGNOSTIC
+    return (__wt_row_modify(cbt, &cbt->iface.key, value, NULL, modify_type, false, false));
+#else
     return (__wt_row_modify(cbt, &cbt->iface.key, value, NULL, modify_type, false));
+#endif
 }
 
 /*
