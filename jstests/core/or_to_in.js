@@ -96,7 +96,8 @@ const positiveTestQueries = [
     ],
     [{$or: [{f2: [32, 52]}, {f2: [42, [13, 11]]}]}, {f2: {$in: [[32, 52], [42, [13, 11]]]}}],
     [{$or: [{f2: 52}, {f2: 13}]}, {f2: {$in: [52, 13]}}],
-    [{$or: [{f2: [11]}, {f2: [23]}]}, {f2: {$in: [[11], [23]]}}, {$or: [{f1: 42}, {f1: null}]}],
+    [{$or: [{f2: [11]}, {f2: [23]}]}, {f2: {$in: [[11], [23]]}}],
+    {$or: [{f1: 42}, {f1: null}]},
 ];
 
 // These $or queries should not be rewritten into $in because of different semantics.

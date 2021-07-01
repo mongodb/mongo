@@ -101,7 +101,7 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
     // queue and reopen the plan stage tree, as we cannot resume such execution tree from where
     // the trial run has stopped, and, as a result, we cannot stash the results returned so far
     // in the plan executor.
-    if (!winner.root->getCommonStats()->isEOF && winner.exitedEarly) {
+    if (!stats.candidatePlanStats[winnerIdx]->common.isEOF && winner.exitedEarly) {
         winner.root->close();
         winner.root->open(false);
         // Clear the results queue.

@@ -133,20 +133,6 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
 
     const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
 
-    // Determine which plans are blocking and which are non blocking. The non blocking plans will
-    // be run first in order to provide a boundary of reads for blocking plans.
-    std::vector<size_t> nonBlockingPlanIndexes;
-    std::vector<size_t> blockingPlanIndexes;
-    for (size_t index = 0; index < solutions.size(); ++index) {
-        if (solutions[index]->hasBlockingStage) {
-            blockingPlanIndexes.push_back(index);
-        } else {
-            nonBlockingPlanIndexes.push_back(index);
-        }
-    }
-
-    auto haveBlockingPlan = !blockingPlanIndexes.empty();
-
     for (size_t ix = 0; ix < roots.size(); ++ix) {
         auto&& [root, data] = roots[ix];
 
@@ -174,53 +160,29 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
         slots.push_back({resultSlot, recordIdSlot});
     }
 
-    auto runPlans = [&](const std::vector<size_t>& planIndexes, size_t* minNumReads) -> void {
-        auto done{false};
-        for (size_t it = 0; it < maxNumResults && !done; ++it) {
-            size_t numCandidatesFailedOrExitedEarly = 0;
-            for (auto planIndex : planIndexes) {
-                // Even if we had a candidate plan that exited early, we still want continue the
-                // trial run as the early exited plan may not be the best. E.g., it could be blocked
-                // in a SORT stage until one of the trial period metrics was reached, causing the
-                // plan to raise an early exit exception and return control back to the runtime
-                // planner. If that happens, we need to continue and complete the trial period for
-                // all candidates, as some of them may have a better cost.
-                if (!candidates[planIndex].status.isOK() || candidates[planIndex].exitedEarly) {
-                    ++numCandidatesFailedOrExitedEarly;
-                    continue;
-                }
-
-                // Note: we evaluate these two separately to avoid short-circuit evaluation. We want
-                // to pull the same number of results from each candidate.
-                bool candidateDone = fetchNextDocument(&candidates[planIndex], slots[planIndex]);
-                done = done || candidateDone;
-
-                // If this plan finished, then use its number of reads as the value for
-                // 'minNumReads' if it's the smallest we've seen.
-                if (candidateDone && minNumReads) {
-                    *minNumReads = std::min(
-                        *minNumReads,
-                        trialRunTrackers[planIndex]
-                            .second->getMetric<TrialRunTracker::TrialRunMetric::kNumReads>());
-                }
+    auto done{false};
+    for (size_t it = 0; it < maxNumResults && !done; ++it) {
+        size_t numCandidatesFailedOrExitedEarly = 0;
+        for (size_t ix = 0; ix < candidates.size(); ++ix) {
+            // Even if we had a candidate plan that exited early, we still want continue the trial
+            // run as the early exited plan may not be the best. E.g., it could be blocked in a SORT
+            // stage until one of the trial period metrics was reached, causing the plan to raise an
+            // early exit exception and return control back to the runtime planner. If that happens,
+            // we need to continue and complete the trial period for all candidates, as some of them
+            // may have a better cost.
+            if (!candidates[ix].status.isOK() || candidates[ix].exitedEarly) {
+                ++numCandidatesFailedOrExitedEarly;
+                continue;
             }
-            done = done || (numCandidatesFailedOrExitedEarly == planIndexes.size());
+
+            // Note: we evaluate these two separately to avoid short-circuit evaluation. We want to
+            // pull the same number of results from each candidate.
+            bool candidateDone = fetchNextDocument(&candidates[ix], slots[ix]);
+            done = done || candidateDone;
         }
-    };
-
-    auto blockingReadsBounds{maxTrialPeriodNumReads};
-    runPlans(nonBlockingPlanIndexes, haveBlockingPlan ? &blockingReadsBounds : nullptr);
-    if (!haveBlockingPlan) {
-        return candidates;
+        done = done || (numCandidatesFailedOrExitedEarly == candidates.size());
     }
 
-    // Configure blocking plans to use at most 'blockingReadsBounds' reads.
-    for (auto planIndex : blockingPlanIndexes) {
-        trialRunTrackers[planIndex]
-            .second->setMaxMetric<TrialRunTracker::TrialRunMetric::kNumReads>(blockingReadsBounds);
-    }
-
-    runPlans(blockingPlanIndexes, nullptr);
     return candidates;
 }
 }  // namespace mongo::sbe
