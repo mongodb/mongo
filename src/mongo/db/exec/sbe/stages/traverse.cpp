@@ -176,6 +176,14 @@ bool TraverseStage::traverse(value::SlotAccessor* inFieldAccessor,
             outFieldOutputAccessor->reset(false, value::TypeTags::Nothing, 0);
         }
 
+        if (level == 0 && inArrayAccessor.atEnd()) {
+            // If we are "traversing" an empty array then the inner side of the traverse stage is
+            // not entered as we do not have any value to process there. However, the inner side
+            // holds now "stale" state from the previous traversal and we must not access it if the
+            // query yields.
+            _children[1]->disableSlotAccess(true);
+        }
+
         // Loop over all elements of array.
         bool firstValue = true;
         for (; !inArrayAccessor.atEnd(); inArrayAccessor.advance()) {
