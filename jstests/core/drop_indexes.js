@@ -1,10 +1,11 @@
 // Cannot implicitly shard accessed collections because of extra shard key index in sharded
-// collection.
-// @tags: [assumes_no_implicit_index_creation]
+// collection. Cannot be handled correctly in a stepdown suite since dropIndexes() with multiple
+// names cannot be retried properly.
+// @tags: [assumes_no_implicit_index_creation, does_not_support_stepdowns]
 (function() {
 'use strict';
 
-const t = db.drop_index;
+const t = db.drop_indexes;
 t.drop();
 
 /**
@@ -42,35 +43,22 @@ assert.commandWorked(t.createIndex({d: 1}));
 assert.commandWorked(t.createIndex({e: 1}));
 assertIndexes(['a_1', 'b_1', 'c_1', 'd_1', 'e_1'], 'creating indexes');
 
-// Drop single index by name.
-// Collection.dropIndex() throws if the dropIndexes command fails.
-assert.commandWorked(t.dropIndex(t._genIndexName({a: 1})));
-assertIndexes(['b_1', 'c_1', 'd_1', 'e_1'], 'dropping {a: 1} by name');
+// Drop multiple indexes.
+assert.commandWorked(t.dropIndexes(['c_1', 'd_1']));
+assertIndexes(['a_1', 'b_1', 'e_1'], 'dropping {c: 1} and {d: 1}');
 
-// Drop single index by key pattern.
-assert.commandWorked(t.dropIndex({b: 1}));
-assertIndexes(['c_1', 'd_1', 'e_1'], 'dropping {b: 1} by key pattern');
+// Must drop all the indexes provided or none at all - for example, if one of the index names
+// provided is invalid.
+let ex = assert.throws(() => {
+    t.dropIndexes(['a_1', '_id_']);
+});
+assert.commandFailedWithCode(ex, ErrorCodes.InvalidOptions);
+assertIndexes(['a_1', 'b_1', 'e_1'], 'failed dropIndexes command with _id index');
 
-const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
-
-// Not allowed to drop _id index.
-for (const dropIndexArg of ['_id_', {_id: 1}]) {
-    const dropIdIndexReply = t.dropIndex(dropIndexArg);
-    jsTestLog(`Reply to dropIndexes with arg ${tojson(dropIndexArg)}: ${tojson(dropIdIndexReply)}`);
-    assert.commandFailedWithCode(dropIdIndexReply, ErrorCodes.InvalidOptions);
-    assert(dropIdIndexReply.hasOwnProperty('errmsg'));
-    if (isMongos) {
-        assert(dropIdIndexReply.hasOwnProperty('raw'));
-    }
-}
-
-// Ensure you can recreate indexes, even if you don't use dropIndex method.
-// Prior to SERVER-7168, the shell used to cache names of indexes created using
-// Collection.createIndex().
-assert.commandWorked(t.createIndex({a: 1}));
-assertIndexes(['a_1', 'c_1', 'd_1', 'e_1'], 'recreating {a: 1}');
-
-// Drop single index with dropIndexes().
-assert.commandWorked(t.dropIndexes(['c_1']));
-assertIndexes(['a_1', 'd_1', 'e_1'], 'dropping {c: 1}');
+// List of index names must contain only strings.
+ex = assert.throws(() => {
+    t.dropIndexes(['a_1', 123]);
+});
+assert.commandFailedWithCode(ex, ErrorCodes.TypeMismatch);
+assertIndexes(['a_1', 'b_1', 'e_1'], 'failed dropIndexes command with non-string index name');
 }());
