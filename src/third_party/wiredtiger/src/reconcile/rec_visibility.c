@@ -667,6 +667,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
      * Paranoia: check that we didn't choose an update that has since been rolled back.
      */
     WT_ASSERT(session, upd_select->upd == NULL || upd_select->upd->txnid != WT_TXN_ABORTED);
+    /* We should never select an update that has been written to the history store. */
+    WT_ASSERT(session, upd_select->upd == NULL || !F_ISSET(upd_select->upd, WT_UPDATE_HS));
+    WT_ASSERT(session, tombstone == NULL || !F_ISSET(tombstone, WT_UPDATE_HS));
 
     /*
      * Returning an update means the original on-page value might be lost, and that's a problem if
