@@ -44,7 +44,38 @@ functions:
     command: shell.exec
     params:
       script: |
+        set -o errexit
+        set -o verbose
         git clone https://github.com/wiredtiger/mongo-tests
+  "fetch mongo repo" :
+    command: shell.exec
+    params:
+      script: |
+        set -o errexit
+        set -o verbose
+        git clone https://github.com/mongodb/mongo
+  "import wiredtiger into mongo" :
+    command: shell.exec
+    params:
+      script: |
+        set -o errexit
+        set -o verbose
+        cp -a wiredtiger mongo/src/third_party/
+  "compile mongodb" :
+    command: shell.exec
+    params:
+      shell: bash
+      working_dir: "mongo"
+      script: |
+        set -o errexit
+        set -o verbose
+        virtualenv -p python3 venv
+        source venv/bin/activate
+        pip3 install requirements_parser
+        pip3 install -r etc/pip/compile-requirements.txt
+        sudo apt install -y ccache
+        ./buildscripts/scons.py --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --link-model=dynamic --ninja generate-ninja ICECC=icecc CCACHE=ccache
+        ninja -j$(nproc --all) install-mongod
   "configure wiredtiger": &configure_wiredtiger
     command: shell.exec
     params:
@@ -2490,6 +2521,26 @@ tasks:
             export "PATH=/opt/mongodbtoolchain/v3/bin:$PATH"
             ./workgen_perf_check.sh many-dhandle-stress.py output.log 50 500 500
 
+  - name: many-collection-test
+    commands:
+      - func: "fetch mongo repo"
+      - func: "get project"
+      - func: "import wiredtiger into mongo"
+      - func: "compile mongodb"
+      - func: "fetch mongo-tests repo"
+      - command: shell.exec
+        params:
+          working_dir: mongo-tests/largescale
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            export "PATH=/opt/mongodbtoolchain/v3/bin:$PATH"
+            virtualenv -p python3 venv
+            source venv/bin/activate
+            pip3 install lorem pymongo
+            ./run_many_coll.sh ../../mongo/build/install/bin/mongod config/many-collection-testing many-collection clean-and-populate
+
   - name: cyclomatic-complexity
     commands:
       - func: "get project"
@@ -2679,6 +2730,7 @@ buildvariants:
 
 - name: large-scale-tests
   display_name: "Large scale tests"
+  batchtime: 480 # 3 times a day
   run_on:
   - ubuntu1804-test
   expansions:
@@ -2686,8 +2738,11 @@ buildvariants:
     posix_configure_flags:
       --enable-silent-rules --enable-python --enable-zlib --enable-snappy
       --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+    test_env_vars:
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
   tasks:
     - name: many-dhandle-stress-test
+    - name: many-collection-test
 
 - name: package
   display_name: "~ Package"
