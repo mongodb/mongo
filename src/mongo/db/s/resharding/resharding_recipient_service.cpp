@@ -305,6 +305,9 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
 
                        if (!_isAlsoDonor) {
                            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+
+                           _externalState->clearFilteringMetadata(opCtx.get());
+
                            RecoverableCriticalSectionService::get(opCtx.get())
                                ->releaseRecoverableCriticalSection(
                                    opCtx.get(),

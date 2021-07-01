@@ -83,6 +83,8 @@ public:
     void updateCoordinatorDocument(OperationContext* opCtx,
                                    const BSONObj& query,
                                    const BSONObj& update) override {}
+
+    void clearFilteringMetadata(OperationContext* opCtx) override {}
 };
 
 class DonorOpObserverForTest : public OpObserverForTest {

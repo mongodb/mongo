@@ -131,6 +131,8 @@ public:
                                    const BSONObj& query,
                                    const BSONObj& update) override {}
 
+    void clearFilteringMetadata(OperationContext* opCtx) override {}
+
 private:
     RoutingTableHistoryValueHandle _makeStandaloneRoutingTableHistory(RoutingTableHistory rt) {
         const auto version = rt.getVersion();

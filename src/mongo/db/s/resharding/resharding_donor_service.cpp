@@ -50,6 +50,7 @@
 #include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -169,6 +170,11 @@ public:
                 "query"_attr = query,
                 "update"_attr = update);
         }
+    }
+
+    void clearFilteringMetadata(OperationContext* opCtx) {
+        // TODO SERVER-57953 Change scheduleAsyncRefresh to true.
+        resharding::clearFilteringMetadata(opCtx, false /* scheduleAsyncRefresh */);
     }
 };
 
@@ -345,6 +351,9 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
 
                {
                    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+
+                   _externalState->clearFilteringMetadata(opCtx.get());
+
                    RecoverableCriticalSectionService::get(opCtx.get())
                        ->releaseRecoverableCriticalSection(
                            opCtx.get(),
