@@ -153,7 +153,7 @@ groups['system'] = [
 ##########################################
 # CONNECTION statistics
 ##########################################
-connection_stats = [
+conn_stats = [
     ##########################################
     # System statistics
     ##########################################
@@ -595,7 +595,7 @@ connection_stats = [
     YieldStat('txn_release_blocked', 'connection close blocked waiting for transaction state stabilization'),
 ]
 
-connection_stats = sorted(connection_stats, key=attrgetter('desc'))
+conn_stats = sorted(conn_stats, key=attrgetter('desc'))
 
 ##########################################
 # Data source statistics

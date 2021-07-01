@@ -3,15 +3,19 @@
 
 import re, string, sys, textwrap
 from dist import compare_srcfile, format_srcfile
+from operator import attrgetter
 
 # Read the source files.
-from stat_data import groups, dsrc_stats, connection_stats, conn_dsrc_stats, join_stats, \
+from stat_data import groups, dsrc_stats, conn_stats, conn_dsrc_stats, join_stats, \
     session_stats
 
-connection_statistics = connection_stats
-connection_statistics.extend(conn_dsrc_stats)
-dsrc_statistics = dsrc_stats
-dsrc_statistics.extend(conn_dsrc_stats)
+# Statistic categories need to be sorted in order to generate a valid statistics JSON file.
+sorted_conn_stats = conn_stats
+sorted_conn_stats.extend(conn_dsrc_stats)
+sorted_conn_stats = sorted(sorted_conn_stats, key=attrgetter('desc'))
+sorted_dsrc_statistics = dsrc_stats
+sorted_dsrc_statistics.extend(conn_dsrc_stats)
+sorted_dsrc_statistics = sorted(sorted_dsrc_statistics, key=attrgetter('desc'))
 
 def print_struct(title, name, base, stats):
     '''Print the structures for the stat.h file.'''
@@ -38,9 +42,8 @@ for line in open('../src/include/stat.h', 'r'):
     elif line.count('Statistics section: BEGIN'):
         f.write('\n')
         skip = 1
-        print_struct(
-            'connections', 'connection', 1000, connection_statistics)
-        print_struct('data sources', 'dsrc', 2000, dsrc_statistics)
+        print_struct('connections', 'connection', 1000, sorted_conn_stats)
+        print_struct('data sources', 'dsrc', 2000, sorted_dsrc_statistics)
         print_struct('join cursors', 'join', 3000, join_stats)
         print_struct('session', 'session', 4000, session_stats)
 f.close()
@@ -79,7 +82,7 @@ def print_defines():
  * @{
  */
 ''')
-    print_defines_one('CONN', 1000, connection_stats)
+    print_defines_one('CONN', 1000, sorted_conn_stats)
     f.write('''
 /*!
  * @}
@@ -88,7 +91,7 @@ def print_defines():
  * @{
  */
 ''')
-    print_defines_one('DSRC', 2000, dsrc_stats)
+    print_defines_one('DSRC', 2000, sorted_dsrc_statistics)
     f.write('''
 /*!
  * @}
@@ -257,8 +260,8 @@ f = open(tmp_file, 'w')
 f.write('/* DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
 f.write('#include "wt_internal.h"\n')
 
-print_func('dsrc', 'WT_DATA_HANDLE', dsrc_statistics)
-print_func('connection', 'WT_CONNECTION_IMPL', connection_statistics)
+print_func('dsrc', 'WT_DATA_HANDLE', sorted_dsrc_statistics)
+print_func('connection', 'WT_CONNECTION_IMPL', sorted_conn_stats)
 print_func('join', None, join_stats)
 print_func('session', None, session_stats)
 f.close()
