@@ -307,8 +307,8 @@ private:
      * Only safe to call if an unrecoverable error is encountered before the coordinator completes
      * its transition to kPreparingToDonate.
      */
-    void _onAbortCoordinatorOnly(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                                 const Status& status);
+    ExecutorFuture<void> _onAbortCoordinatorOnly(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const Status& status);
 
     /*
      * Runs abort cleanup logic when both the coordinator and participants are aware of the
@@ -317,7 +317,7 @@ private:
      * Only safe to call if the coordinator progressed past kInitializing before encountering an
      * unrecoverable error.
      */
-    void _onAbortCoordinatorAndParticipants(
+    ExecutorFuture<void> _onAbortCoordinatorAndParticipants(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const Status& status);
 
     /**

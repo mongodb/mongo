@@ -314,6 +314,10 @@ runAbortWithFailpoint(
                     return false;
                 }
 
+                if (coordinatorDoc.recipientShards.length == 0) {
+                    return false;
+                }
+
                 for (const shardEntry of coordinatorDoc.recipientShards) {
                     if (shardEntry.mutableState.state !== "applying") {
                         return false;

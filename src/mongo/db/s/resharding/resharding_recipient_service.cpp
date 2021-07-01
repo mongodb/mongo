@@ -189,7 +189,7 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                   "error"_attr = status);
         })
         .onUnrecoverableError([](const Status& status) {})
-        .until([abortToken](const Status& status) { return status.isOK(); })
+        .until<Status>([abortToken](const Status& status) { return status.isOK(); })
         .on(**executor, abortToken)
         .onError([this, executor, abortToken](Status status) {
             if (abortToken.isCanceled()) {
@@ -219,7 +219,7 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                           "error"_attr = status);
                 })
                 .onUnrecoverableError([](const Status& status) {})
-                .until([](const Status& retryStatus) { return retryStatus.isOK(); })
+                .until<Status>([](const Status& retryStatus) { return retryStatus.isOK(); })
                 .on(**executor, abortToken);
         })
         .onCompletion([this, executor, abortToken](Status status) {
@@ -259,7 +259,7 @@ ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDec
                   "error"_attr = status);
         })
         .onUnrecoverableError([](const Status& status) {})
-        .until([](const Status& status) { return status.isOK(); })
+        .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, abortToken)
         .then([this, abortToken] {
             return future_util::withCancellation(_coordinatorHasDecisionPersisted.getFuture(),
@@ -337,7 +337,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                   "error"_attr = status);
         })
         .onUnrecoverableError([](const Status& status) {})
-        .until([](const Status& status) { return status.isOK(); })
+        .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, stepdownToken);
 }
 

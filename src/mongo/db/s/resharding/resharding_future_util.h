@@ -114,14 +114,17 @@ public:
         return std::move(*this);
     }
 
-    auto until(unique_function<bool(const Status&)> condition)&& {
+    template <typename StatusType>
+    auto until(unique_function<bool(const StatusType&)> condition)&& {
         invariant(_onTransientError, "Must call onTransientError() first");
         invariant(_onUnrecoverableError, "Must call onUnrecoverableError() first");
 
         return AsyncTry<BodyCallable>(std::move(_body))
             .until([onTransientError = std::move(_onTransientError),
                     onUnrecoverableError = std::move(_onUnrecoverableError),
-                    condition = std::move(condition)](const Status& status) {
+                    condition = std::move(condition)](const StatusType& statusOrStatusWith) {
+                Status status = _getStatus(statusOrStatusWith);
+
                 if (status.isA<ErrorCategory::RetriableError>() ||
                     status.isA<ErrorCategory::CursorInvalidatedError>() ||
                     status == ErrorCodes::Interrupted ||
@@ -144,11 +147,20 @@ public:
                     return true;
                 }
 
-                return condition(status);
+                return condition(statusOrStatusWith);
             });
     }
 
 private:
+    static const Status& _getStatus(const Status& status) {
+        return status;
+    }
+
+    template <typename ValueType>
+    static const Status& _getStatus(const StatusWith<ValueType>& statusWith) {
+        return statusWith.getStatus();
+    }
+
     BodyCallable _body;
 
     unique_function<void(const Status&)> _onTransientError;
