@@ -283,7 +283,7 @@ public:
     virtual ~Sorter() {}
 
     size_t numSpills() const {
-        return _numSpills;
+        return _iters.size();
     }
 
     size_t numSorted() const {
@@ -301,8 +301,7 @@ protected:
 
     virtual void spill() = 0;
 
-    size_t _numSpills = 0;  // Keeps track of the number of times data was spilled to disk.
-    size_t _numSorted = 0;  // Keeps track of the number of keys sorted.
+    size_t _numSorted = 0;              // Keeps track of the number of keys sorted.
     uint64_t _totalDataSizeSorted = 0;  // Keeps track of the total size of data sorted.
 
     // Whether the files written by this Sorter should be kept on destruction.
