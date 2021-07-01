@@ -34,7 +34,7 @@
  */
 class example_test : public test_harness::test {
     public:
-    example_test(const std::string &config, const std::string &name) : test(config, name) {}
+    example_test(const test_harness::test_args &args) : test(args) {}
 
     void
     populate(test_harness::database &database, test_harness::timestamp_manager *_timestamp_manager,

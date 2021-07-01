@@ -68,7 +68,8 @@ print_help()
     std::cout << std::endl;
     std::cout << "SYNOPSIS" << std::endl;
     std::cout << "\trun [OPTIONS]" << std::endl;
-    std::cout << "\trun -C [CONFIGURATION]" << std::endl;
+    std::cout << "\trun -C [WIREDTIGER_OPEN_CONFIGURATION]" << std::endl;
+    std::cout << "\trun -c [TEST_FRAMEWORK_CONFIGURATION]" << std::endl;
     std::cout << "\trun -f [FILE]" << std::endl;
     std::cout << "\trun -l [TRACEL_LEVEL]" << std::endl;
     std::cout << "\trun -t [TEST_NAME]" << std::endl;
@@ -86,7 +87,8 @@ print_help()
     std::cout << std::endl;
     std::cout << "OPTIONS" << std::endl;
     std::cout << "\t-h Output a usage message and exit." << std::endl;
-    std::cout << "\t-C Configuration. Cannot be used with -f." << std::endl;
+    std::cout << "\t-C Additional wiredtiger open configuration." << std::endl;
+    std::cout << "\t-c Test framework configuration. Cannot be used with -f." << std::endl;
     std::cout << "\t-f File that contains the configuration. Cannot be used with -C." << std::endl;
     std::cout << "\t-l Trace level from 0 to 3. "
                  "1 is the default level, all warnings and errors are logged."
@@ -100,18 +102,18 @@ print_help()
  * - config: defines the configuration used for the test.
  */
 int64_t
-run_test(const std::string &test_name, const std::string &config)
+run_test(const std::string &test_name, const std::string &config, const std::string &wt_open_config)
 {
     int error_code = 0;
 
     test_harness::debug_print("Configuration\t:" + config, DEBUG_TRACE);
 
     if (test_name == "base_test")
-        base_test(config, test_name).run();
+        base_test(test_harness::test_args{config,test_name, wt_open_config}).run();
     else if (test_name == "example_test")
-        example_test(config, test_name).run();
+        example_test(test_harness::test_args{config,test_name, wt_open_config}).run();
     else if (test_name == "hs_cleanup")
-        hs_cleanup(config, test_name).run();
+        hs_cleanup(test_harness::test_args{config,test_name, wt_open_config}).run();
     else {
         test_harness::debug_print("Test not found: " + test_name, DEBUG_ERROR);
         error_code = -1;
@@ -132,7 +134,7 @@ get_default_config_path(const std::string &test_name)
 int
 main(int argc, char *argv[])
 {
-    std::string cfg, config_filename, current_cfg, current_test_name, test_name;
+    std::string cfg, config_filename, current_cfg, current_test_name, test_name, wt_open_config;
     int64_t error_code = 0;
     const std::vector<std::string> all_tests = {"example_test", "hs_cleanup", "base_test"};
 
@@ -140,8 +142,9 @@ main(int argc, char *argv[])
     (void)testutil_set_progname(argv);
 
     /* Parse args
-     * -C   : Configuration. Cannot be used with -f. If no specific test is specified to be run, the
-     * same configuration will be used for all existing tests.
+     * -C   : Additional wiredtiger_open configuration.
+     * -c   : Test framework configuration. Cannot be used with -f. If no specific test is specified
+     * to be run, the same configuration will be used for all existing tests.
      * -f   : Filename that contains the configuration. Cannot be used with -C. If no specific test
      * is specified to be run, the same configuration will be used for all existing tests.
      * -l   : Trace level.
@@ -152,6 +155,14 @@ main(int argc, char *argv[])
             print_help();
             return 0;
         } else if (std::string(argv[i]) == "-C") {
+            if ((i + 1) < argc)
+                wt_open_config = argv[++i];
+                /* Add a comma to the front if the user didn't supply one. */
+                if (wt_open_config[0] != ',')
+                    wt_open_config.insert(0, 1, ',');
+            else
+                error_code = -1;
+        } else if (std::string(argv[i]) == "-c") {
             if (!config_filename.empty()) {
                 test_harness::debug_print("Option -C cannot be used with -f", DEBUG_ERROR);
                 error_code = -1;
@@ -198,7 +209,7 @@ main(int argc, char *argv[])
                 else
                     current_cfg = cfg;
 
-                error_code = run_test(current_test_name, current_cfg);
+                error_code = run_test(current_test_name, current_cfg, wt_open_config);
                 if (error_code != 0)
                     break;
             }
@@ -209,7 +220,7 @@ main(int argc, char *argv[])
                 cfg = parse_configuration_from_file(config_filename);
             else if (cfg.empty())
                 cfg = parse_configuration_from_file(get_default_config_path(current_test_name));
-            error_code = run_test(current_test_name, cfg);
+            error_code = run_test(current_test_name, cfg, wt_open_config);
         }
 
         if (error_code != 0)

@@ -50,14 +50,24 @@ extern "C" {
 #include "workload/workload_validation.h"
 
 namespace test_harness {
+class test_args {
+    public:
+    test_args(const std::string &config, const std::string &name, const std::string &wt_open_config)
+        : test_config(config), test_name(name), wt_open_config(wt_open_config)
+    {
+    }
+    const std::string test_config;
+    const std::string test_name;
+    const std::string wt_open_config;
+};
 /*
  * The base class for a test, the standard usage pattern is to just call run().
  */
 class test : public database_operation {
     public:
-    test(const std::string &config, const std::string &name)
+    test(const test_args &args) : _args(args)
     {
-        _config = new configuration(name, config);
+        _config = new configuration(args.test_name, args.test_config);
         _checkpoint_manager = new checkpoint_manager(_config->get_subconfig(CHECKPOINT_MANAGER));
         _runtime_monitor = new runtime_monitor(_config->get_subconfig(RUNTIME_MONITOR), _database);
         _timestamp_manager = new timestamp_manager(_config->get_subconfig(TIMESTAMP_MANAGER));
@@ -118,22 +128,23 @@ class test : public database_operation {
 
         /* Get the cache size. */
         cache_size_mb = _config->get_int(CACHE_SIZE_MB);
+        db_create_config += ",cache_size=" + std::to_string(cache_size_mb) + "MB";
 
         /* Get the statistics configuration for this run. */
         statistics_config = _config->get_subconfig(STATISTICS_CONFIG);
         statistics_type = statistics_config->get_string(TYPE);
         statistics_logging = statistics_config->get_bool(ENABLE_LOGGING);
-
+        db_create_config += statistics_logging ? "," + std::string(STATISTICS_LOG) : "";
+        db_create_config += ",statistics=(" + statistics_type + ")";
         /* Don't forget to delete. */
         delete statistics_config;
-
-        db_create_config += ",statistics=(" + statistics_type + ")";
-        db_create_config += statistics_logging ? "," + std::string(STATISTICS_LOG) : "";
-        db_create_config += ",cache_size=" + std::to_string(cache_size_mb) + "MB";
 
         /* Enable or disable write ahead logging. */
         enable_logging = _config->get_bool(ENABLE_LOGGING);
         db_create_config += ",log=(enabled=" + std::string(enable_logging ? "true" : "false") + ")";
+
+        /* Add the user supplied wiredtiger open config. */
+        db_create_config += _args.wt_open_config;
 
         /* Set up the test environment. */
         connection_manager::instance().create(db_create_config);
@@ -207,7 +218,7 @@ class test : public database_operation {
     }
 
     private:
-    std::string _name;
+    const test_args &_args;
     std::vector<component *> _components;
     configuration *_config;
     checkpoint_manager *_checkpoint_manager = nullptr;

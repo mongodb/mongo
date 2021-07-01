@@ -923,6 +923,8 @@ tasks:
   # End of normal make check test tasks
 
   # Start of cppsuite test tasks.
+  # All cppsuite test tasks must supply the relative path to the config file as we are in the
+  # build_posix working directory and the LD_LIBRARY_PATH is .libs.
 
   - name: cppsuite-base-test
     tags: ["pull_request"]
@@ -937,7 +939,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test/cppsuite/run -t base_test -f test/cppsuite/configs/base_test_default.txt
+            ${test_env_vars|} $(pwd)/test/cppsuite/run -t base_test -C 'debug_mode=(cursor_copy=true)' -f test/cppsuite/configs/base_test_default.txt
 
   # End of cppsuite test tasks.
   # Start of csuite test tasks

@@ -74,6 +74,7 @@ class connection_manager {
             debug_print("Connection is not NULL, cannot be re-opened.", DEBUG_ERROR);
             testutil_die(EINVAL, "Connection is not NULL");
         }
+        debug_print("wiredtiger_open config: " + config, DEBUG_INFO);
 
         /* Create the working dir. */
         testutil_make_work_dir(home.c_str());
