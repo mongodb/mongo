@@ -246,7 +246,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetryNoPrimary) {
         ASSERT_EQUALS(testHost, request.target);
         // Make it so when it attempts to retarget and retry it will get a NotWritablePrimary error.
         configTargeter()->setFindHostReturnValue(
-            Status(ErrorCodes::NotWritablePrimary, "no config master"));
+            Status(ErrorCodes::NotWritablePrimary, "no config primary"));
         return vector<BSONObj>{};
     });
 
@@ -695,7 +695,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotWritablePrimar
         onCommand([](const RemoteCommandRequest& request) {
             BSONObjBuilder responseBuilder;
             CommandHelpers::appendCommandStatusNoThrow(
-                responseBuilder, Status(ErrorCodes::NotWritablePrimary, "not master"));
+                responseBuilder, Status(ErrorCodes::NotWritablePrimary, "not primary"));
             return responseBuilder.obj();
         });
     }
@@ -726,7 +726,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotWritablePrimar
 
         BSONObjBuilder responseBuilder;
         CommandHelpers::appendCommandStatusNoThrow(
-            responseBuilder, Status(ErrorCodes::NotWritablePrimary, "not master"));
+            responseBuilder, Status(ErrorCodes::NotWritablePrimary, "not primary"));
 
         // Ensure that when the catalog manager tries to retarget after getting the
         // NotWritablePrimary response, it will get back a new target.

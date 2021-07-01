@@ -137,7 +137,7 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionWriteErrTest) {
         response.addToErrDetails([&] {
             WriteErrorDetail* errDetail = new WriteErrorDetail();
             errDetail->setIndex(0);
-            errDetail->setStatus({ErrorCodes::NotWritablePrimary, "not master"});
+            errDetail->setStatus({ErrorCodes::NotWritablePrimary, "not primary"});
             return errDetail;
         }());
         return response.toBSON();
@@ -192,7 +192,7 @@ TEST_F(SessionsCollectionShardedTest, RemoveOneSessionWriteErrTest) {
         response.addToErrDetails([&] {
             WriteErrorDetail* errDetail = new WriteErrorDetail();
             errDetail->setIndex(0);
-            errDetail->setStatus({ErrorCodes::NotWritablePrimary, "not master"});
+            errDetail->setStatus({ErrorCodes::NotWritablePrimary, "not primary"});
             return errDetail;
         }());
         return response.toBSON();

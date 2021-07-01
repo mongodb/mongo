@@ -1243,7 +1243,7 @@ TEST_F(DistLockManagerReplSetTest, CannotOvertakeIfNoMaster) {
         } else {
             getMockCatalog()->expectGetServerInfo(
                 [&getServerInfoCallCount]() { getServerInfoCallCount++; },
-                {ErrorCodes::NotWritablePrimary, "not master"});
+                {ErrorCodes::NotWritablePrimary, "not primary"});
         }
 
         auto status = DistLockManager::get(operationContext())

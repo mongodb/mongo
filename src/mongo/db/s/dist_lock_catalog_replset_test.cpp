@@ -561,7 +561,7 @@ TEST_F(DistLockCatalogReplSetTest, GrabLockWriteConcernError) {
                 value: null,
                 writeConcernError: {
                     code: 10107,
-                    errmsg: "Not master while waiting for write concern"
+                    errmsg: "Not primary while waiting for write concern"
                 }
             })");
     });
