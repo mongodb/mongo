@@ -146,6 +146,10 @@ public:
             uassertStatusOK(*aggregateResponse.firstStaleConfigError);
         }
 
+        if (aggregateResponse.responseOK) {
+            LOGV2(5706401, "Indexes dropped", "namespace"_attr = nss);
+        }
+
         return aggregateResponse.responseOK;
     }
 
