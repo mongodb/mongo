@@ -117,6 +117,9 @@ MONGO_FAIL_POINT_DEFINE(initialSyncFassertIfApplyingBatchFails);
 // Failpoint which skips clearing _initialSyncState after a successful initial sync attempt.
 MONGO_FAIL_POINT_DEFINE(skipClearInitialSyncState);
 
+// Failpoint which causes the initial sync function to hang after finishing.
+MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterFinish);
+
 namespace {
 using namespace executor;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -1610,15 +1613,25 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
     // before InitialSyncer::join() returns.
     onCompletion = {};
 
-    stdx::lock_guard<Latch> lock(_mutex);
-    invariant(_state != State::kComplete);
-    _state = State::kComplete;
-    _stateCondition.notify_all();
+    {
+        stdx::lock_guard<Latch> lock(_mutex);
+        invariant(_state != State::kComplete);
+        _state = State::kComplete;
+        _stateCondition.notify_all();
 
-    // Clear the initial sync progress after an initial sync attempt has been successfully
-    // completed.
-    if (lastApplied.isOK() && !MONGO_FAIL_POINT(skipClearInitialSyncState)) {
-        _initialSyncState.reset();
+        // Clear the initial sync progress after an initial sync attempt has been successfully
+        // completed.
+        if (lastApplied.isOK() && !MONGO_FAIL_POINT(skipClearInitialSyncState)) {
+            _initialSyncState.reset();
+        }
+    }
+
+    if (MONGO_FAIL_POINT(initialSyncHangAfterFinish)) {
+        log() << "initial sync finished - initialSyncHangAfterFinish fail point "
+                 "enabled. Blocking until fail point is disabled.";
+        while (MONGO_FAIL_POINT(initialSyncHangAfterFinish) && !_isShuttingDown()) {
+            mongo::sleepsecs(1);
+        }
     }
 }
 

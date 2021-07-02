@@ -40,6 +40,8 @@ assert.commandWorked(secondary.getDB('admin').runCommand(
     {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
 assert.commandWorked(secondary.getDB('admin').runCommand(
     {configureFailPoint: 'initialSyncHangBeforeFinish', mode: 'alwaysOn'}));
+assert.commandWorked(secondary.getDB('admin').runCommand(
+    {configureFailPoint: 'initialSyncHangAfterFinish', mode: 'alwaysOn'}));
 replSet.reInitiate();
 
 // Wait for initial sync to pause before it copies the databases.
@@ -151,10 +153,12 @@ assert.eq(endOfCloningRes.initialSyncStatus.approxTotalDataSize,
 assert.eq(endOfCloningRes.initialSyncStatus.approxTotalBytesCopied,
           fooCollRes.approxBytesCopied + barCollRes.approxBytesCopied + bytesCopiedAdminDb);
 
-// Let initial sync finish and get into secondary state.
 assert.commandWorked(secondary.getDB('admin').runCommand(
     {configureFailPoint: 'initialSyncHangBeforeFinish', mode: 'off'}));
-replSet.awaitSecondaryNodes(60 * 1000);
+
+// Wait until the 'initialSync' field has been cleared before issuing 'replSetGetStatus'.
+checkLog.contains(secondary,
+                  "initial sync finished - initialSyncHangAfterFinish fail point enabled");
 
 // Test that replSetGetStatus returns the correct results after initial sync is finished.
 res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
@@ -163,6 +167,12 @@ assert(!res.initialSyncStatus,
 
 assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "m"}),
                              ErrorCodes.TypeMismatch);
+
+// Let initial sync finish and get into secondary state.
+assert.commandWorked(secondary.getDB('admin').runCommand(
+    {configureFailPoint: 'initialSyncHangAfterFinish', mode: 'off'}));
+replSet.awaitSecondaryNodes(60 * 1000);
+
 assert.eq(0,
           secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
           "Oplog buffer was not dropped after initial sync");
