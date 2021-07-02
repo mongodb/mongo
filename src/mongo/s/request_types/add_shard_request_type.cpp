@@ -136,21 +136,14 @@ Status AddShardRequest::validate(bool allowLocalHost) {
     // Check that if one of the new shard's hosts is localhost, we are allowed to use localhost
     // as a hostname. (Using localhost requires that every server in the cluster uses
     // localhost).
-    std::vector<HostAndPort> serverAddrs = _connString.getServers();
-    for (size_t i = 0; i < serverAddrs.size(); i++) {
-        if (serverAddrs[i].isLocalHost() != allowLocalHost) {
+    for (const auto& serverAddr : _connString.getServers()) {
+        if (serverAddr.isLocalHost() != allowLocalHost) {
             string errmsg = str::stream()
                 << "Can't use localhost as a shard since all shards need to"
                 << " communicate. Either use all shards and configdbs in localhost"
-                << " or all in actual IPs. host: " << serverAddrs[i].toString()
-                << " isLocalHost:" << serverAddrs[i].isLocalHost();
+                << " or all in actual IPs. host: " << serverAddr.toString()
+                << " isLocalHost:" << serverAddr.isLocalHost();
             return Status(ErrorCodes::InvalidOptions, errmsg);
-        }
-
-        // If the server has no port, assign it the default port.
-        if (!serverAddrs[i].hasPort()) {
-            serverAddrs[i] =
-                HostAndPort(serverAddrs[i].host(), ServerGlobalParams::ShardServerPort);
         }
     }
     return Status::OK();

@@ -101,20 +101,6 @@ public:
     CustomConnectionPoolStatsFn getCustomConnectionPoolStatsFn() const;
     void setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn);
 
-    /**
-     * Deprecated. This is only used on mongos, and once addShard is solely handled by the configs,
-     * it can be deleted.
-     * @return true if shards and config servers are allowed to use 'localhost' in address
-     */
-    bool allowLocalHost() const;
-
-    /**
-     * Deprecated. This is only used on mongos, and once addShard is solely handled by the configs,
-     * it can be deleted.
-     * @param whether to allow shards and config servers to use 'localhost' in address
-     */
-    void setAllowLocalHost(bool allow);
-
     ShardingCatalogClient* catalogClient() const {
         return _catalogClient.get();
     }
@@ -215,11 +201,6 @@ private:
      * NOTE: This is not valid to call on a config server instance.
      */
     boost::optional<repl::OpTime> _advanceConfigOpTime(const repl::OpTime& opTime);
-
-    // Deprecated. This is only used on mongos, and once addShard is solely handled by the configs,
-    // it can be deleted.
-    // Can 'localhost' be used in shard addresses?
-    bool _allowLocalShard{true};
 };
 
 }  // namespace mongo

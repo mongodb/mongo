@@ -830,20 +830,13 @@ std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongos
 ExitCode main(ServiceContext* serviceContext) {
     serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds{10}));
 
-    auto const shardingContext = Grid::get(serviceContext);
-
     // We either have a setting where all processes are in localhost or none are
-    std::vector<HostAndPort> configServers = mongosGlobalParams.configdbs.getServers();
-    for (std::vector<HostAndPort>::const_iterator it = configServers.begin();
-         it != configServers.end();
-         ++it) {
-        const HostAndPort& configAddr = *it;
+    const auto& configServers = mongosGlobalParams.configdbs.getServers();
+    invariant(!configServers.empty());
+    const auto allowLocalHost = configServers.front().isLocalHost();
 
-        if (it == configServers.begin()) {
-            shardingContext->setAllowLocalHost(configAddr.isLocalHost());
-        }
-
-        if (configAddr.isLocalHost() != shardingContext->allowLocalHost()) {
+    for (const auto& configServer : configServers) {
+        if (configServer.isLocalHost() != allowLocalHost) {
             LOGV2_OPTIONS(22852,
                           {LogComponent::kDefault},
                           "cannot mix localhost and ip addresses in configdbs");

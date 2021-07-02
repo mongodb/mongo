@@ -106,14 +106,6 @@ void Grid::setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn) {
     _customConnectionPoolStatsFn = std::move(statsFn);
 }
 
-bool Grid::allowLocalHost() const {
-    return _allowLocalShard;
-}
-
-void Grid::setAllowLocalHost(bool allow) {
-    _allowLocalShard = allow;
-}
-
 repl::ReadConcernArgs Grid::readConcernWithConfigTime(
     repl::ReadConcernLevel readConcernLevel) const {
     return ReadConcernArgs(configOpTime(), readConcernLevel);
