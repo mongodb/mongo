@@ -883,8 +883,8 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
         gotid = (uint64_t)strtol(gotkey, &p, 10);
         testutil_assert(*p == KEY_SEP[0]);
         p++;
-        testutil_assert(isxdigit(*p));
-        if (isdigit(*p))
+        testutil_assert(isxdigit((unsigned char)*p));
+        if (isdigit((unsigned char)*p))
             gotth = (uint32_t)(*p - '0');
         else if (*p >= 'a' && *p <= 'f')
             gotth = (uint32_t)((*p - 'a') + 10);

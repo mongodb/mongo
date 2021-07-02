@@ -1082,7 +1082,7 @@ config_file(const char *name)
                 break;
             }
             if (t == buf && *p == ']') { /* Closing brace, configuration starts after it. */
-                while (isblank(*++p))
+                while (isblank((unsigned char)*++p))
                     ;
                 t = p--;
             }
