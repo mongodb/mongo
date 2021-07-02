@@ -951,30 +951,26 @@ TEST(RegexMatchExpression, RegexCannotContainEmbeddedNullByte) {
 TEST(RegexMatchExpression, RegexOptionsStringCannotContainEmbeddedNullByte) {
     {
         const auto embeddedNull = "a\0b"_sd;
-        ASSERT_THROWS_CODE(RegexMatchExpression("path", "pattern", embeddedNull),
-                           AssertionException,
-                           ErrorCodes::BadValue);
+        ASSERT_THROWS_CODE(
+            RegexMatchExpression("path", "pattern", embeddedNull), AssertionException, 51108);
     }
 
     {
         const auto singleNullByte = "\0"_sd;
-        ASSERT_THROWS_CODE(RegexMatchExpression("path", "pattern", singleNullByte),
-                           AssertionException,
-                           ErrorCodes::BadValue);
+        ASSERT_THROWS_CODE(
+            RegexMatchExpression("path", "pattern", singleNullByte), AssertionException, 51108);
     }
 
     {
         const auto leadingNullByte = "\0bbbb"_sd;
-        ASSERT_THROWS_CODE(RegexMatchExpression("path", "pattern", leadingNullByte),
-                           AssertionException,
-                           ErrorCodes::BadValue);
+        ASSERT_THROWS_CODE(
+            RegexMatchExpression("path", "pattern", leadingNullByte), AssertionException, 51108);
     }
 
     {
         const auto trailingNullByte = "bbbb\0"_sd;
-        ASSERT_THROWS_CODE(RegexMatchExpression("path", "pattern", trailingNullByte),
-                           AssertionException,
-                           ErrorCodes::BadValue);
+        ASSERT_THROWS_CODE(
+            RegexMatchExpression("path", "pattern", trailingNullByte), AssertionException, 51108);
     }
 }
 

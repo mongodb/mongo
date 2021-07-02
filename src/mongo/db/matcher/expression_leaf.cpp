@@ -210,8 +210,7 @@ const std::set<char> RegexMatchExpression::kValidRegexFlags = {'i', 'm', 's', 'x
 
 std::unique_ptr<pcrecpp::RE> RegexMatchExpression::makeRegex(const std::string& regex,
                                                              const std::string& flags) {
-    return std::make_unique<pcrecpp::RE>(regex.c_str(),
-                                         regex_util::flagsToPcreOptions(flags, true));
+    return std::make_unique<pcrecpp::RE>(regex.c_str(), regex_util::flagsToPcreOptions(flags));
 }
 
 RegexMatchExpression::RegexMatchExpression(StringData path,
@@ -221,15 +220,11 @@ RegexMatchExpression::RegexMatchExpression(StringData path,
     : LeafMatchExpression(REGEX, path, std::move(annotation)),
       _regex(regex.toString()),
       _flags(options.toString()),
-      _re(new pcrecpp::RE(_regex.c_str(), regex_util::flagsToPcreOptions(_flags, true))) {
+      _re(new pcrecpp::RE(_regex.c_str(), regex_util::flagsToPcreOptions(_flags))) {
 
     uassert(ErrorCodes::BadValue,
             "Regular expression cannot contain an embedded null byte",
             _regex.find('\0') == std::string::npos);
-
-    uassert(ErrorCodes::BadValue,
-            "Regular expression options string cannot contain an embedded null byte",
-            _flags.find('\0') == std::string::npos);
 
     uassert(51091,
             str::stream() << "Regular expression is invalid: " << _re->error(),

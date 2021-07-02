@@ -143,7 +143,7 @@ std::pair<TypeTags, Value> makeCopyPcreRegex(const PcreRegex& regex) {
 }
 
 void PcreRegex::_compile() {
-    const auto pcreOptions = regex_util::flagsToPcreOptions(_options.c_str(), false).all_options();
+    const auto pcreOptions = regex_util::flagsToPcreOptions(_options.c_str()).all_options();
     const char* compile_error;
     int eoffset;
     _pcrePtr = pcre_compile(_pattern.c_str(), pcreOptions, &compile_error, &eoffset, nullptr);

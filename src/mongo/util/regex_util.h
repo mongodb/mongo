@@ -39,8 +39,6 @@ namespace regex_util {
  * Builds PCRE regex options from the input options string. If 'ignoreInvalidOptions' is disabled,
  * throws uassert on invalid flags.
  */
-pcrecpp::RE_Options flagsToPcreOptions(StringData optionFlags,
-                                       bool ignoreInvalidOptions,
-                                       StringData opName = "");
+pcrecpp::RE_Options flagsToPcreOptions(StringData optionFlags, StringData opName = "");
 }  // namespace regex_util
 }  // namespace mongo

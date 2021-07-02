@@ -6614,8 +6614,7 @@ boost::intrusive_ptr<Expression> ExpressionRegex::optimize() {
 void ExpressionRegex::_compile(RegexExecutionState* executionState) const {
 
     const auto pcreOptions =
-        regex_util::flagsToPcreOptions(executionState->options.value_or(""), false, _opName)
-            .all_options();
+        regex_util::flagsToPcreOptions(executionState->options.value_or(""), _opName).all_options();
 
     if (!executionState->pattern) {
         return;

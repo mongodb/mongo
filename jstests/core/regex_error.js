@@ -1,5 +1,6 @@
 /**
  * Test that the server errors when given an invalid regex.
+ * @tags: [requires_fcv_50]
  */
 (function() {
 const coll = db.regex_error;
@@ -10,5 +11,5 @@ assert.commandFailedWithCode(coll.runCommand("find", {filter: {a: {$regex: "[)"}
 assert.commandFailedWithCode(coll.runCommand("find", {filter: {a: {$regex: "ab\0c"}}}),
                              ErrorCodes.BadValue);
 assert.commandFailedWithCode(
-    coll.runCommand("find", {filter: {a: {$regex: "ab", $options: "\0i"}}}), ErrorCodes.BadValue);
+    coll.runCommand("find", {filter: {a: {$regex: "ab", $options: "\0i"}}}), 51108);
 })();

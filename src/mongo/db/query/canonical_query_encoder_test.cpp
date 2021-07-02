@@ -262,11 +262,11 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyRegexDependsOnFlags) {
     testComputeKey(BSON("a" << BSON("$regex"
                                     << "abc"
                                     << "$options"
-                                    << "abcdefghijklmnopqrstuvwxyz")),
+                                    << "imxsu")),
                    {},
                    {},
                    "rea/imsx/");
-    testComputeKey("{a: /abc/gim}", "{}", "{}", "rea/im/");
+    testComputeKey("{a: /abc/im}", "{}", "{}", "rea/im/");
 }
 
 TEST(CanonicalQueryEncoderTest, ComputeKeyMatchInDependsOnPresenceOfRegexAndFlags) {

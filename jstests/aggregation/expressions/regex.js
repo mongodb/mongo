@@ -400,6 +400,9 @@ function testRegexAggException(inputObj, exceptionCode) {
     testRegexFindAggForKey(12, {input: "$text", regex: String.raw`^(\w+)`}, []);
     testRegexFindAggForKey(12, {input: "$text", regex: "^[[:digit:]]"}, []);
     testRegexFindAggForKey(2, {input: "$text", regex: "^[[:alpha:]]+$"}, []);
+
+    // The 'u' option shouldn't throw an error.
+    testRegexFindAggForKey(2, {input: "$text", regex: "^[[:alpha:]]+$", options: "u"}, []);
 })();
 
 (function testErrors() {

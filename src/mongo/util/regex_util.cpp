@@ -35,9 +35,7 @@
 
 namespace mongo {
 namespace regex_util {
-pcrecpp::RE_Options flagsToPcreOptions(StringData optionFlags,
-                                       bool ignoreInvalidFlags,
-                                       StringData opName) {
+pcrecpp::RE_Options flagsToPcreOptions(StringData optionFlags, StringData opName) {
     pcrecpp::RE_Options opt;
     opt.set_utf8(true);
     for (auto flag : optionFlags) {
@@ -54,12 +52,14 @@ pcrecpp::RE_Options flagsToPcreOptions(StringData optionFlags,
             case 's':  // allows dot to include newline chars
                 opt.set_dotall(true);
                 continue;
+            case 'u':
+                // This option allows Unicode matching for patterns like '\w'. The PCRE library
+                // uses this behavior by default, so we don't need to set any options. However, we
+                // must accept this flag without an error as some drivers send it by default.
+                continue;
             default:
-                if (!ignoreInvalidFlags) {
-                    uasserted(51108,
-                              str::stream()
-                                  << opName << " invalid flag in regex options: " << flag);
-                }
+                uasserted(51108,
+                          str::stream() << opName << " invalid flag in regex options: " << flag);
         }
     }
     return opt;
