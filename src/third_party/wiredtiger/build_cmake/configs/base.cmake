@@ -63,7 +63,7 @@ config_bool(
 config_bool(
     ENABLE_STRICT
     "Compile with strict compiler warnings enabled"
-    DEFAULT ON
+    DEFAULT OFF
 )
 
 config_bool(

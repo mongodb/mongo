@@ -27,7 +27,7 @@ cd cmake_build
 
 # Configure build with CMake.
 if( $configure -eq $true) {
-    C:\cmake\bin\cmake --no-warn-unused-cli -DSWIG_DIR="C:\swigwin-3.0.2" -DSWIG_EXECUTABLE="C:\swigwin-3.0.2\swig.exe" -DCMAKE_BUILD_TYPE='None' -DENABLE_PYTHON=1 -DCMAKE_TOOLCHAIN_FILE='..\build_cmake\toolchains\cl.cmake' -G "Ninja" ..\.
+    C:\cmake\bin\cmake --no-warn-unused-cli -DSWIG_DIR="C:\swigwin-3.0.2" -DSWIG_EXECUTABLE="C:\swigwin-3.0.2\swig.exe" -DCMAKE_BUILD_TYPE='None' -DENABLE_PYTHON=1 -DENABLE_STRICT=1 -DCMAKE_TOOLCHAIN_FILE='..\build_cmake\toolchains\cl.cmake' -G "Ninja" ..\.
 }
 
 # Execute Ninja build.
