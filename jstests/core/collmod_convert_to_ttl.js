@@ -14,7 +14,7 @@
 
 (function() {
 'use strict';
-let collName = "collModTest";
+let collName = "collmod_convert_to_ttl";
 let coll = db.getCollection(collName);
 coll.drop();
 db.createCollection(collName);
