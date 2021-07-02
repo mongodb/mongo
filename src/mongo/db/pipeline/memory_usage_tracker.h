@@ -88,8 +88,8 @@ public:
      * Sets the new total for 'name', and updates the current total memory usage.
      */
     void set(StringData name, long long total) {
-        _functionMemoryTracker.try_emplace(name, this);
-        _functionMemoryTracker.find(name)->second.set(total);
+        auto [it, _] = _functionMemoryTracker.try_emplace(name, this);
+        it->second.set(total);
     }
 
     /**
@@ -128,8 +128,8 @@ public:
      * Non-const version, creates a new element if one doesn't exist and returns a reference to it.
      */
     PerFunctionMemoryTracker& operator[](StringData name) {
-        _functionMemoryTracker.try_emplace(name, this);
-        return _functionMemoryTracker.at(name);
+        auto [it, _] = _functionMemoryTracker.try_emplace(name, this);
+        return it->second;
     }
 
     /**
@@ -137,8 +137,8 @@ public:
      * that function. Also updates the total memory usage.
      */
     void update(StringData name, long long diff) {
-        _functionMemoryTracker.try_emplace(name, this);
-        _functionMemoryTracker.find(name)->second.update(diff);
+        auto [it, _] = _functionMemoryTracker.try_emplace(name, this);
+        it->second.update(diff);
     }
 
     /**
