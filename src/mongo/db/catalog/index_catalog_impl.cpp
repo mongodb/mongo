@@ -745,20 +745,8 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
     }
 
     uassert(ErrorCodes::InvalidOptions,
-            "Partial indexes are not supported on collections clustered by _id",
-            !collection->isClustered() || !spec[IndexDescriptor::kPartialFilterExprFieldName]);
-
-    uassert(ErrorCodes::InvalidOptions,
             "Unique indexes are not supported on collections clustered by _id",
             !collection->isClustered() || !spec[IndexDescriptor::kUniqueFieldName].trueValue());
-
-    uassert(ErrorCodes::InvalidOptions,
-            "TTL indexes are not supported on collections clustered by _id",
-            !collection->isClustered() || !spec[IndexDescriptor::kExpireAfterSecondsFieldName]);
-
-    uassert(ErrorCodes::InvalidOptions,
-            "Text indexes are not supported on collections clustered by _id",
-            !collection->isClustered() || pluginName != IndexNames::TEXT);
 
     if (IndexDescriptor::isIdIndexPattern(key)) {
         if (collection->isClustered()) {

@@ -637,6 +637,11 @@ std::unique_ptr<CreateIndexesCommand> makeTimeseriesCreateIndexesCommand(
         BSONObjBuilder builder;
         for (const auto& elem : origIndex) {
             if (elem.fieldNameStringData() == NewIndexSpec::kKeyFieldName) {
+                auto pluginName = IndexNames::findPluginName(elem.Obj());
+                uassert(ErrorCodes::InvalidOptions,
+                        "Text indexes are not supported on time-series collections",
+                        pluginName != IndexNames::TEXT);
+
                 auto bucketsIndexSpecWithStatus =
                     timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(*timeseriesOptions,
                                                                               elem.Obj());
@@ -650,6 +655,15 @@ std::unique_ptr<CreateIndexesCommand> makeTimeseriesCreateIndexesCommand(
                 continue;
             }
             builder.append(elem);
+            if (elem.fieldNameStringData() == IndexDescriptor::kPartialFilterExprFieldName) {
+                uasserted(ErrorCodes::InvalidOptions,
+                          "Partial indexes are not supported on time-series collections");
+            }
+
+            if (elem.fieldNameStringData() == IndexDescriptor::kExpireAfterSecondsFieldName) {
+                uasserted(ErrorCodes::InvalidOptions,
+                          "TTL indexes are not supported on time-series collections");
+            }
         }
         indexes.push_back(builder.obj());
     }
