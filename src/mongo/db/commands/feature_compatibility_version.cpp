@@ -368,7 +368,7 @@ public:
                     repl::ReadConcernLevel::kMajorityReadConcern));
             // If majority reads are not supported, we will take a full snapshot on clean shutdown
             // and the new FCV will be included, so upgrade is possible.
-            if (status.code() != ErrorCodes::CommandNotSupported)
+            if (status.code() != ErrorCodes::ReadConcernMajorityNotEnabled)
                 uassertStatusOK(
                     status.withContext("Most recent 'featureCompatibilityVersion' was not in the "
                                        "majority snapshot on this node"));
