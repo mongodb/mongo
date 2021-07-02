@@ -140,6 +140,11 @@ DEF_OPT_AS_UINT32(random_range, 0,
   "if non zero choose a value from within this range as the key for insert operations")
 DEF_OPT_AS_BOOL(random_value, 0, "generate random content for the value")
 DEF_OPT_AS_BOOL(range_partition, 0, "partition data by range (vs hash)")
+DEF_OPT_AS_UINT32(read_range, 0,
+  "read a sequential range of keys upon each read operation. This value tells us how many keys "
+  "to read each time, or an upper bound on the number of keys read if read_range_random is set.")
+DEF_OPT_AS_BOOL(read_range_random, 0, "if doing range reads, select the number of keys to read "
+   "in a range uniformly at random.")
 DEF_OPT_AS_BOOL(readonly, 0,
   "reopen the connection between populate and workload phases in readonly mode.  Requires "
   "reopen_connection turned on (default).  Requires that read be the only workload specified")
@@ -161,6 +166,8 @@ DEF_OPT_AS_UINT32(
 DEF_OPT_AS_UINT32(scan_table_count, 0,
   "number of separate tables to be used for scanning. Zero indicates that tables are shared with "
   "other operations")
+DEF_OPT_AS_BOOL(select_latest, 0, "in workloads that involve inserts and another type of operation,"
+		"select the recently inserted records with higher probability")
 DEF_OPT_AS_CONFIG_STRING(sess_config, "", "session configuration string")
 DEF_OPT_AS_UINT32(session_count_idle, 0, "number of idle sessions to create. Default 0.")
 /* The following table configuration is based on the configuration MongoDB uses for collections. */

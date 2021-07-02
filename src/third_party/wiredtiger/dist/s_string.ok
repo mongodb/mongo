@@ -478,6 +478,7 @@ Wunused
 XP
 Xcode
 Xcode/
+YCSB
 Yann
 ZSTD
 Zlib
@@ -641,6 +642,7 @@ create's
 createCStream
 crypto
 cryptobad
+cryptographic
 cstring
 csuite
 csv
