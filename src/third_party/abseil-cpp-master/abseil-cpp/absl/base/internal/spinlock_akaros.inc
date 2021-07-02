@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,7 @@
 
 extern "C" {
 
-ABSL_ATTRIBUTE_WEAK void AbslInternalSpinLockDelay(
+ABSL_ATTRIBUTE_WEAK void ABSL_INTERNAL_C_SYMBOL(AbslInternalSpinLockDelay)(
     std::atomic<uint32_t>* /* lock_word */, uint32_t /* value */,
     int /* loop */, absl::base_internal::SchedulingMode /* mode */) {
   // In Akaros, one must take care not to call anything that could cause a
@@ -29,7 +29,7 @@ ABSL_ATTRIBUTE_WEAK void AbslInternalSpinLockDelay(
   // arbitrary code.
 }
 
-ABSL_ATTRIBUTE_WEAK void AbslInternalSpinLockWake(
+ABSL_ATTRIBUTE_WEAK void ABSL_INTERNAL_C_SYMBOL(AbslInternalSpinLockWake)(
     std::atomic<uint32_t>* /* lock_word */, bool /* all */) {}
 
 }  // extern "C"

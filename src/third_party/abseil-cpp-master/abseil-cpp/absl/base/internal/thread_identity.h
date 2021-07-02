@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,9 +30,12 @@
 #include <atomic>
 #include <cstdint>
 
+#include "absl/base/config.h"
 #include "absl/base/internal/per_thread_tls.h"
+#include "absl/base/optimization.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 struct SynchLocksHeld;
 struct SynchWaitParams;
@@ -42,9 +45,9 @@ namespace base_internal {
 class SpinLock;
 struct ThreadIdentity;
 
-// Used by the implementation of base::Mutex and base::CondVar.
+// Used by the implementation of absl::Mutex and absl::CondVar.
 struct PerThreadSynch {
-  // The internal representation of base::Mutex and base::CondVar rely
+  // The internal representation of absl::Mutex and absl::CondVar rely
   // on the alignment of PerThreadSynch. Both store the address of the
   // PerThreadSynch in the high-order bits of their internal state,
   // which means the low kLowZeroBits of the address of PerThreadSynch
@@ -67,30 +70,28 @@ struct PerThreadSynch {
                          // is using this PerThreadSynch as a terminator.  Its
                          // skip field must not be filled in because the loop
                          // might then skip over the terminator.
-
-  // The wait parameters of the current wait.  waitp is null if the
-  // thread is not waiting. Transitions from null to non-null must
-  // occur before the enqueue commit point (state = kQueued in
-  // Enqueue() and CondVarEnqueue()). Transitions from non-null to
-  // null must occur after the wait is finished (state = kAvailable in
-  // Mutex::Block() and CondVar::WaitCommon()). This field may be
-  // changed only by the thread that describes this PerThreadSynch.  A
-  // special case is Fer(), which calls Enqueue() on another thread,
-  // but with an identical SynchWaitParams pointer, thus leaving the
-  // pointer unchanged.
-  SynchWaitParams *waitp;
-
-  bool suppress_fatal_errors;  // If true, try to proceed even in the face of
-                               // broken invariants.  This is used within fatal
-                               // signal handlers to improve the chances of
-                               // debug logging information being output
-                               // successfully.
-
-  intptr_t readers;     // Number of readers in mutex.
-  int priority;         // Priority of thread (updated every so often).
-
-  // When priority will next be read (cycles).
-  int64_t next_priority_read_cycles;
+  bool wake;             // This thread is to be woken from a Mutex.
+  // If "x" is on a waiter list for a mutex, "x->cond_waiter" is true iff the
+  // waiter is waiting on the mutex as part of a CV Wait or Mutex Await.
+  //
+  // The value of "x->cond_waiter" is meaningless if "x" is not on a
+  // Mutex waiter list.
+  bool cond_waiter;
+  bool maybe_unlocking;  // Valid at head of Mutex waiter queue;
+                         // true if UnlockSlow could be searching
+                         // for a waiter to wake.  Used for an optimization
+                         // in Enqueue().  true is always a valid value.
+                         // Can be reset to false when the unlocker or any
+                         // writer releases the lock, or a reader fully
+                         // releases the lock.  It may not be set to false
+                         // by a reader that decrements the count to
+                         // non-zero. protected by mutex spinlock
+  bool suppress_fatal_errors;  // If true, try to proceed even in the face
+                               // of broken invariants.  This is used within
+                               // fatal signal handlers to improve the
+                               // chances of debug logging information being
+                               // output successfully.
+  int priority;                // Priority of thread (updated every so often).
 
   // State values:
   //   kAvailable: This PerThreadSynch is available.
@@ -109,30 +110,30 @@ struct PerThreadSynch {
   };
   std::atomic<State> state;
 
-  bool maybe_unlocking;  // Valid at head of Mutex waiter queue;
-                         // true if UnlockSlow could be searching
-                         // for a waiter to wake.  Used for an optimization
-                         // in Enqueue().  true is always a valid value.
-                         // Can be reset to false when the unlocker or any
-                         // writer releases the lock, or a reader fully releases
-                         // the lock.  It may not be set to false by a reader
-                         // that decrements the count to non-zero.
-                         // protected by mutex spinlock
+  // The wait parameters of the current wait.  waitp is null if the
+  // thread is not waiting. Transitions from null to non-null must
+  // occur before the enqueue commit point (state = kQueued in
+  // Enqueue() and CondVarEnqueue()). Transitions from non-null to
+  // null must occur after the wait is finished (state = kAvailable in
+  // Mutex::Block() and CondVar::WaitCommon()). This field may be
+  // changed only by the thread that describes this PerThreadSynch.  A
+  // special case is Fer(), which calls Enqueue() on another thread,
+  // but with an identical SynchWaitParams pointer, thus leaving the
+  // pointer unchanged.
+  SynchWaitParams* waitp;
 
-  bool wake;  // This thread is to be woken from a Mutex.
+  intptr_t readers;     // Number of readers in mutex.
 
-  // If "x" is on a waiter list for a mutex, "x->cond_waiter" is true iff the
-  // waiter is waiting on the mutex as part of a CV Wait or Mutex Await.
-  //
-  // The value of "x->cond_waiter" is meaningless if "x" is not on a
-  // Mutex waiter list.
-  bool cond_waiter;
+  // When priority will next be read (cycles).
+  int64_t next_priority_read_cycles;
 
   // Locks held; used during deadlock detection.
   // Allocated in Synch_GetAllLocks() and freed in ReclaimThreadIdentity().
   SynchLocksHeld *all_locks;
 };
 
+// The instances of this class are allocated in NewThreadIdentity() with an
+// alignment of PerThreadSynch::kAlignment.
 struct ThreadIdentity {
   // Must be the first member.  The Mutex implementation requires that
   // the PerThreadSynch object associated with each thread is
@@ -142,7 +143,7 @@ struct ThreadIdentity {
 
   // Private: Reserved for absl::synchronization_internal::Waiter.
   struct WaiterState {
-    char data[128];
+    alignas(void*) char data[128];
   } waiter_state;
 
   // Used by PerThreadSem::{Get,Set}ThreadBlockedCounter().
@@ -208,9 +209,11 @@ void ClearCurrentThreadIdentity();
 #error ABSL_THREAD_IDENTITY_MODE cannot be direcly set
 #elif defined(ABSL_FORCE_THREAD_IDENTITY_MODE)
 #define ABSL_THREAD_IDENTITY_MODE ABSL_FORCE_THREAD_IDENTITY_MODE
-#elif defined(_WIN32)
+#elif defined(_WIN32) && !defined(__MINGW32__)
 #define ABSL_THREAD_IDENTITY_MODE ABSL_THREAD_IDENTITY_MODE_USE_CPP11
-#elif ABSL_PER_THREAD_TLS && defined(__GOOGLE_GRTE_VERSION__) && \
+#elif defined(__APPLE__) && defined(ABSL_HAVE_THREAD_LOCAL)
+#define ABSL_THREAD_IDENTITY_MODE ABSL_THREAD_IDENTITY_MODE_USE_CPP11
+#elif ABSL_PER_THREAD_TLS && defined(__GOOGLE_GRTE_VERSION__) &&        \
     (__GOOGLE_GRTE_VERSION__ >= 20140228L)
 // Support for async-safe TLS was specifically added in GRTEv4.  It's not
 // present in the upstream eglibc.
@@ -224,11 +227,26 @@ void ClearCurrentThreadIdentity();
 #if ABSL_THREAD_IDENTITY_MODE == ABSL_THREAD_IDENTITY_MODE_USE_TLS || \
     ABSL_THREAD_IDENTITY_MODE == ABSL_THREAD_IDENTITY_MODE_USE_CPP11
 
-extern ABSL_PER_THREAD_TLS_KEYWORD ThreadIdentity* thread_identity_ptr;
+#if ABSL_PER_THREAD_TLS
+ABSL_CONST_INIT extern ABSL_PER_THREAD_TLS_KEYWORD ThreadIdentity*
+    thread_identity_ptr;
+#elif defined(ABSL_HAVE_THREAD_LOCAL)
+ABSL_CONST_INIT extern thread_local ThreadIdentity* thread_identity_ptr;
+#else
+#error Thread-local storage not detected on this platform
+#endif
 
+// thread_local variables cannot be in headers exposed by DLLs. However, it is
+// important for performance reasons in general that
+// `CurrentThreadIdentityIfPresent` be inlined. This is not possible across a
+// DLL boundary so, with DLLs, we opt to have the function not be inlined. Note
+// that `CurrentThreadIdentityIfPresent` is declared above so we can exclude
+// this entire inline definition when compiling as a DLL.
+#if !defined(ABSL_BUILD_DLL) && !defined(ABSL_CONSUME_DLL)
 inline ThreadIdentity* CurrentThreadIdentityIfPresent() {
   return thread_identity_ptr;
 }
+#endif
 
 #elif ABSL_THREAD_IDENTITY_MODE != \
     ABSL_THREAD_IDENTITY_MODE_USE_POSIX_SETSPECIFIC
@@ -236,5 +254,7 @@ inline ThreadIdentity* CurrentThreadIdentityIfPresent() {
 #endif
 
 }  // namespace base_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
+
 #endif  // ABSL_BASE_INTERNAL_THREAD_IDENTITY_H_

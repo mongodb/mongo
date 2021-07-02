@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,14 @@
 #include <unordered_map>
 #include <utility>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
+#include "absl/container/node_hash_map.h"
+
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace base_internal {
 namespace {
 
@@ -74,7 +81,7 @@ static bool using_low_level_alloc = false;
 // allocations and deallocations are reported via the MallocHook
 // interface.
 static void Test(bool use_new_arena, bool call_malloc_hook, int n) {
-  typedef std::unordered_map<int, BlockDesc> AllocMap;
+  typedef absl::node_hash_map<int, BlockDesc> AllocMap;
   AllocMap allocated;
   AllocMap::iterator it;
   BlockDesc block_desc;
@@ -137,6 +144,7 @@ static void Test(bool use_new_arena, bool call_malloc_hook, int n) {
     TEST_ASSERT(LowLevelAlloc::DeleteArena(arena));
   }
 }
+
 // LowLevelAlloc is designed to be safe to call before main().
 static struct BeforeMain {
   BeforeMain() {
@@ -148,10 +156,26 @@ static struct BeforeMain {
 
 }  // namespace
 }  // namespace base_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 int main(int argc, char *argv[]) {
   // The actual test runs in the global constructor of `before_main`.
   printf("PASS\n");
+#ifdef __EMSCRIPTEN__
+  // clang-format off
+// This is JS here. Don't try to format it.
+    MAIN_THREAD_EM_ASM({
+      if (ENVIRONMENT_IS_WEB) {
+        if (typeof TEST_FINISH === 'function') {
+          TEST_FINISH($0);
+        } else {
+          console.error('Attempted to exit with status ' + $0);
+          console.error('But TEST_FINSIHED is not a function.');
+        }
+      }
+    }, 0);
+// clang-format on
+#endif
   return 0;
 }

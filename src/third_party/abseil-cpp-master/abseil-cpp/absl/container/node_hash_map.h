@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -48,6 +48,7 @@
 #include "absl/memory/memory.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace container_internal {
 template <class Key, class Value>
 class NodeHashMapPolicy;
@@ -224,7 +225,8 @@ class node_hash_map
   //
   // size_type erase(const key_type& key):
   //
-  //   Erases the element with the matching key, if it exists.
+  //   Erases the element with the matching key, if it exists, returning the
+  //   number of elements erased (0 or 1).
   using Base::erase;
 
   // node_hash_map::insert()
@@ -351,6 +353,10 @@ class node_hash_map
   // Inserts (via copy or move) the element of the specified key into the
   // `node_hash_map` using the position of `hint` as a non-binding suggestion
   // for where to begin the insertion search.
+  //
+  // All `try_emplace()` overloads make the same guarantees regarding rvalue
+  // arguments as `std::unordered_map::try_emplace()`, namely that these
+  // functions will not move from rvalue arguments if insertions do not happen.
   using Base::try_emplace;
 
   // node_hash_map::extract()
@@ -369,6 +375,11 @@ class node_hash_map
   //   key value and returns a node handle owning that extracted data. If the
   //   `node_hash_map` does not contain an element with a matching key, this
   //   function returns an empty node handle.
+  //
+  // NOTE: when compiled in an earlier version of C++ than C++17,
+  // `node_type::key()` returns a const reference to the key instead of a
+  // mutable reference. We cannot safely return a mutable reference without
+  // std::launder (which is not available before C++17).
   using Base::extract;
 
   // node_hash_map::merge()
@@ -509,13 +520,16 @@ class node_hash_map
   //
   // Returns the function used for comparing keys equality.
   using Base::key_eq;
-
-  ABSL_DEPRECATED("Call `hash_function()` instead.")
-  typename Base::hasher hash_funct() { return this->hash_function(); }
-
-  ABSL_DEPRECATED("Call `rehash()` instead.")
-  void resize(typename Base::size_type hint) { this->rehash(hint); }
 };
+
+// erase_if(node_hash_map<>, Pred)
+//
+// Erases all elements that satisfy the predicate `pred` from the container `c`.
+template <typename K, typename V, typename H, typename E, typename A,
+          typename Predicate>
+void erase_if(node_hash_map<K, V, H, E, A>& c, Predicate pred) {
+  container_internal::EraseIf(pred, &c);
+}
 
 namespace container_internal {
 
@@ -577,6 +591,7 @@ struct IsUnorderedContainer<
 
 }  // namespace container_algorithm_internal
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_CONTAINER_NODE_HASH_MAP_H_

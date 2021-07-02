@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,6 +13,9 @@
 // limitations under the License.
 
 #include "absl/types/any.h"
+
+// This test is a no-op when absl::any is an alias for std::any.
+#if !defined(ABSL_USES_STD_ANY)
 
 #include <initializer_list>
 #include <type_traits>
@@ -154,6 +157,14 @@ TEST(AnyTest, InPlaceConstruction) {
   EXPECT_EQ(5, v.value);
 }
 
+TEST(AnyTest, InPlaceConstructionVariableTemplate) {
+  const CopyOnly copy_only{};
+  absl::any o(absl::in_place_type<IntMoveOnlyCopyOnly>, 5, MoveOnly(),
+              copy_only);
+  auto& v = absl::any_cast<IntMoveOnlyCopyOnly&>(o);
+  EXPECT_EQ(5, v.value);
+}
+
 TEST(AnyTest, InPlaceConstructionWithCV) {
   const CopyOnly copy_only{};
   absl::any o(absl::in_place_type_t<const volatile IntMoveOnlyCopyOnly>(), 5,
@@ -162,9 +173,23 @@ TEST(AnyTest, InPlaceConstructionWithCV) {
   EXPECT_EQ(5, v.value);
 }
 
+TEST(AnyTest, InPlaceConstructionWithCVVariableTemplate) {
+  const CopyOnly copy_only{};
+  absl::any o(absl::in_place_type<const volatile IntMoveOnlyCopyOnly>, 5,
+              MoveOnly(), copy_only);
+  auto& v = absl::any_cast<IntMoveOnlyCopyOnly&>(o);
+  EXPECT_EQ(5, v.value);
+}
+
 TEST(AnyTest, InPlaceConstructionWithFunction) {
   absl::any o(absl::in_place_type_t<FunctionType>(), FunctionToEmplace);
   FunctionType*& construction_result = absl::any_cast<FunctionType*&>(o);
+  EXPECT_EQ(&FunctionToEmplace, construction_result);
+}
+
+TEST(AnyTest, InPlaceConstructionWithFunctionVariableTemplate) {
+  absl::any o(absl::in_place_type<FunctionType>, FunctionToEmplace);
+  auto& construction_result = absl::any_cast<FunctionType*&>(o);
   EXPECT_EQ(&FunctionToEmplace, construction_result);
 }
 
@@ -175,11 +200,27 @@ TEST(AnyTest, InPlaceConstructionWithArray) {
   EXPECT_EQ(&ar[0], construction_result);
 }
 
+TEST(AnyTest, InPlaceConstructionWithArrayVariableTemplate) {
+  ArrayType ar = {5, 42};
+  absl::any o(absl::in_place_type<ArrayType>, ar);
+  auto& construction_result = absl::any_cast<DecayedArray&>(o);
+  EXPECT_EQ(&ar[0], construction_result);
+}
+
 TEST(AnyTest, InPlaceConstructionIlist) {
   const CopyOnly copy_only{};
   absl::any o(absl::in_place_type_t<ListMoveOnlyCopyOnly>(), {1, 2, 3, 4},
               MoveOnly(), copy_only);
   ListMoveOnlyCopyOnly& v = absl::any_cast<ListMoveOnlyCopyOnly&>(o);
+  std::vector<int> expected_values = {1, 2, 3, 4};
+  EXPECT_EQ(expected_values, v.values);
+}
+
+TEST(AnyTest, InPlaceConstructionIlistVariableTemplate) {
+  const CopyOnly copy_only{};
+  absl::any o(absl::in_place_type<ListMoveOnlyCopyOnly>, {1, 2, 3, 4},
+              MoveOnly(), copy_only);
+  auto& v = absl::any_cast<ListMoveOnlyCopyOnly&>(o);
   std::vector<int> expected_values = {1, 2, 3, 4};
   EXPECT_EQ(expected_values, v.values);
 }
@@ -193,8 +234,22 @@ TEST(AnyTest, InPlaceConstructionIlistWithCV) {
   EXPECT_EQ(expected_values, v.values);
 }
 
+TEST(AnyTest, InPlaceConstructionIlistWithCVVariableTemplate) {
+  const CopyOnly copy_only{};
+  absl::any o(absl::in_place_type<const volatile ListMoveOnlyCopyOnly>,
+              {1, 2, 3, 4}, MoveOnly(), copy_only);
+  auto& v = absl::any_cast<ListMoveOnlyCopyOnly&>(o);
+  std::vector<int> expected_values = {1, 2, 3, 4};
+  EXPECT_EQ(expected_values, v.values);
+}
+
 TEST(AnyTest, InPlaceNoArgs) {
   absl::any o(absl::in_place_type_t<int>{});
+  EXPECT_EQ(0, absl::any_cast<int&>(o));
+}
+
+TEST(AnyTest, InPlaceNoArgsVariableTemplate) {
+  absl::any o(absl::in_place_type<int>);
   EXPECT_EQ(0, absl::any_cast<int&>(o));
 }
 
@@ -501,7 +556,7 @@ TEST(AnyTest, Copy) {
   InstanceTracker tracker_raii;
 
   {
-    absl::any o(absl::in_place_type_t<CopyableOnlyInstance>{}, 123);
+    absl::any o(absl::in_place_type<CopyableOnlyInstance>, 123);
     CopyableOnlyInstance* f1 = absl::any_cast<CopyableOnlyInstance>(&o);
 
     absl::any o2(o);
@@ -587,7 +642,7 @@ TEST(AnyTest, ConversionConstructionCausesOneCopy) {
 // Tests for Exception Behavior //
 //////////////////////////////////
 
-#if defined(ABSL_HAVE_STD_ANY)
+#if defined(ABSL_USES_STD_ANY)
 
 // If using a std `any` implementation, we can't check for a specific message.
 #define ABSL_ANY_TEST_EXPECT_BAD_ANY_CAST(...)                      \
@@ -601,7 +656,7 @@ TEST(AnyTest, ConversionConstructionCausesOneCopy) {
   ABSL_BASE_INTERNAL_EXPECT_FAIL((__VA_ARGS__), absl::bad_any_cast, \
                                  "Bad any cast")
 
-#endif  // defined(ABSL_HAVE_STD_ANY)
+#endif  // defined(ABSL_USES_STD_ANY)
 
 TEST(AnyTest, ThrowBadAlloc) {
   {
@@ -622,7 +677,7 @@ TEST(AnyTest, ThrowBadAlloc) {
   }
 
   {
-    absl::any a(absl::in_place_type_t<int>{});
+    absl::any a(absl::in_place_type<int>);
     ABSL_ANY_TEST_EXPECT_BAD_ANY_CAST(absl::any_cast<float&>(a));
     ABSL_ANY_TEST_EXPECT_BAD_ANY_CAST(absl::any_cast<const float&>(a));
     ABSL_ANY_TEST_EXPECT_BAD_ANY_CAST(absl::any_cast<float&&>(absl::any{}));
@@ -665,7 +720,7 @@ TEST(AnyTest, FailedCopy) {
   }
 
   {
-    absl::any src(absl::in_place_type_t<BadCopyable>{});
+    absl::any src(absl::in_place_type<BadCopyable>);
     ABSL_ANY_TEST_EXPECT_BAD_COPY(absl::any{src});
   }
 
@@ -677,21 +732,21 @@ TEST(AnyTest, FailedCopy) {
 
   {
     BadCopyable bad;
-    absl::any target(absl::in_place_type_t<BadCopyable>{});
+    absl::any target(absl::in_place_type<BadCopyable>);
     ABSL_ANY_TEST_EXPECT_BAD_COPY(target = bad);
     EXPECT_TRUE(target.has_value());
   }
 
   {
-    absl::any src(absl::in_place_type_t<BadCopyable>{});
+    absl::any src(absl::in_place_type<BadCopyable>);
     absl::any target;
     ABSL_ANY_TEST_EXPECT_BAD_COPY(target = src);
     EXPECT_FALSE(target.has_value());
   }
 
   {
-    absl::any src(absl::in_place_type_t<BadCopyable>{});
-    absl::any target(absl::in_place_type_t<BadCopyable>{});
+    absl::any src(absl::in_place_type<BadCopyable>);
+    absl::any target(absl::in_place_type<BadCopyable>);
     ABSL_ANY_TEST_EXPECT_BAD_COPY(target = src);
     EXPECT_TRUE(target.has_value());
   }
@@ -707,9 +762,9 @@ TEST(AnyTest, FailedEmplace) {
 
   {
     BadCopyable bad;
-    absl::any target(absl::in_place_type_t<int>{});
+    absl::any target(absl::in_place_type<int>);
     ABSL_ANY_TEST_EXPECT_BAD_COPY(target.emplace<BadCopyable>(bad));
-#if defined(ABSL_HAVE_STD_ANY) && defined(__GLIBCXX__)
+#if defined(ABSL_USES_STD_ANY) && defined(__GLIBCXX__)
     // libstdc++ std::any::emplace() implementation (as of 7.2) has a bug: if an
     // exception is thrown, *this contains a value.
 #define ABSL_GLIBCXX_ANY_EMPLACE_EXCEPTION_BUG 1
@@ -722,3 +777,5 @@ TEST(AnyTest, FailedEmplace) {
 }
 
 }  // namespace
+
+#endif  // #if !defined(ABSL_USES_STD_ANY)

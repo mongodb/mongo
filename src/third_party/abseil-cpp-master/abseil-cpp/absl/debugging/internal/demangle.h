@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -53,7 +53,10 @@
 #ifndef ABSL_DEBUGGING_INTERNAL_DEMANGLE_H_
 #define ABSL_DEBUGGING_INTERNAL_DEMANGLE_H_
 
+#include "absl/base/config.h"
+
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace debugging_internal {
 
 // Demangle `mangled`.  On success, return true and write the
@@ -62,6 +65,7 @@ namespace debugging_internal {
 bool Demangle(const char *mangled, char *out, int out_size);
 
 }  // namespace debugging_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_DEBUGGING_INTERNAL_DEMANGLE_H_

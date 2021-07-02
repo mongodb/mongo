@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +15,21 @@
 #ifndef ABSL_CONTAINER_INTERNAL_UNORDERED_MAP_MODIFIERS_TEST_H_
 #define ABSL_CONTAINER_INTERNAL_UNORDERED_MAP_MODIFIERS_TEST_H_
 
+#include <memory>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/container/internal/hash_generator_testing.h"
 #include "absl/container/internal/hash_policy_testing.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace container_internal {
 
 template <class UnordMap>
 class ModifiersTest : public ::testing::Test {};
 
-TYPED_TEST_CASE_P(ModifiersTest);
+TYPED_TEST_SUITE_P(ModifiersTest);
 
 TYPED_TEST_P(ModifiersTest, Clear) {
   using T = hash_internal::GeneratedType<TypeParam>;
@@ -267,7 +270,49 @@ REGISTER_TYPED_TEST_CASE_P(ModifiersTest, Clear, Insert, InsertHint,
                            Emplace, EmplaceHint, TryEmplace, TryEmplaceHint,
                            Erase, EraseRange, EraseKey, Swap);
 
+template <typename Type>
+struct is_unique_ptr : std::false_type {};
+
+template <typename Type>
+struct is_unique_ptr<std::unique_ptr<Type>> : std::true_type {};
+
+template <class UnordMap>
+class UniquePtrModifiersTest : public ::testing::Test {
+ protected:
+  UniquePtrModifiersTest() {
+    static_assert(is_unique_ptr<typename UnordMap::mapped_type>::value,
+                  "UniquePtrModifiersTyest may only be called with a "
+                  "std::unique_ptr value type.");
+  }
+};
+
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(UniquePtrModifiersTest);
+
+TYPED_TEST_SUITE_P(UniquePtrModifiersTest);
+
+// Test that we do not move from rvalue arguments if an insertion does not
+// happen.
+TYPED_TEST_P(UniquePtrModifiersTest, TryEmplace) {
+#ifdef UNORDERED_MAP_CXX17
+  using T = hash_internal::GeneratedType<TypeParam>;
+  using V = typename TypeParam::mapped_type;
+  T val = hash_internal::Generator<T>()();
+  TypeParam m;
+  auto p = m.try_emplace(val.first, std::move(val.second));
+  EXPECT_TRUE(p.second);
+  // A moved from std::unique_ptr is guaranteed to be nullptr.
+  EXPECT_EQ(val.second, nullptr);
+  T val2 = {val.first, hash_internal::Generator<V>()()};
+  p = m.try_emplace(val2.first, std::move(val2.second));
+  EXPECT_FALSE(p.second);
+  EXPECT_NE(val2.second, nullptr);
+#endif
+}
+
+REGISTER_TYPED_TEST_SUITE_P(UniquePtrModifiersTest, TryEmplace);
+
 }  // namespace container_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_CONTAINER_INTERNAL_UNORDERED_MAP_MODIFIERS_TEST_H_

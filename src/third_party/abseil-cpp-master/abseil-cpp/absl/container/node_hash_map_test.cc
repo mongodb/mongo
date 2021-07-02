@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,13 +17,16 @@
 #include "absl/container/internal/tracked.h"
 #include "absl/container/internal/unordered_map_constructor_test.h"
 #include "absl/container/internal/unordered_map_lookup_test.h"
+#include "absl/container/internal/unordered_map_members_test.h"
 #include "absl/container/internal/unordered_map_modifiers_test.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace container_internal {
 namespace {
 
 using ::testing::Field;
+using ::testing::IsEmpty;
 using ::testing::Pair;
 using ::testing::UnorderedElementsAre;
 
@@ -34,9 +37,10 @@ using MapTypes = ::testing::Types<
                         StatefulTestingEqual,
                         Alloc<std::pair<const std::string, std::string>>>>;
 
-INSTANTIATE_TYPED_TEST_CASE_P(NodeHashMap, ConstructorTest, MapTypes);
-INSTANTIATE_TYPED_TEST_CASE_P(NodeHashMap, LookupTest, MapTypes);
-INSTANTIATE_TYPED_TEST_CASE_P(NodeHashMap, ModifiersTest, MapTypes);
+INSTANTIATE_TYPED_TEST_SUITE_P(NodeHashMap, ConstructorTest, MapTypes);
+INSTANTIATE_TYPED_TEST_SUITE_P(NodeHashMap, LookupTest, MapTypes);
+INSTANTIATE_TYPED_TEST_SUITE_P(NodeHashMap, MembersTest, MapTypes);
+INSTANTIATE_TYPED_TEST_SUITE_P(NodeHashMap, ModifiersTest, MapTypes);
 
 using M = absl::node_hash_map<std::string, Tracked<int>>;
 
@@ -213,6 +217,59 @@ TEST(NodeHashMap, MergeExtractInsert) {
   EXPECT_THAT(set2, UnorderedElementsAre(Elem(7, -70), Elem(17, 23)));
 }
 
+bool FirstIsEven(std::pair<const int, int> p) { return p.first % 2 == 0; }
+
+TEST(NodeHashMap, EraseIf) {
+  // Erase all elements.
+  {
+    node_hash_map<int, int> s = {{1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}};
+    erase_if(s, [](std::pair<const int, int>) { return true; });
+    EXPECT_THAT(s, IsEmpty());
+  }
+  // Erase no elements.
+  {
+    node_hash_map<int, int> s = {{1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}};
+    erase_if(s, [](std::pair<const int, int>) { return false; });
+    EXPECT_THAT(s, UnorderedElementsAre(Pair(1, 1), Pair(2, 2), Pair(3, 3),
+                                        Pair(4, 4), Pair(5, 5)));
+  }
+  // Erase specific elements.
+  {
+    node_hash_map<int, int> s = {{1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}};
+    erase_if(s,
+             [](std::pair<const int, int> kvp) { return kvp.first % 2 == 1; });
+    EXPECT_THAT(s, UnorderedElementsAre(Pair(2, 2), Pair(4, 4)));
+  }
+  // Predicate is function reference.
+  {
+    node_hash_map<int, int> s = {{1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}};
+    erase_if(s, FirstIsEven);
+    EXPECT_THAT(s, UnorderedElementsAre(Pair(1, 1), Pair(3, 3), Pair(5, 5)));
+  }
+  // Predicate is function pointer.
+  {
+    node_hash_map<int, int> s = {{1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}};
+    erase_if(s, &FirstIsEven);
+    EXPECT_THAT(s, UnorderedElementsAre(Pair(1, 1), Pair(3, 3), Pair(5, 5)));
+  }
+}
+
+// This test requires std::launder for mutable key access in node handles.
+#if defined(__cpp_lib_launder) && __cpp_lib_launder >= 201606
+TEST(NodeHashMap, NodeHandleMutableKeyAccess) {
+  node_hash_map<std::string, std::string> map;
+
+  map["key1"] = "mapped";
+
+  auto nh = map.extract(map.begin());
+  nh.key().resize(3);
+  map.insert(std::move(nh));
+
+  EXPECT_THAT(map, testing::ElementsAre(Pair("key", "mapped")));
+}
+#endif
+
 }  // namespace
 }  // namespace container_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

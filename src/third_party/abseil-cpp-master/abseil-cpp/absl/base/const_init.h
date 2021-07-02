@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +21,8 @@
 
 #ifndef ABSL_BASE_CONST_INIT_H_
 #define ABSL_BASE_CONST_INIT_H_
+
+#include "absl/base/config.h"
 
 // In general, objects with static storage duration (such as global variables)
 // can trigger tricky object lifetime situations.  Attempting to access them
@@ -60,14 +62,15 @@
 //
 // The absl::kConstInit tag should only be used to define objects with static
 // or thread_local storage duration.
-//
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 enum ConstInitType {
   kConstInit,
 };
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_BASE_CONST_INIT_H_

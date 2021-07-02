@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -63,6 +63,7 @@
 #endif  // __APPLE__
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace base_internal {
 
 // A first-fit allocator with amortized logarithmic free() time.
@@ -203,32 +204,33 @@ struct LowLevelAlloc::Arena {
 
   base_internal::SpinLock mu;
   // Head of free list, sorted by address
-  AllocList freelist GUARDED_BY(mu);
+  AllocList freelist ABSL_GUARDED_BY(mu);
   // Count of allocated blocks
-  int32_t allocation_count GUARDED_BY(mu);
+  int32_t allocation_count ABSL_GUARDED_BY(mu);
   // flags passed to NewArena
   const uint32_t flags;
   // Result of sysconf(_SC_PAGESIZE)
   const size_t pagesize;
   // Lowest power of two >= max(16, sizeof(AllocList))
-  const size_t roundup;
+  const size_t round_up;
   // Smallest allocation block size
   const size_t min_size;
   // PRNG state
-  uint32_t random GUARDED_BY(mu);
+  uint32_t random ABSL_GUARDED_BY(mu);
 };
 
 namespace {
-using ArenaStorage = std::aligned_storage<sizeof(LowLevelAlloc::Arena),
-                                          alignof(LowLevelAlloc::Arena)>::type;
-
 // Static storage space for the lazily-constructed, default global arena
 // instances.  We require this space because the whole point of LowLevelAlloc
 // is to avoid relying on malloc/new.
-ArenaStorage default_arena_storage;
-ArenaStorage unhooked_arena_storage;
+alignas(LowLevelAlloc::Arena) unsigned char default_arena_storage[sizeof(
+    LowLevelAlloc::Arena)];
+alignas(LowLevelAlloc::Arena) unsigned char unhooked_arena_storage[sizeof(
+    LowLevelAlloc::Arena)];
 #ifndef ABSL_LOW_LEVEL_ALLOC_ASYNC_SIGNAL_SAFE_MISSING
-ArenaStorage unhooked_async_sig_safe_arena_storage;
+alignas(
+    LowLevelAlloc::Arena) unsigned char unhooked_async_sig_safe_arena_storage
+    [sizeof(LowLevelAlloc::Arena)];
 #endif
 
 // We must use LowLevelCallOnce here to construct the global arenas, rather than
@@ -275,10 +277,10 @@ static const uintptr_t kMagicAllocated = 0x4c833e95U;
 static const uintptr_t kMagicUnallocated = ~kMagicAllocated;
 
 namespace {
-class SCOPED_LOCKABLE ArenaLock {
+class ABSL_SCOPED_LOCKABLE ArenaLock {
  public:
   explicit ArenaLock(LowLevelAlloc::Arena *arena)
-      EXCLUSIVE_LOCK_FUNCTION(arena->mu)
+      ABSL_EXCLUSIVE_LOCK_FUNCTION(arena->mu)
       : arena_(arena) {
 #ifndef ABSL_LOW_LEVEL_ALLOC_ASYNC_SIGNAL_SAFE_MISSING
     if ((arena->flags & LowLevelAlloc::kAsyncSignalSafe) != 0) {
@@ -290,11 +292,14 @@ class SCOPED_LOCKABLE ArenaLock {
     arena_->mu.Lock();
   }
   ~ArenaLock() { ABSL_RAW_CHECK(left_, "haven't left Arena region"); }
-  void Leave() UNLOCK_FUNCTION() {
+  void Leave() ABSL_UNLOCK_FUNCTION() {
     arena_->mu.Unlock();
 #ifndef ABSL_LOW_LEVEL_ALLOC_ASYNC_SIGNAL_SAFE_MISSING
     if (mask_valid_) {
-      pthread_sigmask(SIG_SETMASK, &mask_, nullptr);
+      const int err = pthread_sigmask(SIG_SETMASK, &mask_, nullptr);
+      if (err != 0) {
+        ABSL_RAW_LOG(FATAL, "pthread_sigmask failed: %d", err);
+      }
     }
 #endif
     left_ = true;
@@ -333,11 +338,11 @@ size_t GetPageSize() {
 
 size_t RoundedUpBlockSize() {
   // Round up block sizes to a power of two close to the header size.
-  size_t roundup = 16;
-  while (roundup < sizeof(AllocList::Header)) {
-    roundup += roundup;
+  size_t round_up = 16;
+  while (round_up < sizeof(AllocList::Header)) {
+    round_up += round_up;
   }
-  return roundup;
+  return round_up;
 }
 
 }  // namespace
@@ -347,8 +352,8 @@ LowLevelAlloc::Arena::Arena(uint32_t flags_value)
       allocation_count(0),
       flags(flags_value),
       pagesize(GetPageSize()),
-      roundup(RoundedUpBlockSize()),
-      min_size(2 * roundup),
+      round_up(RoundedUpBlockSize()),
+      min_size(2 * round_up),
       random(0) {
   freelist.header.size = 0;
   freelist.header.magic =
@@ -444,7 +449,7 @@ static inline uintptr_t RoundUp(uintptr_t addr, uintptr_t align) {
 // that the freelist is in the correct order, that it
 // consists of regions marked "unallocated", and that no two regions
 // are adjacent in memory (they should have been coalesced).
-// L < arena->mu
+// L >= arena->mu
 static AllocList *Next(int i, AllocList *prev, LowLevelAlloc::Arena *arena) {
   ABSL_RAW_CHECK(i < prev->levels, "too few levels in Next()");
   AllocList *next = prev->next[i];
@@ -505,8 +510,6 @@ void LowLevelAlloc::Free(void *v) {
   if (v != nullptr) {
     AllocList *f = reinterpret_cast<AllocList *>(
                         reinterpret_cast<char *>(v) - sizeof (f->header));
-    ABSL_RAW_CHECK(f->header.magic == Magic(kMagicAllocated, &f->header),
-                   "bad magic number in Free()");
     LowLevelAlloc::Arena *arena = f->header.arena;
     ArenaLock section(arena);
     AddToFreelist(v, arena);
@@ -525,7 +528,7 @@ static void *DoAllocWithArena(size_t request, LowLevelAlloc::Arena *arena) {
     ArenaLock section(arena);
     // round up with header
     size_t req_rnd = RoundUp(CheckedAdd(request, sizeof (s->header)),
-                             arena->roundup);
+                             arena->round_up);
     for (;;) {      // loop until we find a suitable region
       // find the minimum levels that a block of this size must have
       int i = LLA_SkiplistLevels(req_rnd, arena->min_size, nullptr) - 1;
@@ -595,7 +598,7 @@ static void *DoAllocWithArena(size_t request, LowLevelAlloc::Arena *arena) {
     section.Leave();
     result = &s->levels;
   }
-  ANNOTATE_MEMORY_IS_UNINITIALIZED(result, request);
+  ABSL_ANNOTATE_MEMORY_IS_UNINITIALIZED(result, request);
   return result;
 }
 
@@ -611,6 +614,7 @@ void *LowLevelAlloc::AllocWithArena(size_t request, Arena *arena) {
 }
 
 }  // namespace base_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_LOW_LEVEL_ALLOC_MISSING

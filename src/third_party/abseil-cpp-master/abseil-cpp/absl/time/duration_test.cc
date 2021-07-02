@@ -4,13 +4,17 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+#if defined(_MSC_VER)
+#include <winsock2.h>  // for timeval
+#endif
 
 #include <chrono>  // NOLINT(build/c++11)
 #include <cmath>
@@ -758,11 +762,6 @@ TEST(Duration, DivisionByZero) {
   const double dbl_inf = std::numeric_limits<double>::infinity();
   const double dbl_denorm = std::numeric_limits<double>::denorm_min();
 
-  // IEEE 754 behavior
-  double z = 0.0, two = 2.0;
-  EXPECT_TRUE(std::isinf(two / z));
-  EXPECT_TRUE(std::isnan(z / z));  // We'll return inf
-
   // Operator/(Duration, double)
   EXPECT_EQ(inf, zero / 0.0);
   EXPECT_EQ(-inf, zero / -0.0);
@@ -1046,7 +1045,7 @@ TEST(Duration, Multiplication) {
   EXPECT_EQ(absl::Seconds(666666666) + absl::Nanoseconds(666666667) +
                 absl::Nanoseconds(1) / 2,
             sigfigs / 3);
-  sigfigs = absl::Seconds(7000000000LL);
+  sigfigs = absl::Seconds(int64_t{7000000000});
   EXPECT_EQ(absl::Seconds(2333333333) + absl::Nanoseconds(333333333) +
                 absl::Nanoseconds(1) / 4,
             sigfigs / 3);
@@ -1370,10 +1369,13 @@ TEST(Duration, SmallConversions) {
   EXPECT_THAT(ToTimeval(absl::Nanoseconds(2000)), TimevalMatcher(tv));
 }
 
-void VerifySameAsMul(double time_as_seconds, int* const misses) {
+void VerifyApproxSameAsMul(double time_as_seconds, int* const misses) {
   auto direct_seconds = absl::Seconds(time_as_seconds);
   auto mul_by_one_second = time_as_seconds * absl::Seconds(1);
-  if (direct_seconds != mul_by_one_second) {
+  // These are expected to differ by up to one tick due to fused multiply/add
+  // contraction.
+  if (absl::AbsDuration(direct_seconds - mul_by_one_second) >
+      absl::time_internal::MakeDuration(0, 1u)) {
     if (*misses > 10) return;
     ASSERT_LE(++(*misses), 10) << "Too many errors, not reporting more.";
     EXPECT_EQ(direct_seconds, mul_by_one_second)
@@ -1385,7 +1387,8 @@ void VerifySameAsMul(double time_as_seconds, int* const misses) {
 // For a variety of interesting durations, we find the exact point
 // where one double converts to that duration, and the very next double
 // converts to the next duration.  For both of those points, verify that
-// Seconds(point) returns the same duration as point * Seconds(1.0)
+// Seconds(point) returns a duration near point * Seconds(1.0). (They may
+// not be exactly equal due to fused multiply/add contraction.)
 TEST(Duration, ToDoubleSecondsCheckEdgeCases) {
   constexpr uint32_t kTicksPerSecond = absl::time_internal::kTicksPerSecond;
   constexpr auto duration_tick = absl::time_internal::MakeDuration(0, 1u);
@@ -1424,8 +1427,8 @@ TEST(Duration, ToDoubleSecondsCheckEdgeCases) {
         }
         // Now low_edge is the highest double that converts to Duration d,
         // and high_edge is the lowest double that converts to Duration after_d.
-        VerifySameAsMul(low_edge, &misses);
-        VerifySameAsMul(high_edge, &misses);
+        VerifyApproxSameAsMul(low_edge, &misses);
+        VerifyApproxSameAsMul(high_edge, &misses);
       }
     }
   }
@@ -1445,8 +1448,8 @@ TEST(Duration, ToDoubleSecondsCheckRandom) {
   int misses = 0;
   for (int i = 0; i < 1000000; ++i) {
     double d = std::exp(uniform(gen));
-    VerifySameAsMul(d, &misses);
-    VerifySameAsMul(-d, &misses);
+    VerifyApproxSameAsMul(d, &misses);
+    VerifyApproxSameAsMul(-d, &misses);
   }
 }
 
@@ -1771,7 +1774,7 @@ TEST(Duration, ParseDuration) {
 TEST(Duration, FormatParseRoundTrip) {
 #define TEST_PARSE_ROUNDTRIP(d)                \
   do {                                         \
-    std::string s = absl::FormatDuration(d);        \
+    std::string s = absl::FormatDuration(d);   \
     absl::Duration dur;                        \
     EXPECT_TRUE(absl::ParseDuration(s, &dur)); \
     EXPECT_EQ(d, dur);                         \

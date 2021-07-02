@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,13 +32,22 @@
 
 #include <cstddef>
 
+#include "absl/base/config.h"
+
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 // HaveLeakSanitizer()
 //
 // Returns true if a leak-checking sanitizer (either ASan or standalone LSan) is
 // currently built into this target.
 bool HaveLeakSanitizer();
+
+// LeakCheckerIsActive()
+//
+// Returns true if a leak-checking sanitizer (either ASan or standalone LSan) is
+// currently built into this target and is turned on.
+bool LeakCheckerIsActive();
 
 // DoIgnoreLeak()
 //
@@ -59,13 +68,27 @@ void DoIgnoreLeak(const void* ptr);
 //
 // If the passed `ptr` does not point to an actively allocated object at the
 // time `IgnoreLeak()` is called, the call is a no-op; if it is actively
-// allocated, the object must not get deallocated later.
+// allocated, leak sanitizer will assume this object is referenced even if
+// there is no actual reference in user memory.
 //
 template <typename T>
 T* IgnoreLeak(T* ptr) {
   DoIgnoreLeak(ptr);
   return ptr;
 }
+
+// FindAndReportLeaks()
+//
+// If any leaks are detected, prints a leak report and returns true.  This
+// function may be called repeatedly, and does not affect end-of-process leak
+// checking.
+//
+// Example:
+// if (FindAndReportLeaks()) {
+//   ... diagnostic already printed. Exit with failure code.
+//   exit(1)
+// }
+bool FindAndReportLeaks();
 
 // LeakCheckDisabler
 //
@@ -104,6 +127,7 @@ void RegisterLivePointers(const void* ptr, size_t size);
 // `RegisterLivePointers()`, enabling leak checking of those pointers.
 void UnRegisterLivePointers(const void* ptr, size_t size);
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_DEBUGGING_LEAK_CHECK_H_

@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+#   https://www.apache.org/licenses/LICENSE-2.0
 #
 #   Unless required by applicable law or agreed to in writing, software
 #   distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,21 +12,32 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
 package(features = ["-parse_headers"])
 
-licenses(["notice"])  # Apache License
+licenses(["notice"])
+
+filegroup(
+    name = "zoneinfo",
+    srcs = glob(["testdata/zoneinfo/**"]),
+)
+
+config_setting(
+    name = "osx",
+    constraint_values = [
+        "@bazel_tools//platforms:osx",
+    ],
+)
+
+config_setting(
+    name = "ios",
+    constraint_values = [
+        "@bazel_tools//platforms:ios",
+    ],
+)
 
 ### libraries
-
-cc_library(
-    name = "includes",
-    textual_hdrs = [
-        "include/cctz/civil_time.h",
-        "include/cctz/civil_time_detail.h",
-        "include/cctz/time_zone.h",
-    ],
-    visibility = ["//absl/time:__pkg__"],
-)
 
 cc_library(
     name = "civil_time",
@@ -36,6 +47,7 @@ cc_library(
     ],
     textual_hdrs = ["include/cctz/civil_time_detail.h"],
     visibility = ["//visibility:public"],
+    deps = ["//absl/base:config"],
 )
 
 cc_library(
@@ -62,11 +74,28 @@ cc_library(
         "include/cctz/time_zone.h",
         "include/cctz/zone_info_source.h",
     ],
+    linkopts = select({
+        ":osx": [
+            "-framework Foundation",
+        ],
+        ":ios": [
+            "-framework Foundation",
+        ],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
-    deps = [":civil_time"],
+    deps = [
+        ":civil_time",
+        "//absl/base:config",
+    ],
 )
 
 ### tests
+
+test_suite(
+    name = "all_tests",
+    visibility = ["//visibility:public"],
+)
 
 cc_test(
     name = "civil_time_test",
@@ -74,6 +103,7 @@ cc_test(
     srcs = ["src/civil_time_test.cc"],
     deps = [
         ":civil_time",
+        "//absl/base:config",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -91,6 +121,7 @@ cc_test(
     deps = [
         ":civil_time",
         ":time_zone",
+        "//absl/base:config",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -98,17 +129,18 @@ cc_test(
 cc_test(
     name = "time_zone_lookup_test",
     size = "small",
+    timeout = "moderate",
     srcs = ["src/time_zone_lookup_test.cc"],
     data = [":zoneinfo"],
     tags = [
         "no_test_android_arm",
         "no_test_android_arm64",
         "no_test_android_x86",
-        "no_test_wasm",
     ],
     deps = [
         ":civil_time",
         ":time_zone",
+        "//absl/base:config",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -129,6 +161,7 @@ cc_test(
     deps = [
         ":civil_time",
         ":time_zone",
+        "//absl/base:config",
         "@com_github_google_benchmark//:benchmark_main",
     ],
 )
@@ -136,8 +169,3 @@ cc_test(
 ### examples
 
 ### binaries
-
-filegroup(
-    name = "zoneinfo",
-    srcs = glob(["testdata/zoneinfo/**"]),
-)

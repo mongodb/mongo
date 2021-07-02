@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,6 +25,7 @@
 #include "absl/strings/str_join.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace hash_internal {
 
 // SpyHashState is an implementation of the HashState API that simply
@@ -39,8 +40,7 @@ namespace hash_internal {
 template <typename T>
 class SpyHashStateImpl : public HashStateBase<SpyHashStateImpl<T>> {
  public:
-  SpyHashStateImpl()
-      : error_(std::make_shared<absl::optional<std::string>>()) {
+  SpyHashStateImpl() : error_(std::make_shared<absl::optional<std::string>>()) {
     static_assert(std::is_void<T>::value, "");
   }
 
@@ -147,6 +147,19 @@ class SpyHashStateImpl : public HashStateBase<SpyHashStateImpl<T>> {
   static SpyHashStateImpl combine_contiguous(SpyHashStateImpl hash_state,
                                              const unsigned char* begin,
                                              size_t size) {
+    const size_t large_chunk_stride = PiecewiseChunkSize();
+    if (size > large_chunk_stride) {
+      // Combining a large contiguous buffer must have the same effect as
+      // doing it piecewise by the stride length, followed by the (possibly
+      // empty) remainder.
+      while (size >= large_chunk_stride) {
+        hash_state = SpyHashStateImpl::combine_contiguous(
+            std::move(hash_state), begin, large_chunk_stride);
+        begin += large_chunk_stride;
+        size -= large_chunk_stride;
+      }
+    }
+
     hash_state.hash_representation_.emplace_back(
         reinterpret_cast<const char*>(begin), size);
     return hash_state;
@@ -169,7 +182,6 @@ class SpyHashStateImpl : public HashStateBase<SpyHashStateImpl<T>> {
   // AbslHashValue with the wrong type. This detects that the user called
   // AbslHashValue directly (because the hash state type does not match).
   static bool direct_absl_hash_value_error_;
-
 
   std::vector<std::string> hash_representation_;
   // This is a shared_ptr because we want all instances of the particular
@@ -200,7 +212,7 @@ bool RunOnStartup<f>::run = (f(), true);
 template <
     typename T, typename U,
     // Only trigger for when (T != U),
-    absl::enable_if_t<!std::is_same<T, U>::value, int> = 0,
+    typename = absl::enable_if_t<!std::is_same<T, U>::value>,
     // This statement works in two ways:
     //  - First, it instantiates RunOnStartup and forces the initialization of
     //    `run`, which set the global variable.
@@ -213,6 +225,7 @@ void AbslHashValue(SpyHashStateImpl<T>, const U&);
 using SpyHashState = SpyHashStateImpl<void>;
 
 }  // namespace hash_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_HASH_INTERNAL_SPY_HASH_STATE_H_

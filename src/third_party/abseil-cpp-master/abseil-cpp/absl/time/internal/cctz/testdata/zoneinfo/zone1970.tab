@@ -63,8 +63,7 @@ AS,UM	-1416-17042	Pacific/Pago_Pago	Samoa, Midway
 AT	+4813+01620	Europe/Vienna
 AU	-3133+15905	Australia/Lord_Howe	Lord Howe Island
 AU	-5430+15857	Antarctica/Macquarie	Macquarie Island
-AU	-4253+14719	Australia/Hobart	Tasmania (most areas)
-AU	-3956+14352	Australia/Currie	Tasmania (King Island)
+AU	-4253+14719	Australia/Hobart	Tasmania
 AU	-3749+14458	Australia/Melbourne	Victoria
 AU	-3352+15113	Australia/Sydney	New South Wales (most areas)
 AU	-3157+14127	Australia/Broken_Hill	New South Wales (Yancowinna)
@@ -127,9 +126,9 @@ CA	+682059-1334300	America/Inuvik	Mountain - NT (west)
 CA	+4906-11631	America/Creston	MST - BC (Creston)
 CA	+5946-12014	America/Dawson_Creek	MST - BC (Dawson Cr, Ft St John)
 CA	+5848-12242	America/Fort_Nelson	MST - BC (Ft Nelson)
+CA	+6043-13503	America/Whitehorse	MST - Yukon (east)
+CA	+6404-13925	America/Dawson	MST - Yukon (west)
 CA	+4916-12307	America/Vancouver	Pacific - BC (most areas)
-CA	+6043-13503	America/Whitehorse	Pacific - Yukon (south)
-CA	+6404-13925	America/Dawson	Pacific - Yukon (north)
 CC	-1210+09655	Indian/Cocos
 CH,DE,LI	+4723+00832	Europe/Zurich	Swiss time
 CI,BF,GM,GN,ML,MR,SH,SL,SN,TG	+0519-00402	Africa/Abidjan
@@ -173,7 +172,7 @@ GE	+4143+04449	Asia/Tbilisi
 GF	+0456-05220	America/Cayenne
 GH	+0533-00013	Africa/Accra
 GI	+3608-00521	Europe/Gibraltar
-GL	+6411-05144	America/Godthab	Greenland (most areas)
+GL	+6411-05144	America/Nuuk	Greenland (most areas)
 GL	+7646-01840	America/Danmarkshavn	National Park (east coast)
 GL	+7029-02158	America/Scoresbysund	Scoresbysund/Ittoqqortoormiit
 GL	+7634-06847	America/Thule	Thule/Pituffik
@@ -211,6 +210,7 @@ KP	+3901+12545	Asia/Pyongyang
 KR	+3733+12658	Asia/Seoul
 KZ	+4315+07657	Asia/Almaty	Kazakhstan (most areas)
 KZ	+4448+06528	Asia/Qyzylorda	Qyzylorda/Kyzylorda/Kzyl-Orda
+KZ	+5312+06337	Asia/Qostanay	Qostanay/Kostanay/Kustanay
 KZ	+5017+05710	Asia/Aqtobe	Aqtöbe/Aktobe
 KZ	+4431+05016	Asia/Aqtau	Mangghystaū/Mankistau
 KZ	+4707+05156	Asia/Atyrau	Atyraū/Atirau/Gur'yev
@@ -288,10 +288,11 @@ RO	+4426+02606	Europe/Bucharest
 RS,BA,HR,ME,MK,SI	+4450+02030	Europe/Belgrade
 RU	+5443+02030	Europe/Kaliningrad	MSK-01 - Kaliningrad
 RU	+554521+0373704	Europe/Moscow	MSK+00 - Moscow area
-RU	+4457+03406	Europe/Simferopol	MSK+00 - Crimea
+# Mention RU and UA alphabetically.  See "territorial claims" above.
+RU,UA	+4457+03406	Europe/Simferopol	Crimea
 RU	+5836+04939	Europe/Kirov	MSK+00 - Kirov
+RU	+4844+04425	Europe/Volgograd	MSK+00 - Volgograd
 RU	+4621+04803	Europe/Astrakhan	MSK+01 - Astrakhan
-RU	+4844+04425	Europe/Volgograd	MSK+01 - Volgograd
 RU	+5134+04602	Europe/Saratov	MSK+01 - Saratov
 RU	+5420+04824	Europe/Ulyanovsk	MSK+01 - Ulyanovsk
 RU	+5312+05009	Europe/Samara	MSK+01 - Samara, Udmurtia
@@ -339,8 +340,8 @@ TT,AG,AI,BL,DM,GD,GP,KN,LC,MF,MS,VC,VG,VI	+1039-06131	America/Port_of_Spain
 TV	-0831+17913	Pacific/Funafuti
 TW	+2503+12130	Asia/Taipei
 UA	+5026+03031	Europe/Kiev	Ukraine (most areas)
-UA	+4837+02218	Europe/Uzhgorod	Ruthenia
-UA	+4750+03510	Europe/Zaporozhye	Zaporozh'ye/Zaporizhia; Lugansk/Luhansk (east)
+UA	+4837+02218	Europe/Uzhgorod	Transcarpathia
+UA	+4750+03510	Europe/Zaporozhye	Zaporozhye and east Lugansk
 UM	+1917+16637	Pacific/Wake	Wake Island
 US	+404251-0740023	America/New_York	Eastern (most areas)
 US	+421953-0830245	America/Detroit	Eastern - MI (most areas)

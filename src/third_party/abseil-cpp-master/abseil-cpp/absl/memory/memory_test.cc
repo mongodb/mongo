@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@
 #include "absl/memory/memory.h"
 
 #include <sys/types.h>
+
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -36,10 +37,10 @@ using ::testing::Return;
 // been called, via the instance_count variable.
 class DestructorVerifier {
  public:
-  DestructorVerifier() { ++instance_count_;  }
+  DestructorVerifier() { ++instance_count_; }
   DestructorVerifier(const DestructorVerifier&) = delete;
   DestructorVerifier& operator=(const DestructorVerifier&) = delete;
-  ~DestructorVerifier() {  --instance_count_; }
+  ~DestructorVerifier() { --instance_count_; }
 
   // The number of instances of this class currently active.
   static int instance_count() { return instance_count_; }
@@ -156,9 +157,7 @@ struct ArrayWatch {
     allocs().push_back(n);
     return ::operator new[](n);
   }
-  void operator delete[](void* p) {
-    return ::operator delete[](p);
-  }
+  void operator delete[](void* p) { return ::operator delete[](p); }
   static std::vector<size_t>& allocs() {
     static auto& v = *new std::vector<size_t>;
     return v;
@@ -171,8 +170,7 @@ TEST(Make_UniqueTest, Array) {
   ArrayWatch::allocs().clear();
 
   auto p = absl::make_unique<ArrayWatch[]>(5);
-  static_assert(std::is_same<decltype(p),
-                             std::unique_ptr<ArrayWatch[]>>::value,
+  static_assert(std::is_same<decltype(p), std::unique_ptr<ArrayWatch[]>>::value,
                 "unexpected return type");
   EXPECT_THAT(ArrayWatch::allocs(), ElementsAre(5 * sizeof(ArrayWatch)));
 }
@@ -181,7 +179,7 @@ TEST(Make_UniqueTest, NotAmbiguousWithStdMakeUnique) {
   // Ensure that absl::make_unique is not ambiguous with std::make_unique.
   // In C++14 mode, the below call to make_unique has both types as candidates.
   struct TakesStdType {
-    explicit TakesStdType(const std::vector<int> &vec) {}
+    explicit TakesStdType(const std::vector<int>& vec) {}
   };
   using absl::make_unique;
   (void)make_unique<TakesStdType>(std::vector<int>());
@@ -541,8 +539,8 @@ struct MinimalMockAllocator {
   MinimalMockAllocator(const MinimalMockAllocator& other)
       : value(other.value) {}
   using value_type = TestValue;
-  MOCK_METHOD1(allocate, value_type*(size_t));
-  MOCK_METHOD2(deallocate, void(value_type*, size_t));
+  MOCK_METHOD(value_type*, allocate, (size_t));
+  MOCK_METHOD(void, deallocate, (value_type*, size_t));
 
   int value;
 };
@@ -557,7 +555,7 @@ TEST(AllocatorTraits, FunctionsMinimal) {
   EXPECT_CALL(mock, deallocate(&x, 7));
 
   EXPECT_EQ(&x, Traits::allocate(mock, 7));
-  Traits::allocate(mock, 7, static_cast<const void*>(&hint));
+  static_cast<void>(Traits::allocate(mock, 7, static_cast<const void*>(&hint)));
   EXPECT_EQ(&x, Traits::allocate(mock, 7, static_cast<const void*>(&hint)));
   Traits::deallocate(mock, &x, 7);
 
@@ -579,13 +577,14 @@ struct FullMockAllocator {
   explicit FullMockAllocator(int value) : value(value) {}
   FullMockAllocator(const FullMockAllocator& other) : value(other.value) {}
   using value_type = TestValue;
-  MOCK_METHOD1(allocate, value_type*(size_t));
-  MOCK_METHOD2(allocate, value_type*(size_t, const void*));
-  MOCK_METHOD2(construct, void(value_type*, int*));
-  MOCK_METHOD1(destroy, void(value_type*));
-  MOCK_CONST_METHOD0(max_size, size_t());
-  MOCK_CONST_METHOD0(select_on_container_copy_construction,
-                     FullMockAllocator());
+  MOCK_METHOD(value_type*, allocate, (size_t));
+  MOCK_METHOD(value_type*, allocate, (size_t, const void*));
+  MOCK_METHOD(void, construct, (value_type*, int*));
+  MOCK_METHOD(void, destroy, (value_type*));
+  MOCK_METHOD(size_t, max_size, (),
+              (const));
+  MOCK_METHOD(FullMockAllocator, select_on_container_copy_construction, (),
+              (const));
 
   int value;
 };
@@ -620,7 +619,7 @@ TEST(AllocatorTraits, FunctionsFull) {
 }
 
 TEST(AllocatorNoThrowTest, DefaultAllocator) {
-#if ABSL_ALLOCATOR_NOTHROW
+#if defined(ABSL_ALLOCATOR_NOTHROW) && ABSL_ALLOCATOR_NOTHROW
   EXPECT_TRUE(absl::default_allocator_is_nothrow::value);
 #else
   EXPECT_FALSE(absl::default_allocator_is_nothrow::value);
@@ -628,7 +627,7 @@ TEST(AllocatorNoThrowTest, DefaultAllocator) {
 }
 
 TEST(AllocatorNoThrowTest, StdAllocator) {
-#if ABSL_ALLOCATOR_NOTHROW
+#if defined(ABSL_ALLOCATOR_NOTHROW) && ABSL_ALLOCATOR_NOTHROW
   EXPECT_TRUE(absl::allocator_is_nothrow<std::allocator<int>>::value);
 #else
   EXPECT_FALSE(absl::allocator_is_nothrow<std::allocator<int>>::value);
@@ -642,8 +641,7 @@ TEST(AllocatorNoThrowTest, CustomAllocator) {
   struct CanThrowAllocator {
     using is_nothrow = std::false_type;
   };
-  struct UnspecifiedAllocator {
-  };
+  struct UnspecifiedAllocator {};
   EXPECT_TRUE(absl::allocator_is_nothrow<NoThrowAllocator>::value);
   EXPECT_FALSE(absl::allocator_is_nothrow<CanThrowAllocator>::value);
   EXPECT_FALSE(absl::allocator_is_nothrow<UnspecifiedAllocator>::value);

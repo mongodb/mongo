@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -34,6 +34,7 @@
 #include "absl/meta/type_traits.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 // -----------------------------------------------------------------------------
 // Function Template: WrapUnique()
@@ -47,19 +48,14 @@ namespace absl {
 //   X* NewX(int, int);
 //   auto x = WrapUnique(NewX(1, 2));  // 'x' is std::unique_ptr<X>.
 //
-// The purpose of WrapUnique is to automatically deduce the pointer type. If you
-// wish to make the type explicit, for readability reasons or because you prefer
-// to use a base-class pointer rather than a derived one, just use
+// Do not call WrapUnique with an explicit type, as in
+// `WrapUnique<X>(NewX(1, 2))`.  The purpose of WrapUnique is to automatically
+// deduce the pointer type. If you wish to make the type explicit, just use
 // `std::unique_ptr` directly.
 //
-// Example:
-//   X* Factory(int, int);
-//   auto x = std::unique_ptr<X>(Factory(1, 2));
+//   auto x = std::unique_ptr<X>(NewX(1, 2));
 //                  - or -
-//   std::unique_ptr<X> x(Factory(1, 2));
-//
-// This has the added advantage of working whether Factory returns a raw
-// pointer or a `std::unique_ptr`.
+//   std::unique_ptr<X> x(NewX(1, 2));
 //
 // While `absl::WrapUnique` is useful for capturing the output of a raw
 // pointer factory, prefer 'absl::make_unique<T>(args...)' over
@@ -97,11 +93,12 @@ struct MakeUniqueResult<T[N]> {
 
 }  // namespace memory_internal
 
-// gcc 4.8 has __cplusplus at 201301 but doesn't define make_unique.  Other
-// supported compilers either just define __cplusplus as 201103 but have
-// make_unique (msvc), or have make_unique whenever __cplusplus > 201103 (clang)
+// gcc 4.8 has __cplusplus at 201301 but the libstdc++ shipped with it doesn't
+// define make_unique.  Other supported compilers either just define __cplusplus
+// as 201103 but have make_unique (msvc), or have make_unique whenever
+// __cplusplus > 201103 (clang).
 #if (__cplusplus > 201103L || defined(_MSC_VER)) && \
-    !(defined(__GNUC__) && __GNUC__ == 4 && __GNUC_MINOR__ == 8)
+    !(defined(__GLIBCXX__) && !defined(__cpp_lib_make_unique))
 using std::make_unique;
 #else
 // -----------------------------------------------------------------------------
@@ -120,7 +117,7 @@ using std::make_unique;
 //
 // For more background on why `std::unique_ptr<T>(new T(a,b))` is problematic,
 // see Herb Sutter's explanation on
-// (Exception-Safe Function Calls)[http://herbsutter.com/gotw/_102/].
+// (Exception-Safe Function Calls)[https://herbsutter.com/gotw/_102/].
 // (In general, reviewers should treat `new T(a,b)` with scrutiny.)
 //
 // Example usage:
@@ -423,6 +420,9 @@ struct pointer_traits<T*> {
 //
 // A C++11 compatible implementation of C++17's std::allocator_traits.
 //
+#if __cplusplus >= 201703L
+using std::allocator_traits;
+#else  // __cplusplus >= 201703L
 template <typename Alloc>
 struct allocator_traits {
   using allocator_type = Alloc;
@@ -612,6 +612,7 @@ struct allocator_traits {
     return a;
   }
 };
+#endif  // __cplusplus >= 201703L
 
 namespace memory_internal {
 
@@ -646,7 +647,7 @@ struct allocator_is_nothrow
     : memory_internal::ExtractOrT<memory_internal::GetIsNothrow, Alloc,
                                   std::false_type> {};
 
-#if ABSL_ALLOCATOR_NOTHROW
+#if defined(ABSL_ALLOCATOR_NOTHROW) && ABSL_ALLOCATOR_NOTHROW
 template <typename T>
 struct allocator_is_nothrow<std::allocator<T>> : std::true_type {};
 struct default_allocator_is_nothrow : std::true_type {};
@@ -692,6 +693,7 @@ void CopyRange(Allocator& alloc, Iterator destination, InputIterator first,
   }
 }
 }  // namespace memory_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_MEMORY_MEMORY_H_

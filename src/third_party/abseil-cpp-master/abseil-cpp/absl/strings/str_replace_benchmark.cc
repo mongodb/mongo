@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -54,7 +54,7 @@ void SetUpStrings() {
     size_t r = 0;
     big_string = new std::string(1000 * 1000, ' ');
     for (std::string phrase : {"the quick brown fox jumped over the lazy dogs",
-                          "pack my box with the five dozen liquor jugs"}) {
+                               "pack my box with the five dozen liquor jugs"}) {
       for (int i = 0; i < 10 * 1000; ++i) {
         r = r * 237 + 41;  // not very random.
         memcpy(&(*big_string)[r % (big_string->size() - phrase.size())],
@@ -62,7 +62,7 @@ void SetUpStrings() {
       }
     }
     // big_string->resize(50);
-    // OK, we've set up the std::string, now let's set up expectations - first by
+    // OK, we've set up the string, now let's set up expectations - first by
     // just replacing "the" with "box"
     after_replacing_the = new std::string(*big_string);
     for (size_t pos = 0;
@@ -108,11 +108,11 @@ void BM_StrReplaceAll(benchmark::State& state) {
   std::string src = *big_string;
   for (auto _ : state) {
     std::string dest = absl::StrReplaceAll(src, {{"the", "box"},
-                                            {"brown", "quick"},
-                                            {"jumped", "liquored"},
-                                            {"dozen", "brown"},
-                                            {"lazy", "pack"},
-                                            {"liquor", "shakes"}});
+                                                 {"brown", "quick"},
+                                                 {"jumped", "liquored"},
+                                                 {"dozen", "brown"},
+                                                 {"lazy", "pack"},
+                                                 {"liquor", "shakes"}});
     ABSL_RAW_CHECK(dest == *after_replacing_many,
                    "not benchmarking intended behavior");
   }

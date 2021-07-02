@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,8 +27,10 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/base/dynamic_annotations.h"  // for RunningOnValgrind
+#include "absl/base/dynamic_annotations.h"
 #include "absl/base/macros.h"
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/numbers.h"
 
 namespace {
@@ -40,8 +42,8 @@ using ::testing::UnorderedElementsAre;
 TEST(Split, TraitsTest) {
   static_assert(!absl::strings_internal::SplitterIsConvertibleTo<int>::value,
                 "");
-  static_assert(!absl::strings_internal::SplitterIsConvertibleTo<std::string>::value,
-                "");
+  static_assert(
+      !absl::strings_internal::SplitterIsConvertibleTo<std::string>::value, "");
   static_assert(absl::strings_internal::SplitterIsConvertibleTo<
                     std::vector<std::string>>::value,
                 "");
@@ -71,8 +73,8 @@ TEST(Split, TraitsTest) {
 // namespaces just like callers will need to use.
 TEST(Split, APIExamples) {
   {
-    // Passes std::string delimiter. Assumes the default of Literal.
-    std::vector<std::string> v = absl::StrSplit("a,b,c", ',');
+    // Passes string delimiter. Assumes the default of ByString.
+    std::vector<std::string> v = absl::StrSplit("a,b,c", ",");  // NOLINT
     EXPECT_THAT(v, ElementsAre("a", "b", "c"));
 
     // Equivalent to...
@@ -97,18 +99,7 @@ TEST(Split, APIExamples) {
   }
 
   {
-    // Same as above, but using std::string
-    std::vector<std::string> v = absl::StrSplit("a,b,c", ',');
-    EXPECT_THAT(v, ElementsAre("a", "b", "c"));
-
-    // Equivalent to...
-    using absl::ByChar;
-    v = absl::StrSplit("a,b,c", ByChar(','));
-    EXPECT_THAT(v, ElementsAre("a", "b", "c"));
-  }
-
-  {
-    // Uses the Literal std::string "=>" as the delimiter.
+    // Uses the Literal string "=>" as the delimiter.
     const std::vector<std::string> v = absl::StrSplit("a=>b=>c", "=>");
     EXPECT_THAT(v, ElementsAre("a", "b", "c"));
   }
@@ -132,17 +123,17 @@ TEST(Split, APIExamples) {
   }
 
   {
-    // Splits the input std::string into individual characters by using an empty
-    // std::string as the delimiter.
+    // Splits the input string into individual characters by using an empty
+    // string as the delimiter.
     std::vector<std::string> v = absl::StrSplit("abc", "");
     EXPECT_THAT(v, ElementsAre("a", "b", "c"));
   }
 
   {
-    // Splits std::string data with embedded NUL characters, using NUL as the
+    // Splits string data with embedded NUL characters, using NUL as the
     // delimiter. A simple delimiter of "\0" doesn't work because strlen() will
-    // say that's the empty std::string when constructing the absl::string_view
-    // delimiter. Instead, a non-empty std::string containing NUL can be used as the
+    // say that's the empty string when constructing the absl::string_view
+    // delimiter. Instead, a non-empty string containing NUL can be used as the
     // delimiter.
     std::string embedded_nulls("a\0b\0c", 5);
     std::string null_delim("\0", 1);
@@ -182,7 +173,8 @@ TEST(Split, APIExamples) {
   {
     // Uses the SkipWhitespace predicate.
     using absl::SkipWhitespace;
-    std::vector<std::string> v = absl::StrSplit(" a , ,,b,", ',', SkipWhitespace());
+    std::vector<std::string> v =
+        absl::StrSplit(" a , ,,b,", ',', SkipWhitespace());
     EXPECT_THAT(v, ElementsAre(" a ", "b"));
   }
 
@@ -215,7 +207,8 @@ TEST(Split, APIExamples) {
 
   {
     // Results stored in a std::multimap.
-    std::multimap<std::string, std::string> m = absl::StrSplit("a,1,b,2,a,3", ',');
+    std::multimap<std::string, std::string> m =
+        absl::StrSplit("a,1,b,2,a,3", ',');
     EXPECT_EQ(3, m.size());
     auto it = m.find("a");
     EXPECT_EQ("1", it->second);
@@ -271,7 +264,8 @@ TEST(SplitIterator, Basics) {
   EXPECT_EQ("a", *it);  // tests dereference
   ++it;                 // tests preincrement
   EXPECT_NE(it, end);
-  EXPECT_EQ("b", std::string(it->data(), it->size()));  // tests dereference as ptr
+  EXPECT_EQ("b",
+            std::string(it->data(), it->size()));  // tests dereference as ptr
   it++;                                            // tests postincrement
   EXPECT_EQ(it, end);
 }
@@ -295,7 +289,8 @@ TEST(SplitIterator, Predicate) {
   EXPECT_EQ("a", *it);  // tests dereference
   ++it;                 // tests preincrement -- "b" should be skipped here.
   EXPECT_NE(it, end);
-  EXPECT_EQ("c", std::string(it->data(), it->size()));  // tests dereference as ptr
+  EXPECT_EQ("c",
+            std::string(it->data(), it->size()));  // tests dereference as ptr
   it++;                                            // tests postincrement
   EXPECT_EQ(it, end);
 }
@@ -372,7 +367,7 @@ TEST(SplitIterator, EqualityAsEndCondition) {
 TEST(Splitter, RangeIterators) {
   auto splitter = absl::StrSplit("a,b,c", ',');
   std::vector<absl::string_view> output;
-  for (const absl::string_view p : splitter) {
+  for (const absl::string_view& p : splitter) {
     output.push_back(p);
   }
   EXPECT_THAT(output, ElementsAre("a", "b", "c"));
@@ -421,10 +416,25 @@ TEST(Splitter, ConversionOperator) {
   TestMapConversionOperator<std::map<std::string, std::string>>(splitter);
   TestMapConversionOperator<
       std::multimap<absl::string_view, absl::string_view>>(splitter);
-  TestMapConversionOperator<std::multimap<absl::string_view, std::string>>(splitter);
-  TestMapConversionOperator<std::multimap<std::string, absl::string_view>>(splitter);
+  TestMapConversionOperator<std::multimap<absl::string_view, std::string>>(
+      splitter);
+  TestMapConversionOperator<std::multimap<std::string, absl::string_view>>(
+      splitter);
   TestMapConversionOperator<std::multimap<std::string, std::string>>(splitter);
-  TestMapConversionOperator<std::unordered_map<std::string, std::string>>(splitter);
+  TestMapConversionOperator<std::unordered_map<std::string, std::string>>(
+      splitter);
+  TestMapConversionOperator<
+      absl::node_hash_map<absl::string_view, absl::string_view>>(splitter);
+  TestMapConversionOperator<
+      absl::node_hash_map<absl::string_view, std::string>>(splitter);
+  TestMapConversionOperator<
+      absl::node_hash_map<std::string, absl::string_view>>(splitter);
+  TestMapConversionOperator<
+      absl::flat_hash_map<absl::string_view, absl::string_view>>(splitter);
+  TestMapConversionOperator<
+      absl::flat_hash_map<absl::string_view, std::string>>(splitter);
+  TestMapConversionOperator<
+      absl::flat_hash_map<std::string, absl::string_view>>(splitter);
 
   // Tests conversion to std::pair
 
@@ -440,7 +450,7 @@ TEST(Splitter, ConversionOperator) {
 // less-than, equal-to, and more-than 2 strings.
 TEST(Splitter, ToPair) {
   {
-    // Empty std::string
+    // Empty string
     std::pair<std::string, std::string> p = absl::StrSplit("", ',');
     EXPECT_EQ("", p.first);
     EXPECT_EQ("", p.second);
@@ -568,10 +578,9 @@ TEST(Split, AcceptsCertainTemporaries) {
 }
 
 TEST(Split, Temporary) {
-  // Use a std::string longer than the small-std::string-optimization length, so that when
-  // the temporary is destroyed, if the splitter keeps a reference to the
-  // std::string's contents, it'll reference freed memory instead of just dead
-  // on-stack memory.
+  // Use a std::string longer than the SSO length, so that when the temporary is
+  // destroyed, if the splitter keeps a reference to the string's contents,
+  // it'll reference freed memory instead of just dead on-stack memory.
   const char input[] = "a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u";
   EXPECT_LT(sizeof(std::string), ABSL_ARRAYSIZE(input))
       << "Input should be larger than fits on the stack.";
@@ -647,18 +656,23 @@ TEST(Split, StringDelimiter) {
   }
 }
 
+#if !defined(__cpp_char8_t)
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++2a-compat"
+#endif
 TEST(Split, UTF8) {
   // Tests splitting utf8 strings and utf8 delimiters.
   std::string utf8_string = u8"\u03BA\u1F79\u03C3\u03BC\u03B5";
   {
-    // A utf8 input std::string with an ascii delimiter.
+    // A utf8 input string with an ascii delimiter.
     std::string to_split = "a," + utf8_string;
     std::vector<absl::string_view> v = absl::StrSplit(to_split, ',');
     EXPECT_THAT(v, ElementsAre("a", utf8_string));
   }
 
   {
-    // A utf8 input std::string and a utf8 delimiter.
+    // A utf8 input string and a utf8 delimiter.
     std::string to_split = "a," + utf8_string + ",b";
     std::string unicode_delimiter = "," + utf8_string + ",";
     std::vector<absl::string_view> v =
@@ -667,12 +681,16 @@ TEST(Split, UTF8) {
   }
 
   {
-    // A utf8 input std::string and ByAnyChar with ascii chars.
+    // A utf8 input string and ByAnyChar with ascii chars.
     std::vector<absl::string_view> v =
         absl::StrSplit(u8"Foo h\u00E4llo th\u4E1Ere", absl::ByAnyChar(" \t"));
     EXPECT_THAT(v, ElementsAre("Foo", u8"h\u00E4llo", u8"th\u4E1Ere"));
   }
 }
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
+#endif  // !defined(__cpp_char8_t)
 
 TEST(Split, EmptyStringDelimiter) {
   {
@@ -782,7 +800,7 @@ static bool IsFoundAt(absl::string_view text, Delimiter d, int expected_pos) {
 }
 
 //
-// Tests for Literal
+// Tests for ByString
 //
 
 // Tests using any delimiter that represents a single comma.
@@ -802,7 +820,7 @@ void TestComma(Delimiter d) {
   EXPECT_FALSE(IsFoundAt(";", d, -1));
 }
 
-TEST(Delimiter, Literal) {
+TEST(Delimiter, ByString) {
   using absl::ByString;
   TestComma(ByString(","));
 
@@ -810,10 +828,10 @@ TEST(Delimiter, Literal) {
   ByString comma_string(",");
   TestComma(comma_string);
 
-  // The first occurrence of empty std::string ("") in a std::string is at position 0.
+  // The first occurrence of empty string ("") in a string is at position 0.
   // There is a test below that demonstrates this for absl::string_view::find().
   // If the ByString delimiter returned position 0 for this, there would
-  // be an infinite loop in the SplitIterator code. To avoid this, empty std::string
+  // be an infinite loop in the SplitIterator code. To avoid this, empty string
   // is a special case in that it always returns the item at position 1.
   absl::string_view abc("abc");
   EXPECT_EQ(0, abc.find(""));  // "" is found at position 0
@@ -872,7 +890,7 @@ TEST(Delimiter, ByAnyChar) {
   EXPECT_FALSE(IsFoundAt("=", two_delims, -1));
 
   // ByAnyChar behaves just like ByString when given a delimiter of empty
-  // std::string. That is, it always returns a zero-length absl::string_view
+  // string. That is, it always returns a zero-length absl::string_view
   // referring to the item at position 1, not position 0.
   ByAnyChar empty("");
   EXPECT_FALSE(IsFoundAt("", empty, 0));
@@ -909,7 +927,7 @@ TEST(Split, WorksWithLargeStrings) {
     std::vector<absl::string_view> v = absl::StrSplit(s, '-');
     EXPECT_EQ(2, v.size());
     // The first element will contain 2G of 'x's.
-    // testing::StartsWith is too slow with a 2G std::string.
+    // testing::StartsWith is too slow with a 2G string.
     EXPECT_EQ('x', v[0][0]);
     EXPECT_EQ('x', v[0][1]);
     EXPECT_EQ('x', v[0][3]);

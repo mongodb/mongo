@@ -123,10 +123,13 @@ will be expected to conform to the style outlined
 
 ## Running Tests
 
-Use "bazel test <>" functionality to run the unit tests.
+If you have [Bazel](https://bazel.build/) installed, use `bazel test
+--test_tag_filters="-benchmark" ...` to run the unit tests.
 
-Prerequisites for building and running tests are listed in
-[README.md](README.md)
+If you are running the Linux operating system and have
+[Docker](https://www.docker.com/) installed, you can also run the `linux_*.sh`
+scripts under the `ci/`(https://github.com/abseil/abseil-cpp/tree/master/ci)
+directory to test Abseil under a variety of conditions.
 
 ## Abseil Committers
 

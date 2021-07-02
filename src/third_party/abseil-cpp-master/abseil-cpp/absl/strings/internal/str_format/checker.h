@@ -1,20 +1,34 @@
+// Copyright 2020 The Abseil Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #ifndef ABSL_STRINGS_INTERNAL_STR_FORMAT_CHECKER_H_
 #define ABSL_STRINGS_INTERNAL_STR_FORMAT_CHECKER_H_
 
+#include "absl/base/attributes.h"
 #include "absl/strings/internal/str_format/arg.h"
 #include "absl/strings/internal/str_format/extension.h"
 
 // Compile time check support for entry points.
 
 #ifndef ABSL_INTERNAL_ENABLE_FORMAT_CHECKER
-#if defined(__clang__) && !defined(__native_client__)
-#if __has_attribute(enable_if)
+#if ABSL_HAVE_ATTRIBUTE(enable_if) && !defined(__native_client__)
 #define ABSL_INTERNAL_ENABLE_FORMAT_CHECKER 1
-#endif  // __has_attribute(enable_if)
-#endif  // defined(__clang__) && !defined(__native_client__)
+#endif  // ABSL_HAVE_ATTRIBUTE(enable_if) && !defined(__native_client__)
 #endif  // ABSL_INTERNAL_ENABLE_FORMAT_CHECKER
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace str_format_internal {
 
 constexpr bool AllOf() { return true; }
@@ -24,14 +38,7 @@ constexpr bool AllOf(bool b, T... t) {
   return b && AllOf(t...);
 }
 
-template <typename Arg>
-constexpr Conv ArgumentToConv() {
-  return decltype(str_format_internal::FormatConvertImpl(
-      std::declval<const Arg&>(), std::declval<const ConversionSpec&>(),
-      std::declval<FormatSinkImpl*>()))::kConv;
-}
-
-#if ABSL_INTERNAL_ENABLE_FORMAT_CHECKER
+#ifdef ABSL_INTERNAL_ENABLE_FORMAT_CHECKER
 
 constexpr bool ContainsChar(const char* chars, char c) {
   return *chars == c || (*chars && ContainsChar(chars + 1, c));
@@ -39,14 +46,14 @@ constexpr bool ContainsChar(const char* chars, char c) {
 
 // A constexpr compatible list of Convs.
 struct ConvList {
-  const Conv* array;
+  const FormatConversionCharSet* array;
   int count;
 
   // We do the bound check here to avoid having to do it on the callers.
-  // Returning an empty Conv has the same effect as short circuiting because it
-  // will never match any conversion.
-  constexpr Conv operator[](int i) const {
-    return i < count ? array[i] : Conv{};
+  // Returning an empty FormatConversionCharSet has the same effect as
+  // short circuiting because it will never match any conversion.
+  constexpr FormatConversionCharSet operator[](int i) const {
+    return i < count ? array[i] : FormatConversionCharSet{};
   }
 
   constexpr ConvList without_front() const {
@@ -57,7 +64,7 @@ struct ConvList {
 template <size_t count>
 struct ConvListT {
   // Make sure the array has size > 0.
-  Conv list[count ? count : 1];
+  FormatConversionCharSet list[count ? count : 1];
 };
 
 constexpr char GetChar(string_view str, size_t index) {
@@ -310,7 +317,7 @@ class FormatParser {
   ConvList args_;
 };
 
-template <Conv... C>
+template <FormatConversionCharSet... C>
 constexpr bool ValidFormatImpl(string_view format) {
   return FormatParser(format,
                       {ConvListT<sizeof...(C)>{{C...}}.list, sizeof...(C)})
@@ -320,6 +327,7 @@ constexpr bool ValidFormatImpl(string_view format) {
 #endif  // ABSL_INTERNAL_ENABLE_FORMAT_CHECKER
 
 }  // namespace str_format_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_STRINGS_INTERNAL_STR_FORMAT_CHECKER_H_

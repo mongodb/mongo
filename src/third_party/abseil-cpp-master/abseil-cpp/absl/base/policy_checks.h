@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,7 +41,7 @@
 #endif
 
 // -----------------------------------------------------------------------------
-// Compiler Check
+// Toolchain Check
 // -----------------------------------------------------------------------------
 
 // We support MSVC++ 14.0 update 2 and later.
@@ -81,16 +81,6 @@
 // -----------------------------------------------------------------------------
 // Standard Library Check
 // -----------------------------------------------------------------------------
-
-// We have chosen glibc 2.12 as the minimum as it was tagged for release
-// in May, 2010 and includes some functionality used in Google software
-// (for instance pthread_setname_np):
-// https://sourceware.org/ml/libc-alpha/2010-05/msg00000.html
-#if defined(__GLIBC__) && defined(__GLIBC_PREREQ)
-#if !__GLIBC_PREREQ(2, 12)
-#error "Minimum required version of glibc is 2.12."
-#endif
-#endif
 
 #if defined(_STLPORT_VERSION)
 #error "STLPort is not supported."

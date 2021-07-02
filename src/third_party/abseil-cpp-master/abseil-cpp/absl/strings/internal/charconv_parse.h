@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,9 +17,11 @@
 
 #include <cstdint>
 
+#include "absl/base/config.h"
 #include "absl/strings/charconv.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace strings_internal {
 
 // Enum indicating whether a parsed float is a number or special value.
@@ -92,5 +94,6 @@ extern template ParsedFloat ParseFloat<16>(const char* begin, const char* end,
                                            absl::chars_format format_flags);
 
 }  // namespace strings_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 #endif  // ABSL_STRINGS_INTERNAL_CHARCONV_PARSE_H_

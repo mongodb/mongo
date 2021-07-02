@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,11 +20,13 @@
 #include <iostream>
 #include <string>
 
+#include "absl/base/config.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/internal/charconv_parse.h"
 #include "absl/strings/string_view.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace strings_internal {
 
 // The largest power that 5 that can be raised to, and still fit in a uint32_t.
@@ -32,8 +34,9 @@ constexpr int kMaxSmallPowerOfFive = 13;
 // The largest power that 10 that can be raised to, and still fit in a uint32_t.
 constexpr int kMaxSmallPowerOfTen = 9;
 
-extern const uint32_t kFiveToNth[kMaxSmallPowerOfFive + 1];
-extern const uint32_t kTenToNth[kMaxSmallPowerOfTen + 1];
+ABSL_DLL extern const uint32_t
+    kFiveToNth[kMaxSmallPowerOfFive + 1];
+ABSL_DLL extern const uint32_t kTenToNth[kMaxSmallPowerOfTen + 1];
 
 // Large, fixed-width unsigned integer.
 //
@@ -63,7 +66,7 @@ class BigUnsigned {
                static_cast<uint32_t>(v >> 32)} {}
 
   // Constructs a BigUnsigned from the given string_view containing a decimal
-  // value.  If the input std::string is not a decimal integer, constructs a 0
+  // value.  If the input string is not a decimal integer, constructs a 0
   // instead.
   explicit BigUnsigned(absl::string_view sv) : size_(0), words_{} {
     // Check for valid input, returning a 0 otherwise.  This is reasonable
@@ -207,7 +210,7 @@ class BigUnsigned {
     return words_[index];
   }
 
-  // Returns this integer as a decimal std::string.  This is not used in the decimal-
+  // Returns this integer as a decimal string.  This is not used in the decimal-
   // to-binary conversion; it is intended to aid in testing.
   std::string ToString() const;
 
@@ -414,6 +417,7 @@ extern template class BigUnsigned<4>;
 extern template class BigUnsigned<84>;
 
 }  // namespace strings_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_STRINGS_INTERNAL_CHARCONV_BIGINT_H_

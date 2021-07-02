@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,13 +19,14 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/container/internal/test_instance_tracker.h"
 #include "absl/memory/memory.h"
+#include "absl/types/any.h"
+#include "absl/types/optional.h"
 #include "absl/utility/utility.h"
 
-namespace absl {
-namespace container_internal {
-namespace {
-
+// These are declared at global scope purely so that error messages
+// are smaller and easier to understand.
 enum class CallType { kConstRef, kConstMove };
 
 template <int>
@@ -45,6 +46,15 @@ struct TwoValues {
   U value2;
 };
 
+
+namespace absl {
+ABSL_NAMESPACE_BEGIN
+namespace container_internal {
+namespace {
+
+using absl::test_internal::CopyableMovableInstance;
+using absl::test_internal::InstanceTracker;
+
 TEST(CompressedTupleTest, Sizeof) {
   EXPECT_EQ(sizeof(int), sizeof(CompressedTuple<int>));
   EXPECT_EQ(sizeof(int), sizeof(CompressedTuple<int, Empty<0>>));
@@ -58,6 +68,141 @@ TEST(CompressedTupleTest, Sizeof) {
             sizeof(CompressedTuple<int, Empty<0>, NotEmpty<double>>));
   EXPECT_EQ(sizeof(TwoValues<int, double>),
             sizeof(CompressedTuple<int, Empty<0>, NotEmpty<double>, Empty<1>>));
+}
+
+TEST(CompressedTupleTest, OneMoveOnRValueConstructionTemp) {
+  InstanceTracker tracker;
+  CompressedTuple<CopyableMovableInstance> x1(CopyableMovableInstance(1));
+  EXPECT_EQ(tracker.instances(), 1);
+  EXPECT_EQ(tracker.copies(), 0);
+  EXPECT_LE(tracker.moves(), 1);
+  EXPECT_EQ(x1.get<0>().value(), 1);
+}
+
+TEST(CompressedTupleTest, OneMoveOnRValueConstructionMove) {
+  InstanceTracker tracker;
+
+  CopyableMovableInstance i1(1);
+  CompressedTuple<CopyableMovableInstance> x1(std::move(i1));
+  EXPECT_EQ(tracker.instances(), 2);
+  EXPECT_EQ(tracker.copies(), 0);
+  EXPECT_LE(tracker.moves(), 1);
+  EXPECT_EQ(x1.get<0>().value(), 1);
+}
+
+TEST(CompressedTupleTest, OneMoveOnRValueConstructionMixedTypes) {
+  InstanceTracker tracker;
+  CopyableMovableInstance i1(1);
+  CopyableMovableInstance i2(2);
+  Empty<0> empty;
+  CompressedTuple<CopyableMovableInstance, CopyableMovableInstance&, Empty<0>>
+      x1(std::move(i1), i2, empty);
+  EXPECT_EQ(x1.get<0>().value(), 1);
+  EXPECT_EQ(x1.get<1>().value(), 2);
+  EXPECT_EQ(tracker.copies(), 0);
+  EXPECT_EQ(tracker.moves(), 1);
+}
+
+struct IncompleteType;
+CompressedTuple<CopyableMovableInstance, IncompleteType&, Empty<0>>
+MakeWithIncomplete(CopyableMovableInstance i1,
+                   IncompleteType& t,  // NOLINT
+                   Empty<0> empty) {
+  return CompressedTuple<CopyableMovableInstance, IncompleteType&, Empty<0>>{
+      std::move(i1), t, empty};
+}
+
+struct IncompleteType {};
+TEST(CompressedTupleTest, OneMoveOnRValueConstructionWithIncompleteType) {
+  InstanceTracker tracker;
+  CopyableMovableInstance i1(1);
+  Empty<0> empty;
+  struct DerivedType : IncompleteType {int value = 0;};
+  DerivedType fd;
+  fd.value = 7;
+
+  CompressedTuple<CopyableMovableInstance, IncompleteType&, Empty<0>> x1 =
+      MakeWithIncomplete(std::move(i1), fd, empty);
+
+  EXPECT_EQ(x1.get<0>().value(), 1);
+  EXPECT_EQ(static_cast<DerivedType&>(x1.get<1>()).value, 7);
+
+  EXPECT_EQ(tracker.copies(), 0);
+  EXPECT_EQ(tracker.moves(), 2);
+}
+
+TEST(CompressedTupleTest,
+     OneMoveOnRValueConstructionMixedTypes_BraceInitPoisonPillExpected) {
+  InstanceTracker tracker;
+  CopyableMovableInstance i1(1);
+  CopyableMovableInstance i2(2);
+  CompressedTuple<CopyableMovableInstance, CopyableMovableInstance&, Empty<0>>
+      x1(std::move(i1), i2, {});  // NOLINT
+  EXPECT_EQ(x1.get<0>().value(), 1);
+  EXPECT_EQ(x1.get<1>().value(), 2);
+  EXPECT_EQ(tracker.instances(), 3);
+  // We are forced into the `const Ts&...` constructor (invoking copies)
+  // because we need it to deduce the type of `{}`.
+  // std::tuple also has this behavior.
+  // Note, this test is proof that this is expected behavior, but it is not
+  // _desired_ behavior.
+  EXPECT_EQ(tracker.copies(), 1);
+  EXPECT_EQ(tracker.moves(), 0);
+}
+
+TEST(CompressedTupleTest, OneCopyOnLValueConstruction) {
+  InstanceTracker tracker;
+  CopyableMovableInstance i1(1);
+
+  CompressedTuple<CopyableMovableInstance> x1(i1);
+  EXPECT_EQ(tracker.copies(), 1);
+  EXPECT_EQ(tracker.moves(), 0);
+
+  tracker.ResetCopiesMovesSwaps();
+
+  CopyableMovableInstance i2(2);
+  const CopyableMovableInstance& i2_ref = i2;
+  CompressedTuple<CopyableMovableInstance> x2(i2_ref);
+  EXPECT_EQ(tracker.copies(), 1);
+  EXPECT_EQ(tracker.moves(), 0);
+}
+
+TEST(CompressedTupleTest, OneMoveOnRValueAccess) {
+  InstanceTracker tracker;
+  CopyableMovableInstance i1(1);
+  CompressedTuple<CopyableMovableInstance> x(std::move(i1));
+  tracker.ResetCopiesMovesSwaps();
+
+  CopyableMovableInstance i2 = std::move(x).get<0>();
+  EXPECT_EQ(tracker.copies(), 0);
+  EXPECT_EQ(tracker.moves(), 1);
+}
+
+TEST(CompressedTupleTest, OneCopyOnLValueAccess) {
+  InstanceTracker tracker;
+
+  CompressedTuple<CopyableMovableInstance> x(CopyableMovableInstance(0));
+  EXPECT_EQ(tracker.copies(), 0);
+  EXPECT_EQ(tracker.moves(), 1);
+
+  CopyableMovableInstance t = x.get<0>();
+  EXPECT_EQ(tracker.copies(), 1);
+  EXPECT_EQ(tracker.moves(), 1);
+}
+
+TEST(CompressedTupleTest, ZeroCopyOnRefAccess) {
+  InstanceTracker tracker;
+
+  CompressedTuple<CopyableMovableInstance> x(CopyableMovableInstance(0));
+  EXPECT_EQ(tracker.copies(), 0);
+  EXPECT_EQ(tracker.moves(), 1);
+
+  CopyableMovableInstance& t1 = x.get<0>();
+  const CopyableMovableInstance& t2 = x.get<0>();
+  EXPECT_EQ(tracker.copies(), 0);
+  EXPECT_EQ(tracker.moves(), 1);
+  EXPECT_EQ(t1.value(), 0);
+  EXPECT_EQ(t2.value(), 0);
 }
 
 TEST(CompressedTupleTest, Access) {
@@ -120,18 +265,23 @@ TEST(CompressedTupleTest, Nested) {
   EXPECT_EQ(4 * sizeof(char),
             sizeof(CompressedTuple<CompressedTuple<char, char>,
                                    CompressedTuple<char, char>>));
-  EXPECT_TRUE(
-      (std::is_empty<CompressedTuple<CompressedTuple<Empty<0>>,
-                                     CompressedTuple<Empty<1>>>>::value));
+  EXPECT_TRUE((std::is_empty<CompressedTuple<Empty<0>, Empty<1>>>::value));
+
+  // Make sure everything still works when things are nested.
+  struct CT_Empty : CompressedTuple<Empty<0>> {};
+  CompressedTuple<Empty<0>, CT_Empty> nested_empty;
+  auto contained = nested_empty.get<0>();
+  auto nested = nested_empty.get<1>().get<0>();
+  EXPECT_TRUE((std::is_same<decltype(contained), decltype(nested)>::value));
 }
 
 TEST(CompressedTupleTest, Reference) {
   int i = 7;
-  std::string s = "Very long std::string that goes in the heap";
+  std::string s = "Very long string that goes in the heap";
   CompressedTuple<int, int&, std::string, std::string&> x(i, i, s, s);
 
   // Sanity check. We should have not moved from `s`
-  EXPECT_EQ(s, "Very long std::string that goes in the heap");
+  EXPECT_EQ(s, "Very long string that goes in the heap");
 
   EXPECT_EQ(x.get<0>(), x.get<1>());
   EXPECT_NE(&x.get<0>(), &x.get<1>());
@@ -166,7 +316,36 @@ TEST(CompressedTupleTest, MoveOnlyElements) {
   EXPECT_EQ(*x1, 5);
 }
 
+TEST(CompressedTupleTest, MoveConstructionMoveOnlyElements) {
+  CompressedTuple<std::unique_ptr<std::string>> base(
+      absl::make_unique<std::string>("str"));
+  EXPECT_EQ(*base.get<0>(), "str");
+
+  CompressedTuple<std::unique_ptr<std::string>> copy(std::move(base));
+  EXPECT_EQ(*copy.get<0>(), "str");
+}
+
+TEST(CompressedTupleTest, AnyElements) {
+  any a(std::string("str"));
+  CompressedTuple<any, any&> x(any(5), a);
+  EXPECT_EQ(absl::any_cast<int>(x.get<0>()), 5);
+  EXPECT_EQ(absl::any_cast<std::string>(x.get<1>()), "str");
+
+  a = 0.5f;
+  EXPECT_EQ(absl::any_cast<float>(x.get<1>()), 0.5);
+}
+
 TEST(CompressedTupleTest, Constexpr) {
+  struct NonTrivialStruct {
+    constexpr NonTrivialStruct() = default;
+    constexpr int value() const { return v; }
+    int v = 5;
+  };
+  struct TrivialStruct {
+    TrivialStruct() = default;
+    constexpr int value() const { return v; }
+    int v;
+  };
   constexpr CompressedTuple<int, double, CompressedTuple<int>, Empty<0>> x(
       7, 1.25, CompressedTuple<int>(5), {});
   constexpr int x0 = x.get<0>();
@@ -178,6 +357,32 @@ TEST(CompressedTupleTest, Constexpr) {
   EXPECT_EQ(x1, 1.25);
   EXPECT_EQ(x2, 5);
   EXPECT_EQ(x3, CallType::kConstRef);
+
+#if !defined(__GNUC__) || defined(__clang__) || __GNUC__ > 4
+  constexpr CompressedTuple<Empty<0>, TrivialStruct, int> trivial = {};
+  constexpr CallType trivial0 = trivial.get<0>().value();
+  constexpr int trivial1 = trivial.get<1>().value();
+  constexpr int trivial2 = trivial.get<2>();
+
+  EXPECT_EQ(trivial0, CallType::kConstRef);
+  EXPECT_EQ(trivial1, 0);
+  EXPECT_EQ(trivial2, 0);
+#endif
+
+  constexpr CompressedTuple<Empty<0>, NonTrivialStruct, absl::optional<int>>
+      non_trivial = {};
+  constexpr CallType non_trivial0 = non_trivial.get<0>().value();
+  constexpr int non_trivial1 = non_trivial.get<1>().value();
+  constexpr absl::optional<int> non_trivial2 = non_trivial.get<2>();
+
+  EXPECT_EQ(non_trivial0, CallType::kConstRef);
+  EXPECT_EQ(non_trivial1, 5);
+  EXPECT_EQ(non_trivial2, absl::nullopt);
+
+  static constexpr char data[] = "DEF";
+  constexpr CompressedTuple<const char*> z(data);
+  constexpr const char* z1 = z.get<0>();
+  EXPECT_EQ(std::string(z1), std::string(data));
 
 #if defined(__clang__)
   // An apparent bug in earlier versions of gcc claims these are ambiguous.
@@ -200,4 +405,5 @@ TEST(CompressedTupleTest, EmptyFinalClass) {
 
 }  // namespace
 }  // namespace container_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

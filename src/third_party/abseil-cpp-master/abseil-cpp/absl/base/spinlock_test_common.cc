@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,10 +20,12 @@
 #include <limits>
 #include <random>
 #include <thread>  // NOLINT(build/c++11)
+#include <type_traits>
 #include <vector>
 
 #include "gtest/gtest.h"
 #include "absl/base/attributes.h"
+#include "absl/base/config.h"
 #include "absl/base/internal/low_level_scheduling.h"
 #include "absl/base/internal/scheduling_mode.h"
 #include "absl/base/internal/spinlock.h"
@@ -36,6 +38,7 @@ constexpr int32_t kNumThreads = 10;
 constexpr int32_t kIters = 1000;
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace base_internal {
 
 // This is defined outside of anonymous namespace so that it can be
@@ -54,13 +57,11 @@ namespace {
 
 static constexpr int kArrayLength = 10;
 static uint32_t values[kArrayLength];
-static SpinLock static_spinlock(base_internal::kLinkerInitialized);
-static SpinLock static_cooperative_spinlock(
-    base_internal::kLinkerInitialized,
-    base_internal::SCHEDULE_COOPERATIVE_AND_KERNEL);
-static SpinLock static_noncooperative_spinlock(
-    base_internal::kLinkerInitialized, base_internal::SCHEDULE_KERNEL_ONLY);
 
+ABSL_CONST_INIT static SpinLock static_cooperative_spinlock(
+    absl::kConstInit, base_internal::SCHEDULE_COOPERATIVE_AND_KERNEL);
+ABSL_CONST_INIT static SpinLock static_noncooperative_spinlock(
+    absl::kConstInit, base_internal::SCHEDULE_KERNEL_ONLY);
 
 // Simple integer hash function based on the public domain lookup2 hash.
 // http://burtleburtle.net/bob/c/lookup2.c
@@ -91,6 +92,7 @@ static void TestFunction(int thread_salt, SpinLock* spinlock) {
 
 static void ThreadedTest(SpinLock* spinlock) {
   std::vector<std::thread> threads;
+  threads.reserve(kNumThreads);
   for (int i = 0; i < kNumThreads; ++i) {
     threads.push_back(std::thread(TestFunction, i, spinlock));
   }
@@ -103,6 +105,10 @@ static void ThreadedTest(SpinLock* spinlock) {
     EXPECT_EQ(values[0], values[i]);
   }
 }
+
+#ifndef ABSL_HAVE_THREAD_SANITIZER
+static_assert(std::is_trivially_destructible<SpinLock>(), "");
+#endif
 
 TEST(SpinLock, StackNonCooperativeDisablesScheduling) {
   SpinLock spinlock(base_internal::SCHEDULE_KERNEL_ONLY);
@@ -189,9 +195,7 @@ TEST(SpinLock, WaitCyclesEncoding) {
     SpinLockTest::DecodeWaitCycles(before_max_value);
   EXPECT_GT(expected_max_value_decoded, before_max_value_decoded);
 }
-TEST(SpinLockWithThreads, StaticSpinLock) {
-  ThreadedTest(&static_spinlock);
-}
+
 TEST(SpinLockWithThreads, StackSpinLock) {
   SpinLock spinlock;
   ThreadedTest(&spinlock);
@@ -264,4 +268,5 @@ TEST(SpinLockWithThreads, DoesNotDeadlock) {
 
 }  // namespace
 }  // namespace base_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

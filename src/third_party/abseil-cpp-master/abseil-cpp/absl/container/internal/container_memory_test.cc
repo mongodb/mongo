@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,16 +16,25 @@
 
 #include <cstdint>
 #include <tuple>
+#include <typeindex>
+#include <typeinfo>
 #include <utility>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/container/internal/test_instance_tracker.h"
 #include "absl/strings/string_view.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace container_internal {
 namespace {
 
+using ::absl::test_internal::CopyableMovableInstance;
+using ::absl::test_internal::InstanceTracker;
+using ::testing::_;
+using ::testing::ElementsAre;
+using ::testing::Gt;
 using ::testing::Pair;
 
 TEST(Memory, AlignmentLargerThanBase) {
@@ -42,6 +51,39 @@ TEST(Memory, AlignmentSmallerThanBase) {
   EXPECT_EQ(0, reinterpret_cast<uintptr_t>(mem) % 2);
   memcpy(mem, "abc", 3);
   Deallocate<2>(&alloc, mem, 3);
+}
+
+std::map<std::type_index, int>& AllocationMap() {
+  static auto* map = new std::map<std::type_index, int>;
+  return *map;
+}
+
+template <typename T>
+struct TypeCountingAllocator {
+  TypeCountingAllocator() = default;
+  template <typename U>
+  TypeCountingAllocator(const TypeCountingAllocator<U>&) {}  // NOLINT
+
+  using value_type = T;
+
+  T* allocate(size_t n, const void* = nullptr) {
+    AllocationMap()[typeid(T)] += n;
+    return std::allocator<T>().allocate(n);
+  }
+  void deallocate(T* p, std::size_t n) {
+    AllocationMap()[typeid(T)] -= n;
+    return std::allocator<T>().deallocate(p, n);
+  }
+};
+
+TEST(Memory, AllocateDeallocateMatchType) {
+  TypeCountingAllocator<int> alloc;
+  void* mem = Allocate<1>(&alloc, 1);
+  // Verify that it was allocated
+  EXPECT_THAT(AllocationMap(), ElementsAre(Pair(_, Gt(0))));
+  Deallocate<1>(&alloc, mem, 1);
+  // Verify that the deallocation matched.
+  EXPECT_THAT(AllocationMap(), ElementsAre(Pair(_, 0)));
 }
 
 class Fixture : public ::testing::Test {
@@ -124,7 +166,7 @@ TryDecomposeValue(F&& f, Arg&& arg) {
 }
 
 TEST(DecomposeValue, Decomposable) {
-  auto f = [](const int& x, int&& y) {
+  auto f = [](const int& x, int&& y) {  // NOLINT
     EXPECT_EQ(&x, &y);
     EXPECT_EQ(42, x);
     return 'A';
@@ -158,7 +200,8 @@ TryDecomposePair(F&& f, Args&&... args) {
 }
 
 TEST(DecomposePair, Decomposable) {
-  auto f = [](const int& x, std::piecewise_construct_t, std::tuple<int&&> k,
+  auto f = [](const int& x,  // NOLINT
+              std::piecewise_construct_t, std::tuple<int&&> k,
               std::tuple<double>&& v) {
     EXPECT_EQ(&x, &std::get<0>(k));
     EXPECT_EQ(42, x);
@@ -183,6 +226,32 @@ TEST(DecomposePair, NotDecomposable) {
                                 std::make_tuple(0.5)));
 }
 
+TEST(MapSlotPolicy, ConstKeyAndValue) {
+  using slot_policy = map_slot_policy<const CopyableMovableInstance,
+                                      const CopyableMovableInstance>;
+  using slot_type = typename slot_policy::slot_type;
+
+  union Slots {
+    Slots() {}
+    ~Slots() {}
+    slot_type slots[100];
+  } slots;
+
+  std::allocator<
+      std::pair<const CopyableMovableInstance, const CopyableMovableInstance>>
+      alloc;
+  InstanceTracker tracker;
+  slot_policy::construct(&alloc, &slots.slots[0], CopyableMovableInstance(1),
+                         CopyableMovableInstance(1));
+  for (int i = 0; i < 99; ++i) {
+    slot_policy::transfer(&alloc, &slots.slots[i + 1], &slots.slots[i]);
+  }
+  slot_policy::destroy(&alloc, &slots.slots[99]);
+
+  EXPECT_EQ(tracker.copies(), 0);
+}
+
 }  // namespace
 }  // namespace container_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

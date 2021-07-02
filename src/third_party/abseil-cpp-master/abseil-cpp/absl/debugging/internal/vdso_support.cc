@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,6 +38,7 @@
 #endif
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace debugging_internal {
 
 ABSL_CONST_INIT
@@ -75,15 +76,6 @@ const void *VDSOSupport::Init() {
   }
 #endif  // __GLIBC_PREREQ(2, 16)
   if (vdso_base_.load(std::memory_order_relaxed) == kInvalidBase) {
-    // Valgrind zaps AT_SYSINFO_EHDR and friends from the auxv[]
-    // on stack, and so glibc works as if VDSO was not present.
-    // But going directly to kernel via /proc/self/auxv below bypasses
-    // Valgrind zapping. So we check for Valgrind separately.
-    if (RunningOnValgrind()) {
-      vdso_base_.store(nullptr, std::memory_order_relaxed);
-      getcpu_fn_.store(&GetCPUViaSyscall, std::memory_order_relaxed);
-      return nullptr;
-    }
     int fd = open("/proc/self/auxv", O_RDONLY);
     if (fd == -1) {
       // Kernel too old to have a VDSO.
@@ -174,19 +166,8 @@ int GetCPU() {
   return ret_code == 0 ? cpu : ret_code;
 }
 
-// We need to make sure VDSOSupport::Init() is called before
-// InitGoogle() does any setuid or chroot calls.  If VDSOSupport
-// is used in any global constructor, this will happen, since
-// VDSOSupport's constructor calls Init.  But if not, we need to
-// ensure it here, with a global constructor of our own.  This
-// is an allowed exception to the normal rule against non-trivial
-// global constructors.
-static class VDSOInitHelper {
- public:
-  VDSOInitHelper() { VDSOSupport::Init(); }
-} vdso_init_helper;
-
 }  // namespace debugging_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_HAVE_VDSO_SUPPORT

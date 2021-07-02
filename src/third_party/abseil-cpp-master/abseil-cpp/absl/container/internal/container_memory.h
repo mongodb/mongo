@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,26 +15,33 @@
 #ifndef ABSL_CONTAINER_INTERNAL_CONTAINER_MEMORY_H_
 #define ABSL_CONTAINER_INTERNAL_CONTAINER_MEMORY_H_
 
-#ifdef ADDRESS_SANITIZER
-#include <sanitizer/asan_interface.h>
-#endif
-
-#ifdef MEMORY_SANITIZER
-#include <sanitizer/msan_interface.h>
-#endif
-
 #include <cassert>
 #include <cstddef>
 #include <memory>
+#include <new>
 #include <tuple>
 #include <type_traits>
 #include <utility>
 
+#include "absl/base/config.h"
 #include "absl/memory/memory.h"
+#include "absl/meta/type_traits.h"
 #include "absl/utility/utility.h"
 
+#ifdef ABSL_HAVE_ADDRESS_SANITIZER
+#include <sanitizer/asan_interface.h>
+#endif
+
+#ifdef ABSL_HAVE_MEMORY_SANITIZER
+#include <sanitizer/msan_interface.h>
+#endif
+
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace container_internal {
+
+template <size_t Alignment>
+struct alignas(Alignment) AlignedType {};
 
 // Allocates at least n bytes aligned to the specified alignment.
 // Alignment must be a power of 2. It must be positive.
@@ -47,11 +54,14 @@ template <size_t Alignment, class Alloc>
 void* Allocate(Alloc* alloc, size_t n) {
   static_assert(Alignment > 0, "");
   assert(n && "n must be positive");
-  struct alignas(Alignment) M {};
+  using M = AlignedType<Alignment>;
   using A = typename absl::allocator_traits<Alloc>::template rebind_alloc<M>;
   using AT = typename absl::allocator_traits<Alloc>::template rebind_traits<M>;
-  A mem_alloc(*alloc);
-  void* p = AT::allocate(mem_alloc, (n + sizeof(M) - 1) / sizeof(M));
+  // On macOS, "mem_alloc" is a #define with one argument defined in
+  // rpc/types.h, so we can't name the variable "mem_alloc" and initialize it
+  // with the "foo(bar)" syntax.
+  A my_mem_alloc(*alloc);
+  void* p = AT::allocate(my_mem_alloc, (n + sizeof(M) - 1) / sizeof(M));
   assert(reinterpret_cast<uintptr_t>(p) % Alignment == 0 &&
          "allocator does not respect alignment");
   return p;
@@ -63,11 +73,14 @@ template <size_t Alignment, class Alloc>
 void Deallocate(Alloc* alloc, void* p, size_t n) {
   static_assert(Alignment > 0, "");
   assert(n && "n must be positive");
-  struct alignas(Alignment) M {};
+  using M = AlignedType<Alignment>;
   using A = typename absl::allocator_traits<Alloc>::template rebind_alloc<M>;
   using AT = typename absl::allocator_traits<Alloc>::template rebind_traits<M>;
-  A mem_alloc(*alloc);
-  AT::deallocate(mem_alloc, static_cast<M*>(p),
+  // On macOS, "mem_alloc" is a #define with one argument defined in
+  // rpc/types.h, so we can't name the variable "mem_alloc" and initialize it
+  // with the "foo(bar)" syntax.
+  A my_mem_alloc(*alloc);
+  AT::deallocate(my_mem_alloc, static_cast<M*>(p),
                  (n + sizeof(M) - 1) / sizeof(M));
 }
 
@@ -204,10 +217,10 @@ DecomposeValue(F&& f, Arg&& arg) {
 
 // Helper functions for asan and msan.
 inline void SanitizerPoisonMemoryRegion(const void* m, size_t s) {
-#ifdef ADDRESS_SANITIZER
+#ifdef ABSL_HAVE_ADDRESS_SANITIZER
   ASAN_POISON_MEMORY_REGION(m, s);
 #endif
-#ifdef MEMORY_SANITIZER
+#ifdef ABSL_HAVE_MEMORY_SANITIZER
   __msan_poison(m, s);
 #endif
   (void)m;
@@ -215,10 +228,10 @@ inline void SanitizerPoisonMemoryRegion(const void* m, size_t s) {
 }
 
 inline void SanitizerUnpoisonMemoryRegion(const void* m, size_t s) {
-#ifdef ADDRESS_SANITIZER
+#ifdef ABSL_HAVE_ADDRESS_SANITIZER
   ASAN_UNPOISON_MEMORY_REGION(m, s);
 #endif
-#ifdef MEMORY_SANITIZER
+#ifdef ABSL_HAVE_MEMORY_SANITIZER
   __msan_unpoison(m, s);
 #endif
   (void)m;
@@ -245,8 +258,8 @@ namespace memory_internal {
 // type, which is non-portable.
 template <class Pair, class = std::true_type>
 struct OffsetOf {
-  static constexpr size_t kFirst = -1;
-  static constexpr size_t kSecond = -1;
+  static constexpr size_t kFirst = static_cast<size_t>(-1);
+  static constexpr size_t kSecond = static_cast<size_t>(-1);
 };
 
 template <class Pair>
@@ -286,13 +299,49 @@ struct IsLayoutCompatible {
 
 }  // namespace memory_internal
 
-// If kMutableKeys is false, only the value member is accessed.
+// The internal storage type for key-value containers like flat_hash_map.
 //
-// If kMutableKeys is true, key is accessed through all slots while value and
-// mutable_value are accessed only via INITIALIZED slots. Slots are created and
-// destroyed via mutable_value so that the key can be moved later.
+// It is convenient for the value_type of a flat_hash_map<K, V> to be
+// pair<const K, V>; the "const K" prevents accidental modification of the key
+// when dealing with the reference returned from find() and similar methods.
+// However, this creates other problems; we want to be able to emplace(K, V)
+// efficiently with move operations, and similarly be able to move a
+// pair<K, V> in insert().
+//
+// The solution is this union, which aliases the const and non-const versions
+// of the pair. This also allows flat_hash_map<const K, V> to work, even though
+// that has the same efficiency issues with move in emplace() and insert() -
+// but people do it anyway.
+//
+// If kMutableKeys is false, only the value member can be accessed.
+//
+// If kMutableKeys is true, key can be accessed through all slots while value
+// and mutable_value must be accessed only via INITIALIZED slots. Slots are
+// created and destroyed via mutable_value so that the key can be moved later.
+//
+// Accessing one of the union fields while the other is active is safe as
+// long as they are layout-compatible, which is guaranteed by the definition of
+// kMutableKeys. For C++11, the relevant section of the standard is
+// https://timsong-cpp.github.io/cppwp/n3337/class.mem#19 (9.2.19)
 template <class K, class V>
-union slot_type {
+union map_slot_type {
+  map_slot_type() {}
+  ~map_slot_type() = delete;
+  using value_type = std::pair<const K, V>;
+  using mutable_value_type =
+      std::pair<absl::remove_const_t<K>, absl::remove_const_t<V>>;
+
+  value_type value;
+  mutable_value_type mutable_value;
+  absl::remove_const_t<K> key;
+};
+
+template <class K, class V>
+struct map_slot_policy {
+  using slot_type = map_slot_type<K, V>;
+  using value_type = std::pair<const K, V>;
+  using mutable_value_type = std::pair<K, V>;
+
  private:
   static void emplace(slot_type* slot) {
     // The construction of union doesn't do anything at runtime but it allows us
@@ -302,19 +351,31 @@ union slot_type {
   // If pair<const K, V> and pair<K, V> are layout-compatible, we can accept one
   // or the other via slot_type. We are also free to access the key via
   // slot_type::key in this case.
-  using kMutableKeys =
-      std::integral_constant<bool,
-                             memory_internal::IsLayoutCompatible<K, V>::value>;
+  using kMutableKeys = memory_internal::IsLayoutCompatible<K, V>;
 
  public:
-  slot_type() {}
-  ~slot_type() = delete;
-  using value_type = std::pair<const K, V>;
-  using mutable_value_type = std::pair<K, V>;
+  static value_type& element(slot_type* slot) { return slot->value; }
+  static const value_type& element(const slot_type* slot) {
+    return slot->value;
+  }
 
-  value_type value;
-  mutable_value_type mutable_value;
-  K key;
+  // When C++17 is available, we can use std::launder to provide mutable
+  // access to the key for use in node handle.
+#if defined(__cpp_lib_launder) && __cpp_lib_launder >= 201606
+  static K& mutable_key(slot_type* slot) {
+    // Still check for kMutableKeys so that we can avoid calling std::launder
+    // unless necessary because it can interfere with optimizations.
+    return kMutableKeys::value ? slot->key
+                               : *std::launder(const_cast<K*>(
+                                     std::addressof(slot->value.first)));
+  }
+#else  // !(defined(__cpp_lib_launder) && __cpp_lib_launder >= 201606)
+  static const K& mutable_key(slot_type* slot) { return key(slot); }
+#endif
+
+  static const K& key(const slot_type* slot) {
+    return kMutableKeys::value ? slot->key : slot->value.first;
+  }
 
   template <class Allocator, class... Args>
   static void construct(Allocator* alloc, slot_type* slot, Args&&... args) {
@@ -390,16 +451,10 @@ union slot_type {
                                                    std::move(src->value));
     }
   }
-
-  template <class Allocator>
-  static void move(Allocator* alloc, slot_type* first, slot_type* last,
-                   slot_type* result) {
-    for (slot_type *src = first, *dest = result; src != last; ++src, ++dest)
-      move(alloc, src, dest);
-  }
 };
 
 }  // namespace container_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_CONTAINER_INTERNAL_CONTAINER_MEMORY_H_

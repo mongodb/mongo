@@ -1,3 +1,17 @@
+// Copyright 2020 The Abseil Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #ifndef ABSL_STRINGS_INTERNAL_STR_FORMAT_PARSER_H_
 #define ABSL_STRINGS_INTERNAL_STR_FORMAT_PARSER_H_
 
@@ -6,17 +20,24 @@
 #include <stdlib.h>
 
 #include <cassert>
+#include <cstdint>
 #include <initializer_list>
 #include <iosfwd>
 #include <iterator>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "absl/strings/internal/str_format/checker.h"
 #include "absl/strings/internal/str_format/extension.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace str_format_internal {
+
+enum class LengthMod : std::uint8_t { h, hh, l, ll, L, j, z, t, q, none };
+
+std::string LengthModToString(LengthMod v);
 
 // The analyzed properties of a single specified conversion.
 struct UnboundConversion {
@@ -59,21 +80,52 @@ struct UnboundConversion {
   InputValue precision;
 
   Flags flags;
-  LengthMod length_mod;
-  ConversionChar conv;
+  LengthMod length_mod = LengthMod::none;
+  FormatConversionChar conv = FormatConversionCharInternal::kNone;
 };
 
-// Consume conversion spec prefix (not including '%') of '*src' if valid.
+// Consume conversion spec prefix (not including '%') of [p, end) if valid.
 // Examples of valid specs would be e.g.: "s", "d", "-12.6f".
-// If valid, the front of src is advanced such that src becomes the
-// part following the conversion spec, and the spec part is broken down and
-// returned in 'conv'.
-// If invalid, returns false and leaves 'src' unmodified.
-// For example:
-//   Given "d9", returns "d", and leaves src="9",
-//   Given "!", returns "" and leaves src="!".
-bool ConsumeUnboundConversion(string_view* src, UnboundConversion* conv,
-                              int* next_arg);
+// If valid, it returns the first character following the conversion spec,
+// and the spec part is broken down and returned in 'conv'.
+// If invalid, returns nullptr.
+const char* ConsumeUnboundConversion(const char* p, const char* end,
+                                     UnboundConversion* conv, int* next_arg);
+
+// Helper tag class for the table below.
+// It allows fast `char -> ConversionChar/LengthMod` checking and
+// conversions.
+class ConvTag {
+ public:
+  constexpr ConvTag(FormatConversionChar conversion_char)  // NOLINT
+      : tag_(static_cast<int8_t>(conversion_char)) {}
+  // We invert the length modifiers to make them negative so that we can easily
+  // test for them.
+  constexpr ConvTag(LengthMod length_mod)  // NOLINT
+      : tag_(~static_cast<std::int8_t>(length_mod)) {}
+  // Everything else is -128, which is negative to make is_conv() simpler.
+  constexpr ConvTag() : tag_(-128) {}
+
+  bool is_conv() const { return tag_ >= 0; }
+  bool is_length() const { return tag_ < 0 && tag_ != -128; }
+  FormatConversionChar as_conv() const {
+    assert(is_conv());
+    return static_cast<FormatConversionChar>(tag_);
+  }
+  LengthMod as_length() const {
+    assert(is_length());
+    return static_cast<LengthMod>(~tag_);
+  }
+
+ private:
+  std::int8_t tag_;
+};
+
+extern const ConvTag kTags[256];
+// Keep a single table for all the conversion chars and length modifiers.
+inline ConvTag GetTagForChar(char c) {
+  return kTags[static_cast<unsigned char>(c)];
+}
 
 // Parse the format string provided in 'src' and pass the identified items into
 // 'consumer'.
@@ -88,51 +140,53 @@ bool ConsumeUnboundConversion(string_view* src, UnboundConversion* conv,
 template <typename Consumer>
 bool ParseFormatString(string_view src, Consumer consumer) {
   int next_arg = 0;
-  while (!src.empty()) {
-    const char* percent =
-        static_cast<const char*>(memchr(src.data(), '%', src.size()));
+  const char* p = src.data();
+  const char* const end = p + src.size();
+  while (p != end) {
+    const char* percent = static_cast<const char*>(memchr(p, '%', end - p));
     if (!percent) {
       // We found the last substring.
-      return consumer.Append(src);
+      return consumer.Append(string_view(p, end - p));
     }
     // We found a percent, so push the text run then process the percent.
-    size_t percent_loc = percent - src.data();
-    if (!consumer.Append(string_view(src.data(), percent_loc))) return false;
-    if (percent + 1 >= src.data() + src.size()) return false;
-
-    UnboundConversion conv;
-
-    switch (percent[1]) {
-      case '%':
-        if (!consumer.Append("%")) return false;
-        src.remove_prefix(percent_loc + 2);
-        continue;
-
-#define PARSER_CASE(ch)                                     \
-  case #ch[0]:                                              \
-    src.remove_prefix(percent_loc + 2);                     \
-    conv.conv = ConversionChar::FromId(ConversionChar::ch); \
-    conv.arg_position = ++next_arg;                         \
-    break;
-        ABSL_CONVERSION_CHARS_EXPAND_(PARSER_CASE, );
-#undef PARSER_CASE
-
-      default:
-        src.remove_prefix(percent_loc + 1);
-        if (!ConsumeUnboundConversion(&src, &conv, &next_arg)) return false;
-        break;
-    }
-    if (next_arg == 0) {
-      // This indicates an error in the format std::string.
-      // The only way to get next_arg == 0 is to have a positional argument
-      // first which sets next_arg to -1 and then a non-positional argument
-      // which does ++next_arg.
-      // Checking here seems to be the cheapeast place to do it.
+    if (ABSL_PREDICT_FALSE(!consumer.Append(string_view(p, percent - p)))) {
       return false;
     }
-    if (!consumer.ConvertOne(
-            conv, string_view(percent + 1, src.data() - (percent + 1)))) {
-      return false;
+    if (ABSL_PREDICT_FALSE(percent + 1 >= end)) return false;
+
+    auto tag = GetTagForChar(percent[1]);
+    if (tag.is_conv()) {
+      if (ABSL_PREDICT_FALSE(next_arg < 0)) {
+        // This indicates an error in the format string.
+        // The only way to get `next_arg < 0` here is to have a positional
+        // argument first which sets next_arg to -1 and then a non-positional
+        // argument.
+        return false;
+      }
+      p = percent + 2;
+
+      // Keep this case separate from the one below.
+      // ConvertOne is more efficient when the compiler can see that the `basic`
+      // flag is set.
+      UnboundConversion conv;
+      conv.conv = tag.as_conv();
+      conv.arg_position = ++next_arg;
+      if (ABSL_PREDICT_FALSE(
+              !consumer.ConvertOne(conv, string_view(percent + 1, 1)))) {
+        return false;
+      }
+    } else if (percent[1] != '%') {
+      UnboundConversion conv;
+      p = ConsumeUnboundConversion(percent + 1, end, &conv, &next_arg);
+      if (ABSL_PREDICT_FALSE(p == nullptr)) return false;
+      if (ABSL_PREDICT_FALSE(!consumer.ConvertOne(
+          conv, string_view(percent + 1, p - (percent + 1))))) {
+        return false;
+      }
+    } else {
+      if (ABSL_PREDICT_FALSE(!consumer.Append("%"))) return false;
+      p = percent + 2;
+      continue;
     }
   }
   return true;
@@ -146,8 +200,9 @@ constexpr bool EnsureConstexpr(string_view s) {
 
 class ParsedFormatBase {
  public:
-  explicit ParsedFormatBase(string_view format, bool allow_ignored,
-                            std::initializer_list<Conv> convs);
+  explicit ParsedFormatBase(
+      string_view format, bool allow_ignored,
+      std::initializer_list<FormatConversionCharSet> convs);
 
   ParsedFormatBase(const ParsedFormatBase& other) { *this = other; }
 
@@ -194,8 +249,9 @@ class ParsedFormatBase {
  private:
   // Returns whether the conversions match and if !allow_ignored it verifies
   // that all conversions are used by the format.
-  bool MatchesConversions(bool allow_ignored,
-                          std::initializer_list<Conv> convs) const;
+  bool MatchesConversions(
+      bool allow_ignored,
+      std::initializer_list<FormatConversionCharSet> convs) const;
 
   struct ParsedFormatConsumer;
 
@@ -240,14 +296,14 @@ class ParsedFormatBase {
 // This is the only API that allows the user to pass a runtime specified format
 // string. These factory functions will return NULL if the format does not match
 // the conversions requested by the user.
-template <str_format_internal::Conv... C>
+template <FormatConversionCharSet... C>
 class ExtendedParsedFormat : public str_format_internal::ParsedFormatBase {
  public:
   explicit ExtendedParsedFormat(string_view format)
-#if ABSL_INTERNAL_ENABLE_FORMAT_CHECKER
+#ifdef ABSL_INTERNAL_ENABLE_FORMAT_CHECKER
       __attribute__((
           enable_if(str_format_internal::EnsureConstexpr(format),
-                    "Format std::string is not constexpr."),
+                    "Format string is not constexpr."),
           enable_if(str_format_internal::ValidFormatImpl<C...>(format),
                     "Format specified does not match the template arguments.")))
 #endif  // ABSL_INTERNAL_ENABLE_FORMAT_CHECKER
@@ -287,6 +343,7 @@ class ExtendedParsedFormat : public str_format_internal::ParsedFormatBase {
       : ParsedFormatBase(s, allow_ignored, {C...}) {}
 };
 }  // namespace str_format_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_STRINGS_INTERNAL_STR_FORMAT_PARSER_H_

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,33 +16,34 @@
 #ifndef ABSL_CONTAINER_INTERNAL_HAVE_SSE_H_
 #define ABSL_CONTAINER_INTERNAL_HAVE_SSE_H_
 
-#ifndef SWISSTABLE_HAVE_SSE2
+#ifndef ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSE2
 #if defined(__SSE2__) ||  \
     (defined(_MSC_VER) && \
      (defined(_M_X64) || (defined(_M_IX86) && _M_IX86_FP >= 2)))
-#define SWISSTABLE_HAVE_SSE2 1
+#define ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSE2 1
 #else
-#define SWISSTABLE_HAVE_SSE2 0
+#define ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSE2 0
 #endif
 #endif
 
-#ifndef SWISSTABLE_HAVE_SSSE3
+#ifndef ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3
 #ifdef __SSSE3__
-#define SWISSTABLE_HAVE_SSSE3 1
+#define ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3 1
 #else
-#define SWISSTABLE_HAVE_SSSE3 0
+#define ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3 0
 #endif
 #endif
 
-#if SWISSTABLE_HAVE_SSSE3 && !SWISSTABLE_HAVE_SSE2
+#if ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3 && \
+    !ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSE2
 #error "Bad configuration!"
 #endif
 
-#if SWISSTABLE_HAVE_SSE2
+#if ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSE2
 #include <emmintrin.h>
 #endif
 
-#if SWISSTABLE_HAVE_SSSE3
+#if ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3
 #include <tmmintrin.h>
 #endif
 

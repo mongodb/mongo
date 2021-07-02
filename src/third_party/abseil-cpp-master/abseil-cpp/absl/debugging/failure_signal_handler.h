@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -44,7 +44,10 @@
 #ifndef ABSL_DEBUGGING_FAILURE_SIGNAL_HANDLER_H_
 #define ABSL_DEBUGGING_FAILURE_SIGNAL_HANDLER_H_
 
+#include "absl/base/config.h"
+
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 // FailureSignalHandlerOptions
 //
@@ -85,7 +88,7 @@ struct FailureSignalHandlerOptions {
   bool call_previous_handler = false;
 
   // If non-null, indicates a pointer to a callback function that will be called
-  // upon failure, with a std::string argument containing failure data. This function
+  // upon failure, with a string argument containing failure data. This function
   // may be used as a hook to write failure data to a secondary location, such
   // as a log file. This function may also be called with null data, as a hint
   // to flush any buffered data before the program may be terminated. Consider
@@ -112,6 +115,7 @@ namespace debugging_internal {
 const char* FailureSignalToString(int signo);
 }  // namespace debugging_internal
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_DEBUGGING_FAILURE_SIGNAL_HANDLER_H_

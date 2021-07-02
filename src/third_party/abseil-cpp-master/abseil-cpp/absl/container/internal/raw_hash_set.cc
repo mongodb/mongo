@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,13 +20,14 @@
 #include "absl/base/config.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace container_internal {
 
 constexpr size_t Group::kWidth;
 
 // Returns "random" seed.
 inline size_t RandomSeed() {
-#if ABSL_HAVE_THREAD_LOCAL
+#ifdef ABSL_HAVE_THREAD_LOCAL
   static thread_local size_t counter = 0;
   size_t value = ++counter;
 #else   // ABSL_HAVE_THREAD_LOCAL
@@ -42,5 +43,19 @@ bool ShouldInsertBackwards(size_t hash, ctrl_t* ctrl) {
   return (H1(hash, ctrl) ^ RandomSeed()) % 13 > 6;
 }
 
+void ConvertDeletedToEmptyAndFullToDeleted(
+    ctrl_t* ctrl, size_t capacity) {
+  assert(ctrl[capacity] == kSentinel);
+  assert(IsValidCapacity(capacity));
+  for (ctrl_t* pos = ctrl; pos != ctrl + capacity + 1; pos += Group::kWidth) {
+    Group{pos}.ConvertSpecialToEmptyAndFullToDeleted(pos);
+  }
+  // Copy the cloned ctrl bytes.
+  std::memcpy(ctrl + capacity + 1, ctrl, Group::kWidth);
+  ctrl[capacity] = kSentinel;
+}
+
+
 }  // namespace container_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

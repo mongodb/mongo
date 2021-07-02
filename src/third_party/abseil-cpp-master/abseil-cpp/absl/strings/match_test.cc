@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,7 @@
 namespace {
 
 TEST(MatchTest, StartsWith) {
-  const std::string s1("123" "\0" "456", 7);
+  const std::string s1("123\0abc", 7);
   const absl::string_view a("foobar");
   const absl::string_view b(s1);
   const absl::string_view e;
@@ -36,7 +36,7 @@ TEST(MatchTest, StartsWith) {
 }
 
 TEST(MatchTest, EndsWith) {
-  const std::string s1("123" "\0" "456", 7);
+  const std::string s1("123\0abc", 7);
   const absl::string_view a("foobar");
   const absl::string_view b(s1);
   const absl::string_view e;
@@ -64,6 +64,23 @@ TEST(MatchTest, Contains) {
   EXPECT_TRUE(absl::StrContains("", ""));
   EXPECT_TRUE(absl::StrContains("abc", ""));
   EXPECT_FALSE(absl::StrContains("", "a"));
+}
+
+TEST(MatchTest, ContainsChar) {
+  absl::string_view a("abcdefg");
+  absl::string_view b("abcd");
+  EXPECT_TRUE(absl::StrContains(a, 'a'));
+  EXPECT_TRUE(absl::StrContains(a, 'b'));
+  EXPECT_TRUE(absl::StrContains(a, 'e'));
+  EXPECT_FALSE(absl::StrContains(a, 'h'));
+
+  EXPECT_TRUE(absl::StrContains(b, 'a'));
+  EXPECT_TRUE(absl::StrContains(b, 'b'));
+  EXPECT_FALSE(absl::StrContains(b, 'e'));
+  EXPECT_FALSE(absl::StrContains(b, 'h'));
+
+  EXPECT_FALSE(absl::StrContains("", 'a'));
+  EXPECT_FALSE(absl::StrContains("", 'a'));
 }
 
 TEST(MatchTest, ContainsNull) {

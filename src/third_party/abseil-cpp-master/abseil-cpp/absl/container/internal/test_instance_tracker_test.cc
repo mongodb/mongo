@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -174,6 +174,8 @@ TEST(TestInstanceTracker, Comparisons) {
   EXPECT_EQ(5, tracker.comparisons());
   EXPECT_FALSE(one >= two);
   EXPECT_EQ(6, tracker.comparisons());
+  EXPECT_TRUE(one.compare(two) < 0);  // NOLINT
+  EXPECT_EQ(7, tracker.comparisons());
 
   tracker.ResetCopiesMovesSwaps();
   EXPECT_EQ(0, tracker.comparisons());

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,6 +25,7 @@
 #include "absl/synchronization/internal/waiter.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace synchronization_internal {
 
 void PerThreadSem::SetThreadBlockedCounter(std::atomic<int> *counter) {
@@ -40,10 +41,14 @@ std::atomic<int> *PerThreadSem::GetThreadBlockedCounter() {
 }
 
 void PerThreadSem::Init(base_internal::ThreadIdentity *identity) {
-  Waiter::GetWaiter(identity)->Init();
+  new (Waiter::GetWaiter(identity)) Waiter();
   identity->ticker.store(0, std::memory_order_relaxed);
   identity->wait_start.store(0, std::memory_order_relaxed);
   identity->is_idle.store(false, std::memory_order_relaxed);
+}
+
+void PerThreadSem::Destroy(base_internal::ThreadIdentity *identity) {
+  Waiter::GetWaiter(identity)->~Waiter();
 }
 
 void PerThreadSem::Tick(base_internal::ThreadIdentity *identity) {
@@ -58,16 +63,17 @@ void PerThreadSem::Tick(base_internal::ThreadIdentity *identity) {
 }
 
 }  // namespace synchronization_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 extern "C" {
 
-ABSL_ATTRIBUTE_WEAK void AbslInternalPerThreadSemPost(
+ABSL_ATTRIBUTE_WEAK void ABSL_INTERNAL_C_SYMBOL(AbslInternalPerThreadSemPost)(
     absl::base_internal::ThreadIdentity *identity) {
   absl::synchronization_internal::Waiter::GetWaiter(identity)->Post();
 }
 
-ABSL_ATTRIBUTE_WEAK bool AbslInternalPerThreadSemWait(
+ABSL_ATTRIBUTE_WEAK bool ABSL_INTERNAL_C_SYMBOL(AbslInternalPerThreadSemWait)(
     absl::synchronization_internal::KernelTimeout t) {
   bool timeout = false;
   absl::base_internal::ThreadIdentity *identity;
@@ -89,6 +95,7 @@ ABSL_ATTRIBUTE_WEAK bool AbslInternalPerThreadSemWait(
   if (identity->blocked_count_ptr != nullptr) {
     identity->blocked_count_ptr->fetch_sub(1, std::memory_order_relaxed);
   }
+
   identity->is_idle.store(false, std::memory_order_relaxed);
   identity->wait_start.store(0, std::memory_order_relaxed);
   return !timeout;

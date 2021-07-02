@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,13 +16,17 @@
 #define ABSL_BASE_INTERNAL_PER_THREAD_TLS_H_
 
 // This header defines two macros:
+//
 // If the platform supports thread-local storage:
-//   ABSL_PER_THREAD_TLS_KEYWORD is the C keyword needed to declare a
-//   thread-local variable ABSL_PER_THREAD_TLS is 1
+//
+// * ABSL_PER_THREAD_TLS_KEYWORD is the C keyword needed to declare a
+//   thread-local variable
+// * ABSL_PER_THREAD_TLS is 1
 //
 // Otherwise:
-//   ABSL_PER_THREAD_TLS_KEYWORD is empty
-//   ABSL_PER_THREAD_TLS is 0
+//
+// * ABSL_PER_THREAD_TLS_KEYWORD is empty
+// * ABSL_PER_THREAD_TLS is 0
 //
 // Microsoft C supports thread-local storage.
 // GCC supports it if the appropriate version of glibc is available,

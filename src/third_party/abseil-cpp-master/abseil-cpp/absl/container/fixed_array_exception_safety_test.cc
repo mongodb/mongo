@@ -1,10 +1,10 @@
-// Copyright 2017 The Abseil Authors.
+// Copyright 2019 The Abseil Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,14 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <initializer_list>
-
+#include "absl/base/config.h"
 #include "absl/container/fixed_array.h"
+
+#ifdef ABSL_HAVE_EXCEPTIONS
+
+#include <initializer_list>
 
 #include "gtest/gtest.h"
 #include "absl/base/internal/exception_safety_testing.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 namespace {
 
@@ -33,10 +37,19 @@ constexpr int kUpdatedValue = 10;
 using ::testing::TestThrowingCtor;
 
 using Thrower = testing::ThrowingValue<testing::TypeSpec::kEverythingThrows>;
-using FixedArr = absl::FixedArray<Thrower, kInlined>;
-
+using ThrowAlloc =
+    testing::ThrowingAllocator<Thrower, testing::AllocSpec::kEverythingThrows>;
 using MoveThrower = testing::ThrowingValue<testing::TypeSpec::kNoThrowMove>;
+using MoveThrowAlloc =
+    testing::ThrowingAllocator<MoveThrower,
+                               testing::AllocSpec::kEverythingThrows>;
+
+using FixedArr = absl::FixedArray<Thrower, kInlined>;
+using FixedArrWithAlloc = absl::FixedArray<Thrower, kInlined, ThrowAlloc>;
+
 using MoveFixedArr = absl::FixedArray<MoveThrower, kInlined>;
+using MoveFixedArrWithAlloc =
+    absl::FixedArray<MoveThrower, kInlined, MoveThrowAlloc>;
 
 TEST(FixedArrayExceptionSafety, CopyConstructor) {
   auto small = FixedArr(kSmallSize);
@@ -44,6 +57,14 @@ TEST(FixedArrayExceptionSafety, CopyConstructor) {
 
   auto large = FixedArr(kLargeSize);
   TestThrowingCtor<FixedArr>(large);
+}
+
+TEST(FixedArrayExceptionSafety, CopyConstructorWithAlloc) {
+  auto small = FixedArrWithAlloc(kSmallSize);
+  TestThrowingCtor<FixedArrWithAlloc>(small);
+
+  auto large = FixedArrWithAlloc(kLargeSize);
+  TestThrowingCtor<FixedArrWithAlloc>(large);
 }
 
 TEST(FixedArrayExceptionSafety, MoveConstructor) {
@@ -55,14 +76,33 @@ TEST(FixedArrayExceptionSafety, MoveConstructor) {
   TestThrowingCtor<MoveFixedArr>(MoveFixedArr(kLargeSize));
 }
 
+TEST(FixedArrayExceptionSafety, MoveConstructorWithAlloc) {
+  TestThrowingCtor<FixedArrWithAlloc>(FixedArrWithAlloc(kSmallSize));
+  TestThrowingCtor<FixedArrWithAlloc>(FixedArrWithAlloc(kLargeSize));
+
+  // TypeSpec::kNoThrowMove
+  TestThrowingCtor<MoveFixedArrWithAlloc>(MoveFixedArrWithAlloc(kSmallSize));
+  TestThrowingCtor<MoveFixedArrWithAlloc>(MoveFixedArrWithAlloc(kLargeSize));
+}
+
 TEST(FixedArrayExceptionSafety, SizeConstructor) {
   TestThrowingCtor<FixedArr>(kSmallSize);
   TestThrowingCtor<FixedArr>(kLargeSize);
 }
 
+TEST(FixedArrayExceptionSafety, SizeConstructorWithAlloc) {
+  TestThrowingCtor<FixedArrWithAlloc>(kSmallSize);
+  TestThrowingCtor<FixedArrWithAlloc>(kLargeSize);
+}
+
 TEST(FixedArrayExceptionSafety, SizeValueConstructor) {
   TestThrowingCtor<FixedArr>(kSmallSize, Thrower());
   TestThrowingCtor<FixedArr>(kLargeSize, Thrower());
+}
+
+TEST(FixedArrayExceptionSafety, SizeValueConstructorWithAlloc) {
+  TestThrowingCtor<FixedArrWithAlloc>(kSmallSize, Thrower());
+  TestThrowingCtor<FixedArrWithAlloc>(kLargeSize, Thrower());
 }
 
 TEST(FixedArrayExceptionSafety, IteratorConstructor) {
@@ -71,6 +111,14 @@ TEST(FixedArrayExceptionSafety, IteratorConstructor) {
 
   auto large = FixedArr(kLargeSize);
   TestThrowingCtor<FixedArr>(large.begin(), large.end());
+}
+
+TEST(FixedArrayExceptionSafety, IteratorConstructorWithAlloc) {
+  auto small = FixedArrWithAlloc(kSmallSize);
+  TestThrowingCtor<FixedArrWithAlloc>(small.begin(), small.end());
+
+  auto large = FixedArrWithAlloc(kLargeSize);
+  TestThrowingCtor<FixedArrWithAlloc>(large.begin(), large.end());
 }
 
 TEST(FixedArrayExceptionSafety, InitListConstructor) {
@@ -86,9 +134,23 @@ TEST(FixedArrayExceptionSafety, InitListConstructor) {
       Thrower{}, Thrower{}, Thrower{}, Thrower{}, Thrower{}});
 }
 
-testing::AssertionResult ReadMemory(FixedArr* fixed_arr) {
-  // Marked volatile to prevent optimization. Used for running asan tests.
-  volatile int sum = 0;
+TEST(FixedArrayExceptionSafety, InitListConstructorWithAlloc) {
+  constexpr int small_inlined = 3;
+  using SmallFixedArrWithAlloc =
+      absl::FixedArray<Thrower, small_inlined, ThrowAlloc>;
+
+  TestThrowingCtor<SmallFixedArrWithAlloc>(std::initializer_list<Thrower>{});
+  // Test inlined allocation
+  TestThrowingCtor<SmallFixedArrWithAlloc>(
+      std::initializer_list<Thrower>{Thrower{}, Thrower{}});
+  // Test out of line allocation
+  TestThrowingCtor<SmallFixedArrWithAlloc>(std::initializer_list<Thrower>{
+      Thrower{}, Thrower{}, Thrower{}, Thrower{}, Thrower{}});
+}
+
+template <typename FixedArrT>
+testing::AssertionResult ReadMemory(FixedArrT* fixed_arr) {
+  int sum = 0;
   for (const auto& thrower : *fixed_arr) {
     sum += thrower.Get();
   }
@@ -97,7 +159,7 @@ testing::AssertionResult ReadMemory(FixedArr* fixed_arr) {
 
 TEST(FixedArrayExceptionSafety, Fill) {
   auto test_fill = testing::MakeExceptionSafetyTester()
-                       .WithContracts(ReadMemory)
+                       .WithContracts(ReadMemory<FixedArr>)
                        .WithOperation([&](FixedArr* fixed_arr_ptr) {
                          auto thrower =
                              Thrower(kUpdatedValue, testing::nothrow_ctor);
@@ -112,6 +174,28 @@ TEST(FixedArrayExceptionSafety, Fill) {
           .Test());
 }
 
+TEST(FixedArrayExceptionSafety, FillWithAlloc) {
+  auto test_fill = testing::MakeExceptionSafetyTester()
+                       .WithContracts(ReadMemory<FixedArrWithAlloc>)
+                       .WithOperation([&](FixedArrWithAlloc* fixed_arr_ptr) {
+                         auto thrower =
+                             Thrower(kUpdatedValue, testing::nothrow_ctor);
+                         fixed_arr_ptr->fill(thrower);
+                       });
+
+  EXPECT_TRUE(test_fill
+                  .WithInitialValue(
+                      FixedArrWithAlloc(kSmallSize, Thrower(kInitialValue)))
+                  .Test());
+  EXPECT_TRUE(test_fill
+                  .WithInitialValue(
+                      FixedArrWithAlloc(kLargeSize, Thrower(kInitialValue)))
+                  .Test());
+}
+
 }  // namespace
 
+ABSL_NAMESPACE_END
 }  // namespace absl
+
+#endif  // ABSL_HAVE_EXCEPTIONS

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,6 +26,7 @@
 #define ABSL_SYNCHRONIZATION_INTERNAL_KERNEL_TIMEOUT_H_
 
 #include <time.h>
+
 #include <algorithm>
 #include <limits>
 
@@ -34,6 +35,7 @@
 #include "absl/time/time.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace synchronization_internal {
 
 class Futex;
@@ -53,7 +55,12 @@ class KernelTimeout {
 
   // We explicitly do not support other custom formats: timespec, int64_t nanos.
   // Unify on this and absl::Time, please.
+
   bool has_timeout() const { return ns_ != 0; }
+
+  // Convert to parameter for sem_timedwait/futex/similar.  Only for approved
+  // users.  Do not call if !has_timeout.
+  struct timespec MakeAbsTimespec();
 
  private:
   // internal rep, not user visible: ns after unix epoch.
@@ -78,34 +85,6 @@ class KernelTimeout {
     // as no timeout.
     if (x == (std::numeric_limits<int64_t>::max)()) x = 0;
     return x;
-  }
-
-  // Convert to parameter for sem_timedwait/futex/similar.  Only for approved
-  // users.  Do not call if !has_timeout.
-  struct timespec MakeAbsTimespec() {
-    int64_t n = ns_;
-    static const int64_t kNanosPerSecond = 1000 * 1000 * 1000;
-    if (n == 0) {
-      ABSL_RAW_LOG(
-          ERROR,
-          "Tried to create a timespec from a non-timeout; never do this.");
-      // But we'll try to continue sanely.  no-timeout ~= saturated timeout.
-      n = (std::numeric_limits<int64_t>::max)();
-    }
-
-    // Kernel APIs validate timespecs as being at or after the epoch,
-    // despite the kernel time type being signed.  However, no one can
-    // tell the difference between a timeout at or before the epoch (since
-    // all such timeouts have expired!)
-    if (n < 0) n = 0;
-
-    struct timespec abstime;
-    int64_t seconds = (std::min)(n / kNanosPerSecond,
-                               int64_t{(std::numeric_limits<time_t>::max)()});
-    abstime.tv_sec = static_cast<time_t>(seconds);
-    abstime.tv_nsec =
-        static_cast<decltype(abstime.tv_nsec)>(n % kNanosPerSecond);
-    return abstime;
   }
 
 #ifdef _WIN32
@@ -146,6 +125,32 @@ class KernelTimeout {
   friend class Waiter;
 };
 
+inline struct timespec KernelTimeout::MakeAbsTimespec() {
+  int64_t n = ns_;
+  static const int64_t kNanosPerSecond = 1000 * 1000 * 1000;
+  if (n == 0) {
+    ABSL_RAW_LOG(
+        ERROR, "Tried to create a timespec from a non-timeout; never do this.");
+    // But we'll try to continue sanely.  no-timeout ~= saturated timeout.
+    n = (std::numeric_limits<int64_t>::max)();
+  }
+
+  // Kernel APIs validate timespecs as being at or after the epoch,
+  // despite the kernel time type being signed.  However, no one can
+  // tell the difference between a timeout at or before the epoch (since
+  // all such timeouts have expired!)
+  if (n < 0) n = 0;
+
+  struct timespec abstime;
+  int64_t seconds = (std::min)(n / kNanosPerSecond,
+                               int64_t{(std::numeric_limits<time_t>::max)()});
+  abstime.tv_sec = static_cast<time_t>(seconds);
+  abstime.tv_nsec = static_cast<decltype(abstime.tv_nsec)>(n % kNanosPerSecond);
+  return abstime;
+}
+
 }  // namespace synchronization_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
+
 #endif  // ABSL_SYNCHRONIZATION_INTERNAL_KERNEL_TIMEOUT_H_

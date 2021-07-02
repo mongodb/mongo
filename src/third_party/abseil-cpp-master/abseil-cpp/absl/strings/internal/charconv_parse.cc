@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,6 +22,7 @@
 #include "absl/strings/internal/memutil.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace {
 
 // ParseFloat<10> will read the first 19 significant digits of the mantissa.
@@ -245,14 +246,20 @@ constexpr int DigitMagnitude<16>() {
 // ConsumeDigits does not protect against overflow on *out; max_digits must
 // be chosen with respect to type T to avoid the possibility of overflow.
 template <int base, typename T>
-std::size_t ConsumeDigits(const char* begin, const char* end, int max_digits,
-                          T* out, bool* dropped_nonzero_digit) {
+int ConsumeDigits(const char* begin, const char* end, int max_digits, T* out,
+                  bool* dropped_nonzero_digit) {
   if (base == 10) {
     assert(max_digits <= std::numeric_limits<T>::digits10);
   } else if (base == 16) {
     assert(max_digits * 4 <= std::numeric_limits<T>::digits);
   }
   const char* const original_begin = begin;
+
+  // Skip leading zeros, but only if *out is zero.
+  // They don't cause an overflow so we don't have to count them for
+  // `max_digits`.
+  while (!*out && end != begin && *begin == '0') ++begin;
+
   T accumulator = *out;
   const char* significant_digits_end =
       (end - begin > max_digits) ? begin + max_digits : end;
@@ -275,7 +282,7 @@ std::size_t ConsumeDigits(const char* begin, const char* end, int max_digits,
     *dropped_nonzero_digit = true;
   }
   *out = accumulator;
-  return begin - original_begin;
+  return static_cast<int>(begin - original_begin);
 }
 
 // Returns true if `v` is one of the chars allowed inside parentheses following
@@ -295,7 +302,7 @@ bool ParseInfinityOrNan(const char* begin, const char* end,
   switch (*begin) {
     case 'i':
     case 'I': {
-      // An infinity std::string consists of the characters "inf" or "infinity",
+      // An infinity string consists of the characters "inf" or "infinity",
       // case insensitive.
       if (strings_internal::memcasecmp(begin + 1, "nf", 2) != 0) {
         return false;
@@ -319,7 +326,7 @@ bool ParseInfinityOrNan(const char* begin, const char* end,
       }
       out->type = strings_internal::FloatType::kNan;
       out->end = begin + 3;
-      // NaN is allowed to be followed by a parenthesized std::string, consisting of
+      // NaN is allowed to be followed by a parenthesized string, consisting of
       // only the characters [a-zA-Z0-9_].  Match that if it's present.
       begin += 3;
       if (begin < end && *begin == '(') {
@@ -365,7 +372,7 @@ strings_internal::ParsedFloat ParseFloat(const char* begin, const char* end,
 
   int exponent_adjustment = 0;
   bool mantissa_is_inexact = false;
-  std::size_t pre_decimal_digits = ConsumeDigits<base>(
+  int pre_decimal_digits = ConsumeDigits<base>(
       begin, end, MantissaDigitsMax<base>(), &mantissa, &mantissa_is_inexact);
   begin += pre_decimal_digits;
   int digits_left;
@@ -391,14 +398,14 @@ strings_internal::ParsedFloat ParseFloat(const char* begin, const char* end,
       while (begin < end && *begin == '0') {
         ++begin;
       }
-      std::size_t zeros_skipped = begin - begin_zeros;
+      int zeros_skipped = static_cast<int>(begin - begin_zeros);
       if (zeros_skipped >= DigitLimit<base>()) {
         // refuse to parse pathological inputs
         return result;
       }
       exponent_adjustment -= static_cast<int>(zeros_skipped);
     }
-    std::size_t post_decimal_digits = ConsumeDigits<base>(
+    int post_decimal_digits = ConsumeDigits<base>(
         begin, end, digits_left, &mantissa, &mantissa_is_inexact);
     begin += post_decimal_digits;
 
@@ -493,4 +500,5 @@ template ParsedFloat ParseFloat<16>(const char* begin, const char* end,
                                     chars_format format_flags);
 
 }  // namespace strings_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

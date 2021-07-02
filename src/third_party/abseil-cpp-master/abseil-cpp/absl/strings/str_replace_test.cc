@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,7 +25,7 @@
 TEST(StrReplaceAll, OneReplacement) {
   std::string s;
 
-  // Empty std::string.
+  // Empty string.
   s = absl::StrReplaceAll(s, {{"", ""}});
   EXPECT_EQ(s, "");
   s = absl::StrReplaceAll(s, {{"x", ""}});
@@ -47,7 +47,7 @@ TEST(StrReplaceAll, OneReplacement) {
   s = absl::StrReplaceAll("abc", {{"xyz", "123"}});
   EXPECT_EQ(s, "abc");
 
-  // Replace entire std::string.
+  // Replace entire string.
   s = absl::StrReplaceAll("abc", {{"abc", "xyz"}});
   EXPECT_EQ(s, "xyz");
 
@@ -88,7 +88,7 @@ TEST(StrReplaceAll, OneReplacement) {
 TEST(StrReplaceAll, ManyReplacements) {
   std::string s;
 
-  // Empty std::string.
+  // Empty string.
   s = absl::StrReplaceAll("", {{"", ""}, {"x", ""}, {"", "y"}, {"x", "y"}});
   EXPECT_EQ(s, "");
 
@@ -96,7 +96,7 @@ TEST(StrReplaceAll, ManyReplacements) {
   s = absl::StrReplaceAll("abc", {{"", ""}, {"", "y"}, {"x", ""}});
   EXPECT_EQ(s, "abc");
 
-  // Replace entire std::string, one char at a time
+  // Replace entire string, one char at a time
   s = absl::StrReplaceAll("abc", {{"a", "x"}, {"b", "y"}, {"c", "z"}});
   EXPECT_EQ(s, "xyz");
   s = absl::StrReplaceAll("zxy", {{"z", "x"}, {"x", "y"}, {"y", "z"}});
@@ -148,7 +148,7 @@ TEST(StrReplaceAll, ManyReplacementsInMap) {
   replacements["$count"] = "5";
   replacements["#Noun"] = "Apples";
   std::string s = absl::StrReplaceAll("$who bought $count #Noun. Thanks $who!",
-                                 replacements);
+                                      replacements);
   EXPECT_EQ("Bob bought 5 Apples. Thanks Bob!", s);
 }
 
@@ -264,7 +264,7 @@ TEST(StrReplaceAll, Inplace) {
   std::string s;
   int reps;
 
-  // Empty std::string.
+  // Empty string.
   s = "";
   reps = absl::StrReplaceAll({{"", ""}, {"x", ""}, {"", "y"}, {"x", "y"}}, &s);
   EXPECT_EQ(reps, 0);
@@ -276,7 +276,7 @@ TEST(StrReplaceAll, Inplace) {
   EXPECT_EQ(reps, 0);
   EXPECT_EQ(s, "abc");
 
-  // Replace entire std::string, one char at a time
+  // Replace entire string, one char at a time
   s = "abc";
   reps = absl::StrReplaceAll({{"a", "x"}, {"b", "y"}, {"c", "z"}}, &s);
   EXPECT_EQ(reps, 3);

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,7 @@
 #define ABSL_CONTAINER_INTERNAL_HASH_GENERATOR_TESTING_H_
 
 #include <stdint.h>
+
 #include <algorithm>
 #include <iosfwd>
 #include <random>
@@ -27,10 +28,12 @@
 #include <utility>
 
 #include "absl/container/internal/hash_policy_testing.h"
+#include "absl/memory/memory.h"
 #include "absl/meta/type_traits.h"
 #include "absl/strings/string_view.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace container_internal {
 namespace hash_internal {
 namespace generator_internal {
@@ -129,6 +132,13 @@ struct Generator<std::tuple<Ts...>> {
   }
 };
 
+template <class T>
+struct Generator<std::unique_ptr<T>> {
+  std::unique_ptr<T> operator()() const {
+    return absl::make_unique<T>(Generator<T>()());
+  }
+};
+
 template <class U>
 struct Generator<U, absl::void_t<decltype(std::declval<U&>().key()),
                                 decltype(std::declval<U&>().value())>>
@@ -145,6 +155,7 @@ using GeneratedType = decltype(
 
 }  // namespace hash_internal
 }  // namespace container_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_CONTAINER_INTERNAL_HASH_GENERATOR_TESTING_H_

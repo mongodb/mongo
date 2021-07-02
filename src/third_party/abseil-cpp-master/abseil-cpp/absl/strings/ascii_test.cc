@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -197,10 +197,14 @@ TEST(AsciiStrTo, Lower) {
   const std::string str("GHIJKL");
   const std::string str2("MNOPQR");
   const absl::string_view sp(str2);
+  std::string mutable_str("STUVWX");
 
   EXPECT_EQ("abcdef", absl::AsciiStrToLower(buf));
   EXPECT_EQ("ghijkl", absl::AsciiStrToLower(str));
   EXPECT_EQ("mnopqr", absl::AsciiStrToLower(sp));
+
+  absl::AsciiStrToLower(&mutable_str);
+  EXPECT_EQ("stuvwx", mutable_str);
 
   char mutable_buf[] = "Mutable";
   std::transform(mutable_buf, mutable_buf + strlen(mutable_buf),

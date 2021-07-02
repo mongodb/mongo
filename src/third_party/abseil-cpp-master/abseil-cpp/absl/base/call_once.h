@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,6 +29,7 @@
 #include <atomic>
 #include <cstdint>
 #include <type_traits>
+#include <utility>
 
 #include "absl/base/internal/invoke.h"
 #include "absl/base/internal/low_level_scheduling.h"
@@ -36,9 +37,11 @@
 #include "absl/base/internal/scheduling_mode.h"
 #include "absl/base/internal/spinlock_wait.h"
 #include "absl/base/macros.h"
+#include "absl/base/optimization.h"
 #include "absl/base/port.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 class once_flag;
 
@@ -140,12 +143,13 @@ enum {
 };
 
 template <typename Callable, typename... Args>
+ABSL_ATTRIBUTE_NOINLINE
 void CallOnceImpl(std::atomic<uint32_t>* control,
                   base_internal::SchedulingMode scheduling_mode, Callable&& fn,
                   Args&&... args) {
 #ifndef NDEBUG
   {
-    uint32_t old_control = control->load(std::memory_order_acquire);
+    uint32_t old_control = control->load(std::memory_order_relaxed);
     if (old_control != kOnceInit &&
         old_control != kOnceRunning &&
         old_control != kOnceWaiter &&
@@ -163,16 +167,18 @@ void CallOnceImpl(std::atomic<uint32_t>* control,
   // Must do this before potentially modifying control word's state.
   base_internal::SchedulingHelper maybe_disable_scheduling(scheduling_mode);
   // Short circuit the simplest case to avoid procedure call overhead.
+  // The base_internal::SpinLockWait() call returns either kOnceInit or
+  // kOnceDone. If it returns kOnceDone, it must have loaded the control word
+  // with std::memory_order_acquire and seen a value of kOnceDone.
   uint32_t old_control = kOnceInit;
   if (control->compare_exchange_strong(old_control, kOnceRunning,
-                                       std::memory_order_acquire,
                                        std::memory_order_relaxed) ||
       base_internal::SpinLockWait(control, ABSL_ARRAYSIZE(trans), trans,
                                   scheduling_mode) == kOnceInit) {
-    base_internal::Invoke(std::forward<Callable>(fn),
+    base_internal::invoke(std::forward<Callable>(fn),
                           std::forward<Args>(args)...);
-    old_control = control->load(std::memory_order_relaxed);
-    control->store(base_internal::kOnceDone, std::memory_order_release);
+    old_control =
+        control->exchange(base_internal::kOnceDone, std::memory_order_release);
     if (old_control == base_internal::kOnceWaiter) {
       base_internal::SpinLockWake(control, true);
     }
@@ -207,6 +213,7 @@ void call_once(absl::once_flag& flag, Callable&& fn, Args&&... args) {
   }
 }
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_BASE_CALL_ONCE_H_

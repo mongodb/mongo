@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@
 #include "absl/strings/str_cat.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace strings_internal {
 
 using FixedMapping =
@@ -68,12 +69,14 @@ int ApplySubstitutions(
 // aren't inlined.
 
 std::string StrReplaceAll(absl::string_view s,
-                     strings_internal::FixedMapping replacements) {
+                          strings_internal::FixedMapping replacements) {
   return StrReplaceAll<strings_internal::FixedMapping>(s, replacements);
 }
 
-int StrReplaceAll(strings_internal::FixedMapping replacements, std::string* target) {
+int StrReplaceAll(strings_internal::FixedMapping replacements,
+                  std::string* target) {
   return StrReplaceAll<strings_internal::FixedMapping>(replacements, target);
 }
 
+ABSL_NAMESPACE_END
 }  // namespace absl

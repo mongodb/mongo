@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,27 +16,31 @@
 
 #include "absl/container/internal/unordered_set_constructor_test.h"
 #include "absl/container/internal/unordered_set_lookup_test.h"
+#include "absl/container/internal/unordered_set_members_test.h"
 #include "absl/container/internal/unordered_set_modifiers_test.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace container_internal {
 namespace {
 using ::absl::container_internal::hash_internal::Enum;
 using ::absl::container_internal::hash_internal::EnumClass;
+using ::testing::IsEmpty;
 using ::testing::Pointee;
 using ::testing::UnorderedElementsAre;
 
 using SetTypes = ::testing::Types<
     node_hash_set<int, StatefulTestingHash, StatefulTestingEqual, Alloc<int>>,
     node_hash_set<std::string, StatefulTestingHash, StatefulTestingEqual,
-                  Alloc<int>>,
+                  Alloc<std::string>>,
     node_hash_set<Enum, StatefulTestingHash, StatefulTestingEqual, Alloc<Enum>>,
     node_hash_set<EnumClass, StatefulTestingHash, StatefulTestingEqual,
                   Alloc<EnumClass>>>;
 
-INSTANTIATE_TYPED_TEST_CASE_P(NodeHashSet, ConstructorTest, SetTypes);
-INSTANTIATE_TYPED_TEST_CASE_P(NodeHashSet, LookupTest, SetTypes);
-INSTANTIATE_TYPED_TEST_CASE_P(NodeHashSet, ModifiersTest, SetTypes);
+INSTANTIATE_TYPED_TEST_SUITE_P(NodeHashSet, ConstructorTest, SetTypes);
+INSTANTIATE_TYPED_TEST_SUITE_P(NodeHashSet, LookupTest, SetTypes);
+INSTANTIATE_TYPED_TEST_SUITE_P(NodeHashSet, MembersTest, SetTypes);
+INSTANTIATE_TYPED_TEST_SUITE_P(NodeHashSet, ModifiersTest, SetTypes);
 
 TEST(NodeHashSet, MoveableNotCopyableCompiles) {
   node_hash_set<std::unique_ptr<void*>> t;
@@ -98,6 +102,42 @@ TEST(NodeHashSet, MergeExtractInsert) {
   EXPECT_THAT(set2, UnorderedElementsAre(Pointee(7), Pointee(23)));
 }
 
+bool IsEven(int k) { return k % 2 == 0; }
+
+TEST(NodeHashSet, EraseIf) {
+  // Erase all elements.
+  {
+    node_hash_set<int> s = {1, 2, 3, 4, 5};
+    erase_if(s, [](int) { return true; });
+    EXPECT_THAT(s, IsEmpty());
+  }
+  // Erase no elements.
+  {
+    node_hash_set<int> s = {1, 2, 3, 4, 5};
+    erase_if(s, [](int) { return false; });
+    EXPECT_THAT(s, UnorderedElementsAre(1, 2, 3, 4, 5));
+  }
+  // Erase specific elements.
+  {
+    node_hash_set<int> s = {1, 2, 3, 4, 5};
+    erase_if(s, [](int k) { return k % 2 == 1; });
+    EXPECT_THAT(s, UnorderedElementsAre(2, 4));
+  }
+  // Predicate is function reference.
+  {
+    node_hash_set<int> s = {1, 2, 3, 4, 5};
+    erase_if(s, IsEven);
+    EXPECT_THAT(s, UnorderedElementsAre(1, 3, 5));
+  }
+  // Predicate is function pointer.
+  {
+    node_hash_set<int> s = {1, 2, 3, 4, 5};
+    erase_if(s, &IsEven);
+    EXPECT_THAT(s, UnorderedElementsAre(1, 3, 5));
+  }
+}
+
 }  // namespace
 }  // namespace container_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,6 +29,24 @@
 #include "absl/strings/str_cat.h"
 
 namespace {
+
+void BM_StringViewFromString(benchmark::State& state) {
+  std::string s(state.range(0), 'x');
+  std::string* ps = &s;
+  struct SV {
+    SV() = default;
+    explicit SV(const std::string& s) : sv(s) {}
+    absl::string_view sv;
+  } sv;
+  SV* psv = &sv;
+  benchmark::DoNotOptimize(ps);
+  benchmark::DoNotOptimize(psv);
+  for (auto _ : state) {
+    new (psv) SV(*ps);
+    benchmark::DoNotOptimize(sv);
+  }
+}
+BENCHMARK(BM_StringViewFromString)->Arg(12)->Arg(128);
 
 // Provide a forcibly out-of-line wrapper for operator== that can be used in
 // benchmarks to measure the impact of inlining.
@@ -142,10 +160,44 @@ void BM_CompareSame(benchmark::State& state) {
   absl::string_view b = y;
 
   for (auto _ : state) {
+    benchmark::DoNotOptimize(a);
+    benchmark::DoNotOptimize(b);
     benchmark::DoNotOptimize(a.compare(b));
   }
 }
 BENCHMARK(BM_CompareSame)->DenseRange(0, 3)->Range(4, 1 << 10);
+
+void BM_CompareFirstOneLess(benchmark::State& state) {
+  const int len = state.range(0);
+  std::string x(len, 'a');
+  std::string y = x;
+  y.back() = 'b';
+  absl::string_view a = x;
+  absl::string_view b = y;
+
+  for (auto _ : state) {
+    benchmark::DoNotOptimize(a);
+    benchmark::DoNotOptimize(b);
+    benchmark::DoNotOptimize(a.compare(b));
+  }
+}
+BENCHMARK(BM_CompareFirstOneLess)->DenseRange(1, 3)->Range(4, 1 << 10);
+
+void BM_CompareSecondOneLess(benchmark::State& state) {
+  const int len = state.range(0);
+  std::string x(len, 'a');
+  std::string y = x;
+  x.back() = 'b';
+  absl::string_view a = x;
+  absl::string_view b = y;
+
+  for (auto _ : state) {
+    benchmark::DoNotOptimize(a);
+    benchmark::DoNotOptimize(b);
+    benchmark::DoNotOptimize(a.compare(b));
+  }
+}
+BENCHMARK(BM_CompareSecondOneLess)->DenseRange(1, 3)->Range(4, 1 << 10);
 
 void BM_find_string_view_len_one(benchmark::State& state) {
   std::string haystack(state.range(0), '0');

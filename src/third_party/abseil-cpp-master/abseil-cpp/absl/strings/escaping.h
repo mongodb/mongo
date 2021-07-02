@@ -5,7 +5,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,6 @@
 //
 // This header file contains string utilities involved in escaping and
 // unescaping strings in various ways.
-//
 
 #ifndef ABSL_STRINGS_ESCAPING_H_
 #define ABSL_STRINGS_ESCAPING_H_
@@ -34,11 +33,12 @@
 #include "absl/strings/string_view.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 // CUnescape()
 //
 // Unescapes a `source` string and copies it into `dest`, rewriting C-style
-// escape sequences (http://en.cppreference.com/w/cpp/language/escape) into
+// escape sequences (https://en.cppreference.com/w/cpp/language/escape) into
 // their proper code point equivalents, returning `true` if successful.
 //
 // The following unescape sequences can be handled:
@@ -55,7 +55,6 @@ namespace absl {
 //     '\Unnnnnnnn' for exactly eight hex digits, which will be encoded in
 //     UTF-8. (E.g., `\u2019` unescapes to the three bytes 0xE2, 0x80, and
 //     0x99).
-//
 //
 // If any errors are encountered, this function returns `false`, leaving the
 // `dest` output parameter in an unspecified state, and stores the first
@@ -80,7 +79,7 @@ inline bool CUnescape(absl::string_view source, std::string* dest) {
 // CEscape()
 //
 // Escapes a 'src' string using C-style escapes sequences
-// (http://en.cppreference.com/w/cpp/language/escape), escaping other
+// (https://en.cppreference.com/w/cpp/language/escape), escaping other
 // non-printable/non-whitespace bytes as octal sequences (e.g. "\377").
 //
 // Example:
@@ -134,16 +133,18 @@ bool WebSafeBase64Unescape(absl::string_view src, std::string* dest);
 
 // Base64Escape()
 //
-// Encodes a `src` string into a `dest` buffer using base64 encoding, with
-// padding characters. This function conforms with RFC 4648 section 4 (base64).
+// Encodes a `src` string into a base64-encoded string, with padding characters.
+// This function conforms with RFC 4648 section 4 (base64).
 void Base64Escape(absl::string_view src, std::string* dest);
+std::string Base64Escape(absl::string_view src);
 
 // WebSafeBase64Escape()
 //
-// Encodes a `src` string into a `dest` buffer using '-' instead of '+' and
-// '_' instead of '/', and without padding. This function conforms with RFC 4648
-// section 5 (base64url).
+// Encodes a `src` string into a base64-like string, using '-' instead of '+'
+// and '_' instead of '/', and without padding. This function conforms with RFC
+// 4648 section 5 (base64url).
 void WebSafeBase64Escape(absl::string_view src, std::string* dest);
+std::string WebSafeBase64Escape(absl::string_view src);
 
 // HexStringToBytes()
 //
@@ -157,6 +158,7 @@ std::string HexStringToBytes(absl::string_view from);
 // `2*from.size()`.
 std::string BytesToHexString(absl::string_view from);
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_STRINGS_ESCAPING_H_

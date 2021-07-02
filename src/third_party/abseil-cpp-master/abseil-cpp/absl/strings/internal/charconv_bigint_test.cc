@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,7 @@
 #include "gtest/gtest.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace strings_internal {
 
 TEST(BigUnsigned, ShiftLeft) {
@@ -67,6 +68,61 @@ TEST(BigUnsigned, ShiftLeft) {
     }
     // And we should have fully rotated all bits off by now:
     EXPECT_EQ(a, BigUnsigned<84>(0u));
+  }
+  {
+    // Bit shifting large and small numbers by large and small offsets.
+    // Intended to exercise bounds-checking corner on ShiftLeft() (directly
+    // and under asan).
+
+    // 2**(32*84)-1
+    const BigUnsigned<84> all_bits_one(
+        "1474444211396924248063325089479706787923460402125687709454567433186613"
+        "6228083464060749874845919674257665016359189106695900028098437021384227"
+        "3285029708032466536084583113729486015826557532750465299832071590813090"
+        "2011853039837649252477307070509704043541368002938784757296893793903797"
+        "8180292336310543540677175225040919704702800559606097685920595947397024"
+        "8303316808753252115729411497720357971050627997031988036134171378490368"
+        "6008000778741115399296162550786288457245180872759047016734959330367829"
+        "5235612397427686310674725251378116268607113017720538636924549612987647"
+        "5767411074510311386444547332882472126067840027882117834454260409440463"
+        "9345147252664893456053258463203120637089916304618696601333953616715125"
+        "2115882482473279040772264257431663818610405673876655957323083702713344"
+        "4201105427930770976052393421467136557055");
+    const BigUnsigned<84> zero(0u);
+    const BigUnsigned<84> one(1u);
+    // in bounds shifts
+    for (int i = 1; i < 84*32; ++i) {
+      // shifting all_bits_one to the left should result in a smaller number,
+      // since the high bits rotate off and the low bits are replaced with
+      // zeroes.
+      BigUnsigned<84> big_shifted = all_bits_one;
+      big_shifted.ShiftLeft(i);
+      EXPECT_GT(all_bits_one, big_shifted);
+      // Shifting 1 to the left should instead result in a larger number.
+      BigUnsigned<84> small_shifted = one;
+      small_shifted.ShiftLeft(i);
+      EXPECT_LT(one, small_shifted);
+    }
+    // Shifting by zero or a negative number has no effect
+    for (int no_op_shift : {0, -1, -84 * 32, std::numeric_limits<int>::min()}) {
+      BigUnsigned<84> big_shifted = all_bits_one;
+      big_shifted.ShiftLeft(no_op_shift);
+      EXPECT_EQ(all_bits_one, big_shifted);
+      BigUnsigned<84> small_shifted = one;
+      big_shifted.ShiftLeft(no_op_shift);
+      EXPECT_EQ(one, small_shifted);
+    }
+    // Shifting by an amount greater than the number of bits should result in
+    // zero.
+    for (int out_of_bounds_shift :
+         {84 * 32, 84 * 32 + 1, std::numeric_limits<int>::max()}) {
+      BigUnsigned<84> big_shifted = all_bits_one;
+      big_shifted.ShiftLeft(out_of_bounds_shift);
+      EXPECT_EQ(zero, big_shifted);
+      BigUnsigned<84> small_shifted = one;
+      small_shifted.ShiftLeft(out_of_bounds_shift);
+      EXPECT_EQ(zero, small_shifted);
+    }
   }
 }
 
@@ -200,4 +256,5 @@ TEST(BigUnsigned, TenToTheNth) {
 
 
 }  // namespace strings_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

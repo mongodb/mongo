@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "absl/base/internal/exception_safety_testing.h"
+
+#ifdef ABSL_HAVE_EXCEPTIONS
 
 #include "gtest/gtest.h"
 #include "absl/meta/type_traits.h"
@@ -73,3 +75,5 @@ std::string GetSpecString(AllocSpec spec) {
 }  // namespace exceptions_internal
 
 }  // namespace testing
+
+#endif  // ABSL_HAVE_EXCEPTIONS

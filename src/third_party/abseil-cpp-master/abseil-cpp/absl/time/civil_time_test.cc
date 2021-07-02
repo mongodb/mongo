@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -616,6 +616,8 @@ TEST(CivilTime, Properties) {
   EXPECT_EQ(4, ss.hour());
   EXPECT_EQ(5, ss.minute());
   EXPECT_EQ(6, ss.second());
+  EXPECT_EQ(absl::Weekday::tuesday, absl::GetWeekday(ss));
+  EXPECT_EQ(34, absl::GetYearDay(ss));
 
   absl::CivilMinute mm(2015, 2, 3, 4, 5, 6);
   EXPECT_EQ(2015, mm.year());
@@ -624,6 +626,8 @@ TEST(CivilTime, Properties) {
   EXPECT_EQ(4, mm.hour());
   EXPECT_EQ(5, mm.minute());
   EXPECT_EQ(0, mm.second());
+  EXPECT_EQ(absl::Weekday::tuesday, absl::GetWeekday(mm));
+  EXPECT_EQ(34, absl::GetYearDay(mm));
 
   absl::CivilHour hh(2015, 2, 3, 4, 5, 6);
   EXPECT_EQ(2015, hh.year());
@@ -632,6 +636,8 @@ TEST(CivilTime, Properties) {
   EXPECT_EQ(4, hh.hour());
   EXPECT_EQ(0, hh.minute());
   EXPECT_EQ(0, hh.second());
+  EXPECT_EQ(absl::Weekday::tuesday, absl::GetWeekday(hh));
+  EXPECT_EQ(34, absl::GetYearDay(hh));
 
   absl::CivilDay d(2015, 2, 3, 4, 5, 6);
   EXPECT_EQ(2015, d.year());
@@ -640,6 +646,8 @@ TEST(CivilTime, Properties) {
   EXPECT_EQ(0, d.hour());
   EXPECT_EQ(0, d.minute());
   EXPECT_EQ(0, d.second());
+  EXPECT_EQ(absl::Weekday::tuesday, absl::GetWeekday(d));
+  EXPECT_EQ(34, absl::GetYearDay(d));
 
   absl::CivilMonth m(2015, 2, 3, 4, 5, 6);
   EXPECT_EQ(2015, m.year());
@@ -648,6 +656,8 @@ TEST(CivilTime, Properties) {
   EXPECT_EQ(0, m.hour());
   EXPECT_EQ(0, m.minute());
   EXPECT_EQ(0, m.second());
+  EXPECT_EQ(absl::Weekday::sunday, absl::GetWeekday(m));
+  EXPECT_EQ(32, absl::GetYearDay(m));
 
   absl::CivilYear y(2015, 2, 3, 4, 5, 6);
   EXPECT_EQ(2015, y.year());
@@ -656,6 +666,8 @@ TEST(CivilTime, Properties) {
   EXPECT_EQ(0, y.hour());
   EXPECT_EQ(0, y.minute());
   EXPECT_EQ(0, y.second());
+  EXPECT_EQ(absl::Weekday::thursday, absl::GetWeekday(y));
+  EXPECT_EQ(1, absl::GetYearDay(y));
 }
 
 TEST(CivilTime, Format) {
@@ -678,6 +690,69 @@ TEST(CivilTime, Format) {
   EXPECT_EQ("1970", absl::FormatCivilTime(y));
 }
 
+TEST(CivilTime, Parse) {
+  absl::CivilSecond ss;
+  absl::CivilMinute mm;
+  absl::CivilHour hh;
+  absl::CivilDay d;
+  absl::CivilMonth m;
+  absl::CivilYear y;
+
+  // CivilSecond OK; others fail
+  EXPECT_TRUE(absl::ParseCivilTime("2015-01-02T03:04:05", &ss));
+  EXPECT_EQ("2015-01-02T03:04:05", absl::FormatCivilTime(ss));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03:04:05", &mm));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03:04:05", &hh));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03:04:05", &d));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03:04:05", &m));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03:04:05", &y));
+
+  // CivilMinute OK; others fail
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03:04", &ss));
+  EXPECT_TRUE(absl::ParseCivilTime("2015-01-02T03:04", &mm));
+  EXPECT_EQ("2015-01-02T03:04", absl::FormatCivilTime(mm));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03:04", &hh));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03:04", &d));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03:04", &m));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03:04", &y));
+
+  // CivilHour OK; others fail
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03", &ss));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03", &mm));
+  EXPECT_TRUE(absl::ParseCivilTime("2015-01-02T03", &hh));
+  EXPECT_EQ("2015-01-02T03", absl::FormatCivilTime(hh));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03", &d));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03", &m));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02T03", &y));
+
+  // CivilDay OK; others fail
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02", &ss));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02", &mm));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02", &hh));
+  EXPECT_TRUE(absl::ParseCivilTime("2015-01-02", &d));
+  EXPECT_EQ("2015-01-02", absl::FormatCivilTime(d));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02", &m));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01-02", &y));
+
+  // CivilMonth OK; others fail
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01", &ss));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01", &mm));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01", &hh));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01", &d));
+  EXPECT_TRUE(absl::ParseCivilTime("2015-01", &m));
+  EXPECT_EQ("2015-01", absl::FormatCivilTime(m));
+  EXPECT_FALSE(absl::ParseCivilTime("2015-01", &y));
+
+  // CivilYear OK; others fail
+  EXPECT_FALSE(absl::ParseCivilTime("2015", &ss));
+  EXPECT_FALSE(absl::ParseCivilTime("2015", &mm));
+  EXPECT_FALSE(absl::ParseCivilTime("2015", &hh));
+  EXPECT_FALSE(absl::ParseCivilTime("2015", &d));
+  EXPECT_FALSE(absl::ParseCivilTime("2015", &m));
+  EXPECT_TRUE(absl::ParseCivilTime("2015", &y));
+  EXPECT_EQ("2015", absl::FormatCivilTime(y));
+}
+
 TEST(CivilTime, FormatAndParseLenient) {
   absl::CivilSecond ss;
   EXPECT_EQ("1970-01-01T00:00:00", absl::FormatCivilTime(ss));
@@ -696,6 +771,101 @@ TEST(CivilTime, FormatAndParseLenient) {
 
   absl::CivilYear y;
   EXPECT_EQ("1970", absl::FormatCivilTime(y));
+
+  EXPECT_TRUE(absl::ParseLenientCivilTime("2015-01-02T03:04:05", &ss));
+  EXPECT_EQ("2015-01-02T03:04:05", absl::FormatCivilTime(ss));
+
+  EXPECT_TRUE(absl::ParseLenientCivilTime("2015-01-02T03:04:05", &mm));
+  EXPECT_EQ("2015-01-02T03:04", absl::FormatCivilTime(mm));
+
+  EXPECT_TRUE(absl::ParseLenientCivilTime("2015-01-02T03:04:05", &hh));
+  EXPECT_EQ("2015-01-02T03", absl::FormatCivilTime(hh));
+
+  EXPECT_TRUE(absl::ParseLenientCivilTime("2015-01-02T03:04:05", &d));
+  EXPECT_EQ("2015-01-02", absl::FormatCivilTime(d));
+
+  EXPECT_TRUE(absl::ParseLenientCivilTime("2015-01-02T03:04:05", &m));
+  EXPECT_EQ("2015-01", absl::FormatCivilTime(m));
+
+  EXPECT_TRUE(absl::ParseLenientCivilTime("2015-01-02T03:04:05", &y));
+  EXPECT_EQ("2015", absl::FormatCivilTime(y));
+}
+
+TEST(CivilTime, ParseEdgeCases) {
+  absl::CivilSecond ss;
+  EXPECT_TRUE(
+      absl::ParseLenientCivilTime("9223372036854775807-12-31T23:59:59", &ss));
+  EXPECT_EQ("9223372036854775807-12-31T23:59:59", absl::FormatCivilTime(ss));
+  EXPECT_TRUE(
+      absl::ParseLenientCivilTime("-9223372036854775808-01-01T00:00:00", &ss));
+  EXPECT_EQ("-9223372036854775808-01-01T00:00:00", absl::FormatCivilTime(ss));
+
+  absl::CivilMinute mm;
+  EXPECT_TRUE(
+      absl::ParseLenientCivilTime("9223372036854775807-12-31T23:59", &mm));
+  EXPECT_EQ("9223372036854775807-12-31T23:59", absl::FormatCivilTime(mm));
+  EXPECT_TRUE(
+      absl::ParseLenientCivilTime("-9223372036854775808-01-01T00:00", &mm));
+  EXPECT_EQ("-9223372036854775808-01-01T00:00", absl::FormatCivilTime(mm));
+
+  absl::CivilHour hh;
+  EXPECT_TRUE(
+      absl::ParseLenientCivilTime("9223372036854775807-12-31T23", &hh));
+  EXPECT_EQ("9223372036854775807-12-31T23", absl::FormatCivilTime(hh));
+  EXPECT_TRUE(
+      absl::ParseLenientCivilTime("-9223372036854775808-01-01T00", &hh));
+  EXPECT_EQ("-9223372036854775808-01-01T00", absl::FormatCivilTime(hh));
+
+  absl::CivilDay d;
+  EXPECT_TRUE(absl::ParseLenientCivilTime("9223372036854775807-12-31", &d));
+  EXPECT_EQ("9223372036854775807-12-31", absl::FormatCivilTime(d));
+  EXPECT_TRUE(absl::ParseLenientCivilTime("-9223372036854775808-01-01", &d));
+  EXPECT_EQ("-9223372036854775808-01-01", absl::FormatCivilTime(d));
+
+  absl::CivilMonth m;
+  EXPECT_TRUE(absl::ParseLenientCivilTime("9223372036854775807-12", &m));
+  EXPECT_EQ("9223372036854775807-12", absl::FormatCivilTime(m));
+  EXPECT_TRUE(absl::ParseLenientCivilTime("-9223372036854775808-01", &m));
+  EXPECT_EQ("-9223372036854775808-01", absl::FormatCivilTime(m));
+
+  absl::CivilYear y;
+  EXPECT_TRUE(absl::ParseLenientCivilTime("9223372036854775807", &y));
+  EXPECT_EQ("9223372036854775807", absl::FormatCivilTime(y));
+  EXPECT_TRUE(absl::ParseLenientCivilTime("-9223372036854775808", &y));
+  EXPECT_EQ("-9223372036854775808", absl::FormatCivilTime(y));
+
+  // Tests some valid, but interesting, cases
+  EXPECT_TRUE(absl::ParseLenientCivilTime("0", &ss)) << ss;
+  EXPECT_EQ(absl::CivilYear(0), ss);
+  EXPECT_TRUE(absl::ParseLenientCivilTime("0-1", &ss)) << ss;
+  EXPECT_EQ(absl::CivilMonth(0, 1), ss);
+  EXPECT_TRUE(absl::ParseLenientCivilTime(" 2015 ", &ss)) << ss;
+  EXPECT_EQ(absl::CivilYear(2015), ss);
+  EXPECT_TRUE(absl::ParseLenientCivilTime(" 2015-6 ", &ss)) << ss;
+  EXPECT_EQ(absl::CivilMonth(2015, 6), ss);
+  EXPECT_TRUE(absl::ParseLenientCivilTime("2015-6-7", &ss)) << ss;
+  EXPECT_EQ(absl::CivilDay(2015, 6, 7), ss);
+  EXPECT_TRUE(absl::ParseLenientCivilTime(" 2015-6-7 ", &ss)) << ss;
+  EXPECT_EQ(absl::CivilDay(2015, 6, 7), ss);
+  EXPECT_TRUE(absl::ParseLenientCivilTime("2015-06-07T10:11:12 ", &ss)) << ss;
+  EXPECT_EQ(absl::CivilSecond(2015, 6, 7, 10, 11, 12), ss);
+  EXPECT_TRUE(absl::ParseLenientCivilTime(" 2015-06-07T10:11:12 ", &ss)) << ss;
+  EXPECT_EQ(absl::CivilSecond(2015, 6, 7, 10, 11, 12), ss);
+  EXPECT_TRUE(absl::ParseLenientCivilTime("-01-01", &ss)) << ss;
+  EXPECT_EQ(absl::CivilMonth(-1, 1), ss);
+
+  // Tests some invalid cases
+  EXPECT_FALSE(absl::ParseLenientCivilTime("01-01-2015", &ss)) << ss;
+  EXPECT_FALSE(absl::ParseLenientCivilTime("2015-", &ss)) << ss;
+  EXPECT_FALSE(absl::ParseLenientCivilTime("0xff-01", &ss)) << ss;
+  EXPECT_FALSE(absl::ParseLenientCivilTime("2015-02-30T04:05:06", &ss)) << ss;
+  EXPECT_FALSE(absl::ParseLenientCivilTime("2015-02-03T04:05:96", &ss)) << ss;
+  EXPECT_FALSE(absl::ParseLenientCivilTime("X2015-02-03T04:05:06", &ss)) << ss;
+  EXPECT_FALSE(absl::ParseLenientCivilTime("2015-02-03T04:05:003", &ss)) << ss;
+  EXPECT_FALSE(absl::ParseLenientCivilTime("2015 -02-03T04:05:06", &ss)) << ss;
+  EXPECT_FALSE(absl::ParseLenientCivilTime("2015-02-03-04:05:06", &ss)) << ss;
+  EXPECT_FALSE(absl::ParseLenientCivilTime("2015:02:03T04-05-06", &ss)) << ss;
+  EXPECT_FALSE(absl::ParseLenientCivilTime("9223372036854775808", &y)) << y;
 }
 
 TEST(CivilTime, OutputStream) {
@@ -1028,7 +1198,7 @@ TEST(CivilTime, LeapYears) {
 TEST(CivilTime, FirstThursdayInMonth) {
   const absl::CivilDay nov1(2014, 11, 1);
   const absl::CivilDay thursday =
-      absl::PrevWeekday(nov1, absl::Weekday::thursday) + 7;
+      absl::NextWeekday(nov1 - 1, absl::Weekday::thursday);
   EXPECT_EQ("2014-11-06", absl::FormatCivilTime(thursday));
 
   // Bonus: Date of Thanksgiving in the United States

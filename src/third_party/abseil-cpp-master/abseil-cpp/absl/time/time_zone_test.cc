@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -88,7 +88,7 @@ TEST(TimeZone, Failures) {
   EXPECT_FALSE(LoadTimeZone("Invalid/TimeZone", &tz));
   EXPECT_EQ(absl::UTCTimeZone(), tz);  // guaranteed fallback to UTC
 
-  // Loading an empty std::string timezone should fail.
+  // Loading an empty string timezone should fail.
   tz = absl::time_internal::LoadTimeZone("America/Los_Angeles");
   EXPECT_FALSE(LoadTimeZone("", &tz));
   EXPECT_EQ(absl::UTCTimeZone(), tz);  // guaranteed fallback to UTC

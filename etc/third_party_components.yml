@@ -45,7 +45,6 @@ components:
     release_monitoring_id: 115295
     local_directory_path: src/third_party/abseil-cpp-master
     team_owner: "Service Architecture"
-    upgrade_suppression: TODO SERVER-51476
     # Note: abseil exists in Black Duck, but not OpenHub
 
   Aladdin MD5:
