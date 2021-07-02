@@ -79,11 +79,17 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kNoRetry);
-        return appendRawResponses(opCtx,
-                                  &errmsg,
-                                  &output,
-                                  std::move(shardResponses),
-                                  {ErrorCodes::CannotImplicitlyCreateCollection});
+        const bool ok = appendRawResponses(opCtx,
+                                           &errmsg,
+                                           &output,
+                                           std::move(shardResponses),
+                                           {ErrorCodes::CannotImplicitlyCreateCollection});
+
+        if (ok) {
+            log() << "Indexes created on namespace " << nss;
+        }
+
+        return ok;
     }
 
 } createIndexesCmd;
