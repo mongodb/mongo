@@ -126,6 +126,9 @@ MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCompletingOplogFetching);
 // Failpoint which causes the initial sync function to hang before choosing a sync source.
 MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeChoosingSyncSource);
 
+// Failpoint which causes the initial sync function to hang after finishing.
+MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterFinish);
+
 // Failpoints for synchronization, shared with cloners.
 extern FailPoint initialSyncFuzzerSynchronizationPoint1;
 extern FailPoint initialSyncFuzzerSynchronizationPoint2;
@@ -1830,22 +1833,33 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
     // before InitialSyncer::join() returns.
     onCompletion = {};
 
-    stdx::lock_guard<Latch> lock(_mutex);
-    invariant(_state != State::kComplete);
-    _state = State::kComplete;
-    _stateCondition.notify_all();
+    {
+        stdx::lock_guard<Latch> lock(_mutex);
+        invariant(_state != State::kComplete);
+        _state = State::kComplete;
+        _stateCondition.notify_all();
 
-    // Clear the initial sync progress after an initial sync attempt has been successfully
-    // completed.
-    if (lastApplied.isOK() && !MONGO_unlikely(skipClearInitialSyncState.shouldFail())) {
-        _initialSyncState.reset();
+        // Clear the initial sync progress after an initial sync attempt has been successfully
+        // completed.
+        if (lastApplied.isOK() && !MONGO_unlikely(skipClearInitialSyncState.shouldFail())) {
+            _initialSyncState.reset();
+        }
+
+        // Destroy shared references to executors.
+        _attemptExec = nullptr;
+        _clonerAttemptExec = nullptr;
+        _clonerExec = nullptr;
+        _exec = nullptr;
     }
 
-    // Destroy shared references to executors.
-    _attemptExec = nullptr;
-    _clonerAttemptExec = nullptr;
-    _clonerExec = nullptr;
-    _exec = nullptr;
+    if (MONGO_unlikely(initialSyncHangAfterFinish.shouldFail())) {
+        LOGV2(5825800,
+              "initial sync finished - initialSyncHangAfterFinish fail point "
+              "enabled. Blocking until fail point is disabled.");
+        while (MONGO_unlikely(initialSyncHangAfterFinish.shouldFail()) && !_isShuttingDown()) {
+            mongo::sleepsecs(1);
+        }
+    }
 }
 
 Status InitialSyncer::_scheduleLastOplogEntryFetcher_inlock(
