@@ -51,8 +51,7 @@ public:
                           PlanYieldPolicySBE* yieldPolicy)
         : BaseRuntimePlanner{opCtx, collection, cq, yieldPolicy},
           _queryParams{queryParams},
-          _decisionReads{decisionReads},
-          _indexExistenceChecker{collection} {}
+          _decisionReads{decisionReads} {}
 
     CandidatePlans plan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
@@ -86,7 +85,5 @@ private:
     // The number of physical reads taken to decide on a winning plan when the plan was first
     // cached.
     const size_t _decisionReads;
-
-    const AllIndicesRequiredChecker _indexExistenceChecker;
 };
 }  // namespace mongo::sbe

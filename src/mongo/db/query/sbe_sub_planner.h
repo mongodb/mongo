@@ -48,9 +48,7 @@ public:
                const CanonicalQuery& cq,
                const QueryPlannerParams& queryParams,
                PlanYieldPolicySBE* yieldPolicy)
-        : BaseRuntimePlanner{opCtx, collection, cq, yieldPolicy},
-          _queryParams{queryParams},
-          _indexExistenceChecker(collection) {}
+        : BaseRuntimePlanner{opCtx, collection, cq, yieldPolicy}, _queryParams{queryParams} {}
 
     CandidatePlans plan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
@@ -62,7 +60,5 @@ private:
 
     // Query parameters used to create a query solution for each $or branch.
     const QueryPlannerParams _queryParams;
-
-    const AllIndicesRequiredChecker _indexExistenceChecker;
 };
 }  // namespace mongo::sbe

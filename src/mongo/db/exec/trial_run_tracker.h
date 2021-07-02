@@ -61,25 +61,31 @@ public:
 
     /**
      * Increments the trial run metric specified as a template parameter 'metric' by the
-     * 'metricIncrement' value and returns 'true' if the updated metric value has reached
+     * 'metricIncrement' value and returns 'true' if the updated metric value has exceeded
      * its maximum.
      *
-     * If the metric has already reached its maximum value before this call, this method
+     * If the metric has already exceeded its maximum value before this call, this method
      * returns 'true' immediately without incrementing the metric.
      */
     template <TrialRunMetric metric>
     bool trackProgress(size_t metricIncrement) {
-        static_assert(metric >= 0 && metric < sizeof(_metrics));
+        static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
 
         if (_done) {
             return true;
         }
 
         _metrics[metric] += metricIncrement;
-        if (_metrics[metric] >= _maxMetrics[metric]) {
+        if (_metrics[metric] > _maxMetrics[metric]) {
             _done = true;
         }
         return _done;
+    }
+
+    template <TrialRunMetric metric>
+    size_t getMetric() const {
+        static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
+        return _metrics[metric];
     }
 
 private:

@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_solution.h"
@@ -78,7 +79,11 @@ public:
                        const CollectionPtr& collection,
                        const CanonicalQuery& cq,
                        PlanYieldPolicySBE* yieldPolicy)
-        : _opCtx(opCtx), _collection(collection), _cq(cq), _yieldPolicy(yieldPolicy) {
+        : _opCtx(opCtx),
+          _collection(collection),
+          _cq(cq),
+          _yieldPolicy(yieldPolicy),
+          _indexExistenceChecker{collection} {
         invariant(_opCtx);
     }
 
@@ -117,5 +122,6 @@ protected:
     const CollectionPtr& _collection;
     const CanonicalQuery& _cq;
     PlanYieldPolicySBE* const _yieldPolicy;
+    const AllIndicesRequiredChecker _indexExistenceChecker;
 };
 }  // namespace mongo::sbe
