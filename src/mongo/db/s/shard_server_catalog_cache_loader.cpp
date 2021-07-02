@@ -390,18 +390,6 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx, S
 }
 
 /**
- * Reads the local chunk metadata to obtain the current ChunkVersion. If there is no local
- * metadata for the namespace, returns ChunkVersion::UNSHARDED(), since only metadata for sharded
- * collections is persisted.
- */
-ChunkVersion getLocalVersion(OperationContext* opCtx, const NamespaceString& nss) {
-    auto swRefreshState = getPersistedRefreshFlags(opCtx, nss);
-    if (swRefreshState == ErrorCodes::NamespaceNotFound)
-        return ChunkVersion::UNSHARDED();
-    return uassertStatusOK(std::move(swRefreshState)).lastRefreshedCollectionVersion;
-}
-
-/**
  * if 'mustPatchUpMetadataResults' is true, it sets the current 'timestamp' to all 'changedChunks'.
  * Does nothing otherwise.
  */
