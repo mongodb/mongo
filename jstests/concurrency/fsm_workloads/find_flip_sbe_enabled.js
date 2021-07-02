@@ -3,6 +3,8 @@
 /**
  * Sets the internalQueryEnableSlotBasedExecutionEngine flag to true and false, and
  * asserts that find queries using the plan cache produce the correct results.
+ *
+ * @tags: [requires_fcv_50]
  */
 
 load("jstests/libs/sbe_util.js");
