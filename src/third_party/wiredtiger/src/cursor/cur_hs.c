@@ -968,7 +968,7 @@ __curhs_remove(WT_CURSOR *cursor)
     cbt = (WT_CURSOR_BTREE *)file_cursor;
     hs_tombstone = NULL;
 
-    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, insert, CUR2BT(file_cursor));
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, remove, CUR2BT(file_cursor));
 
     /* Remove must be called with cursor positioned. */
     WT_ASSERT(session, F_ISSET(cursor, WT_CURSTD_KEY_INT));

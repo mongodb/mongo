@@ -965,9 +965,8 @@ __txn_fixup_prepared_update(
         hs_cursor->set_value(hs_cursor, &tw, tw.durable_stop_ts, tw.durable_start_ts,
           (uint64_t)WT_UPDATE_STANDARD, &hs_value);
         WT_ERR(hs_cursor->update(hs_cursor));
-    } else {
+    } else
         WT_ERR(hs_cursor->remove(hs_cursor));
-    }
 
 err:
     F_SET(txn, txn_flags);
