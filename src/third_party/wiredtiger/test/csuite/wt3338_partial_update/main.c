@@ -126,7 +126,8 @@ slow_apply_api(WT_ITEM *orig)
     tb = &_tb;
 
     /* Mess up anything not initialized in the buffers. */
-    memset((uint8_t *)ta->mem + ta->size, 0xff, ta->memsize - ta->size);
+    if ((ta->memsize - ta->size) > 0)
+        memset((uint8_t *)ta->mem + ta->size, 0xff, ta->memsize - ta->size);
 
     if (tb->memsize > 0)
         memset((uint8_t *)tb->mem, 0xff, tb->memsize);
