@@ -2872,6 +2872,8 @@ var ReplSetTest = function(opts) {
         var existingNodes = conf.members.map(member => member.host);
         self.ports = existingNodes.map(node => node.split(':')[1]);
         self.nodes = existingNodes.map(node => {
+            // Note: the seed node is required to be operational in order for the Mongo
+            // shell to connect to it. In this code there is no fallback to other nodes.
             let conn = new Mongo(node);
             conn.name = conn.host;
             return conn;

@@ -5922,6 +5922,16 @@ tasks:
       resmoke_args: --suites=concurrency_simultaneous_replication_wiredtiger_cursor_sweeps --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
+- name: sharding_hello_failures_gen
+  tags: ["concurrency", "large", "sharding", "stepdowns"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_args: --storageEngine=wiredTiger
+      use_large_distro: "true"
+      resmoke_jobs_max: 1
+      fallback_num_sub_suites: 1
+
 - <<: *task_template
   name: read_concern_linearizable_passthrough
   tags: ["read_write_concern", "linearize", "large"]

@@ -58,7 +58,13 @@ var FSMShardingTest = class {
             let shardTopology = topology.shards[shardName];
             let shard;
             if (shardTopology.type === Topology.kReplicaSet) {
-                const shard_rst = new ReplSetTest(shardTopology.nodes[0]);
+                var shard_rst;
+                if (shardTopology.primary) {
+                    shard_rst = new ReplSetTest(shardTopology.primary);
+                } else {
+                    assert(shardTopology.nodes[0]);
+                    shard_rst = new ReplSetTest(shardTopology.nodes[0]);
+                }
                 this._shard_rsts.push(shard_rst);
 
                 shard = new Mongo(shard_rst.getURL());
