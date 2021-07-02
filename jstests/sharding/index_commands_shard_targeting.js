@@ -89,14 +89,16 @@ function assertCommandBlocksIfCriticalSectionInProgress(
     waitForMoveChunkStep(fromShard, moveChunkStepNames.chunkDataCommitted);
 
     // Run the command with maxTimeMS.
-    const cmdWithMaxTimeMS = Object.assign({}, testCase.command, {maxTimeMS: 500});
+    const cmdWithMaxTimeMS = Object.assign({}, testCase.command, {maxTimeMS: 750});
     let cmdThread = new Thread((host, dbName, cmdWithMaxTimeMS) => {
         const conn = new Mongo(host);
         conn.getDB(dbName).runCommand(cmdWithMaxTimeMS);
     }, st.s.host, dbName, cmdWithMaxTimeMS);
     cmdThread.start();
 
-    // Assert that the command eventually times out.
+    // Assert that the command reached the shard and then timed out.
+    // It could be possible that the following check fails on slow clusters because the request
+    // expired its maxTimeMS on the mongos before to reach the shard.
     checkLog.contains(st.shard0,
                       new RegExp("Failed to refresh metadata for collection.*MaxTimeMSExpired"));
     cmdThread.join();
