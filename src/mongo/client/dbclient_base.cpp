@@ -401,63 +401,6 @@ BSONObj DBClientBase::_countCmd(const NamespaceStringOrUUID nsOrUuid,
     return b.obj();
 }
 
-BSONObj DBClientBase::getLastErrorDetailed(bool fsync, bool j, int w, int wtimeout) {
-    return getLastErrorDetailed("admin", fsync, j, w, wtimeout);
-}
-
-BSONObj DBClientBase::getLastErrorDetailed(
-    const std::string& db, bool fsync, bool j, int w, int wtimeout) {
-    BSONObj info;
-    BSONObjBuilder b;
-    b.append("getlasterror", 1);
-
-    if (fsync)
-        b.append("fsync", 1);
-    if (j)
-        b.append("j", 1);
-
-    // only affects request when greater than one node
-    if (w >= 1)
-        b.append("w", w);
-    else if (w == -1)
-        b.append("w", "majority");
-
-    if (wtimeout > 0)
-        b.append("wtimeout", wtimeout);
-
-    runCommand(db, b.obj(), info);
-
-    return info;
-}
-
-string DBClientBase::getLastError(bool fsync, bool j, int w, int wtimeout) {
-    return getLastError("admin", fsync, j, w, wtimeout);
-}
-
-string DBClientBase::getLastError(const std::string& db, bool fsync, bool j, int w, int wtimeout) {
-    BSONObj info = getLastErrorDetailed(db, fsync, j, w, wtimeout);
-    return getLastErrorString(info);
-}
-
-string DBClientBase::getLastErrorString(const BSONObj& info) {
-    if (info["ok"].trueValue()) {
-        BSONElement e = info["err"];
-        if (e.eoo())
-            return "";
-        if (e.type() == Object)
-            return e.toString();
-        return e.str();
-    } else {
-        // command failure
-        BSONElement e = info["errmsg"];
-        if (e.eoo())
-            return "";
-        if (e.type() == Object)
-            return "getLastError command failed: " + e.toString();
-        return "getLastError command failed: " + e.str();
-    }
-}
-
 string DBClientBase::createPasswordDigest(const string& username, const string& clearTextPassword) {
     return mongo::createPasswordDigest(username, clearTextPassword);
 }

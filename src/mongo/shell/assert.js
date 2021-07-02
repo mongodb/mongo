@@ -1079,27 +1079,6 @@ assert = (function() {
         doassert(_buildAssertionMessage(msg, msgPrefix));
     };
 
-    assert.gleSuccess = function(dbOrGLEDoc, msg) {
-        var gle = dbOrGLEDoc instanceof DB ? dbOrGLEDoc.getLastErrorObj() : dbOrGLEDoc;
-        if (gle.err) {
-            if (typeof (msg) == "function")
-                msg = msg(gle);
-            doassert(_buildAssertionMessage(msg, "getLastError not null: " + tojson(gle)), gle);
-        }
-        return gle;
-    };
-
-    assert.gleErrorCode = function(dbOrGLEDoc, code, msg) {
-        var gle = dbOrGLEDoc instanceof DB ? dbOrGLEDoc.getLastErrorObj() : dbOrGLEDoc;
-        if (!gle.err || gle.code != code) {
-            if (typeof (msg) == "function")
-                msg = msg(gle);
-            doassert(_buildAssertionMessage(
-                msg,
-                "getLastError is null or has code other than \"" + code + "\": " + tojson(gle)));
-        }
-    };
-
     assert.includes = function(haystack, needle, msg) {
         if (!haystack.includes(needle)) {
             var assertMsg = "string [" + haystack + "] does not include [" + needle + "]";

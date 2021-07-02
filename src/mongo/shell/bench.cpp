@@ -1288,34 +1288,26 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             {
                 BenchRunEventTrace _bret(&state->stats->deleteCounter);
                 BSONObj predicate = fixQuery(this->query, *state->bsonTemplateEvaluator);
-                if (this->useWriteCmd) {
-                    BSONObjBuilder builder;
-                    builder.append("delete", nsToCollectionSubstring(this->ns));
-                    BSONArrayBuilder docBuilder(builder.subarrayStart("deletes"));
-                    int limit = (this->multi == true) ? 0 : 1;
-                    docBuilder.append(BSON("q" << predicate << "limit" << limit));
-                    docBuilder.done();
-                    builder.append("writeConcern", this->writeConcern);
+                BSONObjBuilder builder;
+                builder.append("delete", nsToCollectionSubstring(this->ns));
+                BSONArrayBuilder docBuilder(builder.subarrayStart("deletes"));
+                int limit = (this->multi == true) ? 0 : 1;
+                docBuilder.append(BSON("q" << predicate << "limit" << limit));
+                docBuilder.done();
+                builder.append("writeConcern", this->writeConcern);
 
-                    boost::optional<TxnNumber> txnNumberForOp;
-                    if (config.useIdempotentWrites) {
-                        ++state->txnNumber;
-                        txnNumberForOp = state->txnNumber;
-                    }
-                    runCommandWithSession(conn,
-                                          nsToDatabaseSubstring(this->ns).toString(),
-                                          builder.done(),
-                                          kNoOptions,
-                                          lsid,
-                                          txnNumberForOp,
-                                          &result);
-                } else {
-                    auto toSend = makeRemoveMessage(
-                        this->ns, predicate, this->multi ? 0 : RemoveOption_JustOne);
-                    conn->say(toSend);
-                    if (this->safe)
-                        result = conn->getLastErrorDetailed();
+                boost::optional<TxnNumber> txnNumberForOp;
+                if (config.useIdempotentWrites) {
+                    ++state->txnNumber;
+                    txnNumberForOp = state->txnNumber;
                 }
+                runCommandWithSession(conn,
+                                      nsToDatabaseSubstring(this->ns).toString(),
+                                      builder.done(),
+                                      kNoOptions,
+                                      lsid,
+                                      txnNumberForOp,
+                                      &result);
             }
 
             if (this->safe) {

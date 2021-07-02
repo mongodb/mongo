@@ -408,39 +408,6 @@ public:
                           BSONObj* info = nullptr,
                           boost::optional<BSONObj> writeConcernObj = boost::none);
 
-    /** Get error result from the last write operation (insert/update/delete) on this connection.
-        db doesn't change the command's behavior - it is just for auth checks.
-        @return error message text, or empty std::string if no error.
-    */
-    std::string getLastError(
-        const std::string& db, bool fsync = false, bool j = false, int w = 0, int wtimeout = 0);
-    /**
-     * Same as the form of getLastError that takes a dbname, but just uses the admin DB.
-     */
-    std::string getLastError(bool fsync = false, bool j = false, int w = 0, int wtimeout = 0);
-
-    /** Get error result from the last write operation (insert/update/delete) on this connection.
-        db doesn't change the command's behavior - it is just for auth checks.
-        @return full error object.
-
-        If "w" is -1, wait for propagation to majority of nodes.
-        If "wtimeout" is 0, the operation will block indefinitely if needed.
-    */
-    virtual BSONObj getLastErrorDetailed(
-        const std::string& db, bool fsync = false, bool j = false, int w = 0, int wtimeout = 0);
-    /**
-     * Same as the form of getLastErrorDetailed that takes a dbname, but just uses the admin DB.
-     */
-    virtual BSONObj getLastErrorDetailed(bool fsync = false,
-                                         bool j = false,
-                                         int w = 0,
-                                         int wtimeout = 0);
-
-    /** Can be called with the returned value from getLastErrorDetailed to extract an error string.
-        If all you need is the string, just call getLastError() instead.
-    */
-    static std::string getLastErrorString(const BSONObj& res);
-
     /** Delete the specified collection.
      *  @param info An optional output parameter that receives the result object the database
      *  returns from the drop command.  May be null if the caller doesn't need that info.

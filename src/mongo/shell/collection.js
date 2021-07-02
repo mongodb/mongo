@@ -279,7 +279,6 @@ DBCollection.prototype.insert = function(obj, options) {
     var flags = 0;
 
     var wc = undefined;
-    var allowDottedFields = false;
     if (options === undefined) {
         // do nothing
     } else if (typeof (options) == 'object') {
@@ -291,8 +290,6 @@ DBCollection.prototype.insert = function(obj, options) {
 
         if (options.writeConcern)
             wc = options.writeConcern;
-        if (options.allowdotted)
-            allowDottedFields = true;
     } else {
         flags = options;
     }
@@ -304,8 +301,6 @@ DBCollection.prototype.insert = function(obj, options) {
         wc = this._createWriteConcern(options);
 
     var result = undefined;
-    var startTime =
-        (typeof (_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
 
     // Bit 1 of option flag is continueOnError. Bit 0 (stop on error) is the default.
     var bulk = ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
@@ -333,9 +328,6 @@ DBCollection.prototype.insert = function(obj, options) {
             throw ex;
         }
     }
-
-    this._lastID = obj._id;
-    this._printExtraInfo("Inserted", startTime);
     return result;
 };
 
@@ -383,9 +375,6 @@ DBCollection.prototype.remove = function(t, justOne) {
     var letParams = parsed.let;
 
     var result = undefined;
-    var startTime =
-        (typeof (_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
-
     var bulk = this.initializeOrderedBulkOp();
 
     if (letParams) {
@@ -415,8 +404,6 @@ DBCollection.prototype.remove = function(t, justOne) {
             throw ex;
         }
     }
-
-    this._printExtraInfo("Removed", startTime);
     return result;
 };
 
@@ -491,9 +478,6 @@ DBCollection.prototype.update = function(query, updateSpec, upsert, multi) {
     let letParams = parsed.let;
 
     var result = undefined;
-    var startTime =
-        (typeof (_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
-
     var bulk = this.initializeOrderedBulkOp();
 
     if (letParams) {
@@ -535,8 +519,6 @@ DBCollection.prototype.update = function(query, updateSpec, upsert, multi) {
             throw ex;
         }
     }
-
-    this._printExtraInfo("Updated", startTime);
     return result;
 };
 
@@ -718,34 +700,6 @@ DBCollection.prototype.renameCollection = function(newName, dropTarget) {
         to: this._db._name + "." + newName,
         dropTarget: dropTarget
     });
-};
-
-// Display verbose information about the operation
-DBCollection.prototype._printExtraInfo = function(action, startTime) {
-    if (typeof _verboseShell === 'undefined' || !_verboseShell) {
-        __callLastError = true;
-        return;
-    }
-
-    // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad.
-    var res = this._db.getLastErrorCmd(1);
-    if (res) {
-        if (res.err != undefined && res.err != null) {
-            // error occurred, display it
-            print(res.err);
-            return;
-        }
-
-        var info = action + " ";
-        // hack for inserted because res.n is 0
-        info += action != "Inserted" ? res.n : 1;
-        if (res.n > 0 && res.updatedExisting != undefined)
-            info += " " + (res.updatedExisting ? "existing" : "new");
-        info += " record(s)";
-        var time = new Date().getTime() - startTime;
-        info += " in " + time + "ms";
-        print(info);
-    }
 };
 
 DBCollection.prototype.validate = function(options) {

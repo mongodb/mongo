@@ -192,6 +192,30 @@ bool wasLogged(DBClientBase* conn, const std::string& opName, const std::string&
     return false;
 }
 
+std::string getLastError(DBClientBase* conn) {
+    BSONObj info;
+    BSONObjBuilder b;
+    b.append("getlasterror", 1);
+    conn->runCommand("admin", b.obj(), info);
+
+    if (info["ok"].trueValue()) {
+        BSONElement e = info["err"];
+        if (e.eoo())
+            return "";
+        if (e.type() == Object)
+            return e.toString();
+        return e.str();
+    } else {
+        // command failure
+        BSONElement e = info["errmsg"];
+        if (e.eoo())
+            return "";
+        if (e.type() == Object)
+            return "getLastError command failed: " + e.toString();
+        return "getLastError command failed: " + e.str();
+    }
+}
+
 void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeverity) {
     // Build the deprecated requests and the getLog command.
     const std::string ns = "test.exerciseDeprecatedOps";
@@ -210,12 +234,12 @@ void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeveri
     // The first deprecated call after adding a suppression is still logged with elevated severity
     // and after it the suppression kicks in. Any deprecated op can be used to start the suppression
     // period, here we chose getLastError.
-    ASSERT_EQ("", conn->getLastError());
+    ASSERT_EQ("", getLastError(conn));
 
     conn->say(opInsert);
     ASSERT(wasLogged(conn, "insert", expectedSeverity));
 
-    ASSERT_EQ("", conn->getLastError());
+    ASSERT_EQ("", getLastError(conn));
     ASSERT(wasLogged(conn, "getLastError", expectedSeverity));
 
     conn->say(opUpdate);

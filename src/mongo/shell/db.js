@@ -467,8 +467,6 @@ DB.prototype.help = function() {
     print("\tdb.getCollectionInfos([filter]) - returns a list that contains the names and options" +
           " of the db's collections");
     print("\tdb.getCollectionNames()");
-    print("\tdb.getLastError() - just returns the err msg string");
-    print("\tdb.getLastErrorObj() - return full status object");
     print("\tdb.getLogComponents()");
     print("\tdb.getMongo() get the server connection object");
     print("\tdb.getMongo().setSecondaryOk() allow queries on a replication secondary server");
@@ -679,29 +677,6 @@ DB.prototype._groupFixParms = function(parmsObj) {
 DB.prototype.forceError = function() {
     return this.runCommand({forceerror: 1});
 };
-
-DB.prototype.getLastError = function(w, wtimeout) {
-    var res = this.getLastErrorObj(w, wtimeout);
-    if (!res.ok)
-        throw _getErrorWithCode(ret, "getlasterror failed: " + tojson(res));
-    return res.err;
-};
-DB.prototype.getLastErrorObj = function(w, wtimeout, j) {
-    var cmd = {getlasterror: 1};
-    if (w) {
-        cmd.w = w;
-        if (wtimeout)
-            cmd.wtimeout = wtimeout;
-        if (j != null)
-            cmd.j = j;
-    }
-    var res = this.runCommand(cmd);
-
-    if (!res.ok)
-        throw _getErrorWithCode(res, "getlasterror failed: " + tojson(res));
-    return res;
-};
-DB.prototype.getLastErrorCmd = DB.prototype.getLastErrorObj;
 
 DB.prototype._getCollectionInfosCommand = function(
     filter, nameOnly = false, authorizedCollections = false, options = {}) {
@@ -1370,29 +1345,6 @@ function _hashPassword(username, password) {
     return hex_md5(username + ":mongo:" + password);
 }
 
-/**
- * Used for updating users in systems with V1 style user information
- * (ie MongoDB v2.4 and prior)
- */
-DB.prototype._updateUserV1 = function(name, updateObject, writeConcern) {
-    var setObj = {};
-    if (updateObject.pwd) {
-        setObj["pwd"] = _hashPassword(name, updateObject.pwd);
-    }
-    if (updateObject.extraData) {
-        setObj["extraData"] = updateObject.extraData;
-    }
-    if (updateObject.roles) {
-        setObj["roles"] = updateObject.roles;
-    }
-
-    this.system.users.update({user: name, userSource: null}, {$set: setObj});
-    var errObj = this.getLastErrorObj(writeConcern['w'], writeConcern['wtimeout']);
-    if (errObj.err) {
-        throw _getErrorWithCode(errObj, "Updating user failed: " + errObj.err);
-    }
-};
-
 DB.prototype.updateUser = function(name, updateObject, writeConcern) {
     var cmdObj = {updateUser: name};
     cmdObj = Object.extend(cmdObj, updateObject);
@@ -1401,11 +1353,6 @@ DB.prototype.updateUser = function(name, updateObject, writeConcern) {
 
     var res = this.runCommand(cmdObj);
     if (res.ok) {
-        return;
-    }
-
-    if (res.errmsg == "no such cmd: updateUser") {
-        this._updateUserV1(name, updateObject, cmdObj['writeConcern']);
         return;
     }
 
@@ -1442,31 +1389,7 @@ DB.prototype.dropUser = function(username, writeConcern) {
         return false;
     }
 
-    if (res.errmsg == "no such cmd: dropUsers") {
-        return this._removeUserV1(username, cmdObj['writeConcern']);
-    }
-
     throw _getErrorWithCode(res, res.errmsg);
-};
-
-/**
- * Used for removing users in systems with V1 style user information
- * (ie MongoDB v2.4 and prior)
- */
-DB.prototype._removeUserV1 = function(username, writeConcern) {
-    this.getCollection("system.users").remove({user: username});
-
-    var le = this.getLastErrorObj(writeConcern['w'], writeConcern['wtimeout']);
-
-    if (le.err) {
-        throw _getErrorWithCode(le, "Couldn't remove user: " + le.err);
-    }
-
-    if (le.n == 1) {
-        return true;
-    } else {
-        return false;
-    }
 };
 
 DB.prototype.dropAllUsers = function(writeConcern) {
