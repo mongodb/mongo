@@ -343,7 +343,7 @@ function(config_include config_name description)
     )
 
     if (NOT "${CONFIG_INCLUDE_UNPARSED_ARGUMENTS}" STREQUAL "")
-        message(FATAL_ERROR "Unknown arguments to config_func: ${CONFIG_INCLUDE_UNPARSED_ARGUMENTS}")
+        message(FATAL_ERROR "Unknown arguments to config_include: ${CONFIG_INCLUDE_UNPARSED_ARGUMENTS}")
     endif()
     # We require a include header (not optional).
     if ("${CONFIG_INCLUDE_FILE}" STREQUAL "")
@@ -386,7 +386,7 @@ function(config_include config_name description)
     endif()
 endfunction()
 
-# config_lib(config_name description LIB <library> FUNC <function-symbol> [DEPENDS <deps>])
+# config_lib(config_name description LIB <library> FUNC <function-symbol> [DEPENDS <deps>] [HEADER <file>])
 # Defines a boolean (0/1) configuration option based on whether a given library exists.
 # The configuration option is stored in the cmake cache and can be exported to the wiredtiger config header.
 #   config_name - name of the configuration option.
@@ -401,7 +401,7 @@ function(config_lib config_name description)
         2
         "CONFIG_LIB"
         ""
-        "LIB;FUNC;DEPENDS"
+        "LIB;FUNC;DEPENDS;HEADER"
         ""
     )
 
@@ -420,17 +420,33 @@ function(config_lib config_name description)
     # Check that the configs dependencies are enabled before setting it to a visible enabled state.
     eval_dependency("${CONFIG_LIB_DEPENDS}" enabled)
     if(enabled)
+        message("-- Looking for library ${CONFIG_LIB_LIB}")
         # 'check_library_exists' won't use our current cache when test compiling the library.
         # To get around this we need to ensure we manually forward WT_ARCH and WT_OS as a minimum. This is particularly
         # needed if 'check_library_exists' will leverage one of our toolchain files.
         if((NOT "${WT_ARCH}" STREQUAL "") AND (NOT "${WT_ARCH}" STREQUAL ""))
             set(CMAKE_REQUIRED_FLAGS "-DWT_ARCH=${WT_ARCH} -DWT_OS=${WT_OS}")
         endif()
-        check_library_exists(${CONFIG_LIB_LIB} ${CONFIG_LIB_FUNC} "" has_lib_${config_name})
+        find_library(has_lib_${config_name} ${CONFIG_LIB_LIB})
+        #check_library_exists(${CONFIG_LIB_LIB} ${CONFIG_LIB_FUNC} "" has_lib_${config_name})
         set(CMAKE_REQUIRED_FLAGS)
         set(has_lib "0")
         if(has_lib_${config_name})
             set(has_lib ${has_lib_${config_name}})
+            if (CONFIG_LIB_HEADER)
+                find_path(include_path_${config_name} ${CONFIG_LIB_HEADER})
+                if (include_path_${config_name})
+                    message("-- Looking for library ${CONFIG_LIB_LIB}: found ${has_lib_${config_name}}, include path ${include_path_${config_name}}")
+                    include_directories(${include_path_${config_name}})
+                else()
+                    message("-- Looking for library ${CONFIG_LIB_LIB}: found ${has_lib$_{config_name}}")
+                endif()
+                unset(include_path_${config_name} CACHE)
+            else()
+                message("-- Looking for library ${CONFIG_LIB_LIB}: found ${has_lib_${config_name}}")
+            endif()
+        else()
+            message("-- Looking for library ${CONFIG_LIB_LIB}: NOT found")
         endif()
         # Set an internal cache variable "${config_name}_DISABLED" to capture its enabled/disabled state.
         # We want to ensure we capture a transition from a disabled to enabled state when dependencies are met.
@@ -444,6 +460,7 @@ function(config_lib config_name description)
         # configuration runs.
         unset(has_lib_${config_name} CACHE)
     else()
+        message("-- Not looking for library ${CONFIG_LIB_LIB}: disabled")
         set(${config_name} 0 CACHE INTERNAL "" FORCE)
         set(${config_name}_DISABLED ON CACHE INTERNAL "" FORCE)
     endif()

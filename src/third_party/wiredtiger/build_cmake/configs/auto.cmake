@@ -251,6 +251,7 @@ config_lib(
     "lz4 library exists."
     LIB "lz4"
     FUNC "LZ4_versionNumber"
+    HEADER "lz4.h"
 )
 
 config_lib(
@@ -258,6 +259,7 @@ config_lib(
     "snappy library exists."
     LIB "snappy"
     FUNC "snappy_compress"
+    HEADER "snappy.h"
 )
 
 config_lib(
@@ -265,6 +267,7 @@ config_lib(
     "zlib library exists."
     LIB "z"
     FUNC "zlibVersion"
+    HEADER "zlib.h"
 )
 
 config_lib(
@@ -272,6 +275,7 @@ config_lib(
     "zstd library exists."
     LIB "zstd"
     FUNC "ZSTD_versionString"
+    HEADER "zstd.h"
 )
 
 config_lib(
