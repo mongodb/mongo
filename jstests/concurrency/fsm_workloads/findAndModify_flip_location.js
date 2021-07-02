@@ -33,7 +33,27 @@ var $config = (function() {
                 upsert: true,
                 update: {$inc: {counter: 1}},
             };
-            this._lastResponse = assert.commandWorked(db.runCommand(this._lastCmd));
+            // The lambda passed into 'assert.soon' does not have access to 'this'.
+            let data = {"lastCmd": this._lastCmd};
+            assert.soon(function() {
+                try {
+                    data.lastResponse = assert.commandWorked(db.runCommand(data.lastCmd));
+                    return true;
+                } catch (e) {
+                    if (e.code === ErrorCodes.DuplicateKey) {
+                        // When run under multiversion suites that operate on v4.4 binary mongods,
+                        // it is possible that two threads race to upsert the same '_id' into the
+                        // same collection, a scenario described in SERVER-47212. In this case, we
+                        // retry the upsert.
+                        checkFCV(db.getSiblingDB('admin'), '4.4');
+                        print('Encountered DuplicateKey error. Retrying upsert:' +
+                              tojson(data.lastCmd));
+                        return false;
+                    }
+                    throw e;
+                }
+            });
+            this._lastResponse = data.lastResponse;
         }
 
         function findAndModifyUpdate(db, collName) {
