@@ -621,6 +621,13 @@ Status storeMongodOptions(const moe::Environment& params) {
                 storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;
             }
         } else if (clusterRoleParam == "shardsvr") {
+            // Force to set up the node as a replica set, unless we're using queryable backup mode.
+            if (!params.count("storage.queryableBackupMode") &&
+                !params.count("replication.replSet") && !params.count("replication.replSetName")) {
+                return Status(ErrorCodes::BadValue,
+                              "Cannot start a shard as a standalone server. Please use the option "
+                              "--replset to start the node as a replica set.");
+            }
             serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         }
     }
