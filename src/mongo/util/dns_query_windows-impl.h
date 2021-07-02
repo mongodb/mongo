@@ -61,7 +61,12 @@ namespace dns {
 namespace {
 enum class DNSQueryClass { kInternet };
 
-enum class DNSQueryType { kSRV = DNS_TYPE_SRV, kTXT = DNS_TYPE_TEXT, kAddress = DNS_TYPE_A };
+enum class DNSQueryType {
+    kSRV = DNS_TYPE_SRV,
+    kTXT = DNS_TYPE_TEXT,
+    kAddress = DNS_TYPE_A,
+    kCNAME = DNS_TYPE_CNAME
+};
 
 /**
  * A `ResourceRecord` represents a single DNS entry as parsed by the resolver API.
@@ -134,6 +139,26 @@ public:
         const auto& data = this->_record->Data.SRV;
         return {data.pNameTarget + "."s, data.wPort};
     }
+
+    /**
+     * View this record as a DNS CName record
+     */
+    std::string cnameEntry() const {
+        if (getType() != DNSQueryType::kCNAME) {
+            StringBuilder oss;
+            oss << "Incorrect record format for \"" << this->_service
+                << "\": expected CNAME record, found a record of type " << this->_record->wType
+                << " instead";
+            uasserted(ErrorCodes::DNSRecordTypeMismatch, oss.str());
+        }
+
+        return std::string(this->_record->Data.CNAME.pNameHost);
+    }
+
+    DNSQueryType getType() const {
+        return static_cast<DNSQueryType>(this->_record->wType);
+    }
+
 
 private:
     std::string _service;

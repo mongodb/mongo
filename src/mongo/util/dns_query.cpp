@@ -73,6 +73,9 @@ std::vector<std::string> dns::lookupARecords(const std::string& service) {
 
     for (const auto& entry : response) {
         try {
+            if (entry.getType() == DNSQueryType::kCNAME) {
+                return lookupARecords(entry.cnameEntry());
+            }
             rv.push_back(entry.addressEntry());
         } catch (const ExceptionFor<ErrorCodes::DNSRecordTypeMismatch>&) {
         }

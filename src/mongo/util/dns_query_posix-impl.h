@@ -41,16 +41,16 @@
 
 #include <stdio.h>
 
-#include <iostream>
-#include <cassert>
-#include <sstream>
-#include <string>
-#include <cstdint>
-#include <vector>
 #include <array>
-#include <stdexcept>
-#include <memory>
+#include <cassert>
+#include <cstdint>
 #include <exception>
+#include <iostream>
+#include <memory>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 #include <boost/noncopyable.hpp>
 
@@ -75,6 +75,7 @@ enum class DNSQueryType {
     kSRV = ns_t_srv,
     kTXT = ns_t_txt,
     kAddress = ns_t_a,
+    kCNAME = ns_t_cname,
 };
 
 /**
@@ -172,6 +173,24 @@ public:
 
         // return by copy is equivalent to a `shrink_to_fit` and `move`.
         return {name, port};
+    }
+
+    /**
+     * View this record as a DNS CName record
+     */
+    std::string cnameEntry() const {
+        char buf[NS_MAXDNAME];
+        int length = dn_expand(
+            _answerStart, _answerEnd, ns_rr_rdata(this->_resource_record), &buf[0], sizeof(buf));
+        if (length == -1) {
+            uasserted(ErrorCodes::DNSProtocolError, "DNS CNAME record could not be decompressed");
+        }
+
+        return std::string(&buf[0], length);
+    }
+
+    DNSQueryType getType() const {
+        return static_cast<DNSQueryType>(this->_resource_record.type);
     }
 
 private:
