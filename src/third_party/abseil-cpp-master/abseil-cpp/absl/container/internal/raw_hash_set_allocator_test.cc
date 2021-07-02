@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,7 @@
 #include "absl/container/internal/tracked.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace container_internal {
 namespace {
 
@@ -423,6 +424,82 @@ TEST_F(PropagateOnAll, Swap) {
   EXPECT_EQ(0, it->num_copies());
 }
 
+// This allocator is similar to std::pmr::polymorphic_allocator.
+// Note the disabled assignment.
+template <class T>
+class PAlloc {
+  template <class>
+  friend class PAlloc;
+
+ public:
+  // types
+  using value_type = T;
+
+  // traits
+  using propagate_on_container_swap = std::false_type;
+
+  PAlloc() noexcept = default;
+  explicit PAlloc(size_t id) noexcept : id_(id) {}
+  PAlloc(const PAlloc&) noexcept = default;
+  PAlloc& operator=(const PAlloc&) noexcept = delete;
+
+  template <class U>
+  PAlloc(const PAlloc<U>& that) noexcept : id_(that.id_) {}  // NOLINT
+
+  template <class U>
+  struct rebind {
+    using other = PAlloc<U>;
+  };
+
+  constexpr PAlloc select_on_container_copy_construction() const { return {}; }
+
+  // public member functions
+  T* allocate(size_t) { return new T; }
+  void deallocate(T* p, size_t) { delete p; }
+
+  friend bool operator==(const PAlloc& a, const PAlloc& b) {
+    return a.id_ == b.id_;
+  }
+  friend bool operator!=(const PAlloc& a, const PAlloc& b) { return !(a == b); }
+
+ private:
+  size_t id_ = std::numeric_limits<size_t>::max();
+};
+
+// This doesn't compile with GCC 5.4 and 5.5 due to a bug in noexcept handing.
+#if !defined(__GNUC__) || __GNUC__ != 5 || (__GNUC_MINOR__ != 4 && \
+    __GNUC_MINOR__ != 5)
+TEST(NoPropagateOn, Swap) {
+  using PA = PAlloc<char>;
+  using Table = raw_hash_set<Policy, Identity, std::equal_to<int32_t>, PA>;
+
+  Table t1(PA{1}), t2(PA{2});
+  swap(t1, t2);
+  EXPECT_EQ(t1.get_allocator(), PA(1));
+  EXPECT_EQ(t2.get_allocator(), PA(2));
+}
+#endif
+
+TEST(NoPropagateOn, CopyConstruct) {
+  using PA = PAlloc<char>;
+  using Table = raw_hash_set<Policy, Identity, std::equal_to<int32_t>, PA>;
+
+  Table t1(PA{1}), t2(t1);
+  EXPECT_EQ(t1.get_allocator(), PA(1));
+  EXPECT_EQ(t2.get_allocator(), PA());
+}
+
+TEST(NoPropagateOn, Assignment) {
+  using PA = PAlloc<char>;
+  using Table = raw_hash_set<Policy, Identity, std::equal_to<int32_t>, PA>;
+
+  Table t1(PA{1}), t2(PA{2});
+  t1 = t2;
+  EXPECT_EQ(t1.get_allocator(), PA(1));
+  EXPECT_EQ(t2.get_allocator(), PA(2));
+}
+
 }  // namespace
 }  // namespace container_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//   https://www.apache.org/licenses/LICENSE-2.0
 //
 //   Unless required by applicable law or agreed to in writing, software
 //   distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,8 +21,10 @@
 #include <type_traits>
 
 #include "gtest/gtest.h"
+#include "absl/base/config.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace time_internal {
 namespace cctz {
 
@@ -37,7 +39,7 @@ std::string Format(const T& t) {
 
 }  // namespace
 
-#if __cpp_constexpr >= 201304 || _MSC_VER >= 1910
+#if __cpp_constexpr >= 201304 || (defined(_MSC_VER) && _MSC_VER >= 1910)
 // Construction constexpr tests
 
 TEST(CivilTime, Normal) {
@@ -233,6 +235,16 @@ TEST(CivilTime, Difference) {
 }
 
 // NOTE: Run this with --copt=-ftrapv to detect overflow problems.
+TEST(CivilTime, ConstructionWithHugeYear) {
+  constexpr civil_hour h(-9223372036854775807, 1, 1, -1);
+  static_assert(h.year() == -9223372036854775807 - 1,
+                "ConstructionWithHugeYear");
+  static_assert(h.month() == 12, "ConstructionWithHugeYear");
+  static_assert(h.day() == 31, "ConstructionWithHugeYear");
+  static_assert(h.hour() == 23, "ConstructionWithHugeYear");
+}
+
+// NOTE: Run this with --copt=-ftrapv to detect overflow problems.
 TEST(CivilTime, DifferenceWithHugeYear) {
   {
     constexpr civil_day d1(9223372036854775807, 1, 1);
@@ -319,7 +331,7 @@ TEST(CivilTime, YearDay) {
   constexpr int yd = get_yearday(cd);
   static_assert(yd == 28, "YearDay");
 }
-#endif  // __cpp_constexpr >= 201304 || _MSC_VER >= 1910
+#endif  // __cpp_constexpr >= 201304 || (defined(_MSC_VER) && _MSC_VER >= 1910)
 
 // The remaining tests do not use constexpr.
 
@@ -821,6 +833,8 @@ TEST(CivilTime, Properties) {
   EXPECT_EQ(4, ss.hour());
   EXPECT_EQ(5, ss.minute());
   EXPECT_EQ(6, ss.second());
+  EXPECT_EQ(weekday::tuesday, get_weekday(ss));
+  EXPECT_EQ(34, get_yearday(ss));
 
   civil_minute mm(2015, 2, 3, 4, 5, 6);
   EXPECT_EQ(2015, mm.year());
@@ -829,6 +843,8 @@ TEST(CivilTime, Properties) {
   EXPECT_EQ(4, mm.hour());
   EXPECT_EQ(5, mm.minute());
   EXPECT_EQ(0, mm.second());
+  EXPECT_EQ(weekday::tuesday, get_weekday(mm));
+  EXPECT_EQ(34, get_yearday(mm));
 
   civil_hour hh(2015, 2, 3, 4, 5, 6);
   EXPECT_EQ(2015, hh.year());
@@ -837,6 +853,8 @@ TEST(CivilTime, Properties) {
   EXPECT_EQ(4, hh.hour());
   EXPECT_EQ(0, hh.minute());
   EXPECT_EQ(0, hh.second());
+  EXPECT_EQ(weekday::tuesday, get_weekday(hh));
+  EXPECT_EQ(34, get_yearday(hh));
 
   civil_day d(2015, 2, 3, 4, 5, 6);
   EXPECT_EQ(2015, d.year());
@@ -855,6 +873,8 @@ TEST(CivilTime, Properties) {
   EXPECT_EQ(0, m.hour());
   EXPECT_EQ(0, m.minute());
   EXPECT_EQ(0, m.second());
+  EXPECT_EQ(weekday::sunday, get_weekday(m));
+  EXPECT_EQ(32, get_yearday(m));
 
   civil_year y(2015, 2, 3, 4, 5, 6);
   EXPECT_EQ(2015, y.year());
@@ -863,6 +883,8 @@ TEST(CivilTime, Properties) {
   EXPECT_EQ(0, y.hour());
   EXPECT_EQ(0, y.minute());
   EXPECT_EQ(0, y.second());
+  EXPECT_EQ(weekday::thursday, get_weekday(y));
+  EXPECT_EQ(1, get_yearday(y));
 }
 
 TEST(CivilTime, OutputStream) {
@@ -1004,19 +1026,13 @@ TEST(CivilTime, LeapYears) {
       int day;
     } leap_day;  // The date of the day after Feb 28.
   } kLeapYearTable[]{
-      {1900, 365, {3, 1}},
-      {1999, 365, {3, 1}},
+      {1900, 365, {3, 1}},  {1999, 365, {3, 1}},
       {2000, 366, {2, 29}},  // leap year
-      {2001, 365, {3, 1}},
-      {2002, 365, {3, 1}},
-      {2003, 365, {3, 1}},
-      {2004, 366, {2, 29}},  // leap year
-      {2005, 365, {3, 1}},
-      {2006, 365, {3, 1}},
-      {2007, 365, {3, 1}},
-      {2008, 366, {2, 29}},  // leap year
-      {2009, 365, {3, 1}},
-      {2100, 365, {3, 1}},
+      {2001, 365, {3, 1}},  {2002, 365, {3, 1}},
+      {2003, 365, {3, 1}},  {2004, 366, {2, 29}},  // leap year
+      {2005, 365, {3, 1}},  {2006, 365, {3, 1}},
+      {2007, 365, {3, 1}},  {2008, 366, {2, 29}},  // leap year
+      {2009, 365, {3, 1}},  {2100, 365, {3, 1}},
   };
 
   for (const auto& e : kLeapYearTable) {
@@ -1035,7 +1051,7 @@ TEST(CivilTime, LeapYears) {
 
 TEST(CivilTime, FirstThursdayInMonth) {
   const civil_day nov1(2014, 11, 1);
-  const civil_day thursday = prev_weekday(nov1, weekday::thursday) + 7;
+  const civil_day thursday = next_weekday(nov1 - 1, weekday::thursday);
   EXPECT_EQ("2014-11-06", Format(thursday));
 
   // Bonus: Date of Thanksgiving in the United States
@@ -1046,4 +1062,5 @@ TEST(CivilTime, FirstThursdayInMonth) {
 
 }  // namespace cctz
 }  // namespace time_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

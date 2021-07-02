@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,6 +22,7 @@
 #include "absl/time/time.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 void Notification::Notify() {
   MutexLock l(&this->mutex_);
@@ -42,15 +43,6 @@ Notification::~Notification() {
   // Make sure that the thread running Notify() exits before the object is
   // destructed.
   MutexLock l(&this->mutex_);
-}
-
-static inline bool HasBeenNotifiedInternal(
-    const std::atomic<bool> *notified_yet) {
-  return notified_yet->load(std::memory_order_acquire);
-}
-
-bool Notification::HasBeenNotified() const {
-  return HasBeenNotifiedInternal(&this->notified_yet_);
 }
 
 void Notification::WaitForNotification() const {
@@ -82,4 +74,5 @@ bool Notification::WaitForNotificationWithDeadline(absl::Time deadline) const {
   return notified;
 }
 
+ABSL_NAMESPACE_END
 }  // namespace absl

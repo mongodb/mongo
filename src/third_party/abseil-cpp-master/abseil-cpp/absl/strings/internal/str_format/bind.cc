@@ -1,3 +1,17 @@
+// Copyright 2020 The Abseil Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "absl/strings/internal/str_format/bind.h"
 
 #include <cerrno>
@@ -6,6 +20,7 @@
 #include <string>
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace str_format_internal {
 
 namespace {
@@ -25,12 +40,12 @@ class ArgContext {
   explicit ArgContext(absl::Span<const FormatArgImpl> pack) : pack_(pack) {}
 
   // Fill 'bound' with the results of applying the context's argument pack
-  // to the specified 'props'. We synthesize a BoundConversion by
+  // to the specified 'unbound'. We synthesize a BoundConversion by
   // lining up a UnboundConversion with a user argument. We also
   // resolve any '*' specifiers for width and precision, so after
   // this call, 'bound' has all the information it needs to be formatted.
   // Returns false on failure.
-  bool Bind(const UnboundConversion *props, BoundConversion *bound);
+  bool Bind(const UnboundConversion* unbound, BoundConversion* bound);
 
  private:
   absl::Span<const FormatArgImpl> pack_;
@@ -53,7 +68,8 @@ inline bool ArgContext::Bind(const UnboundConversion* unbound,
         // "A negative field width is taken as a '-' flag followed by a
         // positive field width."
         force_left = true;
-        width = -width;
+        // Make sure we don't overflow the width when negating it.
+        width = -std::max(width, -std::numeric_limits<int>::max());
       }
     }
 
@@ -64,19 +80,22 @@ inline bool ArgContext::Bind(const UnboundConversion* unbound,
         return false;
     }
 
-    bound->set_width(width);
-    bound->set_precision(precision);
-    bound->set_flags(unbound->flags);
-    if (force_left)
-      bound->set_left(true);
-  } else {
-    bound->set_flags(unbound->flags);
-    bound->set_width(-1);
-    bound->set_precision(-1);
-  }
+    FormatConversionSpecImplFriend::SetWidth(width, bound);
+    FormatConversionSpecImplFriend::SetPrecision(precision, bound);
 
-  bound->set_length_mod(unbound->length_mod);
-  bound->set_conv(unbound->conv);
+    if (force_left) {
+      Flags flags = unbound->flags;
+      flags.left = true;
+      FormatConversionSpecImplFriend::SetFlags(flags, bound);
+    } else {
+      FormatConversionSpecImplFriend::SetFlags(unbound->flags, bound);
+    }
+  } else {
+    FormatConversionSpecImplFriend::SetFlags(unbound->flags, bound);
+    FormatConversionSpecImplFriend::SetWidth(-1, bound);
+    FormatConversionSpecImplFriend::SetPrecision(-1, bound);
+  }
+  FormatConversionSpecImplFriend::SetConversionChar(unbound->conv, bound);
   bound->set_arg(arg);
   return true;
 }
@@ -138,10 +157,11 @@ class SummarizingConverter {
     UntypedFormatSpecImpl spec("%d");
 
     std::ostringstream ss;
-    ss << "{" << Streamable(spec, {*bound.arg()}) << ":" << bound.flags();
+    ss << "{" << Streamable(spec, {*bound.arg()}) << ":"
+       << FormatConversionSpecImplFriend::FlagsToString(bound);
     if (bound.width() >= 0) ss << bound.width();
     if (bound.precision() >= 0) ss << "." << bound.precision();
-    ss << bound.length_mod() << bound.conv() << "}";
+    ss << bound.conversion_char() << "}";
     Append(ss.str());
     return true;
   }
@@ -159,7 +179,7 @@ bool BindWithPack(const UnboundConversion* props,
 }
 
 std::string Summarize(const UntypedFormatSpecImpl format,
-                 absl::Span<const FormatArgImpl> args) {
+                      absl::Span<const FormatArgImpl> args) {
   typedef SummarizingConverter Converter;
   std::string out;
   {
@@ -187,12 +207,21 @@ std::ostream& Streamable::Print(std::ostream& os) const {
 }
 
 std::string& AppendPack(std::string* out, const UntypedFormatSpecImpl format,
-                   absl::Span<const FormatArgImpl> args) {
+                        absl::Span<const FormatArgImpl> args) {
   size_t orig = out->size();
   if (ABSL_PREDICT_FALSE(!FormatUntyped(out, format, args))) {
     out->erase(orig);
   }
   return *out;
+}
+
+std::string FormatPack(const UntypedFormatSpecImpl format,
+                       absl::Span<const FormatArgImpl> args) {
+  std::string out;
+  if (ABSL_PREDICT_FALSE(!FormatUntyped(&out, format, args))) {
+    out.clear();
+  }
+  return out;
 }
 
 int FprintF(std::FILE* output, const UntypedFormatSpecImpl format,
@@ -206,7 +235,7 @@ int FprintF(std::FILE* output, const UntypedFormatSpecImpl format,
     errno = sink.error();
     return -1;
   }
-  if (sink.count() > std::numeric_limits<int>::max()) {
+  if (sink.count() > static_cast<size_t>(std::numeric_limits<int>::max())) {
     errno = EFBIG;
     return -1;
   }
@@ -226,4 +255,5 @@ int SnprintF(char* output, size_t size, const UntypedFormatSpecImpl format,
 }
 
 }  // namespace str_format_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

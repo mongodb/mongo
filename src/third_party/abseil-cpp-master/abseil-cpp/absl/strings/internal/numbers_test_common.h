@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,7 +23,10 @@
 #include <limits>
 #include <string>
 
+#include "absl/base/config.h"
+
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace strings_internal {
 
 template <typename IntType>
@@ -42,8 +45,9 @@ inline bool Itoa(IntType value, int base, std::string* destination) {
   while (value != 0) {
     const IntType next_value = value / base;
     // Can't use std::abs here because of problems when IntType is unsigned.
-    int remainder = value > next_value * base ? value - next_value * base
-                                              : next_value * base - value;
+    int remainder =
+        static_cast<int>(value > next_value * base ? value - next_value * base
+                                                   : next_value * base - value);
     char c = remainder < 10 ? '0' + remainder : 'A' + remainder - 10;
     destination->insert(0, 1, c);
     value = next_value;
@@ -166,7 +170,7 @@ inline const std::array<uint64_test_case, 34>& strtouint64_test_cases() {
 
       {"0x1234", true, 16, 0x1234},
 
-      // Base-10 std::string version.
+      // Base-10 string version.
       {"1234", true, 0, 1234},
       {nullptr, false, 0, 0},
   }};
@@ -174,6 +178,7 @@ inline const std::array<uint64_test_case, 34>& strtouint64_test_cases() {
 }
 
 }  // namespace strings_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_STRINGS_INTERNAL_NUMBERS_TEST_COMMON_H_

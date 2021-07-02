@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,17 +25,20 @@
 
 #include "absl/base/config.h"
 
-#ifdef ABSL_HAVE_STD_VARIANT
+#ifdef ABSL_USES_STD_VARIANT
 
 #include <variant>
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 using std::bad_variant_access;
+ABSL_NAMESPACE_END
 }  // namespace absl
 
-#else  // ABSL_HAVE_STD_VARIANT
+#else  // ABSL_USES_STD_VARIANT
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 // -----------------------------------------------------------------------------
 // bad_variant_access
@@ -71,8 +74,9 @@ namespace variant_internal {
 [[noreturn]] void Rethrow();
 
 }  // namespace variant_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
-#endif  // ABSL_HAVE_STD_VARIANT
+#endif  // ABSL_USES_STD_VARIANT
 
 #endif  // ABSL_TYPES_BAD_VARIANT_ACCESS_H_

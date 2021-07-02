@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,7 +24,7 @@
 // should always hold a value of one of its alternative types (except in the
 // "valueless by exception state" -- see below). A default-constructed
 // `absl::variant` will hold the value of its first alternative type, provided
-// it is default-constructable.
+// it is default-constructible.
 //
 // In exceptional cases due to error, an `absl::variant` can hold no
 // value (known as a "valueless by exception" state), though this is not the
@@ -45,11 +45,12 @@
 #include "absl/base/config.h"
 #include "absl/utility/utility.h"
 
-#ifdef ABSL_HAVE_STD_VARIANT
+#ifdef ABSL_USES_STD_VARIANT
 
-#include <variant>
+#include <variant>  // IWYU pragma: export
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 using std::bad_variant_access;
 using std::get;
 using std::get_if;
@@ -62,9 +63,10 @@ using std::variant_npos;
 using std::variant_size;
 using std::variant_size_v;
 using std::visit;
+ABSL_NAMESPACE_END
 }  // namespace absl
 
-#else  // ABSL_HAVE_STD_VARIANT
+#else  // ABSL_USES_STD_VARIANT
 
 #include <functional>
 #include <new>
@@ -77,6 +79,7 @@ using std::visit;
 #include "absl/types/internal/variant.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 // -----------------------------------------------------------------------------
 // absl::variant
@@ -92,7 +95,7 @@ namespace absl {
 //   // assign it to a std::string.
 //   absl::variant<int, std::string> v = std::string("abc");
 //
-//   // A default-contructed variant will hold a value-initialized value of
+//   // A default-constructed variant will hold a value-initialized value of
 //   // the first alternative type.
 //   auto a = absl::variant<int, std::string>();   // Holds an int of value '0'.
 //
@@ -129,7 +132,12 @@ class variant;
 // type (in which case, they will be swapped) or to two different types (in
 // which case the values will need to be moved).
 //
-template <typename... Ts>
+template <
+    typename... Ts,
+    absl::enable_if_t<
+        absl::conjunction<std::is_move_constructible<Ts>...,
+                          type_traits_internal::IsSwappable<Ts>...>::value,
+        int> = 0>
 void swap(variant<Ts...>& v, variant<Ts...>& w) noexcept(noexcept(v.swap(w))) {
   v.swap(w);
 }
@@ -596,7 +604,10 @@ class variant<T0, Tn...> : private variant_internal::VariantBase<T0, Tn...> {
 
   // emplace() Functions
 
-  // Constructs a value of the given alternative type T within the variant.
+  // Constructs a value of the given alternative type T within the variant. The
+  // existing value of the variant is destroyed first (provided that
+  // `absl::valueless_by_exception()` is false). Requires that T is unambiguous
+  // in the variant.
   //
   // Example:
   //
@@ -616,7 +627,9 @@ class variant<T0, Tn...> : private variant_internal::VariantBase<T0, Tn...> {
   }
 
   // Constructs a value of the given alternative type T within the variant using
-  // an initializer list.
+  // an initializer list. The existing value of the variant is destroyed first
+  // (provided that `absl::valueless_by_exception()` is false). Requires that T
+  // is unambiguous in the variant.
   //
   // Example:
   //
@@ -635,7 +648,7 @@ class variant<T0, Tn...> : private variant_internal::VariantBase<T0, Tn...> {
   }
 
   // Destroys the current value of the variant (provided that
-  // `absl::valueless_by_exception()` is false, and constructs a new value at
+  // `absl::valueless_by_exception()` is false) and constructs a new value at
   // the given index.
   //
   // Example:
@@ -654,7 +667,7 @@ class variant<T0, Tn...> : private variant_internal::VariantBase<T0, Tn...> {
   }
 
   // Destroys the current value of the variant (provided that
-  // `absl::valueless_by_exception()` is false, and constructs a new value at
+  // `absl::valueless_by_exception()` is false) and constructs a new value at
   // the given index using an initializer list and the provided arguments.
   //
   // Example:
@@ -688,12 +701,12 @@ class variant<T0, Tn...> : private variant_internal::VariantBase<T0, Tn...> {
   //
   // Swaps the values of two variant objects.
   //
-  // TODO(calabrese)
-  //   `variant::swap()` and `swap()` rely on `std::is_(nothrow)_swappable()`
-  //   which is introduced in C++17. So we assume `is_swappable()` is always
-  //   true and `is_nothrow_swappable()` is same as `std::is_trivial()`.
   void swap(variant& rhs) noexcept(
-      absl::conjunction<std::is_trivial<T0>, std::is_trivial<Tn>...>::value) {
+      absl::conjunction<
+          std::is_nothrow_move_constructible<T0>,
+          std::is_nothrow_move_constructible<Tn>...,
+          type_traits_internal::IsNothrowSwappable<T0>,
+          type_traits_internal::IsNothrowSwappable<Tn>...>::value) {
     return variant_internal::VisitIndices<sizeof...(Tn) + 1>::Run(
         variant_internal::Swap<T0, Tn...>{this, &rhs}, rhs.index());
   }
@@ -790,6 +803,7 @@ operator>=(const variant<Types...>& a, const variant<Types...>& b) {
                    a.index());
 }
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 namespace std {
@@ -807,9 +821,10 @@ struct hash<absl::variant<T...>>
 
 }  // namespace std
 
-#endif  // ABSL_HAVE_STD_VARIANT
+#endif  // ABSL_USES_STD_VARIANT
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace variant_internal {
 
 // Helper visitor for converting a variant<Ts...>` into another type (mostly
@@ -845,6 +860,7 @@ To ConvertVariantTo(Variant&& variant) {
                      std::forward<Variant>(variant));
 }
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_TYPES_VARIANT_H_

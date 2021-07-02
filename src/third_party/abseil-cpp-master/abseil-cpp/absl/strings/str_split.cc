@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,6 +27,7 @@
 #include "absl/strings/ascii.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 namespace {
 
@@ -41,7 +42,7 @@ absl::string_view GenericFind(absl::string_view text,
                               absl::string_view delimiter, size_t pos,
                               FindPolicy find_policy) {
   if (delimiter.empty() && text.length() > 0) {
-    // Special case for empty std::string delimiters: always return a zero-length
+    // Special case for empty string delimiters: always return a zero-length
     // absl::string_view referring to the item at position 1 past pos.
     return absl::string_view(text.data() + pos + 1, 0);
   }
@@ -126,7 +127,7 @@ absl::string_view ByLength::Find(absl::string_view text,
                                       size_t pos) const {
   pos = std::min(pos, text.size());  // truncate `pos`
   absl::string_view substr = text.substr(pos);
-  // If the std::string is shorter than the chunk size we say we
+  // If the string is shorter than the chunk size we say we
   // "can't find the delimiter" so this will be the last chunk.
   if (substr.length() <= static_cast<size_t>(length_))
     return absl::string_view(text.data() + text.size(), 0);
@@ -134,4 +135,5 @@ absl::string_view ByLength::Find(absl::string_view text,
   return absl::string_view(substr.data() + length_, 0);
 }
 
+ABSL_NAMESPACE_END
 }  // namespace absl

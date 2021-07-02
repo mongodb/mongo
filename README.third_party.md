@@ -21,7 +21,7 @@ a notice will be included in
 
 | Name                       | License           | Upstream Version | Vendored Version  | Emits persisted data | Distributed in Release Binaries |
 | ---------------------------| ----------------- | ---------------- | ------------------| :------------------: | :-----------------------------: |
-| [abseil-cpp]               | Apache-2.0        |                  | 070f6e47b3        |                      |                ✗                |
+| [abseil-cpp]               | Apache-2.0        | 20210324.1       | 20210324.1        |                      |                ✗                |
 | Aladdin MD5                | Zlib              |                  | Unknown           |          ✗           |                ✗                |
 | [ASIO]                     | BSL-1.0           | 1.16.1           | b0926b61b0        |                      |                ✗                |
 | [benchmark]                | Apache-2.0        | 1.5.2            | 1.5.2             |                      |                                 |

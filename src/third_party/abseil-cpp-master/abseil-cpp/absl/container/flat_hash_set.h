@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,6 +40,7 @@
 #include "absl/memory/memory.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace container_internal {
 template <typename T>
 struct FlatHashSetPolicy;
@@ -55,9 +56,9 @@ struct FlatHashSetPolicy;
 // following notable differences:
 //
 // * Requires keys that are CopyConstructible
-// * Supports heterogeneous lookup, through `find()`, `operator[]()` and
-//   `insert()`, provided that the set is provided a compatible heterogeneous
-//   hashing function and equality operator.
+// * Supports heterogeneous lookup, through `find()` and `insert()`, provided
+//   that the set is provided a compatible heterogeneous hashing function and
+//   equality operator.
 // * Invalidates any references and pointers to elements within the table after
 //   `rehash()`.
 // * Contains a `capacity()` member function indicating the number of element
@@ -212,8 +213,12 @@ class flat_hash_set
   //   Erases the element at `position` of the `flat_hash_set`, returning
   //   `void`.
   //
-  //   NOTE: this return behavior is different than that of STL containers in
-  //   general and `std::unordered_map` in particular.
+  //   NOTE: returning `void` in this case is different than that of STL
+  //   containers in general and `std::unordered_set` in particular (which
+  //   return an iterator to the element following the erased element). If that
+  //   iterator is needed, simply post increment the iterator:
+  //
+  //     set.erase(it++);
   //
   // iterator erase(const_iterator first, const_iterator last):
   //
@@ -222,7 +227,8 @@ class flat_hash_set
   //
   // size_type erase(const key_type& key):
   //
-  //   Erases the element with the matching key, if it exists.
+  //   Erases the element with the matching key, if it exists, returning the
+  //   number of elements erased (0 or 1).
   using Base::erase;
 
   // flat_hash_set::insert()
@@ -318,7 +324,7 @@ class flat_hash_set
 
   // flat_hash_set::merge()
   //
-  // Extracts elements from a given `source` flat hash map into this
+  // Extracts elements from a given `source` flat hash set into this
   // `flat_hash_set`. If the destination `flat_hash_set` already contains an
   // element with an equivalent key, that element is not extracted.
   using Base::merge;
@@ -434,6 +440,14 @@ class flat_hash_set
   using Base::key_eq;
 };
 
+// erase_if(flat_hash_set<>, Pred)
+//
+// Erases all elements that satisfy the predicate `pred` from the container `c`.
+template <typename T, typename H, typename E, typename A, typename Predicate>
+void erase_if(flat_hash_set<T, H, E, A>& c, Predicate pred) {
+  container_internal::EraseIf(pred, &c);
+}
+
 namespace container_internal {
 
 template <class T>
@@ -484,6 +498,7 @@ struct IsUnorderedContainer<absl::flat_hash_set<Key, Hash, KeyEqual, Allocator>>
 
 }  // namespace container_algorithm_internal
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_CONTAINER_FLAT_HASH_SET_H_

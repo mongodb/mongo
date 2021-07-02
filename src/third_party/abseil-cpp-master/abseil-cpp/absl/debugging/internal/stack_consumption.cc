@@ -5,7 +5,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,6 +27,7 @@
 #include "absl/base/internal/raw_logging.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace debugging_internal {
 namespace {
 
@@ -41,7 +42,8 @@ namespace {
 // one of them is null, the results of p<q, p>q, p<=q, and p>=q are
 // unspecified. Therefore, instead we hardcode the direction of the
 // stack on platforms we know about.
-#if defined(__i386__) || defined(__x86_64__) || defined(__ppc__)
+#if defined(__i386__) || defined(__x86_64__) || defined(__ppc__) || \
+    defined(__aarch64__)
 constexpr bool kStackGrowsDown = true;
 #else
 #error Need to define kStackGrowsDown
@@ -115,10 +117,11 @@ int GetSignalHandlerStackConsumption(void (*signal_handler)(int)) {
   // Set up the alt-signal-stack (and save the older one).
   stack_t sigstk;
   memset(&sigstk, 0, sizeof(sigstk));
-  stack_t old_sigstk;
   sigstk.ss_sp = altstack;
   sigstk.ss_size = kAlternateStackSize;
   sigstk.ss_flags = 0;
+  stack_t old_sigstk;
+  memset(&old_sigstk, 0, sizeof(old_sigstk));
   ABSL_RAW_CHECK(sigaltstack(&sigstk, &old_sigstk) == 0,
                  "sigaltstack() failed");
 
@@ -152,6 +155,15 @@ int GetSignalHandlerStackConsumption(void (*signal_handler)(int)) {
   int signal_handler_stack_consumption = GetStackConsumption(altstack);
 
   // Now restore the old alt-signal-stack and signal handlers.
+  if (old_sigstk.ss_sp == nullptr && old_sigstk.ss_size == 0 &&
+      (old_sigstk.ss_flags & SS_DISABLE)) {
+    // https://git.musl-libc.org/cgit/musl/commit/src/signal/sigaltstack.c?id=7829f42a2c8944555439380498ab8b924d0f2070
+    // The original stack has ss_size==0 and ss_flags==SS_DISABLE, but some
+    // versions of musl have a bug that rejects ss_size==0. Work around this by
+    // setting ss_size to MINSIGSTKSZ, which should be ignored by the kernel
+    // when SS_DISABLE is set.
+    old_sigstk.ss_size = MINSIGSTKSZ;
+  }
   ABSL_RAW_CHECK(sigaltstack(&old_sigstk, nullptr) == 0,
                  "sigaltstack() failed");
   ABSL_RAW_CHECK(sigaction(SIGUSR1, &old_sa1, nullptr) == 0,
@@ -167,6 +179,7 @@ int GetSignalHandlerStackConsumption(void (*signal_handler)(int)) {
 }
 
 }  // namespace debugging_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_INTERNAL_HAVE_DEBUGGING_STACK_CONSUMPTION

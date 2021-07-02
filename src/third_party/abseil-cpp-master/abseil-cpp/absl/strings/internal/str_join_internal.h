@@ -5,7 +5,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,6 +43,7 @@
 #include "absl/strings/str_cat.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace strings_internal {
 
 //
@@ -193,7 +194,7 @@ struct DefaultFormatter<std::unique_ptr<ValueType>>
 // and formats each element using the provided Formatter object.
 template <typename Iterator, typename Formatter>
 std::string JoinAlgorithm(Iterator start, Iterator end, absl::string_view s,
-                     Formatter&& f) {
+                          Formatter&& f) {
   std::string result;
   absl::string_view sep("");
   for (Iterator it = start; it != end; ++it) {
@@ -212,7 +213,7 @@ std::string JoinAlgorithm(Iterator start, Iterator end, absl::string_view s,
 // This is an overload of the previous JoinAlgorithm() function. Here the
 // Formatter argument is of type NoFormatter. Since NoFormatter is an internal
 // type, this overload is only invoked when strings::Join() is called with a
-// range of string-like objects (e.g., string, absl::string_view), and an
+// range of string-like objects (e.g., std::string, absl::string_view), and an
 // explicit Formatter argument was NOT specified.
 //
 // The optimization is that the needed space will be reserved in the output
@@ -224,7 +225,7 @@ template <typename Iterator,
               typename std::iterator_traits<Iterator>::iterator_category,
               std::forward_iterator_tag>::value>::type>
 std::string JoinAlgorithm(Iterator start, Iterator end, absl::string_view s,
-                     NoFormatter) {
+                          NoFormatter) {
   std::string result;
   if (start != end) {
     // Sums size
@@ -276,14 +277,15 @@ struct JoinTupleLoop<N, N> {
 
 template <typename... T, typename Formatter>
 std::string JoinAlgorithm(const std::tuple<T...>& tup, absl::string_view sep,
-                     Formatter&& fmt) {
+                          Formatter&& fmt) {
   std::string result;
   JoinTupleLoop<0, sizeof...(T)>()(&result, tup, sep, fmt);
   return result;
 }
 
 template <typename Iterator>
-std::string JoinRange(Iterator first, Iterator last, absl::string_view separator) {
+std::string JoinRange(Iterator first, Iterator last,
+                      absl::string_view separator) {
   // No formatter was explicitly given, so a default must be chosen.
   typedef typename std::iterator_traits<Iterator>::value_type ValueType;
   typedef typename DefaultFormatter<ValueType>::Type Formatter;
@@ -292,7 +294,7 @@ std::string JoinRange(Iterator first, Iterator last, absl::string_view separator
 
 template <typename Range, typename Formatter>
 std::string JoinRange(const Range& range, absl::string_view separator,
-                 Formatter&& fmt) {
+                      Formatter&& fmt) {
   using std::begin;
   using std::end;
   return JoinAlgorithm(begin(range), end(range), separator, fmt);
@@ -306,6 +308,7 @@ std::string JoinRange(const Range& range, absl::string_view separator) {
 }
 
 }  // namespace strings_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_STRINGS_INTERNAL_STR_JOIN_INTERNAL_H_

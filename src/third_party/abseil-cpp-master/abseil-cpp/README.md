@@ -9,7 +9,9 @@ standard library.
 - [About Abseil](#about)
 - [Quickstart](#quickstart)
 - [Building Abseil](#build)
+- [Support](#support)
 - [Codemap](#codemap)
+- [Releases](#releases)
 - [License](#license)
 - [Links](#links)
 
@@ -42,14 +44,22 @@ the Abseil code, running tests, and getting a simple binary working.
 <a name="build"></a>
 ## Building Abseil
 
-[Bazel](http://bazel.build) is the official build system for Abseil,
-which is supported on most major platforms (Linux, Windows, MacOS, for example)
-and compilers. See the [quickstart](https://abseil.io/docs/cpp/quickstart) for
-more information on building Abseil using the Bazel build system.
+[Bazel](https://bazel.build) and [CMake](https://cmake.org/) are the official
+build systems for Abseil.
 
-<a name="cmake"></a>
-If you require CMake support, please check the
-[CMake build instructions](CMake/README.md).
+See the [quickstart](https://abseil.io/docs/cpp/quickstart) for more information
+on building Abseil using the Bazel build system.
+
+If you require CMake support, please check the [CMake build
+instructions](CMake/README.md) and [CMake
+Quickstart](https://abseil.io/docs/cpp/quickstart-cmake).
+
+## Support
+
+Abseil is officially supported on many platforms. See the [Abseil
+platform support
+guide](https://abseil.io/docs/cpp/platforms/platforms) for details on
+supported operating systems, compilers, CPUs, etc.
 
 ## Codemap
 
@@ -62,6 +72,9 @@ Abseil contains the following C++ library components:
 * [`algorithm`](absl/algorithm/)
   <br /> The `algorithm` library contains additions to the C++ `<algorithm>`
   library and container-based versions of such algorithms.
+* [`cleanup`](absl/cleanup/)
+  <br /> The `cleanup` library contains the control-flow-construct-like type
+  `absl::Cleanup` which is used for executing a callback on scope exit.
 * [`container`](absl/container/)
   <br /> The `container` library contains additional STL-style containers,
   including Abseil's unordered "Swiss table" containers.
@@ -79,6 +92,9 @@ Abseil contains the following C++ library components:
   available within C++14 and C++17 versions of the C++ `<type_traits>` library.
 * [`numeric`](absl/numeric/)
   <br /> The `numeric` library contains C++11-compatible 128-bit integers.
+* [`status`](absl/status/)
+  <br /> The `status` contains abstractions for error handling, specifically
+  `absl::Status` and `absl::StatusOr<T>`.
 * [`strings`](absl/strings/)
   <br /> The `strings` library contains a variety of strings routines and
   utilities, including a C++11-compatible version of the C++17
@@ -97,6 +113,15 @@ Abseil contains the following C++ library components:
 * [`utility`](absl/utility/)
   <br /> The `utility` library contains utility and helper code.
 
+## Releases
+
+Abseil recommends users "live-at-head" (update to the latest commit from the
+master branch as often as possible). However, we realize this philosophy doesn't
+work for every project, so we also provide [Long Term Support
+Releases](https://github.com/abseil/abseil-cpp/releases) to which we backport
+fixes for severe bugs. See our [release
+management](https://abseil.io/about/releases) document for more details.
+
 ## License
 
 The Abseil C++ library is licensed under the terms of the Apache
@@ -106,9 +131,9 @@ license. See [LICENSE](LICENSE) for more information.
 
 For more information about Abseil:
 
-* Consult our [Abseil Introduction](http://abseil.io/about/intro)
-* Read [Why Adopt Abseil](http://abseil.io/about/philosophy) to understand our
+* Consult our [Abseil Introduction](https://abseil.io/about/intro)
+* Read [Why Adopt Abseil](https://abseil.io/about/philosophy) to understand our
   design philosophy.
 * Peruse our
-  [Abseil Compatibility Guarantees](http://abseil.io/about/compatibility) to
+  [Abseil Compatibility Guarantees](https://abseil.io/about/compatibility) to
   understand both what we promise to you, and what we expect of you in return.

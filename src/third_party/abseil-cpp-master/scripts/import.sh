@@ -8,7 +8,7 @@ set -vx
 
 NAME=abseil-cpp
 
-LIB_GIT_REVISION=mongodb-2018-12-16
+LIB_GIT_REVISION=20210324.1
 LIB_GIT_REPO=git@github.com:mongodb-forks/abseil-cpp.git
 
 # misnamed, we aren't actually taking their 'master' branch.

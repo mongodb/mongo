@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
 #include "absl/strings/substitute.h"
 
 #include <cstdint>
+#include <vector>
 
 #include "gtest/gtest.h"
 #include "absl/strings/str_cat.h"
@@ -88,7 +89,7 @@ TEST(SubstituteTest, Substitute) {
   str = absl::Substitute("$0", char_buf);
   EXPECT_EQ("print me too", str);
 
-  // null char* is "doubly" special. Represented as the empty std::string.
+  // null char* is "doubly" special. Represented as the empty string.
   char_p = nullptr;
   str = absl::Substitute("$0", char_p);
   EXPECT_EQ("", str);
@@ -172,19 +173,30 @@ TEST(SubstituteTest, SubstituteAndAppend) {
   EXPECT_EQ("a b c d e f g h i j", str);
 }
 
+TEST(SubstituteTest, VectorBoolRef) {
+  std::vector<bool> v = {true, false};
+  const auto& cv = v;
+  EXPECT_EQ("true false true false",
+            absl::Substitute("$0 $1 $2 $3", v[0], v[1], cv[0], cv[1]));
+
+  std::string str = "Logic be like: ";
+  absl::SubstituteAndAppend(&str, "$0 $1 $2 $3", v[0], v[1], cv[0], cv[1]);
+  EXPECT_EQ("Logic be like: true false true false", str);
+}
+
 #ifdef GTEST_HAS_DEATH_TEST
 
 TEST(SubstituteDeathTest, SubstituteDeath) {
   EXPECT_DEBUG_DEATH(
       static_cast<void>(absl::Substitute(absl::string_view("-$2"), "a", "b")),
-      "Invalid strings::Substitute\\(\\) format std::string: asked for \"\\$2\", "
+      "Invalid absl::Substitute\\(\\) format string: asked for \"\\$2\", "
       "but only 2 args were given.");
   EXPECT_DEBUG_DEATH(
-      static_cast<void>(absl::Substitute("-$z-")),
-      "Invalid strings::Substitute\\(\\) format std::string: \"-\\$z-\"");
+      static_cast<void>(absl::Substitute(absl::string_view("-$z-"))),
+      "Invalid absl::Substitute\\(\\) format string: \"-\\$z-\"");
   EXPECT_DEBUG_DEATH(
-      static_cast<void>(absl::Substitute("-$")),
-      "Invalid strings::Substitute\\(\\) format std::string: \"-\\$\"");
+      static_cast<void>(absl::Substitute(absl::string_view("-$"))),
+      "Invalid absl::Substitute\\(\\) format string: \"-\\$\"");
 }
 
 #endif  // GTEST_HAS_DEATH_TEST

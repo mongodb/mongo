@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,8 +16,14 @@
 // https://msdn.microsoft.com/en-us/library/windows/desktop/ms680578(v=vs.85).aspx
 
 #include <windows.h>
-#include <DbgHelp.h>
-#pragma comment(lib, "DbgHelp")
+
+// MSVC header dbghelp.h has a warning for an ignored typedef.
+#pragma warning(push)
+#pragma warning(disable:4091)
+#include <dbghelp.h>
+#pragma warning(pop)
+
+#pragma comment(lib, "dbghelp.lib")
 
 #include <algorithm>
 #include <cstring>
@@ -25,10 +31,11 @@
 #include "absl/base/internal/raw_logging.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 static HANDLE process = NULL;
 
-void InitializeSymbolizer(const char *argv0) {
+void InitializeSymbolizer(const char*) {
   if (process != nullptr) {
     return;
   }
@@ -47,13 +54,12 @@ void InitializeSymbolizer(const char *argv0) {
   }
 }
 
-bool Symbolize(const void *pc, char *out, int out_size) {
+bool Symbolize(const void* pc, char* out, int out_size) {
   if (out_size <= 0) {
     return false;
   }
-  std::aligned_storage<sizeof(SYMBOL_INFO) + MAX_SYM_NAME,
-                       alignof(SYMBOL_INFO)>::type buf;
-  SYMBOL_INFO *symbol = reinterpret_cast<SYMBOL_INFO *>(&buf);
+  alignas(SYMBOL_INFO) char buf[sizeof(SYMBOL_INFO) + MAX_SYM_NAME];
+  SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>(buf);
   symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
   symbol->MaxNameLen = MAX_SYM_NAME;
   if (!SymFromAddr(process, reinterpret_cast<DWORD64>(pc), nullptr, symbol)) {
@@ -71,4 +77,5 @@ bool Symbolize(const void *pc, char *out, int out_size) {
   return true;
 }
 
+ABSL_NAMESPACE_END
 }  // namespace absl

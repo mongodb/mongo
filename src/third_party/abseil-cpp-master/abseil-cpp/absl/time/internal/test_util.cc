@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,12 +18,14 @@
 #include <cstddef>
 #include <cstring>
 
+#include "absl/base/config.h"
 #include "absl/base/internal/raw_logging.h"
 #include "absl/time/internal/cctz/include/cctz/zone_info_source.h"
 
 namespace cctz = absl::time_internal::cctz;
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace time_internal {
 
 TimeZone LoadTimeZone(const std::string& name) {
@@ -33,9 +35,11 @@ TimeZone LoadTimeZone(const std::string& name) {
 }
 
 }  // namespace time_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace time_internal {
 namespace cctz_extension {
 namespace {
@@ -116,8 +120,12 @@ std::unique_ptr<cctz::ZoneInfoSource> TestFactory(
 
 }  // namespace
 
+#if !defined(__MINGW32__)
+// MinGW does not support the weak symbol extension mechanism.
 ZoneInfoSourceFactory zone_info_source_factory = TestFactory;
+#endif
 
 }  // namespace cctz_extension
 }  // namespace time_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

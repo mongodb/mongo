@@ -9,6 +9,7 @@ env.Library(
     source=[
         "abseil-cpp/absl/hash/internal/city.cc",
         "abseil-cpp/absl/hash/internal/hash.cc",
+        "abseil-cpp/absl/hash/internal/wyhash.cc",
     ]
 )
 

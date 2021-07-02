@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//   https://www.apache.org/licenses/LICENSE-2.0
 //
 //   Unless required by applicable law or agreed to in writing, software
 //   distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,14 +20,17 @@
 #include <cstring>
 #include <string>
 
+#include "absl/base/config.h"
+
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace time_internal {
 namespace cctz {
 
 namespace {
 
 // The prefix used for the internal names of fixed-offset zones.
-const char kFixedOffsetPrefix[] = "Fixed/UTC";
+const char kFixedZonePrefix[] = "Fixed/UTC";
 
 const char kDigits[] = "0123456789";
 
@@ -55,15 +58,13 @@ bool FixedOffsetFromName(const std::string& name, seconds* offset) {
     return true;
   }
 
-  const std::size_t prefix_len = sizeof(kFixedOffsetPrefix) - 1;
-  const char* const ep = kFixedOffsetPrefix + prefix_len;
+  const std::size_t prefix_len = sizeof(kFixedZonePrefix) - 1;
+  const char* const ep = kFixedZonePrefix + prefix_len;
   if (name.size() != prefix_len + 9)  // <prefix>+99:99:99
     return false;
-  if (!std::equal(kFixedOffsetPrefix, ep, name.begin()))
-    return false;
+  if (!std::equal(kFixedZonePrefix, ep, name.begin())) return false;
   const char* np = name.data() + prefix_len;
-  if (np[0] != '+' && np[0] != '-')
-    return false;
+  if (np[0] != '+' && np[0] != '-') return false;
   if (np[3] != ':' || np[6] != ':')  // see note below about large offsets
     return false;
 
@@ -88,29 +89,29 @@ std::string FixedOffsetToName(const seconds& offset) {
     // offsets and to (somewhat) limit the total number of zones.
     return "UTC";
   }
-  int seconds = static_cast<int>(offset.count());
-  const char sign = (seconds < 0 ? '-' : '+');
-  int minutes = seconds / 60;
-  seconds %= 60;
+  int offset_seconds = static_cast<int>(offset.count());
+  const char sign = (offset_seconds < 0 ? '-' : '+');
+  int offset_minutes = offset_seconds / 60;
+  offset_seconds %= 60;
   if (sign == '-') {
-    if (seconds > 0) {
-      seconds -= 60;
-      minutes += 1;
+    if (offset_seconds > 0) {
+      offset_seconds -= 60;
+      offset_minutes += 1;
     }
-    seconds = -seconds;
-    minutes = -minutes;
+    offset_seconds = -offset_seconds;
+    offset_minutes = -offset_minutes;
   }
-  int hours = minutes / 60;
-  minutes %= 60;
-  char buf[sizeof(kFixedOffsetPrefix) - 1 + sizeof("-24:00:00")];
-  std::strcpy(buf, kFixedOffsetPrefix);
-  char* ep = buf + sizeof(kFixedOffsetPrefix) - 1;
+  int offset_hours = offset_minutes / 60;
+  offset_minutes %= 60;
+  const std::size_t prefix_len = sizeof(kFixedZonePrefix) - 1;
+  char buf[prefix_len + sizeof("-24:00:00")];
+  char* ep = std::copy(kFixedZonePrefix, kFixedZonePrefix + prefix_len, buf);
   *ep++ = sign;
-  ep = Format02d(ep, hours);
+  ep = Format02d(ep, offset_hours);
   *ep++ = ':';
-  ep = Format02d(ep, minutes);
+  ep = Format02d(ep, offset_minutes);
   *ep++ = ':';
-  ep = Format02d(ep, seconds);
+  ep = Format02d(ep, offset_seconds);
   *ep++ = '\0';
   assert(ep == buf + sizeof(buf));
   return buf;
@@ -118,7 +119,7 @@ std::string FixedOffsetToName(const seconds& offset) {
 
 std::string FixedOffsetToAbbr(const seconds& offset) {
   std::string abbr = FixedOffsetToName(offset);
-  const std::size_t prefix_len = sizeof(kFixedOffsetPrefix) - 1;
+  const std::size_t prefix_len = sizeof(kFixedZonePrefix) - 1;
   if (abbr.size() == prefix_len + 9) {         // <prefix>+99:99:99
     abbr.erase(0, prefix_len);                 // +99:99:99
     abbr.erase(6, 1);                          // +99:9999
@@ -135,4 +136,5 @@ std::string FixedOffsetToAbbr(const seconds& offset) {
 
 }  // namespace cctz
 }  // namespace time_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

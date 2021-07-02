@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,7 +14,7 @@
 
 #include "absl/synchronization/mutex.h"
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <windows.h>
 #endif
 
@@ -30,6 +30,7 @@
 
 #include "gtest/gtest.h"
 #include "absl/base/attributes.h"
+#include "absl/base/config.h"
 #include "absl/base/internal/raw_logging.h"
 #include "absl/base/internal/sysinfo.h"
 #include "absl/memory/memory.h"
@@ -425,10 +426,10 @@ TEST(Mutex, CondVarWaitSignalsAwait) {
   // Use a struct so the lock annotations apply.
   struct {
     absl::Mutex barrier_mu;
-    bool barrier GUARDED_BY(barrier_mu) = false;
+    bool barrier ABSL_GUARDED_BY(barrier_mu) = false;
 
     absl::Mutex release_mu;
-    bool release GUARDED_BY(release_mu) = false;
+    bool release ABSL_GUARDED_BY(release_mu) = false;
     absl::CondVar released_cv;
   } state;
 
@@ -466,10 +467,10 @@ TEST(Mutex, CondVarWaitWithTimeoutSignalsAwait) {
   // Use a struct so the lock annotations apply.
   struct {
     absl::Mutex barrier_mu;
-    bool barrier GUARDED_BY(barrier_mu) = false;
+    bool barrier ABSL_GUARDED_BY(barrier_mu) = false;
 
     absl::Mutex release_mu;
-    bool release GUARDED_BY(release_mu) = false;
+    bool release ABSL_GUARDED_BY(release_mu) = false;
     absl::CondVar released_cv;
   } state;
 
@@ -610,9 +611,9 @@ TEST_P(CondVarWaitDeadlock, Test) {
   waiter2.reset();  // "join" waiter2
 }
 
-INSTANTIATE_TEST_CASE_P(CondVarWaitDeadlockTest, CondVarWaitDeadlock,
-                        ::testing::Range(0, 8),
-                        ::testing::PrintToStringParamName());
+INSTANTIATE_TEST_SUITE_P(CondVarWaitDeadlockTest, CondVarWaitDeadlock,
+                         ::testing::Range(0, 8),
+                         ::testing::PrintToStringParamName());
 
 // --------------------------------------------------------
 // Test for fix of bug in DequeueAllWakeable()
@@ -706,6 +707,40 @@ TEST(Mutex, LockWhen) {
   t.join();
 }
 
+TEST(Mutex, LockWhenGuard) {
+  absl::Mutex mu;
+  int n = 30;
+  bool done = false;
+
+  // We don't inline the lambda because the conversion is ambiguous in MSVC.
+  bool (*cond_eq_10)(int *) = [](int *p) { return *p == 10; };
+  bool (*cond_lt_10)(int *) = [](int *p) { return *p < 10; };
+
+  std::thread t1([&mu, &n, &done, cond_eq_10]() {
+    absl::ReaderMutexLock lock(&mu, absl::Condition(cond_eq_10, &n));
+    done = true;
+  });
+
+  std::thread t2[10];
+  for (std::thread &t : t2) {
+    t = std::thread([&mu, &n, cond_lt_10]() {
+      absl::WriterMutexLock lock(&mu, absl::Condition(cond_lt_10, &n));
+      ++n;
+    });
+  }
+
+  {
+    absl::MutexLock lock(&mu);
+    n = 0;
+  }
+
+  for (std::thread &t : t2) t.join();
+  t1.join();
+
+  EXPECT_TRUE(done);
+  EXPECT_EQ(n, 10);
+}
+
 // --------------------------------------------------------
 // The following test requires Mutex::ReaderLock to be a real shared
 // lock, which is not the case in all builds.
@@ -770,7 +805,7 @@ static void GetReadLock(ReaderDecrementBugStruct *x) {
 
 // Test for reader counter being decremented incorrectly by waiter
 // with false condition.
-TEST(Mutex, MutexReaderDecrementBug) NO_THREAD_SAFETY_ANALYSIS {
+TEST(Mutex, MutexReaderDecrementBug) ABSL_NO_THREAD_SAFETY_ANALYSIS {
   ReaderDecrementBugStruct x;
   x.cond = false;
   x.waiting_on_cond = false;
@@ -815,7 +850,12 @@ TEST(Mutex, MutexReaderDecrementBug) NO_THREAD_SAFETY_ANALYSIS {
 
 // Test that we correctly handle the situation when a lock is
 // held and then destroyed (w/o unlocking).
-TEST(Mutex, LockedMutexDestructionBug) NO_THREAD_SAFETY_ANALYSIS {
+#ifdef ABSL_HAVE_THREAD_SANITIZER
+// TSAN reports errors when locked Mutexes are destroyed.
+TEST(Mutex, DISABLED_LockedMutexDestructionBug) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+#else
+TEST(Mutex, LockedMutexDestructionBug) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+#endif
   for (int i = 0; i != 10; i++) {
     // Create, lock and destroy 10 locks.
     const int kNumLocks = 10;
@@ -996,9 +1036,6 @@ TEST(Mutex, AcquireFromCondition) {
   x.mu0.Unlock();
 }
 
-// The deadlock detector is not part of non-prod builds, so do not test it.
-#if !defined(ABSL_INTERNAL_USE_NONPROD_MUTEX)
-
 TEST(Mutex, DeadlockDetector) {
   absl::SetMutexDeadlockDetectionMode(absl::OnDeadlockCycle::kAbort);
 
@@ -1030,11 +1067,11 @@ TEST(Mutex, DeadlockDetector) {
 class ScopedDisableBazelTestWarnings {
  public:
   ScopedDisableBazelTestWarnings() {
-#ifdef WIN32
+#ifdef _WIN32
     char file[MAX_PATH];
-    if (GetEnvironmentVariable(kVarName, file, sizeof(file)) < sizeof(file)) {
+    if (GetEnvironmentVariableA(kVarName, file, sizeof(file)) < sizeof(file)) {
       warnings_output_file_ = file;
-      SetEnvironmentVariable(kVarName, nullptr);
+      SetEnvironmentVariableA(kVarName, nullptr);
     }
 #else
     const char *file = getenv(kVarName);
@@ -1047,8 +1084,8 @@ class ScopedDisableBazelTestWarnings {
 
   ~ScopedDisableBazelTestWarnings() {
     if (!warnings_output_file_.empty()) {
-#ifdef WIN32
-      SetEnvironmentVariable(kVarName, warnings_output_file_.c_str());
+#ifdef _WIN32
+      SetEnvironmentVariableA(kVarName, warnings_output_file_.c_str());
 #else
       setenv(kVarName, warnings_output_file_.c_str(), 0);
 #endif
@@ -1062,7 +1099,12 @@ class ScopedDisableBazelTestWarnings {
 const char ScopedDisableBazelTestWarnings::kVarName[] =
     "TEST_WARNINGS_OUTPUT_FILE";
 
+#ifdef ABSL_HAVE_THREAD_SANITIZER
+// This test intentionally creates deadlocks to test the deadlock detector.
+TEST(Mutex, DISABLED_DeadlockDetectorBazelWarning) {
+#else
 TEST(Mutex, DeadlockDetectorBazelWarning) {
+#endif
   absl::SetMutexDeadlockDetectionMode(absl::OnDeadlockCycle::kReport);
 
   // Cause deadlock detection to detect something, if it's
@@ -1091,7 +1133,7 @@ TEST(Mutex, DeadlockDetectorBazelWarning) {
 // annotation-based static thread-safety analysis is not currently
 // predicate-aware and cannot tell if the two for-loops that acquire and
 // release the locks have the same predicates.
-TEST(Mutex, DeadlockDetectorStessTest) NO_THREAD_SAFETY_ANALYSIS {
+TEST(Mutex, DeadlockDetectorStressTest) ABSL_NO_THREAD_SAFETY_ANALYSIS {
   // Stress test: Here we create a large number of locks and use all of them.
   // If a deadlock detector keeps a full graph of lock acquisition order,
   // it will likely be too slow for this test to pass.
@@ -1109,7 +1151,12 @@ TEST(Mutex, DeadlockDetectorStessTest) NO_THREAD_SAFETY_ANALYSIS {
   }
 }
 
-TEST(Mutex, DeadlockIdBug) NO_THREAD_SAFETY_ANALYSIS {
+#ifdef ABSL_HAVE_THREAD_SANITIZER
+// TSAN reports errors when locked Mutexes are destroyed.
+TEST(Mutex, DISABLED_DeadlockIdBug) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+#else
+TEST(Mutex, DeadlockIdBug) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+#endif
   // Test a scenario where a cached deadlock graph node id in the
   // list of held locks is not invalidated when the corresponding
   // mutex is deleted.
@@ -1142,7 +1189,6 @@ TEST(Mutex, DeadlockIdBug) NO_THREAD_SAFETY_ANALYSIS {
   c.Lock();
   c.Unlock();
 }
-#endif  // !defined(ABSL_INTERNAL_USE_NONPROD_MUTEX)
 
 // --------------------------------------------------------
 // Test for timeouts/deadlines on condition waits that are specified using
@@ -1367,8 +1413,8 @@ std::vector<TimeoutTestParam> MakeTimeoutTestParamValues() {
 }
 
 // Instantiate `TimeoutTest` with `MakeTimeoutTestParamValues()`.
-INSTANTIATE_TEST_CASE_P(All, TimeoutTest,
-                        testing::ValuesIn(MakeTimeoutTestParamValues()));
+INSTANTIATE_TEST_SUITE_P(All, TimeoutTest,
+                         testing::ValuesIn(MakeTimeoutTestParamValues()));
 
 TEST_P(TimeoutTest, Await) {
   const TimeoutTestParam params = GetParam();
@@ -1548,9 +1594,9 @@ static std::vector<int> AllThreadCountValues() {
 class MutexVariableThreadCountTest : public ::testing::TestWithParam<int> {};
 
 // Instantiate the above with AllThreadCountOptions().
-INSTANTIATE_TEST_CASE_P(ThreadCounts, MutexVariableThreadCountTest,
-                        ::testing::ValuesIn(AllThreadCountValues()),
-                        ::testing::PrintToStringParamName());
+INSTANTIATE_TEST_SUITE_P(ThreadCounts, MutexVariableThreadCountTest,
+                         ::testing::ValuesIn(AllThreadCountValues()),
+                         ::testing::PrintToStringParamName());
 
 // Reduces iterations by some factor for slow platforms
 // (determined empirically).

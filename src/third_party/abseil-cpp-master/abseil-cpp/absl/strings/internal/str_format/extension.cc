@@ -5,7 +5,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,38 +20,8 @@
 #include <string>
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace str_format_internal {
-namespace {
-// clang-format off
-#define ABSL_LENGTH_MODS_EXPAND_ \
-  X_VAL(h) X_SEP \
-  X_VAL(hh) X_SEP \
-  X_VAL(l) X_SEP \
-  X_VAL(ll) X_SEP \
-  X_VAL(L) X_SEP \
-  X_VAL(j) X_SEP \
-  X_VAL(z) X_SEP \
-  X_VAL(t) X_SEP \
-  X_VAL(q)
-// clang-format on
-}  // namespace
-
-const LengthMod::Spec LengthMod::kSpecs[] = {
-#define X_VAL(id) { LengthMod::id, #id, strlen(#id) }
-#define X_SEP ,
-    ABSL_LENGTH_MODS_EXPAND_, {LengthMod::none, "", 0}
-#undef X_VAL
-#undef X_SEP
-};
-
-const ConversionChar::Spec ConversionChar::kSpecs[] = {
-#define X_VAL(id) { ConversionChar::id, #id[0] }
-#define X_SEP ,
-    ABSL_CONVERSION_CHARS_EXPAND_(X_VAL, X_SEP),
-    {ConversionChar::none, '\0'},
-#undef X_VAL
-#undef X_SEP
-};
 
 std::string Flags::ToString() const {
   std::string s;
@@ -63,22 +33,43 @@ std::string Flags::ToString() const {
   return s;
 }
 
-const size_t LengthMod::kNumValues;
+#define ABSL_INTERNAL_X_VAL(id) \
+  constexpr absl::FormatConversionChar FormatConversionCharInternal::id;
+ABSL_INTERNAL_CONVERSION_CHARS_EXPAND_(ABSL_INTERNAL_X_VAL, )
+#undef ABSL_INTERNAL_X_VAL
+// NOLINTNEXTLINE(readability-redundant-declaration)
+constexpr absl::FormatConversionChar FormatConversionCharInternal::kNone;
 
-const size_t ConversionChar::kNumValues;
+#define ABSL_INTERNAL_CHAR_SET_CASE(c) \
+  constexpr FormatConversionCharSet FormatConversionCharSetInternal::c;
+ABSL_INTERNAL_CONVERSION_CHARS_EXPAND_(ABSL_INTERNAL_CHAR_SET_CASE, )
+#undef ABSL_INTERNAL_CHAR_SET_CASE
 
-bool FormatSinkImpl::PutPaddedString(string_view v, int w, int p, bool l) {
+// NOLINTNEXTLINE(readability-redundant-declaration)
+constexpr FormatConversionCharSet FormatConversionCharSetInternal::kStar;
+// NOLINTNEXTLINE(readability-redundant-declaration)
+constexpr FormatConversionCharSet FormatConversionCharSetInternal::kIntegral;
+// NOLINTNEXTLINE(readability-redundant-declaration)
+constexpr FormatConversionCharSet FormatConversionCharSetInternal::kFloating;
+// NOLINTNEXTLINE(readability-redundant-declaration)
+constexpr FormatConversionCharSet FormatConversionCharSetInternal::kNumeric;
+// NOLINTNEXTLINE(readability-redundant-declaration)
+constexpr FormatConversionCharSet FormatConversionCharSetInternal::kPointer;
+
+bool FormatSinkImpl::PutPaddedString(string_view value, int width,
+                                     int precision, bool left) {
   size_t space_remaining = 0;
-  if (w >= 0) space_remaining = w;
-  size_t n = v.size();
-  if (p >= 0) n = std::min(n, static_cast<size_t>(p));
-  string_view shown(v.data(), n);
+  if (width >= 0) space_remaining = width;
+  size_t n = value.size();
+  if (precision >= 0) n = std::min(n, static_cast<size_t>(precision));
+  string_view shown(value.data(), n);
   space_remaining = Excess(shown.size(), space_remaining);
-  if (!l) Append(space_remaining, ' ');
+  if (!left) Append(space_remaining, ' ');
   Append(shown);
-  if (l) Append(space_remaining, ' ');
+  if (left) Append(space_remaining, ' ');
   return true;
 }
 
 }  // namespace str_format_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

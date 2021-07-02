@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -65,6 +65,26 @@ void BM_Format(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_Format);
+
+void BM_Parse(benchmark::State& state) {
+  const std::string f = "2014-01-02T03:04:05";
+  absl::CivilSecond c;
+  while (state.KeepRunning()) {
+    const bool b = absl::ParseCivilTime(f, &c);
+    benchmark::DoNotOptimize(b);
+  }
+}
+BENCHMARK(BM_Parse);
+
+void BM_RoundTripFormatParse(benchmark::State& state) {
+  const absl::CivilSecond c(2014, 1, 2, 3, 4, 5);
+  absl::CivilSecond out;
+  while (state.KeepRunning()) {
+    const bool b = absl::ParseCivilTime(absl::FormatCivilTime(c), &out);
+    benchmark::DoNotOptimize(b);
+  }
+}
+BENCHMARK(BM_RoundTripFormatParse);
 
 template <typename T>
 void BM_CivilTimeAbslHash(benchmark::State& state) {

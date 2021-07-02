@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,6 +24,7 @@
 #include "absl/base/config.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace {
 
 const uint64_t kInitialNumber{0x0123456789abcdef};
@@ -53,24 +54,22 @@ const uint32_t k32ValueBE{0x67452301};
 const uint16_t k16ValueBE{0x2301};
 #endif
 
-template<typename T>
-std::vector<T> GenerateAllValuesForType() {
-  std::vector<T> result;
-  T next = std::numeric_limits<T>::min();
-  while (true) {
-    result.push_back(next);
-    if (next == std::numeric_limits<T>::max()) {
-      return result;
-    }
-    ++next;
+std::vector<uint16_t> GenerateAllUint16Values() {
+  std::vector<uint16_t> result;
+  result.reserve(size_t{1} << (sizeof(uint16_t) * 8));
+  for (uint32_t i = std::numeric_limits<uint16_t>::min();
+       i <= std::numeric_limits<uint16_t>::max(); ++i) {
+    result.push_back(static_cast<uint16_t>(i));
   }
+  return result;
 }
 
 template<typename T>
-std::vector<T> GenerateRandomIntegers(size_t numValuesToTest) {
+std::vector<T> GenerateRandomIntegers(size_t num_values_to_test) {
   std::vector<T> result;
+  result.reserve(num_values_to_test);
   std::mt19937_64 rng(kRandomSeed);
-  for (size_t i = 0; i < numValuesToTest; ++i) {
+  for (size_t i = 0; i < num_values_to_test; ++i) {
     result.push_back(rng());
   }
   return result;
@@ -147,7 +146,7 @@ void Swap64(char* bytes) {
 }
 
 TEST(EndianessTest, Uint16) {
-  GBSwapHelper(GenerateAllValuesForType<uint16_t>(), &Swap16);
+  GBSwapHelper(GenerateAllUint16Values(), &Swap16);
 }
 
 TEST(EndianessTest, Uint32) {
@@ -260,4 +259,5 @@ TEST(EndianessTest, big_endian) {
 }
 
 }  // namespace
+ABSL_NAMESPACE_END
 }  // namespace absl

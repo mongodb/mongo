@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -57,6 +57,7 @@
 #include "absl/time/time.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 // -----------------------------------------------------------------------------
 // Notification
@@ -73,7 +74,9 @@ class Notification {
   // Notification::HasBeenNotified()
   //
   // Returns the value of the notification's internal "notified" state.
-  bool HasBeenNotified() const;
+  bool HasBeenNotified() const {
+    return HasBeenNotifiedInternal(&this->notified_yet_);
+  }
 
   // Notification::WaitForNotification()
   //
@@ -105,9 +108,16 @@ class Notification {
   void Notify();
 
  private:
+  static inline bool HasBeenNotifiedInternal(
+      const std::atomic<bool>* notified_yet) {
+    return notified_yet->load(std::memory_order_acquire);
+  }
+
   mutable Mutex mutex_;
   std::atomic<bool> notified_yet_;  // written under mutex_
 };
 
+ABSL_NAMESPACE_END
 }  // namespace absl
+
 #endif  // ABSL_SYNCHRONIZATION_NOTIFICATION_H_

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,7 @@
 #include <string>
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace strings_internal {
 
 namespace {
@@ -157,12 +158,12 @@ const uint32_t* LargePowerOfFiveData(int i) {
 int LargePowerOfFiveSize(int i) { return 2 * i; }
 }  // namespace
 
-const uint32_t kFiveToNth[14] = {
+ABSL_DLL const uint32_t kFiveToNth[14] = {
     1,     5,      25,      125,     625,      3125,      15625,
     78125, 390625, 1953125, 9765625, 48828125, 244140625, 1220703125,
 };
 
-const uint32_t kTenToNth[10] = {
+ABSL_DLL const uint32_t kTenToNth[10] = {
     1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,
 };
 
@@ -207,7 +208,7 @@ int BigUnsigned<max_words>::ReadDigits(const char* begin, const char* end,
     ++dropped_digits;
   }
   if (begin < end && *std::prev(end) == '.') {
-    // If the std::string ends in '.', either before or after dropping zeroes, then
+    // If the string ends in '.', either before or after dropping zeroes, then
     // drop the decimal point and look for more digits to drop.
     dropped_digits = 0;
     --end;
@@ -354,4 +355,5 @@ template class BigUnsigned<4>;
 template class BigUnsigned<84>;
 
 }  // namespace strings_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

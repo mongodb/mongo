@@ -5,7 +5,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,10 @@
 #include <unistd.h>
 #endif
 
+#ifdef __APPLE__
+#include <sys/ucontext.h>
+#endif
+
 #include <csignal>
 #include <cstdio>
 
@@ -30,6 +34,7 @@
 #include "absl/debugging/symbolize.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace debugging_internal {
 
 // Returns the program counter from signal context, nullptr if
@@ -41,26 +46,70 @@ void* GetProgramCounter(void* vuc) {
     ucontext_t* context = reinterpret_cast<ucontext_t*>(vuc);
 #if defined(__aarch64__)
     return reinterpret_cast<void*>(context->uc_mcontext.pc);
+#elif defined(__alpha__)
+    return reinterpret_cast<void*>(context->uc_mcontext.sc_pc);
 #elif defined(__arm__)
     return reinterpret_cast<void*>(context->uc_mcontext.arm_pc);
+#elif defined(__hppa__)
+    return reinterpret_cast<void*>(context->uc_mcontext.sc_iaoq[0]);
 #elif defined(__i386__)
     if (14 < ABSL_ARRAYSIZE(context->uc_mcontext.gregs))
       return reinterpret_cast<void*>(context->uc_mcontext.gregs[14]);
+#elif defined(__ia64__)
+    return reinterpret_cast<void*>(context->uc_mcontext.sc_ip);
+#elif defined(__m68k__)
+    return reinterpret_cast<void*>(context->uc_mcontext.gregs[16]);
 #elif defined(__mips__)
     return reinterpret_cast<void*>(context->uc_mcontext.pc);
 #elif defined(__powerpc64__)
     return reinterpret_cast<void*>(context->uc_mcontext.gp_regs[32]);
 #elif defined(__powerpc__)
-    return reinterpret_cast<void*>(context->uc_mcontext.regs->nip);
+    return reinterpret_cast<void*>(context->uc_mcontext.uc_regs->gregs[32]);
+#elif defined(__riscv)
+    return reinterpret_cast<void*>(context->uc_mcontext.__gregs[REG_PC]);
 #elif defined(__s390__) && !defined(__s390x__)
     return reinterpret_cast<void*>(context->uc_mcontext.psw.addr & 0x7fffffff);
 #elif defined(__s390__) && defined(__s390x__)
     return reinterpret_cast<void*>(context->uc_mcontext.psw.addr);
+#elif defined(__sh__)
+    return reinterpret_cast<void*>(context->uc_mcontext.pc);
+#elif defined(__sparc__) && !defined(__arch64__)
+    return reinterpret_cast<void*>(context->uc_mcontext.gregs[19]);
+#elif defined(__sparc__) && defined(__arch64__)
+    return reinterpret_cast<void*>(context->uc_mcontext.mc_gregs[19]);
 #elif defined(__x86_64__)
     if (16 < ABSL_ARRAYSIZE(context->uc_mcontext.gregs))
       return reinterpret_cast<void*>(context->uc_mcontext.gregs[16]);
+#elif defined(__e2k__)
+    return reinterpret_cast<void*>(context->uc_mcontext.cr0_hi);
 #else
 #error "Undefined Architecture."
+#endif
+  }
+#elif defined(__APPLE__)
+  if (vuc != nullptr) {
+    ucontext_t* signal_ucontext = reinterpret_cast<ucontext_t*>(vuc);
+#if defined(__aarch64__)
+    return reinterpret_cast<void*>(
+        __darwin_arm_thread_state64_get_pc(signal_ucontext->uc_mcontext->__ss));
+#elif defined(__arm__)
+#if __DARWIN_UNIX03
+    return reinterpret_cast<void*>(signal_ucontext->uc_mcontext->__ss.__pc);
+#else
+    return reinterpret_cast<void*>(signal_ucontext->uc_mcontext->ss.pc);
+#endif
+#elif defined(__i386__)
+#if __DARWIN_UNIX03
+    return reinterpret_cast<void*>(signal_ucontext->uc_mcontext->__ss.__eip);
+#else
+    return reinterpret_cast<void*>(signal_ucontext->uc_mcontext->ss.eip);
+#endif
+#elif defined(__x86_64__)
+#if __DARWIN_UNIX03
+    return reinterpret_cast<void*>(signal_ucontext->uc_mcontext->__ss.__rip);
+#else
+    return reinterpret_cast<void*>(signal_ucontext->uc_mcontext->ss.rip);
+#endif
 #endif
   }
 #elif defined(__akaros__)
@@ -150,4 +199,5 @@ void DumpPCAndFrameSizesAndStackTrace(
 }
 
 }  // namespace debugging_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

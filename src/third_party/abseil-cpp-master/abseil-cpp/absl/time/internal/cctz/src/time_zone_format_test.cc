@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//   https://www.apache.org/licenses/LICENSE-2.0
 //
 //   Unless required by applicable law or agreed to in writing, software
 //   distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,20 +12,21 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-#include "absl/time/internal/cctz/include/cctz/time_zone.h"
-
 #include <chrono>
 #include <iomanip>
 #include <sstream>
 #include <string>
 
-#include "absl/time/internal/cctz/include/cctz/civil_time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/base/config.h"
+#include "absl/time/internal/cctz/include/cctz/civil_time.h"
+#include "absl/time/internal/cctz/include/cctz/time_zone.h"
 
 namespace chrono = std::chrono;
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace time_internal {
 namespace cctz {
 
@@ -47,11 +48,11 @@ namespace {
     EXPECT_STREQ(zone, al.abbr);                                  \
   } while (0)
 
-const char RFC3339_full[] = "%Y-%m-%dT%H:%M:%E*S%Ez";
-const char RFC3339_sec[] =  "%Y-%m-%dT%H:%M:%S%Ez";
+const char RFC3339_full[] = "%Y-%m-%d%ET%H:%M:%E*S%Ez";
+const char RFC3339_sec[] = "%Y-%m-%d%ET%H:%M:%S%Ez";
 
 const char RFC1123_full[] = "%a, %d %b %Y %H:%M:%S %z";
-const char RFC1123_no_wday[] =  "%d %b %Y %H:%M:%S %z";
+const char RFC1123_no_wday[] = "%d %b %Y %H:%M:%S %z";
 
 // A helper that tests the given format specifier by itself, and with leading
 // and trailing characters.  For example: TestFormatSpecifier(tp, "%a", "Thu").
@@ -62,17 +63,6 @@ void TestFormatSpecifier(time_point<D> tp, time_zone tz, const std::string& fmt,
   EXPECT_EQ("xxx " + ans, format("xxx " + fmt, tp, tz));
   EXPECT_EQ(ans + " yyy", format(fmt + " yyy", tp, tz));
   EXPECT_EQ("xxx " + ans + " yyy", format("xxx " + fmt + " yyy", tp, tz));
-}
-
-// These tests sometimes run on platforms that have zoneinfo data so old
-// that the transition we are attempting to check does not exist, most
-// notably Android emulators.  Fortunately, AndroidZoneInfoSource supports
-// time_zone::version() so, in cases where we've learned that it matters,
-// we can make the check conditionally.
-int VersionCmp(time_zone tz, const std::string& target) {
-  std::string version = tz.version();
-  if (version.empty() && !target.empty()) return 1;  // unknown > known
-  return version.compare(target);
 }
 
 }  // namespace
@@ -99,8 +89,11 @@ TEST(Format, TimePointResolution) {
       format(kFmt, chrono::time_point_cast<chrono::milliseconds>(t0), utc));
   EXPECT_EQ("03:04:05",
             format(kFmt, chrono::time_point_cast<chrono::seconds>(t0), utc));
-  EXPECT_EQ("03:04:05",
-            format(kFmt, chrono::time_point_cast<absl::time_internal::cctz::seconds>(t0), utc));
+  EXPECT_EQ(
+      "03:04:05",
+      format(kFmt,
+             chrono::time_point_cast<absl::time_internal::cctz::seconds>(t0),
+             utc));
   EXPECT_EQ("03:04:00",
             format(kFmt, chrono::time_point_cast<chrono::minutes>(t0), utc));
   EXPECT_EQ("03:00:00",
@@ -121,12 +114,10 @@ TEST(Format, TimePointExtendedResolution) {
   EXPECT_EQ(
       "12:34:56.012345678901234",
       detail::format(kFmt, tp, detail::femtoseconds(12345678901234), utc));
-  EXPECT_EQ(
-      "12:34:56.001234567890123",
-      detail::format(kFmt, tp, detail::femtoseconds(1234567890123), utc));
-  EXPECT_EQ(
-      "12:34:56.000123456789012",
-      detail::format(kFmt, tp, detail::femtoseconds(123456789012), utc));
+  EXPECT_EQ("12:34:56.001234567890123",
+            detail::format(kFmt, tp, detail::femtoseconds(1234567890123), utc));
+  EXPECT_EQ("12:34:56.000123456789012",
+            detail::format(kFmt, tp, detail::femtoseconds(123456789012), utc));
 
   EXPECT_EQ("12:34:56.000000000000123",
             detail::format(kFmt, tp, detail::femtoseconds(123), utc));
@@ -174,7 +165,9 @@ TEST(Format, PosixConversions) {
   TestFormatSpecifier(tp, tz, "%M", "00");
   TestFormatSpecifier(tp, tz, "%S", "00");
   TestFormatSpecifier(tp, tz, "%U", "00");
+#if !defined(__EMSCRIPTEN__)
   TestFormatSpecifier(tp, tz, "%w", "4");  // 4=Thursday
+#endif
   TestFormatSpecifier(tp, tz, "%W", "00");
   TestFormatSpecifier(tp, tz, "%y", "70");
   TestFormatSpecifier(tp, tz, "%Y", "1970");
@@ -436,51 +429,165 @@ TEST(Format, CompareExtendSecondsVsSubseconds) {
 }
 
 TEST(Format, ExtendedOffset) {
-  auto tp = chrono::system_clock::from_time_t(0);
+  const auto tp = chrono::system_clock::from_time_t(0);
 
-  time_zone tz = utc_time_zone();
+  auto tz = fixed_time_zone(absl::time_internal::cctz::seconds::zero());
+  TestFormatSpecifier(tp, tz, "%z", "+0000");
+  TestFormatSpecifier(tp, tz, "%:z", "+00:00");
   TestFormatSpecifier(tp, tz, "%Ez", "+00:00");
 
-  EXPECT_TRUE(load_time_zone("America/New_York", &tz));
-  TestFormatSpecifier(tp, tz, "%Ez", "-05:00");
+  tz = fixed_time_zone(chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%z", "+0000");
+  TestFormatSpecifier(tp, tz, "%:z", "+00:00");
+  TestFormatSpecifier(tp, tz, "%Ez", "+00:00");
 
-  EXPECT_TRUE(load_time_zone("America/Los_Angeles", &tz));
-  TestFormatSpecifier(tp, tz, "%Ez", "-08:00");
+  tz = fixed_time_zone(-chrono::seconds(56));  // NOTE: +00:00
+  TestFormatSpecifier(tp, tz, "%z", "+0000");
+  TestFormatSpecifier(tp, tz, "%:z", "+00:00");
+  TestFormatSpecifier(tp, tz, "%Ez", "+00:00");
 
-  EXPECT_TRUE(load_time_zone("Australia/Sydney", &tz));
-  TestFormatSpecifier(tp, tz, "%Ez", "+10:00");
+  tz = fixed_time_zone(chrono::minutes(34));
+  TestFormatSpecifier(tp, tz, "%z", "+0034");
+  TestFormatSpecifier(tp, tz, "%:z", "+00:34");
+  TestFormatSpecifier(tp, tz, "%Ez", "+00:34");
 
-  EXPECT_TRUE(load_time_zone("Africa/Monrovia", &tz));
-  // The true offset is -00:44:30 but %z only gives (truncated) minutes.
-  TestFormatSpecifier(tp, tz, "%z", "-0044");
-  TestFormatSpecifier(tp, tz, "%Ez", "-00:44");
+  tz = fixed_time_zone(-chrono::minutes(34));
+  TestFormatSpecifier(tp, tz, "%z", "-0034");
+  TestFormatSpecifier(tp, tz, "%:z", "-00:34");
+  TestFormatSpecifier(tp, tz, "%Ez", "-00:34");
+
+  tz = fixed_time_zone(chrono::minutes(34) + chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%z", "+0034");
+  TestFormatSpecifier(tp, tz, "%:z", "+00:34");
+  TestFormatSpecifier(tp, tz, "%Ez", "+00:34");
+
+  tz = fixed_time_zone(-chrono::minutes(34) - chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%z", "-0034");
+  TestFormatSpecifier(tp, tz, "%:z", "-00:34");
+  TestFormatSpecifier(tp, tz, "%Ez", "-00:34");
+
+  tz = fixed_time_zone(chrono::hours(12));
+  TestFormatSpecifier(tp, tz, "%z", "+1200");
+  TestFormatSpecifier(tp, tz, "%:z", "+12:00");
+  TestFormatSpecifier(tp, tz, "%Ez", "+12:00");
+
+  tz = fixed_time_zone(-chrono::hours(12));
+  TestFormatSpecifier(tp, tz, "%z", "-1200");
+  TestFormatSpecifier(tp, tz, "%:z", "-12:00");
+  TestFormatSpecifier(tp, tz, "%Ez", "-12:00");
+
+  tz = fixed_time_zone(chrono::hours(12) + chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%z", "+1200");
+  TestFormatSpecifier(tp, tz, "%:z", "+12:00");
+  TestFormatSpecifier(tp, tz, "%Ez", "+12:00");
+
+  tz = fixed_time_zone(-chrono::hours(12) - chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%z", "-1200");
+  TestFormatSpecifier(tp, tz, "%:z", "-12:00");
+  TestFormatSpecifier(tp, tz, "%Ez", "-12:00");
+
+  tz = fixed_time_zone(chrono::hours(12) + chrono::minutes(34));
+  TestFormatSpecifier(tp, tz, "%z", "+1234");
+  TestFormatSpecifier(tp, tz, "%:z", "+12:34");
+  TestFormatSpecifier(tp, tz, "%Ez", "+12:34");
+
+  tz = fixed_time_zone(-chrono::hours(12) - chrono::minutes(34));
+  TestFormatSpecifier(tp, tz, "%z", "-1234");
+  TestFormatSpecifier(tp, tz, "%:z", "-12:34");
+  TestFormatSpecifier(tp, tz, "%Ez", "-12:34");
+
+  tz = fixed_time_zone(chrono::hours(12) + chrono::minutes(34) +
+                       chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%z", "+1234");
+  TestFormatSpecifier(tp, tz, "%:z", "+12:34");
+  TestFormatSpecifier(tp, tz, "%Ez", "+12:34");
+
+  tz = fixed_time_zone(-chrono::hours(12) - chrono::minutes(34) -
+                       chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%z", "-1234");
+  TestFormatSpecifier(tp, tz, "%:z", "-12:34");
+  TestFormatSpecifier(tp, tz, "%Ez", "-12:34");
 }
 
 TEST(Format, ExtendedSecondOffset) {
-  const time_zone utc = utc_time_zone();
-  time_point<chrono::seconds> tp;
-  time_zone tz;
+  const auto tp = chrono::system_clock::from_time_t(0);
 
-  EXPECT_TRUE(load_time_zone("America/New_York", &tz));
-  tp = convert(civil_second(1883, 11, 18, 16, 59, 59), utc);
-  if (tz.lookup(tp).offset == -5 * 60 * 60) {
-    // It looks like the tzdata is only 32 bit (probably macOS),
-    // which bottoms out at 1901-12-13T20:45:52+00:00.
-  } else {
-    TestFormatSpecifier(tp, tz, "%E*z", "-04:56:02");
-    TestFormatSpecifier(tp, tz, "%Ez", "-04:56");
-  }
-  tp += chrono::seconds(1);
-  TestFormatSpecifier(tp, tz, "%E*z", "-05:00:00");
+  auto tz = fixed_time_zone(absl::time_internal::cctz::seconds::zero());
+  TestFormatSpecifier(tp, tz, "%E*z", "+00:00:00");
+  TestFormatSpecifier(tp, tz, "%::z", "+00:00:00");
+  TestFormatSpecifier(tp, tz, "%:::z", "+00");
 
-  EXPECT_TRUE(load_time_zone("Europe/Moscow", &tz));
-  tp = convert(civil_second(1919, 6, 30, 23, 59, 59), utc);
-  if (VersionCmp(tz, "2016g") >= 0) {
-    TestFormatSpecifier(tp, tz, "%E*z", "+04:31:19");
-    TestFormatSpecifier(tp, tz, "%Ez", "+04:31");
-  }
-  tp += chrono::seconds(1);
-  TestFormatSpecifier(tp, tz, "%E*z", "+04:00:00");
+  tz = fixed_time_zone(chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%E*z", "+00:00:56");
+  TestFormatSpecifier(tp, tz, "%::z", "+00:00:56");
+  TestFormatSpecifier(tp, tz, "%:::z", "+00:00:56");
+
+  tz = fixed_time_zone(-chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%E*z", "-00:00:56");
+  TestFormatSpecifier(tp, tz, "%::z", "-00:00:56");
+  TestFormatSpecifier(tp, tz, "%:::z", "-00:00:56");
+
+  tz = fixed_time_zone(chrono::minutes(34));
+  TestFormatSpecifier(tp, tz, "%E*z", "+00:34:00");
+  TestFormatSpecifier(tp, tz, "%::z", "+00:34:00");
+  TestFormatSpecifier(tp, tz, "%:::z", "+00:34");
+
+  tz = fixed_time_zone(-chrono::minutes(34));
+  TestFormatSpecifier(tp, tz, "%E*z", "-00:34:00");
+  TestFormatSpecifier(tp, tz, "%::z", "-00:34:00");
+  TestFormatSpecifier(tp, tz, "%:::z", "-00:34");
+
+  tz = fixed_time_zone(chrono::minutes(34) + chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%E*z", "+00:34:56");
+  TestFormatSpecifier(tp, tz, "%::z", "+00:34:56");
+  TestFormatSpecifier(tp, tz, "%:::z", "+00:34:56");
+
+  tz = fixed_time_zone(-chrono::minutes(34) - chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%E*z", "-00:34:56");
+  TestFormatSpecifier(tp, tz, "%::z", "-00:34:56");
+  TestFormatSpecifier(tp, tz, "%:::z", "-00:34:56");
+
+  tz = fixed_time_zone(chrono::hours(12));
+  TestFormatSpecifier(tp, tz, "%E*z", "+12:00:00");
+  TestFormatSpecifier(tp, tz, "%::z", "+12:00:00");
+  TestFormatSpecifier(tp, tz, "%:::z", "+12");
+
+  tz = fixed_time_zone(-chrono::hours(12));
+  TestFormatSpecifier(tp, tz, "%E*z", "-12:00:00");
+  TestFormatSpecifier(tp, tz, "%::z", "-12:00:00");
+  TestFormatSpecifier(tp, tz, "%:::z", "-12");
+
+  tz = fixed_time_zone(chrono::hours(12) + chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%E*z", "+12:00:56");
+  TestFormatSpecifier(tp, tz, "%::z", "+12:00:56");
+  TestFormatSpecifier(tp, tz, "%:::z", "+12:00:56");
+
+  tz = fixed_time_zone(-chrono::hours(12) - chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%E*z", "-12:00:56");
+  TestFormatSpecifier(tp, tz, "%::z", "-12:00:56");
+  TestFormatSpecifier(tp, tz, "%:::z", "-12:00:56");
+
+  tz = fixed_time_zone(chrono::hours(12) + chrono::minutes(34));
+  TestFormatSpecifier(tp, tz, "%E*z", "+12:34:00");
+  TestFormatSpecifier(tp, tz, "%::z", "+12:34:00");
+  TestFormatSpecifier(tp, tz, "%:::z", "+12:34");
+
+  tz = fixed_time_zone(-chrono::hours(12) - chrono::minutes(34));
+  TestFormatSpecifier(tp, tz, "%E*z", "-12:34:00");
+  TestFormatSpecifier(tp, tz, "%::z", "-12:34:00");
+  TestFormatSpecifier(tp, tz, "%:::z", "-12:34");
+
+  tz = fixed_time_zone(chrono::hours(12) + chrono::minutes(34) +
+                       chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%E*z", "+12:34:56");
+  TestFormatSpecifier(tp, tz, "%::z", "+12:34:56");
+  TestFormatSpecifier(tp, tz, "%:::z", "+12:34:56");
+
+  tz = fixed_time_zone(-chrono::hours(12) - chrono::minutes(34) -
+                       chrono::seconds(56));
+  TestFormatSpecifier(tp, tz, "%E*z", "-12:34:56");
+  TestFormatSpecifier(tp, tz, "%::z", "-12:34:56");
+  TestFormatSpecifier(tp, tz, "%:::z", "-12:34:56");
 }
 
 TEST(Format, ExtendedYears) {
@@ -572,6 +679,34 @@ TEST(Format, RFC1123Format) {  // locale specific
   EXPECT_EQ("28 Jun 1977 09:08:07 -0700", format(RFC1123_no_wday, tp, tz));
 }
 
+TEST(Format, Week) {
+  const time_zone utc = utc_time_zone();
+
+  auto tp = convert(civil_second(2017, 1, 1, 0, 0, 0), utc);
+  EXPECT_EQ("2017-01-7", format("%Y-%U-%u", tp, utc));
+  EXPECT_EQ("2017-00-0", format("%Y-%W-%w", tp, utc));
+
+  tp = convert(civil_second(2017, 12, 31, 0, 0, 0), utc);
+  EXPECT_EQ("2017-53-7", format("%Y-%U-%u", tp, utc));
+  EXPECT_EQ("2017-52-0", format("%Y-%W-%w", tp, utc));
+
+  tp = convert(civil_second(2018, 1, 1, 0, 0, 0), utc);
+  EXPECT_EQ("2018-00-1", format("%Y-%U-%u", tp, utc));
+  EXPECT_EQ("2018-01-1", format("%Y-%W-%w", tp, utc));
+
+  tp = convert(civil_second(2018, 12, 31, 0, 0, 0), utc);
+  EXPECT_EQ("2018-52-1", format("%Y-%U-%u", tp, utc));
+  EXPECT_EQ("2018-53-1", format("%Y-%W-%w", tp, utc));
+
+  tp = convert(civil_second(2019, 1, 1, 0, 0, 0), utc);
+  EXPECT_EQ("2019-00-2", format("%Y-%U-%u", tp, utc));
+  EXPECT_EQ("2019-00-2", format("%Y-%W-%w", tp, utc));
+
+  tp = convert(civil_second(2019, 12, 31, 0, 0, 0), utc);
+  EXPECT_EQ("2019-52-2", format("%Y-%U-%u", tp, utc));
+  EXPECT_EQ("2019-52-2", format("%Y-%W-%w", tp, utc));
+}
+
 //
 // Testing parse()
 //
@@ -660,7 +795,7 @@ TEST(Parse, WithTimeZone) {
   EXPECT_TRUE(load_time_zone("America/Los_Angeles", &tz));
   time_point<chrono::nanoseconds> tp;
 
-  // We can parse a std::string without a UTC offset if we supply a timezone.
+  // We can parse a string without a UTC offset if we supply a timezone.
   EXPECT_TRUE(parse("%Y-%m-%d %H:%M:%S", "2013-06-28 19:08:09", tz, &tp));
   ExpectTime(tp, tz, 2013, 6, 28, 19, 8, 9, -7 * 60 * 60, true, "PDT");
 
@@ -1145,9 +1280,9 @@ TEST(Parse, ExtendedSubecondsScan) {
         const auto expected = chrono::system_clock::from_time_t(0) +
                               chrono::nanoseconds(micros * 1000 + ns);
         for (int ps = 0; ps < 1000; ps += 250) {
-          std::ostringstream oss;
+          std::ostringstream ps_oss;
           oss << std::setfill('0') << std::setw(3) << ps;
-          const std::string input = nanos + oss.str() + "999";
+          const std::string input = nanos + ps_oss.str() + "999";
           EXPECT_TRUE(parse("%E*f", input, tz, &tp));
           EXPECT_EQ(expected + chrono::nanoseconds(ps) / 1000, tp) << input;
         }
@@ -1160,25 +1295,6 @@ TEST(Parse, ExtendedOffset) {
   const time_zone utc = utc_time_zone();
   time_point<absl::time_internal::cctz::seconds> tp;
 
-  // %z against +-HHMM.
-  EXPECT_TRUE(parse("%z", "+0000", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%z", "-1234", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 34, 0), utc), tp);
-  EXPECT_TRUE(parse("%z", "+1234", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 26, 0), utc), tp);
-  EXPECT_FALSE(parse("%z", "-123", utc, &tp));
-
-  // %z against +-HH.
-  EXPECT_TRUE(parse("%z", "+00", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%z", "-12", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%z", "+12", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1969, 12, 31, 12, 0, 0), utc), tp);
-  EXPECT_FALSE(parse("%z", "-1", utc, &tp));
-
-  // %Ez against +-HH:MM.
   EXPECT_TRUE(parse("%Ez", "+00:00", utc, &tp));
   EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
   EXPECT_TRUE(parse("%Ez", "-12:34", utc, &tp));
@@ -1187,91 +1303,70 @@ TEST(Parse, ExtendedOffset) {
   EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 26, 0), utc), tp);
   EXPECT_FALSE(parse("%Ez", "-12:3", utc, &tp));
 
-  // %Ez against +-HHMM.
-  EXPECT_TRUE(parse("%Ez", "+0000", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%Ez", "-1234", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 34, 0), utc), tp);
-  EXPECT_TRUE(parse("%Ez", "+1234", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 26, 0), utc), tp);
-  EXPECT_FALSE(parse("%Ez", "-123", utc, &tp));
+  for (auto fmt : {"%Ez", "%z"}) {
+    EXPECT_TRUE(parse(fmt, "+0000", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
+    EXPECT_TRUE(parse(fmt, "-1234", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 34, 0), utc), tp);
+    EXPECT_TRUE(parse(fmt, "+1234", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 26, 0), utc), tp);
+    EXPECT_FALSE(parse(fmt, "-123", utc, &tp));
 
-  // %Ez against +-HH.
-  EXPECT_TRUE(parse("%Ez", "+00", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%Ez", "-12", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%Ez", "+12", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1969, 12, 31, 12, 0, 0), utc), tp);
-  EXPECT_FALSE(parse("%Ez", "-1", utc, &tp));
+    EXPECT_TRUE(parse(fmt, "+00", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
+    EXPECT_TRUE(parse(fmt, "-12", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 0, 0), utc), tp);
+    EXPECT_TRUE(parse(fmt, "+12", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1969, 12, 31, 12, 0, 0), utc), tp);
+    EXPECT_FALSE(parse(fmt, "-1", utc, &tp));
+  }
 }
 
 TEST(Parse, ExtendedSecondOffset) {
   const time_zone utc = utc_time_zone();
   time_point<absl::time_internal::cctz::seconds> tp;
 
-  // %Ez against +-HH:MM:SS.
-  EXPECT_TRUE(parse("%Ez", "+00:00:00", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%Ez", "-12:34:56", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 34, 56), utc), tp);
-  EXPECT_TRUE(parse("%Ez", "+12:34:56", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 25, 4), utc), tp);
-  EXPECT_FALSE(parse("%Ez", "-12:34:5", utc, &tp));
+  for (auto fmt : {"%Ez", "%E*z", "%:z", "%::z", "%:::z"}) {
+    EXPECT_TRUE(parse(fmt, "+00:00:00", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
+    EXPECT_TRUE(parse(fmt, "-12:34:56", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 34, 56), utc), tp);
+    EXPECT_TRUE(parse(fmt, "+12:34:56", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 25, 4), utc), tp);
+    EXPECT_FALSE(parse(fmt, "-12:34:5", utc, &tp));
 
-  // %Ez against +-HHMMSS.
-  EXPECT_TRUE(parse("%Ez", "+000000", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%Ez", "-123456", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 34, 56), utc), tp);
-  EXPECT_TRUE(parse("%Ez", "+123456", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 25, 4), utc), tp);
-  EXPECT_FALSE(parse("%Ez", "-12345", utc, &tp));
+    EXPECT_TRUE(parse(fmt, "+000000", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
+    EXPECT_TRUE(parse(fmt, "-123456", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 34, 56), utc), tp);
+    EXPECT_TRUE(parse(fmt, "+123456", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 25, 4), utc), tp);
+    EXPECT_FALSE(parse(fmt, "-12345", utc, &tp));
 
-  // %E*z against +-HH:MM:SS.
-  EXPECT_TRUE(parse("%E*z", "+00:00:00", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%E*z", "-12:34:56", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 34, 56), utc), tp);
-  EXPECT_TRUE(parse("%E*z", "+12:34:56", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 25, 4), utc), tp);
-  EXPECT_FALSE(parse("%E*z", "-12:34:5", utc, &tp));
+    EXPECT_TRUE(parse(fmt, "+00:00", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
+    EXPECT_TRUE(parse(fmt, "-12:34", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 34, 0), utc), tp);
+    EXPECT_TRUE(parse(fmt, "+12:34", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 26, 0), utc), tp);
+    EXPECT_FALSE(parse(fmt, "-12:3", utc, &tp));
 
-  // %E*z against +-HHMMSS.
-  EXPECT_TRUE(parse("%E*z", "+000000", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%E*z", "-123456", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 34, 56), utc), tp);
-  EXPECT_TRUE(parse("%E*z", "+123456", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 25, 4), utc), tp);
-  EXPECT_FALSE(parse("%E*z", "-12345", utc, &tp));
+    EXPECT_TRUE(parse(fmt, "+0000", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
+    EXPECT_TRUE(parse(fmt, "-1234", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 34, 0), utc), tp);
+    EXPECT_TRUE(parse(fmt, "+1234", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 26, 0), utc), tp);
+    EXPECT_FALSE(parse(fmt, "-123", utc, &tp));
 
-  // %E*z against +-HH:MM.
-  EXPECT_TRUE(parse("%E*z", "+00:00", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%E*z", "-12:34", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 34, 0), utc), tp);
-  EXPECT_TRUE(parse("%E*z", "+12:34", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 26, 0), utc), tp);
-  EXPECT_FALSE(parse("%E*z", "-12:3", utc, &tp));
-
-  // %E*z against +-HHMM.
-  EXPECT_TRUE(parse("%E*z", "+0000", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%E*z", "-1234", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 34, 0), utc), tp);
-  EXPECT_TRUE(parse("%E*z", "+1234", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1969, 12, 31, 11, 26, 0), utc), tp);
-  EXPECT_FALSE(parse("%E*z", "-123", utc, &tp));
-
-  // %E*z against +-HH.
-  EXPECT_TRUE(parse("%E*z", "+00", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%E*z", "-12", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 0, 0), utc), tp);
-  EXPECT_TRUE(parse("%E*z", "+12", utc, &tp));
-  EXPECT_EQ(convert(civil_second(1969, 12, 31, 12, 0, 0), utc), tp);
-  EXPECT_FALSE(parse("%E*z", "-1", utc, &tp));
+    EXPECT_TRUE(parse(fmt, "+00", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 0, 0, 0), utc), tp);
+    EXPECT_TRUE(parse(fmt, "-12", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1970, 1, 1, 12, 0, 0), utc), tp);
+    EXPECT_TRUE(parse(fmt, "+12", utc, &tp));
+    EXPECT_EQ(convert(civil_second(1969, 12, 31, 12, 0, 0), utc), tp);
+    EXPECT_FALSE(parse(fmt, "-1", utc, &tp));
+  }
 }
 
 TEST(Parse, ExtendedYears) {
@@ -1312,10 +1407,85 @@ TEST(Parse, RFC3339Format) {
   EXPECT_TRUE(parse(RFC3339_sec, "2014-02-12T20:21:00+00:00", tz, &tp));
   ExpectTime(tp, tz, 2014, 2, 12, 20, 21, 0, 0, false, "UTC");
 
-  // Check that %Ez also accepts "Z" as a synonym for "+00:00".
+  // Check that %ET also accepts "t".
   time_point<chrono::nanoseconds> tp2;
-  EXPECT_TRUE(parse(RFC3339_sec, "2014-02-12T20:21:00Z", tz, &tp2));
+  EXPECT_TRUE(parse(RFC3339_sec, "2014-02-12t20:21:00+00:00", tz, &tp2));
   EXPECT_EQ(tp, tp2);
+
+  // Check that %Ez also accepts "Z" as a synonym for "+00:00".
+  time_point<chrono::nanoseconds> tp3;
+  EXPECT_TRUE(parse(RFC3339_sec, "2014-02-12T20:21:00Z", tz, &tp3));
+  EXPECT_EQ(tp, tp3);
+
+  // Check that %Ez also accepts "z" as a synonym for "+00:00".
+  time_point<chrono::nanoseconds> tp4;
+  EXPECT_TRUE(parse(RFC3339_sec, "2014-02-12T20:21:00z", tz, &tp4));
+  EXPECT_EQ(tp, tp4);
+}
+
+TEST(Parse, Week) {
+  const time_zone utc = utc_time_zone();
+  time_point<absl::time_internal::cctz::seconds> tp;
+
+  auto exp = convert(civil_second(2017, 1, 1, 0, 0, 0), utc);
+  EXPECT_TRUE(parse("%Y-%U-%u", "2017-01-7", utc, &tp));
+  EXPECT_EQ(exp, tp);
+  EXPECT_TRUE(parse("%Y-%W-%w", "2017-00-0", utc, &tp));
+  EXPECT_EQ(exp, tp);
+
+  exp = convert(civil_second(2017, 12, 31, 0, 0, 0), utc);
+  EXPECT_TRUE(parse("%Y-%U-%u", "2017-53-7", utc, &tp));
+  EXPECT_EQ(exp, tp);
+  EXPECT_TRUE(parse("%Y-%W-%w", "2017-52-0", utc, &tp));
+  EXPECT_EQ(exp, tp);
+
+  exp = convert(civil_second(2018, 1, 1, 0, 0, 0), utc);
+  EXPECT_TRUE(parse("%Y-%U-%u", "2018-00-1", utc, &tp));
+  EXPECT_EQ(exp, tp);
+  EXPECT_TRUE(parse("%Y-%W-%w", "2018-01-1", utc, &tp));
+  EXPECT_EQ(exp, tp);
+
+  exp = convert(civil_second(2018, 12, 31, 0, 0, 0), utc);
+  EXPECT_TRUE(parse("%Y-%U-%u", "2018-52-1", utc, &tp));
+  EXPECT_EQ(exp, tp);
+  EXPECT_TRUE(parse("%Y-%W-%w", "2018-53-1", utc, &tp));
+  EXPECT_EQ(exp, tp);
+
+  exp = convert(civil_second(2019, 1, 1, 0, 0, 0), utc);
+  EXPECT_TRUE(parse("%Y-%U-%u", "2019-00-2", utc, &tp));
+  EXPECT_EQ(exp, tp);
+  EXPECT_TRUE(parse("%Y-%W-%w", "2019-00-2", utc, &tp));
+  EXPECT_EQ(exp, tp);
+
+  exp = convert(civil_second(2019, 12, 31, 0, 0, 0), utc);
+  EXPECT_TRUE(parse("%Y-%U-%u", "2019-52-2", utc, &tp));
+  EXPECT_EQ(exp, tp);
+  EXPECT_TRUE(parse("%Y-%W-%w", "2019-52-2", utc, &tp));
+  EXPECT_EQ(exp, tp);
+}
+
+TEST(Parse, WeekYearShift) {
+  // %U/%W conversions with week values in {0, 52, 53} can slip
+  // into the previous/following calendar years.
+  const time_zone utc = utc_time_zone();
+  time_point<absl::time_internal::cctz::seconds> tp;
+
+  auto exp = convert(civil_second(2019, 12, 31, 0, 0, 0), utc);
+  EXPECT_TRUE(parse("%Y-%U-%u", "2020-00-2", utc, &tp));
+  EXPECT_EQ(exp, tp);
+  EXPECT_TRUE(parse("%Y-%W-%w", "2020-00-2", utc, &tp));
+  EXPECT_EQ(exp, tp);
+
+  exp = convert(civil_second(2021, 1, 1, 0, 0, 0), utc);
+  EXPECT_TRUE(parse("%Y-%U-%u", "2020-52-5", utc, &tp));
+  EXPECT_EQ(exp, tp);
+  EXPECT_TRUE(parse("%Y-%W-%w", "2020-52-5", utc, &tp));
+  EXPECT_EQ(exp, tp);
+
+  // Slipping into the previous/following calendar years should fail when
+  // we're already at the extremes.
+  EXPECT_FALSE(parse("%Y-%U-%u", "-9223372036854775808-0-7", utc, &tp));
+  EXPECT_FALSE(parse("%Y-%U-%u", "9223372036854775807-53-7", utc, &tp));
 }
 
 TEST(Parse, MaxRange) {
@@ -1351,8 +1521,8 @@ TEST(Parse, MaxRange) {
       parse(RFC3339_sec, "-292277022657-01-27T08:29:51+01:00", utc, &tp));
 
   // tests max/min civil-second overflow
-  EXPECT_FALSE(parse(RFC3339_sec, "9223372036854775807-12-31T23:59:59-00:01",
-                     utc, &tp));
+  EXPECT_FALSE(
+      parse(RFC3339_sec, "9223372036854775807-12-31T23:59:59-00:01", utc, &tp));
   EXPECT_FALSE(parse(RFC3339_sec, "-9223372036854775808-01-01T00:00:00+00:01",
                      utc, &tp));
 
@@ -1390,6 +1560,10 @@ TEST(FormatParse, RoundTrip) {
 #if defined(_WIN32) || defined(_WIN64)
   // Initial investigations indicate the %c does not roundtrip on Windows.
   // TODO: Figure out what is going on here (perhaps a locale problem).
+#elif defined(__EMSCRIPTEN__)
+  // strftime() and strptime() use different defintions for "%c" under
+  // emscripten (see https://github.com/kripken/emscripten/pull/7491),
+  // causing its round-trip test to fail.
 #else
   // Even though we don't know what %c will produce, it should roundtrip,
   // but only in the 0-offset timezone.
@@ -1405,7 +1579,8 @@ TEST(FormatParse, RoundTrip) {
 
 TEST(FormatParse, RoundTripDistantFuture) {
   const time_zone utc = utc_time_zone();
-  const time_point<absl::time_internal::cctz::seconds> in = time_point<absl::time_internal::cctz::seconds>::max();
+  const time_point<absl::time_internal::cctz::seconds> in =
+      time_point<absl::time_internal::cctz::seconds>::max();
   const std::string s = format(RFC3339_full, in, utc);
   time_point<absl::time_internal::cctz::seconds> out;
   EXPECT_TRUE(parse(RFC3339_full, s, utc, &out)) << s;
@@ -1414,7 +1589,8 @@ TEST(FormatParse, RoundTripDistantFuture) {
 
 TEST(FormatParse, RoundTripDistantPast) {
   const time_zone utc = utc_time_zone();
-  const time_point<absl::time_internal::cctz::seconds> in = time_point<absl::time_internal::cctz::seconds>::min();
+  const time_point<absl::time_internal::cctz::seconds> in =
+      time_point<absl::time_internal::cctz::seconds>::min();
   const std::string s = format(RFC3339_full, in, utc);
   time_point<absl::time_internal::cctz::seconds> out;
   EXPECT_TRUE(parse(RFC3339_full, s, utc, &out)) << s;
@@ -1423,4 +1599,5 @@ TEST(FormatParse, RoundTripDistantPast) {
 
 }  // namespace cctz
 }  // namespace time_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

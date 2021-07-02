@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,17 +21,18 @@
 #include "absl/base/attributes.h"
 #include "absl/base/internal/spinlock.h"
 #include "absl/base/macros.h"
+#include "absl/base/thread_annotations.h"
 #include "absl/synchronization/internal/per_thread_sem.h"
 #include "absl/synchronization/mutex.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace base_internal {
 namespace {
 
-// protects num_identities_reused
-static absl::base_internal::SpinLock map_lock(
-    absl::base_internal::kLinkerInitialized);
-static int num_identities_reused;
+ABSL_CONST_INIT static absl::base_internal::SpinLock map_lock(
+    absl::kConstInit, base_internal::SCHEDULE_KERNEL_ONLY);
+ABSL_CONST_INIT static int num_identities_reused ABSL_GUARDED_BY(map_lock);
 
 static const void* const kCheckNoIdentity = reinterpret_cast<void*>(1);
 
@@ -74,7 +75,7 @@ TEST(ThreadIdentityTest, BasicIdentityWorksThreaded) {
   // - If a thread implementation chooses to recycle threads, that
   //   correct re-initialization occurs.
   static const int kNumLoops = 3;
-  static const int kNumThreads = 400;
+  static const int kNumThreads = 32;
   for (int iter = 0; iter < kNumLoops; iter++) {
     std::vector<std::thread> threads;
     for (int i = 0; i < kNumThreads; ++i) {
@@ -89,6 +90,7 @@ TEST(ThreadIdentityTest, BasicIdentityWorksThreaded) {
   // We should have recycled ThreadIdentity objects above; while (external)
   // library threads allocating their own identities may preclude some
   // reuse, we should have sufficient repetitions to exclude this.
+  absl::base_internal::SpinLockHolder l(&map_lock);
   EXPECT_LT(kNumThreads, num_identities_reused);
 }
 
@@ -123,4 +125,5 @@ TEST(ThreadIdentityTest, ReusedThreadIdentityMutexTest) {
 
 }  // namespace
 }  // namespace base_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

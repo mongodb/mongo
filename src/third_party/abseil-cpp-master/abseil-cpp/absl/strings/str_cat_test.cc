@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "gtest/gtest.h"
 #include "absl/strings/substitute.h"
@@ -106,11 +107,7 @@ TEST(StrCat, Enums) {
 TEST(StrCat, Basics) {
   std::string result;
 
-  std::string strs[] = {
-    "Hello",
-    "Cruel",
-    "World"
-  };
+  std::string strs[] = {"Hello", "Cruel", "World"};
 
   std::string stdstrs[] = {
     "std::Hello",
@@ -164,9 +161,10 @@ TEST(StrCat, Basics) {
   result = absl::StrCat(ui64s[0], ", ", ui64s[1], "!");
   EXPECT_EQ(result, "12345678910, 10987654321!");
 
-  std::string one = "1";  // Actually, it's the size of this std::string that we want; a
-                     // 64-bit build distinguishes between size_t and uint64_t,
-                     // even though they're both unsigned 64-bit values.
+  std::string one =
+      "1";  // Actually, it's the size of this string that we want; a
+            // 64-bit build distinguishes between size_t and uint64_t,
+            // even though they're both unsigned 64-bit values.
   result = absl::StrCat("And a ", one.size(), " and a ",
                         &result[2] - &result[0], " and a ", one, " 2 3 4", "!");
   EXPECT_EQ(result, "And a 1 and a 2 and a 1 2 3 4!");
@@ -195,6 +193,21 @@ TEST(StrCat, Basics) {
   result = absl::StrCat(1, 2, 333, 4444, 55555, 666666, 7777777, 88888888,
                         999999999);
   EXPECT_EQ(result, "12333444455555666666777777788888888999999999");
+}
+
+TEST(StrCat, CornerCases) {
+  std::string result;
+
+  result = absl::StrCat("");  // NOLINT
+  EXPECT_EQ(result, "");
+  result = absl::StrCat("", "");
+  EXPECT_EQ(result, "");
+  result = absl::StrCat("", "", "");
+  EXPECT_EQ(result, "");
+  result = absl::StrCat("", "", "", "");
+  EXPECT_EQ(result, "");
+  result = absl::StrCat("", "", "", "", "");
+  EXPECT_EQ(result, "");
 }
 
 // A minimal allocator that uses malloc().
@@ -306,11 +319,7 @@ TEST(StrCat, MaxArgs) {
 TEST(StrAppend, Basics) {
   std::string result = "existing text";
 
-  std::string strs[] = {
-    "Hello",
-    "Cruel",
-    "World"
-  };
+  std::string strs[] = {"Hello", "Cruel", "World"};
 
   std::string stdstrs[] = {
     "std::Hello",
@@ -365,9 +374,10 @@ TEST(StrAppend, Basics) {
   absl::StrAppend(&result, ui64s[0], ", ", ui64s[1], "!");
   EXPECT_EQ(result.substr(old_size), "12345678910, 10987654321!");
 
-  std::string one = "1";  // Actually, it's the size of this std::string that we want; a
-                     // 64-bit build distinguishes between size_t and uint64_t,
-                     // even though they're both unsigned 64-bit values.
+  std::string one =
+      "1";  // Actually, it's the size of this string that we want; a
+            // 64-bit build distinguishes between size_t and uint64_t,
+            // even though they're both unsigned 64-bit values.
   old_size = result.size();
   absl::StrAppend(&result, "And a ", one.size(), " and a ",
                   &result[2] - &result[0], " and a ", one, " 2 3 4", "!");
@@ -401,6 +411,32 @@ TEST(StrAppend, Basics) {
             "No limit thanks to C++11's variadic templates");
 }
 
+TEST(StrCat, VectorBoolReferenceTypes) {
+  std::vector<bool> v;
+  v.push_back(true);
+  v.push_back(false);
+  std::vector<bool> const& cv = v;
+  // Test that vector<bool>::reference and vector<bool>::const_reference
+  // are handled as if the were really bool types and not the proxy types
+  // they really are.
+  std::string result = absl::StrCat(v[0], v[1], cv[0], cv[1]); // NOLINT
+  EXPECT_EQ(result, "1010");
+}
+
+// Passing nullptr to memcpy is undefined behavior and this test
+// provides coverage of codepaths that handle empty strings with nullptrs.
+TEST(StrCat, AvoidsMemcpyWithNullptr) {
+  EXPECT_EQ(absl::StrCat(42, absl::string_view{}), "42");
+
+  // Cover CatPieces code.
+  EXPECT_EQ(absl::StrCat(1, 2, 3, 4, 5, absl::string_view{}), "12345");
+
+  // Cover AppendPieces.
+  std::string result;
+  absl::StrAppend(&result, 1, 2, 3, 4, 5, absl::string_view{});
+  EXPECT_EQ(result, "12345");
+}
+
 #ifdef GTEST_HAS_DEATH_TEST
 TEST(StrAppend, Death) {
   std::string s = "self";
@@ -412,10 +448,34 @@ TEST(StrAppend, Death) {
 }
 #endif  // GTEST_HAS_DEATH_TEST
 
-TEST(StrAppend, EmptyString) {
-  std::string s = "";
-  absl::StrAppend(&s, s);
-  EXPECT_EQ(s, "");
+TEST(StrAppend, CornerCases) {
+  std::string result;
+  absl::StrAppend(&result, "");
+  EXPECT_EQ(result, "");
+  absl::StrAppend(&result, "", "");
+  EXPECT_EQ(result, "");
+  absl::StrAppend(&result, "", "", "");
+  EXPECT_EQ(result, "");
+  absl::StrAppend(&result, "", "", "", "");
+  EXPECT_EQ(result, "");
+  absl::StrAppend(&result, "", "", "", "", "");
+  EXPECT_EQ(result, "");
+}
+
+TEST(StrAppend, CornerCasesNonEmptyAppend) {
+  for (std::string result : {"hello", "a string too long to fit in the SSO"}) {
+    const std::string expected = result;
+    absl::StrAppend(&result, "");
+    EXPECT_EQ(result, expected);
+    absl::StrAppend(&result, "", "");
+    EXPECT_EQ(result, expected);
+    absl::StrAppend(&result, "", "", "");
+    EXPECT_EQ(result, expected);
+    absl::StrAppend(&result, "", "", "", "");
+    EXPECT_EQ(result, expected);
+    absl::StrAppend(&result, "", "", "", "", "");
+    EXPECT_EQ(result, expected);
+  }
 }
 
 template <typename IntType>

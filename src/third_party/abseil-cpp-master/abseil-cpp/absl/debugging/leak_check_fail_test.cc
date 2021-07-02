@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,7 +25,7 @@ TEST(LeakCheckTest, LeakMemory) {
   // failed exit code.
 
   char* foo = strdup("lsan should complain about this leaked string");
-  ABSL_RAW_LOG(INFO, "Should detect leaked std::string %s", foo);
+  ABSL_RAW_LOG(INFO, "Should detect leaked string %s", foo);
 }
 
 TEST(LeakCheckTest, LeakMemoryAfterDisablerScope) {
@@ -34,7 +34,7 @@ TEST(LeakCheckTest, LeakMemoryAfterDisablerScope) {
   // failed exit code.
   { absl::LeakCheckDisabler disabler; }
   char* foo = strdup("lsan should also complain about this leaked string");
-  ABSL_RAW_LOG(INFO, "Re-enabled leak detection.Should detect leaked std::string %s",
+  ABSL_RAW_LOG(INFO, "Re-enabled leak detection.Should detect leaked string %s",
                foo);
 }
 

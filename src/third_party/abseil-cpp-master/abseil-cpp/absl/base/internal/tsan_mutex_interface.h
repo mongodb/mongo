@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,8 @@
 #ifndef ABSL_BASE_INTERNAL_TSAN_MUTEX_INTERFACE_H_
 #define ABSL_BASE_INTERNAL_TSAN_MUTEX_INTERFACE_H_
 
+#include "absl/base/config.h"
+
 // ABSL_INTERNAL_HAVE_TSAN_INTERFACE
 // Macro intended only for internal use.
 //
@@ -28,7 +30,7 @@
 #error "ABSL_INTERNAL_HAVE_TSAN_INTERFACE cannot be directly set."
 #endif
 
-#if defined(THREAD_SANITIZER) && defined(__has_include)
+#if defined(ABSL_HAVE_THREAD_SANITIZER) && defined(__has_include)
 #if __has_include(<sanitizer/tsan_interface.h>)
 #define ABSL_INTERNAL_HAVE_TSAN_INTERFACE 1
 #endif

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,6 +28,7 @@
 #include "absl/synchronization/mutex.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace base_internal {
 namespace {
 
@@ -36,17 +37,28 @@ TEST(SysinfoTest, NumCPUs) {
       << "NumCPUs() should not have the default value of 0";
 }
 
+// Ensure that NominalCPUFrequency returns a reasonable value, or 1.00 on
+// platforms where the CPU frequency is not available through sysfs.
+//
+// POWER is particularly problematic here; some Linux kernels expose the CPU
+// frequency, while others do not. Since we can't predict a priori what a given
+// machine is going to do, just disable this test on POWER on Linux.
+#if !(defined(__linux) && (defined(__ppc64__) || defined(__PPC64__)))
 TEST(SysinfoTest, NominalCPUFrequency) {
-#if !(defined(__aarch64__) && defined(__linux__))
-  EXPECT_GE(NominalCPUFrequency(), 1000.0)
-      << "NominalCPUFrequency() did not return a reasonable value";
-#else
-  // TODO(absl-team): Aarch64 cannot read the CPU frequency from sysfs, so we
-  // get back 1.0. Fix once the value is available.
+  // Linux only exposes the CPU frequency on certain architectures, and
+  // Emscripten doesn't expose it at all.
+#if defined(__linux__) &&                                                  \
+        (defined(__aarch64__) || defined(__hppa__) || defined(__mips__) || \
+         defined(__riscv) || defined(__s390x__)) ||                        \
+    defined(__EMSCRIPTEN__)
   EXPECT_EQ(NominalCPUFrequency(), 1.0)
       << "CPU frequency detection was fixed! Please update unittest.";
+#else
+  EXPECT_GE(NominalCPUFrequency(), 1000.0)
+      << "NominalCPUFrequency() did not return a reasonable value";
 #endif
 }
+#endif
 
 TEST(SysinfoTest, GetTID) {
   EXPECT_EQ(GetTID(), GetTID());  // Basic compile and equality test.
@@ -58,8 +70,8 @@ TEST(SysinfoTest, GetTID) {
 #endif
   // Test that TIDs are unique to each thread.
   // Uses a few loops to exercise implementations that reallocate IDs.
-  for (int i = 0; i < 32; ++i) {
-    constexpr int kNumThreads = 64;
+  for (int i = 0; i < 10; ++i) {
+    constexpr int kNumThreads = 10;
     Barrier all_threads_done(kNumThreads);
     std::vector<std::thread> threads;
 
@@ -95,4 +107,5 @@ TEST(SysinfoTest, LinuxGetTID) {
 
 }  // namespace
 }  // namespace base_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

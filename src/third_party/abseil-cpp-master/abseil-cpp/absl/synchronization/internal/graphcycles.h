@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,11 +36,14 @@
 //   InsertEdge() is very fast when the edge already exists, and reasonably fast
 //   otherwise.
 //   FindPath() is linear in the size of the graph.
-// The current implemenation uses O(|V|+|E|) space.
+// The current implementation uses O(|V|+|E|) space.
 
 #include <cstdint>
 
+#include "absl/base/config.h"
+
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace synchronization_internal {
 
 // Opaque identifier for a graph node.
@@ -132,6 +135,7 @@ class GraphCycles {
 };
 
 }  // namespace synchronization_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif

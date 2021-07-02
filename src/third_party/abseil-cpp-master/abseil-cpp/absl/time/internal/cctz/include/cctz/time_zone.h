@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//   https://www.apache.org/licenses/LICENSE-2.0
 //
 //   Unless required by applicable law or agreed to in writing, software
 //   distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,9 +25,11 @@
 #include <string>
 #include <utility>
 
+#include "absl/base/config.h"
 #include "absl/time/internal/cctz/include/cctz/civil_time.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace time_internal {
 namespace cctz {
 
@@ -39,8 +41,8 @@ using sys_seconds = seconds;  // Deprecated.  Use cctz::seconds instead.
 
 namespace detail {
 template <typename D>
-inline std::pair<time_point<seconds>, D>
-split_seconds(const time_point<D>& tp) {
+inline std::pair<time_point<seconds>, D> split_seconds(
+    const time_point<D>& tp) {
   auto sec = std::chrono::time_point_cast<seconds>(tp);
   auto sub = tp - sec;
   if (sub.count() < 0) {
@@ -49,8 +51,8 @@ split_seconds(const time_point<D>& tp) {
   }
   return {sec, std::chrono::duration_cast<D>(sub)};
 }
-inline std::pair<time_point<seconds>, seconds>
-split_seconds(const time_point<seconds>& tp) {
+inline std::pair<time_point<seconds>, seconds> split_seconds(
+    const time_point<seconds>& tp) {
   return {tp, seconds::zero()};
 }
 }  // namespace detail
@@ -72,7 +74,7 @@ split_seconds(const time_point<seconds>& tp) {
 //
 // See also:
 // - http://www.iana.org/time-zones
-// - http://en.wikipedia.org/wiki/Zoneinfo
+// - https://en.wikipedia.org/wiki/Zoneinfo
 class time_zone {
  public:
   time_zone() : time_zone(nullptr) {}  // Equivalent to UTC
@@ -194,22 +196,20 @@ class time_zone {
   bool next_transition(const time_point<seconds>& tp,
                        civil_transition* trans) const;
   template <typename D>
-  bool next_transition(const time_point<D>& tp,
-                       civil_transition* trans) const {
+  bool next_transition(const time_point<D>& tp, civil_transition* trans) const {
     return next_transition(detail::split_seconds(tp).first, trans);
   }
   bool prev_transition(const time_point<seconds>& tp,
                        civil_transition* trans) const;
   template <typename D>
-  bool prev_transition(const time_point<D>& tp,
-                       civil_transition* trans) const {
+  bool prev_transition(const time_point<D>& tp, civil_transition* trans) const {
     return prev_transition(detail::split_seconds(tp).first, trans);
   }
 
   // version() and description() provide additional information about the
   // time zone. The content of each of the returned strings is unspecified,
   // however, when the IANA Time Zone Database is the underlying data source
-  // the version() std::string will be in the familar form (e.g, "2018e") or
+  // the version() string will be in the familar form (e.g, "2018e") or
   // empty when unavailable.
   //
   // Note: These functions are for informational or testing purposes only.
@@ -220,9 +220,7 @@ class time_zone {
   friend bool operator==(time_zone lhs, time_zone rhs) {
     return &lhs.effective_impl() == &rhs.effective_impl();
   }
-  friend bool operator!=(time_zone lhs, time_zone rhs) {
-    return !(lhs == rhs);
-  }
+  friend bool operator!=(time_zone lhs, time_zone rhs) { return !(lhs == rhs); }
 
   template <typename H>
   friend H AbslHashValue(H h, time_zone tz) {
@@ -294,6 +292,7 @@ bool parse(const std::string&, const std::string&, const time_zone&,
 //   - %E#f - Fractional seconds with # digits of precision
 //   - %E*f - Fractional seconds with full precision (a literal '*')
 //   - %E4Y - Four-character years (-999 ... -001, 0000, 0001 ... 9999)
+//   - %ET  - The RFC3339 "date-time" separator "T"
 //
 // Note that %E0S behaves like %S, and %E0f produces no characters. In
 // contrast %E*f always produces at least one digit, which may be '0'.
@@ -323,7 +322,8 @@ inline std::string format(const std::string& fmt, const time_point<D>& tp,
 // returns the corresponding time_point. Uses strftime()-like formatting
 // options, with the same extensions as cctz::format(), but with the
 // exceptions that %E#S is interpreted as %E*S, and %E#f as %E*f. %Ez
-// and %E*z also accept the same inputs.
+// and %E*z also accept the same inputs, which (along with %z) includes
+// 'z' and 'Z' as synonyms for +00:00.  %ET accepts either 'T' or 't'.
 //
 // %Y consumes as many numeric characters as it can, so the matching data
 // should always be terminated with a non-numeric. %E4Y always consumes
@@ -380,6 +380,7 @@ inline bool parse(const std::string& fmt, const std::string& input,
 
 }  // namespace cctz
 }  // namespace time_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_TIME_INTERNAL_CCTZ_TIME_ZONE_H_

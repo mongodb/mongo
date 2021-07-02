@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,8 @@
 
 #include "benchmark/benchmark.h"
 #include "absl/base/internal/raw_logging.h"
+#include "absl/random/distributions.h"
+#include "absl/random/random.h"
 #include "absl/strings/numbers.h"
 
 namespace {
@@ -259,5 +261,26 @@ BENCHMARK_TEMPLATE(BM_SimpleAtod, std::string)
     ->ArgPair(10, 2)
     ->ArgPair(10, 4)
     ->ArgPair(10, 8);
+
+void BM_FastHexToBufferZeroPad16(benchmark::State& state) {
+  absl::BitGen rng;
+  std::vector<uint64_t> nums;
+  nums.resize(1000);
+  auto min = std::numeric_limits<uint64_t>::min();
+  auto max = std::numeric_limits<uint64_t>::max();
+  for (auto& num : nums) {
+    num = absl::LogUniform(rng, min, max);
+  }
+
+  char buf[16];
+  while (state.KeepRunningBatch(nums.size())) {
+    for (auto num : nums) {
+      auto digits = absl::numbers_internal::FastHexToBufferZeroPad16(num, buf);
+      benchmark::DoNotOptimize(digits);
+      benchmark::DoNotOptimize(buf);
+    }
+  }
+}
+BENCHMARK(BM_FastHexToBufferZeroPad16);
 
 }  // namespace

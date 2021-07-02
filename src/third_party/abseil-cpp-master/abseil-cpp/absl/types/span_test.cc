@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,6 +27,7 @@
 #include "absl/base/attributes.h"
 #include "absl/base/config.h"
 #include "absl/base/internal/exception_testing.h"
+#include "absl/base/options.h"
 #include "absl/container/fixed_array.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/hash/hash_testing.h"
@@ -35,7 +36,7 @@
 namespace {
 
 MATCHER_P(DataIs, data,
-          absl::StrCat("data() is ", negation ? "is " : "isn't ",
+          absl::StrCat("data() ", negation ? "isn't " : "is ",
                        testing::PrintToString(data))) {
   return arg.data() == data;
 }
@@ -139,8 +140,10 @@ TEST(CharSpan, StringCtor) {
   EXPECT_THAT(s_const_abc, SpanIs(abc));
 
   EXPECT_FALSE((std::is_constructible<absl::Span<int>, std::string>::value));
-  EXPECT_FALSE((std::is_constructible<absl::Span<const int>, std::string>::value));
-  EXPECT_TRUE((std::is_convertible<std::string, absl::Span<const char>>::value));
+  EXPECT_FALSE(
+      (std::is_constructible<absl::Span<const int>, std::string>::value));
+  EXPECT_TRUE(
+      (std::is_convertible<std::string, absl::Span<const char>>::value));
 }
 
 TEST(IntSpan, FromConstPointer) {
@@ -230,6 +233,11 @@ TEST(IntSpan, ElementAccess) {
 
   EXPECT_EQ(s.front(), s[0]);
   EXPECT_EQ(s.back(), s[9]);
+
+#if !defined(NDEBUG) || ABSL_OPTION_HARDENED
+  EXPECT_DEATH_IF_SUPPORTED(s[-1], "");
+  EXPECT_DEATH_IF_SUPPORTED(s[10], "");
+#endif
 }
 
 TEST(IntSpan, AtThrows) {
@@ -266,6 +274,13 @@ TEST(IntSpan, RemovePrefixAndSuffix) {
   EXPECT_EQ(s.size(), 0);
 
   EXPECT_EQ(v, MakeRamp(20, 1));
+
+#if !defined(NDEBUG) || ABSL_OPTION_HARDENED
+  absl::Span<int> prefix_death(v);
+  EXPECT_DEATH_IF_SUPPORTED(prefix_death.remove_prefix(21), "");
+  absl::Span<int> suffix_death(v);
+  EXPECT_DEATH_IF_SUPPORTED(suffix_death.remove_suffix(21), "");
+#endif
 }
 
 TEST(IntSpan, Subspan) {
@@ -290,6 +305,38 @@ TEST(IntSpan, Subspan) {
   EXPECT_THROW(absl::MakeSpan(ramp).subspan(11, 5), std::out_of_range);
 #else
   EXPECT_DEATH_IF_SUPPORTED(absl::MakeSpan(ramp).subspan(11, 5), "");
+#endif
+}
+
+TEST(IntSpan, First) {
+  std::vector<int> empty;
+  EXPECT_THAT(absl::MakeSpan(empty).first(0), SpanIs(empty));
+
+  auto ramp = MakeRamp(10);
+  EXPECT_THAT(absl::MakeSpan(ramp).first(0), SpanIs(ramp.data(), 0));
+  EXPECT_THAT(absl::MakeSpan(ramp).first(10), SpanIs(ramp));
+  EXPECT_THAT(absl::MakeSpan(ramp).first(3), SpanIs(ramp.data(), 3));
+
+#ifdef ABSL_HAVE_EXCEPTIONS
+  EXPECT_THROW(absl::MakeSpan(ramp).first(11), std::out_of_range);
+#else
+  EXPECT_DEATH_IF_SUPPORTED(absl::MakeSpan(ramp).first(11), "");
+#endif
+}
+
+TEST(IntSpan, Last) {
+  std::vector<int> empty;
+  EXPECT_THAT(absl::MakeSpan(empty).last(0), SpanIs(empty));
+
+  auto ramp = MakeRamp(10);
+  EXPECT_THAT(absl::MakeSpan(ramp).last(0), SpanIs(ramp.data() + 10, 0));
+  EXPECT_THAT(absl::MakeSpan(ramp).last(10), SpanIs(ramp));
+  EXPECT_THAT(absl::MakeSpan(ramp).last(3), SpanIs(ramp.data() + 7, 3));
+
+#ifdef ABSL_HAVE_EXCEPTIONS
+  EXPECT_THROW(absl::MakeSpan(ramp).last(11), std::out_of_range);
+#else
+  EXPECT_DEATH_IF_SUPPORTED(absl::MakeSpan(ramp).last(11), "");
 #endif
 }
 
@@ -767,6 +814,8 @@ TEST(ConstIntSpan, ConstexprTest) {
   ABSL_TEST_CONSTEXPR(span.begin());
   ABSL_TEST_CONSTEXPR(span.cbegin());
   ABSL_TEST_CONSTEXPR(span.subspan(0, 0));
+  ABSL_TEST_CONSTEXPR(span.first(1));
+  ABSL_TEST_CONSTEXPR(span.last(1));
   ABSL_TEST_CONSTEXPR(span[0]);
 }
 
@@ -777,6 +826,21 @@ struct BigStruct {
 TEST(Span, SpanSize) {
   EXPECT_LE(sizeof(absl::Span<int>), 2 * sizeof(void*));
   EXPECT_LE(sizeof(absl::Span<BigStruct>), 2 * sizeof(void*));
+}
+
+TEST(Span, Hash) {
+  int array[] = {1, 2, 3, 4};
+  int array2[] = {1, 2, 3};
+  using T = absl::Span<const int>;
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly(
+      {// Empties
+       T(), T(nullptr, 0), T(array, 0), T(array2, 0),
+       // Different array with same value
+       T(array, 3), T(array2), T({1, 2, 3}),
+       // Same array, but different length
+       T(array, 1), T(array, 2),
+       // Same length, but different array
+       T(array + 1, 2), T(array + 2, 2)}));
 }
 
 }  // namespace

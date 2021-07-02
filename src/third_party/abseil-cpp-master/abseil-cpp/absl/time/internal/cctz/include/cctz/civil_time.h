@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//   https://www.apache.org/licenses/LICENSE-2.0
 //
 //   Unless required by applicable law or agreed to in writing, software
 //   distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,11 @@
 #ifndef ABSL_TIME_INTERNAL_CCTZ_CIVIL_TIME_H_
 #define ABSL_TIME_INTERNAL_CCTZ_CIVIL_TIME_H_
 
+#include "absl/base/config.h"
 #include "absl/time/internal/cctz/include/cctz/civil_time_detail.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace time_internal {
 namespace cctz {
 
@@ -150,7 +152,7 @@ namespace cctz {
 //
 // All civil-time types have accessors for all six of the civil-time fields:
 // year, month, day, hour, minute, and second. Recall that fields inferior to
-// the type's aligment will be set to their minimum valid value.
+// the type's alignment will be set to their minimum valid value.
 //
 //   civil_day d(2015, 6, 28);
 //   // d.year() == 2015
@@ -279,7 +281,7 @@ using civil_second = detail::civil_second;
 //
 using detail::weekday;
 
-// Returns the weekday for the given civil_day.
+// Returns the weekday for the given civil-time value.
 //
 //   civil_day a(2015, 8, 13);
 //   weekday wd = get_weekday(a);  // wd == weekday::thursday
@@ -306,14 +308,14 @@ using detail::get_weekday;
 //
 //   civil_day d = ...
 //   // Gets the following Thursday if d is not already Thursday
-//   civil_day thurs1 = prev_weekday(d, weekday::thursday) + 7;
+//   civil_day thurs1 = next_weekday(d - 1, weekday::thursday);
 //   // Gets the previous Thursday if d is not already Thursday
-//   civil_day thurs2 = next_weekday(d, weekday::thursday) - 7;
+//   civil_day thurs2 = prev_weekday(d + 1, weekday::thursday);
 //
 using detail::next_weekday;
 using detail::prev_weekday;
 
-// Returns the day-of-year for the given civil_day.
+// Returns the day-of-year for the given civil-time value.
 //
 //   civil_day a(2015, 1, 1);
 //   int yd_jan_1 = get_yearday(a);   // yd_jan_1 = 1
@@ -324,6 +326,7 @@ using detail::get_yearday;
 
 }  // namespace cctz
 }  // namespace time_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_TIME_INTERNAL_CCTZ_CIVIL_TIME_H_

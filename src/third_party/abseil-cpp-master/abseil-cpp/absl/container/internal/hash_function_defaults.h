@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,8 +39,8 @@
 // equal functions are still bound to T. This is important because some type U
 // can be hashed by/tested for equality differently depending on T. A notable
 // example is `const char*`. `const char*` is treated as a c-style string when
-// the hash function is hash<string> but as a pointer when the hash function is
-// hash<void*>.
+// the hash function is hash<std::string> but as a pointer when the hash
+// function is hash<void*>.
 //
 #ifndef ABSL_CONTAINER_INTERNAL_HASH_FUNCTION_DEFAULTS_H_
 #define ABSL_CONTAINER_INTERNAL_HASH_FUNCTION_DEFAULTS_H_
@@ -53,9 +53,11 @@
 
 #include "absl/base/config.h"
 #include "absl/hash/hash.h"
+#include "absl/strings/cord.h"
 #include "absl/strings/string_view.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace container_internal {
 
 // The hash of an object of type T is computed by using absl::Hash.
@@ -71,6 +73,9 @@ struct StringHash {
   size_t operator()(absl::string_view v) const {
     return absl::Hash<absl::string_view>{}(v);
   }
+  size_t operator()(const absl::Cord& v) const {
+    return absl::Hash<absl::Cord>{}(v);
+  }
 };
 
 // Supports heterogeneous lookup for string-like elements.
@@ -81,12 +86,24 @@ struct StringHashEq {
     bool operator()(absl::string_view lhs, absl::string_view rhs) const {
       return lhs == rhs;
     }
+    bool operator()(const absl::Cord& lhs, const absl::Cord& rhs) const {
+      return lhs == rhs;
+    }
+    bool operator()(const absl::Cord& lhs, absl::string_view rhs) const {
+      return lhs == rhs;
+    }
+    bool operator()(absl::string_view lhs, const absl::Cord& rhs) const {
+      return lhs == rhs;
+    }
   };
 };
+
 template <>
 struct HashEq<std::string> : StringHashEq {};
 template <>
 struct HashEq<absl::string_view> : StringHashEq {};
+template <>
+struct HashEq<absl::Cord> : StringHashEq {};
 
 // Supports heterogeneous lookup for pointers and smart pointers.
 template <class T>
@@ -138,6 +155,7 @@ template <class T>
 using hash_default_eq = typename container_internal::HashEq<T>::Eq;
 
 }  // namespace container_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_CONTAINER_INTERNAL_HASH_FUNCTION_DEFAULTS_H_

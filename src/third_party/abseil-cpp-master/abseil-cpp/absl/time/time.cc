@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,6 +33,10 @@
 
 #include "absl/time/time.h"
 
+#if defined(_MSC_VER)
+#include <winsock2.h>  // for timeval
+#endif
+
 #include <cstring>
 #include <ctime>
 #include <limits>
@@ -41,7 +45,9 @@
 #include "absl/time/internal/cctz/include/cctz/time_zone.h"
 
 namespace cctz = absl::time_internal::cctz;
+
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 namespace {
 
@@ -54,9 +60,10 @@ inline cctz::time_point<cctz::seconds> unix_epoch() {
 inline int64_t FloorToUnit(absl::Duration d, absl::Duration unit) {
   absl::Duration rem;
   int64_t q = absl::IDivDuration(d, unit, &rem);
-  return (q > 0 ||
-          rem >= ZeroDuration() ||
-          q == std::numeric_limits<int64_t>::min()) ? q : q - 1;
+  return (q > 0 || rem >= ZeroDuration() ||
+          q == std::numeric_limits<int64_t>::min())
+             ? q
+             : q - 1;
 }
 
 inline absl::Time::Breakdown InfiniteFutureBreakdown() {
@@ -425,9 +432,17 @@ absl::TimeConversion ConvertDateTime(int64_t year, int mon, int day, int hour,
 }
 
 absl::Time FromTM(const struct tm& tm, absl::TimeZone tz) {
-  const CivilSecond cs(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-                       tm.tm_hour, tm.tm_min, tm.tm_sec);
-  const auto ti = tz.At(cs);
+  civil_year_t tm_year = tm.tm_year;
+  // Avoids years that are too extreme for CivilSecond to normalize.
+  if (tm_year > 300000000000ll) return InfiniteFuture();
+  if (tm_year < -300000000000ll) return InfinitePast();
+  int tm_mon = tm.tm_mon;
+  if (tm_mon == std::numeric_limits<int>::max()) {
+    tm_mon -= 12;
+    tm_year += 1;
+  }
+  const auto ti = tz.At(CivilSecond(tm_year + 1900, tm_mon + 1, tm.tm_mday,
+                                    tm.tm_hour, tm.tm_min, tm.tm_sec));
   return tm.tm_isdst == 0 ? ti.post : ti.pre;
 }
 
@@ -452,8 +467,7 @@ struct tm ToTM(absl::Time t, absl::TimeZone tz) {
     tm.tm_year = static_cast<int>(cs.year() - 1900);
   }
 
-  const CivilDay cd(cs);
-  switch (GetWeekday(cd)) {
+  switch (GetWeekday(cs)) {
     case Weekday::sunday:
       tm.tm_wday = 0;
       break;
@@ -476,10 +490,11 @@ struct tm ToTM(absl::Time t, absl::TimeZone tz) {
       tm.tm_wday = 6;
       break;
   }
-  tm.tm_yday = GetYearDay(cd) - 1;
+  tm.tm_yday = GetYearDay(cs) - 1;
   tm.tm_isdst = ci.is_dst ? 1 : 0;
 
   return tm;
 }
 
+ABSL_NAMESPACE_END
 }  // namespace absl

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,7 +26,10 @@
 #include <iterator>
 #include <type_traits>
 
+#include "absl/base/config.h"
+
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 namespace algorithm_internal {
 
@@ -84,6 +87,8 @@ It RotateImpl(It first, It middle, It last, std::false_type) {
 
 }  // namespace algorithm_internal
 
+// equal()
+//
 // Compares the equality of two ranges specified by pairs of iterators, using
 // the given predicate, returning true iff for each corresponding iterator i1
 // and i2 in the first and second range respectively, pred(*i1, *i2) == true
@@ -94,7 +99,7 @@ It RotateImpl(It first, It middle, It last, std::false_type) {
 // then the predicate is never invoked and the function returns false.
 //
 // This is a C++11-compatible implementation of C++14 `std::equal`.  See
-// http://en.cppreference.com/w/cpp/algorithm/equal for more information.
+// https://en.cppreference.com/w/cpp/algorithm/equal for more information.
 template <typename InputIter1, typename InputIter2, typename Pred>
 bool equal(InputIter1 first1, InputIter1 last1, InputIter2 first2,
            InputIter2 last2, Pred&& pred) {
@@ -104,8 +109,8 @@ bool equal(InputIter1 first1, InputIter1 last1, InputIter2 first2,
       typename std::iterator_traits<InputIter2>::iterator_category{});
 }
 
-// Performs comparison of two ranges specified by pairs of iterators using
-// operator==.
+// Overload of equal() that performs comparison of two ranges specified by pairs
+// of iterators using operator==.
 template <typename InputIter1, typename InputIter2>
 bool equal(InputIter1 first1, InputIter1 last1, InputIter2 first2,
            InputIter2 last2) {
@@ -113,6 +118,8 @@ bool equal(InputIter1 first1, InputIter1 last1, InputIter2 first2,
                      algorithm_internal::EqualTo{});
 }
 
+// linear_search()
+//
 // Performs a linear search for `value` using the iterator `first` up to
 // but not including `last`, returning true if [`first`, `last`) contains an
 // element equal to `value`.
@@ -126,6 +133,8 @@ bool linear_search(InputIterator first, InputIterator last,
   return std::find(first, last, value) != last;
 }
 
+// rotate()
+//
 // Performs a left rotation on a range of elements (`first`, `last`) such that
 // `middle` is now the first element. `rotate()` returns an iterator pointing to
 // the first element before rotation. This function is exactly the same as
@@ -135,7 +144,6 @@ bool linear_search(InputIterator first, InputIterator last,
 // The complexity of this algorithm is the same as that of `std::rotate`, but if
 // `ForwardIterator` is not a random-access iterator, then `absl::rotate`
 // performs an additional pass over the range to construct the return value.
-
 template <typename ForwardIterator>
 ForwardIterator rotate(ForwardIterator first, ForwardIterator middle,
                        ForwardIterator last) {
@@ -145,6 +153,7 @@ ForwardIterator rotate(ForwardIterator first, ForwardIterator middle,
                    ForwardIterator>());
 }
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_ALGORITHM_ALGORITHM_H_

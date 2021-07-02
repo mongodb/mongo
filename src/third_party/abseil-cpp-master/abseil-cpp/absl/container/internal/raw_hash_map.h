@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,6 +24,7 @@
 #include "absl/container/internal/raw_hash_set.h"  // IWYU pragma: export
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace container_internal {
 
 template <class Policy, class Hash, class Eq, class Alloc>
@@ -40,8 +41,8 @@ class raw_hash_map : public raw_hash_set<Policy, Hash, Eq, Alloc> {
   using MappedConstReference = decltype(P::value(
       std::addressof(std::declval<typename raw_hash_map::const_reference>())));
 
-  using KeyArgImpl = container_internal::KeyArg<IsTransparent<Eq>::value &&
-                                                IsTransparent<Hash>::value>;
+  using KeyArgImpl =
+      KeyArg<IsTransparent<Eq>::value && IsTransparent<Hash>::value>;
 
  public:
   using key_type = typename Policy::key_type;
@@ -109,6 +110,9 @@ class raw_hash_map : public raw_hash_set<Policy, Hash, Eq, Alloc> {
     return insert_or_assign(k, v).first;
   }
 
+  // All `try_emplace()` overloads make the same guarantees regarding rvalue
+  // arguments as `std::unordered_map::try_emplace()`, namely that these
+  // functions will not move from rvalue arguments if insertions do not happen.
   template <class K = key_type, class... Args,
             typename std::enable_if<
                 !std::is_convertible<K, const_iterator>::value, int>::type = 0,
@@ -187,6 +191,7 @@ class raw_hash_map : public raw_hash_set<Policy, Hash, Eq, Alloc> {
 };
 
 }  // namespace container_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_CONTAINER_INTERNAL_RAW_HASH_MAP_H_

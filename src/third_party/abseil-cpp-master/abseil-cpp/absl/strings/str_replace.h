@@ -5,7 +5,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,12 +29,12 @@
 //
 // Example:
 //
-// string html_escaped = absl::StrReplaceAll(user_input, {
-//                                           {"&", "&amp;"},
-//                                           {"<", "&lt;"},
-//                                           {">", "&gt;"},
-//                                           {"\"", "&quot;"},
-//                                           {"'", "&#39;"}});
+// std::string html_escaped = absl::StrReplaceAll(user_input, {
+//                                                {"&", "&amp;"},
+//                                                {"<", "&lt;"},
+//                                                {">", "&gt;"},
+//                                                {"\"", "&quot;"},
+//                                                {"'", "&#39;"}});
 #ifndef ABSL_STRINGS_STR_REPLACE_H_
 #define ABSL_STRINGS_STR_REPLACE_H_
 
@@ -46,6 +46,7 @@
 #include "absl/strings/string_view.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 // StrReplaceAll()
 //
@@ -58,10 +59,11 @@ namespace absl {
 //
 // Example:
 //
-//   string s = absl::StrReplaceAll("$who bought $count #Noun. Thanks $who!",
-//                                  {{"$count", absl::StrCat(5)},
-//                                   {"$who", "Bob"},
-//                                   {"#Noun", "Apples"}});
+//   std::string s = absl::StrReplaceAll(
+//       "$who bought $count #Noun. Thanks $who!",
+//       {{"$count", absl::StrCat(5)},
+//        {"$who", "Bob"},
+//        {"#Noun", "Apples"}});
 //   EXPECT_EQ("Bob bought 5 Apples. Thanks Bob!", s);
 ABSL_MUST_USE_RESULT std::string StrReplaceAll(
     absl::string_view s,
@@ -78,20 +80,22 @@ ABSL_MUST_USE_RESULT std::string StrReplaceAll(
 //   replacements["$who"] = "Bob";
 //   replacements["$count"] = "5";
 //   replacements["#Noun"] = "Apples";
-//   string s = absl::StrReplaceAll("$who bought $count #Noun. Thanks $who!",
-//                                  replacements);
+//   std::string s = absl::StrReplaceAll(
+//       "$who bought $count #Noun. Thanks $who!",
+//       replacements);
 //   EXPECT_EQ("Bob bought 5 Apples. Thanks Bob!", s);
 //
 //   // A std::vector of std::pair elements can be more efficient.
-//   std::vector<std::pair<const absl::string_view, string>> replacements;
+//   std::vector<std::pair<const absl::string_view, std::string>> replacements;
 //   replacements.push_back({"&", "&amp;"});
 //   replacements.push_back({"<", "&lt;"});
 //   replacements.push_back({">", "&gt;"});
-//   string s = absl::StrReplaceAll("if (ptr < &foo)",
+//   std::string s = absl::StrReplaceAll("if (ptr < &foo)",
 //                                  replacements);
 //   EXPECT_EQ("if (ptr &lt; &amp;foo)", s);
 template <typename StrToStrMapping>
-std::string StrReplaceAll(absl::string_view s, const StrToStrMapping& replacements);
+std::string StrReplaceAll(absl::string_view s,
+                          const StrToStrMapping& replacements);
 
 // Overload of `StrReplaceAll()` to replace character sequences within a given
 // output string *in place* with replacements provided within an initializer
@@ -99,7 +103,7 @@ std::string StrReplaceAll(absl::string_view s, const StrToStrMapping& replacemen
 //
 // Example:
 //
-//   string s = std::string("$who bought $count #Noun. Thanks $who!");
+//   std::string s = std::string("$who bought $count #Noun. Thanks $who!");
 //   int count;
 //   count = absl::StrReplaceAll({{"$count", absl::StrCat(5)},
 //                               {"$who", "Bob"},
@@ -117,7 +121,7 @@ int StrReplaceAll(
 //
 // Example:
 //
-//   string s = std::string("if (ptr < &foo)");
+//   std::string s = std::string("if (ptr < &foo)");
 //   int count = absl::StrReplaceAll({{"&", "&amp;"},
 //                                    {"<", "&lt;"},
 //                                    {">", "&gt;"}}, &s);
@@ -187,7 +191,8 @@ int ApplySubstitutions(absl::string_view s,
 }  // namespace strings_internal
 
 template <typename StrToStrMapping>
-std::string StrReplaceAll(absl::string_view s, const StrToStrMapping& replacements) {
+std::string StrReplaceAll(absl::string_view s,
+                          const StrToStrMapping& replacements) {
   auto subs = strings_internal::FindSubstitutions(s, replacements);
   std::string result;
   result.reserve(s.size());
@@ -208,6 +213,7 @@ int StrReplaceAll(const StrToStrMapping& replacements, std::string* target) {
   return substitutions;
 }
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_STRINGS_STR_REPLACE_H_

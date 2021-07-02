@@ -5,7 +5,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
+#      https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,17 +14,71 @@
 # limitations under the License.
 #
 
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 load(
     "//absl:copts/configure_copts.bzl",
     "ABSL_DEFAULT_COPTS",
+    "ABSL_DEFAULT_LINKOPTS",
     "ABSL_TEST_COPTS",
-    "ABSL_EXCEPTIONS_FLAG",
-    "ABSL_EXCEPTIONS_FLAG_LINKOPTS",
 )
 
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
+
+cc_library(
+    name = "atomic_hook",
+    hdrs = ["internal/atomic_hook.h"],
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    visibility = [
+        "//absl:__subpackages__",
+    ],
+    deps = [
+        ":config",
+        ":core_headers",
+    ],
+)
+
+cc_library(
+    name = "errno_saver",
+    hdrs = ["internal/errno_saver.h"],
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    visibility = [
+        "//absl:__subpackages__",
+    ],
+    deps = [":config"],
+)
+
+cc_library(
+    name = "log_severity",
+    srcs = ["log_severity.cc"],
+    hdrs = ["log_severity.h"],
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":config",
+        ":core_headers",
+    ],
+)
+
+cc_library(
+    name = "raw_logging_internal",
+    srcs = ["internal/raw_logging.cc"],
+    hdrs = ["internal/raw_logging.h"],
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    visibility = [
+        "//absl:__subpackages__",
+    ],
+    deps = [
+        ":atomic_hook",
+        ":config",
+        ":core_headers",
+        ":log_severity",
+    ],
+)
 
 cc_library(
     name = "spinlock_wait",
@@ -35,36 +89,51 @@ cc_library(
         "internal/spinlock_wait.cc",
         "internal/spinlock_win32.inc",
     ],
-    hdrs = [
-        "internal/scheduling_mode.h",
-        "internal/spinlock_wait.h",
-    ],
+    hdrs = ["internal/spinlock_wait.h"],
     copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     visibility = [
         "//absl/base:__pkg__",
     ],
-    deps = [":core_headers"],
+    deps = [
+        ":base_internal",
+        ":core_headers",
+        ":errno_saver",
+    ],
 )
 
 cc_library(
     name = "config",
     hdrs = [
         "config.h",
+        "options.h",
         "policy_checks.h",
     ],
     copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
 )
 
 cc_library(
     name = "dynamic_annotations",
-    srcs = ["dynamic_annotations.cc"],
-    hdrs = ["dynamic_annotations.h"],
+    srcs = [
+        "internal/dynamic_annotations.h",
+    ],
+    hdrs = [
+        "dynamic_annotations.h",
+    ],
     copts = ABSL_DEFAULT_COPTS,
-    defines = ["__CLANG_SUPPORT_DYN_ANNOTATION__"],
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":config",
+        ":core_headers",
+    ],
 )
 
 cc_library(
     name = "core_headers",
+    srcs = [
+        "internal/thread_annotations.h",
+    ],
     hdrs = [
         "attributes.h",
         "const_init.h",
@@ -74,6 +143,7 @@ cc_library(
         "thread_annotations.h",
     ],
     copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":config",
     ],
@@ -89,15 +159,22 @@ cc_library(
         "internal/low_level_alloc.h",
     ],
     copts = ABSL_DEFAULT_COPTS,
+    linkopts = select({
+        "//absl:msvc_compiler": [],
+        "//absl:clang-cl_compiler": [],
+        "//absl:wasm": [],
+        "//conditions:default": ["-pthread"],
+    }) + ABSL_DEFAULT_LINKOPTS,
     visibility = [
-        "//absl:__subpackages__",
+        "//visibility:public",
     ],
     deps = [
         ":base",
+        ":base_internal",
         ":config",
         ":core_headers",
         ":dynamic_annotations",
-        ":spinlock_wait",
+        ":raw_logging_internal",
     ],
 )
 
@@ -111,8 +188,13 @@ cc_library(
         "internal/scheduling_mode.h",
     ],
     copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     visibility = [
         "//absl:__subpackages__",
+    ],
+    deps = [
+        ":config",
+        "//absl/meta:type_traits",
     ],
 )
 
@@ -120,7 +202,6 @@ cc_library(
     name = "base",
     srcs = [
         "internal/cycleclock.cc",
-        "internal/raw_logging.cc",
         "internal/spinlock.cc",
         "internal/sysinfo.cc",
         "internal/thread_identity.cc",
@@ -129,25 +210,49 @@ cc_library(
     hdrs = [
         "call_once.h",
         "casts.h",
-        "internal/atomic_hook.h",
         "internal/cycleclock.h",
         "internal/low_level_scheduling.h",
         "internal/per_thread_tls.h",
-        "internal/raw_logging.h",
         "internal/spinlock.h",
         "internal/sysinfo.h",
         "internal/thread_identity.h",
         "internal/tsan_mutex_interface.h",
         "internal/unscaledcycleclock.h",
-        "log_severity.h",
     ],
     copts = ABSL_DEFAULT_COPTS,
+    linkopts = select({
+        "//absl:msvc_compiler": [
+            "-DEFAULTLIB:advapi32.lib",
+        ],
+        "//absl:clang-cl_compiler": [
+            "-DEFAULTLIB:advapi32.lib",
+        ],
+        "//absl:wasm": [],
+        "//conditions:default": ["-pthread"],
+    }) + ABSL_DEFAULT_LINKOPTS,
     deps = [
+        ":atomic_hook",
         ":base_internal",
         ":config",
         ":core_headers",
         ":dynamic_annotations",
+        ":log_severity",
+        ":raw_logging_internal",
         ":spinlock_wait",
+        "//absl/meta:type_traits",
+    ],
+)
+
+cc_library(
+    name = "atomic_hook_test_helper",
+    testonly = 1,
+    srcs = ["internal/atomic_hook_test_helper.cc"],
+    hdrs = ["internal/atomic_hook_test_helper.h"],
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":atomic_hook",
+        ":core_headers",
     ],
 )
 
@@ -156,8 +261,10 @@ cc_test(
     size = "small",
     srcs = ["internal/atomic_hook_test.cc"],
     copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
-        ":base",
+        ":atomic_hook",
+        ":atomic_hook_test_helper",
         ":core_headers",
         "@com_google_googletest//:gtest_main",
     ],
@@ -170,6 +277,7 @@ cc_test(
         "bit_cast_test.cc",
     ],
     copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":base",
         ":core_headers",
@@ -181,24 +289,38 @@ cc_library(
     name = "throw_delegate",
     srcs = ["internal/throw_delegate.cc"],
     hdrs = ["internal/throw_delegate.h"],
-    copts = ABSL_DEFAULT_COPTS + ABSL_EXCEPTIONS_FLAG,
-    linkopts = ABSL_EXCEPTIONS_FLAG_LINKOPTS,
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     visibility = [
         "//absl:__subpackages__",
     ],
     deps = [
-        ":base",
         ":config",
+        ":raw_logging_internal",
     ],
 )
 
 cc_test(
     name = "throw_delegate_test",
     srcs = ["throw_delegate_test.cc"],
-    copts = ABSL_TEST_COPTS + ABSL_EXCEPTIONS_FLAG,
-    linkopts = ABSL_EXCEPTIONS_FLAG_LINKOPTS,
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
+        ":config",
         ":throw_delegate",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "errno_saver_test",
+    size = "small",
+    srcs = ["internal/errno_saver_test.cc"],
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":errno_saver",
+        ":strerror",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -208,6 +330,7 @@ cc_library(
     testonly = 1,
     hdrs = ["internal/exception_testing.h"],
     copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     visibility = [
         "//absl:__subpackages__",
     ],
@@ -220,6 +343,7 @@ cc_library(
 cc_library(
     name = "pretty_function",
     hdrs = ["internal/pretty_function.h"],
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     visibility = ["//absl:__subpackages__"],
 )
 
@@ -228,8 +352,8 @@ cc_library(
     testonly = 1,
     srcs = ["internal/exception_safety_testing.cc"],
     hdrs = ["internal/exception_safety_testing.h"],
-    copts = ABSL_TEST_COPTS + ABSL_EXCEPTIONS_FLAG,
-    linkopts = ABSL_EXCEPTIONS_FLAG_LINKOPTS,
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":config",
         ":pretty_function",
@@ -244,8 +368,8 @@ cc_library(
 cc_test(
     name = "exception_safety_testing_test",
     srcs = ["exception_safety_testing_test.cc"],
-    copts = ABSL_TEST_COPTS + ABSL_EXCEPTIONS_FLAG,
-    linkopts = ABSL_EXCEPTIONS_FLAG_LINKOPTS,
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":exception_safety_testing",
         "//absl/memory",
@@ -263,6 +387,7 @@ cc_test(
         "internal/inline_variable_testing.h",
     ],
     copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":base_internal",
         "@com_google_googletest//:gtest_main",
@@ -274,6 +399,7 @@ cc_test(
     size = "small",
     srcs = ["invoke_test.cc"],
     copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":base_internal",
         "//absl/memory",
@@ -289,10 +415,12 @@ cc_library(
     testonly = 1,
     srcs = ["spinlock_test_common.cc"],
     copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":base",
+        ":base_internal",
+        ":config",
         ":core_headers",
-        ":spinlock_wait",
         "//absl/synchronization",
         "@com_google_googletest//:gtest",
     ],
@@ -304,11 +432,12 @@ cc_test(
     size = "medium",
     srcs = ["spinlock_test_common.cc"],
     copts = ABSL_TEST_COPTS,
-    tags = ["no_test_wasm"],
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":base",
+        ":base_internal",
+        ":config",
         ":core_headers",
-        ":spinlock_wait",
         "//absl/synchronization",
         "@com_google_googletest//:gtest_main",
     ],
@@ -318,13 +447,15 @@ cc_library(
     name = "spinlock_benchmark_common",
     testonly = 1,
     srcs = ["internal/spinlock_benchmark.cc"],
-    copts = ABSL_DEFAULT_COPTS,
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     visibility = [
         "//absl/base:__pkg__",
     ],
     deps = [
         ":base",
         ":base_internal",
+        ":raw_logging_internal",
         "//absl/synchronization",
         "@com_github_google_benchmark//:benchmark_main",
     ],
@@ -335,6 +466,8 @@ cc_binary(
     name = "spinlock_benchmark",
     testonly = 1,
     copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    tags = ["benchmark"],
     visibility = ["//visibility:private"],
     deps = [
         ":spinlock_benchmark_common",
@@ -348,7 +481,9 @@ cc_library(
         "internal/unaligned_access.h",
     ],
     copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
+        ":base",
         ":config",
         ":core_headers",
     ],
@@ -359,7 +494,6 @@ cc_test(
     srcs = ["internal/endian_test.cc"],
     copts = ABSL_TEST_COPTS,
     deps = [
-        ":base",
         ":config",
         ":endian",
         "@com_google_googletest//:gtest_main",
@@ -370,9 +504,7 @@ cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     copts = ABSL_TEST_COPTS,
-    tags = [
-        "no_test_wasm",
-    ],
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":config",
         "//absl/synchronization:thread_pool",
@@ -384,9 +516,7 @@ cc_test(
     name = "call_once_test",
     srcs = ["call_once_test.cc"],
     copts = ABSL_TEST_COPTS,
-    tags = [
-        "no_test_wasm",
-    ],
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":base",
         ":core_headers",
@@ -399,8 +529,9 @@ cc_test(
     name = "raw_logging_test",
     srcs = ["raw_logging_test.cc"],
     copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
-        ":base",
+        ":raw_logging_internal",
         "//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
@@ -411,6 +542,7 @@ cc_test(
     size = "small",
     srcs = ["internal/sysinfo_test.cc"],
     copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":base",
         "//absl/synchronization",
@@ -420,15 +552,17 @@ cc_test(
 
 cc_test(
     name = "low_level_alloc_test",
-    size = "small",
+    size = "medium",
     srcs = ["internal/low_level_alloc_test.cc"],
     copts = ABSL_TEST_COPTS,
-    linkopts = select({
-        "//absl:windows": [],
-        "//conditions:default": ["-pthread"],
-    }),
-    tags = ["no_test_ios_x86_64"],
-    deps = [":malloc_internal"],
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    tags = [
+        "no_test_ios_x86_64",
+    ],
+    deps = [
+        ":malloc_internal",
+        "//absl/container:node_hash_map",
+    ],
 )
 
 cc_test(
@@ -436,13 +570,7 @@ cc_test(
     size = "small",
     srcs = ["internal/thread_identity_test.cc"],
     copts = ABSL_TEST_COPTS,
-    linkopts = select({
-        "//absl:windows": [],
-        "//conditions:default": ["-pthread"],
-    }),
-    tags = [
-        "no_test_wasm",
-    ],
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":base",
         ":core_headers",
@@ -455,6 +583,7 @@ cc_test(
     name = "thread_identity_benchmark",
     srcs = ["internal/thread_identity_benchmark.cc"],
     copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     tags = ["benchmark"],
     visibility = ["//visibility:private"],
     deps = [
@@ -465,21 +594,207 @@ cc_test(
 )
 
 cc_library(
-    name = "bits",
-    hdrs = ["internal/bits.h"],
+    name = "exponential_biased",
+    srcs = ["internal/exponential_biased.cc"],
+    hdrs = ["internal/exponential_biased.h"],
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     visibility = [
         "//absl:__subpackages__",
     ],
-    deps = [":core_headers"],
+    deps = [
+        ":config",
+        ":core_headers",
+    ],
 )
 
 cc_test(
-    name = "bits_test",
+    name = "exponential_biased_test",
     size = "small",
-    srcs = ["internal/bits_test.cc"],
+    srcs = ["internal/exponential_biased_test.cc"],
     copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    visibility = ["//visibility:private"],
     deps = [
-        ":bits",
+        ":exponential_biased",
+        "//absl/strings",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "periodic_sampler",
+    srcs = ["internal/periodic_sampler.cc"],
+    hdrs = ["internal/periodic_sampler.h"],
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":core_headers",
+        ":exponential_biased",
+    ],
+)
+
+cc_test(
+    name = "periodic_sampler_test",
+    size = "small",
+    srcs = ["internal/periodic_sampler_test.cc"],
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    visibility = ["//visibility:private"],
+    deps = [
+        ":core_headers",
+        ":periodic_sampler",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_binary(
+    name = "periodic_sampler_benchmark",
+    testonly = 1,
+    srcs = ["internal/periodic_sampler_benchmark.cc"],
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    tags = ["benchmark"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":core_headers",
+        ":periodic_sampler",
+        "@com_github_google_benchmark//:benchmark_main",
+    ],
+)
+
+cc_library(
+    name = "scoped_set_env",
+    testonly = 1,
+    srcs = ["internal/scoped_set_env.cc"],
+    hdrs = ["internal/scoped_set_env.h"],
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    visibility = [
+        "//absl:__subpackages__",
+    ],
+    deps = [
+        ":config",
+        ":raw_logging_internal",
+    ],
+)
+
+cc_test(
+    name = "scoped_set_env_test",
+    size = "small",
+    srcs = ["internal/scoped_set_env_test.cc"],
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":scoped_set_env",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "log_severity_test",
+    size = "small",
+    srcs = ["log_severity_test.cc"],
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":log_severity",
+        "//absl/flags:flag_internal",
+        "//absl/flags:marshalling",
+        "//absl/strings",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "strerror",
+    srcs = ["internal/strerror.cc"],
+    hdrs = ["internal/strerror.h"],
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    visibility = [
+        "//absl:__subpackages__",
+    ],
+    deps = [
+        ":config",
+        ":core_headers",
+        ":errno_saver",
+    ],
+)
+
+cc_test(
+    name = "strerror_test",
+    size = "small",
+    srcs = ["internal/strerror_test.cc"],
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":strerror",
+        "//absl/strings",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_binary(
+    name = "strerror_benchmark",
+    testonly = 1,
+    srcs = ["internal/strerror_benchmark.cc"],
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    tags = ["benchmark"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":strerror",
+        "@com_github_google_benchmark//:benchmark_main",
+    ],
+)
+
+cc_library(
+    name = "fast_type_id",
+    hdrs = ["internal/fast_type_id.h"],
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    visibility = [
+        "//absl:__subpackages__",
+    ],
+    deps = [
+        ":config",
+    ],
+)
+
+cc_test(
+    name = "fast_type_id_test",
+    size = "small",
+    srcs = ["internal/fast_type_id_test.cc"],
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":fast_type_id",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "unique_small_name_test",
+    size = "small",
+    srcs = ["internal/unique_small_name_test.cc"],
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    linkstatic = 1,
+    deps = [
+        ":core_headers",
+        "//absl/strings",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "optimization_test",
+    size = "small",
+    srcs = ["optimization_test.cc"],
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":core_headers",
+        "//absl/types:optional",
         "@com_google_googletest//:gtest_main",
     ],
 )

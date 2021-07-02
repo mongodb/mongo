@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,6 +42,7 @@
 #include "absl/memory/memory.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace container_internal {
 template <class K, class V>
 struct FlatHashMapPolicy;
@@ -77,7 +78,7 @@ struct FlatHashMapPolicy;
 // NOTE: A `flat_hash_map` stores its value types directly inside its
 // implementation array to avoid memory indirection. Because a `flat_hash_map`
 // is designed to move data when rehashed, map values will not retain pointer
-// stability. If you require pointer stability, or your values are large,
+// stability. If you require pointer stability, or if your values are large,
 // consider using `absl::flat_hash_map<Key, std::unique_ptr<Value>>` instead.
 // If your types are not moveable or you require pointer stability for keys,
 // consider `absl::node_hash_map`.
@@ -219,8 +220,12 @@ class flat_hash_map : public absl::container_internal::raw_hash_map<
   //   Erases the element at `position` of the `flat_hash_map`, returning
   //   `void`.
   //
-  //   NOTE: this return behavior is different than that of STL containers in
-  //   general and `std::unordered_map` in particular.
+  //   NOTE: returning `void` in this case is different than that of STL
+  //   containers in general and `std::unordered_map` in particular (which
+  //   return an iterator to the element following the erased element). If that
+  //   iterator is needed, simply post increment the iterator:
+  //
+  //     map.erase(it++);
   //
   // iterator erase(const_iterator first, const_iterator last):
   //
@@ -229,7 +234,8 @@ class flat_hash_map : public absl::container_internal::raw_hash_map<
   //
   // size_type erase(const key_type& key):
   //
-  //   Erases the element with the matching key, if it exists.
+  //   Erases the element with the matching key, if it exists, returning the
+  //   number of elements erased (0 or 1).
   using Base::erase;
 
   // flat_hash_map::insert()
@@ -356,6 +362,10 @@ class flat_hash_map : public absl::container_internal::raw_hash_map<
   // Inserts (via copy or move) the element of the specified key into the
   // `flat_hash_map` using the position of `hint` as a non-binding suggestion
   // for where to begin the insertion search.
+  //
+  // All `try_emplace()` overloads make the same guarantees regarding rvalue
+  // arguments as `std::unordered_map::try_emplace()`, namely that these
+  // functions will not move from rvalue arguments if insertions do not happen.
   using Base::try_emplace;
 
   // flat_hash_map::extract()
@@ -374,6 +384,11 @@ class flat_hash_map : public absl::container_internal::raw_hash_map<
   //   key value and returns a node handle owning that extracted data. If the
   //   `flat_hash_map` does not contain an element with a matching key, this
   //   function returns an empty node handle.
+  //
+  // NOTE: when compiled in an earlier version of C++ than C++17,
+  // `node_type::key()` returns a const reference to the key instead of a
+  // mutable reference. We cannot safely return a mutable reference without
+  // std::launder (which is not available before C++17).
   using Base::extract;
 
   // flat_hash_map::merge()
@@ -393,7 +408,7 @@ class flat_hash_map : public absl::container_internal::raw_hash_map<
   // for the past-the-end iterator, which is invalidated.
   //
   // `swap()` requires that the flat hash map's hashing and key equivalence
-  // functions be Swappable, and are exchaged using unqualified calls to
+  // functions be Swappable, and are exchanged using unqualified calls to
   // non-member `swap()`. If the map's allocator has
   // `std::allocator_traits<allocator_type>::propagate_on_container_swap::value`
   // set to `true`, the allocators are also exchanged using an unqualified call
@@ -523,29 +538,39 @@ class flat_hash_map : public absl::container_internal::raw_hash_map<
   using Base::key_eq;
 };
 
+// erase_if(flat_hash_map<>, Pred)
+//
+// Erases all elements that satisfy the predicate `pred` from the container `c`.
+template <typename K, typename V, typename H, typename E, typename A,
+          typename Predicate>
+void erase_if(flat_hash_map<K, V, H, E, A>& c, Predicate pred) {
+  container_internal::EraseIf(pred, &c);
+}
+
 namespace container_internal {
 
 template <class K, class V>
 struct FlatHashMapPolicy {
-  using slot_type = container_internal::slot_type<K, V>;
+  using slot_policy = container_internal::map_slot_policy<K, V>;
+  using slot_type = typename slot_policy::slot_type;
   using key_type = K;
   using mapped_type = V;
   using init_type = std::pair</*non const*/ key_type, mapped_type>;
 
   template <class Allocator, class... Args>
   static void construct(Allocator* alloc, slot_type* slot, Args&&... args) {
-    slot_type::construct(alloc, slot, std::forward<Args>(args)...);
+    slot_policy::construct(alloc, slot, std::forward<Args>(args)...);
   }
 
   template <class Allocator>
   static void destroy(Allocator* alloc, slot_type* slot) {
-    slot_type::destroy(alloc, slot);
+    slot_policy::destroy(alloc, slot);
   }
 
   template <class Allocator>
   static void transfer(Allocator* alloc, slot_type* new_slot,
                        slot_type* old_slot) {
-    slot_type::transfer(alloc, new_slot, old_slot);
+    slot_policy::transfer(alloc, new_slot, old_slot);
   }
 
   template <class F, class... Args>
@@ -575,6 +600,7 @@ struct IsUnorderedContainer<
 
 }  // namespace container_algorithm_internal
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_CONTAINER_FLAT_HASH_MAP_H_

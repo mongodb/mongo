@@ -5,7 +5,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -44,11 +44,13 @@
 #include <vector>
 
 #include "absl/base/internal/raw_logging.h"
+#include "absl/base/macros.h"
 #include "absl/strings/internal/str_split_internal.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 //------------------------------------------------------------------------------
 // Delimiters
@@ -71,23 +73,23 @@ namespace absl {
 //   - `ByLength`
 //   - `MaxSplits`
 //
+// A Delimiter's `Find()` member function will be passed an input `text` that is
+// to be split and a position (`pos`) to begin searching for the next delimiter
+// in `text`. The returned absl::string_view should refer to the next occurrence
+// (after `pos`) of the represented delimiter; this returned absl::string_view
+// represents the next location where the input `text` should be broken.
 //
-// A Delimiter's Find() member function will be passed the input text that is to
-// be split and the position to begin searching for the next delimiter in the
-// input text. The returned absl::string_view should refer to the next
-// occurrence (after pos) of the represented delimiter; this returned
-// absl::string_view represents the next location where the input string should
-// be broken. The returned absl::string_view may be zero-length if the Delimiter
-// does not represent a part of the string (e.g., a fixed-length delimiter). If
-// no delimiter is found in the given text, a zero-length absl::string_view
-// referring to text.end() should be returned (e.g.,
-// absl::string_view(text.end(), 0)). It is important that the returned
-// absl::string_view always be within the bounds of input text given as an
+// The returned absl::string_view may be zero-length if the Delimiter does not
+// represent a part of the string (e.g., a fixed-length delimiter). If no
+// delimiter is found in the input `text`, a zero-length absl::string_view
+// referring to `text.end()` should be returned (e.g.,
+// `text.substr(text.size())`). It is important that the returned
+// absl::string_view always be within the bounds of the input `text` given as an
 // argument--it must not refer to a string that is physically located outside of
 // the given string.
 //
 // The following example is a simple Delimiter object that is created with a
-// single char and will look for that char in the text passed to the Find()
+// single char and will look for that char in the text passed to the `Find()`
 // function:
 //
 //   struct SimpleDelimiter {
@@ -96,9 +98,9 @@ namespace absl {
 //     absl::string_view Find(absl::string_view text, size_t pos) {
 //       auto found = text.find(c_, pos);
 //       if (found == absl::string_view::npos)
-//         return absl::string_view(text.end(), 0);
+//         return text.substr(text.size());
 //
-//       return absl::string_view(text, found, 1);
+//       return text.substr(found, 1);
 //     }
 //   };
 
@@ -131,8 +133,7 @@ class ByString {
 // ByChar
 //
 // A single character delimiter. `ByChar` is functionally equivalent to a
-// 1-char string within a `ByString` delimiter, but slightly more
-// efficient.
+// 1-char string within a `ByString` delimiter, but slightly more efficient.
 //
 // Example:
 //
@@ -368,6 +369,12 @@ struct SkipWhitespace {
   }
 };
 
+template <typename T>
+using EnableSplitIfString =
+    typename std::enable_if<std::is_same<T, std::string>::value ||
+                            std::is_same<T, const std::string>::value,
+                            int>::type;
+
 //------------------------------------------------------------------------------
 //                                  StrSplit()
 //------------------------------------------------------------------------------
@@ -413,10 +420,10 @@ struct SkipWhitespace {
 //
 // The `StrSplit()` function adapts the returned collection to the collection
 // specified by the caller (e.g. `std::vector` above). The returned collections
-// may contain `string`, `absl::string_view` (in which case the original string
-// being split must ensure that it outlives the collection), or any object that
-// can be explicitly created from an `absl::string_view`. This behavior works
-// for:
+// may contain `std::string`, `absl::string_view` (in which case the original
+// string being split must ensure that it outlives the collection), or any
+// object that can be explicitly created from an `absl::string_view`. This
+// behavior works for:
 //
 // 1) All standard STL containers including `std::vector`, `std::list`,
 //    `std::deque`, `std::set`,`std::multiset`, 'std::map`, and `std::multimap`
@@ -460,7 +467,7 @@ struct SkipWhitespace {
 // Example:
 //
 //   // Stores first two split strings as the members in a std::pair.
-//   std::pair<string, string> p = absl::StrSplit("a,b,c", ',');
+//   std::pair<std::string, std::string> p = absl::StrSplit("a,b,c", ',');
 //   // p.first == "a", p.second == "b"       // "c" is omitted.
 //
 // The `StrSplit()` function can be used multiple times to perform more
@@ -470,7 +477,7 @@ struct SkipWhitespace {
 //
 //   // The input string "a=b=c,d=e,f=,g" becomes
 //   // { "a" => "b=c", "d" => "e", "f" => "", "g" => "" }
-//   std::map<string, string> m;
+//   std::map<std::string, std::string> m;
 //   for (absl::string_view sp : absl::StrSplit("a=b=c,d=e,f=,g", ',')) {
 //     m.insert(absl::StrSplit(sp, absl::MaxSplits('=', 1)));
 //   }
@@ -488,25 +495,54 @@ struct SkipWhitespace {
 // Try not to depend on this distinction because the bug may one day be fixed.
 template <typename Delimiter>
 strings_internal::Splitter<
-    typename strings_internal::SelectDelimiter<Delimiter>::type, AllowEmpty>
+    typename strings_internal::SelectDelimiter<Delimiter>::type, AllowEmpty,
+    absl::string_view>
 StrSplit(strings_internal::ConvertibleToStringView text, Delimiter d) {
   using DelimiterType =
       typename strings_internal::SelectDelimiter<Delimiter>::type;
-  return strings_internal::Splitter<DelimiterType, AllowEmpty>(
+  return strings_internal::Splitter<DelimiterType, AllowEmpty,
+                                    absl::string_view>(
+      text.value(), DelimiterType(d), AllowEmpty());
+}
+
+template <typename Delimiter, typename StringType,
+          EnableSplitIfString<StringType> = 0>
+strings_internal::Splitter<
+    typename strings_internal::SelectDelimiter<Delimiter>::type, AllowEmpty,
+    std::string>
+StrSplit(StringType&& text, Delimiter d) {
+  using DelimiterType =
+      typename strings_internal::SelectDelimiter<Delimiter>::type;
+  return strings_internal::Splitter<DelimiterType, AllowEmpty, std::string>(
       std::move(text), DelimiterType(d), AllowEmpty());
 }
 
 template <typename Delimiter, typename Predicate>
 strings_internal::Splitter<
-    typename strings_internal::SelectDelimiter<Delimiter>::type, Predicate>
+    typename strings_internal::SelectDelimiter<Delimiter>::type, Predicate,
+    absl::string_view>
 StrSplit(strings_internal::ConvertibleToStringView text, Delimiter d,
          Predicate p) {
   using DelimiterType =
       typename strings_internal::SelectDelimiter<Delimiter>::type;
-  return strings_internal::Splitter<DelimiterType, Predicate>(
+  return strings_internal::Splitter<DelimiterType, Predicate,
+                                    absl::string_view>(
+      text.value(), DelimiterType(d), std::move(p));
+}
+
+template <typename Delimiter, typename Predicate, typename StringType,
+          EnableSplitIfString<StringType> = 0>
+strings_internal::Splitter<
+    typename strings_internal::SelectDelimiter<Delimiter>::type, Predicate,
+    std::string>
+StrSplit(StringType&& text, Delimiter d, Predicate p) {
+  using DelimiterType =
+      typename strings_internal::SelectDelimiter<Delimiter>::type;
+  return strings_internal::Splitter<DelimiterType, Predicate, std::string>(
       std::move(text), DelimiterType(d), std::move(p));
 }
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_STRINGS_STR_SPLIT_H_

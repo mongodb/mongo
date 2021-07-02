@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -132,7 +132,7 @@ BENCHMARK(BM_Absl_HugeMantissa);
 std::string MakeHardCase(int length) {
   // The number 1.1521...e-297 is exactly halfway between 12345 * 2**-1000 and
   // the next larger representable number.  The digits of this number are in
-  // the std::string below.
+  // the string below.
   const std::string digits =
       "1."
       "152113937042223790993097181572444900347587985074226836242307364987727724"

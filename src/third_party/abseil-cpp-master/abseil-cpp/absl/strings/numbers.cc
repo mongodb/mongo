@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,8 +19,8 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cfloat>          // for DBL_DIG and FLT_DIG
-#include <cmath>           // for HUGE_VAL
+#include <cfloat>  // for DBL_DIG and FLT_DIG
+#include <cmath>   // for HUGE_VAL
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -30,22 +30,31 @@
 #include <memory>
 #include <utility>
 
-#include "absl/base/internal/bits.h"
+#include "absl/base/attributes.h"
 #include "absl/base/internal/raw_logging.h"
+#include "absl/numeric/bits.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/charconv.h"
+#include "absl/strings/escaping.h"
 #include "absl/strings/internal/memutil.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
-bool SimpleAtof(absl::string_view str, float* value) {
-  *value = 0.0;
+bool SimpleAtof(absl::string_view str, float* out) {
+  *out = 0.0;
   str = StripAsciiWhitespace(str);
+  // std::from_chars doesn't accept an initial +, but SimpleAtof does, so if one
+  // is present, skip it, while avoiding accepting "+-0" as valid.
   if (!str.empty() && str[0] == '+') {
     str.remove_prefix(1);
+    if (!str.empty() && str[0] == '-') {
+      return false;
+    }
   }
-  auto result = absl::from_chars(str.data(), str.data() + str.size(), *value);
+  auto result = absl::from_chars(str.data(), str.data() + str.size(), *out);
   if (result.ec == std::errc::invalid_argument) {
     return false;
   }
@@ -53,25 +62,30 @@ bool SimpleAtof(absl::string_view str, float* value) {
     // not all non-whitespace characters consumed
     return false;
   }
-  // from_chars() with DR 3801's current wording will return max() on
+  // from_chars() with DR 3081's current wording will return max() on
   // overflow.  SimpleAtof returns infinity instead.
   if (result.ec == std::errc::result_out_of_range) {
-    if (*value > 1.0) {
-      *value = std::numeric_limits<float>::infinity();
-    } else if (*value < -1.0) {
-      *value = -std::numeric_limits<float>::infinity();
+    if (*out > 1.0) {
+      *out = std::numeric_limits<float>::infinity();
+    } else if (*out < -1.0) {
+      *out = -std::numeric_limits<float>::infinity();
     }
   }
   return true;
 }
 
-bool SimpleAtod(absl::string_view str, double* value) {
-  *value = 0.0;
+bool SimpleAtod(absl::string_view str, double* out) {
+  *out = 0.0;
   str = StripAsciiWhitespace(str);
+  // std::from_chars doesn't accept an initial +, but SimpleAtod does, so if one
+  // is present, skip it, while avoiding accepting "+-0" as valid.
   if (!str.empty() && str[0] == '+') {
     str.remove_prefix(1);
+    if (!str.empty() && str[0] == '-') {
+      return false;
+    }
   }
-  auto result = absl::from_chars(str.data(), str.data() + str.size(), *value);
+  auto result = absl::from_chars(str.data(), str.data() + str.size(), *out);
   if (result.ec == std::errc::invalid_argument) {
     return false;
   }
@@ -79,75 +93,30 @@ bool SimpleAtod(absl::string_view str, double* value) {
     // not all non-whitespace characters consumed
     return false;
   }
-  // from_chars() with DR 3801's current wording will return max() on
+  // from_chars() with DR 3081's current wording will return max() on
   // overflow.  SimpleAtod returns infinity instead.
   if (result.ec == std::errc::result_out_of_range) {
-    if (*value > 1.0) {
-      *value = std::numeric_limits<double>::infinity();
-    } else if (*value < -1.0) {
-      *value = -std::numeric_limits<double>::infinity();
+    if (*out > 1.0) {
+      *out = std::numeric_limits<double>::infinity();
+    } else if (*out < -1.0) {
+      *out = -std::numeric_limits<double>::infinity();
     }
   }
   return true;
 }
 
-namespace {
-
-// TODO(rogeeff): replace with the real released thing once we figure out what
-// it is.
-inline bool CaseEqual(absl::string_view piece1, absl::string_view piece2) {
-  return (piece1.size() == piece2.size() &&
-          0 == strings_internal::memcasecmp(piece1.data(), piece2.data(),
-                                            piece1.size()));
-}
-
-// Writes a two-character representation of 'i' to 'buf'. 'i' must be in the
-// range 0 <= i < 100, and buf must have space for two characters. Example:
-//   char buf[2];
-//   PutTwoDigits(42, buf);
-//   // buf[0] == '4'
-//   // buf[1] == '2'
-inline void PutTwoDigits(size_t i, char* buf) {
-  static const char two_ASCII_digits[100][2] = {
-    {'0', '0'}, {'0', '1'}, {'0', '2'}, {'0', '3'}, {'0', '4'},
-    {'0', '5'}, {'0', '6'}, {'0', '7'}, {'0', '8'}, {'0', '9'},
-    {'1', '0'}, {'1', '1'}, {'1', '2'}, {'1', '3'}, {'1', '4'},
-    {'1', '5'}, {'1', '6'}, {'1', '7'}, {'1', '8'}, {'1', '9'},
-    {'2', '0'}, {'2', '1'}, {'2', '2'}, {'2', '3'}, {'2', '4'},
-    {'2', '5'}, {'2', '6'}, {'2', '7'}, {'2', '8'}, {'2', '9'},
-    {'3', '0'}, {'3', '1'}, {'3', '2'}, {'3', '3'}, {'3', '4'},
-    {'3', '5'}, {'3', '6'}, {'3', '7'}, {'3', '8'}, {'3', '9'},
-    {'4', '0'}, {'4', '1'}, {'4', '2'}, {'4', '3'}, {'4', '4'},
-    {'4', '5'}, {'4', '6'}, {'4', '7'}, {'4', '8'}, {'4', '9'},
-    {'5', '0'}, {'5', '1'}, {'5', '2'}, {'5', '3'}, {'5', '4'},
-    {'5', '5'}, {'5', '6'}, {'5', '7'}, {'5', '8'}, {'5', '9'},
-    {'6', '0'}, {'6', '1'}, {'6', '2'}, {'6', '3'}, {'6', '4'},
-    {'6', '5'}, {'6', '6'}, {'6', '7'}, {'6', '8'}, {'6', '9'},
-    {'7', '0'}, {'7', '1'}, {'7', '2'}, {'7', '3'}, {'7', '4'},
-    {'7', '5'}, {'7', '6'}, {'7', '7'}, {'7', '8'}, {'7', '9'},
-    {'8', '0'}, {'8', '1'}, {'8', '2'}, {'8', '3'}, {'8', '4'},
-    {'8', '5'}, {'8', '6'}, {'8', '7'}, {'8', '8'}, {'8', '9'},
-    {'9', '0'}, {'9', '1'}, {'9', '2'}, {'9', '3'}, {'9', '4'},
-    {'9', '5'}, {'9', '6'}, {'9', '7'}, {'9', '8'}, {'9', '9'}
-  };
-  assert(i < 100);
-  memcpy(buf, two_ASCII_digits[i], 2);
-}
-
-}  // namespace
-
-bool SimpleAtob(absl::string_view str, bool* value) {
-  ABSL_RAW_CHECK(value != nullptr, "Output pointer must not be nullptr.");
-  if (CaseEqual(str, "true") || CaseEqual(str, "t") ||
-      CaseEqual(str, "yes") || CaseEqual(str, "y") ||
-      CaseEqual(str, "1")) {
-    *value = true;
+bool SimpleAtob(absl::string_view str, bool* out) {
+  ABSL_RAW_CHECK(out != nullptr, "Output pointer must not be nullptr.");
+  if (EqualsIgnoreCase(str, "true") || EqualsIgnoreCase(str, "t") ||
+      EqualsIgnoreCase(str, "yes") || EqualsIgnoreCase(str, "y") ||
+      EqualsIgnoreCase(str, "1")) {
+    *out = true;
     return true;
   }
-  if (CaseEqual(str, "false") || CaseEqual(str, "f") ||
-      CaseEqual(str, "no") || CaseEqual(str, "n") ||
-      CaseEqual(str, "0")) {
-    *value = false;
+  if (EqualsIgnoreCase(str, "false") || EqualsIgnoreCase(str, "f") ||
+      EqualsIgnoreCase(str, "no") || EqualsIgnoreCase(str, "n") ||
+      EqualsIgnoreCase(str, "0")) {
+    *out = false;
     return true;
   }
   return false;
@@ -344,7 +313,7 @@ static std::pair<uint64_t, uint64_t> Mul32(std::pair<uint64_t, uint64_t> num,
   uint64_t bits128_up = (bits96_127 >> 32) + (bits64_127 < bits64_95);
   if (bits128_up == 0) return {bits64_127, bits0_63};
 
-  int shift = 64 - base_internal::CountLeadingZeros64(bits128_up);
+  auto shift = static_cast<unsigned>(bit_width(bits128_up));
   uint64_t lo = (bits0_63 >> shift) + (bits64_127 << (64 - shift));
   uint64_t hi = (bits64_127 >> shift) + (bits128_up << (64 - shift));
   return {hi, lo};
@@ -375,7 +344,7 @@ static std::pair<uint64_t, uint64_t> PowFive(uint64_t num, int expfive) {
       5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5,
       5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5 * 5};
   result = Mul32(result, powers_of_five[expfive & 15]);
-  int shift = base_internal::CountLeadingZeros64(result.first);
+  int shift = countl_zero(result.first);
   if (shift != 0) {
     result.first = (result.first << shift) + (result.second >> (64 - shift));
     result.second = (result.second << shift);
@@ -502,13 +471,13 @@ static ExpDigits SplitToSix(const double value) {
 
   int two_digits = dddddd / 10000;
   dddddd -= two_digits * 10000;
-  PutTwoDigits(two_digits, &exp_dig.digits[0]);
+  numbers_internal::PutTwoDigits(two_digits, &exp_dig.digits[0]);
 
   two_digits = dddddd / 100;
   dddddd -= two_digits * 100;
-  PutTwoDigits(two_digits, &exp_dig.digits[2]);
+  numbers_internal::PutTwoDigits(two_digits, &exp_dig.digits[2]);
 
-  PutTwoDigits(dddddd, &exp_dig.digits[4]);
+  numbers_internal::PutTwoDigits(dddddd, &exp_dig.digits[4]);
   return exp_dig;
 }
 
@@ -761,8 +730,8 @@ inline bool safe_parse_sign_and_base(absl::string_view* text /*inout*/,
 // commonly used bases.
 template <typename IntType>
 struct LookupTables {
-  static const IntType kVmaxOverBase[];
-  static const IntType kVminOverBase[];
+  ABSL_CONST_INIT static const IntType kVmaxOverBase[];
+  ABSL_CONST_INIT static const IntType kVminOverBase[];
 };
 
 // An array initializer macro for X/base where base in [0, 36].
@@ -776,6 +745,163 @@ struct LookupTables {
         X / 27, X / 28, X / 29, X / 30, X / 31, X / 32, X / 33, X / 34,   \
         X / 35, X / 36,                                                   \
   }
+
+// This kVmaxOverBase is generated with
+//  for (int base = 2; base < 37; ++base) {
+//    absl::uint128 max = std::numeric_limits<absl::uint128>::max();
+//    auto result = max / base;
+//    std::cout << "    MakeUint128(" << absl::Uint128High64(result) << "u, "
+//              << absl::Uint128Low64(result) << "u),\n";
+//  }
+// See https://godbolt.org/z/aneYsb
+//
+// uint128& operator/=(uint128) is not constexpr, so hardcode the resulting
+// array to avoid a static initializer.
+template<>
+const uint128 LookupTables<uint128>::kVmaxOverBase[] = {
+    0,
+    0,
+    MakeUint128(9223372036854775807u, 18446744073709551615u),
+    MakeUint128(6148914691236517205u, 6148914691236517205u),
+    MakeUint128(4611686018427387903u, 18446744073709551615u),
+    MakeUint128(3689348814741910323u, 3689348814741910323u),
+    MakeUint128(3074457345618258602u, 12297829382473034410u),
+    MakeUint128(2635249153387078802u, 5270498306774157604u),
+    MakeUint128(2305843009213693951u, 18446744073709551615u),
+    MakeUint128(2049638230412172401u, 14347467612885206812u),
+    MakeUint128(1844674407370955161u, 11068046444225730969u),
+    MakeUint128(1676976733973595601u, 8384883669867978007u),
+    MakeUint128(1537228672809129301u, 6148914691236517205u),
+    MakeUint128(1418980313362273201u, 4256940940086819603u),
+    MakeUint128(1317624576693539401u, 2635249153387078802u),
+    MakeUint128(1229782938247303441u, 1229782938247303441u),
+    MakeUint128(1152921504606846975u, 18446744073709551615u),
+    MakeUint128(1085102592571150095u, 1085102592571150095u),
+    MakeUint128(1024819115206086200u, 16397105843297379214u),
+    MakeUint128(970881267037344821u, 16504981539634861972u),
+    MakeUint128(922337203685477580u, 14757395258967641292u),
+    MakeUint128(878416384462359600u, 14054662151397753612u),
+    MakeUint128(838488366986797800u, 13415813871788764811u),
+    MakeUint128(802032351030850070u, 4812194106185100421u),
+    MakeUint128(768614336404564650u, 12297829382473034410u),
+    MakeUint128(737869762948382064u, 11805916207174113034u),
+    MakeUint128(709490156681136600u, 11351842506898185609u),
+    MakeUint128(683212743470724133u, 17080318586768103348u),
+    MakeUint128(658812288346769700u, 10540996613548315209u),
+    MakeUint128(636094623231363848u, 15266270957552732371u),
+    MakeUint128(614891469123651720u, 9838263505978427528u),
+    MakeUint128(595056260442243600u, 9520900167075897608u),
+    MakeUint128(576460752303423487u, 18446744073709551615u),
+    MakeUint128(558992244657865200u, 8943875914525843207u),
+    MakeUint128(542551296285575047u, 9765923333140350855u),
+    MakeUint128(527049830677415760u, 8432797290838652167u),
+    MakeUint128(512409557603043100u, 8198552921648689607u),
+};
+
+// This kVmaxOverBase generated with
+//   for (int base = 2; base < 37; ++base) {
+//    absl::int128 max = std::numeric_limits<absl::int128>::max();
+//    auto result = max / base;
+//    std::cout << "\tMakeInt128(" << absl::Int128High64(result) << ", "
+//              << absl::Int128Low64(result) << "u),\n";
+//  }
+// See https://godbolt.org/z/7djYWz
+//
+// int128& operator/=(int128) is not constexpr, so hardcode the resulting array
+// to avoid a static initializer.
+template<>
+const int128 LookupTables<int128>::kVmaxOverBase[] = {
+    0,
+    0,
+    MakeInt128(4611686018427387903, 18446744073709551615u),
+    MakeInt128(3074457345618258602, 12297829382473034410u),
+    MakeInt128(2305843009213693951, 18446744073709551615u),
+    MakeInt128(1844674407370955161, 11068046444225730969u),
+    MakeInt128(1537228672809129301, 6148914691236517205u),
+    MakeInt128(1317624576693539401, 2635249153387078802u),
+    MakeInt128(1152921504606846975, 18446744073709551615u),
+    MakeInt128(1024819115206086200, 16397105843297379214u),
+    MakeInt128(922337203685477580, 14757395258967641292u),
+    MakeInt128(838488366986797800, 13415813871788764811u),
+    MakeInt128(768614336404564650, 12297829382473034410u),
+    MakeInt128(709490156681136600, 11351842506898185609u),
+    MakeInt128(658812288346769700, 10540996613548315209u),
+    MakeInt128(614891469123651720, 9838263505978427528u),
+    MakeInt128(576460752303423487, 18446744073709551615u),
+    MakeInt128(542551296285575047, 9765923333140350855u),
+    MakeInt128(512409557603043100, 8198552921648689607u),
+    MakeInt128(485440633518672410, 17475862806672206794u),
+    MakeInt128(461168601842738790, 7378697629483820646u),
+    MakeInt128(439208192231179800, 7027331075698876806u),
+    MakeInt128(419244183493398900, 6707906935894382405u),
+    MakeInt128(401016175515425035, 2406097053092550210u),
+    MakeInt128(384307168202282325, 6148914691236517205u),
+    MakeInt128(368934881474191032, 5902958103587056517u),
+    MakeInt128(354745078340568300, 5675921253449092804u),
+    MakeInt128(341606371735362066, 17763531330238827482u),
+    MakeInt128(329406144173384850, 5270498306774157604u),
+    MakeInt128(318047311615681924, 7633135478776366185u),
+    MakeInt128(307445734561825860, 4919131752989213764u),
+    MakeInt128(297528130221121800, 4760450083537948804u),
+    MakeInt128(288230376151711743, 18446744073709551615u),
+    MakeInt128(279496122328932600, 4471937957262921603u),
+    MakeInt128(271275648142787523, 14106333703424951235u),
+    MakeInt128(263524915338707880, 4216398645419326083u),
+    MakeInt128(256204778801521550, 4099276460824344803u),
+};
+
+// This kVminOverBase generated with
+//  for (int base = 2; base < 37; ++base) {
+//    absl::int128 min = std::numeric_limits<absl::int128>::min();
+//    auto result = min / base;
+//    std::cout << "\tMakeInt128(" << absl::Int128High64(result) << ", "
+//              << absl::Int128Low64(result) << "u),\n";
+//  }
+//
+// See https://godbolt.org/z/7djYWz
+//
+// int128& operator/=(int128) is not constexpr, so hardcode the resulting array
+// to avoid a static initializer.
+template<>
+const int128 LookupTables<int128>::kVminOverBase[] = {
+    0,
+    0,
+    MakeInt128(-4611686018427387904, 0u),
+    MakeInt128(-3074457345618258603, 6148914691236517206u),
+    MakeInt128(-2305843009213693952, 0u),
+    MakeInt128(-1844674407370955162, 7378697629483820647u),
+    MakeInt128(-1537228672809129302, 12297829382473034411u),
+    MakeInt128(-1317624576693539402, 15811494920322472814u),
+    MakeInt128(-1152921504606846976, 0u),
+    MakeInt128(-1024819115206086201, 2049638230412172402u),
+    MakeInt128(-922337203685477581, 3689348814741910324u),
+    MakeInt128(-838488366986797801, 5030930201920786805u),
+    MakeInt128(-768614336404564651, 6148914691236517206u),
+    MakeInt128(-709490156681136601, 7094901566811366007u),
+    MakeInt128(-658812288346769701, 7905747460161236407u),
+    MakeInt128(-614891469123651721, 8608480567731124088u),
+    MakeInt128(-576460752303423488, 0u),
+    MakeInt128(-542551296285575048, 8680820740569200761u),
+    MakeInt128(-512409557603043101, 10248191152060862009u),
+    MakeInt128(-485440633518672411, 970881267037344822u),
+    MakeInt128(-461168601842738791, 11068046444225730970u),
+    MakeInt128(-439208192231179801, 11419412998010674810u),
+    MakeInt128(-419244183493398901, 11738837137815169211u),
+    MakeInt128(-401016175515425036, 16040647020617001406u),
+    MakeInt128(-384307168202282326, 12297829382473034411u),
+    MakeInt128(-368934881474191033, 12543785970122495099u),
+    MakeInt128(-354745078340568301, 12770822820260458812u),
+    MakeInt128(-341606371735362067, 683212743470724134u),
+    MakeInt128(-329406144173384851, 13176245766935394012u),
+    MakeInt128(-318047311615681925, 10813608594933185431u),
+    MakeInt128(-307445734561825861, 13527612320720337852u),
+    MakeInt128(-297528130221121801, 13686293990171602812u),
+    MakeInt128(-288230376151711744, 0u),
+    MakeInt128(-279496122328932601, 13974806116446630013u),
+    MakeInt128(-271275648142787524, 4340410370284600381u),
+    MakeInt128(-263524915338707881, 14230345428290225533u),
+    MakeInt128(-256204778801521551, 14347467612885206813u),
+};
 
 template <typename IntType>
 const IntType LookupTables<IntType>::kVmaxOverBase[] =
@@ -796,6 +922,8 @@ inline bool safe_parse_positive_int(absl::string_view text, int base,
   assert(base >= 0);
   assert(vmax >= static_cast<IntType>(base));
   const IntType vmax_over_base = LookupTables<IntType>::kVmaxOverBase[base];
+  assert(base < 2 ||
+         std::numeric_limits<IntType>::max() / base == vmax_over_base);
   const char* start = text.data();
   const char* end = start + text.size();
   // loop over digits
@@ -829,6 +957,8 @@ inline bool safe_parse_negative_int(absl::string_view text, int base,
   assert(vmin < 0);
   assert(vmin <= 0 - base);
   IntType vmin_over_base = LookupTables<IntType>::kVminOverBase[base];
+  assert(base < 2 ||
+         std::numeric_limits<IntType>::min() / base == vmin_over_base);
   // 2003 c++ standard [expr.mul]
   // "... the sign of the remainder is implementation-defined."
   // Although (vmin/base)*base + vmin%base is always vmin.
@@ -892,12 +1022,58 @@ inline bool safe_uint_internal(absl::string_view text, IntType* value_p,
 }  // anonymous namespace
 
 namespace numbers_internal {
+
+// Digit conversion.
+ABSL_CONST_INIT ABSL_DLL const char kHexChar[] =
+    "0123456789abcdef";
+
+ABSL_CONST_INIT ABSL_DLL const char kHexTable[513] =
+    "000102030405060708090a0b0c0d0e0f"
+    "101112131415161718191a1b1c1d1e1f"
+    "202122232425262728292a2b2c2d2e2f"
+    "303132333435363738393a3b3c3d3e3f"
+    "404142434445464748494a4b4c4d4e4f"
+    "505152535455565758595a5b5c5d5e5f"
+    "606162636465666768696a6b6c6d6e6f"
+    "707172737475767778797a7b7c7d7e7f"
+    "808182838485868788898a8b8c8d8e8f"
+    "909192939495969798999a9b9c9d9e9f"
+    "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
+    "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
+    "c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
+    "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
+    "e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
+    "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
+
+ABSL_CONST_INIT ABSL_DLL const char two_ASCII_digits[100][2] = {
+    {'0', '0'}, {'0', '1'}, {'0', '2'}, {'0', '3'}, {'0', '4'}, {'0', '5'},
+    {'0', '6'}, {'0', '7'}, {'0', '8'}, {'0', '9'}, {'1', '0'}, {'1', '1'},
+    {'1', '2'}, {'1', '3'}, {'1', '4'}, {'1', '5'}, {'1', '6'}, {'1', '7'},
+    {'1', '8'}, {'1', '9'}, {'2', '0'}, {'2', '1'}, {'2', '2'}, {'2', '3'},
+    {'2', '4'}, {'2', '5'}, {'2', '6'}, {'2', '7'}, {'2', '8'}, {'2', '9'},
+    {'3', '0'}, {'3', '1'}, {'3', '2'}, {'3', '3'}, {'3', '4'}, {'3', '5'},
+    {'3', '6'}, {'3', '7'}, {'3', '8'}, {'3', '9'}, {'4', '0'}, {'4', '1'},
+    {'4', '2'}, {'4', '3'}, {'4', '4'}, {'4', '5'}, {'4', '6'}, {'4', '7'},
+    {'4', '8'}, {'4', '9'}, {'5', '0'}, {'5', '1'}, {'5', '2'}, {'5', '3'},
+    {'5', '4'}, {'5', '5'}, {'5', '6'}, {'5', '7'}, {'5', '8'}, {'5', '9'},
+    {'6', '0'}, {'6', '1'}, {'6', '2'}, {'6', '3'}, {'6', '4'}, {'6', '5'},
+    {'6', '6'}, {'6', '7'}, {'6', '8'}, {'6', '9'}, {'7', '0'}, {'7', '1'},
+    {'7', '2'}, {'7', '3'}, {'7', '4'}, {'7', '5'}, {'7', '6'}, {'7', '7'},
+    {'7', '8'}, {'7', '9'}, {'8', '0'}, {'8', '1'}, {'8', '2'}, {'8', '3'},
+    {'8', '4'}, {'8', '5'}, {'8', '6'}, {'8', '7'}, {'8', '8'}, {'8', '9'},
+    {'9', '0'}, {'9', '1'}, {'9', '2'}, {'9', '3'}, {'9', '4'}, {'9', '5'},
+    {'9', '6'}, {'9', '7'}, {'9', '8'}, {'9', '9'}};
+
 bool safe_strto32_base(absl::string_view text, int32_t* value, int base) {
   return safe_int_internal<int32_t>(text, value, base);
 }
 
 bool safe_strto64_base(absl::string_view text, int64_t* value, int base) {
   return safe_int_internal<int64_t>(text, value, base);
+}
+
+bool safe_strto128_base(absl::string_view text, int128* value, int base) {
+  return safe_int_internal<absl::int128>(text, value, base);
 }
 
 bool safe_strtou32_base(absl::string_view text, uint32_t* value, int base) {
@@ -907,6 +1083,11 @@ bool safe_strtou32_base(absl::string_view text, uint32_t* value, int base) {
 bool safe_strtou64_base(absl::string_view text, uint64_t* value, int base) {
   return safe_uint_internal<uint64_t>(text, value, base);
 }
-}  // namespace numbers_internal
 
+bool safe_strtou128_base(absl::string_view text, uint128* value, int base) {
+  return safe_uint_internal<absl::uint128>(text, value, base);
+}
+
+}  // namespace numbers_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

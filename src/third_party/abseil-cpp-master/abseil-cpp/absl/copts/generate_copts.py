@@ -70,8 +70,9 @@ class StarlarkStyle(object):
     return "GENERATED_copts.bzl"
 
 
-# Copt file generation
 def copt_list(name, arg_list, style):
+  """Copt file generation."""
+
   make_line = lambda s: "    \"" + s + "\"" + style.separator()
   external_str_list = [make_line(s) for s in arg_list]
 

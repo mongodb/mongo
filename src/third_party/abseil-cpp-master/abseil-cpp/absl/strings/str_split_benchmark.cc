@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -44,6 +44,29 @@ void BM_Split2StringView(benchmark::State& state) {
 }
 BENCHMARK_RANGE(BM_Split2StringView, 0, 1 << 20);
 
+static const absl::string_view kDelimiters = ";:,.";
+
+std::string MakeMultiDelimiterTestString(int desired_length) {
+  static const int kAverageValueLen = 25;
+  std::string test(desired_length * kAverageValueLen, 'x');
+  for (int i = 0; i * kAverageValueLen < test.size(); ++i) {
+    // Cycle through a variety of delimiters.
+    test[i * kAverageValueLen] = kDelimiters[i % kDelimiters.size()];
+  }
+  return test;
+}
+
+// Measure StrSplit with ByAnyChar with four delimiters to choose from.
+void BM_Split2StringViewByAnyChar(benchmark::State& state) {
+  std::string test = MakeMultiDelimiterTestString(state.range(0));
+  for (auto _ : state) {
+    std::vector<absl::string_view> result =
+        absl::StrSplit(test, absl::ByAnyChar(kDelimiters));
+    benchmark::DoNotOptimize(result);
+  }
+}
+BENCHMARK_RANGE(BM_Split2StringViewByAnyChar, 0, 1 << 20);
+
 void BM_Split2StringViewLifted(benchmark::State& state) {
   std::string test = MakeTestString(state.range(0));
   std::vector<absl::string_view> result;
@@ -69,7 +92,8 @@ BENCHMARK_RANGE(BM_Split2String, 0, 1 << 20);
 void BM_Split2SplitStringUsing(benchmark::State& state) {
   std::string test = MakeTestString(state.range(0));
   for (auto _ : state) {
-    std::vector<std::string> result = absl::StrSplit(test, ';', absl::SkipEmpty());
+    std::vector<std::string> result =
+        absl::StrSplit(test, ';', absl::SkipEmpty());
     benchmark::DoNotOptimize(result);
   }
 }

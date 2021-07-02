@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -47,12 +47,13 @@
 #endif  // _GLIBCXX_DEBUG
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace strings_internal {
 
 // This class is implicitly constructible from everything that absl::string_view
-// is implicitly constructible from. If it's constructed from a temporary
-// string, the data is moved into a data member so its lifetime matches that of
-// the ConvertibleToStringView instance.
+// is implicitly constructible from, except for rvalue strings.  This means it
+// can be used as a function parameter in places where passing a temporary
+// string might cause memory lifetime issues.
 class ConvertibleToStringView {
  public:
   ConvertibleToStringView(const char* s)  // NOLINT(runtime/explicit)
@@ -64,41 +65,12 @@ class ConvertibleToStringView {
       : value_(s) {}
 
   // Matches rvalue strings and moves their data to a member.
-ConvertibleToStringView(std::string&& s)  // NOLINT(runtime/explicit)
-    : copy_(std::move(s)), value_(copy_) {}
-
-  ConvertibleToStringView(const ConvertibleToStringView& other)
-      : copy_(other.copy_),
-        value_(other.IsSelfReferential() ? copy_ : other.value_) {}
-
-  ConvertibleToStringView(ConvertibleToStringView&& other) {
-    StealMembers(std::move(other));
-  }
-
-  ConvertibleToStringView& operator=(ConvertibleToStringView other) {
-    StealMembers(std::move(other));
-    return *this;
-  }
+  ConvertibleToStringView(std::string&& s) = delete;
+  ConvertibleToStringView(const std::string&& s) = delete;
 
   absl::string_view value() const { return value_; }
 
  private:
-  // Returns true if ctsp's value refers to its internal copy_ member.
-  bool IsSelfReferential() const { return value_.data() == copy_.data(); }
-
-  void StealMembers(ConvertibleToStringView&& other) {
-    if (other.IsSelfReferential()) {
-      copy_ = std::move(other.copy_);
-      value_ = copy_;
-      other.value_ = other.copy_;
-    } else {
-      value_ = other.value_;
-    }
-  }
-
-  // Holds the data moved from temporary std::string arguments. Declared first so
-  // that 'value' can refer to 'copy_'.
-  std::string copy_;
   absl::string_view value_;
 };
 
@@ -272,7 +244,11 @@ struct SplitterIsConvertibleTo
 // the split strings: only strings for which the predicate returns true will be
 // kept. A Predicate object is any unary functor that takes an absl::string_view
 // and returns bool.
-template <typename Delimiter, typename Predicate>
+//
+// The StringType parameter can be either string_view or string, depending on
+// whether the Splitter refers to a string stored elsewhere, or if the string
+// resides inside the Splitter itself.
+template <typename Delimiter, typename Predicate, typename StringType>
 class Splitter {
  public:
   using DelimiterType = Delimiter;
@@ -280,12 +256,12 @@ class Splitter {
   using const_iterator = strings_internal::SplitIterator<Splitter>;
   using value_type = typename std::iterator_traits<const_iterator>::value_type;
 
-  Splitter(ConvertibleToStringView input_text, Delimiter d, Predicate p)
+  Splitter(StringType input_text, Delimiter d, Predicate p)
       : text_(std::move(input_text)),
         delimiter_(std::move(d)),
         predicate_(std::move(p)) {}
 
-  absl::string_view text() const { return text_.value(); }
+  absl::string_view text() const { return text_; }
   const Delimiter& delimiter() const { return delimiter_; }
   const Predicate& predicate() const { return predicate_; }
 
@@ -335,7 +311,7 @@ class Splitter {
     Container operator()(const Splitter& splitter) const {
       Container c;
       auto it = std::inserter(c, c.end());
-      for (const auto sp : splitter) {
+      for (const auto& sp : splitter) {
         *it++ = ValueType(sp);
       }
       return c;
@@ -376,10 +352,10 @@ class Splitter {
 
   // Partial specialization for a std::vector<std::string>.
   //
-  // Optimized for the common case of splitting to a std::vector<std::string>. In
-  // this case we first split the results to a std::vector<absl::string_view> so
-  // the returned std::vector<std::string> can have space reserved to avoid std::string
-  // moves.
+  // Optimized for the common case of splitting to a std::vector<std::string>.
+  // In this case we first split the results to a std::vector<absl::string_view>
+  // so the returned std::vector<std::string> can have space reserved to avoid
+  // std::string moves.
   template <typename A>
   struct ConvertToContainer<std::vector<std::string, A>, std::string, false> {
     std::vector<std::string, A> operator()(const Splitter& splitter) const {
@@ -400,7 +376,7 @@ class Splitter {
       Container m;
       typename Container::iterator it;
       bool insert = true;
-      for (const auto sp : splitter) {
+      for (const auto& sp : splitter) {
         if (insert) {
           it = Inserter<Container>::Insert(&m, First(sp), Second());
         } else {
@@ -442,12 +418,13 @@ class Splitter {
     };
   };
 
-  ConvertibleToStringView text_;
+  StringType text_;
   Delimiter delimiter_;
   Predicate predicate_;
 };
 
 }  // namespace strings_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_STRINGS_INTERNAL_STR_SPLIT_INTERNAL_H_

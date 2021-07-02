@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,15 +31,18 @@
 #ifndef ABSL_DEBUGGING_STACKTRACE_H_
 #define ABSL_DEBUGGING_STACKTRACE_H_
 
+#include "absl/base/config.h"
+
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 // GetStackFrames()
 //
 // Records program counter values for up to `max_depth` frames, skipping the
-// most recent `skip_count` stack frames, and stores their corresponding values
-// and sizes in `results` and `sizes` buffers. (Note that the frame generated
-// for the `absl::GetStackFrames()` routine itself is also skipped.)
-// routine itself.
+// most recent `skip_count` stack frames, stores their corresponding values
+// and sizes in `results` and `sizes` buffers, and returns the number of frames
+// stored. (Note that the frame generated for the `absl::GetStackFrames()`
+// routine itself is also skipped.)
 //
 // Example:
 //
@@ -54,8 +57,8 @@ namespace absl {
 // The current stack frame would consist of three function calls: `bar()`,
 // `foo()`, and then `main()`; however, since the `GetStackFrames()` call sets
 // `skip_count` to `1`, it will skip the frame for `bar()`, the most recently
-// invoked function call. It will therefore return two program counters and will
-// produce values that map to the following function calls:
+// invoked function call. It will therefore return 2 and fill `result` with
+// program counters within the following functions:
 //
 //      result[0]       foo()
 //      result[1]       main()
@@ -82,9 +85,10 @@ extern int GetStackFrames(void** result, int* sizes, int max_depth,
 //
 // Records program counter values obtained from a signal handler. Records
 // program counter values for up to `max_depth` frames, skipping the most recent
-// `skip_count` stack frames, and stores their corresponding values and sizes in
-// `results` and `sizes` buffers. (Note that the frame generated for the
-// `absl::GetStackFramesWithContext()` routine itself is also skipped.)
+// `skip_count` stack frames, stores their corresponding values and sizes in
+// `results` and `sizes` buffers, and returns the number of frames stored. (Note
+// that the frame generated for the `absl::GetStackFramesWithContext()` routine
+// itself is also skipped.)
 //
 // The `uc` parameter, if non-null, should be a pointer to a `ucontext_t` value
 // passed to a signal handler registered via the `sa_sigaction` field of a
@@ -105,8 +109,9 @@ extern int GetStackFramesWithContext(void** result, int* sizes, int max_depth,
 // GetStackTrace()
 //
 // Records program counter values for up to `max_depth` frames, skipping the
-// most recent `skip_count` stack frames, and stores their corresponding values
-// in `results`. Note that this function is similar to `absl::GetStackFrames()`
+// most recent `skip_count` stack frames, stores their corresponding values
+// in `results`, and returns the number of frames
+// stored. Note that this function is similar to `absl::GetStackFrames()`
 // except that it returns the stack trace only, and not stack frame sizes.
 //
 // Example:
@@ -131,9 +136,9 @@ extern int GetStackTrace(void** result, int max_depth, int skip_count);
 //
 // Records program counter values obtained from a signal handler. Records
 // program counter values for up to `max_depth` frames, skipping the most recent
-// `skip_count` stack frames, and stores their corresponding values in
-// `results`. (Note that the frame generated for the
-// `absl::GetStackFramesWithContext()` routine itself is also skipped.)
+// `skip_count` stack frames, stores their corresponding values in `results`,
+// and returns the number of frames stored. (Note that the frame generated for
+// the `absl::GetStackFramesWithContext()` routine itself is also skipped.)
 //
 // The `uc` parameter, if non-null, should be a pointer to a `ucontext_t` value
 // passed to a signal handler registered via the `sa_sigaction` field of a
@@ -220,6 +225,7 @@ namespace debugging_internal {
 // working.
 extern bool StackTraceWorksForTest();
 }  // namespace debugging_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_DEBUGGING_STACKTRACE_H_

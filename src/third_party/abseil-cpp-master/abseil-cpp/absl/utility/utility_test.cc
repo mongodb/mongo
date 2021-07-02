@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -135,7 +135,7 @@ struct PoorStrCat {
 
 template <typename Tup, size_t... Is>
 std::vector<std::string> TupStringVecImpl(const Tup& tup,
-                                     absl::index_sequence<Is...>) {
+                                          absl::index_sequence<Is...>) {
   return {Fmt(std::get<Is>(tup))...};
 }
 
@@ -339,6 +339,37 @@ TEST(ExchangeTest, MoveOnly) {
   auto b = absl::exchange(a, Factory(2));
   EXPECT_EQ(2, *a);
   EXPECT_EQ(1, *b);
+}
+
+TEST(MakeFromTupleTest, String) {
+  EXPECT_EQ(
+      absl::make_from_tuple<std::string>(std::make_tuple("hello world", 5)),
+      "hello");
+}
+
+TEST(MakeFromTupleTest, MoveOnlyParameter) {
+  struct S {
+    S(std::unique_ptr<int> n, std::unique_ptr<int> m) : value(*n + *m) {}
+    int value = 0;
+  };
+  auto tup =
+      std::make_tuple(absl::make_unique<int>(3), absl::make_unique<int>(4));
+  auto s = absl::make_from_tuple<S>(std::move(tup));
+  EXPECT_EQ(s.value, 7);
+}
+
+TEST(MakeFromTupleTest, NoParameters) {
+  struct S {
+    S() : value(1) {}
+    int value = 2;
+  };
+  EXPECT_EQ(absl::make_from_tuple<S>(std::make_tuple()).value, 1);
+}
+
+TEST(MakeFromTupleTest, Pair) {
+  EXPECT_EQ(
+      (absl::make_from_tuple<std::pair<bool, int>>(std::make_tuple(true, 17))),
+      std::make_pair(true, 17));
 }
 
 }  // namespace

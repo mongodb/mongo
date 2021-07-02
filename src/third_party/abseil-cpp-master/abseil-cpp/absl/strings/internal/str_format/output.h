@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,9 +28,8 @@
 #include "absl/base/port.h"
 #include "absl/strings/string_view.h"
 
-class Cord;
-
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace str_format_internal {
 
 // RawSink implementation that writes into a char* buffer.
@@ -75,12 +74,6 @@ inline void AbslFormatFlush(std::ostream* out, string_view s) {
   out->write(s.data(), s.size());
 }
 
-template <class AbslCord, typename = typename std::enable_if<
-                              std::is_same<AbslCord, ::Cord>::value>::type>
-inline void AbslFormatFlush(AbslCord* out, string_view s) {
-  out->Append(s);
-}
-
 inline void AbslFormatFlush(FILERawSink* sink, string_view v) {
   sink->Write(v);
 }
@@ -89,13 +82,15 @@ inline void AbslFormatFlush(BufferRawSink* sink, string_view v) {
   sink->Write(v);
 }
 
+// This is a SFINAE to get a better compiler error message when the type
+// is not supported.
 template <typename T>
-auto InvokeFlush(T* out, string_view s)
-    -> decltype(str_format_internal::AbslFormatFlush(out, s)) {
-  str_format_internal::AbslFormatFlush(out, s);
+auto InvokeFlush(T* out, string_view s) -> decltype(AbslFormatFlush(out, s)) {
+  AbslFormatFlush(out, s);
 }
 
 }  // namespace str_format_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_STRINGS_INTERNAL_STR_FORMAT_OUTPUT_H_

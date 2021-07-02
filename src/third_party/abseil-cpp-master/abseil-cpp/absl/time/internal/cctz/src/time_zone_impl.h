@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//   https://www.apache.org/licenses/LICENSE-2.0
 //
 //   Unless required by applicable law or agreed to in writing, software
 //   distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,12 +18,14 @@
 #include <memory>
 #include <string>
 
+#include "absl/base/config.h"
 #include "absl/time/internal/cctz/include/cctz/civil_time.h"
 #include "absl/time/internal/cctz/include/cctz/time_zone.h"
 #include "time_zone_if.h"
 #include "time_zone_info.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace time_internal {
 namespace cctz {
 
@@ -69,7 +71,7 @@ class time_zone::Impl {
     return zone_->PrevTransition(tp, trans);
   }
 
-  // Returns an implementation-defined version std::string for this time zone.
+  // Returns an implementation-defined version string for this time zone.
   std::string Version() const { return zone_->Version(); }
 
   // Returns an implementation-defined description of this time zone.
@@ -85,6 +87,7 @@ class time_zone::Impl {
 
 }  // namespace cctz
 }  // namespace time_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_TIME_INTERNAL_CCTZ_TIME_ZONE_IMPL_H_

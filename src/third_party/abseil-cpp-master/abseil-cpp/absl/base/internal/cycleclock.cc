@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,11 +22,13 @@
 
 #include "absl/base/internal/cycleclock.h"
 
+#include <atomic>
 #include <chrono>  // NOLINT(build/c++11)
 
 #include "absl/base/internal/unscaledcycleclock.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace base_internal {
 
 #if ABSL_USE_UNSCALED_CYCLECLOCK
@@ -52,15 +54,38 @@ static constexpr int32_t kShift = 2;
 #endif
 
 static constexpr double kFrequencyScale = 1.0 / (1 << kShift);
+static std::atomic<CycleClockSourceFunc> cycle_clock_source;
+
+CycleClockSourceFunc LoadCycleClockSource() {
+  // Optimize for the common case (no callback) by first doing a relaxed load;
+  // this is significantly faster on non-x86 platforms.
+  if (cycle_clock_source.load(std::memory_order_relaxed) == nullptr) {
+    return nullptr;
+  }
+  // This corresponds to the store(std::memory_order_release) in
+  // CycleClockSource::Register, and makes sure that any updates made prior to
+  // registering the callback are visible to this thread before the callback is
+  // invoked.
+  return cycle_clock_source.load(std::memory_order_acquire);
+}
 
 }  // namespace
 
 int64_t CycleClock::Now() {
-  return base_internal::UnscaledCycleClock::Now() >> kShift;
+  auto fn = LoadCycleClockSource();
+  if (fn == nullptr) {
+    return base_internal::UnscaledCycleClock::Now() >> kShift;
+  }
+  return fn() >> kShift;
 }
 
 double CycleClock::Frequency() {
   return kFrequencyScale * base_internal::UnscaledCycleClock::Frequency();
+}
+
+void CycleClockSource::Register(CycleClockSourceFunc source) {
+  // Corresponds to the load(std::memory_order_acquire) in LoadCycleClockSource.
+  cycle_clock_source.store(source, std::memory_order_release);
 }
 
 #else
@@ -78,4 +103,5 @@ double CycleClock::Frequency() {
 #endif
 
 }  // namespace base_internal
+ABSL_NAMESPACE_END
 }  // namespace absl

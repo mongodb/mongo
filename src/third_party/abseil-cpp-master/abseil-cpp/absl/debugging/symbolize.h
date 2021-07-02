@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -55,6 +55,7 @@
 #include "absl/debugging/internal/symbolize.h"
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 // InitializeSymbolizer()
 //
@@ -70,7 +71,7 @@ namespace absl {
 //   // Now you can use the symbolizer
 // }
 void InitializeSymbolizer(const char* argv0);
-
+//
 // Symbolize()
 //
 // Symbolizes a program counter (instruction pointer value) `pc` and, on
@@ -88,10 +89,11 @@ void InitializeSymbolizer(const char* argv0);
 //     if (absl::Symbolize(pc, tmp, sizeof(tmp))) {
 //       symbol = tmp;
 //     }
-//     absl::PrintF("%*p  %s\n", pc, symbol);
+//     absl::PrintF("%p  %s\n", pc, symbol);
 //  }
 bool Symbolize(const void *pc, char *out, int out_size);
 
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_DEBUGGING_SYMBOLIZE_H_

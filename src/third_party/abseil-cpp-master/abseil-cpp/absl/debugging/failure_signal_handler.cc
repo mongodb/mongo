@@ -5,7 +5,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,12 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
+#include <sched.h>
 #include <unistd.h>
+#endif
+
+#ifdef __APPLE__
+#include <TargetConditionals.h>
 #endif
 
 #ifdef ABSL_HAVE_MMAP
@@ -37,6 +42,7 @@
 #include <ctime>
 
 #include "absl/base/attributes.h"
+#include "absl/base/internal/errno_saver.h"
 #include "absl/base/internal/raw_logging.h"
 #include "absl/base/internal/sysinfo.h"
 #include "absl/debugging/internal/examine_stack.h"
@@ -44,9 +50,15 @@
 
 #ifndef _WIN32
 #define ABSL_HAVE_SIGACTION
+// Apple WatchOS and TVOS don't allow sigaltstack
+#if !(defined(TARGET_OS_WATCH) && TARGET_OS_WATCH) && \
+    !(defined(TARGET_OS_TV) && TARGET_OS_TV)
+#define ABSL_HAVE_SIGALTSTACK
+#endif
 #endif
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 
 ABSL_CONST_INIT static FailureSignalHandlerOptions fsh_options;
 
@@ -116,7 +128,7 @@ const char* FailureSignalToString(int signo) {
 
 }  // namespace debugging_internal
 
-#ifndef _WIN32
+#ifdef ABSL_HAVE_SIGALTSTACK
 
 static bool SetupAlternateStackOnce() {
 #if defined(__wasm__) || defined (__asjms__)
@@ -125,8 +137,8 @@ static bool SetupAlternateStackOnce() {
   const size_t page_mask = sysconf(_SC_PAGESIZE) - 1;
 #endif
   size_t stack_size = (std::max(SIGSTKSZ, 65536) + page_mask) & ~page_mask;
-#if defined(ADDRESS_SANITIZER) || defined(MEMORY_SANITIZER) || \
-    defined(THREAD_SANITIZER)
+#if defined(ABSL_HAVE_ADDRESS_SANITIZER) || \
+    defined(ABSL_HAVE_MEMORY_SANITIZER) || defined(ABSL_HAVE_THREAD_SANITIZER)
   // Account for sanitizer instrumentation requiring additional stack space.
   stack_size *= 5;
 #endif
@@ -168,7 +180,7 @@ static bool SetupAlternateStackOnce() {
 // Returns the appropriate flag for sig_action.sa_flags
 // if the system supports using an alternate stack.
 static int MaybeSetupAlternateStack() {
-#ifndef _WIN32
+#ifdef ABSL_HAVE_SIGALTSTACK
   ABSL_ATTRIBUTE_UNUSED static const bool kOnce = SetupAlternateStackOnce();
   return SA_ONSTACK;
 #else
@@ -204,22 +216,28 @@ static void InstallOneFailureHandler(FailureSignalData* data,
 #endif
 
 static void WriteToStderr(const char* data) {
-  int old_errno = errno;
+  absl::base_internal::ErrnoSaver errno_saver;
   absl::raw_logging_internal::SafeWriteToStderr(data, strlen(data));
-  errno = old_errno;
 }
 
-static void WriteSignalMessage(int signo, void (*writerfn)(const char*)) {
-  char buf[64];
+static void WriteSignalMessage(int signo, int cpu,
+                               void (*writerfn)(const char*)) {
+  char buf[96];
+  char on_cpu[32] = {0};
+  if (cpu != -1) {
+    snprintf(on_cpu, sizeof(on_cpu), " on cpu %d", cpu);
+  }
   const char* const signal_string =
       debugging_internal::FailureSignalToString(signo);
   if (signal_string != nullptr && signal_string[0] != '\0') {
-    snprintf(buf, sizeof(buf), "*** %s received at time=%ld ***\n",
+    snprintf(buf, sizeof(buf), "*** %s received at time=%ld%s ***\n",
              signal_string,
-             static_cast<long>(time(nullptr)));  // NOLINT(runtime/int)
+             static_cast<long>(time(nullptr)),   // NOLINT(runtime/int)
+             on_cpu);
   } else {
-    snprintf(buf, sizeof(buf), "*** Signal %d received at time=%ld ***\n",
-             signo, static_cast<long>(time(nullptr)));  // NOLINT(runtime/int)
+    snprintf(buf, sizeof(buf), "*** Signal %d received at time=%ld%s ***\n",
+             signo, static_cast<long>(time(nullptr)),  // NOLINT(runtime/int)
+             on_cpu);
   }
   writerfn(buf);
 }
@@ -259,10 +277,10 @@ ABSL_ATTRIBUTE_NOINLINE static void WriteStackTrace(
 // Called by AbslFailureSignalHandler() to write the failure info. It is
 // called once with writerfn set to WriteToStderr() and then possibly
 // with writerfn set to the user provided function.
-static void WriteFailureInfo(int signo, void* ucontext,
+static void WriteFailureInfo(int signo, void* ucontext, int cpu,
                              void (*writerfn)(const char*)) {
   WriterFnStruct writerfn_struct{writerfn};
-  WriteSignalMessage(signo, writerfn);
+  WriteSignalMessage(signo, cpu, writerfn);
   WriteStackTrace(ucontext, fsh_options.symbolize_stacktrace, WriterFnWrapper,
                   &writerfn_struct);
 }
@@ -324,6 +342,14 @@ static void AbslFailureSignalHandler(int signo, siginfo_t*, void* ucontext) {
     }
   }
 
+  // Increase the chance that the CPU we report was the same CPU on which the
+  // signal was received by doing this as early as possible, i.e. after
+  // verifying that this is not a recursive signal handler invocation.
+  int my_cpu = -1;
+#ifdef ABSL_HAVE_SCHED_GETCPU
+  my_cpu = sched_getcpu();
+#endif
+
 #ifdef ABSL_HAVE_ALARM
   // Set an alarm to abort the program in case this code hangs or deadlocks.
   if (fsh_options.alarm_on_failure_secs > 0) {
@@ -334,12 +360,12 @@ static void AbslFailureSignalHandler(int signo, siginfo_t*, void* ucontext) {
 #endif
 
   // First write to stderr.
-  WriteFailureInfo(signo, ucontext, WriteToStderr);
+  WriteFailureInfo(signo, ucontext, my_cpu, WriteToStderr);
 
   // Riskier code (because it is less likely to be async-signal-safe)
   // goes after this point.
   if (fsh_options.writerfn != nullptr) {
-    WriteFailureInfo(signo, ucontext, fsh_options.writerfn);
+    WriteFailureInfo(signo, ucontext, my_cpu, fsh_options.writerfn);
   }
 
   if (fsh_options.call_previous_handler) {
@@ -356,4 +382,5 @@ void InstallFailureSignalHandler(const FailureSignalHandlerOptions& options) {
   }
 }
 
+ABSL_NAMESPACE_END
 }  // namespace absl

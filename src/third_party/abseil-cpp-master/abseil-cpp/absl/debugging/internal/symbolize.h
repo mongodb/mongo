@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,9 +18,13 @@
 #ifndef ABSL_DEBUGGING_INTERNAL_SYMBOLIZE_H_
 #define ABSL_DEBUGGING_INTERNAL_SYMBOLIZE_H_
 
+#ifdef __cplusplus
+
 #include <cstddef>
 #include <cstdint>
-#include "absl/base/port.h"  // Needed for string vs std::string
+
+#include "absl/base/config.h"
+#include "absl/strings/string_view.h"
 
 #ifdef ABSL_INTERNAL_HAVE_ELF_SYMBOLIZE
 #error ABSL_INTERNAL_HAVE_ELF_SYMBOLIZE cannot be directly set
@@ -34,6 +38,7 @@
 #include <string>
 
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace debugging_internal {
 
 // Iterates over all sections, invoking callback on each with the section name
@@ -42,9 +47,9 @@ namespace debugging_internal {
 // Returns true on success; otherwise returns false in case of errors.
 //
 // This is not async-signal-safe.
-bool ForEachSection(
-    int fd, const std::function<bool(const std::string& name, const ElfW(Shdr) &)>&
-                callback);
+bool ForEachSection(int fd,
+                    const std::function<bool(absl::string_view name,
+                                             const ElfW(Shdr) &)>& callback);
 
 // Gets the section header for the given name, if it exists. Returns true on
 // success. Otherwise, returns false.
@@ -52,11 +57,19 @@ bool GetSectionHeaderByName(int fd, const char *name, size_t name_len,
                             ElfW(Shdr) *out);
 
 }  // namespace debugging_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
 
 #endif  // ABSL_INTERNAL_HAVE_ELF_SYMBOLIZE
 
+#ifdef ABSL_INTERNAL_HAVE_DARWIN_SYMBOLIZE
+#error ABSL_INTERNAL_HAVE_DARWIN_SYMBOLIZE cannot be directly set
+#elif defined(__APPLE__)
+#define ABSL_INTERNAL_HAVE_DARWIN_SYMBOLIZE 1
+#endif
+
 namespace absl {
+ABSL_NAMESPACE_BEGIN
 namespace debugging_internal {
 
 struct SymbolDecoratorArgs {
@@ -105,19 +118,30 @@ bool RemoveAllSymbolDecorators(void);
 //   filename != nullptr
 //
 // Returns true if the file was successfully registered.
-bool RegisterFileMappingHint(
-    const void* start, const void* end, uint64_t offset, const char* filename);
+bool RegisterFileMappingHint(const void* start, const void* end,
+                             uint64_t offset, const char* filename);
 
 // Looks up the file mapping registered by RegisterFileMappingHint for an
 // address range. If there is one, the file name is stored in *filename and
 // *start and *end are modified to reflect the registered mapping. Returns
 // whether any hint was found.
-bool GetFileMappingHint(const void** start,
-                        const void** end,
-                        uint64_t    *  offset,
+bool GetFileMappingHint(const void** start, const void** end, uint64_t* offset,
                         const char** filename);
 
 }  // namespace debugging_internal
+ABSL_NAMESPACE_END
 }  // namespace absl
+
+#endif  // __cplusplus
+
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C"
+#endif  // __cplusplus
+
+    bool
+    AbslInternalGetFileMappingHint(const void** start, const void** end,
+                                   uint64_t* offset, const char** filename);
 
 #endif  // ABSL_DEBUGGING_INTERNAL_SYMBOLIZE_H_

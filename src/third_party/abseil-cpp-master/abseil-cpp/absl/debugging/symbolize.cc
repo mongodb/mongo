@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,15 +14,23 @@
 
 #include "absl/debugging/symbolize.h"
 
+#ifdef _WIN32
+#include <winapifamily.h>
+#if !(WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP)) || \
+    WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+// UWP doesn't have access to win32 APIs.
+#define ABSL_INTERNAL_HAVE_SYMBOLIZE_WIN32
+#endif
+#endif
+
 #if defined(ABSL_INTERNAL_HAVE_ELF_SYMBOLIZE)
 #include "absl/debugging/symbolize_elf.inc"
-#elif defined(_WIN32) && defined(_DEBUG)
-// The Windows Symbolizer only works in debug mode. Note that _DEBUG
-// is the macro that defines whether or not MS C-Runtime debug info is
-// available. Note that the PDB files containing the debug info must
-// also be available to the program at runtime for the symbolizer to
-// work.
+#elif defined(ABSL_INTERNAL_HAVE_SYMBOLIZE_WIN32)
+// The Windows Symbolizer only works if PDB files containing the debug info
+// are available to the program at runtime.
 #include "absl/debugging/symbolize_win32.inc"
+#elif defined(__APPLE__)
+#include "absl/debugging/symbolize_darwin.inc"
 #else
 #include "absl/debugging/symbolize_unimplemented.inc"
 #endif

@@ -3,7 +3,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,8 +17,14 @@
 #include <ctime>
 #include <string>
 
+#include "absl/base/attributes.h"
+#include "absl/flags/flag.h"
 #include "absl/time/time.h"
 #include "benchmark/benchmark.h"
+
+ABSL_FLAG(absl::Duration, absl_duration_flag_for_benchmark,
+          absl::Milliseconds(1),
+          "Flag to use for benchmarking duration flag access speed.");
 
 namespace {
 
@@ -423,5 +429,16 @@ void BM_Duration_ParseDuration(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_Duration_ParseDuration)->DenseRange(0, kNumDurations - 1);
+
+//
+// Flag access
+//
+void BM_Duration_GetFlag(benchmark::State& state) {
+  while (state.KeepRunning()) {
+    benchmark::DoNotOptimize(
+        absl::GetFlag(FLAGS_absl_duration_flag_for_benchmark));
+  }
+}
+BENCHMARK(BM_Duration_GetFlag);
 
 }  // namespace
