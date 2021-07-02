@@ -120,7 +120,8 @@ public:
      *
      * If stale responses are is noted, we must not have noted that we cannot target.
      */
-    virtual void noteStaleDbResponse(const ShardEndpoint& endpoint,
+    virtual void noteStaleDbResponse(OperationContext* optCtx,
+                                     const ShardEndpoint& endpoint,
                                      const StaleDbRoutingVersion& staleInfo) = 0;
 
     /**

@@ -84,15 +84,19 @@ void noteStaleShardResponses(const std::vector<ShardError>& staleErrors, NSTarge
 }
 
 // Helper to note several stale db errors from a response
-void noteStaleDbResponses(const std::vector<ShardError>& staleErrors, NSTargeter* targeter) {
+void noteStaleDbResponses(OperationContext* opCtx,
+                          const std::vector<ShardError>& staleErrors,
+                          NSTargeter* targeter) {
     for (const auto& error : staleErrors) {
         LOGV2_DEBUG(22903,
                     4,
-                    "Noting stale database response from {shardId}: errorInfo",
+                    "Noting stale database response",
                     "shardId"_attr = error.endpoint.shardName,
-                    "errorInfo"_attr = error.error.toBSON());
+                    "errorInfo"_attr = error.error);
         targeter->noteStaleDbResponse(
-            error.endpoint, StaleDbRoutingVersion::parseFromCommandError(error.error.toBSON()));
+            opCtx,
+            error.endpoint,
+            StaleDbRoutingVersion::parseFromCommandError(error.error.toBSON()));
     }
 }
 
@@ -341,7 +345,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
                     if (!staleDbErrors.empty()) {
                         invariant(staleShardErrors.empty());
-                        noteStaleDbResponses(staleDbErrors, &targeter);
+                        noteStaleDbResponses(opCtx, staleDbErrors, &targeter);
                         ++stats->numStaleDbBatches;
                     }
 
