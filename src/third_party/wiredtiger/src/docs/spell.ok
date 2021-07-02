@@ -23,6 +23,7 @@ CURSTD
 CXX
 Cheng
 Christoph
+ctest
 Collet's
 Coverity
 Coverity's
@@ -456,6 +457,7 @@ nosync
 notgranted
 notyet
 nowait
+nproc
 ns
 nul
 num
@@ -631,6 +633,7 @@ versa
 viewable
 vm
 vpmsum
+VV
 warmup
 wget
 whitespace
