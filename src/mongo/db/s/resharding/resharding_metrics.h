@@ -80,6 +80,9 @@ public:
     // Allows updating metrics on "documents to copy".
     void onDocumentsCopiedForCurrentOp(int64_t documents, int64_t bytes) noexcept;
 
+    void setMinRemainingOperationTime(Milliseconds minOpTime) noexcept;
+    void setMaxRemainingOperationTime(Milliseconds maxOpTime) noexcept;
+
     // Starts/ends the timers recording the times spend in the named sections.
     void startCopyingDocuments(Date_t start);
     void endCopyingDocuments(Date_t end);

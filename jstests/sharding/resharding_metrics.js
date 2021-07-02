@@ -184,7 +184,14 @@ var initialServerStatusMetrics = {
 };
 
 verifyParticipantServerStatusOutput(reshardingTest, inputCollection, initialServerStatusMetrics);
-verifyCoordinatorServerStatusOutput(inputCollection, {lastOpEndingChunkImbalance: 0});
+
+// Min and max remaining times should be 0 because the resharding operation hasn't yet started.
+var expected = {
+    lastOpEndingChunkImbalance: 0,
+    minShardRemainingOperationTimeEstimatedMillis: 0,
+    maxShardRemainingOperationTimeEstimatedMillis: 0,
+};
+verifyCoordinatorServerStatusOutput(inputCollection, expected);
 
 var documentsInserted = [
     {_id: "stays on shard0", oldKey: -10, newKey: -10},
@@ -227,7 +234,14 @@ verifyParticipantServerStatusOutput(reshardingTest,
                                     finalServerStatusMetrics,
                                     2 /* minOplogEntriesFetchedAndApplied */);
 
-verifyCoordinatorServerStatusOutput(inputCollection, {lastOpEndingChunkImbalance: 3});
+// Min and max remaining times should be 0 because they are reset at the end of every resharding
+// operation.
+var expected = {
+    lastOpEndingChunkImbalance: 3,
+    minShardRemainingOperationTimeEstimatedMillis: 0,
+    maxShardRemainingOperationTimeEstimatedMillis: 0,
+};
+verifyCoordinatorServerStatusOutput(inputCollection, expected);
 
 reshardingTest.teardown();
 })();

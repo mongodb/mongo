@@ -63,6 +63,11 @@ class CoordinatorCommitMonitor : public std::enable_shared_from_this<Coordinator
 public:
     using TaskExecutorPtr = std::shared_ptr<executor::TaskExecutor>;
 
+    struct RemainingOperationTimes {
+        Milliseconds min;
+        Milliseconds max;
+    };
+
     CoordinatorCommitMonitor(NamespaceString ns,
                              std::vector<ShardId> recipientShards,
                              TaskExecutorPtr executor,
@@ -80,8 +85,9 @@ public:
      */
     void setNetworkExecutorForTest(TaskExecutorPtr networkExecutor);
 
+    RemainingOperationTimes queryRemainingOperationTimeForRecipients() const;
+
 private:
-    Milliseconds _queryMaxRemainingOperationTimeForRecipients() const;
     ExecutorFuture<void> _makeFuture() const;
 
     static constexpr auto kDiagnosticLogLevel = 0;
