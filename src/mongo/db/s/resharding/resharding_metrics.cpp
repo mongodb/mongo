@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 #include <algorithm>
@@ -34,6 +35,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/with_alignment.h"
 
 namespace mongo {
@@ -64,6 +66,8 @@ constexpr auto kRecipientState = "recipientState";
 constexpr auto kOpStatus = "opStatus";
 constexpr auto kLastOpEndingChunkImbalance = "lastOpEndingChunkImbalance";
 constexpr auto kOpCounters = "opcounters";
+constexpr auto kMinRemainingOperationTime = "minShardRemainingOperationTimeEstimatedMillis";
+constexpr auto kMaxRemainingOperationTime = "maxShardRemainingOperationTimeEstimatedMillis";
 
 using MetricsPtr = std::unique_ptr<ReshardingMetrics>;
 
@@ -207,6 +211,9 @@ public:
     // The ops done by resharding to keep up with the client writes.
     ReshardingOpCounters opCounters;
 
+    Milliseconds minRemainingOperationTime = Milliseconds(0);
+    Milliseconds maxRemainingOperationTime = Milliseconds(0);
+
     boost::optional<DonorStateEnum> donorState;
     boost::optional<RecipientStateEnum> recipientState;
     boost::optional<CoordinatorStateEnum> coordinatorState;
@@ -314,6 +321,13 @@ void ReshardingMetrics::onCompletion(Role role,
     // TODO Re-add this invariant once all breaking test cases have been fixed. Add invariant that
     // role being completed is a role that is in progress.
     // invariant(_currentOp.has_value(), kNoOperationInProgress);
+
+    // Reset the cumulative min and max remaining operation time to 0. Only coordinators
+    // will need to report this information, so only reset it for coordinators.
+    if (role == ReshardingMetrics::Role::kCoordinator) {
+        _cumulativeOp->minRemainingOperationTime = Milliseconds(0);
+        _cumulativeOp->maxRemainingOperationTime = Milliseconds(0);
+    }
 
     if (_currentOp->donorState && _currentOp->recipientState) {
         switch (role) {
@@ -493,6 +507,18 @@ void ReshardingMetrics::setLastReshardChunkImbalanceCount(int64_t newCount) noex
     _cumulativeOp->chunkImbalanceCount = newCount;
 }
 
+void ReshardingMetrics::setMinRemainingOperationTime(Milliseconds minTime) noexcept {
+    invariant(_currentOp, kNoOperationInProgress);
+
+    _cumulativeOp->minRemainingOperationTime = minTime;
+}
+
+void ReshardingMetrics::setMaxRemainingOperationTime(Milliseconds maxTime) noexcept {
+    invariant(_currentOp, kNoOperationInProgress);
+
+    _cumulativeOp->maxRemainingOperationTime = maxTime;
+}
+
 void ReshardingMetrics::onDocumentsCopied(int64_t documents, int64_t bytes) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
     if (!_currentOp)
@@ -669,6 +695,10 @@ boost::optional<Milliseconds> ReshardingMetrics::getOperationRemainingTime() con
 void ReshardingMetrics::serializeCumulativeOpMetrics(BSONObjBuilder* bob) const {
     stdx::lock_guard<Latch> lk(_mutex);
 
+    auto getRemainingOperationTime = [&](const Milliseconds& time) -> int64_t {
+        return durationCount<Milliseconds>(time);
+    };
+
     bob->append(kTotalOps, _started);
     bob->append(kSuccessfulOps, _succeeded);
     bob->append(kFailedOps, _failed);
@@ -682,6 +712,10 @@ void ReshardingMetrics::serializeCumulativeOpMetrics(BSONObjBuilder* bob) const 
     bob->append(kOplogsFetched, ops.oplogEntriesFetched);
     bob->append(kLastOpEndingChunkImbalance, ops.chunkImbalanceCount);
     bob->append(kOpCounters, ops.opCounters.getObj());
+    bob->append(kMinRemainingOperationTime,
+                getRemainingOperationTime(ops.minRemainingOperationTime));
+    bob->append(kMaxRemainingOperationTime,
+                getRemainingOperationTime(ops.maxRemainingOperationTime));
 }
 
 Date_t ReshardingMetrics::_now() const {

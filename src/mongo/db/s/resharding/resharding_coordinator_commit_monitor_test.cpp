@@ -41,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
@@ -91,6 +92,8 @@ protected:
     void tearDown() override;
 
     void mockCommandForRecipients(Milliseconds remainingOperationTime);
+    void mockRemaingOperationTimesCommandForRecipients(
+        CoordinatorCommitMonitor::RemainingOperationTimes remainingOperationTimes);
 
 private:
     const NamespaceString _ns{"test.test"};
@@ -113,6 +116,11 @@ auto makeExecutor() {
 
 void CoordinatorCommitMonitorTest::setUp() {
     ConfigServerTestFixture::setUp();
+
+    auto metrics = ReshardingMetrics::get(getServiceContext());
+    metrics->onStart(ReshardingMetrics::Role::kCoordinator,
+                     getServiceContext()->getFastClockSource()->now());
+    metrics->setCoordinatorState(CoordinatorStateEnum::kApplying);
 
     auto hostNameForShard = [](const ShardId& shard) -> std::string {
         return fmt::format("{}:1234", shard.toString());
@@ -170,6 +178,50 @@ void CoordinatorCommitMonitorTest::mockCommandForRecipients(Milliseconds remaini
 
     std::for_each(
         _recipientShards.begin(), _recipientShards.end(), [&](const ShardId&) { onCommand(func); });
+}
+
+void CoordinatorCommitMonitorTest::mockRemaingOperationTimesCommandForRecipients(
+    CoordinatorCommitMonitor::RemainingOperationTimes remainingOperationTimes) {
+    bool useMin = true;
+    auto func = [&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        LOGV2(5727600, "Mocking command response", "command"_attr = request.cmdObj);
+
+        if (_runOnMockingNextResponse) {
+            (*_runOnMockingNextResponse)();
+            _runOnMockingNextResponse = boost::none;
+        }
+
+        if (useMin) {
+            useMin = false;
+            return BSON("remainingMillis"
+                        << durationCount<Milliseconds>(remainingOperationTimes.min));
+        } else {
+            return BSON("remainingMillis"
+                        << durationCount<Milliseconds>(remainingOperationTimes.max));
+        }
+    };
+
+    std::for_each(
+        _recipientShards.begin(), _recipientShards.end(), [&](const ShardId&) { onCommand(func); });
+}
+
+TEST_F(CoordinatorCommitMonitorTest, ComputesMinAndMaxRemainingTimes) {
+    auto future = launchAsync([this] {
+        ThreadClient tc(getServiceContext());
+        return getCommitMonitor()->queryRemainingOperationTimeForRecipients();
+    });
+
+    auto minTimeMillis = 1;
+    auto maxTimeMillis = 8;
+
+    CoordinatorCommitMonitor::RemainingOperationTimes remainingOpTimes = {
+        Milliseconds(minTimeMillis), Milliseconds(maxTimeMillis)};
+
+    mockRemaingOperationTimesCommandForRecipients(remainingOpTimes);
+
+    auto newRemainingOpTimes = future.default_timed_get();
+    ASSERT_EQUALS(newRemainingOpTimes.min, remainingOpTimes.min);
+    ASSERT_EQUALS(newRemainingOpTimes.max, remainingOpTimes.max);
 }
 
 TEST_F(CoordinatorCommitMonitorTest, UnblocksWhenRecipientsWithinCommitThreshold) {

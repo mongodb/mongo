@@ -39,6 +39,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -395,6 +396,41 @@ TEST_F(ReshardingMetricsTest, CurrentOpMetricsAreNotRetainedAfterStepDown) {
     advanceTime();
 
     ASSERT_FALSE(getReport(OpReportType::CurrentOpReportRecipientRole)[kTag].ok());
+}
+
+TEST_F(ReshardingMetricsTest, CumulativeOpMetricsAreSetAndReset) {
+    const auto kExpectedMin = Milliseconds(1);
+    const auto kExpectedMax = Milliseconds(8);
+    auto constexpr kMinOpTime = "minShardRemainingOperationTimeEstimatedMillis";
+    auto constexpr kMaxOpTime = "maxShardRemainingOperationTimeEstimatedMillis";
+    startOperation(ReshardingMetrics::Role::kCoordinator);
+    getMetrics()->setCoordinatorState(CoordinatorStateEnum::kBlockingWrites);
+
+    getMetrics()->setMinRemainingOperationTime(kExpectedMin);
+    checkMetrics(kMinOpTime,
+                 durationCount<Milliseconds>(kExpectedMin),
+                 "Cumulative metrics minimum time remaining is not set",
+                 OpReportType::CumulativeReport);
+
+    getMetrics()->setMaxRemainingOperationTime(kExpectedMax);
+    checkMetrics(kMaxOpTime,
+                 durationCount<Milliseconds>(kExpectedMax),
+                 "Cumulative metrics maximum time remaining is not set",
+                 OpReportType::CumulativeReport);
+
+    advanceTime();
+    completeOperation(ReshardingMetrics::Role::kCoordinator,
+                      ReshardingOperationStatusEnum::kSuccess);
+    advanceTime();
+    checkMetrics(kMinOpTime,
+                 0,
+                 "Cumulative metrics minimum time remaining is not reset",
+                 OpReportType::CumulativeReport);
+
+    checkMetrics(kMaxOpTime,
+                 0,
+                 "Cumulative metrics maximum time remaining is not reset",
+                 OpReportType::CumulativeReport);
 }
 
 TEST_F(ReshardingMetricsTest, EstimatedRemainingOperationTime) {
