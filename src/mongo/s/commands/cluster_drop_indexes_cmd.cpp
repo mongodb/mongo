@@ -83,11 +83,18 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kNotIdempotent);
-        return appendRawResponses(opCtx,
-                                  &errmsg,
-                                  &output,
-                                  std::move(shardResponses),
-                                  {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound});
+        const bool ok =
+            appendRawResponses(opCtx,
+                               &errmsg,
+                               &output,
+                               std::move(shardResponses),
+                               {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound});
+
+        if (ok) {
+            log() << "Indexes dropped on namespace " << nss;
+        }
+
+        return ok;
     }
 
 } dropIndexesCmd;

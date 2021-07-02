@@ -76,11 +76,17 @@ public:
         auto shardResponses = dispatchCommandAssertCollectionExistsOnAtLeastOneShard(
             opCtx, nss, ReadPreference::PrimaryOnly, cmdObj);
 
-        return appendRawResponses(opCtx,
-                                  &errmsg,
-                                  &output,
-                                  std::move(shardResponses),
-                                  {ErrorCodes::CannotImplicitlyCreateCollection});
+        const bool ok = appendRawResponses(opCtx,
+                                           &errmsg,
+                                           &output,
+                                           std::move(shardResponses),
+                                           {ErrorCodes::CannotImplicitlyCreateCollection});
+
+        if (ok) {
+            log() << "Indexes created on namespace " << nss;
+        }
+
+        return ok;
     }
 
 } createIndexesCmd;
