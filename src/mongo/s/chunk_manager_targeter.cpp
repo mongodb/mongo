@@ -294,22 +294,6 @@ CompareResult compareAllShardVersions(const ChunkManager& cm,
     return finalResult;
 }
 
-CompareResult compareDbVersions(const ChunkManager& cm, const DatabaseVersion& remoteDbVersion) {
-    DatabaseVersion cachedDbVersion = cm.dbVersion();
-
-    // Db may have been dropped
-    if (cachedDbVersion.getUuid() != remoteDbVersion.getUuid()) {
-        return CompareResult_Unknown;
-    }
-
-    // Db may have been moved
-    if (cachedDbVersion.getLastMod() < remoteDbVersion.getLastMod()) {
-        return CompareResult_LT;
-    }
-
-    return CompareResult_GTE;
-}
-
 /**
  * Whether or not the manager/primary pair is different from the other manager/primary pair.
  */
@@ -592,14 +576,14 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetAllShards(OperationContex
 
 void ChunkManagerTargeter::noteCouldNotTarget() {
     dassert(_remoteShardVersions.empty());
-    dassert(!_remoteDbVersion);
+    dassert(!_staleDbVersion);
     _needsTargetingRefresh = true;
 }
 
 void ChunkManagerTargeter::noteStaleShardResponse(const ShardEndpoint& endpoint,
                                                   const StaleConfigInfo& staleInfo) {
     dassert(!_needsTargetingRefresh);
-    dassert(!_remoteDbVersion);
+    dassert(!_staleDbVersion);
 
     ChunkVersion remoteShardVersion;
     if (!staleInfo.getVersionWanted()) {
@@ -629,34 +613,14 @@ void ChunkManagerTargeter::noteStaleShardResponse(const ShardEndpoint& endpoint,
     }
 }
 
-void ChunkManagerTargeter::noteStaleDbResponse(const ShardEndpoint& endpoint,
+void ChunkManagerTargeter::noteStaleDbResponse(OperationContext* opCtx,
+                                               const ShardEndpoint& endpoint,
                                                const StaleDbRoutingVersion& staleInfo) {
     dassert(!_needsTargetingRefresh);
     dassert(_remoteShardVersions.empty());
-
-    DatabaseVersion remoteDbVersion;
-    if (!staleInfo.getVersionWanted()) {
-        // If the vWanted is not set, assume the wanted version is higher than our current version.
-        remoteDbVersion = _cm->dbVersion().makeUpdated();
-    } else {
-        remoteDbVersion = *staleInfo.getVersionWanted();
-    }
-
-    // If databaseVersion was sent, only one shard should have been targeted. The shard should have
-    // stopped processing the batch after one write encountered StaleDbVersion, after which the
-    // shard should have simply copied that StaleDbVersion error as the error for the rest of the
-    // writes in the batch. So, all of the write errors that contain a StaleDbVersion error should
-    // contain the same vWanted version.
-    if (_remoteDbVersion) {
-        // Use uassert rather than invariant since this is asserting the contents of a network
-        // response.
-        uassert(
-            ErrorCodes::InternalError,
-            "Did not expect to get multiple StaleDbVersion errors with different vWanted versions",
-            *_remoteDbVersion == remoteDbVersion);
-        return;
-    }
-    _remoteDbVersion = remoteDbVersion;
+    Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(_nss.db(),
+                                                             staleInfo.getVersionWanted());
+    _staleDbVersion = true;
 }
 
 void ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) {
@@ -669,26 +633,23 @@ void ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasCha
 
     LOGV2_DEBUG(22912,
                 4,
-                "ChunkManagerTargeter checking if refresh is needed, "
-                "needsTargetingRefresh({needsTargetingRefresh}) has remoteShardVersion "
-                "({hasRemoteShardVersions})) has remoteDbVersion ({hasRemoteDbVersion})",
                 "ChunkManagerTargeter checking if refresh is needed",
                 "needsTargetingRefresh"_attr = _needsTargetingRefresh,
                 "hasRemoteShardVersions"_attr = !_remoteShardVersions.empty(),
-                "hasRemoteDbVersion"_attr = bool{_remoteDbVersion});
+                "staleDbVersion"_attr = _staleDbVersion);
 
     //
     // Did we have any stale config or targeting errors at all?
     //
 
-    if (!_needsTargetingRefresh && _remoteShardVersions.empty() && !_remoteDbVersion) {
+    if (!_needsTargetingRefresh && _remoteShardVersions.empty() && !_staleDbVersion) {
         return;
     }
 
     // Make sure that by the end of the execution of this refresh all the state data is cleared.
     ON_BLOCK_EXIT([&] {
         _remoteShardVersions.clear();
-        _remoteDbVersion = boost::none;
+        _staleDbVersion = false;
         _needsTargetingRefresh = false;
     });
 
@@ -742,25 +703,8 @@ void ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasCha
         }
 
         *wasChanged = isMetadataDifferent(lastManager, lastDbVersion, *_cm, _cm->dbVersion());
-    } else if (_remoteDbVersion) {
-        // If we got stale database versions from the remote shard, we may need to refresh
-        // NOTE: Not sure yet if this can happen simultaneously with targeting issues
-
-        CompareResult result = compareDbVersions(*_cm, *_remoteDbVersion);
-
-        LOGV2_DEBUG(22914,
-                    4,
-                    "ChunkManagerTargeter database versions comparison result: {result}",
-                    "ChunkManagerTargeter database versions comparison",
-                    "result"_attr = static_cast<int>(result));
-
-        if (result == CompareResult_Unknown || result == CompareResult_LT) {
-            // Our current db version isn't always comparable to the old version, it may have been
-            // dropped
-            _refreshDbVersionNow(opCtx);
-            return;
-        }
-
+    } else if (_staleDbVersion) {
+        _init(opCtx);
         *wasChanged = isMetadataDifferent(lastManager, lastDbVersion, *_cm, _cm->dbVersion());
     }
 }
@@ -795,12 +739,6 @@ int ChunkManagerTargeter::getNShardsOwningChunks() const {
 void ChunkManagerTargeter::_refreshShardVersionNow(OperationContext* opCtx) {
     uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
-
-    _init(opCtx);
-}
-
-void ChunkManagerTargeter::_refreshDbVersionNow(OperationContext* opCtx) {
-    uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, _nss.db()));
 
     _init(opCtx);
 }

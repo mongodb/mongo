@@ -89,7 +89,8 @@ public:
     void noteStaleShardResponse(const ShardEndpoint& endpoint,
                                 const StaleConfigInfo& staleInfo) override;
 
-    void noteStaleDbResponse(const ShardEndpoint& endpoint,
+    void noteStaleDbResponse(OperationContext* opCtx,
+                             const ShardEndpoint& endpoint,
                              const StaleDbRoutingVersion& staleInfo) override;
 
     /**
@@ -114,11 +115,6 @@ private:
      * Performs an actual refresh from the config server.
      */
     void _refreshShardVersionNow(OperationContext* opCtx);
-
-    /**
-     * Performs an actual refresh from the config server.
-     */
-    void _refreshDbVersionNow(OperationContext* opCtx);
 
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.
@@ -161,7 +157,7 @@ private:
     StaleShardVersionMap _remoteShardVersions;
 
     // remote db version reported from stale errors
-    boost::optional<DatabaseVersion> _remoteDbVersion;
+    bool _staleDbVersion{false};
 };
 
 }  // namespace mongo

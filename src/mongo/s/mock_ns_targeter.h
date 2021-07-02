@@ -106,7 +106,8 @@ public:
         // No-op
     }
 
-    void noteStaleDbResponse(const ShardEndpoint& endpoint,
+    void noteStaleDbResponse(OperationContext* opCtx,
+                             const ShardEndpoint& endpoint,
                              const StaleDbRoutingVersion& staleInfo) override {
         // No-op
     }
