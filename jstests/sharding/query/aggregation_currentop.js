@@ -350,7 +350,8 @@ function runCommonTests(conn, curOpSpec) {
               "$currentOp should report 0 active connections but found:\n" + tojson(activeConns));
 
     // Test that the currentOp command with {$all: false} returns only active connections.
-    assert.eq(adminDB.currentOp({$ownOps: false, $all: false, active: false}).inprog.length, 0);
+    const result = adminDB.currentOp({$ownOps: false, $all: false, active: false});
+    assert.eq(result.inprog.length, 0, result);
 
     // Test that {idleConnections: true} returns inactive connections.
     assert.gte(adminDB
