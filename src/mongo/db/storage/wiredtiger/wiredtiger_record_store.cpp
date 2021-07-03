@@ -548,6 +548,7 @@ void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationCon
           "approximately {containsNumRecords} records totaling to {containsNumBytes} bytes",
           "Taking samples and assuming each oplog section contains",
           "numSamples"_attr = numSamples,
+          "minBytesPerStone"_attr = _minBytesPerStone,
           "containsNumRecords"_attr = estRecordsPerStone,
           "containsNumBytes"_attr = estBytesPerStone);
 
