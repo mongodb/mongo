@@ -59,7 +59,7 @@ using StaleShardVersionMap = std::map<ShardId, ChunkVersion>;
 class ChunkManagerTargeter : public NSTargeter {
 public:
     enum class UpdateType { kReplacement, kOpStyle, kUnknown };
-
+    enum class LastErrorType { kCouldNotTarget, kStaleShardVersion, kStaleDbVersion };
     /**
      * Initializes the targeter with the latest routing information for the namespace, which means
      * it may have to block and load information from the config server.
@@ -86,7 +86,8 @@ public:
 
     void noteCouldNotTarget() override;
 
-    void noteStaleShardResponse(const ShardEndpoint& endpoint,
+    void noteStaleShardResponse(OperationContext* opCtx,
+                                const ShardEndpoint& endpoint,
                                 const StaleConfigInfo& staleInfo) override;
 
     void noteStaleDbResponse(OperationContext* opCtx,
@@ -98,23 +99,16 @@ public:
      * information is stale WRT the noted stale responses or a remote refresh is needed due
      * to a targeting failure, will contact the config servers to reload the metadata.
      *
-     * Reports wasChanged = true if the metadata is different after this reload.
+     * Return true if the metadata was different after this reload.
      *
      * Also see NSTargeter::refreshIfNeeded().
      */
-    void refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) override;
-
-    bool endpointIsConfigServer() const override;
+    bool refreshIfNeeded(OperationContext* opCtx) override;
 
     int getNShardsOwningChunks() const override;
 
 private:
     void _init(OperationContext* opCtx);
-
-    /**
-     * Performs an actual refresh from the config server.
-     */
-    void _refreshShardVersionNow(OperationContext* opCtx);
 
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.
@@ -143,8 +137,8 @@ private:
     // Full namespace of the collection for this targeter
     const NamespaceString _nss;
 
-    // Stores whether we need to check the remote server on refresh
-    bool _needsTargetingRefresh;
+    // Stores last error occurred
+    boost::optional<LastErrorType> _lastError;
 
     // The latest loaded routing cache entry
     boost::optional<ChunkManager> _cm;
@@ -152,12 +146,6 @@ private:
     // Set to the epoch of the namespace we are targeting. If we ever refresh the catalog cache and
     // find a new epoch, we immediately throw a StaleEpoch exception.
     boost::optional<OID> _targetEpoch;
-
-    // Map of shard->remote shard version reported from stale errors
-    StaleShardVersionMap _remoteShardVersions;
-
-    // remote db version reported from stale errors
-    bool _staleDbVersion{false};
 };
 
 }  // namespace mongo
