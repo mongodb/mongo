@@ -552,15 +552,11 @@ void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationCon
           "containsNumRecords"_attr = estRecordsPerStone,
           "containsNumBytes"_attr = estBytesPerStone);
 
-    // Inform the random cursor of the number of samples we intend to take. This allows it to
-    // account for skew in the tree shape.
-    const std::string extraConfig = str::stream() << "next_random_sample_size=" << numSamples;
-
     // Divide the oplog into 'wholeStones' logical sections, with each section containing
     // approximately 'estRecordsPerStone'. Do so by oversampling the oplog, sorting the samples in
     // order of their RecordId, and then choosing the samples expected to be near the right edge of
     // each logical section.
-    auto cursor = _rs->getRandomCursorWithOptions(opCtx, extraConfig);
+    auto cursor = _rs->getRandomCursor(opCtx);
     std::vector<RecordIdAndWall> oplogEstimates;
     auto lastProgressLog = Date_t::now();
     for (int i = 0; i < numSamples; ++i) {
