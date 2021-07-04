@@ -13,12 +13,7 @@ TestData.skipCheckOrphans = true;
 (function() {
 "use strict";
 
-var st = new ShardingTest({shards: 2, mongos: 1});
-
-var mongos = st.s0;
-var admin = mongos.getDB("admin");
-var config = mongos.getDB("config");
-var configConnStr = st._configDB;
+var st = new ShardingTest({shards: 2});
 
 jsTest.log("Starting sharding batch write tests...");
 
@@ -31,10 +26,10 @@ var result;
 //
 // Mongos _id autogeneration tests for sharded collections
 
-var coll = mongos.getCollection("foo.bar");
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().toString()}));
-st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
-assert.commandWorked(admin.runCommand({shardCollection: coll.toString(), key: {_id: 1}}));
+var coll = st.s.getCollection("foo.bar");
+assert.commandWorked(st.s.adminCommand(
+    {enableSharding: coll.getDB().toString(), primaryShard: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({shardCollection: coll.toString(), key: {_id: 1}}));
 
 //
 // Basic insert no _id
@@ -75,7 +70,7 @@ var documents = [];
 for (var i = 0; i < 1000; i++)
     documents.push({a: i, data: data});
 
-assert.commandWorked(coll.getMongo().getDB("admin").runCommand({setParameter: 1, logLevel: 4}));
+assert.commandWorked(coll.getMongo().adminCommand({setParameter: 1, logLevel: 4}));
 coll.remove({});
 request = {
     insert: coll.getName(),
@@ -89,7 +84,7 @@ assert.eq(1000, coll.count());
 //
 //
 // Config server upserts (against admin db, for example) require _id test
-var adminColl = admin.getCollection(coll.getName());
+var adminColl = st.s.getDB('admin')[coll.getName()];
 
 //
 // Without _id
@@ -116,73 +111,8 @@ assert.eq(1, adminColl.count());
 
 //
 //
-// Stale config progress tests
-// Set up a new collection across two shards, then revert the chunks to an earlier state to put
-// mongos and mongod permanently out of sync.
-
-// START SETUP
-var brokenColl = mongos.getCollection("broken.coll");
-assert.commandWorked(admin.runCommand({enableSharding: brokenColl.getDB().toString()}));
-st.ensurePrimaryShard(brokenColl.getDB().toString(), st.shard0.shardName);
-assert.commandWorked(admin.runCommand({shardCollection: brokenColl.toString(), key: {_id: 1}}));
-assert.commandWorked(admin.runCommand({split: brokenColl.toString(), middle: {_id: 0}}));
-
-var oldChunks = config.chunks.find().toArray();
-
-// Start a new mongos and bring it up-to-date with the chunks so far
-
-var staleMongos = MongoRunner.runMongos({configdb: configConnStr});
-brokenColl = staleMongos.getCollection(brokenColl.toString());
-assert.commandWorked(brokenColl.insert({hello: "world"}));
-
-// Modify the chunks to make shards at a higher version
-
-assert.commandWorked(
-    admin.runCommand({moveChunk: brokenColl.toString(), find: {_id: 0}, to: st.shard1.shardName}));
-
-// Rewrite the old chunks back to the config server
-
-assert.commandWorked(config.chunks.remove({}));
-for (var i = 0; i < oldChunks.length; i++) {
-    assert.commandWorked(config.chunks.insert(oldChunks[i]));
-}
-
-// Ensure that the inserts have propagated to all secondary nodes
-st.configRS.awaitReplication();
-
-// Stale mongos can no longer bring itself up-to-date!
-// END SETUP
-
-//
-// Config server insert, repeatedly stale
-printjson(request = {
-    insert: brokenColl.getName(),
-    documents: [{_id: -1}]
-});
-printjson(result = brokenColl.runCommand(request));
-assert(result.ok);
-assert.eq(0, result.n);
-assert.eq(1, result.writeErrors.length);
-assert.eq(0, result.writeErrors[0].index);
-assert.eq(result.writeErrors[0].code, 82);  // No Progress Made
-
-//
-// Config server insert to other shard, repeatedly stale
-printjson(request = {
-    insert: brokenColl.getName(),
-    documents: [{_id: 1}]
-});
-printjson(result = brokenColl.runCommand(request));
-assert(result.ok);
-assert.eq(0, result.n);
-assert.eq(1, result.writeErrors.length);
-assert.eq(0, result.writeErrors[0].index);
-assert.eq(result.writeErrors[0].code, 82);  // No Progress Made
-
-//
-//
 // Tests against config server
-var configColl = config.getCollection("batch_write_protocol_sharded");
+var configColl = st.s.getCollection('config.batch_write_protocol_sharded');
 
 //
 // Basic config server insert
@@ -234,8 +164,8 @@ assert.eq(0, st.config0.getCollection(configColl + "").count());
 assert.eq(0, st.config1.getCollection(configColl + "").count());
 assert.eq(0, st.config2.getCollection(configColl + "").count());
 
-MongoRunner.stopMongod(st.config1);
-MongoRunner.stopMongod(st.config2);
+st.stopConfigServer(1);
+st.stopConfigServer(2);
 st.configRS.awaitNoPrimary();
 
 // Config server insert with no config PRIMARY
@@ -268,7 +198,5 @@ printjson(result = configColl.runCommand(request));
 assert.commandFailedWithCode(result, ErrorCodes.FailedToSatisfyReadPreference);
 
 jsTest.log("DONE!");
-
-MongoRunner.stopMongos(staleMongos);
 st.stop();
 }());

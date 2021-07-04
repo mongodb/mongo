@@ -109,7 +109,8 @@ public:
      *
      * If stale responses are is noted, we must not have noted that we cannot target.
      */
-    virtual void noteStaleShardResponse(const ShardEndpoint& endpoint,
+    virtual void noteStaleShardResponse(OperationContext* opCtx,
+                                        const ShardEndpoint& endpoint,
                                         const StaleConfigInfo& staleInfo) = 0;
 
     /**
@@ -130,19 +131,13 @@ public:
      *
      * After this function is called, the targeter should be in a state such that the noted
      * stale responses are not seen again and if a targeting failure occurred it reloaded -
-     * it should try to make progress.  If provided, wasChanged is set to true if the targeting
-     * information used here was changed.
+     * it should try to make progress.
+     *
+     * Returns if the targeting used here was changed.
      *
      * NOTE: This function may block for shared resources or network calls.
      */
-    virtual void refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) = 0;
-
-    /**
-     * Returns whether this write targets the config server. Invariants if the write targets the
-     * config server AND there is more than one endpoint, since there should be no namespaces that
-     * target both config servers and shards.
-     */
-    virtual bool endpointIsConfigServer() const = 0;
+    virtual bool refreshIfNeeded(OperationContext* opCtx) = 0;
 
     /**
      * Returns the number of shards that own one or more chunks for the targeted collection.

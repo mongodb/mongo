@@ -101,7 +101,8 @@ public:
         // No-op
     }
 
-    void noteStaleShardResponse(const ShardEndpoint& endpoint,
+    void noteStaleShardResponse(OperationContext* opCtx,
+                                const ShardEndpoint& endpoint,
                                 const StaleConfigInfo& staleInfo) override {
         // No-op
     }
@@ -112,13 +113,7 @@ public:
         // No-op
     }
 
-    void refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) override {
-        // No-op
-        if (wasChanged)
-            *wasChanged = false;
-    }
-
-    bool endpointIsConfigServer() const override {
+    bool refreshIfNeeded(OperationContext* opCtx) override {
         // No-op
         return false;
     }
