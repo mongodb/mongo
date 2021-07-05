@@ -13,4 +13,5 @@ executor:
       global_vars:
         TestData:
           clusterType: 'standalone'
+          traceExceptions: false
           internalQueryAppendIdToSetWindowFieldsSort: true
