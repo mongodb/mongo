@@ -55,6 +55,7 @@ static const char *OLDEST_LAG = "oldest_lag";
 static const char *OP_RATE = "op_rate";
 static const char *OPS_PER_TRANSACTION = "ops_per_transaction";
 static const char *POPULATE_CONFIG = "populate_config";
+static const char *POSTRUN_STATISTICS = "postrun_statistics";
 static const char *READ_CONFIG = "read_config";
 static const char *STABLE_LAG = "stable_lag";
 static const char *STAT_CACHE_SIZE = "stat_cache_size";

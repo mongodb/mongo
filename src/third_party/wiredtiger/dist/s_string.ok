@@ -324,6 +324,7 @@ Phong
 PlatformSDK
 Posix
 PostgreSQL
+Postrun
 PowerPC
 Pre
 Preload
@@ -1165,6 +1166,7 @@ portably
 pos
 posint
 posix
+postrun
 postsize
 powerpc
 pragmas
@@ -1187,6 +1189,7 @@ printlog
 priv
 prog
 progname
+programmatically
 ps
 psp
 pthread

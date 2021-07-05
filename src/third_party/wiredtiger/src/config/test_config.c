@@ -16,6 +16,7 @@ static const WT_CONFIG_CHECK confchk_stat_db_size_subconfigs[] = {
 
 static const WT_CONFIG_CHECK confchk_runtime_monitor_subconfigs[] = {
   {"enabled", "boolean", NULL, NULL, NULL, 0}, {"op_rate", "string", NULL, NULL, NULL, 0},
+  {"postrun_statistics", "list", NULL, NULL, NULL, 0},
   {"stat_cache_size", "category", NULL, NULL, confchk_stat_cache_size_subconfigs, 2},
   {"stat_db_size", "category", NULL, NULL, confchk_stat_db_size_subconfigs, 2},
   {NULL, NULL, NULL, NULL, NULL, 0}};
@@ -76,7 +77,7 @@ static const WT_CONFIG_CHECK confchk_base_test[] = {
   {"checkpoint_manager", "category", NULL, NULL, confchk_checkpoint_manager_subconfigs, 2},
   {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
   {"enable_logging", "boolean", NULL, NULL, NULL, 0},
-  {"runtime_monitor", "category", NULL, NULL, confchk_runtime_monitor_subconfigs, 4},
+  {"runtime_monitor", "category", NULL, NULL, confchk_runtime_monitor_subconfigs, 5},
   {"statistics_config", "category", NULL, NULL, confchk_statistics_config_subconfigs, 2},
   {"timestamp_manager", "category", NULL, NULL, confchk_timestamp_manager_subconfigs, 4},
   {"workload_generator", "category", NULL, NULL, confchk_workload_generator_subconfigs, 6},
@@ -88,7 +89,7 @@ static const WT_CONFIG_CHECK confchk_example_test[] = {
   {"checkpoint_manager", "category", NULL, NULL, confchk_checkpoint_manager_subconfigs, 2},
   {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
   {"enable_logging", "boolean", NULL, NULL, NULL, 0},
-  {"runtime_monitor", "category", NULL, NULL, confchk_runtime_monitor_subconfigs, 4},
+  {"runtime_monitor", "category", NULL, NULL, confchk_runtime_monitor_subconfigs, 5},
   {"statistics_config", "category", NULL, NULL, confchk_statistics_config_subconfigs, 2},
   {"timestamp_manager", "category", NULL, NULL, confchk_timestamp_manager_subconfigs, 4},
   {"workload_generator", "category", NULL, NULL, confchk_workload_generator_subconfigs, 6},
@@ -100,7 +101,7 @@ static const WT_CONFIG_CHECK confchk_hs_cleanup[] = {
   {"checkpoint_manager", "category", NULL, NULL, confchk_checkpoint_manager_subconfigs, 2},
   {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
   {"enable_logging", "boolean", NULL, NULL, NULL, 0},
-  {"runtime_monitor", "category", NULL, NULL, confchk_runtime_monitor_subconfigs, 4},
+  {"runtime_monitor", "category", NULL, NULL, confchk_runtime_monitor_subconfigs, 5},
   {"statistics_config", "category", NULL, NULL, confchk_statistics_config_subconfigs, 2},
   {"timestamp_manager", "category", NULL, NULL, confchk_timestamp_manager_subconfigs, 4},
   {"workload_generator", "category", NULL, NULL, confchk_workload_generator_subconfigs, 6},
@@ -111,7 +112,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
   {"base_test",
     "cache_size_mb=0,checkpoint_manager=(enabled=false,op_rate=1s),"
     "duration_seconds=0,enable_logging=false,"
-    "runtime_monitor=(enabled=true,op_rate=1s,"
+    "runtime_monitor=(enabled=true,op_rate=1s,postrun_statistics=[],"
     "stat_cache_size=(enabled=false,limit=0),"
     "stat_db_size=(enabled=false,limit=0)),"
     "statistics_config=(enable_logging=true,type=all),"
@@ -129,7 +130,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
   {"example_test",
     "cache_size_mb=0,checkpoint_manager=(enabled=false,op_rate=1s),"
     "duration_seconds=0,enable_logging=false,"
-    "runtime_monitor=(enabled=true,op_rate=1s,"
+    "runtime_monitor=(enabled=true,op_rate=1s,postrun_statistics=[],"
     "stat_cache_size=(enabled=false,limit=0),"
     "stat_db_size=(enabled=false,limit=0)),"
     "statistics_config=(enable_logging=true,type=all),"
@@ -147,7 +148,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
   {"hs_cleanup",
     "cache_size_mb=0,checkpoint_manager=(enabled=false,op_rate=1s),"
     "duration_seconds=0,enable_logging=false,"
-    "runtime_monitor=(enabled=true,op_rate=1s,"
+    "runtime_monitor=(enabled=true,op_rate=1s,postrun_statistics=[],"
     "stat_cache_size=(enabled=false,limit=0),"
     "stat_db_size=(enabled=false,limit=0)),"
     "statistics_config=(enable_logging=true,type=all),"

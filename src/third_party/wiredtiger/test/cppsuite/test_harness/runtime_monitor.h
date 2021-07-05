@@ -49,11 +49,28 @@ get_stat(scoped_cursor &cursor, int stat_field, int64_t *valuep)
     cursor->set_key(cursor.get(), stat_field);
     testutil_check(cursor->search(cursor.get()));
     testutil_check(cursor->get_value(cursor.get(), &desc, &pvalue, valuep));
+    testutil_check(cursor->reset(cursor.get()));
 }
 
-class statistic {
+/*
+ * The WiredTiger configuration API doesn't accept string statistic names when retrieving statistic
+ * values. This function provides the required mapping to statistic id. We should consider
+ * generating it programmatically in `stat.py` to avoid having to manually add a condition every
+ * time we want to observe a new postrun statistic.
+ */
+inline int
+get_stat_field(const std::string &name)
+{
+    if (name == "cache_hs_insert")
+        return (WT_STAT_CONN_CACHE_HS_INSERT);
+    else if (name == "cc_pages_removed")
+        return (WT_STAT_CONN_CC_PAGES_REMOVED);
+    testutil_die(EINVAL, "get_stat_field: Stat \"%s\" is unrecognized", name.c_str());
+}
+
+class runtime_statistic {
     public:
-    explicit statistic(configuration *config)
+    explicit runtime_statistic(configuration *config)
     {
         _enabled = config->get_bool(ENABLED);
     }
@@ -62,7 +79,7 @@ class statistic {
     virtual void check(scoped_cursor &cursor) = 0;
 
     /* Suppress warning about destructor being non-virtual. */
-    virtual ~statistic() {}
+    virtual ~runtime_statistic() {}
 
     bool
     enabled() const
@@ -74,9 +91,9 @@ class statistic {
     bool _enabled = false;
 };
 
-class cache_limit_statistic : public statistic {
+class cache_limit_statistic : public runtime_statistic {
     public:
-    explicit cache_limit_statistic(configuration *config) : statistic(config)
+    explicit cache_limit_statistic(configuration *config) : runtime_statistic(config)
     {
         limit = config->get_int(LIMIT);
     }
@@ -118,13 +135,13 @@ collection_name_to_file_name(const std::string &collection_name)
     const auto stripped_name = collection_name.substr(colon_pos + 1);
 
     /* Now add the directory and file extension. */
-    return std::string(DEFAULT_DIR) + "/" + stripped_name + ".wt";
+    return (std::string(DEFAULT_DIR) + "/" + stripped_name + ".wt");
 }
 
-class db_size_statistic : public statistic {
+class db_size_statistic : public runtime_statistic {
     public:
     db_size_statistic(configuration *config, database &database)
-        : statistic(config), _database(database)
+        : runtime_statistic(config), _database(database)
     {
         _limit = config->get_int(LIMIT);
 #ifdef _WIN32
@@ -175,11 +192,83 @@ class db_size_statistic : public statistic {
         file_names.push_back(std::string(DEFAULT_DIR) + "/" + WT_HS_FILE);
         file_names.push_back(std::string(DEFAULT_DIR) + "/" + WT_METAFILE);
 
-        return file_names;
+        return (file_names);
     }
 
     database &_database;
     int64_t _limit;
+};
+
+class postrun_statistic_check {
+    public:
+    explicit postrun_statistic_check(configuration *config)
+    {
+        const auto config_stats = config->get_list(POSTRUN_STATISTICS);
+        /*
+         * Each stat in the configuration is a colon separated list in the following format:
+         * <stat_name>:<min_limit>:<max_limit>
+         */
+        for (const auto &c : config_stats) {
+            auto stat = split_string(c, ':');
+            if (stat.size() != 3)
+                testutil_die(EINVAL,
+                  "runtime_monitor: Each postrun statistic must follow the format of "
+                  "\"stat_name:min_limit:max_limit\". Invalid format \"%s\" provided.",
+                  c.c_str());
+            const int min_limit = std::stoi(stat.at(1)), max_limit = std::stoi(stat.at(2));
+            if (min_limit > max_limit)
+                testutil_die(EINVAL,
+                  "runtime_monitor: The min limit of each postrun statistic must be less than or "
+                  "equal to its max limit. Config=\"%s\" Min=%ld Max=%ld",
+                  c.c_str(), min_limit, max_limit);
+            _stats.emplace_back(std::move(stat.at(0)), min_limit, max_limit);
+        }
+    }
+    virtual ~postrun_statistic_check() = default;
+
+    void
+    check(scoped_cursor &cursor) const
+    {
+        bool success = true;
+        for (const auto &stat : _stats) {
+            if (!check_stat(cursor, stat))
+                success = false;
+        }
+        if (!success)
+            testutil_die(-1,
+              "runtime_monitor: One or more postrun statistics were outside of their specified "
+              "limits.");
+    }
+
+    private:
+    struct postrun_statistic {
+        postrun_statistic(std::string &&name, const int64_t min_limit, const int64_t max_limit)
+            : name(std::move(name)), field(get_stat_field(this->name)), min_limit(min_limit),
+              max_limit(max_limit)
+        {
+        }
+        const std::string name;
+        const int field;
+        const int64_t min_limit, max_limit;
+    };
+    bool
+    check_stat(scoped_cursor &cursor, const postrun_statistic &stat) const
+    {
+        int64_t stat_value;
+
+        testutil_assert(cursor.get() != nullptr);
+        get_stat(cursor, stat.field, &stat_value);
+        if (stat_value < stat.min_limit || stat_value > stat.max_limit) {
+            const std::string error_string = "runtime_monitor: Postrun stat \"" + stat.name +
+              "\" was outside of the specified limits. Min=" + std::to_string(stat.min_limit) +
+              " Max=" + std::to_string(stat.max_limit) + " Actual=" + std::to_string(stat_value);
+            debug_print(error_string, DEBUG_ERROR);
+            return (false);
+        }
+        return (true);
+    }
+
+    std::vector<postrun_statistic> _stats;
 };
 
 /*
@@ -189,7 +278,7 @@ class db_size_statistic : public statistic {
 class runtime_monitor : public component {
     public:
     runtime_monitor(configuration *config, database &database)
-        : component("runtime_monitor", config), _database(database)
+        : component("runtime_monitor", config), _postrun_stats(config), _database(database)
     {
     }
 
@@ -219,7 +308,7 @@ class runtime_monitor : public component {
             /* Open our statistic cursor. */
             _cursor = _session.open_scoped_cursor(STATISTICS_URI);
 
-            /* Load known statistics. */
+            /* Load known runtime statistics. */
             sub_config = _config->get_subconfig(STAT_CACHE_SIZE);
             _stats.push_back(new cache_limit_statistic(sub_config));
             delete sub_config;
@@ -239,10 +328,18 @@ class runtime_monitor : public component {
         }
     }
 
+    void
+    finish() override final
+    {
+        _postrun_stats.check(_cursor);
+        component::finish();
+    }
+
     private:
     scoped_session _session;
     scoped_cursor _cursor;
-    std::vector<statistic *> _stats;
+    std::vector<runtime_statistic *> _stats;
+    postrun_statistic_check _postrun_stats;
     database &_database;
 };
 } // namespace test_harness
