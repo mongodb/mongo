@@ -247,8 +247,14 @@ local_delay(LOCAL_STORAGE *local)
         WT_VERBOSE_LS(local,
           "Artificial delay %" PRIu32 " milliseconds after %" PRIu64 " object flushes\n",
           local->delay_ms, local->object_flushes);
+        /*
+         * tv_usec has type suseconds_t, which is signed (hence the s), but ->delay_ms is unsigned.
+         * In both gcc8 and gcc10 with -Wsign-conversion enabled (as we do) this causes a spurious
+         * warning about the implicit conversion possibly changing the value. Hence the explicit
+         * cast. (both struct timeval and suseconds_t are POSIX)
+         */
         tv.tv_sec = local->delay_ms / 1000;
-        tv.tv_usec = (local->delay_ms % 1000) * 1000;
+        tv.tv_usec = (suseconds_t)(local->delay_ms % 1000) * 1000;
         (void)select(0, NULL, NULL, NULL, &tv);
     }
     if (local->force_error != 0 && local->object_flushes % local->force_error == 0) {

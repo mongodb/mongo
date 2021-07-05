@@ -59,7 +59,7 @@ for f in $search; do
 	cat "$f" | \
             clang-format --fallback-style=none | \
             python dist/s_comment.py > "$t" || exit 1
-	cmp --silent "$f" "$t"
+	cmp -s "$f" "$t"
 	if test $? -ne 0; then
 		if test $# -eq 0 ; then
 			echo "Modifying $f"

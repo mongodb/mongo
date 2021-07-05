@@ -474,6 +474,7 @@ WiredTigerTxn
 WithSeeds
 Wpedantic
 WriteFile
+Wsign
 Wuninitialized
 Wunused
 XP
@@ -1338,6 +1339,7 @@ subtree
 sunique
 supd
 superset
+suseconds
 sw
 sx
 sy
@@ -1362,6 +1364,7 @@ timedwait
 timestamp
 timestamped
 timestamps
+timeval
 tinfo
 tlb
 tmp
@@ -1384,6 +1387,7 @@ trunc
 trylock
 tsc
 tupdate
+tv
 tvalue
 tw
 txn

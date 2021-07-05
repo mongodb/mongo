@@ -37,7 +37,7 @@
  * util.c
  * 	Utility functions for test that simulates system crashes.
  */
-#define COPY_BUF_SIZE ((size_t)(20 * 1024))
+#define COPY_BUF_SIZE ((size_t)(64 * 1024))
 
 /*
  * copy_directory --
@@ -115,7 +115,7 @@ copy_directory(const char *fromdir, const char *todir, bool directio)
          */
         if (buf == NULL) {
             if (directio) {
-                blksize = (size_t)sb.st_blksize;
+                blksize = (size_t)WT_MAX(sb.st_blksize, WT_BUFFER_ALIGNMENT_DEFAULT);
                 testutil_assert(blksize < COPY_BUF_SIZE);
                 /*
                  * Make sure we have plenty of room for adjusting the pointer.
