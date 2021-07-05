@@ -51,8 +51,8 @@ public:
         : RouterExecStage(opCtx),
           _resultsMerger(opCtx, std::move(armParams), std::move(executor), nullptr) {}
 
-    StatusWith<ClusterQueryResult> next(ExecContext execCtx) final {
-        return _resultsMerger.next(getOpCtx(), execCtx);
+    StatusWith<ClusterQueryResult> next() final {
+        return _resultsMerger.next(getOpCtx());
     }
 
     void kill(OperationContext* opCtx) final {

@@ -47,11 +47,7 @@ RouterStagePipeline::RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDelet
         dynamic_cast<DocumentSourceMergeCursors*>(_mergePipeline->getSources().front().get());
 }
 
-StatusWith<ClusterQueryResult> RouterStagePipeline::next(RouterExecStage::ExecContext execContext) {
-    if (_mergeCursorsStage) {
-        _mergeCursorsStage->setExecContext(execContext);
-    }
-
+StatusWith<ClusterQueryResult> RouterStagePipeline::next() {
     // Pipeline::getNext will return a boost::optional<Document> or boost::none if EOF.
     if (auto result = _mergePipeline->getNext()) {
         return _validateAndConvertToBSON(*result);

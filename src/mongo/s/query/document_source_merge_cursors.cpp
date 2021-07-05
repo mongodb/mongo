@@ -105,7 +105,7 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
         populateMerger();
     }
 
-    auto next = uassertStatusOK(_blockingResultsMerger->next(pExpCtx->opCtx, _execContext));
+    auto next = uassertStatusOK(_blockingResultsMerger->next(pExpCtx->opCtx));
     if (next.isEOF()) {
         return GetNextResult::makeEOF();
     }

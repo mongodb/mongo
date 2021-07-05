@@ -42,9 +42,9 @@ RouterStageSkip::RouterStageSkip(OperationContext* opCtx,
     invariant(skip > 0);
 }
 
-StatusWith<ClusterQueryResult> RouterStageSkip::next(RouterExecStage::ExecContext execContext) {
+StatusWith<ClusterQueryResult> RouterStageSkip::next() {
     while (_skippedSoFar < _skip) {
-        auto next = getChildStage()->next(execContext);
+        auto next = getChildStage()->next();
         if (!next.isOK()) {
             return next;
         }
@@ -56,7 +56,7 @@ StatusWith<ClusterQueryResult> RouterStageSkip::next(RouterExecStage::ExecContex
         ++_skippedSoFar;
     }
 
-    return getChildStage()->next(execContext);
+    return getChildStage()->next();
 }
 
 }  // namespace mongo

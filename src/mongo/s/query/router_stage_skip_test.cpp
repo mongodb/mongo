@@ -54,22 +54,22 @@ TEST(RouterStageSkipTest, SkipIsOne) {
 
     auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 1);
 
-    auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 2));
 
-    auto secondResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto secondResult = skipStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 3));
 
     // Once end-of-stream is reached, the skip stage should keep returning boost::none.
-    auto thirdResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto thirdResult = skipStage->next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().isEOF());
 
-    auto fourthResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto fourthResult = skipStage->next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().isEOF());
 }
@@ -83,12 +83,12 @@ TEST(RouterStageSkipTest, SkipIsThree) {
 
     auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 3);
 
-    auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 4));
 
-    auto secondResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto secondResult = skipStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().isEOF());
 }
@@ -101,7 +101,7 @@ TEST(RouterStageSkipTest, SkipEqualToResultSetSize) {
 
     auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 3);
 
-    auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().isEOF());
 }
@@ -114,7 +114,7 @@ TEST(RouterStageSkipTest, SkipExceedsResultSetSize) {
 
     auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 100);
 
-    auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().isEOF());
 }
@@ -128,7 +128,7 @@ TEST(RouterStageSkipTest, ErrorWhileSkippingResults) {
 
     auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 2);
 
-    auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = skipStage->next();
     ASSERT_NOT_OK(firstResult.getStatus());
     ASSERT_EQ(firstResult.getStatus(), ErrorCodes::BadValue);
     ASSERT_EQ(firstResult.getStatus().reason(), "bad thing happened");
@@ -143,12 +143,12 @@ TEST(RouterStageSkipTest, ErrorAfterSkippingResults) {
 
     auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 2);
 
-    auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 3));
 
-    auto secondResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto secondResult = skipStage->next();
     ASSERT_NOT_OK(secondResult.getStatus());
     ASSERT_EQ(secondResult.getStatus(), ErrorCodes::BadValue);
     ASSERT_EQ(secondResult.getStatus().reason(), "bad thing happened");
@@ -164,16 +164,16 @@ TEST(RouterStageSkipTest, SkipStageToleratesMidStreamEOF) {
 
     auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 2);
 
-    auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().isEOF());
 
-    auto secondResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto secondResult = skipStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 3));
 
-    auto thirdResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto thirdResult = skipStage->next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().isEOF());
 }
@@ -188,19 +188,19 @@ TEST(RouterStageSkipTest, SkipStageRemotesExhausted) {
     auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 1);
     ASSERT_TRUE(skipStage->remotesExhausted());
 
-    auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 2));
     ASSERT_TRUE(skipStage->remotesExhausted());
 
-    auto secondResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto secondResult = skipStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 3));
     ASSERT_TRUE(skipStage->remotesExhausted());
 
-    auto thirdResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto thirdResult = skipStage->next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().isEOF());
     ASSERT_TRUE(skipStage->remotesExhausted());

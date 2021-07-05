@@ -54,17 +54,17 @@ TEST(RouterStageLimitTest, LimitIsOne) {
 
     auto limitStage = std::make_unique<RouterStageLimit>(opCtx, std::move(mockStage), 1);
 
-    auto firstResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = limitStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
 
-    auto secondResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto secondResult = limitStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(!secondResult.getValue().getResult());
 
     // Once end-of-stream is reached, the limit stage should keep returning no results.
-    auto thirdResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto thirdResult = limitStage->next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(!thirdResult.getValue().getResult());
 }
@@ -77,17 +77,17 @@ TEST(RouterStageLimitTest, LimitIsTwo) {
 
     auto limitStage = std::make_unique<RouterStageLimit>(opCtx, std::move(mockStage), 2);
 
-    auto firstResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = limitStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
 
-    auto secondResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto secondResult = limitStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
 
-    auto thirdResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto thirdResult = limitStage->next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(!thirdResult.getValue().getResult());
 }
@@ -101,12 +101,12 @@ TEST(RouterStageLimitTest, LimitStagePropagatesError) {
 
     auto limitStage = std::make_unique<RouterStageLimit>(opCtx, std::move(mockStage), 3);
 
-    auto firstResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = limitStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
 
-    auto secondResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto secondResult = limitStage->next();
     ASSERT_NOT_OK(secondResult.getStatus());
     ASSERT_EQ(secondResult.getStatus(), ErrorCodes::BadValue);
     ASSERT_EQ(secondResult.getStatus().reason(), "bad thing happened");
@@ -124,21 +124,21 @@ TEST(RouterStageLimitTest, LimitStageToleratesMidStreamEOF) {
 
     auto limitStage = std::make_unique<RouterStageLimit>(opCtx, std::move(mockStage), 2);
 
-    auto firstResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = limitStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
 
-    auto secondResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto secondResult = limitStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().isEOF());
 
-    auto thirdResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto thirdResult = limitStage->next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*thirdResult.getValue().getResult(), BSON("a" << 2));
 
-    auto fourthResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto fourthResult = limitStage->next();
     ASSERT_OK(fourthResult.getStatus());
     ASSERT(fourthResult.getValue().isEOF());
 }
@@ -152,19 +152,19 @@ TEST(RouterStageLimitTest, LimitStageRemotesExhausted) {
     auto limitStage = std::make_unique<RouterStageLimit>(opCtx, std::move(mockStage), 100);
     ASSERT_TRUE(limitStage->remotesExhausted());
 
-    auto firstResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = limitStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
     ASSERT_TRUE(limitStage->remotesExhausted());
 
-    auto secondResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto secondResult = limitStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
     ASSERT_TRUE(limitStage->remotesExhausted());
 
-    auto thirdResult = limitStage->next(RouterExecStage::ExecContext::kInitialFind);
+    auto thirdResult = limitStage->next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().isEOF());
     ASSERT_TRUE(limitStage->remotesExhausted());

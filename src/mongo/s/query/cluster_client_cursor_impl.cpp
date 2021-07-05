@@ -101,8 +101,7 @@ ClusterClientCursorImpl::~ClusterClientCursorImpl() {
         mongosCursorStatsMoreThanOneBatch.increment();
 }
 
-StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(
-    RouterExecStage::ExecContext execContext) {
+StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
 
     invariant(_opCtx);
     const auto interruptStatus = _opCtx->checkForInterruptNoAssert();
@@ -118,7 +117,7 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(
         return {front};
     }
 
-    auto next = _root->next(execContext);
+    auto next = _root->next();
     if (next.isOK() && !next.getValue().isEOF()) {
         ++_numReturnedSoFar;
     }

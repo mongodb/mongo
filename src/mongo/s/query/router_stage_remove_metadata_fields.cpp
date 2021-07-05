@@ -46,9 +46,8 @@ RouterStageRemoveMetadataFields::RouterStageRemoveMetadataFields(
     }
 }
 
-StatusWith<ClusterQueryResult> RouterStageRemoveMetadataFields::next(
-    RouterExecStage::ExecContext execContext) {
-    auto childResult = getChildStage()->next(execContext);
+StatusWith<ClusterQueryResult> RouterStageRemoveMetadataFields::next() {
+    auto childResult = getChildStage()->next();
     if (!childResult.isOK() || !childResult.getValue().getResult()) {
         return childResult;
     }

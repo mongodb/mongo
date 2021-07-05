@@ -84,11 +84,11 @@ StatusWith<stdx::cv_status> BlockingResultsMerger::doWaiting(
 }
 
 StatusWith<ClusterQueryResult> BlockingResultsMerger::awaitNextWithTimeout(
-    OperationContext* opCtx, RouterExecStage::ExecContext execCtx) {
+    OperationContext* opCtx) {
     invariant(_tailableMode == TailableModeEnum::kTailableAndAwaitData);
-    // If we are in kInitialFind or kGetMoreWithAtLeastOneResultInBatch context and the ARM is not
-    // ready, we don't block. Fall straight through to the return statement.
-    while (!_arm.ready() && execCtx == RouterExecStage::ExecContext::kGetMoreNoResultsYet) {
+    // If we should wait for inserts and the ARM is not ready, we don't block. Fall straight through
+    // to the return statement.
+    while (!_arm.ready() && awaitDataState(opCtx).shouldWaitForInserts) {
         auto nextEventStatus = getNextEvent();
         if (!nextEventStatus.isOK()) {
             return nextEventStatus.getStatus();
@@ -145,17 +145,15 @@ StatusWith<ClusterQueryResult> BlockingResultsMerger::blockUntilNext(OperationCo
 
     return _arm.nextReady();
 }
-StatusWith<ClusterQueryResult> BlockingResultsMerger::next(OperationContext* opCtx,
-                                                           RouterExecStage::ExecContext execCtx) {
+StatusWith<ClusterQueryResult> BlockingResultsMerger::next(OperationContext* opCtx) {
     if (_recordRemoteOpWaitTime) {
         CurOp::get(opCtx)->enableRecordRemoteOpWait();
     }
 
     // Non-tailable and tailable non-awaitData cursors always block until ready(). AwaitData
     // cursors wait for ready() only until a specified time limit is exceeded.
-    return (_tailableMode == TailableModeEnum::kTailableAndAwaitData
-                ? awaitNextWithTimeout(opCtx, execCtx)
-                : blockUntilNext(opCtx));
+    return (_tailableMode == TailableModeEnum::kTailableAndAwaitData ? awaitNextWithTimeout(opCtx)
+                                                                     : blockUntilNext(opCtx));
 }
 
 StatusWith<executor::TaskExecutor::EventHandle> BlockingResultsMerger::getNextEvent() {

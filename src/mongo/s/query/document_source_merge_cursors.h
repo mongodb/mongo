@@ -118,10 +118,6 @@ public:
 
     bool remotesExhausted() const;
 
-    void setExecContext(RouterExecStage::ExecContext execContext) {
-        _execContext = execContext;
-    }
-
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
         if (!_blockingResultsMerger) {
             // In cases where a cursor was established with a batchSize of 0, the first getMore
@@ -186,11 +182,6 @@ private:
     // out of scope on mongos.
     boost::optional<AsyncResultsMergerParams> _armParams;
     boost::optional<BlockingResultsMerger> _blockingResultsMerger;
-
-    // The ExecContext is needed because if we're a tailable, awaitData cursor, we only want to
-    // 'await data' if we 1) are in a getMore and 2) don't already have data to return. This context
-    // allows us to determine which situation we're in.
-    RouterExecStage::ExecContext _execContext = RouterExecStage::ExecContext::kInitialFind;
 
     // Indicates whether the cursors stored in _armParams are "owned", meaning the cursors should be
     // killed upon disposal of this DocumentSource.

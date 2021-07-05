@@ -46,8 +46,7 @@ ClusterClientCursorMock::~ClusterClientCursorMock() {
     invariant(_remotesExhausted || _killed);
 }
 
-StatusWith<ClusterQueryResult> ClusterClientCursorMock::next(
-    RouterExecStage::ExecContext execContext) {
+StatusWith<ClusterQueryResult> ClusterClientCursorMock::next() {
     invariant(!_killed);
 
     if (_resultsQueue.empty()) {

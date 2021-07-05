@@ -45,7 +45,7 @@ class RouterStagePipeline final : public RouterExecStage {
 public:
     RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline);
 
-    StatusWith<ClusterQueryResult> next(RouterExecStage::ExecContext execContext) final;
+    StatusWith<ClusterQueryResult> next() final;
 
     void kill(OperationContext* opCtx) final;
 

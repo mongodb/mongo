@@ -57,6 +57,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilDeadlineExpires) {
     // expires, so there's no racing.
     awaitDataState(operationContext()).waitForInsertsDeadline =
         getMockClockSource()->now() + Milliseconds{2000};
+    awaitDataState(operationContext()).shouldWaitForInserts = true;
 
     std::vector<RemoteCursor> cursors;
     cursors.emplace_back(
@@ -70,8 +71,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilDeadlineExpires) {
     auto future = launchAsync([&]() {
         // Pass kGetMoreNoResultsYet so that the BRM will block and not just
         // return an empty batch immediately.
-        auto next = unittest::assertGet(blockingMerger.next(
-            operationContext(), RouterExecStage::ExecContext::kGetMoreNoResultsYet));
+        auto next = unittest::assertGet(blockingMerger.next(operationContext()));
 
         // The timeout should hit, and return EOF.
         ASSERT_TRUE(next.isEOF());
@@ -106,12 +106,10 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilNextResultIsReady) {
 
     // Issue a blocking wait for the next result asynchronously on a different thread.
     auto future = launchAsync([&]() {
-        auto next = unittest::assertGet(
-            blockingMerger.next(operationContext(), RouterExecStage::ExecContext::kInitialFind));
+        auto next = unittest::assertGet(blockingMerger.next(operationContext()));
         ASSERT_FALSE(next.isEOF());
         ASSERT_BSONOBJ_EQ(*next.getResult(), BSON("x" << 1));
-        next = unittest::assertGet(
-            blockingMerger.next(operationContext(), RouterExecStage::ExecContext::kInitialFind));
+        next = unittest::assertGet(blockingMerger.next(operationContext()));
         ASSERT_TRUE(next.isEOF());
     });
 
@@ -132,6 +130,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilNextResultIsReadyWithDe
     awaitDataState(operationContext()).waitForInsertsDeadline =
         operationContext()->getServiceContext()->getPreciseClockSource()->now() +
         Milliseconds{2000};
+    awaitDataState(operationContext()).shouldWaitForInserts = true;
 
     std::vector<RemoteCursor> cursors;
     cursors.emplace_back(
@@ -143,8 +142,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilNextResultIsReadyWithDe
 
     // Will schedule a getMore. No one will send a response in time, so will return EOF.
     auto future = launchAsync([&]() {
-        auto next = unittest::assertGet(blockingMerger.next(
-            operationContext(), RouterExecStage::ExecContext::kGetMoreNoResultsYet));
+        auto next = unittest::assertGet(blockingMerger.next(operationContext()));
         ASSERT_TRUE(next.isEOF());
     });
 
@@ -165,8 +163,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilNextResultIsReadyWithDe
         // Block until the main thread has responded to the getMore.
         stdx::unique_lock<Latch> lk(mutex);
 
-        auto next = unittest::assertGet(blockingMerger.next(
-            operationContext(), RouterExecStage::ExecContext::kGetMoreNoResultsYet));
+        auto next = unittest::assertGet(blockingMerger.next(operationContext()));
         ASSERT_FALSE(next.isEOF());
         ASSERT_BSONOBJ_EQ(*next.getResult(), BSON("x" << 1));
     });
@@ -195,8 +192,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeInterruptibleDuringBlockingNext) {
 
     // Issue a blocking wait for the next result asynchronously on a different thread.
     auto future = launchAsync([&]() {
-        auto nextStatus = blockingMerger.next(operationContext(),
-                                              RouterExecStage::ExecContext::kGetMoreNoResultsYet);
+        auto nextStatus = blockingMerger.next(operationContext());
         ASSERT_EQ(nextStatus.getStatus(), ErrorCodes::Interrupted);
     });
 
@@ -245,9 +241,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToHandleExceptionWhenYielding) {
     // Issue a blocking wait for the next result asynchronously on a different thread.
     auto future = launchAsync([&]() {
         // Make sure that the next() call throws correctly.
-        const auto status =
-            blockingMerger.next(operationContext(), RouterExecStage::ExecContext::kInitialFind)
-                .getStatus();
+        const auto status = blockingMerger.next(operationContext()).getStatus();
         ASSERT_EQ(status, ErrorCodes::BadValue);
     });
 
@@ -283,9 +277,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToHandleExceptionWhenUnyielding) {
     // Issue a blocking wait for the next result asynchronously on a different thread.
     auto future = launchAsync([&]() {
         // Make sure that the next() call throws correctly.
-        const auto status =
-            blockingMerger.next(operationContext(), RouterExecStage::ExecContext::kInitialFind)
-                .getStatus();
+        const auto status = blockingMerger.next(operationContext()).getStatus();
         ASSERT_EQ(status, ErrorCodes::BadValue);
     });
 

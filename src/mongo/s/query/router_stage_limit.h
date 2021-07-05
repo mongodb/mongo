@@ -42,7 +42,7 @@ public:
                      std::unique_ptr<RouterExecStage> child,
                      long long limit);
 
-    StatusWith<ClusterQueryResult> next(ExecContext) final;
+    StatusWith<ClusterQueryResult> next() final;
 
 private:
     long long _limit;

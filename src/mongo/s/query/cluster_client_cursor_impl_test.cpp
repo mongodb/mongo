@@ -65,13 +65,13 @@ TEST_F(ClusterClientCursorImplTest, NumReturnedSoFar) {
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 0);
 
     for (int i = 1; i < 10; ++i) {
-        auto result = cursor.next(RouterExecStage::ExecContext::kInitialFind);
+        auto result = cursor.next();
         ASSERT(result.isOK());
         ASSERT_BSONOBJ_EQ(*result.getValue().getResult(), BSON("a" << i));
         ASSERT_EQ(cursor.getNumReturnedSoFar(), i);
     }
     // Now check that if nothing is fetched the getNumReturnedSoFar stays the same.
-    auto result = cursor.next(RouterExecStage::ExecContext::kInitialFind);
+    auto result = cursor.next();
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(result.getValue().isEOF());
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 9LL);
@@ -87,7 +87,7 @@ TEST_F(ClusterClientCursorImplTest, QueueResult) {
                                    ClusterClientCursorParams(NamespaceString("unused"), {}),
                                    boost::none);
 
-    auto firstResult = cursor.next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = cursor.next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
@@ -95,22 +95,22 @@ TEST_F(ClusterClientCursorImplTest, QueueResult) {
     cursor.queueResult(BSON("a" << 2));
     cursor.queueResult(BSON("a" << 3));
 
-    auto secondResult = cursor.next(RouterExecStage::ExecContext::kInitialFind);
+    auto secondResult = cursor.next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
 
-    auto thirdResult = cursor.next(RouterExecStage::ExecContext::kInitialFind);
+    auto thirdResult = cursor.next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*thirdResult.getValue().getResult(), BSON("a" << 3));
 
-    auto fourthResult = cursor.next(RouterExecStage::ExecContext::kInitialFind);
+    auto fourthResult = cursor.next();
     ASSERT_OK(fourthResult.getStatus());
     ASSERT(fourthResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*fourthResult.getValue().getResult(), BSON("a" << 4));
 
-    auto fifthResult = cursor.next(RouterExecStage::ExecContext::kInitialFind);
+    auto fifthResult = cursor.next();
     ASSERT_OK(fifthResult.getStatus());
     ASSERT(fifthResult.getValue().isEOF());
 
@@ -129,19 +129,19 @@ TEST_F(ClusterClientCursorImplTest, RemotesExhausted) {
                                    boost::none);
     ASSERT_TRUE(cursor.remotesExhausted());
 
-    auto firstResult = cursor.next(RouterExecStage::ExecContext::kInitialFind);
+    auto firstResult = cursor.next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
     ASSERT_TRUE(cursor.remotesExhausted());
 
-    auto secondResult = cursor.next(RouterExecStage::ExecContext::kInitialFind);
+    auto secondResult = cursor.next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
     ASSERT_TRUE(cursor.remotesExhausted());
 
-    auto thirdResult = cursor.next(RouterExecStage::ExecContext::kInitialFind);
+    auto thirdResult = cursor.next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT_TRUE(thirdResult.getValue().isEOF());
     ASSERT_TRUE(cursor.remotesExhausted());
@@ -177,7 +177,7 @@ TEST_F(ClusterClientCursorImplTest, ChecksForInterrupt) {
                                    boost::none);
 
     // Pull one result out of the cursor.
-    auto result = cursor.next(RouterExecStage::ExecContext::kInitialFind);
+    auto result = cursor.next();
     ASSERT(result.isOK());
     ASSERT_BSONOBJ_EQ(*result.getValue().getResult(), BSON("a" << 1));
 
@@ -188,7 +188,7 @@ TEST_F(ClusterClientCursorImplTest, ChecksForInterrupt) {
     }
 
     // Now check that a subsequent call to next() will fail.
-    result = cursor.next(RouterExecStage::ExecContext::kInitialFind);
+    result = cursor.next();
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQ(result.getStatus(), ErrorCodes::CursorKilled);
 }

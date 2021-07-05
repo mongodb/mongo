@@ -65,7 +65,7 @@ public:
                                          std::unique_ptr<RouterExecStage> root,
                                          ClusterClientCursorParams&& params);
 
-    StatusWith<ClusterQueryResult> next(RouterExecStage::ExecContext) final;
+    StatusWith<ClusterQueryResult> next() final;
 
     void kill(OperationContext* opCtx) final;
 

@@ -363,7 +363,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // results from the initial batches (that were obtained while establishing cursors) into
     // 'results'.
     while (!FindCommon::enoughForFirstBatch(findCommand, results->size())) {
-        auto next = uassertStatusOK(ccc->next(RouterExecStage::ExecContext::kInitialFind));
+        auto next = uassertStatusOK(ccc->next());
 
         if (next.isEOF()) {
             // We reached end-of-stream. If the cursor is not tailable, then we mark it as
@@ -475,7 +475,7 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
         auto timeout = Milliseconds{cmd.getMaxTimeMS().value_or(1000)};
         awaitDataState(opCtx).waitForInsertsDeadline =
             opCtx->getServiceContext()->getPreciseClockSource()->now() + timeout;
-
+        awaitDataState(opCtx).shouldWaitForInserts = true;
         invariant(cursor->setAwaitDataTimeout(timeout).isOK());
     } else if (cmd.getMaxTimeMS()) {
         return {ErrorCodes::BadValue,
@@ -788,14 +788,10 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     }
 
     while (!FindCommon::enoughForGetMore(batchSize, batch.size())) {
-        auto context = batch.empty()
-            ? RouterExecStage::ExecContext::kGetMoreNoResultsYet
-            : RouterExecStage::ExecContext::kGetMoreWithAtLeastOneResultInBatch;
-
         StatusWith<ClusterQueryResult> next =
             Status{ErrorCodes::InternalError, "uninitialized cluster query result"};
         try {
-            next = pinnedCursor.getValue()->next(context);
+            next = pinnedCursor.getValue()->next();
         } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
             // This exception is thrown when a $changeStream stage encounters an event
             // that invalidates the cursor. We should close the cursor and return without
@@ -836,6 +832,9 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
             stashedResult = true;
             break;
         }
+
+        // As soon as we get a result, this operation no longer waits.
+        awaitDataState(opCtx).shouldWaitForInserts = false;
 
         // Add doc to the batch. Account for the space overhead associated with returning this doc
         // inside a BSON array.

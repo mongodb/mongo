@@ -46,7 +46,7 @@ public:
     RouterStageMock(OperationContext* opCtx) : RouterExecStage(opCtx) {}
     ~RouterStageMock() final {}
 
-    StatusWith<ClusterQueryResult> next(ExecContext) final;
+    StatusWith<ClusterQueryResult> next() final;
 
     void kill(OperationContext* opCtx) final;
 

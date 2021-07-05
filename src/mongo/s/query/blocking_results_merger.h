@@ -50,7 +50,7 @@ public:
     /**
      * Blocks until the next result is available or an error is detected.
      */
-    StatusWith<ClusterQueryResult> next(OperationContext*, RouterExecStage::ExecContext);
+    StatusWith<ClusterQueryResult> next(OperationContext*);
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
         return _arm.setAwaitDataTimeout(awaitDataTimeout);
@@ -101,8 +101,7 @@ private:
      * user's initial find or we have already obtained at least one result for this batch, this
      * method returns EOF immediately rather than blocking.
      */
-    StatusWith<ClusterQueryResult> awaitNextWithTimeout(OperationContext* opCtx,
-                                                        RouterExecStage::ExecContext execCtx);
+    StatusWith<ClusterQueryResult> awaitNextWithTimeout(OperationContext* opCtx);
 
     /**
      * Returns the next event to wait upon - either a new event from the ARM, or a valid preceding
