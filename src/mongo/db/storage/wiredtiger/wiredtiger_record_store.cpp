@@ -1573,8 +1573,7 @@ StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
 
 std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursor(
     OperationContext* opCtx) const {
-    const char* extraConfig = "";
-    return getRandomCursorWithOptions(opCtx, extraConfig);
+    return std::make_unique<RandomCursor>(opCtx, *this, "");
 }
 
 Status WiredTigerRecordStore::truncate(OperationContext* opCtx) {
@@ -2299,11 +2298,6 @@ std::unique_ptr<SeekableRecordCursor> StandardWiredTigerRecordStore::getCursor(
     }
 
     return std::make_unique<WiredTigerRecordStoreStandardCursor>(opCtx, *this, forward);
-}
-
-std::unique_ptr<RecordCursor> StandardWiredTigerRecordStore::getRandomCursorWithOptions(
-    OperationContext* opCtx, StringData extraConfig) const {
-    return std::make_unique<RandomCursor>(opCtx, *this, extraConfig);
 }
 
 WiredTigerRecordStoreStandardCursor::WiredTigerRecordStoreStandardCursor(

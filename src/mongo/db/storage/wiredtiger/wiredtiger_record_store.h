@@ -170,9 +170,6 @@ public:
 
     std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx) const final;
 
-    virtual std::unique_ptr<RecordCursor> getRandomCursorWithOptions(
-        OperationContext* opCtx, StringData extraConfig) const = 0;
-
     virtual Status truncate(OperationContext* opCtx);
 
     virtual bool compactSupported() const {
@@ -376,9 +373,6 @@ public:
 
     virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                             bool forward) const override;
-
-    virtual std::unique_ptr<RecordCursor> getRandomCursorWithOptions(
-        OperationContext* opCtx, StringData extraConfig) const override;
 
 protected:
     virtual RecordId getKey(WT_CURSOR* cursor) const override;
