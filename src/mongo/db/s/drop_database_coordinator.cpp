@@ -33,6 +33,7 @@
 
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
@@ -70,6 +71,33 @@ void removeDatabaseMetadataFromConfig(OperationContext* opCtx,
                                    << "Could not remove database metadata from config server for '"
                                    << dbName << "'.");
 }
+
+class ScopedDatabaseCriticalSection {
+public:
+    ScopedDatabaseCriticalSection(OperationContext* opCtx,
+                                  const std::string dbName,
+                                  const BSONObj reason)
+        : _opCtx(opCtx), _dbName(std::move(dbName)), _reason(std::move(reason)) {
+        Lock::DBLock dbLock(_opCtx, _dbName, MODE_X);
+        auto dss = DatabaseShardingState::get(_opCtx, _dbName);
+        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(_opCtx, dss);
+        dss->enterCriticalSectionCatchUpPhase(_opCtx, dssLock, _reason);
+        dss->enterCriticalSectionCommitPhase(_opCtx, dssLock, _reason);
+    }
+
+    ~ScopedDatabaseCriticalSection() {
+        UninterruptibleLockGuard guard(_opCtx->lockState());
+        Lock::DBLock dbLock(_opCtx, _dbName, MODE_X);
+        auto dss = DatabaseShardingState::get(_opCtx, _dbName);
+        dss->exitCriticalSection(_opCtx, _reason);
+    }
+
+private:
+    OperationContext* _opCtx;
+    const std::string _dbName;
+    const BSONObj _reason;
+};
+
 
 }  // namespace
 
@@ -208,51 +236,61 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     _dropShardedCollection(opCtx, coll, executor);
                 }
 
-                auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
-                dropDatabaseParticipantCmd.setDbName(_dbName);
-                const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
-                    dropDatabaseParticipantCmd.toBSON({}));
-
-                // The database needs to be dropped first on the db primary shard
-                // because otherwise changestreams won't receive the drop event.
-                {
-                    DBDirectClient dbDirectClient(opCtx);
-                    const auto commandResponse =
-                        dbDirectClient.runCommand(OpMsgRequest::fromDBAndBody(_dbName, cmdObj));
-                    uassertStatusOK(getStatusFromCommandResult(commandResponse->getCommandReply()));
-
-                    WriteConcernResult ignoreResult;
-                    const auto latestOpTime =
-                        repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-                    uassertStatusOK(
-                        waitForWriteConcern(opCtx,
-                                            latestOpTime,
-                                            ShardingCatalogClient::kMajorityWriteConcern,
-                                            &ignoreResult));
-                }
-
                 const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-                // Remove primary shard from participants
-                const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-                auto participants = allShardIds;
-                participants.erase(
-                    std::remove(participants.begin(), participants.end(), primaryShardId),
-                    participants.end());
-                // Drop DB on all other shards, attaching the dbVersion to the request to ensure
-                // idempotency.
-                try {
-                    sharding_ddl_util::sendAuthenticatedCommandToShards(
-                        opCtx,
-                        _dbName,
-                        appendDbVersionIfPresent(cmdObj, *metadata().getDatabaseVersion()),
-                        participants,
-                        **executor);
-                } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
-                    // The DB metadata could have been removed by a network-partitioned former
-                    // primary
-                }
+                {
+                    // Acquire the database critical section in order to disallow implicit
+                    // collection creations from happening concurrently with dropDatabase
+                    const auto critSecReason = BSON("dropDatabase" << _dbName);
+                    auto scopedCritSec = ScopedDatabaseCriticalSection(
+                        opCtx, _dbName.toString(), std::move(critSecReason));
 
-                removeDatabaseMetadataFromConfig(opCtx, _dbName, *metadata().getDatabaseVersion());
+                    auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
+                    dropDatabaseParticipantCmd.setDbName(_dbName);
+                    const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
+                        dropDatabaseParticipantCmd.toBSON({}));
+
+                    // The database needs to be dropped first on the db primary shard
+                    // because otherwise changestreams won't receive the drop event.
+                    {
+                        DBDirectClient dbDirectClient(opCtx);
+                        const auto commandResponse =
+                            dbDirectClient.runCommand(OpMsgRequest::fromDBAndBody(_dbName, cmdObj));
+                        uassertStatusOK(
+                            getStatusFromCommandResult(commandResponse->getCommandReply()));
+
+                        WriteConcernResult ignoreResult;
+                        const auto latestOpTime =
+                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+                        uassertStatusOK(
+                            waitForWriteConcern(opCtx,
+                                                latestOpTime,
+                                                ShardingCatalogClient::kMajorityWriteConcern,
+                                                &ignoreResult));
+                    }
+
+                    // Remove primary shard from participants
+                    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+                    auto participants = allShardIds;
+                    participants.erase(
+                        std::remove(participants.begin(), participants.end(), primaryShardId),
+                        participants.end());
+                    // Drop DB on all other shards, attaching the dbVersion to the request to ensure
+                    // idempotency.
+                    try {
+                        sharding_ddl_util::sendAuthenticatedCommandToShards(
+                            opCtx,
+                            _dbName,
+                            appendDbVersionIfPresent(cmdObj, *metadata().getDatabaseVersion()),
+                            participants,
+                            **executor);
+                    } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
+                        // The DB metadata could have been removed by a network-partitioned former
+                        // primary
+                    }
+
+                    removeDatabaseMetadataFromConfig(
+                        opCtx, _dbName, *metadata().getDatabaseVersion());
+                }
 
                 {
                     // Send _flushDatabaseCacheUpdates to all shards

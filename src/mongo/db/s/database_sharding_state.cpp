@@ -187,7 +187,7 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx, DSSLock&) co
             criticalSectionSignal);
 
         uasserted(StaleDbRoutingVersion(_dbName, *clientDbVersion, boost::none),
-                  "movePrimary critical section active");
+                  "database critical section active");
     }
 
     uassert(StaleDbRoutingVersion(_dbName, *clientDbVersion, boost::none),
