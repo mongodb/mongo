@@ -395,16 +395,22 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
                 return;
             }
 
-            if (MONGO_unlikely(!args.response.isOK())) {
-                LOGV2_FATAL(4717301,
-                            "Received mirroring response with a non-okay status",
-                            "error"_attr = args.response);
-            }
-
+            // Count both failed and successful reads as resolved
             gMirroredReadsSection.resolved.fetchAndAdd(1);
             gMirroredReadsSection.resolvedBreakdown.onResponseReceived(host);
             LOGV2_DEBUG(
                 31457, 4, "Response received", "host"_attr = host, "response"_attr = args.response);
+
+            if (ErrorCodes::isRetriableError(args.response.status)) {
+                LOGV2_WARNING(5089200,
+                              "Received mirroring response with a retriable failure",
+                              "error"_attr = args.response);
+                return;
+            } else if (!args.response.isOK()) {
+                LOGV2_FATAL(4717301,
+                            "Received mirroring response with a non-okay status",
+                            "error"_attr = args.response);
+            }
         };
 
         auto newRequest = executor::RemoteCommandRequest(
