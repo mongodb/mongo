@@ -165,36 +165,17 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
         return Comparison::kDifferent;
     }
 
-    auto fcv = serverGlobalParams.featureCompatibility.getVersion();
-    auto isFcvAtLeast50 = fcv >= ServerGlobalParams::FeatureCompatibility::Version::kVersion50;
-
-    // TODO SERVER-47766: remove this FCV check when 5.0 becomes last-lts.
-    if (isFcvAtLeast50) {
-        // The 'wildcardProjection' field is a part of index signature if FCV has been set to 5.0+.
-        // Compare 'wildcardProjection' in each index descriptor. Ignore field order when comparing.
-        // The candidate index descriptor's _projection has already been normalized upstream. The
-        // existing index's _normalizedProjection is populated when its associated IndexCatalogEntry
-        // is created.
-        static const UnorderedFieldsBSONObjComparator kUnorderedBSONCmp;
-        if (kUnorderedBSONCmp.evaluate(_projection != existingIndexDesc->_normalizedProjection)) {
-            return Comparison::kDifferent;
-        }
+    static const UnorderedFieldsBSONObjComparator kUnorderedBSONCmp;
+    if (kUnorderedBSONCmp.evaluate(_projection != existingIndexDesc->_normalizedProjection)) {
+        return Comparison::kDifferent;
     }
 
-    auto isFcvAtLeast49 =
-        isFcvAtLeast50 || fcv >= ServerGlobalParams::FeatureCompatibility::Version::kVersion49;
+    if (unique() != existingIndexDesc->unique()) {
+        return Comparison::kDifferent;
+    }
 
-    // TODO SERVER-47766: remove these FCV checks when 5.0 becomes last-lts.
-    if (isFcvAtLeast49) {
-        // The 'unique' field is a part of index signature if FCV has been set to 4.9+.
-        if (unique() != existingIndexDesc->unique()) {
-            return Comparison::kDifferent;
-        }
-
-        // The 'sparse' field is a part of index signature if FCV has been set to 4.9+.
-        if (isSparse() != existingIndexDesc->isSparse()) {
-            return Comparison::kDifferent;
-        }
+    if (isSparse() != existingIndexDesc->isSparse()) {
+        return Comparison::kDifferent;
     }
 
     // Check whether both indexes have the same collation. If not, then they are not equivalent.
@@ -206,14 +187,9 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
         return Comparison::kDifferent;
     }
 
-    // The partialFilterExpression is only part of the index signature if FCV has been set to 4.7+.
-    // TODO SERVER-47766: remove these FCV checks when 5.0 becomes last-lts.
-    auto isFCVAtLeast47 =
-        isFcvAtLeast49 || fcv >= ServerGlobalParams::FeatureCompatibility::Version::kVersion47;
-
     // If we have a partialFilterExpression and the existingIndex doesn't, or vice-versa, then the
     // two indexes are not equivalent. We therefore return Comparison::kDifferent immediately.
-    if (isFCVAtLeast47 && isPartial() != existingIndexDesc->isPartial()) {
+    if (isPartial() != existingIndexDesc->isPartial()) {
         return Comparison::kDifferent;
     }
     // Compare 'partialFilterExpression' in each descriptor to see if they are equivalent. We use
@@ -222,7 +198,7 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     // For instance, under a case-sensitive collation, the predicates {a: "blah"} and {a: "BLAH"}
     // would match the same set of documents, but these are not currently considered equivalent.
     // TODO SERVER-47664: take collation into account while comparing string predicates.
-    if (isFCVAtLeast47 && existingIndex->getFilterExpression()) {
+    if (existingIndex->getFilterExpression()) {
         auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), ns);
         auto filter = MatchExpressionParser::parseAndNormalize(partialFilterExpression(), expCtx);
         if (!filter->equivalent(existingIndex->getFilterExpression())) {
@@ -236,41 +212,6 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
 
     auto thisOptionsMap = populateOptionsMapForEqualityCheck(infoObj());
     auto existingIndexOptionsMap = populateOptionsMapForEqualityCheck(existingIndexDesc->infoObj());
-
-    // If the FCV has not been upgraded to 5.0+, add wildcardProjection to the options map. They do
-    // not contribute to the index signature, but can determine whether or not the candidate index
-    // is identical to the existing index.
-    if (!isFcvAtLeast50) {
-        thisOptionsMap[IndexDescriptor::kPathProjectionFieldName] =
-            infoObj()[IndexDescriptor::kPathProjectionFieldName];
-        existingIndexOptionsMap[IndexDescriptor::kPathProjectionFieldName] =
-            existingIndexDesc->infoObj()[IndexDescriptor::kPathProjectionFieldName];
-    }
-
-    // If the FCV has not been upgraded to 4.9+, add unique/sparse to the options map. They do not
-    // contribute to the index signature, but can determine whether or not the candidate index is
-    // identical to the existing index.
-    if (!isFcvAtLeast49) {
-        thisOptionsMap[IndexDescriptor::kUniqueFieldName] =
-            infoObj()[IndexDescriptor::kUniqueFieldName];
-        existingIndexOptionsMap[IndexDescriptor::kUniqueFieldName] =
-            existingIndexDesc->infoObj()[IndexDescriptor::kUniqueFieldName];
-
-        thisOptionsMap[IndexDescriptor::kSparseFieldName] =
-            infoObj()[IndexDescriptor::kSparseFieldName];
-        existingIndexOptionsMap[IndexDescriptor::kSparseFieldName] =
-            existingIndexDesc->infoObj()[IndexDescriptor::kSparseFieldName];
-    }
-
-    // If the FCV has not been upgraded to 4.7+, add partialFilterExpression to the options map. It
-    // does not contribute to the index signature, but can determine whether or not the candidate
-    // index is identical to the existing index.
-    if (!isFCVAtLeast47) {
-        thisOptionsMap[IndexDescriptor::kPartialFilterExprFieldName] =
-            infoObj()[IndexDescriptor::kPartialFilterExprFieldName];
-        existingIndexOptionsMap[IndexDescriptor::kPartialFilterExprFieldName] =
-            existingIndexDesc->infoObj()[IndexDescriptor::kPartialFilterExprFieldName];
-    }
 
     const bool optsIdentical = thisOptionsMap.size() == existingIndexOptionsMap.size() &&
         std::equal(thisOptionsMap.begin(),
