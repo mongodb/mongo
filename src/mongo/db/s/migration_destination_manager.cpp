@@ -488,10 +488,6 @@ repl::OpTime MigrationDestinationManager::cloneDocumentsFromDonor(
         }
         auto inserterOpCtx = cc().makeOperationContext();
         inserterOpCtx->setAlwaysInterruptAtStepDownOrUp();
-        {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            opCtx->checkForInterrupt();
-        }
 
         auto consumerGuard = makeGuard([&] {
             batches.closeConsumerEnd();
@@ -499,6 +495,11 @@ repl::OpTime MigrationDestinationManager::cloneDocumentsFromDonor(
         });
 
         try {
+            {
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                opCtx->checkForInterrupt();
+            }
+
             while (true) {
                 auto nextBatch = batches.pop(inserterOpCtx.get());
                 auto arr = nextBatch["objects"].Obj();
