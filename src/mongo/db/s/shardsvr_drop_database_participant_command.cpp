@@ -84,14 +84,6 @@ public:
                             "database locally",
                             "database"_attr = dbName);
             }
-
-            {
-                // Clear CollectionShardingRuntime entry
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                Lock::DBLock dbLock(opCtx, dbName, MODE_X);
-                auto dss = DatabaseShardingState::get(opCtx, dbName);
-                dss->clearDatabaseInfo(opCtx);
-            }
         }
 
     private:
