@@ -69,54 +69,65 @@ const readThreadFunc = function(readFunc, _collName, hangTimesEntered, logTimesE
 function runTest(prefix, readFunc) {
     // Reset the log history between tests.
     assert.commandWorked(db.adminCommand({clearLog: 'global'}));
-    // The default WC is majority and this test can't satisfy majority writes.
-    assert.commandWorked(db.adminCommand(
-        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
-    jsTestLog('Testing oplog visibility for ' + prefix);
-    const collName = baseCollName + '_' + prefix;
-    const testColl = testDB.getCollection(collName);
+    try {
+        // The default WC is majority and this test can't satisfy majority writes.
+        assert.commandWorked(db.adminCommand(
+            {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
-    testColl.drop({writeConcern: {w: "majority"}});
-    assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: 'majority'}}));
+        jsTestLog('Testing oplog visibility for ' + prefix);
+        const collName = baseCollName + '_' + prefix;
+        const testColl = testDB.getCollection(collName);
 
-    let hangFailPoint = configureFailPoint(testDB, "hangAfterReservingPrepareTimestamp");
-    let logFailPoint = configureFailPoint(testDB, "waitForPrepareTransactionCommandLogged");
+        testColl.drop({writeConcern: {w: "majority"}});
+        assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: 'majority'}}));
 
-    // Insert a document for the transaction.
-    assert.commandWorked(testColl.insert(TestData.txnDoc));
-    // Insert a document untouched by the transaction.
-    assert.commandWorked(testColl.insert(TestData.otherDoc, {writeConcern: {w: "majority"}}));
+        let hangFailPoint = configureFailPoint(testDB, "hangAfterReservingPrepareTimestamp");
+        let logFailPoint = configureFailPoint(testDB, "waitForPrepareTransactionCommandLogged");
 
-    // Start a transaction with a single update on the 'txnDoc'.
-    const session = db.getMongo().startSession({causalConsistency: false});
-    const sessionDB = session.getDatabase(TestData.dbName);
-    session.startTransaction({readConcern: {level: 'snapshot'}});
-    const updateResult =
-        assert.commandWorked(sessionDB[collName].update(TestData.txnDoc, {$inc: {x: 1}}));
-    // Make sure that txnDoc is part of both the snapshot and transaction as an update can still
-    // succeed if it doesn't find any matching documents to modify.
-    assert.eq(updateResult["nModified"], 1);
+        // Insert a document for the transaction.
+        assert.commandWorked(testColl.insert(TestData.txnDoc));
+        // Insert a document untouched by the transaction.
+        assert.commandWorked(testColl.insert(TestData.otherDoc, {writeConcern: {w: "majority"}}));
 
-    // We set the log level up to know when 'prepareTransaction' completes.
-    db.setLogLevel(1);
+        // Start a transaction with a single update on the 'txnDoc'.
+        const session = db.getMongo().startSession({causalConsistency: false});
+        const sessionDB = session.getDatabase(TestData.dbName);
+        session.startTransaction({readConcern: {level: 'snapshot'}});
+        const updateResult =
+            assert.commandWorked(sessionDB[collName].update(TestData.txnDoc, {$inc: {x: 1}}));
+        // Make sure that txnDoc is part of both the snapshot and transaction as an update can still
+        // succeed if it doesn't find any matching documents to modify.
+        assert.eq(updateResult["nModified"], 1);
 
-    // Clear the log history to ensure we only see the most recent 'prepareTransaction'
-    // failpoint log message.
-    assert.commandWorked(db.adminCommand({clearLog: 'global'}));
-    const joinReadThread = startParallelShell(funWithArgs(readThreadFunc,
-                                                          readFunc,
-                                                          collName,
-                                                          hangFailPoint.timesEntered + 1,
-                                                          logFailPoint.timesEntered + 1));
+        // We set the log level up to know when 'prepareTransaction' completes.
+        db.setLogLevel(1);
 
-    jsTestLog("Preparing the transaction for " + prefix);
-    const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
+        // Clear the log history to ensure we only see the most recent 'prepareTransaction'
+        // failpoint log message.
+        assert.commandWorked(db.adminCommand({clearLog: 'global'}));
+        const joinReadThread = startParallelShell(funWithArgs(readThreadFunc,
+                                                              readFunc,
+                                                              collName,
+                                                              hangFailPoint.timesEntered + 1,
+                                                              logFailPoint.timesEntered + 1));
 
-    db.setLogLevel(0);
-    joinReadThread({checkExitSuccess: true});
+        jsTestLog("Preparing the transaction for " + prefix);
+        const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-    PrepareHelpers.commitTransaction(session, prepareTimestamp);
+        db.setLogLevel(0);
+        joinReadThread({checkExitSuccess: true});
+
+        PrepareHelpers.commitTransaction(session, prepareTimestamp);
+    } finally {
+        // Unsetting CWWC is not allowed, so explicitly restore the default write concern to be
+        // majority by setting CWWC to {w: majority}.
+        assert.commandWorked(db.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: "majority"},
+            writeConcern: {w: "majority"}
+        }));
+    }
 }
 
 const snapshotRead = function(_collName) {

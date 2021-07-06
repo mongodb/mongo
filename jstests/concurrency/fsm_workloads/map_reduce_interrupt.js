@@ -102,6 +102,26 @@ var $config = extendWorkload($config, function($config, $super) {
             assertAlways.commandWorked(localTempCollectionsResult);
             assertAlways.eq(
                 localTempCollectionsResult.cursor.firstBatch.length, 0, localTempCollectionsResult);
+
+            // Unsetting CWWC is not allowed, so explicitly restore the default write concern to be
+            // majority by setting CWWC to {w: majority}.
+            if (cluster.isReplication()) {
+                assert.commandWorked(db.adminCommand({
+                    setDefaultRWConcern: 1,
+                    defaultWriteConcern: {w: "majority"},
+                    writeConcern: {w: "majority"}
+                }));
+            }
+        } else {
+            // Unsetting CWWC is not allowed, so explicitly restore the default write concern to be
+            // majority by setting CWWC to {w: majority}.
+            cluster.executeOnMongosNodes(function(db) {
+                assert.commandWorked(db.adminCommand({
+                    setDefaultRWConcern: 1,
+                    defaultWriteConcern: {w: "majority"},
+                    writeConcern: {w: "majority"}
+                }));
+            });
         }
     };
 

@@ -156,6 +156,24 @@ var $config = (function() {
     function teardown(db, collName, cluster) {
         // Make sure any currently running transactions are aborted.
         killSessionsFromDocs(db, collName);
+
+        // Unsetting CWWC is not allowed, so explicitly restore the default write concern to be
+        // majority by setting CWWC to {w: majority}.
+        if (cluster.isSharded()) {
+            cluster.executeOnMongosNodes(function(db) {
+                assert.commandWorked(db.adminCommand({
+                    setDefaultRWConcern: 1,
+                    defaultWriteConcern: {w: "majority"},
+                    writeConcern: {w: "majority"}
+                }));
+            });
+        } else if (cluster.isReplication()) {
+            assert.commandWorked(db.adminCommand({
+                setDefaultRWConcern: 1,
+                defaultWriteConcern: {w: "majority"},
+                writeConcern: {w: "majority"}
+            }));
+        }
     }
 
     return {
