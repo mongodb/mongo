@@ -232,13 +232,13 @@ commands:
         namespace: concatenate_with_db
         api_version: ""
         fields:
+            to:
+                type: namespacestring
+                description: "The new namespace for the collection being renamed."
             optFromCollection:
                 description: "Information of the source collection to rename, used only for sharded collection."
                 type: CollectionType
                 optional: true
-            to:
-                type: namespacestring
-                description: "The new namespace for the collection being renamed."
 
     _shardsvrReshardCollection:
         command_name: _shardsvrReshardCollection

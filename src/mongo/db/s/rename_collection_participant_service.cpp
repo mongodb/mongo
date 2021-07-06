@@ -82,16 +82,35 @@ void renameOrDropTarget(OperationContext* opCtx,
                         const NamespaceString& fromNss,
                         const NamespaceString& toNss,
                         const RenameCollectionOptions& options,
-                        const UUID& sourceUUID) {
+                        const UUID& sourceUUID,
+                        const boost::optional<UUID>& targetUUID) {
     {
         Lock::DBLock dbLock(opCtx, toNss.db(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, toNss, MODE_IS);
         const auto targetCollPtr =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss);
-        if (targetCollPtr && targetCollPtr->uuid() == sourceUUID) {
-            // Early return if the rename previously succeeded
-            return;
+        if (targetCollPtr) {
+            if (targetCollPtr->uuid() == sourceUUID) {
+                // Early return if the rename previously succeeded
+                return;
+            }
+            uassert(5807602,
+                    str::stream() << "Target collection " << toNss
+                                  << " UUID does not match the provided UUID.",
+                    !targetUUID || targetCollPtr->uuid() == *targetUUID);
         }
+    }
+
+    {
+        Lock::DBLock dbLock(opCtx, fromNss.db(), MODE_IS);
+        Lock::CollectionLock collLock(opCtx, fromNss, MODE_IS);
+        // ensure idempotency by checking sourceUUID
+        const auto sourceCollPtr =
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, fromNss);
+        uassert(ErrorCodes::CommandFailed,
+                str::stream() << "Source Collection " << fromNss
+                              << " UUID does not match provided uuid.",
+                !sourceCollPtr || sourceCollPtr->uuid() == sourceUUID);
     }
 
     try {
@@ -251,7 +270,8 @@ SemiFuture<void> RenameParticipantInstance::run(
                 _doc.getForwardableOpMetadata().setOn(opCtx);
 
                 const RenameCollectionOptions options{_doc.getDropTarget(), _doc.getStayTemp()};
-                renameOrDropTarget(opCtx, fromNss(), toNss(), options, _doc.getSourceUUID());
+                renameOrDropTarget(
+                    opCtx, fromNss(), toNss(), options, _doc.getSourceUUID(), _doc.getTargetUUID());
 
                 restoreRangeDeletionTasksForRename(opCtx, toNss());
             }))

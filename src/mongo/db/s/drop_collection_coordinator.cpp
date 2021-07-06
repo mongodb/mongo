@@ -186,7 +186,8 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                 if (collIsSharded) {
                     invariant(_doc.getCollInfo());
                     const auto& coll = _doc.getCollInfo().get();
-                    sharding_ddl_util::removeCollAndChunksMetadataFromConfig(opCtx, coll);
+                    sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
+                        opCtx, coll, ShardingCatalogClient::kMajorityWriteConcern);
                 }
 
                 // Remove tags even if the collection is not sharded or didn't exist

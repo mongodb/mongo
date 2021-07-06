@@ -141,7 +141,8 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
 
     auto fromCollType = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, fromNss);
     // Perform the metadata rename
-    sharding_ddl_util::shardedRenameMetadata(opCtx, fromCollType, kToNss);
+    sharding_ddl_util::shardedRenameMetadata(
+        opCtx, fromCollType, kToNss, ShardingCatalogClient::kMajorityWriteConcern);
 
     // Check that the FROM config.collections entry has been deleted
     ASSERT(client.findOne(CollectionType::ConfigNS.ns(), fromCollQuery).isEmpty());

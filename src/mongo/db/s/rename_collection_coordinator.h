@@ -87,6 +87,9 @@ private:
 
     void _enterPhase(Phase newPhase);
 
+    void _performNoopRetryableWriteOnParticipants(
+        OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor);
+
     RenameCollectionCoordinatorDocument _doc;
 
     boost::optional<RenameCollectionResponse> _response;

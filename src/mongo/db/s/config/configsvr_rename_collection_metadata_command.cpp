@@ -32,10 +32,15 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_ddl_util.h"
+#include "mongo/db/transaction_participant.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+
 
 namespace mongo {
 namespace {
@@ -62,12 +67,64 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+            uassert(ErrorCodes::IllegalOperation,
+                    "_configsvrRenameCollectionMetadata can only be run on config servers",
+                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+            uassert(ErrorCodes::InvalidOptions,
+                    "_configsvrRenameCollectionMetadata must be called with majority writeConcern",
+                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
 
             const auto& req = request();
 
-            ShardingCatalogManager::get(opCtx)->renameShardedMetadata(
-                opCtx, ns(), req.getTo(), req.getOptFromCollection());
+            // Set the operation context read concern level to local for reads into the config
+            // database.
+            repl::ReadConcernArgs::get(opCtx) =
+                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            if (!txnParticipant) {
+                // old binaries will not send the txnNumber
+                ShardingCatalogManager::get(opCtx)->renameShardedMetadata(
+                    opCtx,
+                    ns(),
+                    req.getTo(),
+                    ShardingCatalogClient::kMajorityWriteConcern,
+                    req.getOptFromCollection());
+                return;
+            }
+
+            {
+                auto newClient = opCtx->getServiceContext()->makeClient("RenameCollectionMetadata");
+                {
+                    stdx::lock_guard<Client> lk(*newClient.get());
+                    newClient->setSystemOperationKillableByStepdown(lk);
+                }
+
+                AlternativeClientRegion acr(newClient);
+                auto executor =
+                    Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
+                CancelableOperationContext newOpCtxPtr(
+                    cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
+
+                ShardingCatalogManager::get(newOpCtxPtr.get())
+                    ->renameShardedMetadata(newOpCtxPtr.get(),
+                                            ns(),
+                                            req.getTo(),
+                                            ShardingCatalogClient::kLocalWriteConcern,
+                                            req.getOptFromCollection());
+            }
+
+            // Since we no write happened on this txnNumber, we need to make a dummy write so that
+            // secondaries can be aware of this txn.
+            DBDirectClient client(opCtx);
+            client.update(NamespaceString::kServerConfigurationNamespace.ns(),
+                          BSON("_id"
+                               << "RenameCollectionMetadataStats"),
+                          BSON("$inc" << BSON("count" << 1)),
+                          true /* upsert */,
+                          false /* multi */);
         }
 
     private:

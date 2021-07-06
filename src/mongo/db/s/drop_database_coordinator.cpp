@@ -119,7 +119,8 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     OperationContext* opCtx,
     const CollectionType& coll,
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
-    sharding_ddl_util::removeCollAndChunksMetadataFromConfig(opCtx, coll);
+    sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
+        opCtx, coll, ShardingCatalogClient::kMajorityWriteConcern);
 
     _doc = _updateSession(opCtx, _doc);
     sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, coll.getNss(), getCurrentSession(_doc));
