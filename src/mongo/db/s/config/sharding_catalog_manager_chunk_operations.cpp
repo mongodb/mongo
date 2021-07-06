@@ -39,6 +39,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/namespace_string.h"
@@ -1033,6 +1034,15 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     const ShardId& fromShard,
     const ShardId& toShard,
     const boost::optional<Timestamp>& validAfter) {
+
+    // TODO(SERVER-53283): Remove the logic around fcvRegion to re-enable
+    // the concurrent execution of moveChunk() and setFCV().
+    FixedFCVRegion fcvRegion(opCtx);
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Cannot commit a chunk migration request "
+            "while the cluster is being upgraded or downgraded",
+            !fcvRegion->isUpgradingOrDowngrading());
+
 
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 

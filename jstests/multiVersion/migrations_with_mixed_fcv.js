@@ -226,10 +226,16 @@ function testSetFCVDoesNotBlockWhileMigratingChunk() {
     st.stop();
 }
 
-testMigrationSucceedsWhileUpgradingSource();
-testMigrationSucceedsWhileDowngradingSource();
-testMigrationSucceedsWhileUpgradingDestination();
-testMigrationSucceedsWhileDowngradingDestination();
+/*
+ * TODO SERVER-53283: re-enable the execution of the following tests
+ * once the migration protocol is allowed to run in the middle of an FCV operation again
+ * (see SERVER-57790 for details).
+ *
+ *  testMigrationSucceedsWhileUpgradingSource();
+ *  testMigrationSucceedsWhileDowngradingSource();
+ *  testMigrationSucceedsWhileUpgradingDestination();
+ *  testMigrationSucceedsWhileDowngradingDestination();
+ */
 
 testMigrateFromLastLTSToLastLTS();
 testMigrateFromLatestToLastLTS();
