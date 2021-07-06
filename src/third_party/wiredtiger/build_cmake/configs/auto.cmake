@@ -229,28 +229,24 @@ config_lib(
     HAVE_LIBPTHREAD
     "Pthread library exists."
     LIB "pthread"
-    FUNC "pthread_create"
 )
 
 config_lib(
     HAVE_LIBRT
     "rt library exists."
     LIB "rt"
-    FUNC "timer_create"
 )
 
 config_lib(
     HAVE_LIBDL
     "dl library exists."
     LIB "dl"
-    FUNC "dlopen"
 )
 
 config_lib(
     HAVE_LIBLZ4
     "lz4 library exists."
     LIB "lz4"
-    FUNC "LZ4_versionNumber"
     HEADER "lz4.h"
 )
 
@@ -258,7 +254,6 @@ config_lib(
     HAVE_LIBSNAPPY
     "snappy library exists."
     LIB "snappy"
-    FUNC "snappy_compress"
     HEADER "snappy.h"
 )
 
@@ -266,7 +261,6 @@ config_lib(
     HAVE_LIBZ
     "zlib library exists."
     LIB "z"
-    FUNC "zlibVersion"
     HEADER "zlib.h"
 )
 
@@ -274,7 +268,6 @@ config_lib(
     HAVE_LIBZSTD
     "zstd library exists."
     LIB "zstd"
-    FUNC "ZSTD_versionString"
     HEADER "zstd.h"
 )
 
@@ -282,7 +275,6 @@ config_lib(
     HAVE_LIBTCMALLOC
     "tcmalloc library exists."
     LIB "tcmalloc"
-    FUNC "tc_malloc"
 )
 
 config_compile(

@@ -401,7 +401,7 @@ function(config_lib config_name description)
         2
         "CONFIG_LIB"
         ""
-        "LIB;FUNC;DEPENDS;HEADER"
+        "LIB;DEPENDS;HEADER"
         ""
     )
 
@@ -411,10 +411,6 @@ function(config_lib config_name description)
     # We require a library (not optional).
     if ("${CONFIG_LIB_LIB}" STREQUAL "")
         message(FATAL_ERROR "No library passed")
-    endif()
-    # We require a function within the library (not optional).
-    if ("${CONFIG_LIB_FUNC}" STREQUAL "")
-        message(FATAL_ERROR "No library function passed")
     endif()
 
     # Check that the configs dependencies are enabled before setting it to a visible enabled state.
@@ -428,7 +424,6 @@ function(config_lib config_name description)
             set(CMAKE_REQUIRED_FLAGS "-DWT_ARCH=${WT_ARCH} -DWT_OS=${WT_OS}")
         endif()
         find_library(has_lib_${config_name} ${CONFIG_LIB_LIB})
-        #check_library_exists(${CONFIG_LIB_LIB} ${CONFIG_LIB_FUNC} "" has_lib_${config_name})
         set(CMAKE_REQUIRED_FLAGS)
         set(has_lib "0")
         if(has_lib_${config_name})
