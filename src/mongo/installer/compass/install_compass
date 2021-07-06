@@ -375,7 +375,7 @@ def download_and_install_compass():
         LOG.exception(error)
         is_successful = False
     except Exception as error:  # pylint: disable=broad-except
-        LOG.info('Unexpected error when downloading: %s', error.message)
+        LOG.error('Unexpected error when downloading: %s', error.message)
         is_successful = False
 
     else:
@@ -429,6 +429,6 @@ if __name__ == '__main__':
     LOG.info('A log file for this installation can be found at %s', LOG_FILE_NAME)
 
     if not SUCCESS:
-        LOG.error('Please open a ticket with the log file attached on the SERVER ' \
-                  'project at https://jira.mongodb.org/')
+        LOG.error('Please see our documentation for how to download and install ' \
+                  'Compass manually: https://docs.mongodb.com/compass/current/install/#download-and-install-compass')
         sys.exit(1)
