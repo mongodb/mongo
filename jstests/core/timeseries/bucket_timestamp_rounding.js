@@ -86,19 +86,18 @@
     assert.eq(1, buckets.length);
     assert.eq(buckets[0].control.min.t, ISODate("2021-04-22T20:10:00.000Z"));
 
-    // TODO SERVER-58171: Re-enable these tests
     // Now let's bump to minutes and make sure we get the expected behavior
-    // assert.commandWorked(
-    // db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'minutes'}}));
+    assert.commandWorked(
+        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'minutes'}}));
 
     // Open a new bucket and ensure min time is rounded down to nearest hour.
-    // assert.commandWorked(coll.insert({t: ISODate("2021-04-24T20:10:14.134Z")}));
+    assert.commandWorked(coll.insert({t: ISODate("2021-04-24T20:10:14.134Z")}));
     // And that going backwards, but after the rounding point, doesn't open another new bucket.
-    // assert.commandWorked(coll.insert({t: ISODate("2021-04-24T20:05:00.000Z")}));
+    assert.commandWorked(coll.insert({t: ISODate("2021-04-24T20:05:00.000Z")}));
 
-    // buckets = db.system.buckets.granularitySecondsToMinutes.find().toArray();
-    // assert.eq(2, buckets.length);
-    // assert.eq(buckets[1].control.min.t, ISODate("2021-04-24T20:00:00.000Z"));
+    buckets = db.system.buckets.granularitySecondsToMinutes.find().toArray();
+    assert.eq(2, buckets.length);
+    assert.eq(buckets[1].control.min.t, ISODate("2021-04-24T20:00:00.000Z"));
 })();
 
 (function testMinutesToHours() {
@@ -117,18 +116,17 @@
     assert.eq(1, buckets.length);
     assert.eq(buckets[0].control.min.t, ISODate("2021-04-22T20:00:00.000Z"));
 
-    // TODO SERVER-58171: Re-enable these tests
     // Now let's bump to minutes and make sure we get the expected behavior
-    // assert.commandWorked(
-    // db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'hours'}}));
+    assert.commandWorked(
+        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'hours'}}));
 
     // Open a new bucket and ensure min time is rounded down to nearest day.
-    // assert.commandWorked(coll.insert({t: ISODate("2021-06-24T20:10:14.134Z")}));
+    assert.commandWorked(coll.insert({t: ISODate("2021-06-24T20:10:14.134Z")}));
     // And that going backwards, but after the rounding point, doesn't open another new bucket.
-    // assert.commandWorked(coll.insert({t: ISODate("2021-06-24T10:00:00.000Z")}));
+    assert.commandWorked(coll.insert({t: ISODate("2021-06-24T10:00:00.000Z")}));
 
-    // buckets = db.system.buckets.granularityMinutesToHours.find().toArray();
-    // assert.eq(2, buckets.length);
-    // assert.eq(buckets[1].control.min.t, ISODate("2021-06-24T00:00:00.000Z"));
+    buckets = db.system.buckets.granularityMinutesToHours.find().toArray();
+    assert.eq(2, buckets.length);
+    assert.eq(buckets[1].control.min.t, ISODate("2021-06-24T00:00:00.000Z"));
 })();
 })();
