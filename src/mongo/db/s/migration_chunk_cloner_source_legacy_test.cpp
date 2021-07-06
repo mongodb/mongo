@@ -218,6 +218,14 @@ protected:
         return BSON("_id" << value << "X" << value);
     }
 
+    /**
+     * Instantiates a BSON object with objsize close to size.
+     */
+    static BSONObj createSizedCollectionDocument(int id, long long size) {
+        std::string value(size, 'x');
+        return BSON("_id" << id << "X" << id << "Y" << value);
+    }
+
 protected:
     LogicalSessionId _lsid;
     TxnNumber _txnNumber{0};
@@ -348,6 +356,141 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
             ASSERT_BSONOBJ_EQ(BSON("_id" << 80), modsObj["deleted"].Array()[0].Obj());
             ASSERT_BSONOBJ_EQ(BSON("_id" << 199), modsObj["deleted"].Array()[1].Obj());
             ASSERT_BSONOBJ_EQ(BSON("_id" << 220), modsObj["deleted"].Array()[2].Obj());
+        }
+    }
+
+    auto futureCommit = launchAsync([&]() {
+        onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
+    });
+
+    ASSERT_OK(cloner.commitClone(operationContext()));
+    futureCommit.default_timed_get();
+}
+
+TEST_F(MigrationChunkClonerSourceLegacyTest, OneLargeDocumentTransferMods) {
+    const std::vector<BSONObj> contents = {createCollectionDocument(1)};
+
+    createShardedCollection(contents);
+
+    MigrationChunkClonerSourceLegacy cloner(
+        createMoveChunkRequest(ChunkRange(BSON("X" << 1), BSON("X" << 100))),
+        kShardKeyPattern,
+        kDonorConnStr,
+        kRecipientConnStr.getServers()[0]);
+
+    {
+        auto futureStartClone = launchAsync([&]() {
+            onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
+        });
+
+        ASSERT_OK(cloner.startClone(operationContext(), UUID::gen(), _lsid, _txnNumber));
+        futureStartClone.default_timed_get();
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+
+        {
+            BSONArrayBuilder arrBuilder;
+            ASSERT_OK(
+                cloner.nextCloneBatch(operationContext(), autoColl.getCollection(), &arrBuilder));
+            ASSERT_EQ(1, arrBuilder.arrSize());
+        }
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
+        BSONObj insertDoc =
+            createSizedCollectionDocument(2, BSONObjMaxUserSize - kFixedCommandOverhead + 2 * 1024);
+        insertDocsInShardedCollection({insertDoc});
+        WriteUnitOfWork wuow(operationContext());
+        cloner.onInsertOp(operationContext(), insertDoc, {});
+        wuow.commit();
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+        {
+            BSONObjBuilder modsBuilder;
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), autoColl.getDb(), &modsBuilder));
+
+            const auto modsObj = modsBuilder.obj();
+            ASSERT_EQ(1, modsObj["reload"].Array().size());
+        }
+    }
+
+    auto futureCommit = launchAsync([&]() {
+        onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
+    });
+
+    ASSERT_OK(cloner.commitClone(operationContext()));
+    futureCommit.default_timed_get();
+}
+
+TEST_F(MigrationChunkClonerSourceLegacyTest, ManySmallDocumentsTransferMods) {
+    const std::vector<BSONObj> contents = {createCollectionDocument(1)};
+
+    createShardedCollection(contents);
+
+    MigrationChunkClonerSourceLegacy cloner(
+        createMoveChunkRequest(ChunkRange(BSON("X" << 1), BSON("X" << 1000000))),
+        kShardKeyPattern,
+        kDonorConnStr,
+        kRecipientConnStr.getServers()[0]);
+
+    {
+        auto futureStartClone = launchAsync([&]() {
+            onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
+        });
+
+        ASSERT_OK(cloner.startClone(operationContext(), UUID::gen(), _lsid, _txnNumber));
+        futureStartClone.default_timed_get();
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+
+        {
+            BSONArrayBuilder arrBuilder;
+            ASSERT_OK(
+                cloner.nextCloneBatch(operationContext(), autoColl.getCollection(), &arrBuilder));
+            ASSERT_EQ(1, arrBuilder.arrSize());
+        }
+    }
+
+    long long numDocuments = 0;
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
+
+        std::vector<BSONObj> insertDocs;
+        long long totalSize = 0;
+        long long id = 2;
+        while (true) {
+            BSONObj add = createSizedCollectionDocument(id++, 4 * 1024);
+            // The overhead for a BSONObjBuilder with 4KB documents is ~ 22 * 1024, so this is the
+            // max documents to fit in one batch
+            if (totalSize + add.objsize() > BSONObjMaxUserSize - kFixedCommandOverhead - 22 * 1024)
+                break;
+            insertDocs.push_back(add);
+            totalSize += add.objsize();
+            numDocuments++;
+            insertDocsInShardedCollection({add});
+        }
+
+        WriteUnitOfWork wuow(operationContext());
+        for (BSONObj add : insertDocs) {
+            cloner.onInsertOp(operationContext(), add, {});
+        }
+        wuow.commit();
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+        {
+            BSONObjBuilder modsBuilder;
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), autoColl.getDb(), &modsBuilder));
+            const auto modsObj = modsBuilder.obj();
+            ASSERT_EQ(modsObj["reload"].Array().size(), numDocuments);
         }
     }
 

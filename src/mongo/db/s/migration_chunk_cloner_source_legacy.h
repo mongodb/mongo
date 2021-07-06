@@ -56,6 +56,9 @@ class CollectionPtr;
 class Database;
 class RecordId;
 
+// Overhead to prevent mods buffers from being too large
+const long long kFixedCommandOverhead = 32 * 1024;
+
 /**
  * Used to commit work for LogOpForSharding. Used to keep track of changes in documents that are
  * part of a chunk being migrated.

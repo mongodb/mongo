@@ -750,13 +750,14 @@ Status MigrationChunkClonerSourceLegacy::nextModsBatch(OperationContext* opCtx,
     long long totalDocSize = xferMods(&arrDel, &deleteList, 0, noopFn);
     arrDel.done();
 
-    BSONArrayBuilder arrUpd(builder->subarrayStart("reload"));
-    auto findByIdWrapper = [opCtx, db, ns](BSONObj idDoc, BSONObj* fullDoc) {
-        return Helpers::findById(opCtx, db, ns, idDoc, *fullDoc);
-    };
-    totalDocSize = xferMods(&arrUpd, &updateList, totalDocSize, findByIdWrapper);
-    arrUpd.done();
-
+    if (deleteList.empty()) {
+        BSONArrayBuilder arrUpd(builder->subarrayStart("reload"));
+        auto findByIdWrapper = [opCtx, db, ns](BSONObj idDoc, BSONObj* fullDoc) {
+            return Helpers::findById(opCtx, db, ns, idDoc, *fullDoc);
+        };
+        totalDocSize = xferMods(&arrUpd, &updateList, totalDocSize, findByIdWrapper);
+        arrUpd.done();
+    }
 
     builder->append("size", totalDocSize);
 
@@ -967,25 +968,27 @@ long long xferMods(BSONArrayBuilder* arr,
                    std::list<BSONObj>* modsList,
                    long long initialSize,
                    std::function<bool(BSONObj, BSONObj*)> extractDocToAppendFn) {
-    const long long maxSize = 1024 * 1024;
+    const long long maxSize = BSONObjMaxUserSize;
 
     if (modsList->empty() || initialSize > maxSize) {
         return initialSize;
     }
 
-    long long totalSize = initialSize;
-
     auto iter = modsList->begin();
-    for (; iter != modsList->end() && totalSize < maxSize; ++iter) {
+    for (; iter != modsList->end(); ++iter) {
         auto idDoc = *iter;
 
         BSONObj fullDoc;
         if (extractDocToAppendFn(idDoc, &fullDoc)) {
+            if (arr->arrSize() &&
+                (arr->len() + fullDoc.objsize() + kFixedCommandOverhead) > maxSize) {
+                break;
+            }
             arr->append(fullDoc);
-            totalSize += fullDoc.objsize();
         }
     }
 
+    long long totalSize = arr->len();
     modsList->erase(modsList->begin(), iter);
 
     return totalSize;
