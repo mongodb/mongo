@@ -41,26 +41,25 @@ namespace mongo {
  * its "fullDocumentBeforeChange" field shall be the optime of the noop oplog entry containing the
  * pre-image. This stage replaces that field with the actual pre-image document.
  */
-class DocumentSourceChangeStreamLookupPreImage final
-    : public DocumentSource,
-      public ChangeStreamStageSerializationInterface {
+class DocumentSourceChangeStreamAddPreImage final : public DocumentSource,
+                                                    public ChangeStreamStageSerializationInterface {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamLookupPreImage"_sd;
+    static constexpr StringData kStageName = "$_internalChangeStreamAddPreImage"_sd;
     static constexpr StringData kFullDocumentBeforeChangeFieldName =
         DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
 
     /**
-     * Creates a DocumentSourceChangeStreamLookupPostImage stage.
+     * Creates a DocumentSourceChangeStreamAddPreImage stage.
      */
-    static boost::intrusive_ptr<DocumentSourceChangeStreamLookupPreImage> create(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamAddPreImage> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const DocumentSourceChangeStreamSpec& spec);
 
-    static boost::intrusive_ptr<DocumentSourceChangeStreamLookupPreImage> createFromBson(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamAddPreImage> createFromBson(
         const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    DocumentSourceChangeStreamLookupPreImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                             FullDocumentBeforeChangeModeEnum mode)
+    DocumentSourceChangeStreamAddPreImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                          FullDocumentBeforeChangeModeEnum mode)
         : DocumentSource(kStageName, expCtx), _fullDocumentBeforeChangeMode(mode) {
         // This stage should never be created with FullDocumentBeforeChangeMode::kOff.
         invariant(_fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kOff);

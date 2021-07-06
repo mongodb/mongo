@@ -101,21 +101,21 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
         // to be merged, do not add a close cursor stage, since the mongos will already have one.
         stages.push_back(DocumentSourceChangeStreamCloseCursor::create(expCtx));
 
-        // We only create a pre-image lookup stage on a non-merging mongoD. We place this stage
-        // here so that any $match stages which follow the $changeStream pipeline prefix may be
-        // able to skip ahead of the DSCSLookupPreImage stage. This allows a whole-db or
-        // whole-cluster stream to run on an instance where only some collections have pre-images
-        // enabled, so long as the user filters for only those namespaces.
+        // We only create a pre-image lookup stage on a non-merging mongoD. We place this stage here
+        // so that any $match stages which follow the $changeStream pipeline prefix may be able to
+        // skip ahead of the DSCSAddPreImage stage. This allows a whole-db or whole-cluster stream
+        // to run on an instance where only some collections have pre-images enabled, so long as the
+        // user filters for only those namespaces.
         // TODO SERVER-36941: figure out how to get this to work in a sharded cluster.
         if (spec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff) {
             invariant(!expCtx->inMongos);
-            stages.push_back(DocumentSourceChangeStreamLookupPreImage::create(expCtx, spec));
+            stages.push_back(DocumentSourceChangeStreamAddPreImage::create(expCtx, spec));
         }
 
         // There should be only one post-image lookup stage.  If we're on the shards and producing
         // input to be merged, the lookup is done on the mongos.
         if (spec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup) {
-            stages.push_back(DocumentSourceChangeStreamLookupPostImage::create(expCtx));
+            stages.push_back(DocumentSourceChangeStreamAddPostImage::create(expCtx));
         }
     }
 
@@ -165,12 +165,12 @@ Value DocumentSourceChangeStreamUnwindTransaction::serializeLegacy(
     return Value();
 }
 
-Value DocumentSourceChangeStreamLookupPreImage::serializeLegacy(
+Value DocumentSourceChangeStreamAddPreImage::serializeLegacy(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return (explain ? Value{Document{{kStageName, Document()}}} : Value());
 }
 
-Value DocumentSourceChangeStreamLookupPostImage::serializeLegacy(
+Value DocumentSourceChangeStreamAddPostImage::serializeLegacy(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return (explain ? Value{Document{{kStageName, Document()}}} : Value());
 }

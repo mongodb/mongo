@@ -35,14 +35,14 @@
 
 namespace mongo {
 
-constexpr StringData DocumentSourceChangeStreamLookupPostImage::kStageName;
-constexpr StringData DocumentSourceChangeStreamLookupPostImage::kFullDocumentFieldName;
+constexpr StringData DocumentSourceChangeStreamAddPostImage::kStageName;
+constexpr StringData DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName;
 
 namespace {
 REGISTER_INTERNAL_DOCUMENT_SOURCE(
-    _internalChangeStreamLookupPostImage,
+    _internalChangeStreamAddPostImage,
     LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceChangeStreamLookupPostImage::createFromBson,
+    DocumentSourceChangeStreamAddPostImage::createFromBson,
     feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
 
 
@@ -58,22 +58,22 @@ Value assertFieldHasType(const Document& fullDoc, StringData fieldName, BSONType
 }
 }  // namespace
 
-boost::intrusive_ptr<DocumentSourceChangeStreamLookupPostImage>
-DocumentSourceChangeStreamLookupPostImage::createFromBson(
+boost::intrusive_ptr<DocumentSourceChangeStreamAddPostImage>
+DocumentSourceChangeStreamAddPostImage::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5467608,
             str::stream() << "the '" << kStageName << "' stage spec must be an object",
             elem.type() == BSONType::Object);
-    auto parsedSpec = DocumentSourceChangeStreamLookUpPostImageSpec::parse(
-        IDLParserErrorContext("DocumentSourceChangeStreamLookUpPostImageSpec"), elem.Obj());
+    auto parsedSpec = DocumentSourceChangeStreamAddPostImageSpec::parse(
+        IDLParserErrorContext("DocumentSourceChangeStreamAddPostImageSpec"), elem.Obj());
     uassert(5467609,
             str::stream() << "the 'fullDocument' field can only be 'updateLookup'",
             parsedSpec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup);
 
-    return new DocumentSourceChangeStreamLookupPostImage(expCtx);
+    return new DocumentSourceChangeStreamAddPostImage(expCtx);
 }
 
-DocumentSource::GetNextResult DocumentSourceChangeStreamLookupPostImage::doGetNext() {
+DocumentSource::GetNextResult DocumentSourceChangeStreamAddPostImage::doGetNext() {
     auto input = pSource->getNext();
     if (!input.isAdvanced()) {
         return input;
@@ -89,7 +89,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamLookupPostImage::doGetNe
     return output.freeze();
 }
 
-NamespaceString DocumentSourceChangeStreamLookupPostImage::assertValidNamespace(
+NamespaceString DocumentSourceChangeStreamAddPostImage::assertValidNamespace(
     const Document& inputDoc) const {
     auto namespaceObject =
         assertFieldHasType(inputDoc, DocumentSourceChangeStream::kNamespaceField, BSONType::Object)
@@ -110,7 +110,7 @@ NamespaceString DocumentSourceChangeStreamLookupPostImage::assertValidNamespace(
     return nss;
 }
 
-Value DocumentSourceChangeStreamLookupPostImage::lookupPostImage(const Document& updateOp) const {
+Value DocumentSourceChangeStreamAddPostImage::lookupPostImage(const Document& updateOp) const {
     // Make sure we have a well-formed input.
     auto nss = assertValidNamespace(updateOp);
 
@@ -138,15 +138,15 @@ Value DocumentSourceChangeStreamLookupPostImage::lookupPostImage(const Document&
     return (lookedUpDoc ? Value(*lookedUpDoc) : Value(BSONNULL));
 }
 
-Value DocumentSourceChangeStreamLookupPostImage::serializeLatest(
+Value DocumentSourceChangeStreamAddPostImage::serializeLatest(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return explain
         ? Value(Document{{DocumentSourceChangeStream::kStageName,
-                          Document{{"stage"_sd, "internalLookUpPostImage"_sd},
+                          Document{{"stage"_sd, "internalAddPostImage"_sd},
                                    {"fullDocumentBeforeChange"_sd, "updateLookUp"_sd}}}})
         : Value(Document{
               {kStageName,
-               DocumentSourceChangeStreamLookUpPostImageSpec(FullDocumentModeEnum::kUpdateLookup)
+               DocumentSourceChangeStreamAddPostImageSpec(FullDocumentModeEnum::kUpdateLookup)
                    .toBSON()}});
 }
 

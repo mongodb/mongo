@@ -38,23 +38,23 @@ namespace mongo {
  * Part of the change stream API machinery used to look up the post-image of a document. Uses the
  * "documentKey" field of the input to look up the new version of the document.
  */
-class DocumentSourceChangeStreamLookupPostImage final
+class DocumentSourceChangeStreamAddPostImage final
     : public DocumentSource,
       public ChangeStreamStageSerializationInterface {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamLookupPostImage"_sd;
+    static constexpr StringData kStageName = "$_internalChangeStreamAddPostImage"_sd;
     static constexpr StringData kFullDocumentFieldName =
         DocumentSourceChangeStream::kFullDocumentField;
 
     /**
-     * Creates a DocumentSourceChangeStreamLookupPostImage stage.
+     * Creates a DocumentSourceChangeStreamAddPostImage stage.
      */
-    static boost::intrusive_ptr<DocumentSourceChangeStreamLookupPostImage> create(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamAddPostImage> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceChangeStreamLookupPostImage(expCtx);
+        return new DocumentSourceChangeStreamAddPostImage(expCtx);
     }
 
-    static boost::intrusive_ptr<DocumentSourceChangeStreamLookupPostImage> createFromBson(
+    static boost::intrusive_ptr<DocumentSourceChangeStreamAddPostImage> createFromBson(
         const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
@@ -112,7 +112,7 @@ public:
     }
 
 private:
-    DocumentSourceChangeStreamLookupPostImage(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    DocumentSourceChangeStreamAddPostImage(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(kStageName, expCtx) {}
 
     /**

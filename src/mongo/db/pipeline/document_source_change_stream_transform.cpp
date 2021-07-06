@@ -370,7 +370,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     // Add the post-image, pre-image, namespace, documentKey and other fields as appropriate.
     doc.addField(DocumentSourceChangeStream::kFullDocumentField, std::move(fullDocument));
     if (_includePreImageOptime) {
-        // Set 'kFullDocumentBeforeChangeField' to the pre-image optime. The DSCSLookupPreImage
+        // Set 'kFullDocumentBeforeChangeField' to the pre-image optime. The DSCSAddPreImage
         // stage will replace this optime with the actual pre-image taken from the oplog.
         doc.addField(DocumentSourceChangeStream::kFullDocumentBeforeChangeField,
                      std::move(preImageOpTime));

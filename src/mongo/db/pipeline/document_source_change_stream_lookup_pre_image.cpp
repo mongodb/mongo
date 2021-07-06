@@ -42,37 +42,36 @@ namespace mongo {
 
 namespace {
 REGISTER_INTERNAL_DOCUMENT_SOURCE(
-    _internalChangeStreamLookupPreImage,
+    _internalChangeStreamAddPreImage,
     LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceChangeStreamLookupPreImage::createFromBson,
+    DocumentSourceChangeStreamAddPreImage::createFromBson,
     feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
 }
 
-constexpr StringData DocumentSourceChangeStreamLookupPreImage::kStageName;
-constexpr StringData DocumentSourceChangeStreamLookupPreImage::kFullDocumentBeforeChangeFieldName;
+constexpr StringData DocumentSourceChangeStreamAddPreImage::kStageName;
+constexpr StringData DocumentSourceChangeStreamAddPreImage::kFullDocumentBeforeChangeFieldName;
 
-boost::intrusive_ptr<DocumentSourceChangeStreamLookupPreImage>
-DocumentSourceChangeStreamLookupPreImage::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const DocumentSourceChangeStreamSpec& spec) {
+boost::intrusive_ptr<DocumentSourceChangeStreamAddPreImage>
+DocumentSourceChangeStreamAddPreImage::create(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              const DocumentSourceChangeStreamSpec& spec) {
     auto mode = spec.getFullDocumentBeforeChange();
 
-    return make_intrusive<DocumentSourceChangeStreamLookupPreImage>(expCtx, mode);
+    return make_intrusive<DocumentSourceChangeStreamAddPreImage>(expCtx, mode);
 }
 
-boost::intrusive_ptr<DocumentSourceChangeStreamLookupPreImage>
-DocumentSourceChangeStreamLookupPreImage::createFromBson(
+boost::intrusive_ptr<DocumentSourceChangeStreamAddPreImage>
+DocumentSourceChangeStreamAddPreImage::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5467610,
             str::stream() << "the '" << kStageName << "' stage spec must be an object",
             elem.type() == BSONType::Object);
-    auto parsedSpec = DocumentSourceChangeStreamLookUpPreImageSpec::parse(
-        IDLParserErrorContext("DocumentSourceChangeStreamLookUpPreImageSpec"), elem.Obj());
-    return make_intrusive<DocumentSourceChangeStreamLookupPreImage>(
+    auto parsedSpec = DocumentSourceChangeStreamAddPreImageSpec::parse(
+        IDLParserErrorContext("DocumentSourceChangeStreamAddPreImageSpec"), elem.Obj());
+    return make_intrusive<DocumentSourceChangeStreamAddPreImage>(
         expCtx, parsedSpec.getFullDocumentBeforeChange());
 }
 
-DocumentSource::GetNextResult DocumentSourceChangeStreamLookupPreImage::doGetNext() {
+DocumentSource::GetNextResult DocumentSourceChangeStreamAddPreImage::doGetNext() {
     auto input = pSource->getNext();
     if (!input.isAdvanced()) {
         return input;
@@ -113,7 +112,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamLookupPreImage::doGetNex
     return outputDoc.freeze();
 }
 
-boost::optional<Document> DocumentSourceChangeStreamLookupPreImage::lookupPreImage(
+boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
     const Document& inputDoc, const repl::OpTime& opTime) const {
     // We need the oplog's UUID for lookup, so obtain the collection info via MongoProcessInterface.
     auto localOplogInfo = pExpCtx->mongoProcessInterface->getCollectionOptions(
@@ -154,18 +153,17 @@ boost::optional<Document> DocumentSourceChangeStreamLookupPreImage::lookupPreIma
     return Document{opLogEntry.getObject().getOwned()};
 }
 
-Value DocumentSourceChangeStreamLookupPreImage::serializeLatest(
+Value DocumentSourceChangeStreamAddPreImage::serializeLatest(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return explain
         ? Value(Document{
               {DocumentSourceChangeStream::kStageName,
-               Document{{"stage"_sd, "internalLookUpPreImage"_sd},
+               Document{{"stage"_sd, "internalAddPreImage"_sd},
                         {"fullDocumentBeforeChange"_sd,
                          FullDocumentBeforeChangeMode_serializer(_fullDocumentBeforeChangeMode)}}}})
-        : Value(
-              Document{{kStageName,
-                        DocumentSourceChangeStreamLookUpPreImageSpec(_fullDocumentBeforeChangeMode)
-                            .toBSON()}});
+        : Value(Document{
+              {kStageName,
+               DocumentSourceChangeStreamAddPreImageSpec(_fullDocumentBeforeChangeMode).toBSON()}});
 }
 
 }  // namespace mongo

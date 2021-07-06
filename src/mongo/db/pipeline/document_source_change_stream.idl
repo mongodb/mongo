@@ -190,17 +190,17 @@ structs:
                 type: resumeToken
                 optional: false
 
-    DocumentSourceChangeStreamLookUpPreImageSpec:
+    DocumentSourceChangeStreamAddPreImageSpec:
         strict: true
-        description: A document used to specify the $_internalChangeStreamLookupPreImage stage of
+        description: A document used to specify the $_internalChangeStreamAddPreImage stage of
                      an aggregation pipeline.
         fields:
             fullDocumentBeforeChange:
                 type: FullDocumentBeforeChangeMode
 
-    DocumentSourceChangeStreamLookUpPostImageSpec:
+    DocumentSourceChangeStreamAddPostImageSpec:
         strict: true
-        description: A document used to specify the $_internalChangeStreamLookupPostImage stage of
+        description: A document used to specify the $_internalChangeStreamAddPostImage stage of
                      an aggregation pipeline.
         fields:
             fullDocument:

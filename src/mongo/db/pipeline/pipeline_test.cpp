@@ -2558,7 +2558,7 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
     ASSERT_EQ(stages.size(), getChangeStreamStageSize());
     // Make sure the change lookup is at the end.
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamLookupPostImage*>(stages.back().get()));
+    ASSERT(dynamic_cast<DocumentSourceChangeStreamAddPostImage*>(stages.back().get()));
 
     auto matchPredicate = BSON("extra"
                                << "predicate");
@@ -2567,8 +2567,8 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
     pipeline->optimizePipeline();
 
     // Make sure the $match stage has swapped before the change look up.
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamLookupPostImage*>(
-        pipeline->getSources().back().get()));
+    ASSERT(
+        dynamic_cast<DocumentSourceChangeStreamAddPostImage*>(pipeline->getSources().back().get()));
 }
 
 TEST(PipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage) {
@@ -2585,11 +2585,10 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
     ASSERT_EQ(stages.size(), getChangeStreamStageSize());
     // Make sure the change lookup is at the end.
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamLookupPostImage*>(stages.back().get()));
+    ASSERT(dynamic_cast<DocumentSourceChangeStreamAddPostImage*>(stages.back().get()));
 
     stages.push_back(DocumentSourceMatch::create(
-        BSON(DocumentSourceChangeStreamLookupPostImage::kFullDocumentFieldName << BSONNULL),
-        expCtx));
+        BSON(DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName << BSONNULL), expCtx));
     auto pipeline = Pipeline::create(stages, expCtx);
     pipeline->optimizePipeline();
 
@@ -2611,7 +2610,7 @@ TEST(PipelineOptimizationTest, FullDocumentBeforeChangeLookupSwapsWithIndependen
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
     ASSERT_EQ(stages.size(), getChangeStreamStageSize());
     // Make sure the pre-image lookup is at the end.
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamLookupPreImage*>(stages.back().get()));
+    ASSERT(dynamic_cast<DocumentSourceChangeStreamAddPreImage*>(stages.back().get()));
 
     auto matchPredicate = BSON("extra"
                                << "predicate");
@@ -2620,8 +2619,8 @@ TEST(PipelineOptimizationTest, FullDocumentBeforeChangeLookupSwapsWithIndependen
     pipeline->optimizePipeline();
 
     // Make sure the $match stage has swapped before the change look up.
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamLookupPreImage*>(
-        pipeline->getSources().back().get()));
+    ASSERT(
+        dynamic_cast<DocumentSourceChangeStreamAddPreImage*>(pipeline->getSources().back().get()));
 }
 
 TEST(PipelineOptimizationTest, FullDocumentBeforeChangeDoesNotSwapWithMatchOnPreImage) {
@@ -2638,11 +2637,10 @@ TEST(PipelineOptimizationTest, FullDocumentBeforeChangeDoesNotSwapWithMatchOnPre
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
     ASSERT_EQ(stages.size(), getChangeStreamStageSize());
     // Make sure the pre-image lookup is at the end.
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamLookupPreImage*>(stages.back().get()));
+    ASSERT(dynamic_cast<DocumentSourceChangeStreamAddPreImage*>(stages.back().get()));
 
     stages.push_back(DocumentSourceMatch::create(
-        BSON(DocumentSourceChangeStreamLookupPreImage::kFullDocumentBeforeChangeFieldName
-             << BSONNULL),
+        BSON(DocumentSourceChangeStreamAddPreImage::kFullDocumentBeforeChangeFieldName << BSONNULL),
         expCtx));
     auto pipeline = Pipeline::create(stages, expCtx);
     pipeline->optimizePipeline();

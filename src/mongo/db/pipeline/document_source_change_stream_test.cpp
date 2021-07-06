@@ -147,7 +147,7 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
         return iterator;
     }
 
-    // Called by DocumentSourceLookupPreImage to obtain the UUID of the oplog. Since that's the only
+    // Called by DocumentSourceAddPreImage to obtain the UUID of the oplog. Since that's the only
     // piece of collection info we need for now, just return a BSONObj with the mock oplog UUID.
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
         return BSON("uuid" << oplogUuid());
@@ -2264,20 +2264,20 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSResumabilityStageSeria
 TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSLookupChangePreImageStageSerialization) {
     auto expCtx = getExpCtx();
 
-    DocumentSourceChangeStreamLookUpPreImageSpec spec(FullDocumentBeforeChangeModeEnum::kRequired);
+    DocumentSourceChangeStreamAddPreImageSpec spec(FullDocumentBeforeChangeModeEnum::kRequired);
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
-    validateDocumentSourceStageSerialization<DocumentSourceChangeStreamLookupPreImage>(
+    validateDocumentSourceStageSerialization<DocumentSourceChangeStreamAddPreImage>(
         std::move(spec), stageSpecAsBSON, expCtx);
 }
 
 TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSLookupChangePostImageStageSerialization) {
     auto expCtx = getExpCtx();
 
-    DocumentSourceChangeStreamLookUpPostImageSpec spec(FullDocumentModeEnum::kUpdateLookup);
+    DocumentSourceChangeStreamAddPostImageSpec spec(FullDocumentModeEnum::kUpdateLookup);
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
-    validateDocumentSourceStageSerialization<DocumentSourceChangeStreamLookupPostImage>(
+    validateDocumentSourceStageSerialization<DocumentSourceChangeStreamAddPostImage>(
         std::move(spec), stageSpecAsBSON, expCtx);
 }
 
