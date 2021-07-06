@@ -93,7 +93,6 @@ constexpr StringData IndexDescriptor::kCollationFieldName;
 constexpr StringData IndexDescriptor::kDefaultLanguageFieldName;
 constexpr StringData IndexDescriptor::kDropDuplicatesFieldName;
 constexpr StringData IndexDescriptor::kExpireAfterSecondsFieldName;
-constexpr StringData IndexDescriptor::kGeoHaystackBucketSize;
 constexpr StringData IndexDescriptor::kIndexNameFieldName;
 constexpr StringData IndexDescriptor::kIndexVersionFieldName;
 constexpr StringData IndexDescriptor::kKeyPatternFieldName;

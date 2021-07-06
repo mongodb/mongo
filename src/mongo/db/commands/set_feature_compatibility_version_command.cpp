@@ -560,13 +560,6 @@ private:
                 "Failing upgrade due to 'failUpgrading' failpoint set",
                 !failUpgrading.shouldFail());
 
-        // Delete any haystack indexes if we're upgrading to an FCV of 4.9 or higher.
-        //
-        // TODO SERVER-51871: This block can removed once 5.0 becomes last-lts.
-        if (requestedVersion >= FeatureCompatibility::Version::kVersion49) {
-            _deleteHaystackIndexesOnUpgrade(opCtx);
-        }
-
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
             if (requestedVersion >= FeatureCompatibility::Version::kVersion50) {
@@ -594,41 +587,6 @@ private:
         }
 
         hangWhileUpgrading.pauseWhileSet(opCtx);
-    }
-
-    /**
-     * Removes all haystack indexes from the catalog.
-     *
-     * TODO SERVER-51871: This method can be removed once 5.0 becomes last-lts.
-     */
-    void _deleteHaystackIndexesOnUpgrade(OperationContext* opCtx) {
-        auto collCatalog = CollectionCatalog::get(opCtx);
-        for (const auto& db : collCatalog->getAllDbNames()) {
-            for (auto collIt = collCatalog->begin(opCtx, db); collIt != collCatalog->end(opCtx);
-                 ++collIt) {
-                NamespaceStringOrUUID collName(
-                    collCatalog->lookupNSSByUUID(opCtx, collIt.uuid().get()).get());
-                AutoGetCollectionForRead coll(opCtx, collName);
-                if (!coll) {
-                    continue;
-                }
-
-                auto idxCatalog = coll->getIndexCatalog();
-                std::vector<const IndexDescriptor*> haystackIndexes;
-                idxCatalog->findIndexByType(opCtx, IndexNames::GEO_HAYSTACK, haystackIndexes);
-
-                // Continue if 'coll' has no haystack indexes.
-                if (haystackIndexes.empty()) {
-                    continue;
-                }
-
-                std::vector<std::string> indexNames;
-                for (auto&& haystackIndex : haystackIndexes) {
-                    indexNames.emplace_back(haystackIndex->indexName());
-                }
-                dropIndexes(opCtx, *collName.nss(), indexNames);
-            }
-        }
     }
 
     void _runDowngrade(OperationContext* opCtx,

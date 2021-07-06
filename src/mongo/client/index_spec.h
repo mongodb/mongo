@@ -47,7 +47,6 @@ public:
         kIndexTypeDescending,
         kIndexTypeText,
         kIndexTypeGeo2D,
-        kIndexTypeGeoHaystack,
         kIndexTypeGeo2DSphere,
         kIndexTypeHashed,
     };
@@ -57,7 +56,6 @@ public:
     static const int kIndexValDescending = -1;
     static const char kIndexValText[];
     static const char kIndexValGeo2D[];
-    static const char kIndexValGeoHaystack[];
     static const char kIndexValGeo2DSphere[];
     static const char kIndexValHashed[];
 
@@ -175,15 +173,6 @@ public:
 
     /** Sets the maximum value for keys in a geo2d index. */
     IndexSpec& geo2DMax(double value);
-
-
-    //
-    // Geo Haystack Options
-    //
-
-    /** Sets the bucket size for haystack indexes. */
-    IndexSpec& geoHaystackBucketSize(double value);
-
 
     //
     // Support for adding generic options. This is here so that if new index options

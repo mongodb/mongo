@@ -52,7 +52,6 @@ TEST(Options, RepeatedOptionsFail) {
     ASSERT_UASSERTS(IndexSpec().geo2DBits(0).geo2DBits(0));
     ASSERT_UASSERTS(IndexSpec().geo2DMin(2.00).geo2DMin(2.00));
     ASSERT_UASSERTS(IndexSpec().geo2DMax(2.00).geo2DMax(2.00));
-    ASSERT_UASSERTS(IndexSpec().geoHaystackBucketSize(2.0).geoHaystackBucketSize(2.0));
     ASSERT_UASSERTS(IndexSpec().addOptions(BSON("foo" << 1 << "foo" << 1)));
     ASSERT_UASSERTS(IndexSpec().sparse(0).addOptions(BSON("sparse" << 1)));
 }

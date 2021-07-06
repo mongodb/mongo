@@ -74,7 +74,6 @@ public:
     static constexpr StringData kDefaultLanguageFieldName = "default_language"_sd;
     static constexpr StringData kDropDuplicatesFieldName = "dropDups"_sd;
     static constexpr StringData kExpireAfterSecondsFieldName = "expireAfterSeconds"_sd;
-    static constexpr StringData kGeoHaystackBucketSize = "bucketSize"_sd;
     static constexpr StringData kHiddenFieldName = "hidden"_sd;
     static constexpr StringData kIndexNameFieldName = "name"_sd;
     static constexpr StringData kIndexVersionFieldName = "v"_sd;

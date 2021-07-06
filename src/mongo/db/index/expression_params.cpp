@@ -106,33 +106,6 @@ void ExpressionParams::parseHashParams(const BSONObj& infoObj,
             numHashFields == 1);
 }
 
-void ExpressionParams::parseHaystackParams(const BSONObj& infoObj,
-                                           std::string* geoFieldOut,
-                                           std::vector<std::string>* otherFieldsOut,
-                                           double* bucketSizeOut) {
-    BSONElement e = infoObj["bucketSize"];
-    uassert(16777, "need bucketSize", e.isNumber());
-    *bucketSizeOut = e.numberDouble();
-    uassert(16769, "bucketSize cannot be zero", *bucketSizeOut != 0.0);
-
-    // Example:
-    // db.foo.ensureIndex({ pos : "geoHaystack", type : 1 }, { bucketSize : 1 })
-    BSONObjIterator i(infoObj.getObjectField("key"));
-    while (i.more()) {
-        BSONElement e = i.next();
-        if (e.type() == String && IndexNames::GEO_HAYSTACK == e.valuestr()) {
-            uassert(16770, "can't have more than one geo field", geoFieldOut->size() == 0);
-            uassert(16771, "the geo field has to be first in index", otherFieldsOut->size() == 0);
-            *geoFieldOut = e.fieldName();
-        } else {
-            uassert(16772,
-                    "geoSearch can only have 1 non-geo field for now",
-                    otherFieldsOut->size() == 0);
-            otherFieldsOut->push_back(e.fieldName());
-        }
-    }
-}
-
 void ExpressionParams::initialize2dsphereParams(const BSONObj& infoObj,
                                                 const CollatorInterface* collator,
                                                 S2IndexingParams* out) {

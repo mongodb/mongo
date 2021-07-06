@@ -128,9 +128,7 @@ public:
         // Make sure we have a valid IndexSpec for the type requested
         IndexSpec spec;
         spec.version(1).name(indexName).addKeys(keyPattern);
-        if (indexType == IndexNames::GEO_HAYSTACK) {
-            spec.geoHaystackBucketSize(1.0);
-        } else if (indexType == IndexNames::TEXT) {
+        if (indexType == IndexNames::TEXT) {
             spec.textWeights(BSON("a" << 1));
             spec.textIndexVersion(2);
             spec.textDefaultLanguage("swedish");
@@ -396,8 +394,7 @@ TEST_F(DurableCatalogTest, PathLevelMultikeyTrackingIsSupportedBy2dsphereIndexes
 }
 
 TEST_F(DurableCatalogTest, PathLevelMultikeyTrackingIsNotSupportedByAllIndexTypes) {
-    std::string indexTypes[] = {
-        IndexNames::GEO_2D, IndexNames::GEO_HAYSTACK, IndexNames::TEXT, IndexNames::HASHED};
+    std::string indexTypes[] = {IndexNames::GEO_2D, IndexNames::TEXT, IndexNames::HASHED};
 
     for (auto&& indexType : indexTypes) {
         auto indexEntry = createIndex(BSON("a" << indexType << "b" << 1), indexType);

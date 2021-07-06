@@ -151,7 +151,6 @@ env.Library(
         "btree_access_method.cpp",
         "fts_access_method.cpp",
         "hash_access_method.cpp",
-        "haystack_access_method.cpp",
         "index_access_method_factory_impl.cpp",
         "s2_access_method.cpp",
         "wildcard_access_method.cpp",

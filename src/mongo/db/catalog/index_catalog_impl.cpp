@@ -119,14 +119,6 @@ Status IndexCatalogImpl::init(OperationContext* opCtx, Collection* collection) {
         BSONObj spec = collection->getIndexSpec(indexName).getOwned();
         BSONObj keyPattern = spec.getObjectField("key");
 
-        // TODO SERVER-51871: Delete this block once 5.0 becomes last-lts.
-        if (spec.hasField(IndexDescriptor::kGeoHaystackBucketSize)) {
-            LOGV2_OPTIONS(4670602,
-                          {logv2::LogTag::kStartupWarnings},
-                          "Found an existing geoHaystack index in the catalog. Support for "
-                          "geoHaystack indexes has been removed. Instead create a 2d index. See "
-                          "https://dochub.mongodb.org/core/4.4-deprecate-geoHaystack");
-        }
         auto descriptor = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
 
         // TTL indexes are not compatible with capped collections.
@@ -335,15 +327,6 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
     }
 
     auto validatedSpec = swValidatedAndFixed.getValue();
-
-    // TODO SERVER-51871: Delete this block once 5.0 becomes last-lts.
-    if (validatedSpec.hasField(IndexDescriptor::kGeoHaystackBucketSize)) {
-        LOGV2_OPTIONS(4670601,
-                      {logv2::LogTag::kStartupWarnings},
-                      "Support for "
-                      "geoHaystack indexes has been removed. Instead create a 2d index. See "
-                      "https://dochub.mongodb.org/core/4.4-deprecate-geoHaystack");
-    }
 
     // Check whether this is a non-_id index and there are any settings disallowing this server
     // from building non-_id indexes.

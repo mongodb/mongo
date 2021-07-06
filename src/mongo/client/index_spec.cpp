@@ -38,7 +38,6 @@ namespace mongo {
 
 const char IndexSpec::kIndexValText[] = "text";
 const char IndexSpec::kIndexValGeo2D[] = "2d";
-const char IndexSpec::kIndexValGeoHaystack[] = "geoHaystack";
 const char IndexSpec::kIndexValGeo2DSphere[] = "2dsphere";
 const char IndexSpec::kIndexValHashed[] = "hashed";
 
@@ -50,7 +49,6 @@ const char* const kIndexTypeStrings[] = {nullptr,
                                          nullptr,
                                          IndexSpec::kIndexValText,
                                          IndexSpec::kIndexValGeo2D,
-                                         IndexSpec::kIndexValGeoHaystack,
                                          IndexSpec::kIndexValGeo2DSphere,
                                          IndexSpec::kIndexValHashed};
 
@@ -195,13 +193,6 @@ IndexSpec& IndexSpec::geo2DMin(double value) {
 IndexSpec& IndexSpec::geo2DMax(double value) {
     uassert(ErrorCodes::InvalidOptions, kDuplicateOption, !_options.asTempObj().hasField("max"));
     _options.append("max", value);
-    return *this;
-}
-
-IndexSpec& IndexSpec::geoHaystackBucketSize(double value) {
-    uassert(
-        ErrorCodes::InvalidOptions, kDuplicateOption, !_options.asTempObj().hasField("bucketSize"));
-    _options.append("bucketSize", value);
     return *this;
 }
 

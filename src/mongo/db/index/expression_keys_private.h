@@ -108,35 +108,6 @@ public:
     static long long int makeSingleHashKey(const BSONElement& e, HashSeed seed, int v);
 
     //
-    // Haystack
-    //
-
-    /**
-     * Generates keys for haystack access method.
-     */
-    static void getHaystackKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
-                                const BSONObj& obj,
-                                const std::string& geoField,
-                                const std::vector<std::string>& otherFields,
-                                double bucketSize,
-                                KeyStringSet* keys,
-                                KeyString::Version keyStringVersion,
-                                Ordering ordering,
-                                boost::optional<RecordId> id = boost::none);
-
-    /**
-     * Returns a hash of a BSON element.
-     * Used by getHaystackKeys and HaystackAccessMethod::searchCommand.
-     */
-    static int hashHaystackElement(const BSONElement& e, double bucketSize);
-
-    /**
-     * Joins two strings using underscore as separator.
-     * Used by getHaystackKeys and HaystackAccessMethod::searchCommand.
-     */
-    static std::string makeHaystackString(int hashedX, int hashedY);
-
-    //
     // S2
     //
 

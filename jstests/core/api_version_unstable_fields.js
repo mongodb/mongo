@@ -70,7 +70,7 @@ const findCmd = {
 testCommandWithUnstableFields(aggCmd, unstableFieldsForAggregate);
 testCommandWithUnstableFields(findCmd, unstableFieldsForFind);
 
-// Test that creating unstable indexes with 'apiStrict: ture' throws.
+// Test that creating unstable indexes with 'apiStrict: true' throws.
 let createIndexesCmd = {
     createIndexes: collName,
     indexes: [{key: {a: "text"}, name: "a_1"}],

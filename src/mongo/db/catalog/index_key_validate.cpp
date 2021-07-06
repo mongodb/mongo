@@ -80,7 +80,6 @@ static std::set<StringData> allowedFieldNames = {
     IndexDescriptor::kDefaultLanguageFieldName,
     IndexDescriptor::kDropDuplicatesFieldName,
     IndexDescriptor::kExpireAfterSecondsFieldName,
-    IndexDescriptor::kGeoHaystackBucketSize,
     IndexDescriptor::kHiddenFieldName,
     IndexDescriptor::kIndexNameFieldName,
     IndexDescriptor::kIndexVersionFieldName,
@@ -133,6 +132,10 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
 
     auto pluginName = IndexNames::findPluginName(key);
     if (pluginName.size()) {
+        if (pluginName == IndexNames::GEO_HAYSTACK)
+            return {
+                ErrorCodes::CannotCreateIndex,
+                str::stream() << "GeoHaystack indexes cannot be created in version 5.0 and above"};
         if (!IndexNames::isKnownName(pluginName))
             return Status(code, str::stream() << "Unknown index plugin '" << pluginName << '\'');
     }
@@ -293,30 +296,20 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                             << "The field '" << IndexDescriptor::kKeyPatternFieldName
                             << "' must be an object, but got " << typeName(indexSpecElem.type())};
             }
-
+            auto keyPattern = indexSpecElem.Obj();
             std::vector<StringData> keys;
-            for (auto&& keyElem : indexSpecElem.Obj()) {
+            for (auto&& keyElem : keyPattern) {
                 auto keyElemFieldName = keyElem.fieldNameStringData();
                 if (std::find(keys.begin(), keys.end(), keyElemFieldName) != keys.end()) {
                     return {ErrorCodes::BadValue,
                             str::stream() << "The field '" << keyElemFieldName
                                           << "' appears multiple times in the index key pattern "
-                                          << indexSpecElem.Obj()};
+                                          << keyPattern};
                 }
                 keys.push_back(keyElemFieldName);
             }
 
-            // TODO SERVER-51871: When 5.0 becomes last-lts, this check should be moved into
-            // 'validateKeyPattern()'. It must currently be done here so that haystack indexes
-            // continue to replicate correctly before the upgrade to FCV "4.9" is complete.
-            const auto keyPattern = indexSpecElem.Obj();
             indexType = IndexNames::findPluginName(keyPattern);
-            if (indexType == IndexNames::GEO_HAYSTACK) {
-                return {ErrorCodes::CannotCreateIndex,
-                        str::stream()
-                            << "GeoHaystack indexes cannot be created in version 4.9 and above"};
-            }
-
             if (apiStrict && indexType == IndexNames::TEXT) {
                 return {ErrorCodes::APIStrictError,
                         str::stream()
@@ -331,7 +324,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                 return keyPatternValidateStatus;
             }
 
-            for (const auto& keyElement : indexSpecElem.Obj()) {
+            for (const auto& keyElement : keyPattern) {
                 if (keyElement.type() == String && keyElement.str().empty()) {
                     return {ErrorCodes::CannotCreateIndex,
                             str::stream()
@@ -472,11 +465,6 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                             << "' must be an object, but got " << typeName(indexSpecElem.type())};
             }
             hasWeightsField = true;
-        } else if (IndexDescriptor::kGeoHaystackBucketSize == indexSpecElemFieldName) {
-            return {ErrorCodes::CannotCreateIndex,
-                    str::stream()
-                        << "The 'bucketSize' parameter is disallowed because "
-                           "geoHaystack indexes are no longer supported in version 4.9 and above"};
         } else if ((IndexDescriptor::kBackgroundFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kUniqueFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kSparseFieldName == indexSpecElemFieldName ||
