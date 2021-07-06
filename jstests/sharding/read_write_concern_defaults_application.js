@@ -97,6 +97,7 @@ let testCases = {
     _configsvrMoveChunk: {skip: "internal command"},
     _configsvrMovePrimary: {skip: "internal command"},
     _configsvrRefineCollectionShardKey: {skip: "internal command"},
+    _configsvrRemoveChunks: {skip: "internal command"},
     _configsvrRemoveShard: {skip: "internal command"},
     _configsvrRemoveShardFromZone: {skip: "internal command"},
     _configsvrRemoveTags: {skip: "internal command"},

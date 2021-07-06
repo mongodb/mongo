@@ -56,6 +56,9 @@ function Sharding(lifetime) {
     assert.commandWorked(this.st.c0.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
     assert.commandWorked(
         this.st.rs0.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
+
+    // Remove the session created by the above shardCollection
+    this.st.s.getDB("config").system.sessions.remove({});
 }
 
 Sharding.prototype.stop = function() {

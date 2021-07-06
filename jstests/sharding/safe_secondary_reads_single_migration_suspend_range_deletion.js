@@ -65,6 +65,7 @@ let testCases = {
     _configsvrDropDatabase: {skip: "primary only"},
     _configsvrMoveChunk: {skip: "primary only"},
     _configsvrMovePrimary: {skip: "primary only"},
+    _configsvrRemoveChunks: {skip: "primary only"},
     _configsvrRemoveShardFromZone: {skip: "primary only"},
     _configsvrRemoveTags: {skip: "primary only"},
     _configsvrReshardCollection: {skip: "primary only"},

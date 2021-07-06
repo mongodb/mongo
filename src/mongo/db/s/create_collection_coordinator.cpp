@@ -40,6 +40,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/recoverable_critical_section_service.h"
+#include "mongo/db/s/remove_chunks_gen.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -213,33 +214,30 @@ BSONObj getCollation(OperationContext* opCtx,
     return actualCollatorBSON;
 }
 
-void removeChunks(OperationContext* opCtx, const UUID& uuid) {
-    BatchWriteExecStats stats;
-    BatchedCommandResponse response;
+void cleanupPartialChunksFromPreviousAttempt(OperationContext* opCtx,
+                                             const UUID& uuid,
+                                             const OperationSessionInfo& osi) {
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    BatchedCommandRequest deleteRequest([&]() {
-        write_ops::DeleteCommandRequest deleteOp(ChunkType::ConfigNS);
-        deleteOp.setWriteCommandRequestBase([] {
-            write_ops::WriteCommandRequestBase writeCommandBase;
-            writeCommandBase.setOrdered(false);
-            return writeCommandBase;
-        }());
-        deleteOp.setDeletes(std::vector{write_ops::DeleteOpEntry(
-            BSON(ChunkType::collectionUUID << uuid), true /* multi: true */)});
-        return deleteOp;
-    }());
+    // Remove the chunks matching uuid
+    ConfigsvrRemoveChunks configsvrRemoveChunksCmd(uuid);
+    configsvrRemoveChunksCmd.setDbName(NamespaceString::kAdminDb);
 
-    deleteRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+    const auto swRemoveChunksResult = configShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        NamespaceString::kAdminDb.toString(),
+        CommandHelpers::appendMajorityWriteConcern(configsvrRemoveChunksCmd.toBSON(osi.toBSON())),
+        Shard::RetryPolicy::kIdempotent);
 
-    cluster::write(opCtx, deleteRequest, &stats, &response, boost::none);
-
-    uassertStatusOK(response.toStatus());
+    uassertStatusOKWithContext(
+        Shard::CommandResponse::getEffectiveStatus(std::move(swRemoveChunksResult)),
+        str::stream() << "Error removing chunks matching uuid " << uuid);
 }
 
-void upsertChunks(OperationContext* opCtx, std::vector<ChunkType>& chunks) {
-    BatchWriteExecStats stats;
-    BatchedCommandResponse response;
-
+void upsertChunks(OperationContext* opCtx,
+                  std::vector<ChunkType>& chunks,
+                  const OperationSessionInfo& osi) {
     BatchedCommandRequest updateRequest([&]() {
         write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
         std::vector<write_ops::UpdateOpEntry> entries;
@@ -260,14 +258,31 @@ void upsertChunks(OperationContext* opCtx, std::vector<ChunkType>& chunks) {
 
     updateRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
-    cluster::write(opCtx, updateRequest, &stats, &response, boost::none);
+    const BSONObj cmdObj = updateRequest.toBSON().addFields(osi.toBSON());
 
-    uassertStatusOK(response.toStatus());
+    BatchedCommandResponse batchResponse;
+    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    const auto response =
+        configShard->runCommand(opCtx,
+                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                ChunkType::ConfigNS.db().toString(),
+                                cmdObj,
+                                Shard::kDefaultConfigCommandTimeout,
+                                Shard::RetryPolicy::kIdempotent);
+
+    const auto writeStatus =
+        Shard::CommandResponse::processBatchWriteResponse(response, &batchResponse);
+
+    uassertStatusOK(batchResponse.toStatus());
+    uassertStatusOK(writeStatus);
 }
 
-void updateCatalogEntry(OperationContext* opCtx, const NamespaceString& nss, CollectionType& coll) {
-    BatchWriteExecStats stats;
-    BatchedCommandResponse response;
+void updateCatalogEntry(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        CollectionType& coll,
+                        const OperationSessionInfo& osi) {
+    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
     BatchedCommandRequest updateRequest([&]() {
         write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
         updateOp.setUpdates({[&] {
@@ -282,13 +297,26 @@ void updateCatalogEntry(OperationContext* opCtx, const NamespaceString& nss, Col
     }());
 
     updateRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
-    try {
-        cluster::write(opCtx, updateRequest, &stats, &response, boost::none);
+    const BSONObj cmdObj = updateRequest.toBSON().addFields(osi.toBSON());
 
-        uassertStatusOK(response.toStatus());
+    try {
+        BatchedCommandResponse batchResponse;
+        const auto response =
+            configShard->runCommand(opCtx,
+                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                    CollectionType::ConfigNS.db().toString(),
+                                    cmdObj,
+                                    Shard::kDefaultConfigCommandTimeout,
+                                    Shard::RetryPolicy::kIdempotent);
+
+        const auto writeStatus =
+            Shard::CommandResponse::processBatchWriteResponse(response, &batchResponse);
+
+        uassertStatusOK(batchResponse.toStatus());
+        uassertStatusOK(writeStatus);
     } catch (const DBException&) {
         // If an error happens when contacting the config server, we don't know if the update
-        // succeded or not, which might cause the local shard version to differ from the config
+        // succeeded or not, which might cause the local shard version to differ from the config
         // server, so we clear the metadata to allow another operation to refresh it.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
@@ -299,21 +327,18 @@ void updateCatalogEntry(OperationContext* opCtx, const NamespaceString& nss, Col
 
 void broadcastDropCollection(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             const std::shared_ptr<executor::TaskExecutor>& executor) {
+                             const std::shared_ptr<executor::TaskExecutor>& executor,
+                             const OperationSessionInfo& osi) {
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
     const ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
 
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    // Remove prymary shard from participants
+    // Remove primary shard from participants
     participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
                        participants.end());
 
-    sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx,
-        nss.db(),
-        CommandHelpers::appendMajorityWriteConcern(dropCollectionParticipant.toBSON({})),
-        participants,
-        executor);
+    sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+        opCtx, nss, participants, executor, osi);
 }
 
 }  // namespace
@@ -382,6 +407,13 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
+                if (!_firstExecution) {
+                    // Perform a noop write on the participants in order to advance the txnNumber
+                    // for this coordinator's lsid so that requests with older txnNumbers can no
+                    // longer execute.
+                    _performNoopRetryableWriteOnParticipants(opCtx, **executor);
+                }
+
                 if (_recoveredFromDisk) {
                     // If a stedown happened it could've ocurred while waiting for majority when
                     // writing config.collections. If the refresh happens before this write is
@@ -431,8 +463,13 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                                     1,
                                     "Removing partial changes from previous run",
                                     "namespace"_attr = nss());
-                        removeChunks(opCtx, *uuid);
-                        broadcastDropCollection(opCtx, nss(), **executor);
+
+                        _doc = _updateSession(opCtx, _doc);
+                        cleanupPartialChunksFromPreviousAttempt(
+                            opCtx, *uuid, getCurrentSession(_doc));
+
+                        _doc = _updateSession(opCtx, _doc);
+                        broadcastDropCollection(opCtx, nss(), **executor, getCurrentSession(_doc));
                     }
                 }
 
@@ -458,7 +495,16 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             nss(),
                             _critSecReason,
                             ShardingCatalogClient::kMajorityWriteConcern);
-                    _createCollectionOnNonPrimaryShards(opCtx);
+
+                    _doc = _updateSession(opCtx, _doc);
+                    try {
+                        _createCollectionOnNonPrimaryShards(opCtx, getCurrentSession(_doc));
+                    } catch (const ExceptionFor<ErrorCodes::NotARetryableWriteCommand>&) {
+                        // Older 5.0 binaries don't support running the
+                        // _shardsvrCreateCollectionParticipant command as a retryable write yet. In
+                        // that case, retry without attaching session info.
+                        _createCollectionOnNonPrimaryShards(opCtx, boost::none);
+                    }
 
                     _commit(opCtx);
                 }
@@ -641,7 +687,8 @@ void CreateCollectionCoordinator::_createPolicyAndChunks(OperationContext* opCtx
     _numChunks = _initialChunks.chunks.size();
 }
 
-void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(OperationContext* opCtx) {
+void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(
+    OperationContext* opCtx, const boost::optional<OperationSessionInfo>& osi) {
     LOGV2_DEBUG(5277905,
                 2,
                 "Create collection _createCollectionOnNonPrimaryShards",
@@ -670,8 +717,8 @@ void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(OperationC
 
         requests.emplace_back(
             chunkShardId,
-            createCollectionParticipantRequest.toBSON(
-                BSON("writeConcern" << ShardingCatalogClient::kMajorityWriteConcern.toBSON())));
+            CommandHelpers::appendMajorityWriteConcern(
+                createCollectionParticipantRequest.toBSON(osi ? osi->toBSON() : BSONObj())));
 
         initializedShards.emplace(chunkShardId);
     }
@@ -707,7 +754,8 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
     LOGV2_DEBUG(5277906, 2, "Create collection _commit", "namespace"_attr = nss());
 
     // Upsert Chunks.
-    upsertChunks(opCtx, _initialChunks.chunks);
+    _doc = _updateSession(opCtx, _doc);
+    upsertChunks(opCtx, _initialChunks.chunks, getCurrentSession(_doc));
 
     CollectionType coll(nss(),
                         _initialChunks.collVersion().epoch(),
@@ -731,7 +779,8 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
         coll.setUnique(*_doc.getUnique());
     }
 
-    updateCatalogEntry(opCtx, nss(), coll);
+    _doc = _updateSession(opCtx, _doc);
+    updateCatalogEntry(opCtx, nss(), coll, getCurrentSession(_doc));
 }
 
 void CreateCollectionCoordinator::_finalize(OperationContext* opCtx) {
@@ -806,6 +855,20 @@ void CreateCollectionCoordinator::_logEndCreateCollection(OperationContext* opCt
         collectionDetail.appendNumber("numChunks", static_cast<long long>(*_numChunks));
     ShardingLogging::get(opCtx)->logChange(
         opCtx, "shardCollection.end", nss().ns(), collectionDetail.obj());
+}
+
+void CreateCollectionCoordinator::_performNoopRetryableWriteOnParticipants(
+    OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor) {
+    auto shardsAndConfigsvr = [&] {
+        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+        auto participants = shardRegistry->getAllShardIds(opCtx);
+        participants.emplace_back(shardRegistry->getConfigShard()->getId());
+        return participants;
+    }();
+
+    _doc = _updateSession(opCtx, _doc);
+    sharding_ddl_util::performNoopRetryableWriteOnShards(
+        opCtx, shardsAndConfigsvr, getCurrentSession(_doc), executor);
 }
 
 // Phase change API.
