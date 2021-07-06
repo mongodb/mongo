@@ -111,7 +111,8 @@ private:
      * If the optimized path can be taken, ensure the collection is already created in all the
      * participant shards.
      */
-    void _createCollectionOnNonPrimaryShards(OperationContext* opCtx);
+    void _createCollectionOnNonPrimaryShards(OperationContext* opCtx,
+                                             const boost::optional<OperationSessionInfo>& osi);
 
     /**
      * Does the following writes:
@@ -134,6 +135,10 @@ private:
      * Helper function to log the end of the shard collection event.
      */
     void _logEndCreateCollection(OperationContext* opCtx);
+
+    void _performNoopRetryableWriteOnParticipants(
+        OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor);
+
 
     CreateCollectionCoordinatorDocument _doc;
     const BSONObj _critSecReason;

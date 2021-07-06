@@ -70,6 +70,7 @@ public:
                                   << request().toBSON(BSONObj()),
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
 
             MigrationDestinationManager::cloneCollectionIndexesAndOptions(
                 opCtx,
