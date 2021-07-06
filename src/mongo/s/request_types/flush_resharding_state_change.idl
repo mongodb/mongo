@@ -38,7 +38,6 @@ commands:
     _flushReshardingStateChange:
         description: "An internal command to flush resharding state changes to shards."
         command_name: _flushReshardingStateChange
-        command_alias: _shardsvrCommitReshardCollection
         strict: true
         namespace: type
         api_version: ""

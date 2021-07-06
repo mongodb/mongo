@@ -173,8 +173,7 @@ public:
     }
 
     void clearFilteringMetadata(OperationContext* opCtx) {
-        // TODO SERVER-57953 Change scheduleAsyncRefresh to true.
-        resharding::clearFilteringMetadata(opCtx, false /* scheduleAsyncRefresh */);
+        resharding::clearFilteringMetadata(opCtx, true /* scheduleAsyncRefresh */);
     }
 };
 

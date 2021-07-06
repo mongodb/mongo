@@ -77,6 +77,7 @@ const allCommands = {
     _shardsvrAbortReshardCollection: {skip: isPrimaryOnly},
     _shardsvrCleanupReshardCollection: {skip: isPrimaryOnly},
     _shardsvrCloneCatalogData: {skip: isPrimaryOnly},
+    _shardsvrCommitReshardCollection: {skip: isPrimaryOnly},
     _shardsvrDropCollection: {skip: isPrimaryOnly},
     _shardsvrCreateCollection: {skip: isPrimaryOnly},
     _shardsvrDropCollectionParticipant: {skip: isPrimaryOnly},
