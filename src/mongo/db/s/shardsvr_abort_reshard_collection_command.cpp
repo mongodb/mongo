@@ -111,7 +111,7 @@ public:
             uassert(
                 5563803,
                 "Recipient state document still exists after attempted abort",
-                donorReshardingOpStore.count(
+                recipientReshardingOpStore.count(
                     opCtx, BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << uuid())) ==
                     0);
 
