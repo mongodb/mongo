@@ -226,7 +226,8 @@ public:
         : _registry(ActiveMigrationsRegistry::get(opCtx)), _reason(std::move(reason)) {
         // Ensure any thread attempting to use a MigrationBlockingGuard will be interrupted by
         // a stepdown.
-        invariant(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
+        invariant(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites() ||
+                  opCtx->shouldAlwaysInterruptAtStepDownOrUp());
         _registry.lock(opCtx, _reason);
     }
 

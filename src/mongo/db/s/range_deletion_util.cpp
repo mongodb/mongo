@@ -251,14 +251,9 @@ auto withTemporaryOperationContext(Callable&& callable) {
     auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
     auto opCtx = uniqueOpCtx.get();
 
-    {
-        // We acquire the global IX lock and then immediately release it to ensure this operation
-        // would be killed by the RstlKillOpThread during step-up or stepdown. Note that the
-        // RstlKillOpThread kills any operations on step-up or stepdown for which
-        // Locker::wasGlobalLockTakenInModeConflictingWithWrites() returns true.
-        Lock::GlobalLock lk(opCtx, MODE_IX);
-    }
-    invariant(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
+    // Ensure that this operation will be killed by the RstlKillOpThread during step-up or stepdown.
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
+    invariant(opCtx->shouldAlwaysInterruptAtStepDownOrUp());
 
     return callable(opCtx);
 }
