@@ -116,7 +116,6 @@ class LibdepsGraph(networkx.DiGraph):
                 self._deptypes['Public'] = self._deptypes.get('Public', 1)
                 self._deptypes['Private'] = self._deptypes.get('Private', 2)
                 self._deptypes['Interface'] = self._deptypes.get('Interface', 3)
-                self._deptypes['Typeinfo'] = self._deptypes.get('Typeinfo', 4)
 
         return self._deptypes[deptype]
 

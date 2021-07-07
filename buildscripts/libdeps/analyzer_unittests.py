@@ -61,7 +61,6 @@ def get_double_diamond_mock_graph():
         "Public": 1,
         "Private": 2,
         "Interface": 3,
-        "Typeinfo": 4
     }'''
 
     # builds a graph of mostly public edges that looks like this:
@@ -145,7 +144,6 @@ def get_basic_mock_graph():
         "Public": 1,
         "Private": 2,
         "Interface": 3,
-        "Typeinfo": 4
     }'''
 
     # builds a graph of mostly public edges:
