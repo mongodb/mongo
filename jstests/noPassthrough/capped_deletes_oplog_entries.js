@@ -1,7 +1,7 @@
 /**
  * Tests that capped deletes generate oplog entries in FCV >= 5.0 only.
  *
- * @tags: [requires_replication]
+ * @tags: [requires_replication, disabled_due_to_server_58295]
  */
 (function() {
 "use strict";

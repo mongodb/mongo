@@ -10,6 +10,7 @@
  *   requires_sharding,
  *   requires_profiling,
  *   requires_fcv_47,
+ *   disabled_due_to_server_58295
  * ]
  */
 

@@ -2,7 +2,7 @@
  * Test to make sure that the abort command interrupts a resharding operation that has not yet
  * persisted a decision.
  *
- * @tags: [requires_fcv_49, uses_atclustertime]
+ * @tags: [requires_fcv_49, uses_atclustertime, disabled_due_to_server_58295]
  */
 (function() {
 "use strict";

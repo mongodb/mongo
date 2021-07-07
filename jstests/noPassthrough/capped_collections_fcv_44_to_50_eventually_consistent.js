@@ -15,6 +15,7 @@
  *     # ephemeralForTest runs with 'oplogApplicationEnforcesSteadyStateConstraints=false' by
  *     # default.
  *     incompatible_with_eft,
+ *     disabled_due_to_server_58295
  * ]
  */
 (function() {

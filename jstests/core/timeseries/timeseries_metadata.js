@@ -7,6 +7,7 @@
  *   does_not_support_transactions,
  *   requires_fcv_49,
  *   requires_getmore,
+ *   disabled_due_to_server_58295
  * ]
  */
 (function() {

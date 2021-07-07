@@ -4,7 +4,7 @@
  * the featureFlagFryer parameter to be disabled.
  *
  * Add test tags for the feature flags depended on by this test.
- * @tags: [featureFlagToaster, featureFlagSpoon]
+ * @tags: [featureFlagToaster, featureFlagSpoon, disabled_due_to_server_58295]
  */
 
 (function() {

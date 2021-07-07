@@ -12,7 +12,7 @@
  *        {$lookup: {from: {db:<>, coll:<>},...}}
  *
  * @tags: [
- *   requires_fcv_47
+ *   requires_fcv_47, disabled_due_to_server_58295
  * ]
  */
 (function() {

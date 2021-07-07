@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_49,
+ *   disabled_due_to_server_58295
  * ]
  */
 

@@ -9,6 +9,7 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [
  *   resource_intensive,
+ *   disabled_due_to_server_58295
  * ]
  */
 load('jstests/libs/write_concern_util.js');

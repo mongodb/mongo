@@ -3,7 +3,7 @@
  * feature compatibility version is older than the latest version.
  *
  * We restart mongod during the test and expect it to have the same data after restarting.
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, disabled_due_to_server_58295]
  */
 
 (function() {

@@ -1,7 +1,8 @@
 /*
  * Tests that coordinateCommitTransaction returns the decision once the decision has been written
  * with the client's writeConcern.
- * @tags: [uses_transactions, uses_multi_shard_transaction, requires_fcv_47]
+ * @tags: [uses_transactions, uses_multi_shard_transaction, requires_fcv_47,
+ * disabled_due_to_server_58295]
  */
 (function() {
 'use strict';
