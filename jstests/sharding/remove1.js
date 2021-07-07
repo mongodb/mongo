@@ -44,12 +44,10 @@ assert.gt(topologyTime2, topologyTime1);
 assert.commandFailed(s.s0.adminCommand({removeshard: s.shard1.shardName}));
 
 // Should create a shard0002 shard
-var rs = new ReplSetTest({nodes: 1});
-rs.startSet({shardsvr: ""});
-rs.initiate();
-assert.commandWorked(s.s0.adminCommand({addshard: rs.getURL()}));
+var conn = MongoRunner.runMongod({shardsvr: ""});
+assert.commandWorked(s.s0.adminCommand({addshard: conn.host}));
 assert.eq(2, s.config.shards.count(), "new server does not appear in count");
 
-rs.stopSet();
+MongoRunner.stopMongod(conn);
 s.stop();
 })();

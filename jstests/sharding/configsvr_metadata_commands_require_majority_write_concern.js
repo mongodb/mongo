@@ -11,7 +11,6 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 const newShardName = "newShard";
-let newShard;
 
 // Commands sent directly to the config server should fail with WC < majority.
 const unacceptableWCsForConfig = [
@@ -51,7 +50,7 @@ const setupFuncs = {
         assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
     },
     addShard: function() {
-        assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: newShardName}));
+        assert.commandWorked(st.s.adminCommand({addShard: newShard.name, name: newShardName}));
     },
 };
 
@@ -126,7 +125,7 @@ function checkCommandConfigSvr(command, setupFunc, cleanupFunc) {
                  cleanupFunc);
 }
 
-let st = new ShardingTest({shards: 1});
+var st = new ShardingTest({shards: 1});
 
 // enableSharding
 checkCommandMongos({enableSharding: dbName}, setupFuncs.noop, cleanupFuncs.dropDatabase);
@@ -156,13 +155,11 @@ checkCommandConfigSvr({_configsvrCreateDatabase: dbName, to: st.shard0.name},
                       cleanupFuncs.dropDatabase);
 
 // addShard
-newShard = new ReplSetTest({nodes: 1});
-newShard.startSet({shardsvr: ''});
-newShard.initiate();
-checkCommandMongos({addShard: newShard.getURL(), name: newShardName},
+var newShard = MongoRunner.runMongod({shardsvr: ""});
+checkCommandMongos({addShard: newShard.name, name: newShardName},
                    setupFuncs.noop,
                    cleanupFuncs.removeShardIfExists);
-checkCommandConfigSvr({_configsvrAddShard: newShard.getURL(), name: newShardName},
+checkCommandConfigSvr({_configsvrAddShard: newShard.name, name: newShardName},
                       setupFuncs.noop,
                       cleanupFuncs.removeShardIfExists);
 
@@ -193,6 +190,6 @@ checkCommand(st.s.getDB(dbName),
              setupFuncs.createDatabase,
              cleanupFuncs.dropDatabase);
 
-newShard.stopSet();
+MongoRunner.stopMongos(newShard);
 st.stop();
 })();

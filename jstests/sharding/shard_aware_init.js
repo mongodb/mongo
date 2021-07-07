@@ -166,6 +166,12 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
 var st = new ShardingTest({shards: 1});
 
 {
+    var mongod = MongoRunner.runMongod({shardsvr: ''});
+    runTest(mongod, st.configRS.getURL(), function() {});
+    MongoRunner.stopMongod(mongod);
+}
+
+{
     var replTest = new ReplSetTest({nodes: 1});
     replTest.startSet({shardsvr: ''});
     replTest.initiate();

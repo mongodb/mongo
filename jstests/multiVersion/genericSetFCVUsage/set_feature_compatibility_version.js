@@ -237,6 +237,15 @@ function runStandaloneTest(downgradeVersion) {
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, downgradeFCV);
     MongoRunner.stopMongod(conn);
+
+    // A 'latest' binary mongod started with --shardsvr and clean data files defaults to
+    // lastLTSFCV.
+    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, shardsvr: ""});
+    assert.neq(
+        null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
+    adminDB = conn.getDB("admin");
+    checkFCV(adminDB, lastLTSFCV);
+    MongoRunner.stopMongod(conn);
 }
 
 function runReplicaSetTest(downgradeVersion) {
@@ -439,26 +448,10 @@ function runShardingTest(downgradeVersion) {
     const unsupportedOldFCV = (parseFloat(downgradeFCV) - 1).toFixed(1);
     const unsupportedFutureFCV = (parseFloat(latestFCV) + 0.1).toFixed(1);
 
-    let singleNodeShard;
-    let conn;
     let st;
     let mongosAdminDB;
     let configPrimaryAdminDB;
     let shardPrimaryAdminDB;
-
-    // A 'latest' binary single node replica set and clean data files defaults to lastLTSFCV.
-    singleNodeShard =
-        new ReplSetTest({dbpath: dbpath, binVersion: latest, noCleanData: true, nodes: 1});
-    singleNodeShard.startSet({shardsvr: ""});
-    singleNodeShard.initiate();
-    conn = singleNodeShard.getPrimary();
-    assert.neq(
-        null,
-        conn,
-        "Single node replSet was unable to start up with version=" + latest + " and no data files");
-    shardPrimaryAdminDB = conn.getDB("admin");
-    checkFCV(shardPrimaryAdminDB, lastLTSFCV);
-    singleNodeShard.stopSet();
 
     // A 'latest' binary cluster started with clean data files will set FCV to 'latestFCV'.
     st = new ShardingTest({

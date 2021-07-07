@@ -221,12 +221,12 @@ let standaloneTest = function(nodeOptions, downgradeVersion) {
 //
 // Replica set tests.
 //
-let replicaSetTest = function(nodeOptions, downgradeVersion, numNodes = 3) {
+let replicaSetTest = function(nodeOptions, downgradeVersion) {
     jsTestLog("Running replica set test with 'downgradeVersion': " + downgradeVersion);
     const downgradeFCV = binVersionToFCV(downgradeVersion);
     // New latest binary version replica set.
     jsTest.log("Starting a latest binVersion ReplSetTest");
-    let rst = new ReplSetTest({nodes: numNodes, nodeOptions: nodeOptions});
+    let rst = new ReplSetTest({nodes: 3, nodeOptions: nodeOptions});
     rst.startSet();
     rst.initiate();
     let primaryAdminDB = rst.getPrimary().getDB("admin");
@@ -362,7 +362,9 @@ standaloneTest({}, 'last-lts');
 replicaSetTest({}, 'last-continuous');
 replicaSetTest({}, 'last-lts');
 
-// Do tests for replica sets started with --shardsvr.
+// Do tests for standalones and replica sets started with --shardsvr.
+standaloneTest({shardsvr: ""}, 'last-continuous');
+standaloneTest({shardsvr: ""}, 'last-lts');
 replicaSetTest({shardsvr: ""}, 'last-continuous');
 replicaSetTest({shardsvr: ""}, 'last-lts');
 

@@ -7,11 +7,8 @@ var s = new ShardingTest({name: "add_shard1", shards: 1, useHostname: false});
 
 // Create a shard and add a database; if the database is not duplicated the mongod should accept
 // it as shard
-var rs1 = new ReplSetTest({name: "addshard1-1", host: 'localhost', nodes: 1});
-rs1.startSet({shardsvr: ""});
-rs1.initiate();
-
-var db1 = rs1.getPrimary().getDB("testDB");
+var conn1 = MongoRunner.runMongod({'shardsvr': ""});
+var db1 = conn1.getDB("testDB");
 
 var numObjs = 3;
 for (var i = 0; i < numObjs; i++) {
@@ -22,7 +19,8 @@ var configDB = s.s.getDB('config');
 assert.eq(null, configDB.databases.findOne({_id: 'testDB'}));
 
 var newShard = "myShard";
-assert.commandWorked(s.admin.runCommand({addShard: rs1.getURL(), name: newShard, maxSize: 1024}));
+assert.commandWorked(
+    s.admin.runCommand({addshard: "localhost:" + conn1.port, name: newShard, maxSize: 1024}));
 
 assert.neq(null, configDB.databases.findOne({_id: 'testDB'}));
 
@@ -31,20 +29,18 @@ assert.eq(1024, newShardDoc.maxSize);
 assert(newShardDoc.topologyTime instanceof Timestamp);
 
 // a mongod with an existing database name should not be allowed to become a shard
-var rs2 = new ReplSetTest({name: "addshard1-2", nodes: 1});
-rs2.startSet({shardsvr: ""});
-rs2.initiate();
+var conn2 = MongoRunner.runMongod({'shardsvr': ""});
 
-var db2 = rs2.getPrimary().getDB("otherDB");
+var db2 = conn2.getDB("otherDB");
 assert.commandWorked(db2.foo.save({a: 1}));
 
-var db3 = rs2.getPrimary().getDB("testDB");
+var db3 = conn2.getDB("testDB");
 assert.commandWorked(db3.foo.save({a: 1}));
 
 s.config.databases.find().forEach(printjson);
 
 var rejectedShard = "rejectedShard";
-assert(!s.admin.runCommand({addShard: rs2.getURL(), name: rejectedShard}).ok,
+assert(!s.admin.runCommand({addshard: "localhost:" + conn2.port, name: rejectedShard}).ok,
        "accepted mongod with duplicate db");
 
 // Check that all collection that were local to the mongod's are accessible through the mongos
@@ -77,8 +73,8 @@ assert.eq(2,
           "wrong chunk number after splitting collection that existed before");
 assert.eq(numObjs, sdb1.foo.count(), "wrong count after splitting collection that existed before");
 
-rs1.stopSet();
-rs2.stopSet();
+MongoRunner.stopMongod(conn1);
+MongoRunner.stopMongod(conn2);
 
 s.stop();
 })();

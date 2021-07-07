@@ -4,29 +4,39 @@
 (function() {
 'use strict';
 
-const checkShardName = function(shardName, shardsArray) {
+function checkShardName(shardName, shardsArray) {
     var found = false;
-    shardsArray.forEach((shardObj) => {
+    shardsArray.forEach(function(shardObj) {
         if (shardObj._id === shardName) {
             found = true;
             return;
         }
     });
     return found;
-};
+}
 
-const shardTest =
+var shardTest =
     new ShardingTest({name: 'listShardsTest', shards: 1, mongos: 1, other: {useHostname: true}});
 
-const mongos = shardTest.s0;
-let res = mongos.adminCommand('listShards');
+var mongos = shardTest.s0;
+var res = mongos.adminCommand('listShards');
 assert.commandWorked(res, 'listShards command failed');
-let shardsArray = res.shards;
+var shardsArray = res.shards;
 assert.eq(shardsArray.length, 1);
 
+// add standalone mongod
+var standaloneShard = MongoRunner.runMongod({useHostName: true, shardsvr: ""});
+res = shardTest.admin.runCommand({addShard: standaloneShard.host, name: 'standalone'});
+assert.commandWorked(res, 'addShard command failed');
+res = mongos.adminCommand('listShards');
+assert.commandWorked(res, 'listShards command failed');
+shardsArray = res.shards;
+assert.eq(shardsArray.length, 2);
+assert(checkShardName('standalone', shardsArray),
+       'listShards command didn\'t return standalone shard: ' + tojson(shardsArray));
+
 // add replica set named 'repl'
-const rs1 =
-    new ReplSetTest({name: 'repl', nodes: 1, useHostName: true, nodeOptions: {shardsvr: ""}});
+var rs1 = new ReplSetTest({name: 'repl', nodes: 1, useHostName: true, nodeOptions: {shardsvr: ""}});
 rs1.startSet();
 rs1.initiate();
 res = shardTest.admin.runCommand({addShard: rs1.getURL()});
@@ -34,7 +44,7 @@ assert.commandWorked(res, 'addShard command failed');
 res = mongos.adminCommand('listShards');
 assert.commandWorked(res, 'listShards command failed');
 shardsArray = res.shards;
-assert.eq(shardsArray.length, 2);
+assert.eq(shardsArray.length, 3);
 assert(checkShardName('repl', shardsArray),
        'listShards command didn\'t return replica set shard: ' + tojson(shardsArray));
 
@@ -57,10 +67,11 @@ assert.soon(function() {
 res = mongos.adminCommand('listShards');
 assert.commandWorked(res, 'listShards command failed');
 shardsArray = res.shards;
-assert.eq(shardsArray.length, 1);
+assert.eq(shardsArray.length, 2);
 assert(!checkShardName('repl', shardsArray),
        'listShards command returned removed replica set shard: ' + tojson(shardsArray));
 
 rs1.stopSet();
 shardTest.stop();
+MongoRunner.stopMongod(standaloneShard);
 })();
