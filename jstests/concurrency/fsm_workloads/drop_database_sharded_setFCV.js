@@ -61,6 +61,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.teardown = function(db, collName) {
         assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+        $super.teardown(db, collName);
     };
 
     return $config;
