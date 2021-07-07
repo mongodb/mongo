@@ -147,15 +147,12 @@ function requireApiVersionOnShardOrConfigServerTest() {
         "should not be able to set requireApiVersion=true on mongod that was started with --shardsvr");
     rs.stopSet();
 
-    const configsvrRS = new ReplSetTest({nodes: 1});
-    configsvrRS.startSet({configsvr: ""});
-    configsvrRS.initiate();
-    const configsvrConn = configsvrRS.getPrimary();
-    assert.neq(null, configsvrConn, "mongod was not able to start up");
+    const configsvrMongod = MongoRunner.runMongod({configsvr: ""});
+    assert.neq(null, configsvrMongod, "mongod was not able to start up");
     assert.commandFailed(
-        configsvrConn.adminCommand({setParameter: 1, requireApiVersion: 1}),
+        configsvrMongod.adminCommand({setParameter: 1, requireApiVersion: 1}),
         "should not be able to set requireApiVersion=true on mongod that was started with --configsvr");
-    configsvrRS.stopSet();
+    MongoRunner.stopMongod(configsvrMongod);
 }
 
 requireApiVersionOnShardOrConfigServerTest();

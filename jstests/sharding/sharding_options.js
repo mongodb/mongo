@@ -29,13 +29,9 @@ testGetCmdLineOptsMongod({config: "jstests/libs/config_files/enable_paranoia.jso
 // Sharding Role
 jsTest.log("Testing \"configsvr\" command line option");
 var expectedResult = {
-    "parsed": {
-        "sharding": {"clusterRole": "configsvr"},
-        "replication": {"replSet": "dummy"},
-        "storage": {"journal": {"enabled": true}}
-    }
+    "parsed": {"sharding": {"clusterRole": "configsvr"}, "storage": {"journal": {"enabled": true}}}
 };
-testGetCmdLineOptsMongod({configsvr: "", journal: "", replSet: "dummy"}, expectedResult);
+testGetCmdLineOptsMongod({configsvr: "", journal: ""}, expectedResult);
 
 jsTest.log("Testing \"shardsvr\" command line option");
 expectedResult = {
@@ -57,12 +53,11 @@ testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole_sh
 jsTest.log("Testing \"sharding.clusterRole = configsvr\" config file option");
 expectedResult = {
     "parsed": {
-        "config": "jstests/libs/config_files/set_shardingrole_configsvr.json",
-        "sharding": {"clusterRole": "configsvr"},
-        "replication": {"replSetName": "dummy"}
+        "config": "jstests/libs/config_files/set_shardingrole.json",
+        "sharding": {"clusterRole": "configsvr"}
     }
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole_configsvr.json"},
+testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole.json"},
                          expectedResult);
 
 // Test that we preserve switches explicitly set to false in config files.  See SERVER-13439.
@@ -88,8 +83,5 @@ testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_nomoveparan
 
 jsTest.log("Ensure starting a standalone with --shardsvr fails");
 testGetCmdLineOptsMongodFailed({shardsvr: ""});
-
-jsTest.log("Ensure starting a standalone with --configsvr fails");
-testGetCmdLineOptsMongodFailed({configsvr: ""});
 
 print(baseName + " succeeded.");
