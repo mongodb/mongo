@@ -10,6 +10,10 @@
 (function() {
 'use strict';
 
+const isCodeCoverageEnabled = buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage');
+const isSanitizerEnabled = buildInfo().buildEnvironment.ccflags.includes('-fsanitize');
+const slowTestVariant = isCodeCoverageEnabled || isSanitizerEnabled;
+
 var st = new ShardingTest({shards: 2, mongos: 1});
 
 var dbname = "test";
@@ -36,8 +40,15 @@ assert.commandWorked(st.s0.adminCommand({shardcollection: ns, key: {a: 1}}));
 var join = startParallelShell("db." + coll + ".remove({});", st.s0.port);
 
 // migrate while deletions are happening
-assert.commandWorked(st.s0.adminCommand(
-    {moveChunk: ns, find: {a: 1}, to: st.getOther(st.getPrimaryShard(dbname)).name}));
+try {
+    assert.commandWorked(st.s0.adminCommand(
+        {moveChunk: ns, find: {a: 1}, to: st.getOther(st.getPrimaryShard(dbname)).name}));
+} catch (e) {
+    const expectedFailureMessage = "startCommit timed out waiting for the catch up completion.";
+    if (!slowTestVariant || !e.message.match(expectedFailureMessage)) {
+        throw e;
+    }
+}
 
 join();
 
