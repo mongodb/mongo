@@ -288,8 +288,17 @@ class WiredTigerTestCase(unittest.TestCase):
     # the name if the file exists.
     @staticmethod
     def findExtension(dirname, libname):
-        pat = os.path.join(WiredTigerTestCase._builddir, 'ext',
-            dirname, libname, '.libs', 'libwiredtiger_*.so')
+        pat = ''
+        # When scanning for the extension library, we need to account for
+        # the binary paths produced by libtool and CMake. Libtool will export
+        # the library under '.libs'.
+        if os.path.exists(os.path.join(WiredTigerTestCase._builddir, 'ext',
+            dirname, libname, '.libs')):
+            pat = os.path.join(WiredTigerTestCase._builddir, 'ext',
+                dirname, libname, '.libs', 'libwiredtiger_*.so')
+        else:
+            pat = os.path.join(WiredTigerTestCase._builddir, 'ext',
+                dirname, libname, 'libwiredtiger_*.so')
         filenames = glob.glob(pat)
         if len(filenames) > 1:
             raise Exception(self.shortid() + ": " + ext +
