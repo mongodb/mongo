@@ -18,6 +18,7 @@ var keyfile = "jstests/libs/key1";
 var numShards = 2;
 var username = "foo";
 var password = "bar";
+var adhocShard = 0;
 
 var createUser = function(mongo) {
     print("============ adding a user.");
@@ -33,14 +34,19 @@ var addUsersToEachShard = function(st) {
 };
 
 var addShard = function(st, shouldPass) {
-    var m = MongoRunner.runMongod({auth: "", keyFile: keyfile, useHostname: false, 'shardsvr': ''});
-    var res = st.getDB("admin").runCommand({addShard: m.host});
+    adhocShard++;
+    var rs =
+        new ReplSetTest({nodes: 1, host: 'localhost', name: 'localhostAuthShard-' + adhocShard});
+    rs.startSet({shardsvr: "", keyFile: keyfile, auth: ""});
+    rs.initiate();
+
+    var res = st.getDB("admin").runCommand({addShard: rs.getURL()});
     if (shouldPass) {
         assert.commandWorked(res, "Add shard");
     } else {
         assert.commandFailed(res, "Add shard");
     }
-    return m;
+    return rs;
 };
 
 var findEmptyShard = function(st, ns) {
@@ -192,35 +198,6 @@ var start = function() {
     });
 };
 
-var shutdown = function(st) {
-    print("============ shutting down.");
-
-    // SERVER-8445
-    // Unlike MongoRunner.stopMongod and ReplSetTest.stopSet,
-    // ShardingTest.stop does not have a way to provide auth
-    // information.  Therefore, we'll do this manually for now.
-
-    for (var i = 0; i < st._mongos.length; i++) {
-        var conn = st["s" + i];
-        MongoRunner.stopMongos(conn,
-                               /*signal*/ false,
-                               {auth: {user: username, pwd: password}});
-    }
-
-    for (var i = 0; i < st._connections.length; i++) {
-        st["rs" + i].stopSet(/*signal*/ false, {auth: {user: username, pwd: password}});
-    }
-
-    for (var i = 0; i < st._configServers.length; i++) {
-        var conn = st["config" + i];
-        MongoRunner.stopMongod(conn,
-                               /*signal*/ false,
-                               {auth: {user: username, pwd: password}});
-    }
-
-    st.stop();
-};
-
 print("=====================");
 print("starting shards");
 print("=====================");
@@ -259,8 +236,8 @@ assertCanRunCommands(mongo, st);
 extraShards.push(addShard(mongo, 1));
 st.printShardingStatus();
 
-shutdown(st);
-extraShards.forEach(function(sh) {
-    MongoRunner.stopMongod(sh);
+extraShards.forEach(function(rs) {
+    rs.stopSet();
 });
+st.stop();
 })();

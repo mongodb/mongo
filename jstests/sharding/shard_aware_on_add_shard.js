@@ -6,15 +6,8 @@
 (function() {
 "use strict";
 
-var waitForPrimary = function(conn) {
-    assert.soon(function() {
-        var res = conn.getDB('admin').runCommand({hello: 1});
-        return res.isWritablePrimary;
-    });
-};
-
-var checkShardingStateInitialized = function(conn, configConnStr, shardName, clusterId) {
-    var res = conn.getDB('admin').runCommand({shardingState: 1});
+const checkShardingStateInitialized = function(conn, configConnStr, shardName, clusterId) {
+    const res = conn.getDB('admin').runCommand({shardingState: 1});
     assert.commandWorked(res);
     assert(res.enabled);
     assert.eq(shardName, res.shardName);
@@ -23,40 +16,25 @@ var checkShardingStateInitialized = function(conn, configConnStr, shardName, clu
     assert.soon(() => configConnStr == conn.adminCommand({shardingState: 1}).configServer);
 };
 
-var checkShardMarkedAsShardAware = function(mongosConn, shardName) {
-    var res = mongosConn.getDB('config').getCollection('shards').findOne({_id: shardName});
+const checkShardMarkedAsShardAware = function(mongosConn, shardName) {
+    const res = mongosConn.getDB('config').getCollection('shards').findOne({_id: shardName});
     assert.neq(null, res, "Could not find new shard " + shardName + " in config.shards");
     assert.eq(1, res.state);
 };
 
 // Create the cluster to test adding shards to.
-var st = new ShardingTest({shards: 1});
-var clusterId = st.s.getDB('config').getCollection('version').findOne().clusterId;
+const st = new ShardingTest({shards: 1});
+const clusterId = st.s.getDB('config').getCollection('version').findOne().clusterId;
+const newShardName = "newShard";
 
-// Add a shard that is a standalone mongod.
-
-var standaloneConn = MongoRunner.runMongod({shardsvr: ''});
-waitForPrimary(standaloneConn);
-
-jsTest.log("Going to add standalone as shard: " + standaloneConn);
-var newShardName = "newShard";
-assert.commandWorked(st.s.adminCommand({addShard: standaloneConn.name, name: newShardName}));
-checkShardingStateInitialized(standaloneConn, st.configRS.getURL(), newShardName, clusterId);
-checkShardMarkedAsShardAware(st.s, newShardName);
-
-MongoRunner.stopMongod(standaloneConn);
-
-// Add a shard that is a replica set.
-
-var replTest = new ReplSetTest({nodes: 1});
+// Add a shard and ensure awareness.
+const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet({shardsvr: ''});
 replTest.initiate();
-waitForPrimary(replTest.getPrimary());
 
 jsTest.log("Going to add replica set as shard: " + tojson(replTest));
-assert.commandWorked(st.s.adminCommand({addShard: replTest.getURL(), name: replTest.getURL()}));
-checkShardingStateInitialized(
-    replTest.getPrimary(), st.configRS.getURL(), replTest.getURL(), clusterId);
+assert.commandWorked(st.s.adminCommand({addShard: replTest.getURL(), name: newShardName}));
+checkShardingStateInitialized(replTest.getPrimary(), st.configRS.getURL(), newShardName, clusterId);
 checkShardMarkedAsShardAware(st.s, newShardName);
 
 replTest.stopSet();
