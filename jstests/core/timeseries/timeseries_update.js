@@ -13,6 +13,11 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");
 
+if (!TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
+    jsTestLog("Skipping test because the time-series updates and deletes feature flag is disabled");
+    return;
+}
+
 TimeseriesTest.run((insert) => {
     const testDB = db.getSiblingDB(jsTestName());
     assert.commandWorked(testDB.dropDatabase());

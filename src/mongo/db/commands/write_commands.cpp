@@ -61,6 +61,7 @@
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/view_catalog.h"
@@ -125,6 +126,28 @@ bool isMetaFieldFirstElementOfDottedPathField(StringData metaField, StringData f
     return field.substr(0, field.find('.')) == metaField;
 }
 
+// Recurses through the mutablebson element query and replaces any occurences of the
+// metaField with "meta" accounting for queries that may be in dot notation.
+void replaceTimeseriesQueryMetaFieldName(mutablebson::Element elem, const StringData& metaField) {
+    if (metaField.empty()) {
+        return;
+    }
+    if (isMetaFieldFirstElementOfDottedPathField(metaField, elem.getFieldName())) {
+        size_t dotIndex = elem.getFieldName().find('.');
+        dotIndex >= elem.getFieldName().size()
+            ? invariantStatusOK(elem.rename("meta"))
+            : invariantStatusOK(elem.rename(
+                  "meta" +
+                  elem.getFieldName().substr(dotIndex, elem.getFieldName().size() - dotIndex)));
+    }
+    if (elem.hasChildren()) {
+        for (size_t i = 0; i < elem.countChildren(); ++i) {
+            replaceTimeseriesQueryMetaFieldName(elem.findNthChild(i), metaField);
+        }
+    }
+}
+
+// TODO: SERVER-57735: remove this method.
 template <typename OpEntry>
 bool queryOnlyDependsOnTimeseriesMetaField(OperationContext* opCtx,
                                            const NamespaceString& ns,
@@ -151,9 +174,9 @@ bool queryOnlyDependsOnTimeseriesMetaField(OperationContext* opCtx,
                        [&timeseriesOptions](const auto& dependency) {
                            StringData queryField(dependency);
                            return isMetaFieldFirstElementOfDottedPathField(
-                               timeseriesOptions->getMetaField().get(), queryField);
+                               *timeseriesOptions->getMetaField(), queryField);
                        });
-}  // namespace
+}
 
 /**
  * Returns true if the given update request only modifies the time-series collection's metaField,
@@ -173,7 +196,7 @@ bool updateOnlyModifiesTimeseriesMetaField(OperationContext* opCtx,
             "Time-series buckets collection is missing time-series options",
             timeseriesOptions);
 
-    auto metaField = timeseriesOptions->getMetaField().get();
+    auto metaField = *timeseriesOptions->getMetaField();
 
     for (auto&& update : request.getUpdates()) {
         auto& updateMod = update.getU();
@@ -1363,6 +1386,10 @@ public:
 
         void _performTimeseriesUpdates(OperationContext* opCtx,
                                        write_ops::UpdateCommandReply* updateReply) const {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Time-series updates are not enabled",
+                    feature_flags::gTimeseriesUpdatesAndDeletes.isEnabled(
+                        serverGlobalParams.featureCompatibility));
 
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "Cannot perform an update on a time-series collection "
@@ -1508,16 +1535,47 @@ public:
                                    &bodyBuilder);
         }
 
-        void _performTimeseriesDeletes(OperationContext* opCtx,
-                                       write_ops::DeleteCommandReply* deleteReply) const {
+        write_ops::DeleteCommandReply* _performTimeseriesDeletes(
+            OperationContext* opCtx, write_ops::DeleteCommandReply* deleteReply) {
+
             uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "Cannot perform a delete on a time-series collection "
-                                     "when querying on a field that is not the metaField: "
-                                  << ns(),
-                    queryOnlyDependsOnTimeseriesMetaField(opCtx, ns(), request().getDeletes()));
-            uasserted(ErrorCodes::IllegalOperation,
-                      str::stream()
-                          << "Cannot perform a delete on a time-series collection: " << ns());
+                    "Time-series deletes are not enabled",
+                    feature_flags::gTimeseriesUpdatesAndDeletes.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+
+            auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
+                opCtx, ns().makeTimeseriesBucketsNamespace());
+            uassert(ErrorCodes::NamespaceNotFound,
+                    "Could not find time-series buckets collection for write",
+                    collection);
+            auto timeseriesOptions = collection->getTimeseriesOptions();
+            uassert(ErrorCodes::InvalidOptions,
+                    "Time-series buckets collection is missing time-series options",
+                    timeseriesOptions);
+            StringData metaField =
+                timeseriesOptions->getMetaField() ? *timeseriesOptions->getMetaField() : "";
+
+            std::vector<mongo::write_ops::DeleteOpEntry> timeseriesDeletes;
+            timeseriesDeletes.reserve(request().getDeletes().size());
+            for (auto& deleteEntry : request().getDeletes()) {
+                mutablebson::Document doc(deleteEntry.getQ());
+                replaceTimeseriesQueryMetaFieldName(doc.root(), metaField);
+                timeseriesDeletes.emplace_back(doc.getObject(), deleteEntry.getMulti());
+            }
+
+            write_ops::DeleteCommandRequest timeseriesDeleteReq(
+                ns().makeTimeseriesBucketsNamespace(), timeseriesDeletes);
+            timeseriesDeleteReq.setWriteCommandRequestBase(request().getWriteCommandRequestBase());
+
+            auto reply = write_ops_exec::performDeletes(
+                opCtx, timeseriesDeleteReq, OperationSource::kTimeseries);
+            populateReply(opCtx,
+                          !timeseriesDeleteReq.getWriteCommandRequestBase().getOrdered(),
+                          timeseriesDeleteReq.getDeletes().size(),
+                          std::move(reply),
+                          deleteReply);
+
+            return deleteReply;
         }
 
         const BSONObj& _commandObj;

@@ -570,6 +570,23 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
     return res;
 }
 
+// TODO: SERVER-58382 Handle time-series collections without a metaField.
+template <typename OpEntry>
+bool isTimeseriesMetaFieldOnlyQuery(OperationContext* opCtx,
+                                    const NamespaceString& ns,
+                                    OpEntry& opEntry) {
+
+    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, nullptr, ns));
+
+    std::vector<BSONObj> rawPipeline{BSON("$match" << opEntry.getQ())};
+    DepsTracker dependencies = Pipeline::parse(rawPipeline, expCtx)->getDependencies({});
+    return std::all_of(
+        dependencies.fields.begin(), dependencies.fields.end(), [](const auto& dependency) {
+            StringData queryField(dependency);
+            return queryField.substr(0, queryField.find('.')) == "meta";
+        });
+}
+
 }  // namespace
 
 WriteResult performInserts(OperationContext* opCtx,
@@ -1072,7 +1089,8 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 }
 
 WriteResult performDeletes(OperationContext* opCtx,
-                           const write_ops::DeleteCommandRequest& wholeOp) {
+                           const write_ops::DeleteCommandRequest& wholeOp,
+                           const OperationSource& source) {
     // Delete performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -1130,6 +1148,20 @@ WriteResult performDeletes(OperationContext* opCtx,
         });
         try {
             lastOpFixer.startingOp();
+
+            if (source == OperationSource::kTimeseries) {
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "Cannot perform a delete on a time-series collection "
+                                         "when querying on a field that is not the metaField: "
+                                      << wholeOp.getNamespace(),
+                        isTimeseriesMetaFieldOnlyQuery(opCtx, wholeOp.getNamespace(), singleOp));
+                uassert(ErrorCodes::IllegalOperation,
+                        str::stream() << "Cannot perform a delete with limit: 1 on a "
+                                         "time-series collection: "
+                                      << wholeOp.getNamespace(),
+                        singleOp.getMulti());
+            }
+
             out.results.emplace_back(performSingleDeleteOp(opCtx,
                                                            wholeOp.getNamespace(),
                                                            stmtId,

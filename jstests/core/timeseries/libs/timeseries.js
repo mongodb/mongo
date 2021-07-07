@@ -10,6 +10,16 @@ var TimeseriesTest = class {
             .featureFlagTimeseriesCollection.value;
     }
 
+    /**
+     * Returns whether time-series updates and deletes are supported.
+     */
+    static timeseriesUpdatesAndDeletesEnabled(conn) {
+        return assert
+            .commandWorked(
+                conn.adminCommand({getParameter: 1, featureFlagTimeseriesUpdatesAndDeletes: 1}))
+            .featureFlagTimeseriesUpdatesAndDeletes.value;
+    }
+
     static shardedtimeseriesCollectionsEnabled(conn) {
         return assert
             .commandWorked(conn.adminCommand({getParameter: 1, featureFlagShardedTimeSeries: 1}))
