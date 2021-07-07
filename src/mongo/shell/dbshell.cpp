@@ -728,7 +728,9 @@ int _main(int argc, char* argv[], char** envp) {
     // TODO This should use a TransportLayerManager or TransportLayerFactory
     auto serviceContext = getGlobalServiceContext();
 
+#ifdef MONGO_CONFIG_SSL
     OCSPManager::get()->startThreadPool();
+#endif
 
     transport::TransportLayerASIO::Options opts;
     opts.enableIPv6 = shellGlobalParams.enableIPv6;
