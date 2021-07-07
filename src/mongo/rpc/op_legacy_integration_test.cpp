@@ -27,8 +27,11 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
@@ -51,13 +54,26 @@ long getDeprecatedOpCount(BSONObj serverStatus, const char* opName) {
     return deprecatedOpcounters ? deprecatedOpcounters[opName].Long() : 0;
 }
 
-bool isStandaloneMongod(DBClientBase* conn) {
-    return !conn->isReplicaSetMember() && !conn->isMongos();
+// Issue a find command request so we can use cursor id from it to test the deprecated getMore
+// and killCursors ops.
+int64_t getValidCursorIdFromFindCmd(DBClientBase* conn, const char* collName) {
+    Message findCmdRequest =
+        OpMsgRequest::fromDBAndBody("testOpLegacy", BSON("find" << collName << "batchSize" << 2))
+            .serialize();
+    Message findCmdReply;
+    ASSERT(conn->call(findCmdRequest, findCmdReply));
+    BSONObj findCmdReplyBody = OpMsg::parse(findCmdReply).body;
+    auto cr = CursorResponse::parseFromBSON(findCmdReplyBody.getOwned());
+    ASSERT_OK(cr.getStatus());
+    const int64_t cursorId = cr.getValue().getCursorId();
+    ASSERT_NE(0, cursorId);
+
+    return cursorId;
 }
 
 TEST(OpLegacy, DeprecatedWriteOpsCounters) {
     auto conn = getIntegrationTestConnection();
-    const std::string ns = "test.DeprecatedWriteOpsCounters";
+    const std::string ns = "testOpLegacy.DeprecatedWriteOpsCounters";
 
     // Cache the counters prior to running the deprecated requests.
     auto serverStatusCmd = fromjson("{serverStatus: 1}");
@@ -73,13 +89,13 @@ TEST(OpLegacy, DeprecatedWriteOpsCounters) {
 
     // Issue the requests. They are expected to fail but should still be counted.
     Message ignore;
-    auto opInsert = makeInsertMessage(ns, insert, 2, 0 /*continue on error*/);
+    auto opInsert = makeDeprecatedInsertMessage(ns, insert, 2, 0 /*continue on error*/);
     ASSERT_THROWS(conn->call(opInsert, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
 
-    auto opUpdate = makeUpdateMessage(ns, query, update, 0 /*no upsert, no multi*/);
+    auto opUpdate = makeDeprecatedUpdateMessage(ns, query, update, 0 /*no upsert, no multi*/);
     ASSERT_THROWS(conn->call(opUpdate, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
 
-    auto opDelete = makeRemoveMessage(ns, query, 0 /*limit*/);
+    auto opDelete = makeDeprecatedRemoveMessage(ns, query, 0 /*limit*/);
     ASSERT_THROWS(conn->call(opDelete, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
 
     // Check the opcounters after running the deprecated operations.
@@ -99,40 +115,57 @@ TEST(OpLegacy, DeprecatedWriteOpsCounters) {
               getDeprecatedOpCount(serverStatusReply, "total"));
 }
 
+void assertFailure(const Message response, StringData expectedErr) {
+    QueryResult::ConstView qr = response.singleData().view2ptr();
+    BufReader responseData(qr.data(), qr.dataLen());
+    BSONObj responseBody = responseData.read<BSONObj>();
+
+    ASSERT_FALSE(responseBody["ok"].trueValue()) << responseBody;
+    ASSERT_EQ(5739101, responseBody["code"].Int()) << responseBody;
+    ASSERT_NE(getErrField(responseBody).checkAndGetStringData().find(expectedErr),
+              std::string::npos)
+        << responseBody;
+}
+
 TEST(OpLegacy, DeprecatedReadOpsCounters) {
     auto conn = getIntegrationTestConnection();
-    const std::string ns = "test.DeprecatedReadOpsCounters";
+    const std::string ns = "testOpLegacy.DeprecatedReadOpsCounters";
 
     BSONObj insert = fromjson(R"({
         insert: "DeprecatedReadOpsCounters",
         documents: [ {a: 1},{a: 2},{a: 3},{a: 4},{a: 5},{a: 6},{a: 7} ]
     })");
     BSONObj ignoreResponse;
-    ASSERT(conn->runCommand("test", insert, ignoreResponse));
+    ASSERT(conn->runCommand("testOpLegacy", insert, ignoreResponse));
 
     // Cache the counters prior to running the deprecated requests.
     auto serverStatusCmd = fromjson("{serverStatus: 1}");
     BSONObj serverStatusReplyPrior;
     ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReplyPrior));
 
-    // Issue the deprecated requests.
-    const BSONObj query = fromjson("{a: {$lt: 42}}");
+    // Issue the deprecated requests. They all should fail one way or another.
+    Message opQueryRequest = makeDeprecatedQueryMessage(ns,
+                                                        fromjson("{}"),
+                                                        2 /*nToReturn*/,
+                                                        0 /*nToSkip*/,
+                                                        nullptr /*fieldsToReturn*/,
+                                                        0 /*queryOptions*/);
+    Message opQueryReply;
+    ASSERT(conn->call(opQueryRequest, opQueryReply));
+    assertFailure(opQueryReply, "OP_QUERY is no longer supported");
 
-    auto opQuery = makeQueryMessage(
-        ns, query, 2 /*nToReturn*/, 0 /*nToSkip*/, nullptr /*fieldsToReturn*/, 0 /*queryOptions*/);
-    Message replyQuery;
-    ASSERT(conn->call(opQuery, replyQuery));
-    QueryResult::ConstView qr = replyQuery.singleData().view2ptr();
-    int64_t cursorId = qr.getCursorId();
-    ASSERT_NE(0, cursorId);
+    const int64_t cursorId = getValidCursorIdFromFindCmd(conn.get(), "DeprecatedReadOpsCounters");
 
-    auto opGetMore = makeGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
-    Message replyGetMore;
-    ASSERT(conn->call(opGetMore, replyGetMore));
+    Message opGetMoreRequest =
+        makeDeprecatedGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
+    Message opGetMoreReply;
+    ASSERT(conn->call(opGetMoreRequest, opGetMoreReply));
+    assertFailure(opGetMoreReply, "OP_GET_MORE is no longer supported");
 
-    auto opKillCursors = makeKillCursorsMessage(cursorId);
-    Message ignore;
-    ASSERT_THROWS(conn->call(opKillCursors, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
+    Message opKillCursorsRequest = makeDeprecatedKillCursorsMessage(cursorId);
+    Message opKillCursorsReply;
+    ASSERT_THROWS(conn->call(opKillCursorsRequest, opKillCursorsReply),
+                  ExceptionForCat<ErrorCategory::NetworkError>);
 
     // Check the opcounters after running the deprecated operations.
     BSONObj serverStatusReply;
@@ -140,17 +173,9 @@ TEST(OpLegacy, DeprecatedReadOpsCounters) {
 
     ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "query") + 1,
               getDeprecatedOpCount(serverStatusReply, "query"));
-    if (isStandaloneMongod(conn.get())) {
-        ASSERT_EQ(getOpCount(serverStatusReplyPrior, "query") + 1,
-                  getOpCount(serverStatusReply, "query"));
-    }
 
     ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "getmore") + 1,
               getDeprecatedOpCount(serverStatusReply, "getmore"));
-    if (isStandaloneMongod(conn.get())) {
-        ASSERT_EQ(getOpCount(serverStatusReplyPrior, "getmore") + 1,
-                  getOpCount(serverStatusReply, "getmore"));
-    }
 
     ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "killcursors") + 1,
               getDeprecatedOpCount(serverStatusReply, "killcursors"));
@@ -205,7 +230,7 @@ std::string getLastError(DBClientBase* conn) {
 
 void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeverity) {
     // Build the deprecated requests and the getLog command.
-    const std::string ns = "test.exerciseDeprecatedOps";
+    const std::string ns = "testOpLegacy.exerciseDeprecatedOps";
 
     // Insert some docs into the collection so even though the legacy write ops are failing we can
     // still test getMore, killCursors and query.
@@ -214,17 +239,17 @@ void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeveri
         documents: [ {a: 1},{a: 2},{a: 3},{a: 4},{a: 5},{a: 6},{a: 7} ]
     })");
     BSONObj ignoreResponse;
-    ASSERT(conn->runCommand("test", data, ignoreResponse));
+    ASSERT(conn->runCommand("testOpLegacy", data, ignoreResponse));
 
     const BSONObj doc1 = fromjson("{a: 1}");
     const BSONObj doc2 = fromjson("{a: 2}");
     const BSONObj insert[2] = {doc1, doc2};
     const BSONObj query = fromjson("{a: {$lt: 42}}");
     const BSONObj update = fromjson("{$set: {b: 2}}");
-    auto opInsert = makeInsertMessage(ns, insert, 2, 0 /*continue on error*/);
-    auto opUpdate = makeUpdateMessage(ns, query, update, 0 /*no upsert, no multi*/);
-    auto opDelete = makeRemoveMessage(ns, query, 0 /*limit*/);
-    auto opQuery = makeQueryMessage(
+    auto opInsert = makeDeprecatedInsertMessage(ns, insert, 2, 0 /*continue on error*/);
+    auto opUpdate = makeDeprecatedUpdateMessage(ns, query, update, 0 /*no upsert, no multi*/);
+    auto opDelete = makeDeprecatedRemoveMessage(ns, query, 0 /*limit*/);
+    auto opQuery = makeDeprecatedQueryMessage(
         ns, query, 2 /*nToReturn*/, 0 /*nToSkip*/, nullptr /*fieldsToReturn*/, 0 /*queryOptions*/);
     Message ignore;
 
@@ -246,15 +271,14 @@ void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeveri
     ASSERT(conn->call(opQuery, replyQuery));
     ASSERT(wasLogged(conn, "query", expectedSeverity));
 
-    QueryResult::ConstView qr = replyQuery.singleData().view2ptr();
-    int64_t cursorId = qr.getCursorId();
-    ASSERT_NE(0, cursorId);
-    auto opGetMore = makeGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
+    int64_t cursorId = getValidCursorIdFromFindCmd(conn, "exerciseDeprecatedOps");
+
+    auto opGetMore = makeDeprecatedGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
     Message replyGetMore;
     ASSERT(conn->call(opGetMore, replyGetMore));
     ASSERT(wasLogged(conn, "getmore", expectedSeverity));
 
-    auto opKillCursors = makeKillCursorsMessage(cursorId);
+    auto opKillCursors = makeDeprecatedKillCursorsMessage(cursorId);
     ASSERT_THROWS(conn->call(opKillCursors, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
     ASSERT(wasLogged(conn, "killcursors", expectedSeverity));
 
@@ -320,12 +344,12 @@ TEST(OpLegacy, GenericCommandViaOpQuery) {
     ASSERT(wasLogged(conn.get(), "getLastError", ""));
 
     // The actual command doesn't matter, as long as it's not 'hello' or 'isMaster'.
-    auto opQuery = makeQueryMessage("test.$cmd",
-                                    serverStatusCmd,
-                                    1 /*nToReturn*/,
-                                    0 /*nToSkip*/,
-                                    nullptr /*fieldsToReturn*/,
-                                    0 /*queryOptions*/);
+    auto opQuery = makeDeprecatedQueryMessage("testOpLegacy.$cmd",
+                                              serverStatusCmd,
+                                              1 /*nToReturn*/,
+                                              0 /*nToSkip*/,
+                                              nullptr /*fieldsToReturn*/,
+                                              0 /*queryOptions*/);
     Message replyQuery;
     ASSERT(conn->call(opQuery, replyQuery));
     QueryResult::ConstView qr = replyQuery.singleData().view2ptr();
@@ -356,12 +380,12 @@ void testAllowedCommand(const char* command) {
     ASSERT_EQ("", getLastError(conn.get()));  // will start failing soon but will still log
     ASSERT(wasLogged(conn.get(), "getLastError", ""));
 
-    auto opQuery = makeQueryMessage("test.$cmd",
-                                    fromjson(command),
-                                    1 /*nToReturn*/,
-                                    0 /*nToSkip*/,
-                                    nullptr /*fieldsToReturn*/,
-                                    0 /*queryOptions*/);
+    auto opQuery = makeDeprecatedQueryMessage("testOpLegacy.$cmd",
+                                              fromjson(command),
+                                              1 /*nToReturn*/,
+                                              0 /*nToSkip*/,
+                                              nullptr /*fieldsToReturn*/,
+                                              0 /*queryOptions*/);
     Message replyQuery;
     ASSERT(conn->call(opQuery, replyQuery));
     QueryResult::ConstView qr = replyQuery.singleData().view2ptr();

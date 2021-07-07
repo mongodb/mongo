@@ -67,86 +67,11 @@ using std::string;
 
 namespace {
 
-// Lists the $-prefixed query options that can be passed alongside a wrapped query predicate for
-// OP_QUERY find. The $orderby field is omitted because "orderby" (no dollar sign) is also allowed,
-// and this requires special handling.
-const std::vector<const char*> kDollarQueryModifiers = {
-    "$hint",
-    "$comment",
-    "$max",
-    "$min",
-    "$returnKey",
-    "$showDiskLoc",
-    "$snapshot",
-    "$maxTimeMS",
-};
-
 TimerStats oplogGetMoreStats;
 ServerStatusMetricField<TimerStats> displayBatchesReceived("repl.network.oplogGetMoresProcessed",
                                                            &oplogGetMoreStats);
 
 }  // namespace
-
-BSONObj upconvertQueryEntry(const BSONObj& query,
-                            const NamespaceString& nss,
-                            int ntoreturn,
-                            int ntoskip) {
-    BSONObjBuilder bob;
-
-    bob.append("find", nss.coll());
-
-    // Whether or not the query predicate is wrapped inside a "query" or "$query" field so that
-    // other options can be passed alongside the predicate.
-    bool predicateIsWrapped = false;
-
-    // Extract the query predicate.
-    BSONObj filter;
-    if (query["query"].isABSONObj()) {
-        predicateIsWrapped = true;
-        bob.appendAs(query["query"], "filter");
-    } else if (query["$query"].isABSONObj()) {
-        predicateIsWrapped = true;
-        bob.appendAs(query["$query"], "filter");
-    } else if (!query.isEmpty()) {
-        bob.append("filter", query);
-    }
-
-    if (ntoskip) {
-        bob.append("skip", ntoskip);
-    }
-    if (ntoreturn) {
-        bob.append("ntoreturn", ntoreturn);
-    }
-
-    // The remainder of the query options are only available if the predicate is passed in wrapped
-    // form. If the predicate is not wrapped, we're done.
-    if (!predicateIsWrapped) {
-        return bob.obj();
-    }
-
-    // Extract the sort.
-    if (auto elem = query["orderby"]) {
-        bob.appendAs(elem, "sort");
-    } else if (auto elem = query["$orderby"]) {
-        bob.appendAs(elem, "sort");
-    }
-
-    // Add $-prefixed OP_QUERY modifiers, like $hint.
-    for (auto modifier : kDollarQueryModifiers) {
-        if (auto elem = query[modifier]) {
-            // Use "+ 1" to omit the leading dollar sign.
-            bob.appendAs(elem, modifier + 1);
-        }
-    }
-
-    return bob.obj();
-}
-
-BSONObj upconvertGetMoreEntry(const NamespaceString& nss, CursorId cursorId, int ntoreturn) {
-    GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
-    getMoreRequest.setBatchSize(ntoreturn);
-    return getMoreRequest.toBSON({});
-}
 
 /**
  * This type decorates a Client object with a stack of active CurOp objects.

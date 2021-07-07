@@ -154,12 +154,12 @@ Message makeMessage(NetworkOp op, Func&& bodyBuilder) {
 }
 }  // namespace
 
-Message makeQueryMessage(StringData ns,
-                         BSONObj query,
-                         int nToReturn,
-                         int nToSkip,
-                         const BSONObj* fieldsToReturn,
-                         int queryOptions) {
+Message makeDeprecatedQueryMessage(StringData ns,
+                                   BSONObj query,
+                                   int nToReturn,
+                                   int nToSkip,
+                                   const BSONObj* fieldsToReturn,
+                                   int queryOptions) {
     return makeMessage(dbQuery, [&](BufBuilder& b) {
         b.appendNum(queryOptions);
         b.appendStr(ns);
@@ -171,7 +171,7 @@ Message makeQueryMessage(StringData ns,
     });
 }
 
-Message makeInsertMessage(StringData ns, const BSONObj* objs, size_t count, int flags) {
+Message makeDeprecatedInsertMessage(StringData ns, const BSONObj* objs, size_t count, int flags) {
     return makeMessage(dbInsert, [&](BufBuilder& b) {
         int reservedFlags = 0;
         if (flags & InsertOption_ContinueOnError)
@@ -186,7 +186,7 @@ Message makeInsertMessage(StringData ns, const BSONObj* objs, size_t count, int 
     });
 }
 
-Message makeUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flags) {
+Message makeDeprecatedUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flags) {
     return makeMessage(dbUpdate, [&](BufBuilder& b) {
         const int reservedFlags = 0;
         b.appendNum(reservedFlags);
@@ -198,7 +198,7 @@ Message makeUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flag
     });
 }
 
-Message makeRemoveMessage(StringData ns, BSONObj query, int flags) {
+Message makeDeprecatedRemoveMessage(StringData ns, BSONObj query, int flags) {
     return makeMessage(dbDelete, [&](BufBuilder& b) {
         const int reservedFlags = 0;
         b.appendNum(reservedFlags);
@@ -209,7 +209,7 @@ Message makeRemoveMessage(StringData ns, BSONObj query, int flags) {
     });
 }
 
-Message makeKillCursorsMessage(long long cursorId) {
+Message makeDeprecatedKillCursorsMessage(long long cursorId) {
     return makeMessage(dbKillCursors, [&](BufBuilder& b) {
         b.appendNum((int)0);  // reserved
         b.appendNum((int)1);  // number
@@ -217,7 +217,7 @@ Message makeKillCursorsMessage(long long cursorId) {
     });
 }
 
-Message makeGetMoreMessage(StringData ns, long long cursorId, int nToReturn, int flags) {
+Message makeDeprecatedGetMoreMessage(StringData ns, long long cursorId, int nToReturn, int flags) {
     return makeMessage(dbGetMore, [&](BufBuilder& b) {
         b.appendNum(flags);
         b.appendStr(ns);
@@ -226,32 +226,25 @@ Message makeGetMoreMessage(StringData ns, long long cursorId, int nToReturn, int
     });
 }
 
-OpQueryReplyBuilder::OpQueryReplyBuilder() : _buffer(32768) {
-    _buffer.skip(sizeof(QueryResult::Value));
-}
+DbResponse makeErrorResponseToDeprecatedOpQuery(StringData errorMsg) {
+    BSONObjBuilder err;
+    err.append("$err", errorMsg);
+    err.append("code", 5739101);
+    err.append("ok", 0.0);
+    BSONObj errObj = err.done();
 
-Message OpQueryReplyBuilder::toQueryReply(int queryResultFlags,
-                                          int nReturned,
-                                          int startingFrom,
-                                          long long cursorId) {
-    QueryResult::View qr = _buffer.buf();
-    qr.setResultFlags(queryResultFlags);
-    qr.msgdata().setLen(_buffer.len());
+    BufBuilder buffer(sizeof(QueryResult::Value) + errObj.objsize());
+    buffer.skip(sizeof(QueryResult::Value));
+    buffer.appendBuf(errObj.objdata(), errObj.objsize());
+
+    QueryResult::View qr = buffer.buf();
+    qr.setResultFlags(ResultFlag_ErrSet);
+    qr.msgdata().setLen(buffer.len());
     qr.msgdata().setOperation(opReply);
-    qr.setCursorId(cursorId);
-    qr.setStartingFrom(startingFrom);
-    qr.setNReturned(nReturned);
-    return Message(_buffer.release());
-}
+    qr.setCursorId(0);
+    qr.setStartingFrom(0);
+    qr.setNReturned(1);
 
-DbResponse replyToQuery(int queryResultFlags,
-                        const void* data,
-                        int size,
-                        int nReturned,
-                        int startingFrom,
-                        long long cursorId) {
-    OpQueryReplyBuilder reply;
-    reply.bufBuilderForResults().appendBuf(data, size);
-    return DbResponse{reply.toQueryReply(queryResultFlags, nReturned, startingFrom, cursorId)};
+    return DbResponse{Message(buffer.release())};
 }
 }  // namespace mongo

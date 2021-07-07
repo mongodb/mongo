@@ -404,8 +404,8 @@ TEST(LegacyWriteOpsParsers, SingleInsert) {
     const std::string ns = "test.foo";
     const BSONObj obj = BSON("x" << 1);
     for (bool continueOnError : {false, true}) {
-        auto message =
-            makeInsertMessage(ns, &obj, 1, continueOnError ? InsertOption_ContinueOnError : 0);
+        auto message = makeDeprecatedInsertMessage(
+            ns, &obj, 1, continueOnError ? InsertOption_ContinueOnError : 0);
         const auto op = InsertOp::parseLegacy(message);
         ASSERT_EQ(op.getNamespace().ns(), ns);
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
@@ -419,7 +419,7 @@ TEST(LegacyWriteOpsParsers, EmptyMultiInsertFails) {
     const std::string ns = "test.foo";
     for (bool continueOnError : {false, true}) {
         auto objs = std::vector<BSONObj>{};
-        auto message = makeInsertMessage(
+        auto message = makeDeprecatedInsertMessage(
             ns, objs.data(), objs.size(), (continueOnError ? InsertOption_ContinueOnError : 0));
         ASSERT_THROWS_CODE(
             InsertOp::parseLegacy(message), AssertionException, ErrorCodes::InvalidLength);
@@ -432,7 +432,7 @@ TEST(LegacyWriteOpsParsers, RealMultiInsert) {
     const BSONObj obj1 = BSON("x" << 1);
     for (bool continueOnError : {false, true}) {
         auto objs = std::vector<BSONObj>{obj0, obj1};
-        auto message = makeInsertMessage(
+        auto message = makeDeprecatedInsertMessage(
             ns, objs.data(), objs.size(), continueOnError ? InsertOption_ContinueOnError : 0);
         const auto op = InsertOp::parseLegacy(message);
         ASSERT_EQ(op.getNamespace().ns(), ns);
@@ -450,11 +450,11 @@ TEST(LegacyWriteOpsParsers, UpdateCommandRequest) {
     const BSONObj update = BSON("$inc" << BSON("x" << 1));
     for (bool upsert : {false, true}) {
         for (bool multi : {false, true}) {
-            auto message = makeUpdateMessage(ns,
-                                             query,
-                                             update,
-                                             (upsert ? UpdateOption_Upsert : 0) |
-                                                 (multi ? UpdateOption_Multi : 0));
+            auto message = makeDeprecatedUpdateMessage(ns,
+                                                       query,
+                                                       update,
+                                                       (upsert ? UpdateOption_Upsert : 0) |
+                                                           (multi ? UpdateOption_Multi : 0));
             const auto op = UpdateOp::parseLegacy(message);
             ASSERT_EQ(op.getNamespace().ns(), ns);
             ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
@@ -478,11 +478,11 @@ TEST(LegacyWriteOpsParsers, UpdateWithArrayUpdateFieldIsParsedAsReplacementStyle
     const BSONObj update = BSON_ARRAY(BSON("$addFields" << BSON("x" << 1)));
     for (bool upsert : {false, true}) {
         for (bool multi : {false, true}) {
-            auto message = makeUpdateMessage(ns,
-                                             query,
-                                             update,
-                                             (upsert ? UpdateOption_Upsert : 0) |
-                                                 (multi ? UpdateOption_Multi : 0));
+            auto message = makeDeprecatedUpdateMessage(ns,
+                                                       query,
+                                                       update,
+                                                       (upsert ? UpdateOption_Upsert : 0) |
+                                                           (multi ? UpdateOption_Multi : 0));
             const auto op = UpdateOp::parseLegacy(message);
             ASSERT_EQ(op.getNamespace().ns(), ns);
             ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
@@ -502,7 +502,7 @@ TEST(LegacyWriteOpsParsers, Remove) {
     const std::string ns = "test.foo";
     const BSONObj query = BSON("x" << 1);
     for (bool multi : {false, true}) {
-        auto message = makeRemoveMessage(ns, query, (multi ? 0 : RemoveOption_JustOne));
+        auto message = makeDeprecatedRemoveMessage(ns, query, (multi ? 0 : RemoveOption_JustOne));
         const auto op = DeleteOp::parseLegacy(message);
         ASSERT_EQ(op.getNamespace().ns(), ns);
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());

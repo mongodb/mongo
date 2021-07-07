@@ -387,12 +387,12 @@ public:
 /**
  * Builds a legacy OP_QUERY message.
  */
-Message makeQueryMessage(StringData ns,
-                         BSONObj query,
-                         int nToReturn,
-                         int nToSkip,
-                         const BSONObj* fieldsToReturn,
-                         int queryOptions);
+Message makeDeprecatedQueryMessage(StringData ns,
+                                   BSONObj query,
+                                   int nToReturn,
+                                   int nToSkip,
+                                   const BSONObj* fieldsToReturn,
+                                   int queryOptions);
 
 enum InsertOptions {
     /** With muli-insert keep processing inserts if one fails */
@@ -402,7 +402,10 @@ enum InsertOptions {
 /**
  * Builds a legacy OP_INSERT message.
  */
-Message makeInsertMessage(StringData ns, const BSONObj* objs, size_t count, int flags = 0);
+Message makeDeprecatedInsertMessage(StringData ns,
+                                    const BSONObj* objs,
+                                    size_t count,
+                                    int flags = 0);
 
 enum UpdateOptions {
     /** Upsert - that is, insert the item if no matching item is found. */
@@ -419,7 +422,7 @@ enum UpdateOptions {
 /**
  * Builds a legacy OP_UPDATE message.
  */
-Message makeUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flags = 0);
+Message makeDeprecatedUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flags = 0);
 
 enum RemoveOptions {
     /** only delete one option */
@@ -432,17 +435,20 @@ enum RemoveOptions {
 /**
  * Builds a legacy OP_REMOVE message.
  */
-Message makeRemoveMessage(StringData ns, BSONObj query, int flags = 0);
+Message makeDeprecatedRemoveMessage(StringData ns, BSONObj query, int flags = 0);
 
 /**
  * Builds a legacy OP_KILLCURSORS message.
  */
-Message makeKillCursorsMessage(long long cursorId);
+Message makeDeprecatedKillCursorsMessage(long long cursorId);
 
 /**
- * Builds a legacy OP_GETMORE message.
+ * Builds a legacy OP_GET_MORE message.
  */
-Message makeGetMoreMessage(StringData ns, long long cursorId, int nToReturn, int flags = 0);
+Message makeDeprecatedGetMoreMessage(StringData ns,
+                                     long long cursorId,
+                                     int nToReturn,
+                                     int flags = 0);
 
 /**
  * A response to a DbMessage.
@@ -462,61 +468,7 @@ struct DbResponse {
 };
 
 /**
- * Prepares query replies to legacy finds (opReply to dbQuery) in place. This is also used for
- * command responses that don't use the new dbMsg protocol.
+ * Helper to build an error DbResponse for OP_QUERY and OP_GET_MORE.
  */
-class OpQueryReplyBuilder {
-    OpQueryReplyBuilder(const OpQueryReplyBuilder&) = delete;
-    OpQueryReplyBuilder& operator=(const OpQueryReplyBuilder&) = delete;
-
-public:
-    OpQueryReplyBuilder();
-
-    /**
-     * Returns the BufBuilder that should be used for placing result objects. It will be positioned
-     * where the first (or next) object should go.
-     *
-     * You must finish the BSONObjBuilder that uses this (by destruction or calling doneFast())
-     * before calling any more methods on this object.
-     */
-    BufBuilder& bufBuilderForResults() {
-        return _buffer;
-    }
-
-    /**
-     * Finishes the reply and returns the message buffer.
-     */
-    Message toQueryReply(int queryResultFlags,
-                         int nReturned,
-                         int startingFrom = 0,
-                         long long cursorId = 0);
-
-    /**
-     * Similar to toQueryReply() but used for replying to a command.
-     */
-    Message toCommandReply() {
-        return toQueryReply(0, 1);
-    }
-
-private:
-    BufBuilder _buffer;
-};
-
-/**
- * Helper to build a DbResponse from a buffer containing an OP_QUERY response.
- */
-DbResponse replyToQuery(int queryResultFlags,
-                        const void* data,
-                        int size,
-                        int nReturned,
-                        int startingFrom = 0,
-                        long long cursorId = 0);
-
-
-/**
- * Helper to build a DbRespose for OP_QUERY with a single reply object.
- */
-inline DbResponse replyToQuery(const BSONObj& obj, int queryResultFlags = 0) {
-    return replyToQuery(queryResultFlags, obj.objdata(), obj.objsize(), /*nReturned*/ 1);
-}
+DbResponse makeErrorResponseToDeprecatedOpQuery(StringData errorMsg);
 }  // namespace mongo

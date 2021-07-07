@@ -512,13 +512,6 @@ public:
     }
 
     /**
-     * Returns true if this CurOp represents a non-command OP_QUERY request.
-     */
-    bool isLegacyQuery() const {
-        return _networkOp == NetworkOp::dbQuery && !isCommand();
-    }
-
-    /**
      * Returns true if the current operation is known to be a command.
      */
     bool isCommand() const {
@@ -855,18 +848,4 @@ private:
 
     TickSource* _tickSource = nullptr;
 };
-
-/**
- * Upconverts a legacy query object such that it matches the format of the find command.
- */
-BSONObj upconvertQueryEntry(const BSONObj& query,
-                            const NamespaceString& nss,
-                            int ntoreturn,
-                            int ntoskip);
-
-/**
- * Generates a getMore command object from the specified namespace, cursor ID and batchsize.
- */
-BSONObj upconvertGetMoreEntry(const NamespaceString& nss, CursorId cursorId, int ntoreturn);
-
 }  // namespace mongo

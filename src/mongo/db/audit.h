@@ -172,28 +172,12 @@ void logCommandAuthzCheck(Client* client,
                           ErrorCodes::Error result);
 
 /**
- * Logs the result of an authorization check for an OP_GET_MORE wire protocol message.
- */
-void logGetMoreAuthzCheck(Client* client,
-                          const NamespaceString& ns,
-                          long long cursorId,
-                          ErrorCodes::Error result);
-
-/**
  * Logs the result of an authorization check for a killCursors command.
  */
 void logKillCursorsAuthzCheck(Client* client,
                               const NamespaceString& ns,
                               long long cursorId,
                               ErrorCodes::Error result);
-
-/**
- * Logs the result of an authorization check for an OP_QUERY wire protocol message.
- */
-void logQueryAuthzCheck(Client* client,
-                        const NamespaceString& ns,
-                        const BSONObj& query,
-                        ErrorCodes::Error result);
 
 /**
  * Logs the result of a createUser command.

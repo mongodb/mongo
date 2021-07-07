@@ -79,11 +79,6 @@ Query& Query::hint(BSONObj keyPattern) {
     return *this;
 }
 
-Query& Query::explain() {
-    appendComplex("$explain", true);
-    return *this;
-}
-
 Query& Query::minKey(const BSONObj& val) {
     appendComplex("$min", val);
     return *this;

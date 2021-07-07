@@ -61,24 +61,6 @@ bool parsingCanProduceNoopMatchNodes(const ExtensionsCallback& extensionsCallbac
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     OperationContext* opCtx,
-    const QueryMessage& qm,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const ExtensionsCallback& extensionsCallback,
-    MatchExpressionParser::AllowedFeatureSet allowedFeatures) {
-    bool explain = false;
-    // Make FindCommandRequest.
-    auto status = query_request_helper::fromLegacyQueryMessage(qm, &explain);
-    if (!status.isOK()) {
-        return status.getStatus();
-    }
-
-    return CanonicalQuery::canonicalize(
-        opCtx, std::move(status.getValue()), explain, expCtx, extensionsCallback, allowedFeatures);
-}
-
-// static
-StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    OperationContext* opCtx,
     std::unique_ptr<FindCommandRequest> findCommand,
     bool explain,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

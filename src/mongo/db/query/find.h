@@ -84,20 +84,4 @@ void endQueryOp(OperationContext* opCtx,
                 long long numResults,
                 CursorId cursorId);
 
-/**
- * Called from the getMore entry point in ops/query.cpp.
- * Returned buffer is the message to return to the client.
- */
-Message getMore(OperationContext* opCtx,
-                const char* ns,
-                int ntoreturn,
-                long long cursorid,
-                bool* exhaust,
-                bool* isCursorAuthorized);
-
-/**
- * Run the query 'q' and place the result in 'result'. Returns true if in exhaust mode.
- */
-bool runQuery(OperationContext* opCtx, QueryMessage& q, const NamespaceString& ns, Message& result);
-
 }  // namespace mongo

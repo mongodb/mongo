@@ -111,7 +111,6 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(rsStopGetMore);
 MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(skipCheckingForNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(sleepMillisAfterCommandExecutionBegins);
@@ -224,66 +223,6 @@ struct HandleRequest {
 
     std::shared_ptr<ExecutionContext> executionContext;
 };
-
-void generateLegacyQueryErrorResponse(const AssertionException& exception,
-                                      const QueryMessage& queryMessage,
-                                      CurOp* curop,
-                                      Message* response) {
-    curop->debug().errInfo = exception.toStatus();
-
-    if (queryMessage.query.valid())
-        LOGV2_OPTIONS(51777,
-                      {logv2::LogComponent::kQuery},
-                      "Assertion {error} ns: {namespace} query: {query}",
-                      "Assertion for valid query",
-                      "error"_attr = exception,
-                      "namespace"_attr = queryMessage.ns,
-                      "query"_attr = redact(queryMessage.query));
-    else
-        LOGV2_OPTIONS(51778,
-                      {logv2::LogComponent::kQuery},
-                      "Assertion {error} ns: {namespace} query object is corrupt",
-                      "Assertion for query with corrupted object",
-                      "error"_attr = exception,
-                      "namespace"_attr = queryMessage.ns);
-
-    if (queryMessage.ntoskip || queryMessage.ntoreturn) {
-        LOGV2_OPTIONS(21952,
-                      {logv2::LogComponent::kQuery},
-                      "Query's nToSkip = {nToSkip} and nToReturn = {nToReturn}",
-                      "Assertion for query with nToSkip and/or nToReturn",
-                      "nToSkip"_attr = queryMessage.ntoskip,
-                      "nToReturn"_attr = queryMessage.ntoreturn);
-    }
-
-    BSONObjBuilder err;
-    err.append("$err", exception.reason());
-    err.append("code", exception.code());
-    err.append("ok", 0.0);
-    auto const extraInfo = exception.extraInfo();
-    if (extraInfo) {
-        extraInfo->serialize(&err);
-    }
-    BSONObj errObj = err.done();
-
-    invariant(!exception.isA<ErrorCategory::StaleShardVersionError>() &&
-              exception.code() != ErrorCodes::StaleDbVersion);
-
-    BufBuilder bb;
-    bb.skip(sizeof(QueryResult::Value));
-    bb.appendBuf((void*)errObj.objdata(), errObj.objsize());
-
-    // TODO: call replyToQuery() from here instead of this!!! see dbmessage.h
-    QueryResult::View msgdata = bb.buf();
-    QueryResult::View qr = msgdata;
-    qr.setResultFlags(ResultFlag_ErrSet);
-    qr.msgdata().setLen(bb.len());
-    qr.msgdata().setOperation(opReply);
-    qr.setCursorId(0);
-    qr.setStartingFrom(0);
-    qr.setNReturned(1);
-    response->setData(bb.release());
-}
 
 void registerError(OperationContext* opCtx, const Status& status) {
     LastError::get(opCtx->getClient()).setLastError(status.code(), status.reason());
@@ -1989,132 +1928,6 @@ Future<DbResponse> receivedCommands(std::shared_ptr<HandleRequest::ExecutionCont
         .then([execContext]() mutable { return makeCommandResponse(std::move(execContext)); });
 }
 
-DbResponse receivedQuery(OperationContext* opCtx,
-                         const NamespaceString& nss,
-                         Client& c,
-                         const Message& m,
-                         const ServiceEntryPointCommon::Hooks& behaviors) {
-    invariant(!nss.isCommand());
-
-    // The legacy opcodes should be counted twice: as part of the overall opcodes' counts and on
-    // their own to highlight that they are being used.
-    globalOpCounters.gotQuery();
-    globalOpCounters.gotQueryDeprecated();
-
-    if (!opCtx->getClient()->isInDirectClient()) {
-        ServerReadConcernMetrics::get(opCtx)->recordReadConcern(repl::ReadConcernArgs::get(opCtx),
-                                                                false /* isTransaction */);
-    }
-
-    DbMessage d(m);
-    QueryMessage q(d);
-
-    CurOp& op = *CurOp::get(opCtx);
-    DbResponse dbResponse;
-
-    try {
-        warnDeprecation(c, networkOpToString(m.operation()));
-        Client* client = opCtx->getClient();
-        Status status = auth::checkAuthForFind(AuthorizationSession::get(client), nss, false);
-        audit::logQueryAuthzCheck(client, nss, q.query, status.code());
-        uassertStatusOK(status);
-
-        dbResponse.shouldRunAgainForExhaust = runQuery(opCtx, q, nss, dbResponse.response);
-    } catch (const AssertionException& e) {
-        dbResponse.response.reset();
-        generateLegacyQueryErrorResponse(e, q, &op, &dbResponse.response);
-    }
-
-    op.debug().responseLength = dbResponse.response.header().dataLen();
-    return dbResponse;
-}
-
-DbResponse receivedGetMore(OperationContext* opCtx,
-                           const Message& m,
-                           CurOp& curop,
-                           bool* shouldLogOpDebug) {
-    // The legacy opcodes should be counted twice: as part of the overall opcodes' counts and on
-    // their own to highlight that they are being used.
-    globalOpCounters.gotGetMore();
-    globalOpCounters.gotGetMoreDeprecated();
-    DbMessage d(m);
-
-    const char* ns = d.getns();
-    int ntoreturn = d.pullInt();
-    uassert(
-        34419, str::stream() << "Invalid ntoreturn for OP_GET_MORE: " << ntoreturn, ntoreturn >= 0);
-    long long cursorid = d.pullInt64();
-
-    curop.debug().ntoreturn = ntoreturn;
-    curop.debug().cursorid = cursorid;
-
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setNS_inlock(ns);
-    }
-
-    bool exhaust = false;
-    bool isCursorAuthorized = false;
-
-    DbResponse dbresponse;
-    try {
-        warnDeprecation(*opCtx->getClient(), networkOpToString(m.operation()));
-        const NamespaceString nsString(ns);
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid ns [" << ns << "]",
-                nsString.isValid());
-
-        Status status = auth::checkAuthForGetMore(
-            AuthorizationSession::get(opCtx->getClient()), nsString, cursorid, false);
-        audit::logGetMoreAuthzCheck(opCtx->getClient(), nsString, cursorid, status.code());
-        uassertStatusOK(status);
-
-        while (MONGO_unlikely(rsStopGetMore.shouldFail())) {
-            sleepmillis(0);
-        }
-
-        dbresponse.response =
-            getMore(opCtx, ns, ntoreturn, cursorid, &exhaust, &isCursorAuthorized);
-    } catch (AssertionException& e) {
-        if (isCursorAuthorized) {
-            // Make sure that killCursorGlobal does not throw an exception if it is interrupted.
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
-            // If an error was thrown prior to auth checks, then the cursor should remain alive
-            // in order to prevent an unauthorized user from resulting in the death of a cursor.
-            // In other error cases, the cursor is dead and should be cleaned up.
-            //
-            // If killing the cursor fails, ignore the error and don't try again. The cursor
-            // should be reaped by the client cursor timeout thread.
-            CursorManager::get(opCtx)->killCursor(opCtx, cursorid).ignore();
-        }
-
-        BSONObjBuilder err;
-        err.append("$err", e.reason());
-        err.append("code", e.code());
-        BSONObj errObj = err.obj();
-
-        curop.debug().errInfo = e.toStatus();
-
-        dbresponse = replyToQuery(errObj, ResultFlag_ErrSet);
-        curop.debug().responseLength = dbresponse.response.header().dataLen();
-        curop.debug().nreturned = 1;
-        *shouldLogOpDebug = true;
-        return dbresponse;
-    }
-
-    curop.debug().responseLength = dbresponse.response.header().dataLen();
-    auto queryResult = QueryResult::ConstView(dbresponse.response.buf());
-    curop.debug().nreturned = queryResult.getNReturned();
-
-    if (exhaust) {
-        curop.debug().exhaust = true;
-        dbresponse.shouldRunAgainForExhaust = true;
-    }
-
-    return dbresponse;
-}
-
 struct CommandOpRunner : HandleRequest::OpRunner {
     using HandleRequest::OpRunner::OpRunner;
     Future<DbResponse> run() override {
@@ -2134,23 +1947,20 @@ struct SynchronousOpRunner : HandleRequest::OpRunner {
 struct QueryOpRunner : SynchronousOpRunner {
     using SynchronousOpRunner::SynchronousOpRunner;
     DbResponse runSync() override {
-        auto opCtx = executionContext->getOpCtx();
-        opCtx->markKillOnClientDisconnect();
-        return receivedQuery(opCtx,
-                             executionContext->nsString(),
-                             executionContext->client(),
-                             executionContext->getMessage(),
-                             *executionContext->behaviors);
+        invariant(!executionContext->nsString().isCommand());
+
+        globalOpCounters.gotQueryDeprecated();
+        warnDeprecation(executionContext->client(), networkOpToString(dbQuery));
+        return makeErrorResponseToDeprecatedOpQuery("OP_QUERY is no longer supported");
     }
 };
 
 struct GetMoreOpRunner : SynchronousOpRunner {
     using SynchronousOpRunner::SynchronousOpRunner;
     DbResponse runSync() override {
-        return receivedGetMore(executionContext->getOpCtx(),
-                               executionContext->getMessage(),
-                               executionContext->currentOp(),
-                               &executionContext->forceLog);
+        globalOpCounters.gotGetMoreDeprecated();
+        warnDeprecation(executionContext->client(), networkOpToString(dbGetMore));
+        return makeErrorResponseToDeprecatedOpQuery("OP_GET_MORE is no longer supported");
     }
 };
 
@@ -2220,7 +2030,9 @@ std::unique_ptr<HandleRequest::OpRunner> HandleRequest::makeOpRunner() {
         case dbQuery:
             if (!executionContext->nsString().isCommand())
                 return std::make_unique<QueryOpRunner>(this);
-            // FALLTHROUGH: it's a query containing a command
+            // FALLTHROUGH: it's a query containing a command. Ideally, we'd like to let through
+            // only hello|isMaster commands but at this point the command hasn't been parsed yet, so
+            // we don't know what it is.
         case dbMsg:
             return std::make_unique<CommandOpRunner>(this);
         case dbGetMore:

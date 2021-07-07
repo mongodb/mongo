@@ -40,7 +40,6 @@
 
 namespace mongo {
 
-extern FailPoint rsStopGetMore;
 extern FailPoint respondWithNotPrimaryInCommandDispatch;
 
 // When active, we won't check if we are primary in command dispatch. Activate this if you want to

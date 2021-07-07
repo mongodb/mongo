@@ -615,7 +615,7 @@ public:
     /** Uses QueryOption_Exhaust, when available and specified in 'queryOptions'.
 
         Exhaust mode sends back all data queries as fast as possible, with no back-and-forth for
-        OP_GETMORE.  If you are certain you will exhaust the query, it could be useful.  If
+        OP_GET_MORE.  If you are certain you will exhaust the query, it could be useful.  If
         exhaust mode is not specified in 'queryOptions' or not available, this call transparently
         falls back to using ordinary getMores.
 

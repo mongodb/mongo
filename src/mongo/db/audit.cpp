@@ -54,24 +54,10 @@ void logCommandAuthzCheck(Client* client,
     invariant(client);
 }
 
-void logGetMoreAuthzCheck(Client* client,
-                          const NamespaceString& ns,
-                          long long cursorId,
-                          ErrorCodes::Error result) {
-    invariant(client);
-}
-
 void logKillCursorsAuthzCheck(Client* client,
                               const NamespaceString& ns,
                               long long cursorId,
                               ErrorCodes::Error result) {
-    invariant(client);
-}
-
-void logQueryAuthzCheck(Client* client,
-                        const NamespaceString& ns,
-                        const BSONObj& query,
-                        ErrorCodes::Error result) {
     invariant(client);
 }
 

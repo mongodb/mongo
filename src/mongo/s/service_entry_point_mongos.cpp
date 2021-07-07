@@ -139,99 +139,24 @@ struct CommandOpRunner final : public HandleRequest::OpRunnerBase {
     }
 };
 
-// The base for operations that may throw exceptions, but should not cause the connection to close.
-struct OpRunner : public HandleRequest::OpRunnerBase {
-    using HandleRequest::OpRunnerBase::OpRunnerBase;
-    virtual DbResponse runOperation() = 0;
-    Future<DbResponse> run() override;
-};
-
-Future<DbResponse> OpRunner::run() try {
-    using namespace fmt::literals;
-    const NamespaceString& nss = hr->nsString;
-    const DbMessage& dbm = hr->rec->getDbMessage();
-
-    if (dbm.messageShouldHaveNs()) {
-        uassert(ErrorCodes::InvalidNamespace, "Invalid ns [{}]"_format(nss.ns()), nss.isValid());
-
-        uassert(ErrorCodes::IllegalOperation,
-                "Can't use 'local' database through mongos",
-                nss.db() != NamespaceString::kLocalDb);
-    }
-
-    LOGV2_DEBUG(22867,
-                3,
-                "Request::process begin ns: {namespace} msg id: {msgId} op: {operation}",
-                "Starting operation",
-                "namespace"_attr = nss,
-                "msgId"_attr = hr->msgId,
-                "operation"_attr = networkOpToString(hr->op));
-
-    auto dbResponse = runOperation();
-
-    LOGV2_DEBUG(22868,
-                3,
-                "Request::process end ns: {namespace} msg id: {msgId} op: {operation}",
-                "Done processing operation",
-                "namespace"_attr = nss,
-                "msgId"_attr = hr->msgId,
-                "operation"_attr = networkOpToString(hr->op));
-
-    return Future<DbResponse>::makeReady(std::move(dbResponse));
-} catch (const DBException& ex) {
-    LOGV2_DEBUG(22869,
-                1,
-                "Exception thrown while processing {operation} op for {namespace}: {error}",
-                "Got an error while processing operation",
-                "operation"_attr = networkOpToString(hr->op),
-                "namespace"_attr = hr->nsString.ns(),
-                "error"_attr = ex);
-
-    DbResponse dbResponse;
-    if (hr->op == dbQuery || hr->op == dbGetMore) {
-        dbResponse = replyToQuery(buildErrReply(ex), ResultFlag_ErrSet);
-    } else {
-        // No Response.
-    }
-
-    // We *always* populate the last error for now
-    auto opCtx = hr->rec->getOpCtx();
-    LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.what());
-
-    CurOp::get(opCtx)->debug().errInfo = ex.toStatus();
-
-    return Future<DbResponse>::makeReady(std::move(dbResponse));
-}
-
-struct QueryOpRunner final : public OpRunner {
-    using OpRunner::OpRunner;
-    DbResponse runOperation() override {
-        // Commands are handled through CommandOpRunner and Strategy::clientCommand().
-        invariant(!hr->nsString.isCommand());
-        warnDeprecation(*hr->rec->getOpCtx()->getClient(), networkOpToString(hr->op));
-        hr->rec->getOpCtx()->markKillOnClientDisconnect();
-        return Strategy::queryOp(hr->rec->getOpCtx(), hr->nsString, &hr->rec->getDbMessage());
-    }
-};
-
-struct GetMoreOpRunner final : public OpRunner {
-    using OpRunner::OpRunner;
-    DbResponse runOperation() override {
-        warnDeprecation(*hr->rec->getOpCtx()->getClient(), networkOpToString(hr->op));
-        return Strategy::getMore(hr->rec->getOpCtx(), hr->nsString, &hr->rec->getDbMessage());
-    }
-};
-
 Future<DbResponse> HandleRequest::handleRequest() {
     switch (op) {
         case dbQuery:
-            if (!nsString.isCommand())
-                return std::make_unique<QueryOpRunner>(shared_from_this())->run();
+            if (!nsString.isCommand()) {
+                globalOpCounters.gotQueryDeprecated();
+                warnDeprecation(*(rec->getOpCtx()->getClient()), networkOpToString(dbQuery));
+                return Future<DbResponse>::makeReady(
+                    makeErrorResponseToDeprecatedOpQuery("OP_QUERY is no longer supported"));
+            }
         // FALLTHROUGH: it's a query containing a command
         case dbMsg:
             return std::make_unique<CommandOpRunner>(shared_from_this())->run();
-        case dbGetMore:
-            return std::make_unique<GetMoreOpRunner>(shared_from_this())->run();
+        case dbGetMore: {
+            globalOpCounters.gotGetMoreDeprecated();
+            warnDeprecation(*(rec->getOpCtx()->getClient()), networkOpToString(dbGetMore));
+            return Future<DbResponse>::makeReady(
+                makeErrorResponseToDeprecatedOpQuery("OP_GET_MORE is no longer supported"));
+        }
         case dbKillCursors:
             globalOpCounters.gotKillCursorsDeprecated();
             warnDeprecation(*(rec->getOpCtx()->getClient()), networkOpToString(op));

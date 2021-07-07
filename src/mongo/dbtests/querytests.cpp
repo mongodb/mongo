@@ -768,22 +768,22 @@ public:
         insert(ns, BSON("ts" << Timestamp(1000, 0)));
         insert(ns, BSON("ts" << Timestamp(1000, 1)));
         insert(ns, BSON("ts" << Timestamp(1000, 2)));
-        unique_ptr<DBClientCursor> c = _client.query(
-            NamespaceString(ns),
-            QUERY("ts" << GT << Timestamp(1000, 1)).hint(BSON("$natural" << 1)).explain(),
-            0,
-            0,
-            nullptr);
-        ASSERT(c->more());
 
-        // Check number of results and filterSet flag in explain.
-        // filterSet is not available in oplog replay mode.
-        BSONObj explainObj = c->next();
-        ASSERT(explainObj.hasField("executionStats")) << explainObj;
-        BSONObj execStats = explainObj["executionStats"].Obj();
-        ASSERT_EQUALS(1, execStats.getIntField("nReturned"));
+        BSONObj explainCmdObj =
+            BSON("explain" << BSON("find"
+                                   << "oplog.querytests.OplogScanGtTsExplain"
+                                   << "filter" << BSON("ts" << GT << Timestamp(1000, 1)) << "hint"
+                                   << BSON("$natural" << 1))
+                           << "verbosity"
+                           << "executionStats");
 
-        ASSERT(!c->more());
+        auto reply = _client.runCommand(OpMsgRequest::fromDBAndBody("local", explainCmdObj));
+        BSONObj explainCmdReplyBody = reply->getCommandReply();
+        ASSERT_OK(getStatusFromCommandResult(explainCmdReplyBody));
+
+        ASSERT(explainCmdReplyBody.hasField("executionStats")) << explainCmdReplyBody;
+        BSONObj execStats = explainCmdReplyBody["executionStats"].Obj();
+        ASSERT_EQUALS(1, execStats.getIntField("nReturned")) << explainCmdReplyBody;
     }
 
 private:

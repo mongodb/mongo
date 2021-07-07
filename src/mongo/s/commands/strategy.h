@@ -51,53 +51,12 @@ class FindCommandRequest;
 class Strategy {
 public:
     /**
-     * Handles a legacy-style opQuery request and sends the response back on success or throws on
-     * error.
-     *
-     * Must not be called with legacy '.$cmd' commands.
-     */
-    static DbResponse queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm);
-
-    /**
-     * Handles a legacy-style getMore request and sends the response back on success (or cursor not
-     * found) or throws on error.
-     */
-    static DbResponse getMore(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm);
-
-    /**
-     * Handles a legacy-style killCursors request. Doesn't send any response on success or throws on
-     * error.
-     */
-    static void killCursors(OperationContext* opCtx, DbMessage* dbm);
-
-    /**
-     * Handles a legacy-style write operation request and updates the last error state on the client
-     * with the result from the operation. Doesn't send any response back and does not throw on
-     * errors.
-     */
-    static void writeOp(std::shared_ptr<RequestExecutionContext> rec);
-
-    /**
      * Executes a command from either OP_QUERY or OP_MSG wire protocols.
      *
      * Catches StaleConfigException errors and retries the command automatically after refreshing
      * the metadata for the failing namespace.
      */
     static Future<DbResponse> clientCommand(std::shared_ptr<RequestExecutionContext> rec);
-
-    /**
-     * Helper to run an explain of a find operation on the shards. Fills 'out' with the result of
-     * the of the explain command on success. On failure, throws and does not modify 'out'.
-     *
-     * Used both if mongos receives an explain command and if it receives an OP_QUERY find with the
-     * $explain modifier.
-     */
-    static void explainFind(OperationContext* opCtx,
-                            const BSONObj& findCommandObj,
-                            const FindCommandRequest& findCommand,
-                            ExplainOptions::Verbosity verbosity,
-                            const ReadPreferenceSetting& readPref,
-                            BSONObjBuilder* out);
 };
 
 }  // namespace mongo
