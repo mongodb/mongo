@@ -111,7 +111,7 @@ if platform_family? 'suse'
   end
 
   execute 'install mongo tools' do
-    command 'zypper --no-gpg-checks -n install `find . -name "*tools-extra*.rpm"`'
+    command 'zypper --no-gpg-checks -n install `find . -name "*tools*.rpm"`'
     live_stream true
     cwd homedir
   end
