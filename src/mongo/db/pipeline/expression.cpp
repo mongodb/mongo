@@ -5221,9 +5221,45 @@ boost::intrusive_ptr<Expression> ExpressionSwitch::optimize() {
         _default = _default->optimize();
     }
 
-    for (auto&& [switchCase, switchThen] : _branches) {
-        switchCase = switchCase->optimize();
-        switchThen = switchThen->optimize();
+    std::vector<ExpressionPair>::iterator it = _branches.begin();
+    bool true_const = false;
+
+    while (!true_const && it != _branches.end()) {
+        (it->first) = (it->first)->optimize();
+
+        if (auto* val = dynamic_cast<ExpressionConstant*>((it->first).get())) {
+            if (!((val->getValue()).coerceToBool())) {
+                // Case is constant and evaluates to false, so it is removed.
+                it = _branches.erase(it);
+            } else {
+                // Case is constant and true so it is set to default and then removed.
+                true_const = true;
+
+                // Optimizing this case's then, so that default will remain optimized.
+                (it->second) = (it->second)->optimize();
+                _default = it->second;
+                it = _branches.erase(it);
+            }
+        } else {
+            // Since case is not removed from the switch, its then is now optimized.
+            (it->second) = (it->second)->optimize();
+            ++it;
+        }
+    }
+
+    // Erasing the rest of the cases because found a default true value.
+    if (true_const) {
+        _branches.erase(it, _branches.end());
+    }
+
+    // If there are no cases, make the switch its default.
+    if (_branches.size() == 0 && _default) {
+        return _default;
+    } else if (_branches.size() == 0) {
+        uassert(40069,
+                "One cannot execute a switch statement where all the cases evaluate to false "
+                "without a default.",
+                _branches.size());
     }
 
     return this;

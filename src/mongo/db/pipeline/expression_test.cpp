@@ -902,6 +902,169 @@ TEST(ExpressionArray, ExpressionArrayWithAllConstantValuesShouldOptimizeToExpres
     ASSERT_FALSE(notExprConstant);
 }
 
+TEST(ExpressionSwitch, ExpressionSwitchShouldFilterOutConstantFalsesWhenOptimized) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    BSONObj switchQ = fromjson(
+        "{$switch: {branches: [{case: \"$x\", then: 1}, {case: { $const: false}, then: 2}, {case: "
+        "\"$y\", then: 3}], default: 4}}");
+    auto switchExp = ExpressionSwitch::parse(&expCtx, switchQ.firstElement(), vps);
+    auto optimizedRemovedConstF = switchExp->optimize();
+
+    auto notExprConstant = dynamic_cast<ExpressionConstant*>(optimizedRemovedConstF.get());
+    ASSERT_FALSE(notExprConstant);
+
+    BSONObj switchOptResult = fromjson(
+        "{$switch: {branches: [{case: \"$x\", then: { $const: 1 }}, {case: \"$y\", then: { $const: "
+        "3 }}], default: { $const: 4 }}}");
+    ASSERT_BSONOBJ_BINARY_EQ(switchOptResult, expressionToBson(optimizedRemovedConstF));
+}
+
+TEST(ExpressionSwitch, ExpressionSwitchShouldFilterOutMultipleConstantFalsesWhenOptimized) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    BSONObj switchQ = fromjson(
+        "{$switch: {branches: [{case: { $const: false}, then: 5}, {case: \"$x\", then: 1}, {case: "
+        "{ $const: false}, then: 2}, {case: { $const: false}, then: 2}, {case: \"$y\", then: 3}, "
+        "{case: { $const: false}, then: 2}], default: 4}}");
+    auto switchExp = ExpressionSwitch::parse(&expCtx, switchQ.firstElement(), vps);
+    auto optimizedRemovedConstF = switchExp->optimize();
+
+    auto notExprConstant = dynamic_cast<ExpressionConstant*>(optimizedRemovedConstF.get());
+    ASSERT_FALSE(notExprConstant);
+
+    BSONObj switchOptResult = fromjson(
+        "{$switch: {branches: [{case: \"$x\", then: { $const: 1 }}, {case: \"$y\", then: { $const: "
+        "3 }}], default: { $const: 4 }}}");
+    ASSERT_BSONOBJ_BINARY_EQ(switchOptResult, expressionToBson(optimizedRemovedConstF));
+}
+
+TEST(ExpressionSwitch, ExpressionSwitchWithAllConstantFalsesAndNoDefaultErrors) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    BSONObj switchQ = fromjson(
+        "{$switch: {branches: [{case: { $const: false}, then: 5}, {case: { $const: false}, then: "
+        "1}, {case: "
+        "{ $const: false}, then: 2}]}}");
+    auto switchExp = ExpressionSwitch::parse(&expCtx, switchQ.firstElement(), vps);
+    ASSERT_THROWS_CODE(switchExp->optimize(), AssertionException, 40069);
+}
+
+TEST(ExpressionSwitch, ExpressionSwitchWithZeroAsConstantFalsesAndNoDefaulErrors) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    BSONObj switchQ = fromjson(
+        "{$switch: {branches: [{case: { $const: 0}, then: 5}, {case: { $const: false}, then: 1}, "
+        "{case: "
+        "{ $const: false}, then: 2}]}}");
+    auto switchExp = ExpressionSwitch::parse(&expCtx, switchQ.firstElement(), vps);
+    ASSERT_THROWS_CODE(switchExp->optimize(), AssertionException, 40069);
+}
+
+TEST(ExpressionSwitch, ExpressionSwitchShouldMakeConstTrueDefaultAndRemoveRest) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    BSONObj switchQ = fromjson(
+        "{$switch: {branches: [{case: \"$x\", then: 1}, {case: { $const: true}, then: 2}, {case: "
+        "\"$y\", then: 3}], default: 4}}");
+    auto switchExp = ExpressionSwitch::parse(&expCtx, switchQ.firstElement(), vps);
+    auto optimizedRemovedConstT = switchExp->optimize();
+
+    auto notExprConstant = dynamic_cast<ExpressionConstant*>(optimizedRemovedConstT.get());
+    ASSERT_FALSE(notExprConstant);
+
+    BSONObj switchOptResult = fromjson(
+        "{$switch: {branches: [{case: \"$x\", then: { $const: 1 }}], default: { $const: 2 }}}");
+    ASSERT_BSONOBJ_BINARY_EQ(switchOptResult, expressionToBson(optimizedRemovedConstT));
+}
+
+TEST(ExpressionSwitch, ExpressionSwitchShouldOptimizeThensCorrectly) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    BSONObj switchQ = fromjson(
+        "{$switch: {branches: [{case: \"$x\", then: {$add: [2, 4]}}, {case: { $const: true}, then: "
+        "{$add: [3, 4]}}, {case: "
+        "\"$y\", then: 3}], default: 4}}");
+    auto switchExp = ExpressionSwitch::parse(&expCtx, switchQ.firstElement(), vps);
+    auto optimizedRemovedConstT = switchExp->optimize();
+
+    auto notExprConstant = dynamic_cast<ExpressionConstant*>(optimizedRemovedConstT.get());
+    ASSERT_FALSE(notExprConstant);
+
+    BSONObj switchOptResult = fromjson(
+        "{$switch: {branches: [{case: \"$x\", then: { $const: 6 }}], default: { $const: 7 }}}");
+    ASSERT_BSONOBJ_BINARY_EQ(switchOptResult, expressionToBson(optimizedRemovedConstT));
+}
+
+TEST(ExpressionSwitch, ExpressionSwitchWithFirstCaseTrueShouldReturnFirstThenExpression) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    BSONObj switchQ = fromjson(
+        "{$switch: {branches: [{case: { $const: true}, then: 3}, {case: "
+        "\"$y\", then: 4}], default: 4}}");
+    auto switchExp = ExpressionSwitch::parse(&expCtx, switchQ.firstElement(), vps);
+    auto optimizedRemovedConstT = switchExp->optimize();
+
+    BSONObj switchOptResult = fromjson("{ $const: 3 }");
+    ASSERT_BSONOBJ_BINARY_EQ(switchOptResult, expressionToBson(optimizedRemovedConstT));
+}
+
+TEST(ExpressionSwitch, ExpressionSwitchWithNoDefaultShouldMakeConstTrueDefaultAndRemoveRest) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    BSONObj switchQ = fromjson(
+        "{$switch: {branches: [{case: \"$x\", then: 1}, {case: { $const: true}, then: 2}, {case: "
+        "\"$y\", then: 3}]}}");
+    auto switchExp = ExpressionSwitch::parse(&expCtx, switchQ.firstElement(), vps);
+    auto optimizedRemovedConstT = switchExp->optimize();
+
+    auto notExprConstant = dynamic_cast<ExpressionConstant*>(optimizedRemovedConstT.get());
+    ASSERT_FALSE(notExprConstant);
+
+    BSONObj switchOptResult = fromjson(
+        "{$switch: {branches: [{case: \"$x\", then: { $const: 1 }}], default: { $const: 2 }}}");
+    ASSERT_BSONOBJ_BINARY_EQ(switchOptResult, expressionToBson(optimizedRemovedConstT));
+}
+
+TEST(ExpressionSwitch, ExpressionSwitchWithNoCasesShouldReturnDefault) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    BSONObj switchQ = fromjson(
+        "{$switch: {branches: [{case: { $const: false}, then: 1}, {case: { $const: false}, then: "
+        "2}], default: 4}}");
+    auto switchExp = ExpressionSwitch::parse(&expCtx, switchQ.firstElement(), vps);
+    auto optimizedDefault = switchExp->optimize();
+
+    auto exprConstant = dynamic_cast<ExpressionConstant*>(optimizedDefault.get());
+    ASSERT_TRUE(exprConstant);
+    ASSERT_VALUE_EQ(exprConstant->getValue(), Value(4));
+}
+
+TEST(ExpressionSwitch, ExpressionSwitchWithNoConstantsShouldStayTheSame) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    BSONObj switchQ = fromjson(
+        "{$switch: {branches: [{case: \"$x\", then: { $const: 1 }}, {case: \"$z\", then: { $const: "
+        "2 }}, {case: \"$y\", then: { $const: 3 }}], default: { $const: 4 }}}");
+    auto switchExp = ExpressionSwitch::parse(&expCtx, switchQ.firstElement(), vps);
+    auto optimizedStaySame = switchExp->optimize();
+
+    auto notExprConstant = dynamic_cast<ExpressionConstant*>(optimizedStaySame.get());
+    ASSERT_FALSE(notExprConstant);
+
+    ASSERT_BSONOBJ_BINARY_EQ(switchQ, expressionToBson(optimizedStaySame));
+}
+
 TEST(ExpressionArray, ExpressionArrayShouldOptimizeSubExpressionToExpressionConstant) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
