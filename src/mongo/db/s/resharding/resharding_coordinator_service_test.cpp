@@ -198,8 +198,7 @@ public:
             _reshardingUUID, _originalNss, UUID::gen(), _tempNss, _newShardKey.toBSON());
         ReshardingCoordinatorDocument doc(state,
                                           {DonorShardEntry(ShardId("shard0000"), {})},
-                                          {RecipientShardEntry(ShardId("shard0001"), {})},
-                                          ReshardingCoordinatorMetrics());
+                                          {RecipientShardEntry(ShardId("shard0001"), {})});
         doc.setCommonReshardingMetadata(meta);
         emplaceCloneTimestampIfExists(doc, cloneTimestamp);
         return doc;

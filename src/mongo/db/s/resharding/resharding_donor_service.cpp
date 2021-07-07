@@ -202,7 +202,8 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
       _metadata{donorDoc.getCommonReshardingMetadata()},
       _recipientShardIds{donorDoc.getRecipientShards()},
       _donorCtx{donorDoc.getMutableState()},
-      _donorMetricsToRestore{donorDoc.getMetrics()},
+      _donorMetricsToRestore{donorDoc.getMetrics() ? donorDoc.getMetrics().get()
+                                                   : ReshardingDonorMetrics()},
       _externalState{std::move(externalState)},
       _markKilledExecutor(std::make_shared<ThreadPool>([] {
           ThreadPool::Options options;

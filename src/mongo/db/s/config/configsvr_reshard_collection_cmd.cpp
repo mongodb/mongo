@@ -178,9 +178,8 @@ public:
 
                 auto coordinatorDoc =
                     ReshardingCoordinatorDocument(std::move(CoordinatorStateEnum::kUnused),
-                                                  {},  // donorShards
-                                                  {},  // recipientShards
-                                                  ReshardingCoordinatorMetrics());
+                                                  {},   // donorShards
+                                                  {});  // recipientShards
 
                 // Generate the resharding metadata for the ReshardingCoordinatorDocument.
                 auto reshardingUUID = UUID::gen();

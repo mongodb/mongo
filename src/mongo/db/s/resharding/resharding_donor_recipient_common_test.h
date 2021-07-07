@@ -138,8 +138,7 @@ protected:
         donorCtx.setState(DonorStateEnum::kPreparingToDonate);
 
         ReshardingDonorDocument doc(std::move(donorCtx),
-                                    {kThisShard.getShardId(), kOtherShard.getShardId()},
-                                    ReshardingDonorMetrics());
+                                    {kThisShard.getShardId(), kOtherShard.getShardId()});
 
         NamespaceString sourceNss = kOriginalNss;
         auto sourceUUID = UUID::gen();
@@ -154,10 +153,8 @@ protected:
         RecipientShardContext recipCtx;
         recipCtx.setState(RecipientStateEnum::kCloning);
 
-        ReshardingRecipientDocument doc(std::move(recipCtx),
-                                        {kThisShard.getShardId(), kOtherShard.getShardId()},
-                                        1000,
-                                        ReshardingRecipientMetrics());
+        ReshardingRecipientDocument doc(
+            std::move(recipCtx), {kThisShard.getShardId(), kOtherShard.getShardId()}, 1000);
 
         NamespaceString sourceNss = kOriginalNss;
         auto sourceUUID = UUID::gen();
