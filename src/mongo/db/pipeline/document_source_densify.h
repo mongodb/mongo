@@ -59,7 +59,7 @@ public:
                      StepSpec step,
                      FieldPath fieldName,
                      Document includeFields,
-                     Document finalDoc);
+                     boost::optional<Document> finalDoc);
         Document getNextDocument();
         bool done() const;
 
@@ -69,8 +69,9 @@ public:
         FieldPath _path;
         Document _includeFields;
         // The document that is equal to or larger than '_max' that prompted the creation of this
-        // generator. Will be returned after the final generated document.
-        Document _finalDoc;
+        // generator. Will be returned after the final generated document. Can be boost::none if we
+        // are generating the values at the end of the range.
+        boost::optional<Document> _finalDoc;
         // The minimum value that this generator will create, therefore the next generated document
         // will have this value.
         DensifyValueType _min;

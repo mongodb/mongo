@@ -41,7 +41,7 @@ DocumentSourceInternalDensify::DocGenerator::DocGenerator(
     StepSpec step,
     FieldPath fieldName,
     Document includeFields,
-    Document finalDoc)
+    boost::optional<Document> finalDoc)
     : _step(std::move(step)),
       _path(std::move(fieldName.fullPath())),
       _includeFields(std::move(includeFields)),
@@ -107,7 +107,9 @@ Document DocumentSourceInternalDensify::DocGenerator::getNextDocument() {
             _state != GeneratorState::kDone);
     if (_state == GeneratorState::kReturningFinalDocument) {
         _state = GeneratorState::kDone;
-        return _finalDoc;
+        // If _finalDoc is boost::none we can't be in this state.
+        tassert(5832800, "DocGenerator expected _finalDoc, found boost::none", _finalDoc);
+        return _finalDoc.get();
     }
     // Assume all types have been checked at this point and we are in a valid state.
     Value valueToAdd;
@@ -117,7 +119,8 @@ Document DocumentSourceInternalDensify::DocGenerator::getNextDocument() {
                 valueToAdd = Value(doubleVal);
                 doubleVal += _step.step;
                 if (doubleVal > stdx::get<double>(_max)) {
-                    _state = GeneratorState::kReturningFinalDocument;
+                    _state =
+                        _finalDoc ? GeneratorState::kReturningFinalDocument : GeneratorState::kDone;
                 }
                 _min = doubleVal;
             },
@@ -125,7 +128,8 @@ Document DocumentSourceInternalDensify::DocGenerator::getNextDocument() {
                 valueToAdd = Value(dateVal);
                 dateVal = dateAdd(dateVal, _step.unit.get(), _step.step, _step.tz.get());
                 if (dateVal > stdx::get<Date_t>(_max)) {
-                    _state = GeneratorState::kReturningFinalDocument;
+                    _state =
+                        _finalDoc ? GeneratorState::kReturningFinalDocument : GeneratorState::kDone;
                 }
                 _min = dateVal;
             },

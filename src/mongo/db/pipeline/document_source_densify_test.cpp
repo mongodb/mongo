@@ -111,6 +111,14 @@ TEST(DensifyGeneratorTest, GeneratesNumericDocumentCorrectly) {
     ASSERT_TRUE(generator.done());
 }
 
+TEST(DensifyGeneratorTest, GeneratesNumericDocumentCorrectlyWithoutFinalDoc) {
+    auto generator = GenClass(1, 1, {1, boost::none, boost::none}, "a", Document(), boost::none);
+    ASSERT_FALSE(generator.done());
+    Document docOne{{"a", 1}};
+    ASSERT_DOCUMENT_EQ(docOne, generator.getNextDocument());
+    ASSERT_TRUE(generator.done());
+}
+
 TEST(DensifyGeneratorTest, PreservesIncludeFields) {
     Document doc{{"a", 2}, {"b", 2}, {"c", 2}};
     Document preserveFields{{"b", 1}, {"c", 1}};
