@@ -1,7 +1,6 @@
 /**
  * Tests that if chaining is disabled, enabling the server parameter
  * 'enableOverrideClusterChainingSetting' will allow the node to chain anyway.
- * @tags: [requires_fcv_50]
  */
 
 (function() {
