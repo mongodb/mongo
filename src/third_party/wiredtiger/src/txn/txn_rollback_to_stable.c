@@ -508,15 +508,18 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page
             WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_restore_updates);
 
             /*
-             * We have a tombstone on the original update chain and it is behind or equal to the
-             * stable timestamp, we need to restore that as well.
+             * We have a tombstone on the original update chain and it is stable according to the
+             * timestamp and txnid, we need to restore that as well.
              */
-            if (hs_stop_durable_ts <= rollback_timestamp) {
+            if (!__rollback_check_if_txnid_non_committed(session, hs_tw->stop_txn) &&
+              hs_stop_durable_ts <= rollback_timestamp) {
                 /*
-                 * The restoring tombstone timestamp must be less than previous update start
+                 * The restoring tombstone timestamp must be zero or less than previous update start
                  * timestamp or the on-disk update is an out of order prepared.
                  */
-                WT_ASSERT(session, hs_stop_durable_ts < newer_hs_durable_ts || unpack->tw.prepare);
+                WT_ASSERT(session,
+                  hs_stop_durable_ts == WT_TS_NONE || hs_stop_durable_ts < newer_hs_durable_ts ||
+                    unpack->tw.prepare);
 
                 WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
                 /*
