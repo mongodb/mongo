@@ -224,7 +224,7 @@ TEST_F(CacheTest, GetKeyShouldReturnCorrectKeysAfterRefreshDirectClient) {
     ExternalKeysCollectionDocument origKey1(OID::gen(), 1, kMigrationId1);
     origKey1.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
-    origKey1.setTTLExpiresAt(ServiceContext().getFastClockSource()->now() + Seconds(30));
+    origKey1.setTTLExpiresAt(getServiceContext()->getFastClockSource()->now() + Seconds(30));
     insertDocument(
         operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey1.toBSON());
 
@@ -543,7 +543,7 @@ TEST_F(CacheTest, CacheExternalKeyBasic) {
     ASSERT_EQ(ErrorCodes::KeyNotFound, swExternalKeys.getStatus());
 
     ExternalKeysCollectionDocument externalKey(OID::gen(), 5, kMigrationId1);
-    externalKey.setTTLExpiresAt(ServiceContext().getFastClockSource()->now() + Seconds(30));
+    externalKey.setTTLExpiresAt(getServiceContext()->getFastClockSource()->now() + Seconds(30));
     externalKey.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
 
@@ -572,7 +572,7 @@ TEST_F(CacheTest, RefreshClearsRemovedExternalKeys) {
     ExternalKeysCollectionDocument origKey1(OID::gen(), 1, kMigrationId1);
     origKey1.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
-    origKey1.setTTLExpiresAt(ServiceContext().getFastClockSource()->now() + Seconds(30));
+    origKey1.setTTLExpiresAt(getServiceContext()->getFastClockSource()->now() + Seconds(30));
     insertDocument(
         operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey1.toBSON());
 
@@ -664,7 +664,7 @@ TEST_F(CacheTest, RefreshHandlesKeysReceivingTTLValue) {
         ASSERT(!key.getTTLExpiresAt());
     }
 
-    origKey1.setTTLExpiresAt(ServiceContext().getFastClockSource()->now() + Seconds(30));
+    origKey1.setTTLExpiresAt(getServiceContext()->getFastClockSource()->now() + Seconds(30));
     updateDocument(operationContext(),
                    NamespaceString::kExternalKeysCollectionNamespace,
                    BSON(ExternalKeysCollectionDocument::kIdFieldName << origKey1.getId()),
