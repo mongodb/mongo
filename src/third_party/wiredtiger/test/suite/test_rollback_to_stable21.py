@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from wiredtiger import stat
+from wiredtiger import stat, WT_NOTFOUND
 from wtscenario import make_scenarios
 from helper import simulate_crash_restart
 from wtdataset import SimpleDataSet
@@ -114,3 +114,146 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
         stat_cursor.close()
 
         self.assertGreater(hs_removed, 0)
+
+    def test_rollback_to_stable_with_different_tombstone(self):
+        nrows = 1000
+
+        # Prepare transactions for column store table is not yet supported.
+        if self.key_format == 'r':
+            self.skipTest('Prepare transactions for column store table is not yet supported')
+
+        # Create a table without logging.
+        uri = "table:rollback_to_stable21"
+        ds = SimpleDataSet(
+            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+        ds.populate()
+
+        # Pin oldest and stable timestamps to 10.
+        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
+            ',stable_timestamp=' + timestamp_str(10))
+
+        valuea = 'a' * 400
+        valueb = 'b' * 400
+
+        cursor = self.session.open_cursor(uri)
+        self.session.begin_transaction()
+        for i in range(1, nrows + 1):
+            cursor[i] = valuea
+        self.session.commit_transaction('commit_timestamp=' + timestamp_str(30))
+
+        self.session.begin_transaction()
+        for i in range(1, nrows + 1):
+            cursor.set_key(i)
+            cursor.remove()
+        self.session.commit_transaction('commit_timestamp=' + timestamp_str(40))
+
+        self.session.begin_transaction()
+        for i in range(1, nrows + 1):
+            cursor[i] = valueb
+
+        cursor.reset()
+        cursor.close()
+        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(20))
+
+        s = self.conn.open_session()
+        s.begin_transaction('ignore_prepare = true, read_timestamp = ' + timestamp_str(30))
+        # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
+        evict_cursor = s.open_cursor(uri, None, "debug=(release_evict)")
+
+        for i in range(1, nrows + 1):
+            evict_cursor.set_key(i)
+            self.assertEquals(evict_cursor.search(), 0)
+            self.assertEqual(evict_cursor.get_value(), valuea)
+            evict_cursor.reset()
+
+        s.rollback_transaction()
+        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(40))
+        s.checkpoint()
+
+        # Rollback the prepared transaction
+        self.session.rollback_transaction()
+
+        # Simulate a server crash and restart.
+        self.pr("restart")
+        simulate_crash_restart(self, ".", "RESTART")
+        self.pr("restart complete")
+
+        self.check(valuea, uri, nrows, 30)
+        self.check(valuea, uri, 0, 40)
+
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
+        hs_restored_tombstone = stat_cursor[stat.conn.txn_rts_hs_restore_tombstones][2]
+        stat_cursor.close()
+
+        self.assertGreater(hs_removed, 0)
+        self.assertGreater(hs_restored_tombstone, 0)
+
+    def test_rollback_to_stable_with_same_tombstone(self):
+        nrows = 1000
+
+        # Prepare transactions for column store table is not yet supported.
+        if self.key_format == 'r':
+            self.skipTest('Prepare transactions for column store table is not yet supported')
+
+        # Create a table without logging.
+        uri = "table:rollback_to_stable21"
+        ds = SimpleDataSet(
+            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+        ds.populate()
+
+        # Pin oldest and stable timestamps to 10.
+        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
+            ',stable_timestamp=' + timestamp_str(10))
+
+        valuea = 'a' * 400
+        valueb = 'b' * 400
+
+        cursor = self.session.open_cursor(uri)
+        self.session.begin_transaction()
+        for i in range(1, nrows + 1):
+            cursor[i] = valuea
+            cursor.set_key(i)
+            cursor.remove()
+
+        self.session.commit_transaction('commit_timestamp=' + timestamp_str(30))
+
+        self.session.begin_transaction()
+        for i in range(1, nrows + 1):
+            cursor[i] = valueb
+
+        cursor.reset()
+        cursor.close()
+        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(20))
+
+        s = self.conn.open_session()
+        s.begin_transaction('ignore_prepare = true')
+        # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
+        evict_cursor = s.open_cursor(uri, None, "debug=(release_evict)")
+
+        for i in range(1, nrows + 1):
+            evict_cursor.set_key(i)
+            self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
+            evict_cursor.reset()
+
+        s.rollback_transaction()
+        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(40))
+        s.checkpoint()
+
+        # Rollback the prepared transaction
+        self.session.rollback_transaction()
+
+        # Simulate a server crash and restart.
+        self.pr("restart")
+        simulate_crash_restart(self, ".", "RESTART")
+        self.pr("restart complete")
+
+        self.check(valuea, uri, 0, 40)
+
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
+        hs_restored_tombstone = stat_cursor[stat.conn.txn_rts_hs_restore_tombstones][2]
+        stat_cursor.close()
+
+        self.assertGreater(hs_removed, 0)
+        self.assertGreater(hs_restored_tombstone, 0)
