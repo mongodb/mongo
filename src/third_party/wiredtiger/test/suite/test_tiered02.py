@@ -32,9 +32,6 @@ from wtdataset import SimpleDataSet
 # test_tiered02.py
 #    Test tiered tree
 class test_tiered02(wttest.WiredTigerTestCase):
-    K = 1024
-    M = 1024 * K
-    G = 1024 * M
     uri = "table:test_tiered02"
 
     auth_token = "test_token"
@@ -46,7 +43,6 @@ class test_tiered02(wttest.WiredTigerTestCase):
         if not os.path.exists(self.bucket):
             os.mkdir(self.bucket)
         return \
-          'statistics=(all),' + \
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % self.bucket + \
           'bucket_prefix=%s,' % self.bucket_prefix + \
@@ -153,10 +149,6 @@ class test_tiered02(wttest.WiredTigerTestCase):
 
         self.progress('reopen_conn')
         self.reopen_conn()
-
-        # FIXME-WT-7589 This test works up to this point, then runs into trouble.
-        if True:
-            return
 
         # Check what was there before
         ds = SimpleDataSet(self, self.uri, 200, config=args)

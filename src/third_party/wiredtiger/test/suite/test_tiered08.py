@@ -43,7 +43,7 @@ class test_tiered08(wttest.WiredTigerTestCase):
     batch_size = 100000
 
     # Keep inserting keys until we've done this many flush and checkpoint ops.
-    ckpt_flush_target = 100
+    ckpt_flush_target = 10
 
     uri = "table:test_tiered08"
 
@@ -132,9 +132,6 @@ class test_tiered08(wttest.WiredTigerTestCase):
         self.pr('Reopening tiered table')
         self.reopen_conn()
 
-        # FIXME-WT-7729 Opening the table for the final verify runs into trouble.
-        if True:
-            return
         self.verify(key_count)
 
 if __name__ == '__main__':

@@ -1855,7 +1855,7 @@ fake:
     if (WT_IS_METADATA(dhandle) || !F_ISSET(session->txn, WT_TXN_RUNNING))
         WT_ERR(__wt_checkpoint_sync(session, NULL));
 
-    WT_ERR(__wt_meta_ckptlist_set(session, dhandle->name, btree->ckpt, &ckptlsn));
+    WT_ERR(__wt_meta_ckptlist_set(session, dhandle, btree->ckpt, &ckptlsn));
 
     /*
      * If we wrote a checkpoint (rather than faking one), we have to resolve it. Normally, tracking

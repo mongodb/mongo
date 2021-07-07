@@ -293,6 +293,29 @@ err:
 }
 
 /*
+ * __wt_tiered_set_metadata --
+ *     Generate the tiered metadata information string into the given buffer.
+ */
+int
+__wt_tiered_set_metadata(WT_SESSION_IMPL *session, WT_TIERED *tiered, WT_ITEM *buf)
+{
+    uint32_t i;
+
+    WT_RET(__wt_buf_catfmt(session, buf, ",last=%" PRIu32 ",tiers=(", tiered->current_id));
+    for (i = 0; i < WT_TIERED_MAX_TIERS; ++i) {
+        if (tiered->tiers[i].name == NULL) {
+            __wt_verbose(session, WT_VERB_TIERED, "TIER_SET_META: names[%" PRIu32 "] NULL", i);
+            continue;
+        }
+        __wt_verbose(session, WT_VERB_TIERED, "TIER_SET_META: names[%" PRIu32 "]: %s", i,
+          tiered->tiers[i].name);
+        WT_RET(__wt_buf_catfmt(session, buf, "%s\"%s\"", i == 0 ? "" : ",", tiered->tiers[i].name));
+    }
+    WT_RET(__wt_buf_catfmt(session, buf, ")"));
+    return (0);
+}
+
+/*
  * __tiered_update_metadata --
  *     Update the metadata for a tiered structure after object switching.
  */
@@ -302,7 +325,6 @@ __tiered_update_metadata(WT_SESSION_IMPL *session, WT_TIERED *tiered, const char
     WT_DATA_HANDLE *dhandle;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
-    uint32_t i;
     const char *cfg[4] = {NULL, NULL, NULL, NULL};
     const char *newconfig;
 
@@ -310,17 +332,7 @@ __tiered_update_metadata(WT_SESSION_IMPL *session, WT_TIERED *tiered, const char
     newconfig = NULL;
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
-    WT_RET(__wt_buf_fmt(session, tmp, "last=%" PRIu32 ",tiers=(", tiered->current_id));
-    for (i = 0; i < WT_TIERED_MAX_TIERS; ++i) {
-        if (tiered->tiers[i].name == NULL) {
-            __wt_verbose(session, WT_VERB_TIERED, "TIER_UPDATE_META: names[%" PRIu32 "] NULL", i);
-            continue;
-        }
-        __wt_verbose(session, WT_VERB_TIERED, "TIER_UPDATE_META: names[%" PRIu32 "]: %s", i,
-          tiered->tiers[i].name);
-        WT_RET(__wt_buf_catfmt(session, tmp, "%s\"%s\"", i == 0 ? "" : ",", tiered->tiers[i].name));
-    }
-    WT_RET(__wt_buf_catfmt(session, tmp, ")"));
+    WT_ERR(__wt_tiered_set_metadata(session, tiered, tmp));
 
     cfg[0] = WT_CONFIG_BASE(session, tiered_meta);
     cfg[1] = orig_config;
