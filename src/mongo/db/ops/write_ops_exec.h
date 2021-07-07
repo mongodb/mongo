@@ -80,7 +80,9 @@ WriteResult performInserts(OperationContext* opCtx,
 WriteResult performUpdates(OperationContext* opCtx,
                            const write_ops::UpdateCommandRequest& op,
                            const OperationSource& source = OperationSource::kStandard);
-WriteResult performDeletes(OperationContext* opCtx, const write_ops::DeleteCommandRequest& op);
+WriteResult performDeletes(OperationContext* opCtx,
+                           const write_ops::DeleteCommandRequest& op,
+                           const OperationSource& source = OperationSource::kStandard);
 
 Status performAtomicTimeseriesWrites(OperationContext* opCtx,
                                      const std::vector<write_ops::InsertCommandRequest>& insertOps,
