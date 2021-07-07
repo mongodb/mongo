@@ -88,12 +88,12 @@ class workload_tracking : public component {
         testutil_check(_session->create(
           _session.get(), _schema_table_name.c_str(), _schema_table_config.c_str()));
         _schema_track_cursor = _session.open_scoped_cursor(_schema_table_name.c_str());
-        debug_print("Schema tracking initiated", DEBUG_TRACE);
+        log_msg(LOG_TRACE, "Schema tracking initiated");
 
         /* Initiate operations tracking. */
         testutil_check(_session->create(
           _session.get(), _operation_table_name.c_str(), _operation_table_config.c_str()));
-        debug_print("Operations tracking created", DEBUG_TRACE);
+        log_msg(LOG_TRACE, "Operations tracking created");
     }
 
     void
@@ -122,7 +122,7 @@ class workload_tracking : public component {
               std::to_string(static_cast<int>(operation));
             testutil_die(EINVAL, error_message.c_str());
         }
-        debug_print("save_schema_operation: workload tracking saved operation.", DEBUG_TRACE);
+        log_msg(LOG_TRACE, "save_schema_operation: workload tracking saved operation.");
     }
 
     template <typename K, typename V>
@@ -148,7 +148,7 @@ class workload_tracking : public component {
             op_track_cursor->set_value(op_track_cursor.get(), static_cast<int>(operation), value);
             ret = op_track_cursor->insert(op_track_cursor.get());
         }
-        debug_print("save_operation: workload tracking saved operation.", DEBUG_TRACE);
+        log_msg(LOG_TRACE, "save_operation: workload tracking saved operation.");
         return (ret);
     }
 

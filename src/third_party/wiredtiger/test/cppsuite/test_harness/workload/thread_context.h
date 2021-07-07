@@ -258,7 +258,7 @@ class thread_context {
                   ret, "unhandled error while trying to save an update to the tracking table");
         }
         transaction.add_op();
-        debug_print("key/value updated", DEBUG_TRACE);
+        log_msg(LOG_TRACE, "key/value updated");
         return (true);
     }
 
@@ -306,7 +306,7 @@ class thread_context {
                   ret, "unhandled error while trying to save an insert to the tracking table");
         }
         transaction.add_op();
-        debug_print("key/value insert", DEBUG_TRACE);
+        log_msg(LOG_TRACE, "key/value insert");
         return (true);
     }
 

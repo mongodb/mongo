@@ -77,8 +77,8 @@ class database_operation {
              */
             database.add_collection(key_count);
 
-        debug_print(
-          "Populate: " + std::to_string(collection_count) + " collections created.", DEBUG_INFO);
+        log_msg(
+          LOG_INFO, "Populate: " + std::to_string(collection_count) + " collections created.");
 
         /*
          * Spawn thread_count threads to populate the database, theoretically we should be IO bound
@@ -92,7 +92,7 @@ class database_operation {
         }
 
         /* Wait for our populate threads to finish and then join them. */
-        debug_print("Populate: waiting for threads to complete.", DEBUG_INFO);
+        log_msg(LOG_INFO, "Populate: waiting for threads to complete.");
         tm.join();
 
         /* Cleanup our workers. */
@@ -100,7 +100,7 @@ class database_operation {
             delete it;
             it = nullptr;
         }
-        debug_print("Populate: finished.", DEBUG_INFO);
+        log_msg(LOG_INFO, "Populate: finished.");
     }
 
     /* Basic insert operation that adds a new key every rate tick. */
@@ -112,8 +112,9 @@ class database_operation {
             collection &coll;
             scoped_cursor cursor;
         };
-        debug_print(type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.",
-          DEBUG_INFO);
+        log_msg(
+          LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
+
         /* Collection cursor vector. */
         std::vector<collection_cursor> ccv;
         uint64_t collection_count = tc->database.get_collection_count();
@@ -164,8 +165,8 @@ class database_operation {
     virtual void
     read_operation(thread_context *tc)
     {
-        debug_print(type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.",
-          DEBUG_INFO);
+        log_msg(
+          LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
         WT_CURSOR *cursor = nullptr;
         WT_DECL_RET;
         std::map<uint64_t, scoped_cursor> cursors;
@@ -204,8 +205,8 @@ class database_operation {
     virtual void
     update_operation(thread_context *tc)
     {
-        debug_print(type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.",
-          DEBUG_INFO);
+        log_msg(
+          LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
         /* Cursor map. */
         std::map<uint64_t, scoped_cursor> cursors;
         uint64_t collection_id = 0;
@@ -225,9 +226,9 @@ class database_operation {
 
             /* Look for existing cursors in our cursor cache. */
             if (cursors.find(coll.id) == cursors.end()) {
-                debug_print("Thread {" + std::to_string(tc->id) +
-                    "} Creating cursor for collection: " + coll.name,
-                  DEBUG_TRACE);
+                log_msg(LOG_TRACE,
+                  "Thread {" + std::to_string(tc->id) +
+                    "} Creating cursor for collection: " + coll.name);
                 /* Open a cursor for the chosen collection. */
                 scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name.c_str());
                 cursors.emplace(coll.id, std::move(cursor));
@@ -274,7 +275,7 @@ class database_operation {
                 tc->transaction.commit(tc->session.get(), "");
             }
         }
-        debug_print("Populate: thread {" + std::to_string(tc->id) + "} finished", DEBUG_TRACE);
+        log_msg(LOG_TRACE, "Populate: thread {" + std::to_string(tc->id) + "} finished");
     }
 };
 } // namespace test_harness
