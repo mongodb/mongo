@@ -2566,11 +2566,6 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &stepdownHangBeforeRSTLEnqueue, opCtx, "stepdownHangBeforeRSTLEnqueue");
 
-    // To prevent a deadlock between session checkout and RSTL lock taking, disallow new sessions
-    // from being checked out. Existing sessions currently checked out will be killed by the
-    // killOpThread.
-    ScopedBlockSessionCheckouts blockSessions(opCtx);
-
     // Using 'force' sets the default for the wait time to zero, which means the stepdown will
     // fail if it does not acquire the lock immediately. In such a scenario, we use the
     // stepDownUntil deadline instead.
@@ -3698,11 +3693,6 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
     if (isForceReconfig && _shouldStepDownOnReconfig(lk, newConfig, myIndex)) {
         _topCoord->prepareForUnconditionalStepDown();
         lk.unlock();
-
-        // To prevent a deadlock between session checkout and RSTL lock taking, disallow new
-        // sessions from being checked out. Existing sessions currently checked out will be killed
-        // by the killOpThread.
-        ScopedBlockSessionCheckouts blockSessions(opCtx);
 
         // Primary node won't be electable or removed after the configuration change.
         // So, finish the reconfig under RSTL, so that the step down occurs safely.
