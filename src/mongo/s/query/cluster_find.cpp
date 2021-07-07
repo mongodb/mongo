@@ -49,6 +49,7 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -496,6 +497,8 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                                const ReadPreferenceSetting& readPref,
                                std::vector<BSONObj>* results,
                                bool* partialResultsReturned) {
+    CurOp::get(opCtx)->debug().queryHash = canonical_query_encoder::computeHash(query.encodeKey());
+
     // If the user supplied a 'partialResultsReturned' out-parameter, default it to false here.
     if (partialResultsReturned) {
         *partialResultsReturned = false;

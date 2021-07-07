@@ -917,7 +917,8 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
 
     if (queryHash) {
         s << " queryHash:" << zeroPaddedHex(*queryHash);
-        invariant(planCacheKey);
+    }
+    if (planCacheKey) {
         s << " planCacheKey:" << zeroPaddedHex(*planCacheKey);
     }
 
@@ -1100,7 +1101,8 @@ void OpDebug::report(OperationContext* opCtx,
 
     if (queryHash) {
         pAttrs->addDeepCopy("queryHash", zeroPaddedHex(*queryHash));
-        invariant(planCacheKey);
+    }
+    if (planCacheKey) {
         pAttrs->addDeepCopy("planCacheKey", zeroPaddedHex(*planCacheKey));
     }
 
@@ -1249,7 +1251,8 @@ void OpDebug::append(OperationContext* opCtx,
 
     if (queryHash) {
         b.append("queryHash", zeroPaddedHex(*queryHash));
-        invariant(planCacheKey);
+    }
+    if (planCacheKey) {
         b.append("planCacheKey", zeroPaddedHex(*planCacheKey));
     }
 
