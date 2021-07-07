@@ -122,3 +122,4 @@ structs:
             metrics:
                 type: ReshardingCoordinatorMetrics
                 description: "Metrics related to the coordinator."
+                optional: true

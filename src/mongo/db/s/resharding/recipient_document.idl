@@ -85,3 +85,4 @@ structs:
             metrics:
                 type: ReshardingRecipientMetrics
                 description: "Metrics related to this recipient."
+                optional: true

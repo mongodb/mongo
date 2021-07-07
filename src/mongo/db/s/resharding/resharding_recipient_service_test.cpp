@@ -239,8 +239,7 @@ public:
                                         {ShardId{"donor1"},
                                          isAlsoDonor ? recipientShardId : ShardId{"donor2"},
                                          ShardId{"donor3"}},
-                                        durationCount<Milliseconds>(Milliseconds{5}),
-                                        ReshardingRecipientMetrics());
+                                        durationCount<Milliseconds>(Milliseconds{5}));
 
         NamespaceString sourceNss("sourcedb", "sourcecollection");
         auto sourceUUID = UUID::gen();
