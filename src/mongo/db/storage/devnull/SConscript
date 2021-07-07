@@ -17,9 +17,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_options',
     ],
-    LIBDEPS_TYPEINFO=[
-        '$BUILD_DIR/mongo/db/service_context',
-    ],
 )
 
 env.Library(

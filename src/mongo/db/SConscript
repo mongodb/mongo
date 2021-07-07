@@ -621,9 +621,6 @@ env.Library(
         'commands/test_commands_enabled',
         'service_context',
     ],
-    LIBDEPS_TYPEINFO=[
-        '$BUILD_DIR/mongo/db/commands',
-    ]
 )
 
 env.Library(
@@ -799,9 +796,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ],
-    LIBDEPS_TYPEINFO=[
-        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 

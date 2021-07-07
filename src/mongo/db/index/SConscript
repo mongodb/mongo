@@ -113,9 +113,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
     ],
-    LIBDEPS_TYPEINFO=[
-        '$BUILD_DIR/mongo/db/service_context',
-    ],
 )
 
 serveronlyEnv = env.Clone()
@@ -145,9 +142,6 @@ serveronlyEnv.Library(
         '$BUILD_DIR/mongo/idl/server_parameter',
         'skipped_record_tracker',
     ],
-    LIBDEPS_TYPEINFO=[
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-    ]
 )
 
 env.Library(

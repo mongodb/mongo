@@ -2006,23 +2006,14 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     # command but instead runs a function.
     env["BUILDERS"]["StaticLibrary"].action = SCons.Action.Action(write_uuid_to_file, "Generating placeholder library $TARGET")
 
-libdeps_typeinfo = False
-
 if get_option('build-tools') == 'next':
     import libdeps_next as libdeps
-
-    if (has_option('sanitize') and 'undefined' in get_option('sanitize')
-        and env.ToolchainIs('clang', 'gcc')
-        and (env.TargetOSIs('posix') and not env.TargetOSIs('darwin'))):
-
-        libdeps_typeinfo = True
 
     libdeps.setup_environment(
         env,
         emitting_shared=(link_model.startswith("dynamic")),
         debug=get_option('libdeps-debug'),
-        linting=get_option('libdeps-linting'),
-        sanitize_typeinfo=libdeps_typeinfo)
+        linting=get_option('libdeps-linting'))
 else:
     import libdeps
 
@@ -3684,11 +3675,28 @@ def doConfigure(myenv):
             if not using_fsan and not AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover"):
                 AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover=undefined")
             myenv.AppendUnique(CPPDEFINES=['UNDEFINED_BEHAVIOR_SANITIZER'])
+
             # If anything is changed, added, or removed in ubsan_options, be
             # sure to make the corresponding changes to the appropriate build
             # variants in etc/evergreen.yml
             ubsan_options = "print_stacktrace=1"
             myenv['ENV']['UBSAN_OPTIONS'] = ubsan_options + symbolizer_option
+
+            # In dynamic builds, the `vptr` sanitizer check can
+            # require additional LIBDEPS edges. That is very
+            # inconvenient, because such builds can't use z,defs. The
+            # result is a very fragile link graph, where refactoring
+            # the link graph in one place can have surprising effects
+            # in others. Instead, we just disable the `vptr` sanitizer
+            # for dynamic builds. We tried some other approaches in
+            # SERVER-49798 of adding a new LIBDEPS_TYPEINFO type, but
+            # that didn't address the fundamental issue that the
+            # correct link graph for a dynamic+ubsan build isn't the
+            # same as the correct link graph for a regular dynamic
+            # build.
+            if link_model == "dynamic":
+                if AddToCCFLAGSIfSupported(myenv, "-fno-sanitize=vptr"):
+                    myenv.AppendUnique(LINKFLAGS=["-fno-sanitize=vptr"])
 
     if myenv.ToolchainIs('msvc') and optBuild:
         # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
@@ -4733,41 +4741,6 @@ if get_option('ninja') != 'disabled':
         base_emitter = builder.emitter
         new_emitter = SCons.Builder.ListEmitter([base_emitter, winlink_workaround_emitter])
         builder.emitter = new_emitter
-
-    if libdeps_typeinfo and get_option('build-tools') == 'next':
-        # ninja will not handle the list action libdeps creates so in order for
-        # to build ubsan with ninja, we need to undo the list action and then
-        # create a special rule to handle the shlink typeinfo checks. If ninja is
-        # updated to handle list actions correctly, this whole section can go away.
-        base_action = env['BUILDERS']['SharedLibrary'].action
-        base_action.list[:] = base_action.list[:-2]
-
-        # Now we rewrite the command and set it up as a rule for ninja shlinks. We are
-        # cramming this all into a single command for ninja, so it is broken apart with
-        # commentation for each part.
-        env.NinjaRule(
-            "SHLINK",
-            libdeps.get_typeinfo_link_command().format(
-                ninjalink="$env$SHLINK @$out.rsp && ",
-                ldpath="",
-                target="${out}",
-                libdeps_tags="printenv",
-                tag='libdeps-cyclic-typeinfo'
-            ),
-            description="Linking $out",
-            deps=None,
-            pool="local_pool",
-            use_depfile=False,
-            use_response_file=True)
-
-        provider = env.NinjaGenResponseFileProvider(
-            "SHLINK",
-            "$SHLINK",
-            custom_env={
-                "TYPEINFO_TAGS":"'$LIBDEPS_TAGS'",
-                "LD_LIBRARY_PATH":"'$_LIBDEPS_LD_PATH'"})
-        env.NinjaRuleMapping("${SHLINKCOM}", provider)
-        env.NinjaRuleMapping(env["SHLINKCOM"], provider)
 
     # idlc.py has the ability to print it's implicit dependencies
     # while generating, Ninja can consume these prints using the
