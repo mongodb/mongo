@@ -216,7 +216,6 @@ public:
 
         _controller = std::make_shared<RecipientStateTransitionController>();
         _opObserverRegistry->addObserver(std::make_unique<RecipientOpObserverForTest>(_controller));
-        _metrics = ReshardingMetrics::get(serviceContext);
     }
 
     RecipientStateTransitionController* controller() {
@@ -224,7 +223,8 @@ public:
     }
 
     ReshardingMetrics* metrics() {
-        return _metrics;
+        auto serviceContext = getServiceContext();
+        return ReshardingMetrics::get(serviceContext);
     }
 
     ReshardingRecipientDocument makeStateDocument(bool isAlsoDonor) {
@@ -314,7 +314,6 @@ private:
     }
 
     std::shared_ptr<RecipientStateTransitionController> _controller;
-    ReshardingMetrics* _metrics;
 };
 
 TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion) {
