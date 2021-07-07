@@ -31,6 +31,7 @@
 
 #include <chrono>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <thread>
 
@@ -45,6 +46,10 @@ namespace test_harness {
 #define LOG_ERROR 0
 #define LOG_WARN 1
 #define LOG_INFO 2
+/*
+ * The trace log level can incur a performance overhead since the current logging implementation
+ * requires per-line locking.
+ */
 #define LOG_TRACE 3
 
 /* Order of elements in this array corresponds to the definitions above. */
@@ -55,6 +60,9 @@ static int64_t _trace_level = LOG_WARN;
 
 /* Include date in the logs if enabled. */
 static bool _include_date = true;
+
+/* Mutex used by logger to synchronize printing. */
+extern std::mutex _logger_mtx;
 
 void
 get_time(char *time_buf, size_t buf_size)
@@ -94,6 +102,7 @@ log_msg(int64_t trace_type, const std::string &str)
         ss << time_buf << "[TID:" << std::this_thread::get_id() << "][" << LOG_LEVELS[trace_type]
            << "]: " << str << std::endl;
 
+        std::lock_guard<std::mutex> lg(_logger_mtx);
         if (trace_type == LOG_ERROR)
             std::cerr << ss.str();
         else

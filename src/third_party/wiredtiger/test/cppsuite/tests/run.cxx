@@ -37,6 +37,14 @@
 #include "example_test.cxx"
 #include "hs_cleanup.cxx"
 
+namespace test_harness {
+/*
+ * FIXME-WT-7782: This needs to exist in a single translation unit. At the moment, almost everything
+ * is in headers so the only reasonable spot to put it is here.
+ */
+std::mutex _logger_mtx;
+} // namespace test_harness
+
 std::string
 parse_configuration_from_file(const std::string &filename)
 {
