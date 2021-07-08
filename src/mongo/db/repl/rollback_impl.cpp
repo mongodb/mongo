@@ -583,13 +583,18 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
 
     // Log the total number of insert and update operations that have been rolled back as a
     // result of recovering to the stable timestamp.
+    auto getCommandCount = [&](StringData key) {
+        const auto& m = _observerInfo.rollbackCommandCounts;
+        auto it = m.find(key);
+        return (it == m.end()) ? 0 : it->second;
+    };
     LOGV2(21599,
           "Rollback reverted {insert} insert operations, {update} update operations and {delete} "
           "delete operations.",
           "Rollback reverted command counts",
-          "insert"_attr = _observerInfo.rollbackCommandCounts[kInsertCmdName],
-          "update"_attr = _observerInfo.rollbackCommandCounts[kUpdateCmdName],
-          "delete"_attr = _observerInfo.rollbackCommandCounts[kDeleteCmdName]);
+          "insert"_attr = getCommandCount(kInsertCmdName),
+          "update"_attr = getCommandCount(kUpdateCmdName),
+          "delete"_attr = getCommandCount(kDeleteCmdName));
 
     // Retryable writes create derived updates to the transactions table which can be coalesced into
     // one operation, so certain session operations history may be lost after restoring to the
