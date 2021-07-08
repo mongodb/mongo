@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/platform/basic.h"
@@ -48,6 +49,8 @@
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/views/resolved_view.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/util/fail_point.h"
 
@@ -413,6 +416,40 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     return output.freeze();
 }
 
+std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipelineFromViewDefinition(
+    std::vector<BSONObj> serializedPipeline,
+    ExpressionContext::ResolvedNamespace resolvedNamespace) {
+    // We don't want to optimize or attach a cursor source here because we need to update
+    // _resolvedPipeline so we can reuse it on subsequent calls to getNext(), and we may need to
+    // update _fieldMatchPipelineIdx as well in the case of a field join.
+    MakePipelineOptions opts;
+    opts.optimize = false;
+    opts.attachCursorSource = false;
+    opts.validator = lookupPipeValidator;
+
+    // Resolve the view definition.
+    auto pipeline = Pipeline::makePipelineFromViewDefinition(
+        _fromExpCtx, resolvedNamespace, serializedPipeline, opts);
+
+    // Store the pipeline with resolved namespaces so that we only trigger this exception on the
+    // first input document.
+    _resolvedPipeline = pipeline->serializeToBson();
+
+    // In the case of a foreign field join we expect the match to be found in the last position of
+    // _resolvedPipeline, but optimizing might move this stage elsewhere or merge it with another
+    // stage.
+    if (hasLocalFieldForeignFieldJoin()) {
+        _fieldMatchPipelineIdx = _resolvedPipeline.size() - 1;
+    }
+
+    // Update the expression context with any new namespaces the resolved pipeline has introduced.
+    LiteParsedPipeline liteParsedPipeline(resolvedNamespace.ns, resolvedNamespace.pipeline);
+    _fromExpCtx = _fromExpCtx->copyForSubPipeline(resolvedNamespace.ns);
+    _fromExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
+
+    return pipeline;
+}
+
 std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
     const Document& inputDoc) {
     // Copy all 'let' variables into the foreign pipeline's expression context.
@@ -438,7 +475,28 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
         pipelineOpts.shardTargetingPolicy = allowForeignShardedColl
             ? ShardTargetingPolicy::kAllowed
             : ShardTargetingPolicy::kNotAllowed;
-        return Pipeline::makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
+        try {
+            return Pipeline::makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
+        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
+            // This exception returns the information we need to resolve a sharded view. Update the
+            // pipeline with the resolved view definition.
+            auto pipeline = buildPipelineFromViewDefinition(
+                _resolvedPipeline,
+                ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()});
+
+            LOGV2_DEBUG(3254800,
+                        3,
+                        "$lookup found view definition. ns: {ns}, pipeline: {pipeline}. New "
+                        "$lookup sub-pipeline: {new_pipe}",
+                        "ns"_attr = e->getNamespace(),
+                        "pipeline"_attr = Value(e->getPipeline()),
+                        "new_pipe"_attr = _resolvedPipeline);
+
+            // We can now safely optimize and reattempt attaching the cursor source.
+            pipeline = Pipeline::makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
+
+            return pipeline;
+        }
     }
 
     // Construct the basic pipeline without a cache stage. Avoid optimizing here since we need to
@@ -462,14 +520,38 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
             DocumentSourceSequentialDocumentCache::create(_fromExpCtx, _cache.get_ptr()));
     }
 
+    // We can store the unoptimized serialization of the pipeline so that if we need to resolve
+    // a sharded view later on, and we have a local-foreign field join, we will need to update
+    // metadata tracking the position of this join in the _resolvedPipeline.
+    auto serializedPipeline = pipeline->serializeToBson();
     pipeline->optimizePipeline();
 
     if (!_cache->isServing()) {
         // The cache has either been abandoned or has not yet been built. Attach a cursor.
         auto shardTargetingPolicy = allowForeignShardedColl ? ShardTargetingPolicy::kAllowed
                                                             : ShardTargetingPolicy::kNotAllowed;
-        pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
-            pipeline.release(), shardTargetingPolicy);
+        try {
+            pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
+                pipeline.release(), shardTargetingPolicy);
+        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
+            // This exception returns the information we need to resolve a sharded view. Update the
+            // pipeline with the resolved view definition.
+            pipeline = buildPipelineFromViewDefinition(
+                serializedPipeline,
+                ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()});
+
+            LOGV2_DEBUG(3254801,
+                        3,
+                        "$lookup found view definition. ns: {ns}, pipeline: {pipeline}. New "
+                        "$lookup sub-pipeline: {new_pipe}",
+                        "ns"_attr = e->getNamespace(),
+                        "pipeline"_attr = Value(e->getPipeline()),
+                        "new_pipe"_attr = _resolvedPipeline);
+
+            // Try to attach the cursor source again.
+            pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
+                pipeline.release(), shardTargetingPolicy);
+        }
     }
 
     // If the cache has been abandoned, release it.

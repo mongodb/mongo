@@ -448,8 +448,12 @@ function runTest(coll, from, thirdColl, fourthColl) {
     //
     // Test $lookup when the foreign collection is a view.
     //
-    // TODO SERVER-32548: Allow this test to run when the foreign collection is sharded.
-    if (!FixtureHelpers.isSharded(from)) {
+    const getShardedLookupParam =
+        coll.getDB().adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+    const isShardedLookupEnabled =
+        getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+        getShardedLookupParam.featureFlagShardedLookup.value;
+    if (!FixtureHelpers.isSharded(from) || isShardedLookupEnabled) {
         assert.commandWorked(
             coll.getDB().runCommand({create: "fromView", viewOn: "from", pipeline: []}));
         pipeline = [

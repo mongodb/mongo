@@ -271,6 +271,13 @@ public:
         _resolvedNamespaces = std::move(resolvedNamespaces);
     }
 
+    void addResolvedNamespaces(
+        mongo::stdx::unordered_set<mongo::NamespaceString> resolvedNamespaces) {
+        for (auto&& nss : resolvedNamespaces) {
+            _resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
+        }
+    }
+
     /**
      * Retrieves the Javascript Scope for the current thread or creates a new one if it has not been
      * created yet. Initializes the Scope with the 'jsScope' variables from the runtimeConstants.

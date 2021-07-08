@@ -283,6 +283,15 @@ private:
     void initializeResolvedIntrospectionPipeline();
 
     /**
+     * Builds the $lookup pipeline using the resolved view definition for a sharded foreign view and
+     * updates the '_resolvedPipeline', as well as '_fieldMatchPipelineIdx' in the case of a
+     * 'foreign' join.
+     */
+    std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
+        std::vector<BSONObj> serializedPipeline,
+        ExpressionContext::ResolvedNamespace resolvedNamespace);
+
+    /**
      * Builds the $lookup pipeline and resolves any variables using the passed 'inputDoc', adding a
      * cursor and/or cache source as appropriate.
      */

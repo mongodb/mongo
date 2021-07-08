@@ -63,22 +63,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
         });
     };
 
-    // Copy the ExpressionContext of the base aggregation, using the inner namespace instead.
-    auto unionExpCtx = expCtx->copyForSubPipeline(resolvedNs.ns);
-
-    if (resolvedNs.pipeline.empty()) {
-        return Pipeline::parse(currentPipeline, unionExpCtx, validatorCallback);
-    }
-    auto resolvedPipeline = std::move(resolvedNs.pipeline);
-    resolvedPipeline.reserve(currentPipeline.size() + resolvedPipeline.size());
-    resolvedPipeline.insert(resolvedPipeline.end(),
-                            std::make_move_iterator(currentPipeline.begin()),
-                            std::make_move_iterator(currentPipeline.end()));
-
     MakePipelineOptions opts;
     opts.attachCursorSource = false;
+    // Only call optimize() here if we actually have a pipeline to resolve in the view definition.
+    opts.optimize = !resolvedNs.pipeline.empty();
     opts.validator = validatorCallback;
-    return Pipeline::makePipeline(std::move(resolvedPipeline), unionExpCtx, opts);
+
+    return Pipeline::makePipelineFromViewDefinition(expCtx, resolvedNs, currentPipeline, opts);
 }
 
 }  // namespace

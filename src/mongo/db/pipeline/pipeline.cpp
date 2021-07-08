@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/fail_point.h"
@@ -657,4 +658,32 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
 
     return pipeline;
 }
+
+std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinition(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    ExpressionContext::ResolvedNamespace resolvedNs,
+    std::vector<BSONObj> currentPipeline,
+    MakePipelineOptions opts) {
+
+    // Copy the ExpressionContext of the base aggregation, using the inner namespace instead.
+    auto subPipelineExpCtx = expCtx->copyForSubPipeline(resolvedNs.ns);
+
+    if (resolvedNs.pipeline.empty()) {
+        return Pipeline::makePipeline(std::move(currentPipeline), subPipelineExpCtx, opts);
+    }
+    auto resolvedPipeline = std::move(resolvedNs.pipeline);
+
+    // When we get a resolved pipeline back, we may not yet have its namespaces available in the
+    // expression context, e.g. if the view's pipeline contains a $lookup on another collection.
+    LiteParsedPipeline liteParsedPipeline(resolvedNs.ns, resolvedPipeline);
+    subPipelineExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
+
+    resolvedPipeline.reserve(currentPipeline.size() + resolvedPipeline.size());
+    resolvedPipeline.insert(resolvedPipeline.end(),
+                            std::make_move_iterator(currentPipeline.begin()),
+                            std::make_move_iterator(currentPipeline.end()));
+
+    return Pipeline::makePipeline(std::move(resolvedPipeline), subPipelineExpCtx, opts);
+}
+
 }  // namespace mongo

@@ -152,6 +152,12 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts = MakePipelineOptions{});
 
+    static std::unique_ptr<Pipeline, PipelineDeleter> makePipelineFromViewDefinition(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        ExpressionContext::ResolvedNamespace resolvedNs,
+        std::vector<BSONObj> currentPipeline,
+        MakePipelineOptions opts);
+
     std::unique_ptr<Pipeline, PipelineDeleter> clone() const;
 
     const boost::intrusive_ptr<ExpressionContext>& getContext() const {
