@@ -32,8 +32,8 @@
 #include <memory>
 #include <utility>
 
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -88,8 +88,7 @@ public:
      * Sets the new total for 'name', and updates the current total memory usage.
      */
     void set(StringData name, long long total) {
-        auto [it, _] = _functionMemoryTracker.try_emplace(name, this);
-        it->second.set(total);
+        (*this)[name].set(total);
     }
 
     /**
@@ -116,19 +115,20 @@ public:
     /**
      * Provides read-only access to the function memory tracker for 'name'.
      */
-    auto operator[](StringData name) const {
+    const PerFunctionMemoryTracker& operator[](StringData name) const {
+        auto it = _functionMemoryTracker.find(_key(name));
         tassert(5466400,
                 str::stream() << "Invalid call to memory usage tracker, could not find function "
                               << name,
-                _functionMemoryTracker.find(name) != _functionMemoryTracker.end());
-        return _functionMemoryTracker.at(name);
+                it != _functionMemoryTracker.end());
+        return it->second;
     }
 
     /**
      * Non-const version, creates a new element if one doesn't exist and returns a reference to it.
      */
     PerFunctionMemoryTracker& operator[](StringData name) {
-        auto [it, _] = _functionMemoryTracker.try_emplace(name, this);
+        auto [it, _] = _functionMemoryTracker.try_emplace(_key(name), this);
         return it->second;
     }
 
@@ -137,8 +137,7 @@ public:
      * that function. Also updates the total memory usage.
      */
     void update(StringData name, long long diff) {
-        auto [it, _] = _functionMemoryTracker.try_emplace(name, this);
-        it->second.update(diff);
+        (*this)[name].update(diff);
     }
 
     /**
@@ -163,12 +162,16 @@ public:
     const size_t _maxAllowedMemoryUsageBytes;
 
 private:
+    static absl::string_view _key(StringData s) {
+        return {s.rawData(), s.size()};
+    }
+
     // Tracks current memory used.
     long long _memoryUsageBytes = 0;
     long long _maxMemoryUsageBytes = 0;
 
     // Tracks memory consumption per function using the output field name as a key.
-    StringMap<PerFunctionMemoryTracker> _functionMemoryTracker;
+    stdx::unordered_map<std::string, PerFunctionMemoryTracker> _functionMemoryTracker;
 };
 
 }  // namespace mongo
