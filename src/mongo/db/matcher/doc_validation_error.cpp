@@ -2331,10 +2331,6 @@ BSONObj generateErrorHelper(const MatchExpression& validatorExpr,
 }  // namespace
 
 std::shared_ptr<const ErrorExtraInfo> DocumentValidationFailureInfo::parse(const BSONObj& obj) {
-    if (!obj.hasField("errInfo"_sd)) {
-        // TODO SERVER-50524: remove this block when 5.0 becomes last-lts.
-        return nullptr;
-    }
     auto errInfo = obj["errInfo"];
     uassert(4878100,
             "DocumentValidationFailureInfo must have a field 'errInfo' of type object",

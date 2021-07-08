@@ -508,32 +508,13 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
         return status;
     }
 
-    // TODO SERVER-50524: remove these FCV checks when 5.0 becomes last-lts in order to make sure
-    // that an upgrade from 4.4 directly to the 5.0 LTS version is supported.
-    const auto isFCVAtLeast47 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            ServerGlobalParams::FeatureCompatibility::Version::kVersion47);
-
     try {
         if (validatorMatchExpr->matchesBSON(document))
             return Status::OK();
-    } catch (DBException& e) {
-        // If the FCV is lower than 4.7 and we're in error mode, then we cannot generate detailed
-        // errors. As such, we simply add extra context to the error and rethrow. Note that
-        // writes which result in the validator throwing an exception are accepted when we're in
-        // warn mode.
-        if (!isFCVAtLeast47 &&
-            validationActionOrDefault(_metadata->options.validationAction) ==
-                ValidationActionEnum::error) {
-            e.addContext("Document validation failed");
-            throw;
-        }
-    }
+    } catch (DBException&) {
+    };
 
-    BSONObj generatedError;
-    if (isFCVAtLeast47) {
-        generatedError = doc_validation_error::generateError(*validatorMatchExpr, document);
-    }
+    BSONObj generatedError = doc_validation_error::generateError(*validatorMatchExpr, document);
 
     if (validationActionOrDefault(_metadata->options.validationAction) ==
         ValidationActionEnum::warn) {
@@ -546,12 +527,8 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
     }
 
     static constexpr auto kValidationFailureErrorStr = "Document failed validation"_sd;
-    if (isFCVAtLeast47) {
-        return {doc_validation_error::DocumentValidationFailureInfo(generatedError),
-                kValidationFailureErrorStr};
-    } else {
-        return {ErrorCodes::DocumentValidationFailure, kValidationFailureErrorStr};
-    }
+    return {doc_validation_error::DocumentValidationFailureInfo(generatedError),
+            kValidationFailureErrorStr};
 }
 
 Collection::Validator CollectionImpl::parseValidator(
