@@ -8,9 +8,8 @@
 
 #include "wt_internal.h"
 
-#define WT_CHECK_RECOVERY_FLAG_TS_TXNID(session, txnid, durablets)             \
-    ((durablets) == WT_TS_NONE && F_ISSET(S2C(session), WT_CONN_RECOVERING) && \
-      (txnid) >= S2C(session)->recovery_ckpt_snap_min)
+#define WT_CHECK_RECOVERY_FLAG_TXNID(session, txnid) \
+    (F_ISSET(S2C(session), WT_CONN_RECOVERING) && (txnid) >= S2C(session)->recovery_ckpt_snap_min)
 
 /* Enable rollback to stable verbose messaging during recovery. */
 #define WT_VERB_RECOVERY_RTS(session) \
@@ -414,10 +413,8 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page
          */
         /* Retrieve the time window from the history cursor. */
         __wt_hs_upd_time_window(hs_cursor, &hs_tw);
-        if (!replace &&
-          (hs_stop_durable_ts != WT_TS_NONE ||
-            !__rollback_check_if_txnid_non_committed(session, hs_tw->stop_txn)) &&
-          (hs_stop_durable_ts <= rollback_timestamp)) {
+        if (!replace && !__rollback_check_if_txnid_non_committed(session, hs_tw->stop_txn) &&
+          hs_stop_durable_ts <= rollback_timestamp) {
             __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
               "history store update valid with stop timestamp: %s, stable timestamp: %s, txnid: "
               "%" PRIu64 " and type: %" PRIu8,
@@ -430,9 +427,8 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page
          * Stop processing when we find a stable update according to the given timestamp and
          * transaction id.
          */
-        if ((hs_durable_ts != WT_TS_NONE ||
-              !__rollback_check_if_txnid_non_committed(session, hs_tw->start_txn)) &&
-          (hs_durable_ts <= rollback_timestamp)) {
+        if (!__rollback_check_if_txnid_non_committed(session, hs_tw->start_txn) &&
+          hs_durable_ts <= rollback_timestamp) {
             __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
               "history store update valid with start timestamp: %s, durable timestamp: %s, stop "
               "timestamp: %s, stable timestamp: %s, txnid: %" PRIu64 " and type: %" PRIu8,
@@ -639,9 +635,8 @@ __rollback_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_COL *cip, W
             WT_STAT_CONN_DATA_INCR(session, txn_rts_sweep_hs_keys);
         } else
             return (0);
-    } else if (((vpack->tw.durable_start_ts > rollback_timestamp) ||
-                 (vpack->tw.durable_start_ts == WT_TS_NONE &&
-                   __rollback_check_if_txnid_non_committed(session, vpack->tw.start_txn))) ||
+    } else if (vpack->tw.durable_start_ts > rollback_timestamp ||
+      __rollback_check_if_txnid_non_committed(session, vpack->tw.start_txn) ||
       (!WT_TIME_WINDOW_HAS_STOP(&vpack->tw) && prepared)) {
         __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
           "on-disk update aborted with start durable timestamp: %s, commit timestamp: %s, "
@@ -661,10 +656,8 @@ __rollback_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_COL *cip, W
             WT_STAT_CONN_DATA_INCR(session, txn_rts_keys_removed);
         }
     } else if (WT_TIME_WINDOW_HAS_STOP(&vpack->tw) &&
-      (((vpack->tw.durable_stop_ts > rollback_timestamp) ||
-         (vpack->tw.durable_stop_ts == WT_TS_NONE &&
-           __rollback_check_if_txnid_non_committed(session, vpack->tw.stop_txn))) ||
-        prepared)) {
+      (vpack->tw.durable_stop_ts > rollback_timestamp ||
+        __rollback_check_if_txnid_non_committed(session, vpack->tw.stop_txn) || prepared)) {
         /*
          * Clear the remove operation from the key by inserting the original on-disk value as a
          * standard update.
@@ -1062,14 +1055,14 @@ __rollback_page_needs_abort(
         prepared = vpack.ta.prepare;
         newest_txn = vpack.ta.newest_txn;
         result = (durable_ts > rollback_timestamp) || prepared ||
-          WT_CHECK_RECOVERY_FLAG_TS_TXNID(session, newest_txn, durable_ts);
+          WT_CHECK_RECOVERY_FLAG_TXNID(session, newest_txn);
     } else if (addr != NULL) {
         tag = "address";
         durable_ts = __rollback_get_ref_max_durable_timestamp(session, &addr->ta);
         prepared = addr->ta.prepare;
         newest_txn = addr->ta.newest_txn;
         result = (durable_ts > rollback_timestamp) || prepared ||
-          WT_CHECK_RECOVERY_FLAG_TS_TXNID(session, newest_txn, durable_ts);
+          WT_CHECK_RECOVERY_FLAG_TXNID(session, newest_txn);
     }
 
     __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
@@ -1479,8 +1472,7 @@ __rollback_to_stable_btree_apply(
         WT_RET_NOTFOUND_OK(ret);
     }
     max_durable_ts = WT_MAX(newest_start_durable_ts, newest_stop_durable_ts);
-    has_txn_updates_gt_than_ckpt_snap =
-      WT_CHECK_RECOVERY_FLAG_TS_TXNID(session, rollback_txnid, max_durable_ts);
+    has_txn_updates_gt_than_ckpt_snap = WT_CHECK_RECOVERY_FLAG_TXNID(session, rollback_txnid);
 
     /* Increment the inconsistent checkpoint stats counter. */
     if (has_txn_updates_gt_than_ckpt_snap)
