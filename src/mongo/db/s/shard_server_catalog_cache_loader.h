@@ -227,16 +227,6 @@ private:
         }
 
         /**
-         * Must only be called if there is an active task. Behaves like a condition variable and
-         * will be signaled when the active task has been completed.
-         *
-         * NOTE: Because this call unlocks and locks the provided mutex, it is not safe to use the
-         * same task object on which it was called because it might have been deleted during the
-         * unlocked period.
-         */
-        void waitForActiveTaskCompletion(stdx::unique_lock<Latch>& lg);
-
-        /**
          * Checks whether 'term' matches the term of the latest task in the task list. This is
          * useful to check whether the task list has outdated data that's no longer valid to use in
          * the current/new term specified by 'term'.
@@ -256,6 +246,8 @@ private:
 
 
     private:
+        friend class ShardServerCatalogCacheLoader;
+
         std::list<CollAndChunkTask> _tasks{};
 
         // Condition variable which will be signaled whenever the active task from the tasks list is
@@ -337,17 +329,9 @@ private:
             return _tasks.empty();
         }
 
-        /**
-         * Must only be called if there is an active task. Behaves like a condition variable and
-         * will be signaled when the active task has been completed.
-         *
-         * NOTE: Because this call unlocks and locks the provided mutex, it is not safe to use the
-         * same task object on which it was called because it might have been deleted during the
-         * unlocked period.
-         */
-        void waitForActiveTaskCompletion(stdx::unique_lock<Latch>& lg);
-
     private:
+        friend class ShardServerCatalogCacheLoader;
+
         std::list<DBTask> _tasks{};
 
         // Condition variable which will be signaled whenever the active task from the tasks list is
