@@ -1,6 +1,7 @@
 // In SERVER-20169, the $range expression was added to the aggregation framework. In this file, we
 // test the behavior and error cases of this expression.
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 (function() {
 "use strict";
