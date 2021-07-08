@@ -185,6 +185,13 @@ createRandomCursorExecutor(const CollectionPtr& coll,
                                             minAdvancedToWorkRatio);
         trialStage = static_cast<TrialStage*>(root.get());
     } else if (expCtx->ns.isTimeseriesBucketsCollection()) {
+        // We can't take ARHASH optimization path for a direct $sample on the system.buckets
+        // collection because data is in compressed form. If we did have a direct $sample on the
+        // system.buckets collection, then the 'bucketUnpacker' would not be set up properly.
+        if (!bucketUnpacker) {
+            return std::pair{nullptr, false};
+        }
+
         // Use a 'TrialStage' to run a trial between 'SampleFromTimeseriesBucket' and
         // 'UnpackTimeseriesBucket' with $sample left in the pipeline in-place. If the buckets are
         // not sufficiently full, or the 'SampleFromTimeseriesBucket' plan draws too many
