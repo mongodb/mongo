@@ -2,6 +2,7 @@
 // @tags: [
 //  requires_fcv_50,
 //  requires_timeseries,
+//  requires_replication,
 // ]
 (function() {
 "use strict";
