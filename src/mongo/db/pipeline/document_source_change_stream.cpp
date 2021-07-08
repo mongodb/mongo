@@ -247,6 +247,17 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
         stages.push_back(DocumentSourceChangeStreamCheckTopologyChange::create(expCtx));
     }
 
+    // We only create a pre-image lookup stage on a non-merging mongoD. We place this stage here
+    // (after DSCSCheckTopologyChange) so that any $match stages which follow the $changeStream
+    // pipeline may be able to skip ahead of the DSCSAddPreImage stage. This allows a whole-db or
+    // whole-cluster stream to run on an instance where only some collections have pre-images
+    // enabled, so long as the user filters for only those namespaces.
+    // TODO SERVER-36941: figure out how to get this to work in a sharded cluster.
+    if (spec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff) {
+        invariant(!expCtx->inMongos);
+        stages.push_back(DocumentSourceChangeStreamAddPreImage::create(expCtx, spec));
+    }
+
     // If 'fullDocument' is set to "updateLookup", add the DSCSAddPostImage stage here.
     if (spec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup) {
         stages.push_back(DocumentSourceChangeStreamAddPostImage::create(expCtx));
@@ -262,17 +273,6 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
     // If the resume point is an event, we must include a DSCSEnsureResumeTokenPresent stage.
     if (!ResumeToken::isHighWaterMarkToken(resumeToken)) {
         stages.push_back(DocumentSourceChangeStreamEnsureResumeTokenPresent::create(expCtx, spec));
-    }
-
-    // We only create a pre-image lookup stage on a non-merging mongoD. We place this stage here
-    // so that any $match stages which follow the $changeStream pipeline prefix may be able to
-    // skip ahead of the DSCSAddPreImage stage. This allows a whole-db or whole-cluster stream to
-    // run on an instance where only some collections have pre-images enabled, so long as the
-    // user filters for only those namespaces.
-    // TODO SERVER-36941: figure out how to get this to work in a sharded cluster.
-    if (spec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff) {
-        invariant(!expCtx->inMongos);
-        stages.push_back(DocumentSourceChangeStreamAddPreImage::create(expCtx, spec));
     }
 
     return stages;
