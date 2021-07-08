@@ -772,7 +772,7 @@ extern int __wt_hex_to_raw(WT_SESSION_IMPL *session, const char *from, WT_ITEM *
 extern int __wt_hs_config(WT_SESSION_IMPL *session, const char **cfg)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_delete_key_from_ts(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor,
-  uint32_t btree_id, const WT_ITEM *key, wt_timestamp_t ts, bool reinsert)
+  uint32_t btree_id, const WT_ITEM *key, wt_timestamp_t ts, bool reinsert, bool checkpoint_running)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_find_upd(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
   const char *value_format, uint64_t recno, WT_UPDATE_VALUE *upd_value, WT_ITEM *base_value_buf)
@@ -780,7 +780,7 @@ extern int __wt_hs_find_upd(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM
 extern int __wt_hs_get_btree(WT_SESSION_IMPL *session, WT_BTREE **hs_btreep)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi,
-  bool *cache_write_hs) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  bool *cache_write_hs, bool checkpoint_running) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_modify(WT_CURSOR_BTREE *hs_cbt, WT_UPDATE *hs_upd)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_open(WT_SESSION_IMPL *session, const char **cfg)

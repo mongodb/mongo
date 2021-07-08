@@ -455,6 +455,7 @@ struct __wt_connection_stats {
     int64_t cache_eviction_fail_parent_has_overflow_items;
     int64_t cache_eviction_fail_active_children_on_an_internal_page;
     int64_t cache_eviction_fail_in_reconciliation;
+    int64_t cache_eviction_fail_checkpoint_out_of_order_ts;
     int64_t cache_eviction_walk;
     int64_t cache_write;
     int64_t cache_write_restore;
