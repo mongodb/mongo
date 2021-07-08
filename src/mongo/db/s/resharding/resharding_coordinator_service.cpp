@@ -1205,6 +1205,13 @@ ReshardingCoordinatorService::ReshardingCoordinator::_commitAndFinishReshardOper
             // keep 'this' pointer alive for the remaining callbacks.
             return _awaitAllParticipantShardsDone(executor);
         })
+        .then([this, self = shared_from_this(), executor] {
+            // Best-effort attempt to trigger a refresh on the participant shards so they see
+            // the collection metadata without reshardingFields and no longer throw
+            // ReshardCollectionInProgress. There is no guarantee this logic ever runs if the config
+            // server primary steps down after having removed thr coordinator state document.
+            return _tellAllRecipientsToRefresh(executor);
+        })
         .onError([this, self = shared_from_this(), executor](Status status) {
             {
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());

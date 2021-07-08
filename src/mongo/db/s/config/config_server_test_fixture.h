@@ -85,7 +85,8 @@ protected:
      */
     StatusWith<BSONObj> findOneOnConfigCollection(OperationContext* opCtx,
                                                   const NamespaceString& ns,
-                                                  const BSONObj& filter);
+                                                  const BSONObj& filter,
+                                                  const BSONObj& sort = {});
 
     /**
      * Setup the config.shards collection to contain the given shards.
@@ -125,6 +126,12 @@ protected:
                                       const BSONObj& minKey,
                                       const OID& collEpoch,
                                       const boost::optional<Timestamp>& collTimestamp);
+
+    /**
+     * Returns the collection version.
+     */
+    StatusWith<ChunkVersion> getCollectionVersion(OperationContext* opCtx,
+                                                  const NamespaceString& nss);
 
     /**
      * Inserts a document for the database into the config.databases collection.

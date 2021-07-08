@@ -268,12 +268,13 @@ Status ConfigServerTestFixture::deleteToConfigCollection(OperationContext* opCtx
 
 StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(OperationContext* opCtx,
                                                                        const NamespaceString& ns,
-                                                                       const BSONObj& filter) {
+                                                                       const BSONObj& filter,
+                                                                       const BSONObj& sort) {
     auto config = getConfigShard();
     invariant(config);
 
     auto findStatus = config->exhaustiveFindOnConfig(
-        opCtx, kReadPref, repl::ReadConcernLevel::kMajorityReadConcern, ns, filter, BSONObj(), 1);
+        opCtx, kReadPref, repl::ReadConcernLevel::kMajorityReadConcern, ns, filter, sort, 1);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -375,6 +376,34 @@ StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(
         return doc.getStatus();
 
     return ChunkType::fromConfigBSON(doc.getValue(), collEpoch, collTimestamp);
+}
+
+StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionVersion(OperationContext* opCtx,
+                                                                       const NamespaceString& nss) {
+    auto collectionDoc = findOneOnConfigCollection(
+        opCtx, CollectionType::ConfigNS, BSON(CollectionType::kNssFieldName << nss.ns()));
+    if (!collectionDoc.isOK())
+        return collectionDoc.getStatus();
+
+    const CollectionType coll(collectionDoc.getValue());
+
+    auto chunkDoc = findOneOnConfigCollection(
+        opCtx,
+        ChunkType::ConfigNS,
+        coll.getTimestamp() ? BSON(ChunkType::collectionUUID << coll.getUuid())
+                            : BSON(ChunkType::ns << coll.getNss().ns()) /* query */,
+        BSON(ChunkType::lastmod << -1) /* sort */);
+
+    if (!chunkDoc.isOK())
+        return chunkDoc.getStatus();
+
+    const auto chunkType =
+        ChunkType::fromConfigBSON(chunkDoc.getValue(), coll.getEpoch(), coll.getTimestamp());
+    if (!chunkType.isOK()) {
+        return chunkType.getStatus();
+    }
+
+    return chunkType.getValue().getVersion();
 }
 
 void ConfigServerTestFixture::setupDatabase(const std::string& dbName,

@@ -50,7 +50,7 @@ const KeyPattern kKeyPattern(BSON("a" << 1));
 const ShardType kShard0("shard0000", "shard0000:1234");
 const ShardType kShard1("shard0001", "shard0001:1234");
 
-class ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest
+class ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest
     : public ConfigServerTestFixture {
     void setUp() {
         ConfigServerTestFixture::setUp();
@@ -89,97 +89,29 @@ protected:
         return chunkType;
     }
 
-    /**
-     * Determines if the chunk's version has been bumped to the targetChunkVersion.
-     */
-    bool chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        const ChunkType& chunkTypeBefore,
-        const StatusWith<ChunkType> swChunkTypeAfter,
-        const ChunkVersion& targetChunkVersion) {
-        ASSERT_OK(swChunkTypeAfter.getStatus());
-        auto chunkTypeAfter = swChunkTypeAfter.getValue();
-
-        // Regardless of whether the major version was bumped, the chunk's other fields should be
-        // unchanged.
-        ASSERT_EQ(chunkTypeBefore.getName(), chunkTypeAfter.getName());
-        ASSERT_EQ(chunkTypeBefore.getNS(), chunkTypeAfter.getNS());
-        ASSERT_BSONOBJ_EQ(chunkTypeBefore.getMin(), chunkTypeAfter.getMin());
-        ASSERT_BSONOBJ_EQ(chunkTypeBefore.getMax(), chunkTypeAfter.getMax());
-        ASSERT(chunkTypeBefore.getHistory() == chunkTypeAfter.getHistory());
-
-        return chunkTypeAfter.getVersion().majorVersion() == targetChunkVersion.majorVersion();
+    void assertChunkUnchanged(const ChunkType& chunkTypeBefore) {
+        const auto chunkTypeNow =
+            uassertStatusOK(getChunkDoc(operationContext(),
+                                        chunkTypeBefore.getMin(),
+                                        chunkTypeBefore.getVersion().epoch(),
+                                        chunkTypeBefore.getVersion().getTimestamp()));
+        ASSERT_BSONOBJ_EQ(chunkTypeBefore.toConfigBSON(), chunkTypeNow.toConfigBSON());
     }
 
-    /**
-     * If there are multiple chunks per shard, the chunk whose version gets bumped is not
-     * deterministic.
-     *
-     * Asserts that only chunk per shard has its major version increased.
-     */
-    void assertOnlyOneChunkVersionBumped(OperationContext* opCtx,
-                                         std::vector<ChunkType> originalChunkTypes,
-                                         const ChunkVersion& targetChunkVersion,
-                                         const OID& collEpoch,
-                                         const boost::optional<Timestamp>& collTimestamp) {
-        auto aChunkVersionWasBumped = false;
-        for (auto originalChunkType : originalChunkTypes) {
-            auto swChunkTypeAfter =
-                getChunkDoc(opCtx, originalChunkType.getMin(), collEpoch, collTimestamp);
-            auto wasBumped = chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-                originalChunkType, swChunkTypeAfter, targetChunkVersion);
-            if (aChunkVersionWasBumped) {
-                ASSERT_FALSE(wasBumped);
-            } else {
-                aChunkVersionWasBumped = wasBumped;
-            }
-        }
-
-        ASSERT_TRUE(aChunkVersionWasBumped);
+    void assertChunkVersionChangedAndOtherFieldsUnchanged(const ChunkType& chunkTypeBefore,
+                                                          const ChunkVersion& targetChunkVersion) {
+        const auto chunkTypeNow = uassertStatusOK(getChunkDoc(operationContext(),
+                                                              chunkTypeBefore.getMin(),
+                                                              targetChunkVersion.epoch(),
+                                                              targetChunkVersion.getTimestamp()));
+        ASSERT_BSONOBJ_EQ(chunkTypeBefore.toConfigBSON().removeField(ChunkType::lastmod()),
+                          chunkTypeNow.toConfigBSON().removeField(ChunkType::lastmod()));
+        ASSERT_EQ(targetChunkVersion, chunkTypeNow.getVersion());
     }
 };
 
-TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
-       BumpChunkVersionOneChunkPerShard) {
-    const auto collEpoch = OID::gen();
-    const auto collTimestamp = boost::none;
-
-    const auto shard0Chunk0 = generateChunkType(kNss,
-                                                ChunkVersion(10, 1, collEpoch, collTimestamp),
-                                                kShard0.getName(),
-                                                BSON("a" << 1),
-                                                BSON("a" << 10));
-    const auto shard1Chunk0 = generateChunkType(kNss,
-                                                ChunkVersion(11, 2, collEpoch, collTimestamp),
-                                                kShard1.getName(),
-                                                BSON("a" << 11),
-                                                BSON("a" << 20));
-
-    const auto collectionVersion = shard1Chunk0.getVersion();
-    ChunkVersion targetChunkVersion(collectionVersion.majorVersion() + 1,
-                                    0,
-                                    collectionVersion.epoch(),
-                                    collectionVersion.getTimestamp());
-
-    setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard1Chunk0});
-
-    auto opCtx = operationContext();
-
-    ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
-        opCtx, kNss, [&](OperationContext*, TxnNumber) {});
-
-    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard0Chunk0,
-        getChunkDoc(operationContext(), shard0Chunk0.getMin(), collEpoch, collTimestamp),
-        targetChunkVersion));
-
-    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard1Chunk0,
-        getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
-        targetChunkVersion));
-}
-
-TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
-       BumpChunkVersionTwoChunksOnOneShard) {
+TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
+       BumpsOnlyMinorVersionOfNewestChunk) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = boost::none;
 
@@ -200,10 +132,8 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
                                                 BSON("a" << 100));
 
     const auto collectionVersion = shard0Chunk1.getVersion();
-    ChunkVersion targetChunkVersion(collectionVersion.majorVersion() + 1,
-                                    0,
-                                    collectionVersion.epoch(),
-                                    collectionVersion.getTimestamp());
+    auto targetCollectionVersion = collectionVersion;
+    targetCollectionVersion.incMinor();
 
     setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard0Chunk1, shard1Chunk0});
 
@@ -211,20 +141,12 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
     ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
         opCtx, kNss, [&](OperationContext*, TxnNumber) {});
 
-    assertOnlyOneChunkVersionBumped(operationContext(),
-                                    {shard0Chunk0, shard0Chunk1},
-                                    targetChunkVersion,
-                                    collEpoch,
-                                    collTimestamp);
-
-    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard1Chunk0,
-        getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
-        targetChunkVersion));
+    assertChunkUnchanged(shard0Chunk0);
+    assertChunkVersionChangedAndOtherFieldsUnchanged(shard0Chunk1, targetCollectionVersion);
+    assertChunkUnchanged(shard1Chunk0);
 }
 
-TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
-       BumpChunkVersionTwoChunksOnTwoShards) {
+TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest, NoChunks) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = boost::none;
 
@@ -233,48 +155,21 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
                                                 kShard0.getName(),
                                                 BSON("a" << 1),
                                                 BSON("a" << 10));
-    const auto shard0Chunk1 = generateChunkType(kNss,
-                                                ChunkVersion(11, 2, collEpoch, collTimestamp),
-                                                kShard0.getName(),
-                                                BSON("a" << 11),
-                                                BSON("a" << 20));
-    const auto shard1Chunk0 = generateChunkType(kNss,
-                                                ChunkVersion(8, 1, collEpoch, collTimestamp),
-                                                kShard1.getName(),
-                                                BSON("a" << 21),
-                                                BSON("a" << 100));
-    const auto shard1Chunk1 = generateChunkType(kNss,
-                                                ChunkVersion(12, 1, collEpoch, collTimestamp),
-                                                kShard1.getName(),
-                                                BSON("a" << 101),
-                                                BSON("a" << 200));
 
-    const auto collectionVersion = shard1Chunk1.getVersion();
-    ChunkVersion targetChunkVersion(collectionVersion.majorVersion() + 1,
-                                    0,
-                                    collectionVersion.epoch(),
-                                    collectionVersion.getTimestamp());
-
-    setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard0Chunk1, shard1Chunk0, shard1Chunk1});
+    setupCollection(kNss, kKeyPattern, {shard0Chunk0});
 
     auto opCtx = operationContext();
-    ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
-        opCtx, kNss, [&](OperationContext*, TxnNumber) {});
+    ASSERT_OK(deleteToConfigCollection(
+        opCtx, ChunkType::ConfigNS, BSON(ChunkType::name << shard0Chunk0.getName()), false));
 
-    assertOnlyOneChunkVersionBumped(operationContext(),
-                                    {shard0Chunk0, shard0Chunk1},
-                                    targetChunkVersion,
-                                    collEpoch,
-                                    collTimestamp);
-
-    assertOnlyOneChunkVersionBumped(operationContext(),
-                                    {shard1Chunk0, shard1Chunk1},
-                                    targetChunkVersion,
-                                    collEpoch,
-                                    collTimestamp);
+    ASSERT_THROWS_CODE(
+        ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
+            opCtx, kNss, [&](OperationContext*, TxnNumber) {}),
+        DBException,
+        ErrorCodes::IncompatibleShardingMetadata);
 }
 
-TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
+TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
        SucceedsInThePresenceOfTransientTransactionErrors) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = boost::none;
@@ -303,20 +198,11 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
                 }
             });
 
-    auto targetChunkVersion = ChunkVersion{initialCollectionVersion.majorVersion() + 1,
-                                           0,
-                                           initialCollectionVersion.epoch(),
-                                           initialCollectionVersion.getTimestamp()};
+    auto targetCollectionVersion = initialCollectionVersion;
+    targetCollectionVersion.incMinor();
 
-    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard0Chunk0,
-        getChunkDoc(operationContext(), shard0Chunk0.getMin(), collEpoch, collTimestamp),
-        targetChunkVersion));
-
-    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard1Chunk0,
-        getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
-        targetChunkVersion));
+    assertChunkUnchanged(shard0Chunk0);
+    assertChunkVersionChangedAndOtherFieldsUnchanged(shard1Chunk0, targetCollectionVersion);
 
     ASSERT_EQ(numCalls, 5) << "transaction succeeded after unexpected number of attempts";
 
@@ -336,25 +222,15 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
                 }
             });
 
-    targetChunkVersion = ChunkVersion{initialCollectionVersion.majorVersion() + 2,
-                                      0,
-                                      initialCollectionVersion.epoch(),
-                                      initialCollectionVersion.getTimestamp()};
+    targetCollectionVersion.incMinor();
 
-    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard0Chunk0,
-        getChunkDoc(operationContext(), shard0Chunk0.getMin(), collEpoch, collTimestamp),
-        targetChunkVersion));
-
-    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard1Chunk0,
-        getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
-        targetChunkVersion));
+    assertChunkUnchanged(shard0Chunk0);
+    assertChunkVersionChangedAndOtherFieldsUnchanged(shard1Chunk0, targetCollectionVersion);
 
     ASSERT_EQ(numCalls, 5) << "transaction succeeded after unexpected number of attempts";
 }
 
-TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
+TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
        StopsRetryingOnPermanentServerErrors) {
     const auto collEpoch = OID::gen();
     const auto collTimestamp = boost::none;
@@ -385,15 +261,8 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
                        DBException,
                        ErrorCodes::ShutdownInProgress);
 
-    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard0Chunk0,
-        getChunkDoc(operationContext(), shard0Chunk0.getMin(), collEpoch, collTimestamp),
-        shard0Chunk0.getVersion()));
-
-    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard1Chunk0,
-        getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
-        shard1Chunk0.getVersion()));
+    assertChunkUnchanged(shard0Chunk0);
+    assertChunkUnchanged(shard1Chunk0);
 
     ASSERT_EQ(numCalls, 1) << "transaction failed after unexpected number of attempts";
 
@@ -410,15 +279,8 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
                        DBException,
                        ErrorCodes::NotWritablePrimary);
 
-    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard0Chunk0,
-        getChunkDoc(operationContext(), shard0Chunk0.getMin(), collEpoch, collTimestamp),
-        shard0Chunk0.getVersion()));
-
-    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
-        shard1Chunk0,
-        getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
-        shard1Chunk0.getVersion()));
+    assertChunkUnchanged(shard0Chunk0);
+    assertChunkUnchanged(shard1Chunk0);
 
     ASSERT_EQ(numCalls, 1) << "transaction failed after unexpected number of attempts";
 
@@ -440,7 +302,10 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
                        DBException,
                        ErrorCodes::Interrupted);
 
-    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
+    assertChunkUnchanged(shard0Chunk0);
+    assertChunkUnchanged(shard1Chunk0);
+
+    /*ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
         shard0Chunk0,
         getChunkDoc(operationContext(), shard0Chunk0.getMin(), collEpoch, collTimestamp),
         shard0Chunk0.getVersion()));
@@ -448,7 +313,7 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
         shard1Chunk0,
         getChunkDoc(operationContext(), shard1Chunk0.getMin(), collEpoch, collTimestamp),
-        shard1Chunk0.getVersion()));
+        shard1Chunk0.getVersion()));*/
 
     ASSERT_EQ(numCalls, 1) << "transaction failed after unexpected number of attempts";
 }

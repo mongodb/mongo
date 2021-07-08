@@ -407,18 +407,20 @@ BSONObj getShardAndCollectionVersion(OperationContext* opCtx,
     return result.obj();
 }
 
-void bumpMajorVersionOneChunkPerShard(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      TxnNumber txnNumber,
-                                      const std::vector<ShardId>& shardIds) {
-    auto curCollectionVersion = uassertStatusOK(getCollectionVersion(opCtx, nss));
-    ChunkVersion targetChunkVersion(curCollectionVersion.majorVersion() + 1,
-                                    0,
-                                    curCollectionVersion.epoch(),
-                                    curCollectionVersion.getTimestamp());
+NamespaceStringOrUUID getNsOrUUIDForChunkTargeting(const CollectionType& coll) {
+    if (coll.getTimestamp()) {
+        return {coll.getNss().db().toString(), coll.getUuid()};
+    } else {
+        return {coll.getNss()};
+    }
+}
 
+void bumpCollectionMinorVersion(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                TxnNumber txnNumber) {
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto findCollResponse = uassertStatusOK(
+
+    const auto findCollResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             repl::ReadConcernLevel::kLocalReadConcern,
@@ -426,57 +428,60 @@ void bumpMajorVersionOneChunkPerShard(OperationContext* opCtx,
                                             BSON(CollectionType::kNssFieldName << nss.ns()),
                                             {},
                                             1));
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            "Collection does not exist",
-            !findCollResponse.docs.empty());
+    uassert(
+        ErrorCodes::NamespaceNotFound, "Collection does not exist", !findCollResponse.docs.empty());
     const CollectionType coll(findCollResponse.docs[0]);
+    const auto nsOrUUID = getNsOrUUIDForChunkTargeting(coll);
 
-    for (const auto& shardId : shardIds) {
-        const auto query = [&] {
-            if (coll.getTimestamp()) {
-                return BSON(ChunkType::collectionUUID << coll.getUuid()
-                                                      << ChunkType::shard(shardId.toString()));
-            } else {
-                return BSON(ChunkType::ns(coll.getNss().ns())
-                            << ChunkType::shard(shardId.toString()));
-            }
-        }();
+    // Find the newest chunk
+    const auto findChunkResponse = uassertStatusOK(configShard->exhaustiveFindOnConfig(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        repl::ReadConcernLevel::kLocalReadConcern,
+        ChunkType::ConfigNS,
+        nsOrUUID.uuid() ? BSON(ChunkType::collectionUUID << *nsOrUUID.uuid())
+                        : BSON(ChunkType::ns() << nsOrUUID.nss()->toString()) /* query */,
+        BSON(ChunkType::lastmod << -1) /* sort */,
+        1 /* limit */));
 
-        BSONObjBuilder updateVersionClause;
-        updateVersionClause.appendTimestamp(ChunkType::lastmod(), targetChunkVersion.toLong());
+    uassert(ErrorCodes::IncompatibleShardingMetadata,
+            str::stream() << "Tried to find max chunk version for collection '" << nss.ns()
+                          << ", but found no chunks",
+            !findChunkResponse.docs.empty());
 
-        auto request = BatchedCommandRequest::buildUpdateOp(
-            ChunkType::ConfigNS,
-            query,
-            BSON("$set" << updateVersionClause.obj()),  // update
-            false,                                      // upsert
-            false                                       // multi
-        );
+    const auto newestChunk = uassertStatusOK(
+        ChunkType::fromConfigBSON(findChunkResponse.docs[0], coll.getEpoch(), coll.getTimestamp()));
+    const auto targetVersion = [&]() {
+        ChunkVersion version = newestChunk.getVersion();
+        version.incMinor();
+        return version;
+    }();
 
-        auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-            opCtx, ChunkType::ConfigNS, request, txnNumber);
+    // Update the newest chunk to have the new (bumped) version
+    BSONObjBuilder updateBuilder;
+    BSONObjBuilder updateVersionClause(updateBuilder.subobjStart("$set"));
+    updateVersionClause.appendTimestamp(ChunkType::lastmod(), targetVersion.toLong());
+    updateVersionClause.doneFast();
+    const auto chunkUpdate = updateBuilder.obj();
+    const auto request = BatchedCommandRequest::buildUpdateOp(
+        ChunkType::ConfigNS,
+        BSON(ChunkType::name << newestChunk.getName()),  // query
+        chunkUpdate,                                     // update
+        false,                                           // upsert
+        false                                            // multi
+    );
 
-        auto numDocsExpectedModified = 1;
-        auto numDocsModified = res.getIntField("n");
+    const auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+        opCtx, ChunkType::ConfigNS, request, txnNumber);
 
-        uassert(5030400,
-                str::stream() << "Expected to match " << numDocsExpectedModified
-                              << " docs, but only matched " << numDocsModified
-                              << " for write request " << request.toString(),
-                numDocsExpectedModified == numDocsModified);
+    auto numDocsExpectedModified = 1;
+    auto numDocsModified = res.getIntField("n");
 
-        // There exists a constraint that a chunk version must be unique for a given namespace,
-        // so the minor version is incremented for each chunk placed.
-        targetChunkVersion.incMinor();
-    }
-}
-
-NamespaceStringOrUUID getNsOrUUIDForChunkTargeting(const CollectionType& coll) {
-    if (coll.getTimestamp()) {
-        return {coll.getNss().db().toString(), coll.getUuid()};
-    } else {
-        return {coll.getNss()};
-    }
+    uassert(5511400,
+            str::stream() << "Expected to match " << numDocsExpectedModified
+                          << " docs, but only matched " << numDocsModified << " for write request "
+                          << request.toString(),
+            numDocsExpectedModified == numDocsModified);
 }
 
 std::vector<ShardId> getShardsOwningChunksForCollection(OperationContext* opCtx,
@@ -491,7 +496,7 @@ std::vector<ShardId> getShardsOwningChunksForCollection(OperationContext* opCtx,
                                             {},
                                             1));
     uassert(
-        ErrorCodes::Error(5514600), "Collection does not exist", !findCollResponse.docs.empty());
+        ErrorCodes::NamespaceNotFound, "Collection does not exist", !findCollResponse.docs.empty());
     const CollectionType coll(findCollResponse.docs[0]);
     const auto nsOrUUID = getNsOrUUIDForChunkTargeting(coll);
 
@@ -1638,19 +1643,11 @@ void ShardingCatalogManager::bumpMultipleCollectionVersionsAndChangeMetadataInTx
     // migrations
     Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
-    using NssAndShardIds = std::pair<NamespaceString, std::vector<ShardId>>;
-    std::vector<NssAndShardIds> nssAndShardIds;
-    for (const auto& nss : collNames) {
-        auto shardIds = getShardsOwningChunksForCollection(opCtx, nss);
-        nssAndShardIds.emplace_back(nss, std::move(shardIds));
-    }
-
     withTransaction(opCtx,
                     NamespaceString::kConfigReshardingOperationsNamespace,
                     [&](OperationContext* opCtx, TxnNumber txnNumber) {
-                        for (const auto& nssAndShardId : nssAndShardIds) {
-                            bumpMajorVersionOneChunkPerShard(
-                                opCtx, nssAndShardId.first, txnNumber, nssAndShardId.second);
+                        for (const auto& nss : collNames) {
+                            bumpCollectionMinorVersion(opCtx, nss, txnNumber);
                         }
                         changeMetadataFunc(opCtx, txnNumber);
                     });
@@ -1792,9 +1789,7 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
                                       << " but matched " << numDocsModified,
                         numDocsModified == 1);
 
-                // Bump the chunk version for one single chunk
-                invariant(!shardsIds.empty());
-                bumpMajorVersionOneChunkPerShard(opCtx, nss, txnNumber, {*shardsIds.begin()});
+                bumpCollectionMinorVersion(opCtx, nss, txnNumber);
             });
 
         // From now on migrations are not allowed anymore, so it is not possible that new shards
