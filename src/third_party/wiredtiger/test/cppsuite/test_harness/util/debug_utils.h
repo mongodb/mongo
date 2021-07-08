@@ -29,6 +29,10 @@
 #ifndef DEBUG_UTILS_H
 #define DEBUG_UTILS_H
 
+/* Following definitions are required in order to use printing format specifiers in C++. */
+#define __STDC_LIMIT_MACROS
+#define __STDC_FORMAT_MACROS
+
 #include <chrono>
 #include <iostream>
 #include <mutex>
