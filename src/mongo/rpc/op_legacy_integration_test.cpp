@@ -29,6 +29,7 @@
 
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -159,7 +160,7 @@ TEST(OpLegacy, DeprecatedReadOpsCounters) {
 }
 
 // Check whether the most recent "deprecation" entry in the log matches the given opName and
-// severity. Return 'false' if no deprecation entries found.
+// severity (if the 'severity' string isn't empty). Return 'false' if no deprecation entries found.
 bool wasLogged(DBClientBase* conn, const std::string& opName, const std::string& severity) {
     BSONObj getLogResponse;
     ASSERT(conn->runCommand("admin", fromjson("{getLog: 'global'}"), getLogResponse));
@@ -168,7 +169,7 @@ bool wasLogged(DBClientBase* conn, const std::string& opName, const std::string&
     for (auto it = logEntries.rbegin(); it != logEntries.rend(); ++it) {
         auto entry = it->String();
         if (entry.find("\"id\":5578800") != std::string::npos) {
-            const bool severityMatches =
+            const bool severityMatches = severity.empty() ||
                 (entry.find(std::string("\"s\":\"") + severity + "\"") != std::string::npos);
             const bool opNameMatches =
                 (entry.find(std::string("\"op\":\"") + opName + "\"") != std::string::npos);
@@ -304,6 +305,84 @@ TEST(OpLegacy, DeprecatedOpsLogging) {
 
     setDeprecatedWireOpsWarningPeriod(conn.get(), Seconds{3600} /*timeout*/);
     exerciseDeprecatedOps(conn.get(), "D2" /*expectedSeverity*/);
+}
+
+TEST(OpLegacy, GenericCommandViaOpQuery) {
+    auto conn = getIntegrationTestConnection();
+
+    auto serverStatusCmd = fromjson("{serverStatus: 1}");
+    BSONObj serverStatusReplyPrior;
+    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReplyPrior));
+
+    // Because we cannot link the log entries to the issued commands, limit the search window for
+    // the query-related entry in the log by first running a different command (e.g. getLastError).
+    ASSERT_EQ("", getLastError(conn.get()));  // will start failing soon but will still log
+    ASSERT(wasLogged(conn.get(), "getLastError", ""));
+
+    // The actual command doesn't matter, as long as it's not 'hello' or 'isMaster'.
+    auto opQuery = makeQueryMessage("test.$cmd",
+                                    serverStatusCmd,
+                                    1 /*nToReturn*/,
+                                    0 /*nToSkip*/,
+                                    nullptr /*fieldsToReturn*/,
+                                    0 /*queryOptions*/);
+    Message replyQuery;
+    ASSERT(conn->call(opQuery, replyQuery));
+    QueryResult::ConstView qr = replyQuery.singleData().view2ptr();
+    BufReader data(qr.data(), qr.dataLen());
+    BSONObj obj = data.read<BSONObj>();
+    ASSERT_OK(getStatusFromCommandResult(obj));  // will fail after we remove the support for $cmd
+
+    // The logic around log severity for the deprecation logging is tested elsewhere. Here we check
+    // that it gets logged at all.
+    ASSERT(wasLogged(conn.get(), "query", ""));
+
+    BSONObj serverStatusReply;
+    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "query") + 1,
+              getDeprecatedOpCount(serverStatusReply, "query"));
+}
+
+// 'hello' and 'isMaster' commands, issued via OP_QUERY protocol, are still fully supported.
+void testAllowedCommand(const char* command) {
+    auto conn = getIntegrationTestConnection();
+
+    auto serverStatusCmd = fromjson("{serverStatus: 1}");
+    BSONObj serverStatusReplyPrior;
+    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReplyPrior));
+
+    // Because we cannot link the log entries to the issued commands, limit the search window for
+    // the query-related entry in the log by first running a different command (e.g. getLastError).
+    ASSERT_EQ("", getLastError(conn.get()));  // will start failing soon but will still log
+    ASSERT(wasLogged(conn.get(), "getLastError", ""));
+
+    auto opQuery = makeQueryMessage("test.$cmd",
+                                    fromjson(command),
+                                    1 /*nToReturn*/,
+                                    0 /*nToSkip*/,
+                                    nullptr /*fieldsToReturn*/,
+                                    0 /*queryOptions*/);
+    Message replyQuery;
+    ASSERT(conn->call(opQuery, replyQuery));
+    QueryResult::ConstView qr = replyQuery.singleData().view2ptr();
+    BufReader data(qr.data(), qr.dataLen());
+    BSONObj obj = data.read<BSONObj>();
+    ASSERT_OK(getStatusFromCommandResult(obj));
+
+    ASSERT_FALSE(wasLogged(conn.get(), "query", ""));
+
+    BSONObj serverStatusReply;
+    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT_EQ(getDeprecatedOpCount(serverStatusReplyPrior, "query"),
+              getDeprecatedOpCount(serverStatusReply, "query"));
+}
+
+TEST(OpLegacy, HelloCommandViaOpQuery) {
+    testAllowedCommand("{hello: 1}");
+}
+
+TEST(OpLegacy, IsMasterCommandViaOpQuery) {
+    testAllowedCommand("{isMaster: 1}");
 }
 
 }  // namespace

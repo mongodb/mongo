@@ -75,6 +75,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/rewrite_state_change_errors.h"
+#include "mongo/rpc/warn_deprecated_wire_ops.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -860,6 +861,11 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     if (command->shouldAffectCommandCounter()) {
         globalOpCounters.gotCommand();
         _shouldAffectCommandCounter = true;
+    }
+
+    if (_parc->_opType == dbQuery && !_parc->_isHello.get()) {
+        warnDeprecation(*opCtx->getClient(), networkOpToString(dbQuery));
+        globalOpCounters.gotQueryDeprecated();
     }
 
     return Status::OK();

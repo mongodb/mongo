@@ -1529,8 +1529,12 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     if (command->shouldAffectCommandCounter()) {
-        OpCounters* opCounters = &globalOpCounters;
-        opCounters->gotCommand();
+        globalOpCounters.gotCommand();
+    }
+
+    if (!isHello() && _execContext->getMessage().operation() == dbQuery) {
+        warnDeprecation(*client, networkOpToString(dbQuery));
+        globalOpCounters.gotQueryDeprecated();
     }
 
     // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on the
