@@ -38,6 +38,7 @@
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/replica_set_monitor_stats.h"
 #include "mongo/client/sdam/sdam.h"
 #include "mongo/client/server_discovery_monitor.h"
 #include "mongo/client/server_ping_monitor.h"
@@ -80,7 +81,8 @@ public:
     StreamableReplicaSetMonitor(const MongoURI& uri,
                                 std::shared_ptr<executor::TaskExecutor> executor,
                                 std::shared_ptr<executor::EgressTagCloser> connectionManager,
-                                std::function<void()> cleanupCallback);
+                                std::function<void()> cleanupCallback,
+                                std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats);
 
     ~StreamableReplicaSetMonitor() override;
 
@@ -93,7 +95,8 @@ public:
     static ReplicaSetMonitorPtr make(const MongoURI& uri,
                                      std::shared_ptr<executor::TaskExecutor> executor,
                                      std::shared_ptr<executor::EgressTagCloser> connectionCloser,
-                                     std::function<void()> cleanupCallback);
+                                     std::function<void()> cleanupCallback,
+                                     std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats);
 
     SemiFuture<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
                                              const std::vector<HostAndPort>& excludedHosts,
@@ -143,6 +146,9 @@ private:
         std::shared_ptr<StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor>;
 
     struct HostQuery {
+        HostQuery(std::shared_ptr<ReplicaSetMonitorStats> stats)
+            : statsCollector(stats->collectGetHostAndRefreshStats()) {}
+
         ~HostQuery() {
             invariant(hasBeenResolved());
         }
@@ -177,6 +183,8 @@ private:
             }
             return !wasAlreadyDone;
         }
+
+        const mongo::ScopeGuard<std::function<void()>> statsCollector;
 
         CancellationSource deadlineCancelSource;
 
@@ -301,6 +309,7 @@ private:
     std::list<HostQueryPtr> _outstandingQueries;
     boost::optional<ChangeNotifierState> _confirmedNotifierState;
     mutable PseudoRandom _random;
+    std::shared_ptr<ReplicaSetMonitorStats> _stats;
 
     static constexpr auto kDefaultLogLevel = 0;
     static constexpr auto kLowerLogLevel = 1;

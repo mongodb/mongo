@@ -185,14 +185,16 @@ StreamableReplicaSetMonitor::StreamableReplicaSetMonitor(
     const MongoURI& uri,
     std::shared_ptr<TaskExecutor> executor,
     std::shared_ptr<executor::EgressTagCloser> connectionManager,
-    std::function<void()> cleanupCallback)
+    std::function<void()> cleanupCallback,
+    std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats)
     : ReplicaSetMonitor(cleanupCallback),
       _errorHandler(std::make_unique<SdamErrorHandler>(uri.getSetName())),
       _queryProcessor(std::make_shared<StreamableReplicaSetMonitorQueryProcessor>()),
       _uri(uri),
       _connectionManager(connectionManager),
       _executor(executor),
-      _random(PseudoRandom(SecureRandom().nextInt64())) {
+      _random(PseudoRandom(SecureRandom().nextInt64())),
+      _stats(std::make_shared<ReplicaSetMonitorStats>(managerStats)) {
     // Maintain order of original seed list
     std::vector<HostAndPort> seedsNoDups;
     std::set<HostAndPort> alreadyAdded;
@@ -219,10 +221,12 @@ ReplicaSetMonitorPtr StreamableReplicaSetMonitor::make(
     const MongoURI& uri,
     std::shared_ptr<TaskExecutor> executor,
     std::shared_ptr<executor::EgressTagCloser> connectionManager,
-    std::function<void()> cleanupCallback) {
+    std::function<void()> cleanupCallback,
+    std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats) {
     auto result = std::make_shared<StreamableReplicaSetMonitor>(
-        uri, executor, connectionManager, cleanupCallback);
+        uri, executor, connectionManager, cleanupCallback, managerStats);
     result->init();
+    invariant(managerStats);
     return result;
 }
 
@@ -248,8 +252,13 @@ void StreamableReplicaSetMonitor::init() {
         _uri, _eventsPublisher.get(), _sdamConfig.getHeartBeatFrequency(), _executor);
     _eventsPublisher->registerListener(_pingMonitor);
 
-    _serverDiscoveryMonitor = std::make_unique<ServerDiscoveryMonitor>(
-        _uri, _sdamConfig, _eventsPublisher, _topologyManager->getTopologyDescription(), _executor);
+    _serverDiscoveryMonitor =
+        std::make_unique<ServerDiscoveryMonitor>(_uri,
+                                                 _sdamConfig,
+                                                 _eventsPublisher,
+                                                 _topologyManager->getTopologyDescription(),
+                                                 _stats,
+                                                 _executor);
     _eventsPublisher->registerListener(_serverDiscoveryMonitor);
 
     _eventsPublisher->registerListener(_queryProcessor);
@@ -390,7 +399,7 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_enqueueOutsta
     const CancellationToken& cancelToken,
     const Date_t& deadline) {
 
-    auto query = std::make_shared<HostQuery>();
+    auto query = std::make_shared<HostQuery>(_stats);
     query->criteria = criteria;
     query->excludedHosts = excludedHosts;
 

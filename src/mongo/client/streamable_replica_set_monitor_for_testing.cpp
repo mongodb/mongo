@@ -56,6 +56,7 @@ void StreamableReplicaSetMonitorForTesting::setup(const MongoURI& uri) {
                                        std::move(networkConnectionHook),
                                        std::move(hookList));
     _connectionManager = std::make_unique<ReplicaSetMonitorConnectionManager>(networkInterface);
+    _stats = std::make_shared<ReplicaSetMonitorManagerStats>();
 
     auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(networkInterface.get());
 
@@ -64,7 +65,7 @@ void StreamableReplicaSetMonitorForTesting::setup(const MongoURI& uri) {
     _taskExecutor->startup();
 
     _replSetMonitor = std::make_shared<StreamableReplicaSetMonitor>(
-        uri, _taskExecutor, _connectionManager, [] {});
+        uri, _taskExecutor, _connectionManager, [] {}, _stats);
     auto topologyManager = std::make_unique<sdam::MockTopologyManager>();
     _topologyManagerPtr = topologyManager.get();
 

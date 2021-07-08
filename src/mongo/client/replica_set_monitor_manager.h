@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/client/replica_set_change_notifier.h"
+#include "mongo/client/replica_set_monitor_stats.h"
 #include "mongo/executor/egress_tag_closer.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
@@ -202,7 +203,7 @@ private:
 
     int _numMonitorsCreated;
 
-    void _setupTaskExecutorInLock();
+    void _setupTaskExecutorAndStatsInLock();
 
     // Set to true when shutdown has been called.
     bool _isShutdown{false};
@@ -225,6 +226,9 @@ private:
 
     // Used for tests.
     Counter64 _monitorsGarbageCollected;
+
+    // Internally synchronized.
+    std::shared_ptr<ReplicaSetMonitorManagerStats> _stats;
 };
 
 }  // namespace mongo

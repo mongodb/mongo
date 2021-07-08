@@ -139,10 +139,14 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData se
     }
 }
 
-void ReplicaSetMonitorManager::_setupTaskExecutorInLock() {
+void ReplicaSetMonitorManager::_setupTaskExecutorAndStatsInLock() {
     if (_isShutdown || _taskExecutor) {
         // do not restart taskExecutor if is in shutdown
         return;
+    }
+
+    if (!_stats) {
+        _stats = std::make_shared<ReplicaSetMonitorManagerStats>();
     }
 
     // construct task executor
@@ -179,7 +183,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
             !_isShutdown);
 
     _doGarbageCollectionLocked(lk);
-    _setupTaskExecutorInLock();
+    _setupTaskExecutorAndStatsInLock();
     const auto& setName = uri.getSetName();
     auto monitor = _monitors[setName].lock();
     if (monitor) {
@@ -199,7 +203,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
         // Both ReplicaSetMonitorProtocol::kSdam and ReplicaSetMonitorProtocol::kStreamable use the
         // StreamableReplicaSetMonitor.
         newMonitor = StreamableReplicaSetMonitor::make(
-            uri, getExecutor(), _getConnectionManager(), cleanupCallback);
+            uri, getExecutor(), _getConnectionManager(), cleanupCallback, _stats);
     }
     _monitors[setName] = newMonitor;
     _numMonitorsCreated++;
@@ -329,15 +333,21 @@ void ReplicaSetMonitorManager::report(BSONObjBuilder* builder, bool forFTDC) {
 
     builder->appendNumber("numReplicaSetMonitorsCreated", _numMonitorsCreated);
 
-    BSONObjBuilder setStats(
-        builder->subobjStart(forFTDC ? "replicaSetPingTimesMillis" : "replicaSets"));
+    {
+        BSONObjBuilder setStats(
+            builder->subobjStart(forFTDC ? "replicaSetPingTimesMillis" : "replicaSets"));
 
-    for (const auto& setName : setNames) {
-        auto monitor = getMonitor(setName);
-        if (!monitor) {
-            continue;
+        for (const auto& setName : setNames) {
+            auto monitor = getMonitor(setName);
+            if (!monitor) {
+                continue;
+            }
+            monitor->appendInfo(setStats, forFTDC);
         }
-        monitor->appendInfo(setStats, forFTDC);
+    }
+
+    if (_stats) {
+        _stats->report(builder, forFTDC);
     }
 }
 

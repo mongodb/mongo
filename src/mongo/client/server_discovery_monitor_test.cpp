@@ -131,7 +131,8 @@ protected:
                                                                                 boost::none,
                                                                                 sdamConfiguration,
                                                                                 _eventsPublisher,
-                                                                                _executor);
+                                                                                _executor,
+                                                                                _stats);
         ssIsMasterMonitor->init();
 
         // Ensure that the clock has not advanced since setUp() and _startDate is representative
@@ -145,7 +146,7 @@ protected:
         const sdam::SdamConfiguration& sdamConfiguration,
         const sdam::TopologyDescriptionPtr topologyDescription) {
         auto serverIsMasterMonitor = std::make_shared<ServerDiscoveryMonitor>(
-            setUri, sdamConfiguration, _eventsPublisher, topologyDescription, _executor);
+            setUri, sdamConfiguration, _eventsPublisher, topologyDescription, _stats, _executor);
 
         // Ensure that the clock has not advanced since setUp() and _startDate is representative
         // of when the first isMaster request was sent.
@@ -263,6 +264,11 @@ private:
     std::shared_ptr<sdam::TopologyListenerMock> _topologyListener;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     executor::NetworkInterfaceMock* _net;
+
+    std::shared_ptr<ReplicaSetMonitorManagerStats> _managerStats =
+        std::make_shared<ReplicaSetMonitorManagerStats>();
+    std::shared_ptr<ReplicaSetMonitorStats> _stats =
+        std::make_shared<ReplicaSetMonitorStats>(_managerStats);
 };
 
 /**

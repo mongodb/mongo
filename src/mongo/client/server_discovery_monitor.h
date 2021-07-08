@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 #include "mongo/client/mongo_uri.h"
+#include "mongo/client/replica_set_monitor_stats.h"
 #include "mongo/client/sdam/sdam.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/unordered_map.h"
@@ -43,7 +44,8 @@ public:
                                           boost::optional<TopologyVersion> topologyVersion,
                                           const SdamConfiguration& sdamConfig,
                                           TopologyEventsPublisherPtr eventListener,
-                                          std::shared_ptr<executor::TaskExecutor> executor);
+                                          std::shared_ptr<executor::TaskExecutor> executor,
+                                          std::shared_ptr<ReplicaSetMonitorStats> stats);
 
     void init();
     void shutdown();
@@ -94,9 +96,11 @@ private:
 
     static constexpr auto kLogLevel = 0;
 
+    const HostAndPort _host;
+    const std::shared_ptr<ReplicaSetMonitorStats> _stats;
+
     Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(4), "SingleServerDiscoveryMonitor::mutex");
-    HostAndPort _host;
     boost::optional<TopologyVersion> _topologyVersion;
     TopologyEventsPublisherPtr _eventListener;
     std::shared_ptr<executor::TaskExecutor> _executor;
@@ -121,6 +125,7 @@ public:
                            const SdamConfiguration& sdamConfiguration,
                            TopologyEventsPublisherPtr eventsPublisher,
                            TopologyDescriptionPtr initialTopologyDescription,
+                           std::shared_ptr<ReplicaSetMonitorStats> stats,
                            std::shared_ptr<executor::TaskExecutor> executor = nullptr);
 
     virtual ~ServerDiscoveryMonitor() {}
@@ -149,6 +154,8 @@ private:
     void _disableExpeditedChecking(WithLock);
 
     static constexpr auto kLogLevel = 0;
+
+    const std::shared_ptr<ReplicaSetMonitorStats> _stats;
 
     Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "ServerDiscoveryMonitor::mutex");

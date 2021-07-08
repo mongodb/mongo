@@ -60,6 +60,8 @@ private:
 
     // ReplicaSetMonitorManager only stores weak_ptrs, so we need to keep the monitor alive.
     std::shared_ptr<StreamableReplicaSetMonitor> _replSetMonitor;
+
+    std::shared_ptr<ReplicaSetMonitorManagerStats> _stats;
 };
 
 }  // namespace mongo
