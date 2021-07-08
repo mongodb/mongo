@@ -1953,7 +1953,7 @@ TEST_F(InitialSyncerTest,
 
 TEST_F(InitialSyncerTest, InitialSyncerReturnsParseErrorWhenFCVFetcherReturnsNoVersion) {
     auto docs = {BSON("_id" << FeatureCompatibilityVersionParser::kParameterName << "targetVersion"
-                            << FeatureCompatibilityVersionParser::kVersion44)};
+                            << FeatureCompatibilityVersionParser::kLatest)};
     runInitialSyncWithBadFCVResponse(docs, ((ErrorCodes::Error)40414));
 }
 
