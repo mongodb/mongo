@@ -575,9 +575,24 @@ void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opC
             }
         }
 
-        // It is not safe to use taskList after this call, because it will unlock and lock the tasks
-        // mutex, so we just loop around.
-        taskList.waitForActiveTaskCompletion(lg);
+        // Wait for the active task to complete
+        {
+            const auto activeTaskNum = taskList.front().taskNum;
+
+            // Increase the use_count of the condition variable shared pointer, because the entire
+            // task list might get deleted during the unlocked interval
+            auto condVar = taskList._activeTaskCompletedCondVar;
+
+            // It is not safe to use taskList after this call, because it will unlock and lock the
+            // tasks mutex, so we just loop around.
+            // It is only correct to wait again on condVar if the taskNum has not changed, meaning
+            // that it must still be the same task list.
+            opCtx->waitForConditionOrInterrupt(*condVar, lg, [&]() {
+                const auto it = _collAndChunkTaskLists.find(nss);
+                return it == _collAndChunkTaskLists.end() || it->second.empty() ||
+                    it->second.front().taskNum != activeTaskNum;
+            });
+        }
     }
 }
 
@@ -628,9 +643,24 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
             }
         }
 
-        // It is not safe to use taskList after this call, because it will unlock and lock the tasks
-        // mutex, so we just loop around.
-        taskList.waitForActiveTaskCompletion(lg);
+        // Wait for the active task to complete
+        {
+            const auto activeTaskNum = taskList.front().taskNum;
+
+            // Increase the use_count of the condition variable shared pointer, because the entire
+            // task list might get deleted during the unlocked interval
+            auto condVar = taskList._activeTaskCompletedCondVar;
+
+            // It is not safe to use taskList after this call, because it will unlock and lock the
+            // tasks mutex, so we just loop around.
+            // It is only correct to wait again on condVar if the taskNum has not changed, meaning
+            // that it must still be the same task list.
+            opCtx->waitForConditionOrInterrupt(*condVar, lg, [&]() {
+                const auto it = _dbTaskLists.find(dbName.toString());
+                return it == _dbTaskLists.end() || it->second.empty() ||
+                    it->second.front().taskNum != activeTaskNum;
+            });
+        }
     }
 }
 
@@ -1439,22 +1469,6 @@ void ShardServerCatalogCacheLoader::DbTaskList::pop_front() {
     invariant(!_tasks.empty());
     _tasks.pop_front();
     _activeTaskCompletedCondVar->notify_all();
-}
-
-void ShardServerCatalogCacheLoader::CollAndChunkTaskList::waitForActiveTaskCompletion(
-    stdx::unique_lock<Latch>& lg) {
-    // Increase the use_count of the condition variable shared pointer, because the entire task list
-    // might get deleted during the unlocked interval
-    auto condVar = _activeTaskCompletedCondVar;
-    condVar->wait(lg);
-}
-
-void ShardServerCatalogCacheLoader::DbTaskList::waitForActiveTaskCompletion(
-    stdx::unique_lock<Latch>& lg) {
-    // Increase the use_count of the condition variable shared pointer, because the entire task list
-    // might get deleted during the unlocked interval
-    auto condVar = _activeTaskCompletedCondVar;
-    condVar->wait(lg);
 }
 
 bool ShardServerCatalogCacheLoader::CollAndChunkTaskList::hasTasksFromThisTerm(
