@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/executor/connection_pool_test_fixture.h"
+
+#include "mongo/util/assert_util.h"
 
 #include <memory>
 
@@ -46,6 +46,7 @@ TimerImpl::~TimerImpl() {
 
 void TimerImpl::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
     _cb = std::move(cb);
+    invariant(timeout >= Milliseconds(0));
     _expiration = _global->now() + timeout;
 
     _timers.emplace(this);

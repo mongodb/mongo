@@ -1144,6 +1144,14 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
         nextEventTime = _requests.front().first;
     }
 
+    // Clamp next event time to be either now or in the future. Next event time
+    // can be in the past anytime we wait a long time between invocations of
+    // updateState; in these cases, we want to set our event timer to expire
+    // immediately.
+    if (nextEventTime < now) {
+        nextEventTime = now;
+    }
+
     // If our timer is already set to the next event, then we're done
     if (nextEventTime == _eventTimerExpiration) {
         return;
@@ -1156,7 +1164,7 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
     _eventTimer->cancelTimeout();
 
     // Set our event timer to timeout requests, refresh the state, and potentially expire this pool
-    auto deferredStateUpdateFunc = guardCallback([this, timeout]() {
+    auto deferredStateUpdateFunc = guardCallback([this]() {
         auto now = _parent->_factory->now();
 
         _health.isFailed = false;
