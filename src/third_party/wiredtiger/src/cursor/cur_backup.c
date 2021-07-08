@@ -348,7 +348,7 @@ __backup_add_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
     if (i == WT_BLKINCR_MAX)
         WT_RET_PANIC(session, WT_NOTFOUND, "Could not find an incremental backup slot to use");
 
-    /* Use the slot.  */
+    /* Use the slot. */
     if (blk->id_str != NULL)
         __wt_verbose(
           session, WT_VERB_BACKUP, "Freeing and reusing backup slot with old id %s", blk->id_str);

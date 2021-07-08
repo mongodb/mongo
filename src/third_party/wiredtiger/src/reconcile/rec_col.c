@@ -578,7 +578,7 @@ __wt_rec_col_var(
     WT_DECL_RET;
     WT_INSERT *ins;
     WT_PAGE *page;
-    WT_TIME_WINDOW tw, default_tw;
+    WT_TIME_WINDOW clear_tw, *twp;
     WT_UPDATE *upd;
     WT_UPDATE_SELECT upd_select;
     uint64_t n, nrepeat, repeat_count, rle, skip, src_recno;
@@ -589,10 +589,11 @@ __wt_rec_col_var(
     btree = S2BT(session);
     vpack = &_vpack;
     page = pageref->page;
+    WT_TIME_WINDOW_INIT(&clear_tw);
+    twp = NULL;
     upd = NULL;
     size = 0;
     data = NULL;
-    WT_TIME_WINDOW_INIT(&default_tw);
 
     cbt = &r->update_modify_cbt;
     cbt->iface.session = (WT_SESSION *)session;
@@ -601,13 +602,6 @@ __wt_rec_col_var(
     last.value = r->last;
     WT_TIME_WINDOW_INIT(&last.tw);
     last.deleted = false;
-
-    /*
-     * Set the start/stop values to cause failure if they're not set.
-     * [-Werror=maybe-uninitialized]
-     */
-    /* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
-    WT_TIME_WINDOW_INIT(&tw);
 
     WT_RET(__wt_rec_split_init(session, r, page, pageref->ref_recno, btree->maxleafpage_precomp));
 
@@ -626,7 +620,6 @@ __wt_rec_col_var(
     if (salvage != NULL && salvage->missing != 0) {
         if (salvage->skip == 0) {
             rle = salvage->missing;
-            WT_TIME_WINDOW_INIT(&last.tw);
             last.deleted = true;
 
             /*
@@ -636,7 +629,7 @@ __wt_rec_col_var(
             salvage->take += salvage->missing;
         } else
             WT_ERR(__rec_col_var_helper(
-              session, r, NULL, NULL, &default_tw, salvage->missing, true, false));
+              session, r, NULL, NULL, &clear_tw, salvage->missing, true, false));
     }
 
     /*
@@ -721,18 +714,15 @@ record_loop:
                     repeat_count = WT_INSERT_RECNO(ins) - src_recno;
 
                 /*
-                 * The key on the old disk image is unchanged. If it is a deleted record or we are
-                 * salvaging the file, clear the time window information, else take the time window
-                 * from the cell.
+                 * The key on the old disk image is unchanged. Clear the time window information if
+                 * it's a deleted record, else take the time window from the cell.
                  */
                 deleted = orig_deleted;
-                if (deleted || salvage) {
-                    WT_TIME_WINDOW_INIT(&tw);
-
-                    if (deleted)
-                        goto compare;
-                } else
-                    WT_TIME_WINDOW_COPY(&tw, &vpack->tw);
+                if (deleted) {
+                    twp = &clear_tw;
+                    goto compare;
+                }
+                twp = &vpack->tw;
 
                 /*
                  * If we are handling overflow items, use the overflow item itself exactly once,
@@ -755,7 +745,7 @@ record_loop:
                     last.value->data = vpack->data;
                     last.value->size = vpack->size;
                     WT_ERR(__rec_col_var_helper(
-                      session, r, salvage, last.value, &tw, repeat_count, false, true));
+                      session, r, salvage, last.value, twp, repeat_count, false, true));
 
                     /* Track if page has overflow items. */
                     r->ovfl_items = true;
@@ -781,7 +771,7 @@ record_loop:
                     break;
                 }
             } else {
-                WT_TIME_WINDOW_COPY(&tw, &upd_select.tw);
+                twp = &upd_select.tw;
 
                 switch (upd->type) {
                 case WT_UPDATE_MODIFY:
@@ -798,7 +788,7 @@ record_loop:
                     size = upd->size;
                     break;
                 case WT_UPDATE_TOMBSTONE:
-                    WT_TIME_WINDOW_INIT(&tw);
+                    twp = &clear_tw;
                     deleted = true;
                     break;
                 default:
@@ -814,7 +804,7 @@ compare:
              * record number, we've been doing that all along.
              */
             if (rle != 0) {
-                if (WT_TIME_WINDOWS_EQUAL(&tw, &last.tw) &&
+                if (WT_TIME_WINDOWS_EQUAL(twp, &last.tw) &&
                   ((deleted && last.deleted) ||
                     (!deleted && !last.deleted && last.value->size == size &&
                       memcmp(last.value->data, data, size) == 0))) {
@@ -849,7 +839,7 @@ compare:
                     WT_ERR(__wt_buf_set(session, last.value, data, size));
             }
 
-            WT_TIME_WINDOW_COPY(&last.tw, &tw);
+            WT_TIME_WINDOW_COPY(&last.tw, twp);
             last.deleted = deleted;
             rle = repeat_count;
         }
@@ -918,14 +908,14 @@ compare:
                     src_recno += skip;
                 } else
                     /* Set time window for the first deleted key in a deleted range. */
-                    WT_TIME_WINDOW_INIT(&tw);
+                    twp = &clear_tw;
             } else if (upd == NULL) {
                 /* The updates on the key are all uncommitted so we write a deleted key to disk. */
-                WT_TIME_WINDOW_INIT(&tw);
+                twp = &clear_tw;
                 deleted = true;
             } else {
                 /* Set time window for the key. */
-                WT_TIME_WINDOW_COPY(&tw, &upd_select.tw);
+                twp = &upd_select.tw;
 
                 switch (upd->type) {
                 case WT_UPDATE_MODIFY:
@@ -945,7 +935,7 @@ compare:
                     size = upd->size;
                     break;
                 case WT_UPDATE_TOMBSTONE:
-                    WT_TIME_WINDOW_INIT(&tw);
+                    twp = &clear_tw;
                     deleted = true;
                     break;
                 default:
@@ -958,7 +948,7 @@ compare:
              * the same thing.
              */
             if (rle != 0) {
-                if (WT_TIME_WINDOWS_EQUAL(&last.tw, &tw) &&
+                if (WT_TIME_WINDOWS_EQUAL(&last.tw, twp) &&
                   ((deleted && last.deleted) ||
                     (!deleted && !last.deleted && size != 0 && last.value->size == size &&
                       memcmp(last.value->data, data, size) == 0))) {
@@ -990,7 +980,7 @@ compare:
             }
 
             /* Ready for the next loop, reset the RLE counter. */
-            WT_TIME_WINDOW_COPY(&last.tw, &tw);
+            WT_TIME_WINDOW_COPY(&last.tw, twp);
             last.deleted = deleted;
             rle = 1;
 

@@ -38,6 +38,7 @@ __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
      */
     WT_ASSERT(session, __wt_hazard_check_assert(session, ref, true));
 
+    /* Check we are not evicting an accessible internal page with an active split generation. */
     WT_ASSERT(session,
       !F_ISSET(ref, WT_REF_FLAG_INTERNAL) ||
         F_ISSET(session->dhandle, WT_DHANDLE_DEAD | WT_DHANDLE_EXCLUSIVE) ||

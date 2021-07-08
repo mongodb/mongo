@@ -1126,26 +1126,30 @@ __rollback_abort_updates(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
 
 /*
  * __rollback_abort_fast_truncate --
- *     Abort fast truncate on this page newer than the timestamp.
+ *     Abort fast truncate for an internal page of leaf pages.
  */
 static int
 __rollback_abort_fast_truncate(
   WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t rollback_timestamp)
 {
-    /*
-     * A fast-truncate page is either in the WT_REF_DELETED state (where the WT_PAGE_DELETED
-     * structure has the timestamp information), or in an in-memory state where it started as a
-     * fast-truncate page which was then instantiated and the timestamp information moved to the
-     * individual WT_UPDATE structures. When reviewing internal pages, ignore the second case, an
-     * instantiated page is handled when the leaf page is visited.
-     */
-    if (ref->state == WT_REF_DELETED && ref->ft_info.del != NULL &&
-      rollback_timestamp < ref->ft_info.del->durable_timestamp) {
-        __wt_verbose(
-          session, WT_VERB_RECOVERY_RTS(session), "%p: deleted page rolled back", (void *)ref);
-        WT_RET(__wt_delete_page_rollback(session, ref));
-    }
+    WT_REF *child_ref;
 
+    WT_INTL_FOREACH_BEGIN (session, ref->page, child_ref) {
+        /*
+         * A fast-truncate page is either in the WT_REF_DELETED state (where the WT_PAGE_DELETED
+         * structure has the timestamp information), or in an in-memory state where it started as a
+         * fast-truncate page which was then instantiated and the timestamp information moved to the
+         * individual WT_UPDATE structures. When reviewing internal pages, ignore the second case,
+         * an instantiated page is handled when the leaf page is visited.
+         */
+        if (child_ref->state == WT_REF_DELETED && child_ref->ft_info.del != NULL &&
+          rollback_timestamp < child_ref->ft_info.del->durable_timestamp) {
+            __wt_verbose(session, WT_VERB_RECOVERY_RTS(session), "%p: deleted page rolled back",
+              (void *)child_ref);
+            WT_RET(__wt_delete_page_rollback(session, child_ref));
+        }
+    }
+    WT_INTL_FOREACH_END;
     return (0);
 }
 
@@ -1183,19 +1187,17 @@ static int
 __rollback_to_stable_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
 {
     WT_DECL_RET;
-    WT_REF *child_ref, *ref;
+    WT_REF *ref;
 
     /* Walk the tree, marking commits aborted where appropriate. */
     ref = NULL;
     while ((ret = __wt_tree_walk_custom_skip(session, &ref, __wt_rts_page_skip, &rollback_timestamp,
               WT_READ_NO_EVICT | WT_READ_WONT_NEED)) == 0 &&
       ref != NULL)
-        if (F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
-            WT_INTL_FOREACH_BEGIN (session, ref->page, child_ref) {
-                WT_RET(__rollback_abort_fast_truncate(session, child_ref, rollback_timestamp));
-            }
-            WT_INTL_FOREACH_END;
-        } else
+        if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
+            WT_WITH_PAGE_INDEX(
+              session, ret = __rollback_abort_fast_truncate(session, ref, rollback_timestamp));
+        else
             WT_RET(__rollback_abort_updates(session, ref, rollback_timestamp));
 
     return (ret);
@@ -1210,7 +1212,6 @@ __rollback_to_stable_btree(WT_SESSION_IMPL *session, wt_timestamp_t rollback_tim
 {
     WT_BTREE *btree;
     WT_CONNECTION_IMPL *conn;
-    WT_DECL_RET;
 
     btree = S2BT(session);
     conn = S2C(session);
@@ -1224,17 +1225,12 @@ __rollback_to_stable_btree(WT_SESSION_IMPL *session, wt_timestamp_t rollback_tim
      * Immediately durable files don't get their commits wiped. This case mostly exists to support
      * the semantic required for the oplog in MongoDB - updates that have been made to the oplog
      * should not be aborted. It also wouldn't be safe to roll back updates for any table that had
-     * it's records logged, since those updates would be recovered after a crash making them
-     * inconsistent.
+     * its records logged: those updates would be recovered after a crash, making them inconsistent.
      */
-    if (__wt_btree_immediately_durable(session)) {
-        if (btree->id >= conn->stable_rollback_maxfile)
-            WT_RET_PANIC(session, EINVAL, "btree file ID %" PRIu32 " larger than max %" PRIu32,
-              btree->id, conn->stable_rollback_maxfile);
+    if (__wt_btree_immediately_durable(session))
         return (0);
-    }
 
-    /* There is never anything to do for checkpoint handles */
+    /* There is never anything to do for checkpoint handles. */
     if (session->dhandle->checkpoint != NULL)
         return (0);
 
@@ -1242,8 +1238,7 @@ __rollback_to_stable_btree(WT_SESSION_IMPL *session, wt_timestamp_t rollback_tim
     if (btree->root.page == NULL)
         return (0);
 
-    WT_WITH_PAGE_INDEX(session, ret = __rollback_to_stable_btree_walk(session, rollback_timestamp));
-    return (ret);
+    return (__rollback_to_stable_btree_walk(session, rollback_timestamp));
 }
 
 /*
@@ -1427,10 +1422,15 @@ __rollback_to_stable_btree_apply(
     wt_timestamp_t max_durable_ts, newest_start_durable_ts, newest_stop_durable_ts;
     size_t addr_size;
     uint64_t rollback_txnid;
-    uint32_t btree_id;
+    uint32_t btree_id, handle_open_flags;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool dhandle_allocated, durable_ts_found, has_txn_updates_gt_than_ckpt_snap, perform_rts;
     bool prepared_updates;
+
+    /* Ignore non-file objects as well as the metadata and history store files. */
+    if (!WT_PREFIX_MATCH(uri, "file:") || strcmp(uri, WT_HS_URI) == 0 ||
+      strcmp(uri, WT_METAFILE_URI) == 0)
+        return (0);
 
     txn_global = &S2C(session)->txn_global;
     rollback_txnid = 0;
@@ -1511,7 +1511,19 @@ __rollback_to_stable_btree_apply(
 
     if (perform_rts || max_durable_ts > rollback_timestamp || prepared_updates ||
       !durable_ts_found || has_txn_updates_gt_than_ckpt_snap) {
-        WT_ERR(__wt_session_get_dhandle(session, uri, NULL, NULL, 0));
+        /*
+         * MongoDB does not close all open handles before calling rollback-to-stable; otherwise,
+         * don't permit that behavior, the application is likely making a mistake.
+         */
+#ifdef WT_STANDALONE_BUILD
+        handle_open_flags = WT_DHANDLE_DISCARD | WT_DHANDLE_EXCLUSIVE;
+#else
+        handle_open_flags = 0;
+#endif
+        ret = __wt_session_get_dhandle(session, uri, NULL, NULL, handle_open_flags);
+        if (ret != 0)
+            WT_ERR_MSG(session, ret, "%s: unable to open handle%s", uri,
+              ret == EBUSY ? ", error indicates handle is unavailable due to concurrent use" : "");
         dhandle_allocated = true;
 
         __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
@@ -1552,12 +1564,48 @@ err:
 }
 
 /*
+ * __wt_rollback_to_stable_one --
+ *     Perform rollback to stable on a single object.
+ */
+int
+__wt_rollback_to_stable_one(WT_SESSION_IMPL *session, const char *uri, bool *skipp)
+{
+    WT_DECL_RET;
+    wt_timestamp_t rollback_timestamp;
+    char *config;
+
+    /*
+     * This is confusing: the caller's boolean argument "skip" stops the schema-worker loop from
+     * processing this object and any underlying objects it may have (for example, a table with
+     * multiple underlying file objects). We rollback-to-stable all of the file objects an object
+     * may contain, so set the caller's skip argument to true on all file objects, else set the
+     * caller's skip argument to false so our caller continues down the tree of objects.
+     */
+    *skipp = WT_PREFIX_MATCH(uri, "file:");
+    if (!*skipp)
+        return (0);
+
+    WT_RET(__wt_metadata_search(session, uri, &config));
+
+    /* Read the stable timestamp once, when we first start up. */
+    WT_ORDERED_READ(rollback_timestamp, S2C(session)->txn_global.stable_timestamp);
+
+    F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
+    ret = __rollback_to_stable_btree_apply(session, uri, config, rollback_timestamp);
+    F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
+
+    __wt_free(session, config);
+
+    return (ret);
+}
+
+/*
  * __rollback_to_stable_btree_apply_all --
  *     Perform rollback to stable to all files listed in the metadata, apart from the metadata and
  *     history store files.
  */
 static int
-__rollback_to_stable_btree_apply_all(WT_SESSION_IMPL *session, uint64_t rollback_timestamp)
+__rollback_to_stable_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
 {
     struct timespec rollback_timer;
     WT_CURSOR *cursor;
@@ -1577,12 +1625,6 @@ __rollback_to_stable_btree_apply_all(WT_SESSION_IMPL *session, uint64_t rollback
         ++rollback_count;
 
         WT_ERR(cursor->get_key(cursor, &uri));
-
-        /* Ignore non-file objects as well as the metadata and history store files. */
-        if (!WT_PREFIX_MATCH(uri, "file:") || strcmp(uri, WT_HS_URI) == 0 ||
-          strcmp(uri, WT_METAFILE_URI) == 0)
-            continue;
-
         WT_ERR(cursor->get_value(cursor, &config));
 
         F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
@@ -1653,11 +1695,6 @@ __rollback_to_stable(WT_SESSION_IMPL *session, bool no_ckpt)
           conn->recovery_ckpt_snap_min, conn->recovery_ckpt_snap_max,
           conn->recovery_ckpt_snapshot_count);
 
-    /*
-     * Allocate a non-durable btree bitstring. We increment the global value before using it, so the
-     * current value is already in use, and hence we need to add one here.
-     */
-    conn->stable_rollback_maxfile = conn->next_file_id + 1;
     WT_ERR(__rollback_to_stable_btree_apply_all(session, rollback_timestamp));
 
     /* Rollback the global durable timestamp to the stable timestamp. */

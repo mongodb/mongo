@@ -154,6 +154,8 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
             cur_ts_nolog[k] = 3
 
         self.session.commit_transaction('commit_timestamp=' + timestamp_str(301))
+        cur_ts_log.close()
+        cur_ts_nolog.close()
 
         # Scenario: 1
         # Check that we see all the latest values (i.e. 3) as per transaction

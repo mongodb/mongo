@@ -2437,7 +2437,8 @@ struct __wt_connection {
 	 * to have completed. Any updates to checkpoint durable tables that are more recent than
 	 * the stable timestamp are removed.
 	 *
-	 * This method requires that there are no active operations for the duration of the call.
+	 * This method requires that there are no open cursors or active operations for the duration
+	 * of the call.
 	 *
 	 * Any updates made to logged tables will not be rolled back. Any updates made without an
 	 * associated timestamp will not be rolled back. See @ref transaction_timestamps.
@@ -2447,6 +2448,8 @@ struct __wt_connection {
 	 * @param connection the connection handle
 	 * @configempty{WT_CONNECTION.rollback_to_stable, see dist/api_data.py}
 	 * @errors
+	 * An error should occur only in the case of a system problem, and an application typically
+	 * will retry WT_CONNECTION::rollback_to_stable on error, or fail outright.
 	 */
 	int __F(rollback_to_stable)(
 	    WT_CONNECTION *connection, const char *config);

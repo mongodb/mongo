@@ -77,6 +77,7 @@ class test_rollback_to_stable15(wttest.WiredTigerTestCase):
             self.assertEqual(v, check_value)
             count += 1
         session.commit_transaction()
+        cursor.close()
         self.assertEqual(count, nrows)
 
     def test_rollback_to_stable(self):
@@ -107,6 +108,7 @@ class test_rollback_to_stable15(wttest.WiredTigerTestCase):
             self.session.begin_transaction()
             cursor[i] = value30
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+        cursor.close()
 
         #Set stable timestamp to 2
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(2))
@@ -115,6 +117,7 @@ class test_rollback_to_stable15(wttest.WiredTigerTestCase):
         self.check(value20, uri, nrows - 1, 2)
 
         #Second Update to value30 at timestamp 7
+        cursor = self.session.open_cursor(uri)
         for i in range(1, nrows):
             self.session.begin_transaction()
             cursor[i] = value30
@@ -125,6 +128,7 @@ class test_rollback_to_stable15(wttest.WiredTigerTestCase):
             self.session.begin_transaction()
             cursor[i] = value40
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(9))
+        cursor.close()
 
         #Set stable timestamp to 7
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(7))

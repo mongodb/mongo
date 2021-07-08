@@ -454,7 +454,7 @@ __ckpt_valid_blk_mods(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool rename)
          * resources and then set up our entry.
          */
 
-        /* Check if the global entry is valid at our index.  */
+        /* Check if the global entry is valid at our index. */
         if (!F_ISSET(blk, WT_BLKINCR_VALID)) {
             free = true;
             setup = false;
@@ -473,7 +473,7 @@ __ckpt_valid_blk_mods(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool rename)
         if (rename && (!free || setup))
             F_SET(blk_mod, WT_BLOCK_MODS_RENAME);
 
-        /* Free any old information if we need to do so.  */
+        /* Free any old information if we need to do so. */
         if (free && F_ISSET(blk_mod, WT_BLOCK_MODS_VALID)) {
             __wt_free(session, blk_mod->id_str);
             __wt_buf_free(session, &blk_mod->bitstring);
@@ -483,7 +483,7 @@ __ckpt_valid_blk_mods(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool rename)
             F_CLR(blk_mod, WT_BLOCK_MODS_VALID);
         }
 
-        /* Set up the block list to point to the current information.  */
+        /* Set up the block list to point to the current information. */
         if (setup) {
             WT_RET(__wt_strdup(session, blk->id_str, &blk_mod->id_str));
             WT_CLEAR(blk_mod->bitstring);

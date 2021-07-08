@@ -1689,7 +1689,7 @@ __evict_walk_target(WT_SESSION_IMPL *session)
     if (target_pages < MIN_PAGES_PER_TREE)
         target_pages = MIN_PAGES_PER_TREE;
 
-    /* If the tree is dead, take a lot of pages.  */
+    /* If the tree is dead, take a lot of pages. */
     if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
         target_pages *= 10;
 

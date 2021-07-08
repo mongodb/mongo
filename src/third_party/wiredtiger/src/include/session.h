@@ -164,6 +164,9 @@ struct __wt_session_impl {
     void *reconcile; /* Reconciliation support */
     int (*reconcile_cleanup)(WT_SESSION_IMPL *);
 
+    /* Salvage support. */
+    void *salvage_track;
+
     /* Sessions have an associated statistics bucket based on its ID. */
     u_int stat_bucket; /* Statistics bucket offset */
 

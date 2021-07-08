@@ -511,8 +511,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi,
                 fix_ts_upd = oldest_upd;
 
             if (!F_ISSET(fix_ts_upd, WT_UPDATE_FIXED_HS)) {
-                /* Delete and reinsert any update of the key with a higher timestamp.
-                 */
+                /* Delete and reinsert any update of the key with a higher timestamp. */
                 WT_ERR(__wt_hs_delete_key_from_ts(session, hs_cursor, btree->id, key,
                   fix_ts_upd->start_ts + 1, true, checkpoint_running));
                 F_SET(fix_ts_upd, WT_UPDATE_FIXED_HS);

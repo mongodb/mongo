@@ -1700,15 +1700,18 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     }
 
     /*
+     * Check we are not evicting an accessible internal page with an active split generation.
+     *
      * If a split created new internal pages, those newly created internal pages cannot be evicted
      * until all threads are known to have exited the original parent page's index, because evicting
      * an internal page discards its WT_REF array, and a thread traversing the original parent page
      * index might see a freed WT_REF.
      *
-     * One special case where we know this is safe is if the handle is locked exclusive (e.g., when
-     * the whole tree is being evicted). In that case, no readers can be looking at an old index.
+     * One special case where we know this is safe is if the handle is dead or locked exclusively,
+     * that is, no readers can be looking at an old index.
      */
-    if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) && !F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE) &&
+    if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) &&
+      !F_ISSET(session->dhandle, WT_DHANDLE_DEAD | WT_DHANDLE_EXCLUSIVE) &&
       __wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen))
         return (false);
 

@@ -150,6 +150,10 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
             # Setup an oldest timestamp to ensure state remains in cache.
             if k == 1:
                 self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
+        cur_ts_log.close()
+        cur_ts_nolog.close()
+        cur_nots_log.close()
+        cur_nots_nolog.close()
 
         # Scenario: 1
         # Check that we see all the inserted values(i.e 1) in all tables
@@ -217,6 +221,10 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn.set_timestamp('oldest_timestamp=' + stable_ts)
 
         # Update the values again in preparation for rolling back more.
+        cur_ts_log = self.session.open_cursor(self.table_ts_log)
+        cur_ts_nolog = self.session.open_cursor(self.table_ts_nolog)
+        cur_nots_log = self.session.open_cursor(self.table_nots_log)
+        cur_nots_nolog = self.session.open_cursor(self.table_nots_nolog)
         for k in keys:
             cur_nots_log[k] = 2
             cur_nots_nolog[k] = 2
@@ -224,6 +232,10 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
             cur_ts_log[k] = 2
             cur_ts_nolog[k] = 2
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(k + key_range))
+        cur_ts_log.close()
+        cur_ts_nolog.close()
+        cur_nots_log.close()
+        cur_nots_nolog.close()
 
         # Scenario: 3
         # Check that we see all values updated (i.e 2) in all tables.

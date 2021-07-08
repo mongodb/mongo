@@ -488,8 +488,6 @@ struct __wt_connection_impl {
     uint64_t sweep_interval;        /* Handle sweep interval */
     uint64_t sweep_handles_min;     /* Handle sweep minimum open */
 
-    uint32_t stable_rollback_maxfile;
-
     /* Locked: collator list */
     TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;
 

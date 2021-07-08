@@ -113,6 +113,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         cursor2.set_key(1)
         self.assertEquals(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()
+        cursor2.close()
 
         # Pin stable timestamp to 20.
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(20))
@@ -138,6 +139,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
         self.assertGreater(upd_aborted, 0)
         self.assertGreater(keys_removed, 0)
+        stat_cursor.close()
 
     def test_rollback_to_stable_with_history(self):
         nrows = 1000
@@ -193,6 +195,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         cursor2.set_key(1)
         self.assertEquals(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()
+        cursor2.close()
 
         # Pin stable timestamp to 40.
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(40))

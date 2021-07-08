@@ -664,7 +664,7 @@ __wt_tiered_storage_destroy(WT_SESSION_IMPL *session)
     /* Destroy all condition variables after threads have stopped. */
     __wt_cond_destroy(session, &conn->tiered_cond);
     __wt_cond_destroy(session, &conn->tiered_mgr_cond);
-    /* The flush condition variable must be last because any internal thread could be using it.  */
+    /* The flush condition variable must be last because any internal thread could be using it. */
     __wt_cond_destroy(session, &conn->flush_cond);
 
     if (conn->tiered_mgr_session != NULL) {

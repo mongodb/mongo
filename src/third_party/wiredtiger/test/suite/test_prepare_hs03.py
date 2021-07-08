@@ -60,10 +60,21 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
             tablepointer.write('Bad!' * 1024)
 
     def corrupt_salvage_verify(self):
+        # An exclusive handle operation can fail if there is dirty data in the cache, closing the
+        # open handles before acquiring an exclusive handle will return EBUSY. A checkpoint should
+        # clear the dirty data, but eviction can re-dirty the cache between the checkpoint and the
+        # open attempt, we have to loop.
+        self.session.checkpoint()
         if self.corrupt == True:
             self.corrupt_table()
-        self.session.salvage(self.uri, "force")
-        self.session.verify(self.uri, None)
+        while True:
+            if not self.raisesBusy(lambda: self.session.salvage(self.uri, "force")):
+                break
+            self.session.checkpoint()
+        while True:
+            if not self.raisesBusy(lambda: self.session.verify(self.uri, None)):
+                break
+            self.session.checkpoint()
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -72,8 +83,6 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         return val
 
     def prepare_updates(self, ds, nrows, nsessions, nkeys):
-        # Insert some records with commit timestamp, corrupt file and call salvage, verify before checkpoint.
-
         # Commit some updates to get eviction and history store fired up
         commit_value = b"bbbbb" * 100
         cursor = self.session.open_cursor(self.uri)
@@ -85,11 +94,12 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(1))
         cursor.close()
 
-        # Corrupt the table, Call salvage to recover data from the corrupted table and call verify
-        self.corrupt_salvage_verify()
+        # Set the stable/oldest timstamps.
+        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
 
-        # Call checkpoint
-        self.session.checkpoint()
+        # Corrupt the table, call salvage to recover data from the corrupted table and call verify
+        self.corrupt_salvage_verify()
 
         hs_writes_start = self.get_stat(stat.conn.cache_write_hs)
 
@@ -129,19 +139,13 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
             self.assertNotEquals(cursor.get_value(), prepare_value)
         cursor.close()
 
-        # Close all cursors and sessions, this will cause prepared updates to be
-        # rollback-ed
+        # Close all sessions (and cursors), this will cause prepared updates to be rolled back.
         for j in range (0, nsessions):
-            cursors[j].close()
             sessions[j].close()
 
-        # Corrupt the table, Call salvage to recover data from the corrupted table and call verify
-        self.corrupt_salvage_verify()
-
         self.session.commit_transaction()
-        self.session.checkpoint()
 
-        # Corrupt the table, Call salvage to recover data from the corrupted table and call verify
+        # Corrupt the table, call salvage to recover data from the corrupted table and call verify
         self.corrupt_salvage_verify()
 
         # Finally, search for the keys inserted with commit timestamp
@@ -180,8 +184,8 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         cursor.close()
         self.session.commit_transaction()
 
-        # After simulating a crash, corrupt the table, call salvage to recover data from the corrupted table
-        # and call verify
+        # After simulating a crash, corrupt the table, call salvage to recover data from the
+        # corrupted table and call verify
         self.corrupt_salvage_verify()
 
     def test_prepare_hs(self):
