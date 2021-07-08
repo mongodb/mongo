@@ -29,20 +29,27 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_densify.h"
+#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include <utility>
 
 namespace mongo {
 namespace {
 
 using GenClass = DocumentSourceInternalDensify::DocGenerator;
+using DensifyFullNumericTest = AggregationContextFixture;
+using DensifyExplicitNumericTest = AggregationContextFixture;
 
 Date_t makeDate(std::string dateStr) {
     auto statusDate = dateFromISOString(dateStr);
     ASSERT_TRUE(statusDate.isOK());
     return statusDate.getValue();
 }
+
 DEATH_TEST(DensifyGeneratorTest, ErrorsIfMinOverMax, "lower or equal to max") {
     Document doc{{"a", 1}};
     ASSERT_THROWS_CODE(
@@ -316,5 +323,745 @@ TEST(DensifyGeneratorTest, GeneratesDatesByMonthCorrectly) {
     ASSERT_DOCUMENT_EQ(doc, generator.getNextDocument());
     ASSERT_TRUE(generator.done());
 }
+TEST_F(DensifyFullNumericTest, DensifySingleValue) {
+    auto densify = DocumentSourceInternalDensify(getExpCtx(), 2, "a");
+    auto source = DocumentSourceMock::createForTest({"{a: 1}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 1));
+
+    ASSERT(densify.getNext().isEOF());
+}
+
+TEST_F(DensifyFullNumericTest, DensifyValuesCorrectlyWithDuplicates) {
+    auto densify = DocumentSourceInternalDensify(getExpCtx(), 2, "a");
+    auto source = DocumentSourceMock::createForTest(
+        {"{a: 1}", "{a: 1}", "{a: 1}", "{a: 3}", "{a: 7}", "{a: 7}", "{a: 7}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 1));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 1));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 1));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 3));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 5));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 7));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 7));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 7));
+    ASSERT(densify.getNext().isEOF());
+}
+
+TEST_F(DensifyFullNumericTest, DensifyValuesCorrectlyOffStep) {
+    auto densify = DocumentSourceInternalDensify(getExpCtx(), 3, "a");
+    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 9}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 1));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 4));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 7));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 9));
+
+    // Check that multiple EOFs are correctly returned at the end
+    ASSERT(densify.getNext().isEOF());
+    ASSERT(densify.getNext().isEOF());
+    ASSERT(densify.getNext().isEOF());
+}
+
+TEST_F(DensifyFullNumericTest, DensifyValuesCorrectlyOnStep) {
+    auto densify = DocumentSourceInternalDensify(getExpCtx(), 2, "a");
+    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 9}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 1));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 3));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 5));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 7));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 9));
+    ASSERT(densify.getNext().isEOF());
+
+    // Check that multiple EOFs are correctly returned at the end
+    ASSERT(densify.getNext().isEOF());
+    ASSERT(densify.getNext().isEOF());
+    ASSERT(densify.getNext().isEOF());
+}
+
+
+TEST_F(DensifyFullNumericTest,
+       NoDensificationIfStepIsGreaterThanDocumentDifferenceMultipleDocuments) {
+    auto densify = DocumentSourceInternalDensify(getExpCtx(), 2, "a");
+    auto source =
+        DocumentSourceMock::createForTest({"{a: 1}", "{a : 2}", "{a: 3}", "{a: 4}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 1));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 2));
+
+    next = densify.getNext();
+
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 3));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 4));
+    ASSERT(densify.getNext().isEOF());
+}
+
+TEST_F(DensifyFullNumericTest, DensificationFieldMissing) {
+    auto densify = DocumentSourceInternalDensify(getExpCtx(), 10, "a");
+    auto source = DocumentSourceMock::createForTest(
+        {"{b: 1}", "{a: 1}", "{a: 20}", "{b: 2}", "{b: 3}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("b" << 1));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 1));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 11));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 20));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("b" << 2));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("b" << 3));
+    ASSERT(densify.getNext().isEOF());
+}
+
+TEST_F(DensifyFullNumericTest, NoDensificationIfStepGreaterThanDocumentDifference) {
+    auto densify = DocumentSourceInternalDensify(getExpCtx(), 10, "a");
+    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 9}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 1));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 9));
+    ASSERT(densify.getNext().isEOF());
+}
+
+TEST_F(DensifyFullNumericTest, DensifyOverDocumentsWithGaps) {
+    auto densify = DocumentSourceInternalDensify(getExpCtx(), 3, "a");
+    auto source = DocumentSourceMock::createForTest(
+        {"{a: 1}", "{a: 2}", "{a : 3}", "{a : 4}", "{a : 9}", "{a : 10}", "{a : 15}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 1));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 2));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 3));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 4));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 7));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 9));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 10));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 13));
+
+    next = densify.getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), DOC("a" << 15));
+    ASSERT(densify.getNext().isEOF());
+}
+
+TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStartingBelowRange) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        2,
+        "a",
+        std::make_pair(DocumentSourceInternalDensify::DensifyValueType(5),
+                       DocumentSourceInternalDensify::DensifyValueType(15)));
+    auto source = DocumentSourceMock::createForTest(
+        {"{a: 0}", "{a: 1}", "{a: 8}", "{a: 13}", "{a: 19}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(5, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(7, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(8, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(9, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(11, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(13, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(15, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(19, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+
+TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStepStartinOnMinRange) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        1,
+        "a",
+        std::make_pair(DocumentSourceInternalDensify::DensifyValueType(0),
+                       DocumentSourceInternalDensify::DensifyValueType(4)));
+    auto source = DocumentSourceMock::createForTest(
+        {"{a: 0}", "{a: 1}", "{a: 8}", "{a: 13}", "{a: 19}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(3, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(4, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(8, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(13, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(19, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStartingInsideRange) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        1,
+        "a",
+        std::make_pair(DocumentSourceInternalDensify::DensifyValueType(0),
+                       DocumentSourceInternalDensify::DensifyValueType(4)));
+    auto source =
+        DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}", "{a: 4}", "{a: 6}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(3, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(4, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(6, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeOnlyInsideRange) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        1,
+        "a",
+        std::make_pair(DocumentSourceInternalDensify::DensifyValueType(0),
+                       DocumentSourceInternalDensify::DensifyValueType(4)));
+    auto source = DocumentSourceMock::createForTest({"{a: 1}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(3, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(4, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStartingAboveRange) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        1,
+        "a",
+        std::make_pair(DocumentSourceInternalDensify::DensifyValueType(0),
+                       DocumentSourceInternalDensify::DensifyValueType(4)));
+    auto source = DocumentSourceMock::createForTest({"{a: 5}", "{a: 6}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(3, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(4, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(5, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(6, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStartingInsideOffStep) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        2,
+        "a",
+        std::make_pair(DocumentSourceInternalDensify::DensifyValueType(0),
+                       DocumentSourceInternalDensify::DensifyValueType(4)));
+    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 6}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(4, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(6, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyExplicitNumericTest,
+       CorrectlyDensifiesForNumericExplicitRangeStartingInsideWithDupes) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        1,
+        "a",
+        std::make_pair(DocumentSourceInternalDensify::DensifyValueType(0),
+                       DocumentSourceInternalDensify::DensifyValueType(4)));
+    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 1}", "{a: 6}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(3, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(4, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(6, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeWithDupesWithinSource) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        1,
+        "a",
+        std::make_pair(DocumentSourceInternalDensify::DensifyValueType(0),
+                       DocumentSourceInternalDensify::DensifyValueType(20)));
+    auto source = DocumentSourceMock::createForTest(
+        {"{a: 1}", "{a: 7}", "{a: 7}", "{a: 7}", "{a: 15}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
+
+    for (int i = 1; i <= 6; ++i) {
+        next = densify.getNext();
+        ASSERT(next.isAdvanced());
+        ASSERT_EQUALS(i, next.getDocument().getField("a").getDouble());
+    }
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(7, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(7, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(7, next.getDocument().getField("a").getDouble());
+
+    for (int i = 8; i <= 20; ++i) {
+        next = densify.getNext();
+        ASSERT(next.isAdvanced());
+        ASSERT_EQUALS(i, next.getDocument().getField("a").getDouble());
+    }
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeAfterHitsEOF) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        1,
+        "a",
+        std::make_pair(DocumentSourceInternalDensify::DensifyValueType(2),
+                       DocumentSourceInternalDensify::DensifyValueType(5)));
+    auto source = DocumentSourceMock::createForTest({"{a: 0}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(3, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(4, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(5, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeWhenFieldIsMissing) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        1,
+        "a",
+        std::make_pair(DocumentSourceInternalDensify::DensifyValueType(0),
+                       DocumentSourceInternalDensify::DensifyValueType(4)));
+    auto source = DocumentSourceMock::createForTest({"{b: 2}", "{b: 6}", "{a: 1}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(6, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(3, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(4, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStepLargerThanRange) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        6,
+        "a",
+        std::make_pair(DocumentSourceInternalDensify::DensifyValueType(0),
+                       DocumentSourceInternalDensify::DensifyValueType(4)));
+    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 6}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(6, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeHitEOFNearMax) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        2,
+        "a",
+        std::make_pair(DocumentSourceInternalDensify::DensifyValueType(0),
+                       DocumentSourceInternalDensify::DensifyValueType(3)));
+    auto source = DocumentSourceMock::createForTest({"{a: 0}", "{a: 2}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyExplicitNumericTest, DensificationForNumericValuesErrorsIfFieldIsNotNumeric) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        6,
+        "a",
+        std::make_pair(DocumentSourceInternalDensify::DensifyValueType(0),
+                       DocumentSourceInternalDensify::DensifyValueType(4)));
+    auto source =
+        DocumentSourceMock::createForTest({"{a: \"should be numeric\"}", "{a: 6}"}, getExpCtx());
+    densify.setSource(source.get());
+    ASSERT_THROWS_CODE(densify.getNext(), AssertionException, 5733201);
+}
+
 }  // namespace
 }  // namespace mongo

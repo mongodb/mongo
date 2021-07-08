@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -58,7 +57,7 @@ public:
                      DensifyValueType max,
                      StepSpec step,
                      FieldPath fieldName,
-                     Document includeFields,
+                     boost::optional<Document> includeFields,
                      boost::optional<Document> finalDoc);
         Document getNextDocument();
         bool done() const;
@@ -89,6 +88,12 @@ public:
         GeneratorState _state = GeneratorState::kGeneratingDocuments;
     };
 
+    DocumentSourceInternalDensify(
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+        double step,
+        FieldPath path,
+        boost::optional<std::pair<DensifyValueType, DensifyValueType>> range = boost::none);
+
     static boost::intrusive_ptr<DocumentSourceInternalDensify> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
@@ -109,7 +114,10 @@ public:
     const char* getSourceName() const final {
         return kStageName.rawData();
     }
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
+        // TODO SERVER-57334
+        return Value(DOC("$densify" << Document()));
+    }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         return DepsTracker::State::SEE_NEXT;
@@ -119,7 +127,79 @@ public:
         return DistributedPlanLogic{nullptr, this, boost::none};
     }
 
-    DocumentSourceInternalDensify(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
     GetNextResult doGetNext() final;
+
+private:
+    enum class ValComparedToRange {
+        kBelow,
+        kRangeMin,
+        kInside,
+        kAbove,
+    };
+
+    /**
+       Decides whether or not to build a DocGen and return the first document generated
+       or return the current doc if the rangeMin + step is greater than rangeMax.
+    */
+    DocumentSource::GetNextResult handleNeedGenFull(Document currentDoc);
+
+    /**
+        Checks where the current doc's value lies compared to the range and
+        creates the correct DocGen if needed and returns the next doc.
+    */
+    DocumentSource::GetNextResult handleNeedGenExplicit(Document currentDoc, double val);
+
+    /** Takes care of when an EOF has been hit for the explicit case.
+    It checks if we have finished densifying over the range, and if so changes the
+    state to be kDensify done. Otherwise it builds a new generator that will finish
+    densifying over the range and changes the state to kHaveGen. */
+    DocumentSource::GetNextResult densifyAfterEOF();
+
+    /** Creates a document generator based on the value passed in, the current
+    _rangeMin, and the _rangeMax. Once created, the state changes to kHaveGenerator and the first
+    document from the generator is returned. */
+    DocumentSource::GetNextResult processDocAboveMinBound(double val, Document doc);
+
+    /** Takes in a value and checks if the value is below, on the bottom, inside, or above the
+    range, and returns the equivelant state from ValComparedToRange. */
+    ValComparedToRange processRangeNum(double val, double rangeMin, double rangeMax);
+
+    /** Handles when the pSource has been exhausted. In the full
+    case we are done with the densification process and the state becomes kDensifyDone, however in
+    the explicit case we may still need to densify over the remainder of the range, so the
+    densifyAfterEOF() function is called. */
+    DocumentSource::GetNextResult handleSourceExhausted();
+
+    /** Checks if the current document generator is done. If it is and we have finished densifying,
+    it changes the state to be kDensifyDone. If there is more to densify, the state becomes
+    kNeedGen. The generator is also deleted. */
+    void resetDocGen();
+
+    auto valOffsetFromStep(double val, double sub, double step) {
+        return fmod((val - sub), step);
+    }
+    boost::optional<DocGenerator> _docGenerator = boost::none;
+
+    // The minimum value that the document generator will create, therefore the next generated
+    // document will have this value.
+    // This is also used as last seen value by the explicit case.
+    boost::optional<DensifyValueType> _rangeMin = boost::none;
+    boost::optional<DensifyValueType> _rangeMax = boost::none;
+
+    bool _eof = false;
+
+    enum class DensifyState { kUninitializedOrBelowRange, kNeedGen, kHaveGenerator, kDensifyDone };
+
+    enum class TypeOfDensify {
+        kFull,
+        kExplicitRange,
+        kPartition,
+    };
+
+    StepSpec _step;
+    FieldPath _path;
+
+    DensifyState _densifyState = DensifyState::kUninitializedOrBelowRange;
+    TypeOfDensify _densifyType;
 };
 }  // namespace mongo
