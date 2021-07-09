@@ -761,5 +761,9 @@ void ReplicationCoordinatorMock::restartScheduledHeartbeats_forTest() {
     return;
 }
 
+void ReplicationCoordinatorMock::recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

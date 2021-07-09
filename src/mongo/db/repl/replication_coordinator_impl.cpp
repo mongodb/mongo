@@ -4552,6 +4552,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     if (!oldConfig.isInitialized()) {
         // We allow the IDWC to be set only once after initial configuration is loaded.
         _setImplicitDefaultWriteConcern(opCtx, lk);
+        _validateDefaultWriteConcernOnShardStartup(lk);
     } else {
         // If 'enableDefaultWriteConcernUpdatesForInitiate' is enabled, we allow the IDWC to be
         // recalculated after a reconfig. However, this logic is only relevant for testing,
@@ -5821,6 +5822,32 @@ void ReplicationCoordinatorImpl::ReadWriteAbility::setCanServeNonLocalReads(Oper
 void ReplicationCoordinatorImpl::ReadWriteAbility::setCanServeNonLocalReads_UNSAFE(
     unsigned int newVal) {
     _canServeNonLocalReads.store(newVal);
+}
+
+void ReplicationCoordinatorImpl::recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) {
+    auto isCWWCSet = _externalState->isCWWCSetOnConfigShard(opCtx);
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
+        _wasCWWCSetOnConfigServerOnStartup = isCWWCSet;
+    }
+}
+
+void ReplicationCoordinatorImpl::_validateDefaultWriteConcernOnShardStartup(WithLock lk) const {
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        // Checking whether the shard is part of a sharded cluster or not by checking if CWWC
+        // flag is set as we record it during sharding initialization phase, as on restarting a
+        // shard node for upgrading or any other reason, sharding initialization happens before
+        // config initialization.
+        if (_wasCWWCSetOnConfigServerOnStartup && !_wasCWWCSetOnConfigServerOnStartup.get() &&
+            !_rsConfig.isImplicitDefaultWriteConcernMajority()) {
+            auto msg =
+                "Cannot start shard because the implicit default write concern on this shard is "
+                "set to {w : 1}, since the number of writable voting members is not strictly more "
+                "than the voting majority. Change the shard configuration or set the cluster-wide "
+                "write concern using setDefaultRWConcern command and try again.";
+            fassert(5684400, {ErrorCodes::IllegalOperation, msg});
+        }
+    }
 }
 
 }  // namespace repl

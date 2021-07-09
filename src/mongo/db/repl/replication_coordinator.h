@@ -1139,6 +1139,13 @@ public:
      */
     virtual void restartScheduledHeartbeats_forTest() = 0;
 
+    /**
+     * Records if the cluster-wide write concern is set during sharding initialization.
+     *
+     * This function will assert if the shard can't talk to config server.
+     */
+    virtual void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) = 0;
+
 protected:
     ReplicationCoordinator();
 };

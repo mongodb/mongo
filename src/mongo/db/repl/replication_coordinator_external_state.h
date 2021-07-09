@@ -321,6 +321,13 @@ public:
      * Stops periodic noop writes to oplog.
      */
     virtual void stopNoopWriter() = 0;
+
+    /**
+     * Returns whether cluster-wide write concern is set on config server or not.
+     *
+     * Assert will be raised if running a command on the config server failed.
+     */
+    virtual bool isCWWCSetOnConfigShard(OperationContext* opCtx) const = 0;
 };
 
 }  // namespace repl

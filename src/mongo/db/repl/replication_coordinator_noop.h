@@ -327,6 +327,8 @@ public:
 
     virtual void restartScheduledHeartbeats_forTest() final;
 
+    virtual void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
+
 private:
     ServiceContext* const _service;
 };

@@ -337,6 +337,8 @@ public:
 
     virtual void restartScheduledHeartbeats_forTest() override;
 
+    virtual void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
+
 private:
     // Back pointer to the ServiceContext that has started the instance.
     ServiceContext* const _service;

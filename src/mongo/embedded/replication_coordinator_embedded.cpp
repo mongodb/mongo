@@ -623,5 +623,11 @@ void ReplicationCoordinatorEmbedded::restartScheduledHeartbeats_forTest() {
     MONGO_UNREACHABLE;
 }
 
+
+void ReplicationCoordinatorEmbedded::recordIfCWWCIsSetOnConfigServerOnStartup(
+    OperationContext* opCtx) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace embedded
 }  // namespace mongo

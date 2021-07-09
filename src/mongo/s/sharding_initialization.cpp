@@ -41,6 +41,7 @@
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/time_proof_service.h"
@@ -207,6 +208,14 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     return Status::OK();
 }
 
+void loadCWWCFromConfigServerForReplication(OperationContext* opCtx) {
+    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+        return;
+    }
+
+    repl::ReplicationCoordinator::get(opCtx)->recordIfCWWCIsSetOnConfigServerOnStartup(opCtx);
+}
+
 Status waitForShardRegistryReload(OperationContext* opCtx) {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return Status::OK();
@@ -221,6 +230,8 @@ Status waitForShardRegistryReload(OperationContext* opCtx) {
         try {
             uassertStatusOK(ClusterIdentityLoader::get(opCtx)->loadClusterId(
                 opCtx, repl::ReadConcernLevel::kMajorityReadConcern));
+            // Assert will be raised on failure to talk to config server.
+            loadCWWCFromConfigServerForReplication(opCtx);
             if (Grid::get(opCtx)->shardRegistry()->isUp()) {
                 return Status::OK();
             }

@@ -196,6 +196,8 @@ public:
      */
     virtual void stopNoopWriter();
 
+    virtual bool isCWWCSetOnConfigShard(OperationContext* opCtx) const final;
+
 private:
     StatusWith<BSONObj> _localRsConfigDocument;
     StatusWith<LastVote> _localRsLastVoteDocument;

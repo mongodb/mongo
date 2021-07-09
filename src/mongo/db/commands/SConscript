@@ -142,7 +142,6 @@ env.Library(
         'user_management_commands_common.cpp',
         'drop_connections.idl',
         'rotate_certificates.idl',
-        'rwc_defaults_commands.idl',
         'user_management_commands.idl',
     ],
     LIBDEPS=[
@@ -177,6 +176,16 @@ env.Library(
         'feature_compatibility_parsers',
         'server_status',
         'test_commands_enabled',
+    ]
+)
+
+env.Library(
+    target='rwc_defaults_commands',
+    source=[
+        'rwc_defaults_commands.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/read_write_concern_defaults',
     ]
 )
 
@@ -514,6 +523,7 @@ env.Library(
         'mongod_fcv',
         'mongod_fsync',
         'profile_common',
+        'rwc_defaults_commands',
         'server_status',
         'servers',
         'set_feature_compatibility_version_idl',

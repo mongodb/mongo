@@ -3168,7 +3168,7 @@ var ReplSetTest = function(opts) {
             let port = parseInt(conn.port);
             print("ReplSetTest stopSet waiting for mongo program on port " + port + " to stop.");
             let exitCode = waitMongoProgram(port);
-            if (exitCode !== MongoRunner.EXIT_CLEAN) {
+            if (exitCode !== MongoRunner.EXIT_CLEAN && !opts.skipValidatingExitCode) {
                 throw new Error("ReplSetTest stopSet mongo program on port " + port +
                                 " shut down unexpectedly with code " + exitCode + " when code " +
                                 MongoRunner.EXIT_CLEAN + " was expected.");

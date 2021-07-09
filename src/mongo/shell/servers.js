@@ -1030,6 +1030,7 @@ MongoRunner.validateCollectionsCallback = function(port) {};
  *        pwd {string}: admin password
  *      },
  *      skipValidation: <bool>,
+ *      skipValidatingExitCode: <bool>,
  *      allowedExitCode: <int>
  *    }
  * @param {boolean} waitpid should we wait for the process to terminate after stopping it.
@@ -1093,7 +1094,7 @@ var stopMongoProgram = function(conn, signal, opts, waitpid) {
     if (!waitpid) {
         returnCode = 0;
     }
-    if (allowedExitCode !== returnCode) {
+    if (allowedExitCode !== returnCode && !opts.skipValidatingExitCode) {
         throw new MongoRunner.StopError(returnCode);
     } else if (returnCode !== MongoRunner.EXIT_CLEAN) {
         print("MongoDB process on port " + port + " intentionally exited with error code ",
