@@ -41,16 +41,18 @@ class test_hs24(wttest.WiredTigerTestCase):
         # Check the data store and the history store content is consistent.
         # If we have a value in the data store, we should see the older
         # version in the history store as well.
+        newer_data_visible = False
         for i in range(0, 2000):
             cursor.set_key(str(i))
             cursor2.set_key(str(i))
             ret = cursor.search()
             ret2 = cursor2.search()
-            if ret == 0:
+            if not newer_data_visible:
+                newer_data_visible = ret != wiredtiger.WT_NOTFOUND
+            if newer_data_visible:
                 self.assertEquals(cursor.get_value(), self.value2)
                 self.assertEquals(cursor2.get_value(), self.value1)
             else:
-                self.assertEquals(ret, wiredtiger.WT_NOTFOUND)
                 self.assertEquals(ret2, wiredtiger.WT_NOTFOUND)
         session2.rollback_transaction()
         self.session.rollback_transaction()
@@ -58,7 +60,7 @@ class test_hs24(wttest.WiredTigerTestCase):
     def zero_ts_deletes(self):
         session = self.setUpSessionOpen(self.conn)
         cursor = session.open_cursor(self.uri)
-        for i in range(1, 2000):
+        for i in range(0, 2000):
             session.begin_transaction()
             cursor.set_key(str(i))
             cursor.remove()
@@ -88,10 +90,15 @@ class test_hs24(wttest.WiredTigerTestCase):
         self.session.begin_transaction('read_timestamp=' + timestamp_str(4))
         # Check we can only see the version committed by the zero timestamp
         # commit thread before the checkpoint starts or value1.
+        newer_data_visible = False
         for i in range(0, 2000):
             value = cursor[str(i)]
-            if value != self.value3:
+            if not newer_data_visible:
+                newer_data_visible = value != self.value3
+            if newer_data_visible:
                 self.assertEquals(value, self.value1)
+            else:
+                self.assertEquals(value, self.value3)
         self.session.rollback_transaction()
 
     def zero_ts_commits(self):
@@ -131,10 +138,15 @@ class test_hs24(wttest.WiredTigerTestCase):
         # Check we can only see the version at timestamp 4, it's either
         # committed by the out of order timestamp commit thread before the
         # checkpoint starts or value1.
+        newer_data_visible = False
         for i in range(0, 2000):
             value = cursor[str(i)]
-            if value != self.value4:
+            if not newer_data_visible:
+                newer_data_visible = value != self.value4
+            if newer_data_visible:
                 self.assertEquals(value, self.value1)
+            else:
+                self.assertEquals(value, self.value4)
         self.session.rollback_transaction()
 
     def out_of_order_ts_commits(self):
