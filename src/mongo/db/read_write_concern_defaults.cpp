@@ -161,16 +161,9 @@ bool ReadWriteConcernDefaults::isCWRCSet(OperationContext* opCtx) {
 }
 
 bool ReadWriteConcernDefaults::isCWWCSet(OperationContext* opCtx) {
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        repl::feature_flags::gDefaultWCMajority.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        auto rwcd = getDefault(opCtx);
-        return rwcd.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal;
-    } else {
-        auto cached = _getDefaultCWRWCFromDisk(opCtx).value_or(RWConcernDefaultAndTime());
-        return cached.getDefaultWriteConcern() &&
-            !cached.getDefaultWriteConcern().get().usedDefaultConstructedWC;
-    }
+    auto cached = _getDefaultCWRWCFromDisk(opCtx).value_or(RWConcernDefaultAndTime());
+    return cached.getDefaultWriteConcern() &&
+        !cached.getDefaultWriteConcern().get().usedDefaultConstructedWC;
 }
 
 void ReadWriteConcernDefaults::observeDirectWriteToConfigSettings(OperationContext* opCtx,

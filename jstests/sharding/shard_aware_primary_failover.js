@@ -6,6 +6,10 @@
 
 var st = new ShardingTest({shards: 1});
 
+// Setting CWWC for addShard to work, as implicitDefaultWC is set to w:1.
+assert.commandWorked(st.s.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 var replTest = new ReplSetTest({nodes: 3});
 replTest.startSet({shardsvr: ''});
 

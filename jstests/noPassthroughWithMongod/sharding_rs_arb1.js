@@ -22,6 +22,9 @@ printjson(rs.status());
 var st = new ShardingTest({numShards: 0});
 var admin = st.getDB('admin');
 
+// Setting CWWC for addShard to work, as implicitDefaultWC is set to w:1.
+assert.commandWorked(st.s.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 var res = admin.runCommand({addshard: replTest.getURL()});
 printjson(res);
 assert(res.ok, tojson(res));

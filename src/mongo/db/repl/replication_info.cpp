@@ -122,6 +122,13 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
             replCoord->appendSecondaryInfoData(result);
         }
         invariant(helloResponse->getTopologyVersion());
+
+        // Only shard servers will respond with the isImplicitDefaultMajorityWC field.
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            result->append(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName,
+                           replCoord->getConfig().isImplicitDefaultWriteConcernMajority());
+        }
+
         return helloResponse->getTopologyVersion().get();
     }
 
