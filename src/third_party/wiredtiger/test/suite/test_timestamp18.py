@@ -26,6 +26,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+# [TEST_TAGS]
+# transactions:mixed_mode_timestamps
+# verify:prepare
+# [END_TAGS]
+#
 # test_timestamp18.py
 #   Mixing timestamped and non-timestamped writes.
 #

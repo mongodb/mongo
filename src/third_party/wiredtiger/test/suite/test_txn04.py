@@ -26,6 +26,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+# [TEST_TAGS]
+# backup
+# recovery
+# [END_TAGS]
+#
 # test_txn04.py
 #   Transactions: hot backup and recovery
 #

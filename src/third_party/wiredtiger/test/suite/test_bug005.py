@@ -26,6 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+# [TEST_TAGS]
+# session_api:verify
+# [END_TAGS]
+#
 # test_bug005.py
 #       Regression tests.
 

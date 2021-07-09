@@ -26,6 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+# [TEST_TAGS]
+# checkpoint:obsolete_data
+# [END_TAGS]
+#
 # test_checkpoint08.py
 # Test that the btree checkpoint is not skipped if there are obsolete pages.
 

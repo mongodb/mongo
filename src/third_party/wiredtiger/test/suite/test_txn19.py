@@ -26,6 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+# [TEST_TAGS]
+# recovery:log_files
+# [END_TAGS]
+#
 # test_txn19.py
 #   Transactions: test recovery with corrupted log files
 #

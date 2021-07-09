@@ -25,6 +25,10 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+#
+# [TEST_TAGS]
+# rollback_to_stable
+# [END_TAGS]
 
 import fnmatch, os, shutil, threading, time
 from wtthread import checkpoint_thread, op_thread

@@ -27,7 +27,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # [TEST_TAGS]
-# checkpoints:correctness:checkpoint_data
+# tiered_storage:checkpoint
+# tiered_storage:flush_tier
 # [END_TAGS]
 #
 
