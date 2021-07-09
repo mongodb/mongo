@@ -451,7 +451,7 @@ err:
  */
 static int
 __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[],
-  WT_CURSOR_BACKUP *othercb, bool *foundp, bool *log_only, bool *incr_only)
+  WT_CURSOR_BACKUP *othercb, bool *foundp, bool *log_only)
 {
     WT_CONFIG targetconf;
     WT_CONFIG_ITEM cval, k, v;
@@ -461,7 +461,7 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
     const char *uri;
     bool consolidate, incremental_config, is_dup, log_config, target_list;
 
-    *foundp = *incr_only = *log_only = false;
+    *foundp = *log_only = false;
 
     conn = S2C(session);
     incremental_config = log_config = false;
@@ -665,7 +665,7 @@ __backup_start(
     WT_DECL_RET;
     WT_FSTREAM *srcfs;
     const char *dest;
-    bool exist, is_dup, is_incr, log_only, target_list;
+    bool exist, is_dup, log_only, target_list;
 
     conn = S2C(session);
     srcfs = NULL;
@@ -748,7 +748,7 @@ __backup_start(
      * database objects and log files to the list.
      */
     target_list = false;
-    WT_ERR(__backup_config(session, cb, cfg, othercb, &target_list, &log_only, &is_incr));
+    WT_ERR(__backup_config(session, cb, cfg, othercb, &target_list, &log_only));
     /*
      * For a duplicate cursor, all the work is done in backup_config.
      */
