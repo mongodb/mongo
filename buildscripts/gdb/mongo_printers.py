@@ -169,6 +169,28 @@ class BSONObjPrinter(object):
         return "%s BSONObj %s bytes @ %s%s" % (ownership, size, self.ptr, suffix)
 
 
+class OplogEntryPrinter(object):
+    """Pretty-printer for mongo::repl::OplogEntry."""
+
+    def __init__(self, val):
+        """Initialize OplogEntryPrinter."""
+        self.val = val
+
+    @staticmethod
+    def display_hint():
+        """Display hint."""
+        return 'string'
+
+    def to_string(self):
+        """Return OplogEntry for printing."""
+        optime = self.val['_entry']['_opTimeBase']
+        optime_str = "ts(%s, %s)" % (optime['_timestamp']['secs'], optime['_timestamp']['i'])
+        return "OplogEntry(%s, %s, %s, %s)" % (
+            str(self.val['_entry']['_durableReplOperation']['_opType']).split('::')[-1],
+            str(self.val['_entry']['_commandType']).split('::')[-1],
+            self.val['_entry']['_durableReplOperation']['_nss']['_ns'], optime_str)
+
+
 class UUIDPrinter(object):
     """Pretty-printer for mongo::UUID."""
 
@@ -645,6 +667,7 @@ def build_pretty_printer():
     pp.add('flat_hash_set', 'absl::flat_hash_set', True, AbslFlatHashSetPrinter)
     pp.add('RecordId', 'mongo::RecordId', False, RecordIdPrinter)
     pp.add('UUID', 'mongo::UUID', False, UUIDPrinter)
+    pp.add('OplogEntry', 'mongo::repl::OplogEntry', False, OplogEntryPrinter)
     pp.add('__wt_cursor', '__wt_cursor', False, WtCursorPrinter)
     pp.add('__wt_session_impl', '__wt_session_impl', False, WtSessionImplPrinter)
     pp.add('__wt_txn', '__wt_txn', False, WtTxnPrinter)
