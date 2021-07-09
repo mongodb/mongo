@@ -55,6 +55,7 @@ class EvgExpansions(BaseModel):
     project: Evergreen project being run under.
     max_test_per_suite: Maximum amount of tests to include in a suite.
     max_sub_suites: Maximum number of sub-suites to generate per task.
+    resmoke_repeat_suites: Number of times suites should be repeated.
     revision: Git revision being run against.
     task_name: Name of task running.
     target_resmoke_time: Target time of generated sub-suites.
@@ -67,6 +68,7 @@ class EvgExpansions(BaseModel):
     project: str
     max_tests_per_suite: Optional[int] = 100
     max_sub_suites: Optional[int] = 5
+    resmoke_repeat_suites: Optional[int] = None
     revision: str
     task_name: str
     target_resmoke_time: Optional[int] = None
@@ -222,10 +224,14 @@ class GenerateBuildVariantOrchestrator:
         run_func = task_def.generate_resmoke_tasks_command
         run_vars = run_func["vars"]
 
+        repeat_suites = 1
+        if self.evg_expansions.resmoke_repeat_suites:
+            repeat_suites = self.evg_expansions.resmoke_repeat_suites
+
         return ResmokeGenTaskParams(
             use_large_distro=run_vars.get("use_large_distro"),
             require_multiversion=run_vars.get("require_multiversion"),
-            repeat_suites=1,
+            repeat_suites=repeat_suites,
             resmoke_args=run_vars.get("resmoke_args"),
             resmoke_jobs_max=run_vars.get("resmoke_jobs_max"),
             large_distro_name=self.get_build_variant_expansion(build_variant, "large_distro_name"),
