@@ -84,6 +84,7 @@ public:
     void onDocumentsCopiedForCurrentOp(int64_t documents, int64_t bytes) noexcept;
 
     // Allows updating metrics on "opcounters";
+    void gotInserts(int n) noexcept;
     void gotInsert() noexcept;
     void gotUpdate() noexcept;
     void gotDelete() noexcept;

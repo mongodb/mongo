@@ -100,14 +100,14 @@ const topology = DiscoverTopology.findConnectedNodes(mongos);
     documents: 2,
     fetched: 2,
     applied: 2,
-    opcounters: {insert: 0, update: 0, delete: 0}
+    opcounters: {insert: 2, update: 0, delete: 0}
 },
  {
      shardName: recipientShardNames[1],
      documents: 2,
      fetched: 12,
      applied: 12,
-     opcounters: {insert: 10, update: 0, delete: 0}
+     opcounters: {insert: 12, update: 0, delete: 0}
  },
 ].forEach(e => {
     const mongo = new Mongo(topology.shards[e.shardName].primary);

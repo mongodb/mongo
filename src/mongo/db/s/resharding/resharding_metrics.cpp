@@ -107,14 +107,17 @@ static StringData serializeState(boost::optional<CoordinatorStateEnum> e) {
 // client workload tracked in the globalOpCounters.
 class ReshardingOpCounters {
 public:
+    void gotInserts(int n) noexcept {
+        _checkWrap(&ReshardingOpCounters::_insert, n);
+    }
     void gotInsert() noexcept {
-        _checkWrap(&ReshardingOpCounters::_insert);
+        _checkWrap(&ReshardingOpCounters::_insert, 1);
     }
     void gotUpdate() noexcept {
-        _checkWrap(&ReshardingOpCounters::_update);
+        _checkWrap(&ReshardingOpCounters::_update, 1);
     }
     void gotDelete() noexcept {
-        _checkWrap(&ReshardingOpCounters::_delete);
+        _checkWrap(&ReshardingOpCounters::_delete, 1);
     }
 
     BSONObj getObj() const noexcept {
@@ -126,11 +129,11 @@ public:
     }
 
 private:
-    // Increment member `counter` by 1, resetting all counters if it was > 2^60.
-    void _checkWrap(CacheAligned<AtomicWord<long long>> ReshardingOpCounters::*counter) {
+    // Increment member `counter` by n, resetting all counters if it was > 2^60.
+    void _checkWrap(CacheAligned<AtomicWord<long long>> ReshardingOpCounters::*counter, int n) {
         static constexpr auto maxCount = 1LL << 60;
-        auto oldValue = (this->*counter).fetchAndAddRelaxed(1);
-        if (oldValue > maxCount - 1) {
+        auto oldValue = (this->*counter).fetchAndAddRelaxed(n);
+        if (oldValue > maxCount - n) {
             LOGV2(5776000,
                   "ReshardingOpCounters exceeded maximum value, resetting all to 0",
                   "insert"_attr = _insert.loadRelaxed(),
@@ -186,6 +189,7 @@ public:
 
     boost::optional<Milliseconds> remainingOperationTime(Date_t now) const;
 
+    void gotInserts(int n) noexcept;
     void gotInsert() noexcept;
     void gotUpdate() noexcept;
     void gotDelete() noexcept;
@@ -218,6 +222,10 @@ public:
     boost::optional<RecipientStateEnum> recipientState;
     boost::optional<CoordinatorStateEnum> coordinatorState;
 };
+
+void ReshardingMetrics::OperationMetrics::gotInserts(int n) noexcept {
+    opCounters.gotInserts(n);
+}
 
 void ReshardingMetrics::OperationMetrics::gotInsert() noexcept {
     opCounters.gotInsert();
@@ -537,6 +545,10 @@ void ReshardingMetrics::onDocumentsCopiedForCurrentOp(int64_t documents, int64_t
 
     _currentOp->documentsCopied += documents;
     _currentOp->bytesCopied += bytes;
+}
+
+void ReshardingMetrics::gotInserts(int n) noexcept {
+    _cumulativeOp->gotInserts(n);
 }
 
 void ReshardingMetrics::gotInsert() noexcept {

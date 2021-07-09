@@ -312,6 +312,7 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx, Pipeline& p
 
     int bytesInserted = resharding::data_copy::insertBatch(opCtx, _outputNss, batch);
     _env->metrics()->onDocumentsCopied(batch.size(), bytesInserted);
+    _env->metrics()->gotInserts(batch.size());
     return true;
 }
 
