@@ -56,6 +56,18 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='timeseries_update_delete_util',
+    source=[
+        'timeseries_update_delete_util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+    ],
+)
+
 env.CppUnitTest(
     target='db_timeseries_test',
     source=[

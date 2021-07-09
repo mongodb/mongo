@@ -18,174 +18,378 @@ if (!TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
     return;
 }
 
+const timeFieldName = "time";
+const metaFieldName = "tag";
+const dateTime = ISODate("2021-07-12T16:00:00Z");
+const doc1 = {
+    _id: 1,
+    [timeFieldName]: dateTime,
+    [metaFieldName]: {a: "A", b: "B"}
+};
+const doc2 = {
+    _id: 2,
+    [timeFieldName]: dateTime,
+    [metaFieldName]: {c: "C", d: 2},
+    f: [{"k": "K", "v": "V"}],
+};
+
 TimeseriesTest.run((insert) => {
     const testDB = db.getSiblingDB(jsTestName());
     assert.commandWorked(testDB.dropDatabase());
 
-    const coll = testDB.getCollection('t');
-    const timeFieldName = "time";
-    const metaFieldName = "tag";
+    /**
+     * Confirms that a set of updates returns the expected set of documents.
+     */
+    function testUpdate({
+        initialDocList,
+        updateList,
+        resultDocList,
+        nModified = 0,
+        failCode = null,
+        ordered = true
+    }) {
+        const coll = testDB.getCollection('t');
+        assert.commandWorked(testDB.createCollection(
+            coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+        assert.commandWorked(insert(coll, initialDocList));
 
-    assert.commandWorked(testDB.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+        const updateCommand = {update: coll.getName(), updates: updateList};
+        if (failCode) {
+            assert.commandFailedWithCode(testDB.runCommand(updateCommand), failCode);
+        } else {
+            const res = assert.commandWorked(testDB.runCommand(updateCommand));
+            assert.eq(res["n"], nModified);
+        }
 
-    assert.commandWorked(
-        insert(coll, {[timeFieldName]: ISODate(), [metaFieldName]: {a: "A", b: "B"}}));
+        assert.docEq(coll.find().toArray(), resultDocList);
+        assert(coll.drop());
+    }
 
+    /************************************ multi:false updates ************************************/
+    testUpdate({
+        initialDocList: [doc1],
+        updateList: [{q: {[metaFieldName]: {b: "B"}}, u: {$set: {[metaFieldName]: {b: "C"}}}}],
+        resultDocList: [doc1],
+        failCode: ErrorCodes.InvalidOptions,
+    });
+
+    /************************************ multi:true updates *************************************/
     // Query on a single field that is the metaField.
-    assert.commandFailedWithCode(
-        coll.update({[metaFieldName]: {b: "B"}}, {$set: {[metaFieldName]: {b: "C"}}}),
-        ErrorCodes.IllegalOperation);
+    testUpdate({
+        initialDocList: [doc1],
+        updateList: [{
+            q: {[metaFieldName]: {a: "A", b: "B"}},
+            u: {$set: {[metaFieldName]: {c: "C"}}},
+            multi: true,
+        }],
+        resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {c: "C"}}],
+        nModified: 1,
+    });
 
     // Query on a single field that is not the metaField.
-    assert.commandFailedWithCode(
-        coll.update({measurement: "cpu"}, {$set: {[metaFieldName]: {b: "C"}}}),
-        ErrorCodes.InvalidOptions);
+    testUpdate({
+        initialDocList: [doc1],
+        updateList: [{
+            q: {measurement: "cpu"},
+            u: {$set: {[metaFieldName]: {c: "C"}}},
+            multi: true,
+        }],
+        resultDocList: [doc1],
+        failCode: ErrorCodes.InvalidOptions,
+    });
 
     // Query on both the metaField and a field that is not the metaField.
-    assert.commandFailedWithCode(coll.update({measurement: "cpu", [metaFieldName]: {b: "B"}},
-                                             {$set: {[metaFieldName]: {b: "C"}}}),
-                                 ErrorCodes.InvalidOptions);
-
-    // Compound query on the metaField.
-    assert.commandFailedWithCode(
-        coll.update({"$and": [{[metaFieldName]: {b: "B"}}, {[metaFieldName]: {a: "A"}}]},
-                    {$set: {[metaFieldName]: {b: "C"}}}),
-        ErrorCodes.IllegalOperation);
+    testUpdate({
+        initialDocList: [doc1],
+        updateList: [
+            {
+                q: {[metaFieldName]: {a: "A", b: "B"}, measurement: "cpu"},
+                u: {$set: {[metaFieldName]: {c: "C"}}},
+                multi: true,
+            },
+        ],
+        resultDocList: [doc1],
+        failCode: ErrorCodes.InvalidOptions,
+    });
 
     // Compound query on the metaField using dot notation.
-    assert.commandFailedWithCode(
-        coll.update({"$and": [{[metaFieldName + ".b"]: "B"}, {[metaFieldName + ".a"]: "A"}]},
-                    {$set: {[metaFieldName]: {b: "C"}}}),
-        ErrorCodes.IllegalOperation);
-
-    // Query on a single field that is the metaField.
-    assert.commandFailedWithCode(
-        coll.update({[metaFieldName]: {a: "A", b: "B"}}, {$set: {[metaFieldName]: {b: "C"}}}),
-        ErrorCodes.IllegalOperation);
+    testUpdate({
+        initialDocList: [doc1],
+        updateList: [{
+            q: {"$and": [{[metaFieldName + ".a"]: "A"}, {[metaFieldName + ".b"]: "B"}]},
+            u: {$set: {[metaFieldName]: {c: "C"}}},
+            multi: true,
+        }],
+        resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {c: "C"}}],
+        nModified: 1,
+    });
 
     // Query on a single field that is the metaField using dot notation.
-    assert.commandFailedWithCode(
-        coll.update({[metaFieldName + ".a"]: "A"}, {$set: {[metaFieldName]: {b: "C"}}}),
-        ErrorCodes.IllegalOperation);
+    testUpdate({
+        initialDocList: [doc1],
+        updateList: [{
+            q: {[metaFieldName + ".a"]: "A"},
+            u: {$set: {[metaFieldName]: {c: "C"}}},
+            multi: true,
+        }],
+        resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {c: "C"}}],
+        nModified: 1,
+    });
 
     // Query on a single field that is not the metaField using dot notation.
-    assert.commandFailedWithCode(
-        coll.update({"measurement.A": "cpu"}, {$set: {[metaFieldName]: {b: "C"}}}),
-        ErrorCodes.InvalidOptions);
+    testUpdate({
+        initialDocList: [doc1],
+        updateList: [{
+            q: {"measurement.A": "cpu"},
+            u: {$set: {[metaFieldName]: {c: "C"}}},
+            multi: true,
+        }],
+        resultDocList: [doc1],
+        failCode: ErrorCodes.InvalidOptions,
+    });
 
     // Multiple queries on a single field that is the metaField.
-    assert.commandFailedWithCode(testDB.runCommand({
-        update: coll.getName(),
-        updates: [
-            {q: {[metaFieldName]: {a: "A", b: "B"}}, u: {$set: {[metaFieldName]: {b: "C"}}}},
+    testUpdate({
+        initialDocList: [doc1],
+        updateList: [
             {
-                q: {"$and": [{[metaFieldName]: {b: "B"}}, {[metaFieldName]: {a: "A"}}]},
-                u: {$set: {[metaFieldName]: {b: "C"}}}
+                q: {[metaFieldName]: {a: "A", b: "B"}},
+                u: {$set: {[metaFieldName]: {c: "C", d: 1}}},
+                multi: true,
+            },
+            {
+                q: {[metaFieldName + ".d"]: 1},
+                u: {$set: {[metaFieldName + ".c"]: "CC"}},
+                multi: true,
             }
-        ]
-    }),
-                                 ErrorCodes.IllegalOperation);
+        ],
+        resultDocList: [doc1],
+        failCode: ErrorCodes.IllegalOperation,
+    });
 
     // Multiple queries on both the metaField and a field that is not the metaField.
-    assert.commandFailedWithCode(testDB.runCommand({
-        update: coll.getName(),
-        updates: [
-            {q: {[metaFieldName]: {a: "A", b: "B"}}, u: {$set: {[metaFieldName]: {b: "C"}}}},
+    testUpdate({
+        initialDocList: [doc1],
+        updateList: [
             {
-                q: {measurement: "cpu", [metaFieldName]: {b: "B"}},
-                u: {$set: {[metaFieldName]: {b: "C"}}}
+                q: {[metaFieldName]: {a: "A", b: "B"}},
+                u: {$set: {[metaFieldName]: {c: "C", d: 1}}},
+                multi: true,
+            },
+            {
+                q: {measurement: "cpu", [metaFieldName + ".d"]: 1},
+                u: {$set: {[metaFieldName + ".c"]: "CC"}},
+                multi: true,
             }
-        ]
-    }),
-                                 ErrorCodes.InvalidOptions);
+        ],
+        resultDocList: [doc1],
+        failCode: ErrorCodes.IllegalOperation,
+    });
 
-    assert.commandWorked(insert(coll, {
-        [timeFieldName]: ISODate(),
-        [metaFieldName]: {c: "C", d: 2},
-        f1: [{"k": "K", "v": "V"}],
-        f2: 0,
-        f3: "f3",
-    }));
+    // Query with an empty document (i.e update all documents in the collection).
+    testUpdate({
+        initialDocList: [doc1, doc2],
+        updateList: [{
+            q: {},
+            u: {$set: {[metaFieldName]: {z: "Z"}}},
+            multi: true,
+        }],
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {z: "Z"}},
+            {
+                _id: 2,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {z: "Z"},
+                f: [{"k": "K", "v": "V"}]
+            }
+        ],
+        nModified: 2,
+    });
 
-    /*************************** Tests updating with an update document ***************************/
-    // Modify a field that is the metaField.
-    assert.commandFailedWithCode(
-        coll.update({[metaFieldName]: {c: "C", d: 2}}, {$set: {[metaFieldName]: {e: "E"}}}),
-        ErrorCodes.IllegalOperation);
+    /************************** Tests updating with an update document ***************************/
+    //  Modify a field that is the metaField.
+    testUpdate({
+        initialDocList: [doc2],
+        updateList: [{
+            q: {[metaFieldName]: {c: "C", d: 2}},
+            u: {$set: {[metaFieldName]: {e: "E"}}},
+            multi: true,
+        }],
+        resultDocList: [{
+            _id: 2,
+            [timeFieldName]: dateTime,
+            [metaFieldName]: {e: "E"},
+            f: [{"k": "K", "v": "V"}]
+        }],
+        nModified: 1,
+    });
 
     // Modify a field that is not the metaField.
-    assert.commandFailedWithCode(coll.update({[metaFieldName]: {c: "C", d: 2}}, {$set: {f2: "f2"}}),
-                                 ErrorCodes.InvalidOptions);
+    testUpdate({
+        initialDocList: [doc2],
+        updateList: [{
+            q: {[metaFieldName]: {c: "C", d: 2}},
+            u: {$set: {f2: "f2"}},
+            multi: true,
+        }],
+        resultDocList: [doc2],
+        failCode: ErrorCodes.InvalidOptions,
+    });
 
     // Modify the metafield and fields that are not the metaField.
-    assert.commandFailedWithCode(
-        coll.update({[metaFieldName]: {c: "C", d: 2}},
-                    {$set: {[metaFieldName]: {e: "E"}, f3: "f3"}, $inc: {f2: 3}, $unset: {f1: ""}}),
-        ErrorCodes.InvalidOptions);
+    testUpdate({
+        initialDocList: [doc2],
+        updateList: [{
+            q: {[metaFieldName]: {c: "C", d: 2}},
+            u: {$set: {[metaFieldName]: {e: "E"}, f3: "f3"}, $inc: {f2: 3}, $unset: {f1: ""}},
+            multi: true,
+        }],
+        resultDocList: [doc2],
+        failCode: ErrorCodes.InvalidOptions,
+    });
 
     // Modify a field that is the metaField using dot notation.
-    assert.commandFailedWithCode(
-        coll.update({[metaFieldName + ".c"]: "C"}, {$inc: {[metaFieldName + ".d"]: 10}}),
-        ErrorCodes.IllegalOperation);
+    testUpdate({
+        initialDocList: [doc2],
+        updateList: [{
+            q: {[metaFieldName + ".c"]: "C"},
+            u: {$inc: {[metaFieldName + ".d"]: 10}},
+            multi: true,
+        }],
+        resultDocList: [{
+            _id: 2,
+            [timeFieldName]: dateTime,
+            [metaFieldName]: {c: "C", d: 12},
+            f: [{"k": "K", "v": "V"}]
+        }],
+        nModified: 1,
+    });
 
     // Modify the metaField multiple times.
-    assert.commandFailedWithCode(testDB.runCommand({
-        update: coll.getName(),
-        updates: [
-            {q: {[metaFieldName]: {c: "C", d: 2}}, u: {$set: {[metaFieldName]: 1}}},
-            {q: {[metaFieldName]: 1}, u: {$set: {[metaFieldName]: 2}}},
-            {q: {[metaFieldName]: 2}, u: {$set: {[metaFieldName]: 3}}}
-        ]
-    }),
-                                 ErrorCodes.IllegalOperation);
+    testUpdate({
+        initialDocList: [doc2],
+        updateList: [
+            {
+                q: {[metaFieldName]: {c: "C", d: 2}},
+                u: {$set: {[metaFieldName]: 1}},
+                multi: true,
+            },
+            {
+                q: {[metaFieldName]: 1},
+                u: {$set: {[metaFieldName]: 2}},
+                multi: true,
+            },
+            {
+                q: {[metaFieldName]: 2},
+                u: {$set: {[metaFieldName]: 3}},
+                multi: true,
+            }
+        ],
+        resultDocList: [doc2],
+        failCode: ErrorCodes.IllegalOperation,
+    });
 
     // Modify the metaField and a field that is not the metaField using dot notation.
-    assert.commandFailedWithCode(testDB.runCommand({
-        update: coll.getName(),
-        updates: [
-            {q: {[metaFieldName]: {c: "C", d: 2}}, u: {$inc: {[metaFieldName + ".d"]: 6}}},
-            {q: {[metaFieldName]: {c: "C", d: 8}}, u: {$set: {"f1.0": "f2"}}}
-        ]
-    }),
-                                 ErrorCodes.InvalidOptions);
+    testUpdate({
+        initialDocList: [doc2],
+        updateList: [
+            {
+                q: {[metaFieldName]: {c: "C", d: 2}},
+                u: {$inc: {[metaFieldName + ".d"]: 6}},
+                multi: true,
+            },
+            {
+                q: {[metaFieldName]: {c: "C", d: 8}},
+                u: {$set: {"f1.0": "f2"}},
+                multi: true,
+            }
+        ],
+        resultDocList: [doc2],
+        failCode: ErrorCodes.IllegalOperation,
+    });
 
-    /*************************** Tests updating with an update pipeline ***************************/
+    /************************** Tests updating with an update pipeline **************************/
     // Modify the metaField using dot notation: Add embedded fields to the metaField and remove an
     // embedded field.
-    assert.commandFailedWithCode(
-        coll.update({[metaFieldName + ".c"]: "C"},
-                    [
-                        {$set: {[metaFieldName + ".e"]: "E", [metaFieldName + ".f"]: "F"}},
-                        {$unset: metaFieldName + ".d"}
-                    ]),
-        ErrorCodes.IllegalOperation);
+    testUpdate({
+        initialDocList: [doc2],
+        updateList: [{
+            q: {[metaFieldName + ".d"]: 2},
+            u: [
+                {$set: {[metaFieldName + ".e"]: "E", [metaFieldName + ".f"]: "F"}},
+                {$unset: metaFieldName + ".d"}
+            ],
+            multi: true,
+        }],
+        resultDocList: [{
+            _id: 2,
+            [timeFieldName]: dateTime,
+            [metaFieldName]: {c: "C", e: "E", f: "F"},
+            f: [{"k": "K", "v": "V"}]
+        }],
+        nModified: 1,
+    });
 
     // Modify the metaField using dot notation: Remove an embedded field of the metaField
     // and a field that is not the metaField.
-    assert.commandFailedWithCode(
-        coll.update({[metaFieldName + ".c"]: "C"}, [{$unset: [metaFieldName + ".c", "f3"]}]),
-        ErrorCodes.InvalidOptions);
+    testUpdate({
+        initialDocList: [doc2],
+        updateList: [{
+            q: {[metaFieldName + ".c"]: "C"},
+            u: [{$unset: [metaFieldName + ".c", "f"]}],
+            multi: true,
+        }],
+        resultDocList: [doc2],
+        failCode: ErrorCodes.InvalidOptions,
+    });
 
     // Modify the metaField using dot notation: Add an embedded field and add a new field.
-    assert.commandFailedWithCode(
-        coll.update({[metaFieldName + ".c"]: "C"}, [{$set: {[metaFieldName + ".e"]: "E", n: 1}}]),
-        ErrorCodes.InvalidOptions);
+    testUpdate({
+        initialDocList: [doc2],
+        updateList: [{
+            q: {[metaFieldName + ".c"]: "C"},
+            u: [{$set: {[metaFieldName + ".e"]: "E", n: 1}}],
+            multi: true,
+        }],
+        resultDocList: [doc2],
+        failCode: ErrorCodes.InvalidOptions,
+    });
 
     // Replace an entire document.
-    assert.commandFailedWithCode(
-        coll.update({[metaFieldName + ".c"]: "C"},
-                    [{$replaceWith: {_id: 4, t: ISODate(), [metaFieldName]: {"z": "Z"}}}]),
-        ErrorCodes.InvalidOptions);
+    testUpdate({
+        initialDocList: [doc2],
+        updateList: [{
+            q: {[metaFieldName + ".c"]: "C"},
+            u: [{$replaceWith: {_id: 4, t: ISODate(), [metaFieldName]: {"z": "Z"}}}],
+            multi: true,
+        }],
+        resultDocList: [doc2],
+        failCode: ErrorCodes.InvalidOptions,
+    });
 
     /************************ Tests updating with a replacement document *************************/
     // Replace a document to have no metaField.
-    assert.commandFailedWithCode(
-        coll.update({[metaFieldName]: {c: "C", d: 2}}, {f2: {e: "E", f: "F"}, f3: 7}),
-        ErrorCodes.InvalidOptions);
+    testUpdate({
+        initialDocList: [doc2],
+        updateList: [{
+            q: {[metaFieldName]: {c: "C", d: 2}},
+            u: {f2: {e: "E", f: "F"}, f3: 7},
+            multi: true,
+        }],
+        resultDocList: [doc2],
+        failCode: ErrorCodes.InvalidOptions,
+    });
 
     // Replace a document with an empty document.
-    assert.commandFailedWithCode(coll.update({[metaFieldName]: {c: "C", d: 2}}, {}),
-                                 ErrorCodes.InvalidOptions);
+    testUpdate({
+        initialDocList: [doc2],
+        updateList: [{
+            q: {[metaFieldName]: {c: "C", d: 2}},
+            u: {},
+            multi: true,
+        }],
+        resultDocList: [doc2],
+        failCode: ErrorCodes.InvalidOptions,
+    });
 });
 }());

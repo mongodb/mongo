@@ -63,6 +63,7 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/db/write_concern.h"
@@ -119,6 +120,8 @@ bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
         .get();
 }
 
+// TODO: SERVER-58394 Remove this method since it is in an anonymous namespace in
+// timeseries_update_delete_util.
 /**
  * Returns if the given metaField is the first element of the dotted path in the given field.
  */
@@ -126,9 +129,13 @@ bool isMetaFieldFirstElementOfDottedPathField(StringData metaField, StringData f
     return field.substr(0, field.find('.')) == metaField;
 }
 
-// Recurses through the mutablebson element query and replaces any occurences of the
-// metaField with "meta" accounting for queries that may be in dot notation. shouldReplaceFieldValue
-// is set for $expr queries when "$" + the metaField should be subsitutited for "$meta".
+// TODO: SERVER-58394 Remove this method and combine its logic with
+// timeseries::replaceTimeseriesQueryMetaFieldName().
+/**
+ * Recurses through the mutablebson element query and replaces any occurrences of the
+ * metaField with "meta" accounting for queries that may be in dot notation. shouldReplaceFieldValue
+ * is set for $expr queries when "$" + the metaField should be subsitutited for "$meta".
+ */
 void replaceTimeseriesQueryMetaFieldName(mutablebson::Element elem,
                                          const StringData& metaField,
                                          bool shouldReplaceFieldValue = false) {
@@ -162,123 +169,6 @@ void replaceTimeseriesQueryMetaFieldName(mutablebson::Element elem,
                 elem.findNthChild(i), metaField, shouldReplaceFieldValue);
         }
     }
-}
-
-// TODO: SERVER-57735: remove this method.
-template <typename OpEntry>
-bool queryOnlyDependsOnTimeseriesMetaField(OperationContext* opCtx,
-                                           const NamespaceString& ns,
-                                           const std::vector<OpEntry>& opEntries) {
-
-    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
-        opCtx, ns.makeTimeseriesBucketsNamespace());
-    uassert(ErrorCodes::NamespaceNotFound,
-            "Could not find time-series buckets collection for write",
-            collection);
-    auto timeseriesOptions = collection->getTimeseriesOptions();
-    uassert(ErrorCodes::InvalidOptions,
-            "Time-series buckets collection is missing time-series options",
-            timeseriesOptions);
-    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, nullptr, ns));
-    std::vector<BSONObj> rawPipeline;
-    rawPipeline.reserve(opEntries.size());
-    for (auto&& opEntry : opEntries) {
-        rawPipeline.push_back(BSON("$match" << opEntry.getQ()));
-    }
-    DepsTracker dependencies = Pipeline::parse(rawPipeline, expCtx)->getDependencies({});
-    return std::all_of(dependencies.fields.begin(),
-                       dependencies.fields.end(),
-                       [&timeseriesOptions](const auto& dependency) {
-                           StringData queryField(dependency);
-                           return isMetaFieldFirstElementOfDottedPathField(
-                               *timeseriesOptions->getMetaField(), queryField);
-                       });
-}
-
-/**
- * Returns true if the given update request only modifies the time-series collection's metaField,
- * false otherwise. Returns false on any document replacement.
- */
-bool updateOnlyModifiesTimeseriesMetaField(OperationContext* opCtx,
-                                           const NamespaceString& ns,
-                                           const write_ops::UpdateCommandRequest& request) {
-    auto bucketsColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
-        opCtx, ns.makeTimeseriesBucketsNamespace());
-    uassert(ErrorCodes::NamespaceNotFound,
-            "Could not find time-series buckets collection for update",
-            bucketsColl);
-
-    auto timeseriesOptions = bucketsColl->getTimeseriesOptions();
-    uassert(ErrorCodes::InvalidOptions,
-            "Time-series buckets collection is missing time-series options",
-            timeseriesOptions);
-
-    auto metaField = *timeseriesOptions->getMetaField();
-
-    for (auto&& update : request.getUpdates()) {
-        auto& updateMod = update.getU();
-        switch (updateMod.type()) {
-            case write_ops::UpdateModification::Type::kClassic: {
-                auto document = updateMod.getUpdateClassic();
-                if (!document.isEmpty() &&
-                    document.firstElementFieldNameStringData().find("$") != std::string::npos) {
-                    // Document is an update document.
-                    for (auto&& updatePair : document) {
-                        // updatePair = <updateOperator> : {<field1> : <value1>, ... }
-                        for (auto&& fieldValuePair : updatePair.embeddedObject()) {
-                            // updatePair.embeddedObject() = {<field1> : <value1>, ... }
-                            if (!isMetaFieldFirstElementOfDottedPathField(
-                                    metaField, fieldValuePair.fieldNameStringData()))
-                                return false;
-                        }
-                    }
-                } else {
-                    // Document is a replacement document.
-                    return false;
-                }
-                break;
-            }
-            case write_ops::UpdateModification::Type::kPipeline: {
-                const auto& updatePipeline = updateMod.getUpdatePipeline();
-                for (const auto& stage : updatePipeline) {
-                    auto aggOp = stage.firstElementFieldNameStringData();
-                    auto operation = stage.firstElement();
-                    if (aggOp == "$set" || aggOp == "$addFields") {
-                        // stage = {$set: {<newField> : <newExpression>, ...}}
-                        // operation = $set: {<newField> : <newExpression>, ...}
-                        for (auto&& updatePair : operation.embeddedObject()) {
-                            // operation.embeddedObject() = {<newField> : <newExpression>, ...}
-                            if (!isMetaFieldFirstElementOfDottedPathField(
-                                    metaField, updatePair.fieldNameStringData())) {
-                                return false;
-                            }
-                        }
-                    } else if (aggOp == "$unset" || aggOp == "$project") {
-                        if (operation.type() == BSONType::Array) {
-                            // stage = {$unset: ["field1", "field2", ...]}
-                            for (auto elt : operation.Array()) {
-                                if (!isMetaFieldFirstElementOfDottedPathField(
-                                        metaField, elt.valueStringDataSafe()))
-                                    return false;
-                            }
-                        } else {
-                            // stage = {$unset: "singleField"}
-                            if (!isMetaFieldFirstElementOfDottedPathField(
-                                    metaField, operation.valueStringDataSafe()))
-                                return false;
-                        }
-                    } else {  // aggOp == "$replaceWith" || aggOp == "$replaceRoot"
-                        return false;
-                    }
-                }
-                break;
-            }
-            case write_ops::UpdateModification::Type::kDelta:
-                // It is not possible for the client to run a delta update.
-                MONGO_UNREACHABLE;
-        }
-    }
-    return true;
 }
 
 // Default for control.version in time-series bucket collection.
@@ -562,7 +452,7 @@ void populateReply(OperationContext* opCtx,
     long long nVal = 0;
     std::vector<BSONObj> errors;
 
-    for (size_t i = 0; i < result.results.size(); i++) {
+    for (size_t i = 0; i < result.results.size(); ++i) {
         if (auto error = generateError(opCtx, result.results[i], i, errors.size())) {
             errors.push_back(*error);
             continue;
@@ -1401,8 +1291,8 @@ public:
                                    &bodyBuilder);
         }
 
-        void _performTimeseriesUpdates(OperationContext* opCtx,
-                                       write_ops::UpdateCommandReply* updateReply) const {
+        write_ops::UpdateCommandReply* _performTimeseriesUpdates(
+            OperationContext* opCtx, write_ops::UpdateCommandReply* updateReply) const {
             uassert(ErrorCodes::InvalidOptions,
                     "Time-series updates are not enabled",
                     feature_flags::gTimeseriesUpdatesAndDeletes.isEnabled(
@@ -1414,21 +1304,87 @@ public:
                     << ns(),
                 !opCtx->inMultiDocumentTransaction());
 
+            auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
+                opCtx, ns().makeTimeseriesBucketsNamespace());
+            uassert(ErrorCodes::NamespaceNotFound,
+                    "Could not find time-series buckets collection for update",
+                    collection);
+
+            auto timeseriesOptions = collection->getTimeseriesOptions();
             uassert(ErrorCodes::InvalidOptions,
+                    "Time-series buckets collection is missing time-series options",
+                    timeseriesOptions);
+
+            // TODO: SERVER-58617 Allow updates on time-series collections with no metaField.
+            uassert(
+                ErrorCodes::IllegalOperation,
+                str::stream()
+                    << "Updates on a time-series collection without a metaField are not supported: "
+                    << ns(),
+                timeseriesOptions->getMetaField() != boost::none);
+            StringData metaField = *timeseriesOptions->getMetaField();
+
+            // Create the translated updates to apply, which are used to make a new
+            // UpdateCommandRequest.
+            std::vector<write_ops::UpdateOpEntry> translatedUpdates;
+            auto numUpdates = request().getUpdates().size();
+
+            // TODO: SERVER-58394 Allow multiple time-series metaField-only updates.
+            uassert(
+                ErrorCodes::IllegalOperation,
+                str::stream() << "Multiple updates are not supported for time-series collections: "
+                              << ns(),
+                numUpdates == 1);
+
+            translatedUpdates.reserve(numUpdates);
+
+            // Translate each query-update pair in the update.
+            for (auto& updateEntry : request().getUpdates()) {
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream()
+                            << "multi:false updates are not supported for time-series collections: "
+                            << ns(),
+                        updateEntry.getMulti());
+
+                // Get the original update query and check that it only depends on the metaField.
+                const auto& updateQuery = updateEntry.getQ();
+                uassert(
+                    ErrorCodes::InvalidOptions,
                     str::stream() << "Cannot perform an update on a time-series collection "
                                      "when querying on a field that is not the metaField: "
                                   << ns(),
-                    queryOnlyDependsOnTimeseriesMetaField(opCtx, ns(), request().getUpdates()));
+                    timeseries::queryOnlyDependsOnMetaField(opCtx, ns(), updateQuery, metaField));
 
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "Update on a time-series collection must only "
-                                     "modify the metaField: "
-                                  << ns(),
-                    updateOnlyModifiesTimeseriesMetaField(opCtx, ns(), request()));
+                // Get the original set of modifications to apply and check that they only modify
+                // the metaField.
+                const auto& updateMod = updateEntry.getU();
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "Update on a time-series collection must only "
+                                         "modify the metaField: "
+                                      << ns(),
+                        timeseries::updateOnlyModifiesMetaField(opCtx, ns(), updateMod, metaField));
 
-            uasserted(ErrorCodes::IllegalOperation,
-                      str::stream()
-                          << "Cannot perform an update on a time-series collection: " << ns());
+                translatedUpdates.push_back(timeseries::translateUpdate(
+                    metaField.empty() ? updateQuery
+                                      : timeseries::translateQuery(updateQuery, metaField),
+                    updateMod,
+                    metaField));
+            }
+
+            // Make a new UpdateCommandRequest from the translated updates.
+            write_ops::UpdateCommandRequest translatedRequest(ns().makeTimeseriesBucketsNamespace(),
+                                                              translatedUpdates);
+            translatedRequest.setWriteCommandRequestBase(request().getWriteCommandRequestBase());
+
+            auto reply = write_ops_exec::performUpdates(
+                opCtx, translatedRequest, OperationSource::kTimeseries);
+            populateReply(opCtx,
+                          !translatedRequest.getWriteCommandRequestBase().getOrdered(),
+                          numUpdates,
+                          std::move(reply),
+                          updateReply);
+
+            return updateReply;
         }
 
         BSONObj _commandObj;
@@ -1587,6 +1543,7 @@ public:
             std::vector<mongo::write_ops::DeleteOpEntry> timeseriesDeletes;
             timeseriesDeletes.reserve(request().getDeletes().size());
             for (auto& deleteEntry : request().getDeletes()) {
+                // TODO: SERVER-58394 Call timeseries::translateQuery() here instead.
                 mutablebson::Document doc(deleteEntry.getQ());
                 replaceTimeseriesQueryMetaFieldName(doc.root(), metaField);
                 timeseriesDeletes.push_back(deleteEntry);

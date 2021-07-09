@@ -75,6 +75,7 @@
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/path_support.h"
@@ -570,6 +571,8 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
     return res;
 }
 
+// TODO: SERVER-58394 Remove this function and combine it with
+// timeseries::queryOnlyDependsOnMetaField.
 // TODO: SERVER-58382 Handle time-series collections without a metaField.
 template <typename OpEntry, typename WholeOp>
 bool isTimeseriesMetaFieldOnlyQuery(OperationContext* opCtx,
