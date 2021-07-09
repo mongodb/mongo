@@ -258,7 +258,8 @@ void ReshardingMetrics::OperationMetrics::appendCurrentOpMetrics(BSONObjBuilder*
         case Role::kDonor:
             bob->append(kWritesDuringCritialSection, writesDuringCriticalSection);
             bob->append(kCriticalSectionTimeElapsed, getElapsedTime(inCriticalSection));
-            bob->append(kDonorState, serializeState(donorState));
+            bob->append(kDonorState,
+                        serializeState(donorState.get_value_or(DonorStateEnum::kUnused)));
             bob->append(kOpStatus, ReshardingOperationStatus_serializer(opStatus));
             break;
         case Role::kRecipient:
@@ -274,7 +275,8 @@ void ReshardingMetrics::OperationMetrics::appendCurrentOpMetrics(BSONObjBuilder*
             bob->append(kOplogsFetched, oplogEntriesFetched);
             bob->append(kOplogsApplied, oplogEntriesApplied);
             bob->append(kApplyTimeElapsed, getElapsedTime(applyingOplogEntries));
-            bob->append(kRecipientState, serializeState(recipientState));
+            bob->append(kRecipientState,
+                        serializeState(recipientState.get_value_or(RecipientStateEnum::kUnused)));
             bob->append(kOpStatus, ReshardingOperationStatus_serializer(opStatus));
             break;
         case Role::kCoordinator:
