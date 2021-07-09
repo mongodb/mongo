@@ -193,6 +193,10 @@ structs:
             lastWrite:
                 type: HelloLastWrite
                 optional: true
+            isImplicitDefaultMajorityWC:
+                # Only populated on shard server.
+                type: bool
+                optional: true
 
 commands:
     hello:

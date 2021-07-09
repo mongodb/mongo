@@ -52,6 +52,7 @@
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
@@ -390,6 +391,20 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
         return {ErrorCodes::OperationFailed,
                 str::stream() << "Cannot add " << connectionString.toString()
                               << " as a shard since it is a config server"};
+    }
+
+    if (resIsMaster.hasField("isImplicitDefaultMajorityWC") &&
+        !resIsMaster.getBoolField("isImplicitDefaultMajorityWC") &&
+        !ReadWriteConcernDefaults::get(opCtx).isCWWCSet(opCtx)) {
+        return {
+            ErrorCodes::OperationFailed,
+            str::stream()
+                << "Cannot add " << connectionString.toString()
+                << " as a shard since the implicit default write concern on this shard is set to "
+                   "{w : 1}, because number of arbiters in the shard's configuration caused the "
+                   "number of writable voting members not to be strictly more than the voting "
+                   "majority. Change the shard configuration or set the cluster-wide write concern "
+                   "using the setDefaultRWConcern command and try again."};
     }
 
     // If the shard is part of a replica set, make sure all the hosts mentioned in the connection

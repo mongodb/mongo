@@ -4,8 +4,19 @@
 
 (function() {
 "use strict";
-let st = new ShardingTest(
-    {shards: {rs0: {nodes: [{arbiter: false}, {arbiter: false}, {arbiter: true}]}}});
+let st = new ShardingTest({
+    shards: {
+        rs0: {
+            nodes: [
+                {arbiter: false},
+                {arbiter: false},
+                {arbiter: true},
+                {arbiter: false},
+                {arbiter: false}
+            ]
+        }
+    }
+});
 
 jsTestLog("Started ShardingTest");
 

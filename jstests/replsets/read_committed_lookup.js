@@ -38,13 +38,14 @@ rst.initiate(config);
 let st = new ShardingTest({
     manualAddShard: true,
 });
-assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 // We can't run this command on a shard server (configured with --shardsvr) which is why we must run
 // it on mongos.
 assert.commandWorked(st.s.adminCommand(
     {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
+// Even though implicitDefaultWC is set to w:1, addShard will work as CWWC is set.
+assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));
 let shardSecondary = rst.getSecondary();
 
 testReadCommittedLookup(rst.getPrimary().getDB("test"), shardSecondary, rst);
