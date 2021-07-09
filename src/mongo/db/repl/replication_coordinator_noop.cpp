@@ -549,5 +549,9 @@ void ReplicationCoordinatorNoOp::restartScheduledHeartbeats_forTest() {
     MONGO_UNREACHABLE;
 }
 
+void ReplicationCoordinatorNoOp::recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

@@ -368,6 +368,8 @@ public:
                                             OnRemoteCmdCompleteFn onRemoteCmdComplete) override;
     virtual void restartScheduledHeartbeats_forTest() override;
 
+    virtual void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
+
 private:
     ServiceContext* const _service;
     ReplSettings _settings;

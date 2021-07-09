@@ -60,6 +60,11 @@ function testReplSet(CWWCSet, isPSASet) {
 }
 
 function testSharding(CWWCSet, isPSASet) {
+    if (isPSASet && !CWWCSet) {
+        // Shard server will fassert on startup if DWCF=w:1 and no CWWC set.
+        return;
+    }
+
     jsTestLog("Running sharding test with CWWCSet: " + tojson(CWWCSet) +
               ", isPSASet: " + tojson(isPSASet));
     let replSetNodes = [{binVersion: "last-lts"}, {binVersion: "last-lts"}];

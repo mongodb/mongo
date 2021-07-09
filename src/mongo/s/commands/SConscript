@@ -123,6 +123,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/map_reduce_parser',
         '$BUILD_DIR/mongo/db/commands/profile_common',
         '$BUILD_DIR/mongo/db/commands/rename_collection_idl',
+        '$BUILD_DIR/mongo/db/commands/rwc_defaults_commands',
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/commands/servers',
         '$BUILD_DIR/mongo/db/commands/set_feature_compatibility_version_idl',

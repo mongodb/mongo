@@ -47,6 +47,7 @@
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/rwc_defaults_commands_gen.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -1130,5 +1131,31 @@ void ReplicationCoordinatorExternalStateImpl::setupNoopWriter(Seconds waitTime) 
 
     _noopWriter = std::make_unique<NoopWriter>(waitTime);
 }
+
+bool ReplicationCoordinatorExternalStateImpl::isCWWCSetOnConfigShard(
+    OperationContext* opCtx) const {
+    GetDefaultRWConcern configsvrRequest;
+    configsvrRequest.setDbName(NamespaceString::kAdminDb.toString());
+    auto cmdResponse = uassertStatusOK(
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            NamespaceString::kAdminDb.toString(),
+            configsvrRequest.toBSON({}),
+            Shard::RetryPolicy::kIdempotent));
+
+    bool isCWWCSet = false;
+    if (cmdResponse.response.hasField("defaultWriteConcernSource")) {
+        // FCV is set to "5.0" or higher.
+        isCWWCSet = cmdResponse.response.getField("defaultWriteConcernSource").valueStringData() ==
+            DefaultWriteConcernSource_serializer(DefaultWriteConcernSourceEnum::kGlobal);
+    } else {
+        // FCV is set to lower than "5.0".
+        isCWWCSet = cmdResponse.response.hasField("defaultWriteConcern");
+    }
+
+    return isCWWCSet;
+}
+
 }  // namespace repl
 }  // namespace mongo

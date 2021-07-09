@@ -390,6 +390,8 @@ public:
 
     virtual void restartScheduledHeartbeats_forTest() override;
 
+    virtual void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
+
     // ================== Test support API ===================
 
     /**
@@ -1493,6 +1495,12 @@ private:
                               bool force,
                               bool skipSafetyChecks);
 
+    /**
+     * This validation should be called on shard startup, it fasserts if the defaultWriteConcern
+     * on the shard is set to w:1 and CWWC is not set.
+     */
+    void _validateDefaultWriteConcernOnShardStartup(WithLock lk) const;
+
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
@@ -1690,6 +1698,9 @@ private:
 
     // The cached value of the 'counter' field in the server's TopologyVersion.
     AtomicWord<int64_t> _cachedTopologyVersionCounter;  // (S)
+
+    // This should be set during sharding initialization.
+    boost::optional<bool> _wasCWWCSetOnConfigServerOnStartup;
 };
 
 }  // namespace repl
