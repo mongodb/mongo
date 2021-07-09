@@ -40,12 +40,14 @@ env.CppUnitTest(
     source=[
         'bson_check_test.cpp',
         'bson_extract_test.cpp',
+        'bitstream_builder_test.cpp',
         'builder_test.cpp',
         'simple8b_test.cpp', 
         'simple8b_type_util_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        'bitstream_builder',
         'bson_extract',
         'type_compressor', 
     ],

@@ -38,7 +38,6 @@ TEST(BitStreamBuilderBSON, AddZeroBits) {
     uint64_t data = 0xA;
     obj.appendBits(data, numBits);
     ASSERT_EQUALS(obj.getBuffer()->len(), 0);
-    std::cout << obj.getCurrentBitPos() << std ::endl;
     ASSERT_EQUALS(obj.getCurrentBitPos(), 0);
 }
 
@@ -64,11 +63,12 @@ TEST(BitStreamBuilderBSON, AddPartialByte) {
 
 TEST(BitStreamBuilderBSON, AddFullInt) {
     BitStreamBuilder obj;
+    std::vector<unsigned char> testArr = {0xCF, 0xAB, 0xCF, 0xAB};
     uint64_t data = 0xABCFABCF;
     int32_t numBits = sizeof(data) * 8;
     obj.appendBits(data, numBits);
     ASSERT_EQUALS(obj.getBuffer()->len(), 8);
-    ASSERT_EQUALS(0, std::memcmp(obj.getBuffer()->buf(), &data, 8));
+    ASSERT_EQUALS(0, std::memcmp(obj.getBuffer()->buf(), testArr.data(), testArr.size()));
     ASSERT_EQUALS(obj.getCurrentBitPos(), 0);
 }
 
