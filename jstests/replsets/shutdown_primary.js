@@ -43,7 +43,7 @@
 
     jsTestLog("Shutting down primary in a parallel shell");
     var awaitShell = startParallelShell(function() {
-        db.adminCommand({shutdown: 1, timeoutSecs: 60});
+        db.adminCommand({shutdown: 1, timeoutSecs: 200});
     }, primary.port);
 
     jsTestLog("Resuming replication.");
