@@ -49,17 +49,17 @@
 
 namespace test_harness {
 /* Tracking operations. */
-enum class tracking_operation { CREATE_COLLECTION, DELETE_COLLECTION, DELETE_KEY, INSERT, UPDATE };
+enum class tracking_operation { CREATE_COLLECTION, DELETE_COLLECTION, DELETE_KEY, INSERT };
 /* Class used to track operations performed on collections */
 class workload_tracking : public component {
 
     public:
     workload_tracking(configuration *_config, const std::string &operation_table_config,
       const std::string &operation_table_name, const std::string &schema_table_config,
-      const std::string &schema_table_name)
+      const std::string &schema_table_name, timestamp_manager &tsm)
         : component("workload_tracking", _config), _operation_table_config(operation_table_config),
           _operation_table_name(operation_table_name), _schema_table_config(schema_table_config),
-          _schema_table_name(schema_table_name)
+          _schema_table_name(schema_table_name), _tsm(tsm)
     {
     }
 
@@ -94,12 +94,81 @@ class workload_tracking : public component {
         testutil_check(_session->create(
           _session.get(), _operation_table_name.c_str(), _operation_table_config.c_str()));
         log_msg(LOG_TRACE, "Operations tracking created");
+
+        /*
+         * Open sweep cursor. This cursor will be used to clear out obsolete data from the tracking
+         * table.
+         */
+        _sweep_cursor = _session.open_scoped_cursor(_operation_table_name.c_str());
+        log_msg(LOG_TRACE, "Tracking table sweep initialized");
     }
 
+    /*
+     * As every operation is tracked in the tracking table we need to clear out obsolete operations
+     * otherwise the file size grow continuously, as such we cleanup operations that are no longer
+     * relevant, i.e. older than the oldest timestamp.
+     */
     void
-    run() override final
+    do_work() override final
     {
-        /* Does not do anything. */
+        WT_DECL_RET;
+        wt_timestamp_t ts, oldest_ts;
+        uint64_t collection_id, sweep_collection_id;
+        int op_type;
+        const char *key, *value;
+        char *sweep_key;
+        bool globally_visible_update_found;
+
+        key = sweep_key = nullptr;
+        globally_visible_update_found = false;
+
+        /* Take a copy of the oldest so that we sweep with a consistent timestamp. */
+        oldest_ts = _tsm.get_oldest_ts();
+
+        /* If we have a position, give it up. */
+        testutil_check(_sweep_cursor->reset(_sweep_cursor.get()));
+
+        while ((ret = _sweep_cursor->prev(_sweep_cursor.get())) == 0) {
+            testutil_check(_sweep_cursor->get_key(_sweep_cursor.get(), &collection_id, &key, &ts));
+            testutil_check(_sweep_cursor->get_value(_sweep_cursor.get(), &op_type, &value));
+            /*
+             * If we're on a new key, reset the check. We want to track whether we have a globally
+             * visible update for the current key.
+             */
+            if (sweep_key == nullptr || sweep_collection_id != collection_id ||
+              strcmp(sweep_key, key) != 0) {
+                globally_visible_update_found = false;
+                if (sweep_key != nullptr)
+                    free(sweep_key);
+                sweep_key = static_cast<char *>(dstrdup(key));
+                sweep_collection_id = collection_id;
+            }
+            if (ts <= oldest_ts) {
+                if (globally_visible_update_found) {
+                    if (_trace_level == LOG_TRACE)
+                        log_msg(LOG_TRACE,
+                          std::string("workload tracking: Obsoleted update, key=") + sweep_key +
+                            ", collection_id=" + std::to_string(collection_id) +
+                            ", timestamp=" + std::to_string(ts) +
+                            ", oldest_timestamp=" + std::to_string(oldest_ts) + ", value=" + value);
+                    testutil_check(_sweep_cursor->remove(_sweep_cursor.get()));
+                } else if (static_cast<tracking_operation>(op_type) == tracking_operation::INSERT) {
+                    if (_trace_level == LOG_TRACE)
+                        log_msg(LOG_TRACE,
+                          std::string("workload tracking: Found globally visible update, key=") +
+                            sweep_key + ", collection_id=" + std::to_string(collection_id) +
+                            ", timestamp=" + std::to_string(ts) +
+                            ", oldest_timestamp=" + std::to_string(oldest_ts) + ", value=" + value);
+                    globally_visible_update_found = true;
+                }
+            }
+        }
+
+        free(sweep_key);
+
+        if (ret != WT_NOTFOUND)
+            testutil_die(LOG_ERROR,
+              "Tracking table sweep failed: cursor->next() returned an unexpected error %d.", ret);
     }
 
     void
@@ -122,7 +191,6 @@ class workload_tracking : public component {
               std::to_string(static_cast<int>(operation));
             testutil_die(EINVAL, error_message.c_str());
         }
-        log_msg(LOG_TRACE, "save_schema_operation: workload tracking saved operation.");
     }
 
     template <typename K, typename V>
@@ -148,17 +216,18 @@ class workload_tracking : public component {
             op_track_cursor->set_value(op_track_cursor.get(), static_cast<int>(operation), value);
             ret = op_track_cursor->insert(op_track_cursor.get());
         }
-        log_msg(LOG_TRACE, "save_operation: workload tracking saved operation.");
         return (ret);
     }
 
     private:
     scoped_session _session;
     scoped_cursor _schema_track_cursor;
+    scoped_cursor _sweep_cursor;
     const std::string _operation_table_config;
     const std::string _operation_table_name;
     const std::string _schema_table_config;
     const std::string _schema_table_name;
+    timestamp_manager &_tsm;
 };
 } // namespace test_harness
 

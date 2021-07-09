@@ -222,24 +222,9 @@ class workload_validation {
 
             /* Update the key_state to deleted. */
             it->second.exists = false;
-        } else if (operation == tracking_operation::INSERT) {
-            /* Keys are unique, if we have already inserted this key something has gone wrong. */
-            const auto result = collection.insert(validation_collection::value_type(
-              key_value_t(key), key_state{true, key_value_t(value)}));
-            /* The returned result is true if we inserted a new key. */
-            if (result.second == false)
-                testutil_die(LOG_ERROR,
-                  "Validation failed: detected a duplicated key. Collection id: %lu Key: %s",
-                  collection_id, key);
-        } else if (operation == tracking_operation::UPDATE) {
-            const auto it = collection.find(key);
-            if (it == collection.end())
-                testutil_die(LOG_ERROR,
-                  "Validation failed: key updated without previous insertion. Collection id: %lu "
-                  "Key: %s",
-                  collection_id, key);
-            collection[key] = key_state{true, value};
-        } else
+        } else if (operation == tracking_operation::INSERT)
+            collection[key_value_t(key)] = key_state{true, key_value_t(value)};
+        else
             testutil_die(LOG_ERROR,
               "Validation failed: unexpected operation in the tracking table: %d",
               static_cast<tracking_operation>(operation));

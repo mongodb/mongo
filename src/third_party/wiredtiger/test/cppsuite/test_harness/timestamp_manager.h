@@ -90,19 +90,24 @@ class timestamp_manager : public component {
          * Keep a time window between the stable and oldest ts less than the max defined in the
          * configuration.
          */
+        wt_timestamp_t new_oldest_ts = _oldest_ts;
         testutil_assert(_stable_ts >= _oldest_ts);
         if ((_stable_ts - _oldest_ts) > _oldest_lag) {
             log_msg(LOG_INFO, "Timestamp_manager: Oldest timestamp expired.");
-            _oldest_ts = _stable_ts - _oldest_lag;
+            new_oldest_ts = _stable_ts - _oldest_lag;
             if (!config.empty())
                 config += ",";
-            config += std::string(OLDEST_TS) + "=" + decimal_to_hex(_oldest_ts);
+            config += std::string(OLDEST_TS) + "=" + decimal_to_hex(new_oldest_ts);
         }
 
-        /* Save the new timestamps. */
+        /*
+         * Save the new timestamps. Any timestamps that we're viewing from another thread should be
+         * set AFTER we've saved the new timestamps to avoid races where we sweep data that is not
+         * yet obsolete.
+         */
         if (!config.empty()) {
             connection_manager::instance().set_timestamp(config);
-            config = "";
+            _oldest_ts = new_oldest_ts;
         }
     }
 
@@ -127,6 +132,12 @@ class timestamp_manager : public component {
         return (res);
     }
 
+    wt_timestamp_t
+    get_oldest_ts() const
+    {
+        return (_oldest_ts);
+    }
+
     private:
     /* Get the current time in seconds, bit shifted to the expected location. */
     uint64_t
@@ -141,7 +152,9 @@ class timestamp_manager : public component {
 
     private:
     std::atomic<wt_timestamp_t> _increment_ts{0};
-    wt_timestamp_t _oldest_ts = 0U, _stable_ts = 0U;
+    /* The tracking table sweep needs to read the oldest timestamp. */
+    std::atomic<wt_timestamp_t> _oldest_ts{0U};
+    wt_timestamp_t _stable_ts = 0U;
     /*
      * _oldest_lag is the time window between the stable and oldest timestamps.
      * _stable_lag is the time window between the latest and stable timestamps.

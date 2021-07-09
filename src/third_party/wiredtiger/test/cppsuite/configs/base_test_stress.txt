@@ -10,7 +10,7 @@ runtime_monitor=
 (
     stat_cache_size=
     (
-        enabled=true,
+        enabled=false,
         limit=100
     )
 ),
@@ -56,5 +56,6 @@ workload_generator=
 ),
 workload_tracking=
 (
-    enabled=true
+    enabled=true,
+    op_rate=30s
 )
