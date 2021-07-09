@@ -238,8 +238,9 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             auto completionStatus = status;
 
             // Release the coordinator only if we are not stepping down
-            if (!status.isA<ErrorCategory::NotPrimaryError>() &&
-                !status.isA<ErrorCategory::ShutdownError>()) {
+            if ((!status.isA<ErrorCategory::NotPrimaryError>() &&
+                 !status.isA<ErrorCategory::ShutdownError>()) ||
+                (!status.isOK() && _completeOnError)) {
                 try {
                     LOGV2(5565601,
                           "Releasing sharding DDL coordinator",

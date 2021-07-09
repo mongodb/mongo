@@ -19,13 +19,13 @@ const toNss = nss + '_renamed';
 
 let st = new ShardingTest({shards: 1});
 
-st.s.adminCommand({enableSharding: kDbName});
+st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName});
 
 st.s.getDB(kDbName).getCollection(kCollectionName).insert({x: 1});
 
 let getCurrentOpOfDDL = (ddlOpThread, desc) => {
     let ddlCoordinatorFailPoint =
-        configureFailPoint(st.rs0.getPrimary(), 'hangBeforeRunningCoordinatorInstance');
+        configureFailPoint(st.getPrimaryShard(kDbName), 'hangBeforeRunningCoordinatorInstance');
 
     ddlOpThread.start();
     ddlCoordinatorFailPoint.wait();
@@ -97,6 +97,24 @@ let getCurrentOpOfDDL = (ddlOpThread, desc) => {
     // It must have the target collection.
     assert(currOp[0].hasOwnProperty('command'));
     assert.docEq({to: toNss, dropTarget: true, stayTemp: false}, currOp[0].command);
+}
+
+{
+    jsTestLog('Check move primary shows in current op');
+
+    let ddlOpThread = new Thread((mongosConnString, dbName, destShard) => {
+        let mongos = new Mongo(mongosConnString);
+        mongos.adminCommand({movePrimary: dbName, to: destShard});
+    }, st.s0.host, kDbName, st.shard0.shardName);
+
+    let currOp = getCurrentOpOfDDL(ddlOpThread, 'MovePrimaryCoordinator');
+
+    // There must be one operation running with the appropiate ns.
+    assert.eq(1, currOp.length);
+    assert.eq(kDbName, currOp[0].ns);
+    assert(currOp[0].command.hasOwnProperty('request'));
+    assert(currOp[0].command.request.hasOwnProperty('toShardId'));
+    assert.eq(st.shard0.shardName, currOp[0].command.request.toShardId);
 }
 
 {

@@ -29,24 +29,32 @@
 
 #pragma once
 
+#include "mongo/db/s/move_primary_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
-#include "mongo/s/shard_id.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
-class MovePrimaryCoordinator final : public ShardingDDLCoordinator_NORESILIENT,
-                                     public std::enable_shared_from_this<MovePrimaryCoordinator> {
+class MovePrimaryCoordinator final : public ShardingDDLCoordinator {
 public:
-    MovePrimaryCoordinator(OperationContext* opCtx,
-                           const NamespaceString& dbNss,
-                           const StringData& toShard);
+    MovePrimaryCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState);
+    ~MovePrimaryCoordinator() = default;
+
+    void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
+
+    boost::optional<BSONObj> reportForCurrentOp(
+        MongoProcessInterface::CurrentOpConnectionsMode connMode,
+        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
 private:
-    SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
+    ShardingDDLCoordinatorMetadata const& metadata() const override {
+        return _doc.getShardingDDLCoordinatorMetadata();
+    }
 
-    ServiceContext* _serviceContext;
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancellationToken& token) noexcept override;
 
-    const ShardId _toShardId;
+    MovePrimaryCoordinatorDocument _doc;
 };
 
 }  // namespace mongo

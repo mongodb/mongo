@@ -71,8 +71,15 @@ void newMovePrimaryFlow(OperationContext* opCtx,
                           << opCtx->getWriteConcern().wMode,
             opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-    auto movePrimaryCoordinator = std::make_shared<MovePrimaryCoordinator>(opCtx, dbNss, toShard);
-    movePrimaryCoordinator->run(opCtx).get();
+    auto coordinatorDoc = MovePrimaryCoordinatorDocument();
+    coordinatorDoc.setShardingDDLCoordinatorMetadata(
+        {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});
+    coordinatorDoc.setToShardId(ShardId(cmdObj.getTo().toString()));
+
+    auto service = ShardingDDLCoordinatorService::getService(opCtx);
+    auto movePrimaryCoordinator = checked_pointer_cast<MovePrimaryCoordinator>(
+        service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+    movePrimaryCoordinator->getCompletionFuture().get(opCtx);
 }
 
 class MovePrimaryCommand : public BasicCommand {

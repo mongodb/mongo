@@ -69,24 +69,55 @@ void uassertStatusOKWithWarning(const Status& status) {
 
 }  // namespace
 
-MovePrimaryCoordinator::MovePrimaryCoordinator(OperationContext* opCtx,
-                                               const NamespaceString& dbNss,
-                                               const StringData& toShard)
-    : ShardingDDLCoordinator_NORESILIENT(opCtx, dbNss),
-      _serviceContext(opCtx->getServiceContext()),
-      _toShardId(ShardId(toShard.toString())) {}
+MovePrimaryCoordinator::MovePrimaryCoordinator(ShardingDDLCoordinatorService* service,
+                                               const BSONObj& initialState)
+    : ShardingDDLCoordinator(service, initialState),
+      _doc(MovePrimaryCoordinatorDocument::parse(
+          IDLParserErrorContext("MovePrimaryCoordinatorDocument"), initialState)) {}
 
-SemiFuture<void> MovePrimaryCoordinator::runImpl(std::shared_ptr<executor::TaskExecutor> executor) {
-    return ExecutorFuture<void>(executor, Status::OK())
-        .then([this, anchor = shared_from_this()]() {
-            ThreadClient tc{"MovePrimaryCoordinator", _serviceContext};
-            auto opCtxHolder = tc->makeOperationContext();
+boost::optional<BSONObj> MovePrimaryCoordinator::reportForCurrentOp(
+    MongoProcessInterface::CurrentOpConnectionsMode connMode,
+    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
+    BSONObjBuilder cmdBob;
+    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
+        cmdBob.append(optComment.get().firstElement());
+    }
+    cmdBob.append("request", BSON(_doc.kToShardIdFieldName << _doc.getToShardId()));
+
+    BSONObjBuilder bob;
+    bob.append("type", "op");
+    bob.append("desc", "MovePrimaryCoordinator");
+    bob.append("op", "command");
+    bob.append("ns", nss().toString());
+    bob.append("command", cmdBob.obj());
+    bob.append("active", true);
+    return bob.obj();
+}
+
+void MovePrimaryCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
+    // If we have two shard collections on the same namespace, then the arguments must be the same.
+    const auto otherDoc = MovePrimaryCoordinatorDocument::parse(
+        IDLParserErrorContext("MovePrimaryCoordinatorDocument"), doc);
+
+    uassert(
+        ErrorCodes::ConflictingOperationInProgress,
+        "Another move primary with different arguments is already running for the same namespace",
+        _doc.getToShardId() == otherDoc.getToShardId());
+}
+
+
+ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) noexcept {
+    return ExecutorFuture<void>(**executor)
+        .then([this, anchor = shared_from_this()] {
+            auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            _forwardableOpMetadata.setOn(opCtx);
+            getForwardableOpMetadata().setOn(opCtx);
 
-            auto distLockManager = DistLockManager::get(opCtx->getServiceContext());
-            const auto dbDistLock = uassertStatusOK(distLockManager->lock(
-                opCtx, _nss.db(), "MovePrimary", DistLockManager::kDefaultLockTimeout));
+            // Any error should terminate the coordinator, even if it is a retryable error, this way
+            // we have a movePrimary with a similar behavior of the previous one.
+            _completeOnError = true;
 
             auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
             // Make sure we're as up-to-date as possible with shard information. This catches the
@@ -94,71 +125,42 @@ SemiFuture<void> MovePrimaryCoordinator::runImpl(std::shared_ptr<executor::TaskE
             // same name.
             shardRegistry->reload(opCtx);
 
-            const auto& dbName = _nss.db();
-
-            const auto& toShard = [&]() {
-                auto toShardStatus = shardRegistry->getShard(opCtx, _toShardId);
-                if (!toShardStatus.isOK()) {
-                    LOGV2(5275802,
-                          "Could not move database {db} to shard {shardId}: {error}",
-                          "Could not move database to shard",
-                          "db"_attr = dbName,
-                          "shardId"_attr = _toShardId,
-                          "error"_attr = toShardStatus.getStatus());
-                    uassertStatusOKWithContext(toShardStatus.getStatus(),
-                                               str::stream()
-                                                   << "Could not move database '" << dbName
-                                                   << "' to shard '" << _toShardId << "'");
-                }
-                return toShardStatus.getValue();
-            }();
+            const auto& dbName = nss().db();
+            const auto& toShard = uassertStatusOKWithContext(
+                shardRegistry->getShard(opCtx, _doc.getToShardId()),
+                str::stream() << "Could not move database '" << dbName << "' to shard '"
+                              << _doc.getToShardId() << "'");
 
             const auto& selfShardId = ShardingState::get(opCtx)->shardId();
             if (selfShardId == toShard->getId()) {
                 LOGV2(5275803,
                       "Database already on the requested primary shard",
                       "db"_attr = dbName,
-                      "shardId"_attr = _toShardId);
+                      "shardId"_attr = _doc.getToShardId());
                 // The database primary is already the `to` shard
                 return;
             }
 
-            ShardMovePrimary movePrimaryRequest(_nss, _toShardId.toString());
+            ShardMovePrimary movePrimaryRequest(nss(), _doc.getToShardId().toString());
 
-            auto scopedMovePrimary = uassertStatusOK(
-                ActiveMovePrimariesRegistry::get(opCtx).registerMovePrimary(movePrimaryRequest));
-            // Check if there is an existing movePrimary running and if so, join it
-            if (scopedMovePrimary.mustExecute()) {
-                auto status = [&] {
-                    try {
-                        auto primaryId = selfShardId;
-                        auto toId = toShard->getId();
-                        MovePrimarySourceManager movePrimarySourceManager(
-                            opCtx, movePrimaryRequest, dbName, primaryId, toId);
-                        uassertStatusOKWithWarning(movePrimarySourceManager.clone(opCtx));
-                        uassertStatusOKWithWarning(
-                            movePrimarySourceManager.enterCriticalSection(opCtx));
-                        uassertStatusOKWithWarning(movePrimarySourceManager.commitOnConfig(opCtx));
-                        uassertStatusOKWithWarning(movePrimarySourceManager.cleanStaleData(opCtx));
-                        return Status::OK();
-                    } catch (const DBException& ex) {
-                        return ex.toStatus();
-                    }
-                }();
-                scopedMovePrimary.signalComplete(status);
-                uassertStatusOK(status);
-            } else {
-                uassertStatusOK(scopedMovePrimary.waitForCompletion(opCtx));
-            }
+            auto primaryId = selfShardId;
+            auto toId = toShard->getId();
+            MovePrimarySourceManager movePrimarySourceManager(
+                opCtx, movePrimaryRequest, dbName, primaryId, toId);
+            uassertStatusOKWithWarning(movePrimarySourceManager.clone(opCtx));
+            uassertStatusOKWithWarning(movePrimarySourceManager.enterCriticalSection(opCtx));
+            uassertStatusOKWithWarning(movePrimarySourceManager.commitOnConfig(opCtx));
+            uassertStatusOKWithWarning(movePrimarySourceManager.cleanStaleData(opCtx));
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             LOGV2_ERROR(5275804,
                         "Error running move primary",
-                        "namespace"_attr = _nss,
+                        "database"_attr = nss().db(),
+                        "to"_attr = _doc.getToShardId(),
                         "error"_attr = redact(status));
+
             return status;
-        })
-        .semi();
+        });
 }
 
 }  // namespace mongo
