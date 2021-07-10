@@ -28,4 +28,4 @@ def PrintGlobalServiceContext(debugger, *_args):  # pylint: disable=invalid-name
 
 def MongoDBDumpLocks(debugger, *_args):  # pylint: disable=invalid-name
     """Dump locks in the mongod process."""
-    debugger.HandleCommand("call globalLockManager.dump()")
+    debugger.HandleCommand("call mongo::getGlobalLockManager()->dump()")
