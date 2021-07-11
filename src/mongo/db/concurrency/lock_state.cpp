@@ -117,18 +117,6 @@ private:
     AlignedLockStats _partitions[NumPartitions];
 };
 
-
-// Provide backwards compatibility for debugger scripts that expect a 'globalLockManager' variable
-// in the anonymous namespace. See buildscripts/gdb/mongo.py and buildscripts/lldb/lldb_commands.py.
-[[maybe_unused]] struct {
-    void dump() {
-        auto serviceContext = getGlobalServiceContext();
-        invariant(serviceContext);
-        auto lockManager = LockManager::get(serviceContext);
-        lockManager->dump();
-    }
-} globalLockManager;
-
 // How often (in millis) to check for deadlock if a lock has not been granted for some time
 const Milliseconds MaxWaitTime = Milliseconds(500);
 
