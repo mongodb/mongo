@@ -26,8 +26,9 @@ const mongosColl = mongosDB[jsTestName()];
 const unshardedColl = mongosDB[jsTestName() + "_unsharded"];
 const primaryShardDB = st.shard0.getDB(jsTestName());
 
-const isShardedLookupEnabled = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1})
-                                   .featureFlagShardedLookup.value;
+const getShardedLookupParam = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
 
 assert.commandWorked(mongosDB.dropDatabase());
 
