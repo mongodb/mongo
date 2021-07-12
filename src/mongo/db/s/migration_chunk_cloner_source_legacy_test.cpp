@@ -136,6 +136,18 @@ protected:
         ASSERT_GT(response["n"].Int(), 0);
     }
 
+    void deleteDocsInShardedCollection(BSONObj query) {
+        auto response = client()->removeAcknowledged(kNss.ns(), query);
+        ASSERT_OK(getStatusFromWriteCommandReply(response));
+        ASSERT_GT(response["n"].Int(), 0);
+    }
+
+    void updateDocsInShardedCollection(BSONObj query, BSONObj updated) {
+        auto response = client()->updateAcknowledged(kNss.ns(), query, updated);
+        ASSERT_OK(getStatusFromWriteCommandReply(response));
+        ASSERT_GT(response["n"].Int(), 0);
+    }
+
     /**
      * Creates a collection, which contains an index corresponding to kShardKeyPattern and insers
      * the specified initial documents.
@@ -216,6 +228,13 @@ protected:
      */
     static BSONObj createCollectionDocument(int value) {
         return BSON("_id" << value << "X" << value);
+    }
+
+    /**
+     * Instantiates a BSON object with different "_id" and "X" values.
+     */
+    static BSONObj createCollectionDocumentForUpdate(int id, int value) {
+        return BSON("_id" << id << "X" << value);
     }
 
     /**
@@ -366,6 +385,100 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
     ASSERT_OK(cloner.commitClone(operationContext()));
     futureCommit.default_timed_get();
 }
+
+
+TEST_F(MigrationChunkClonerSourceLegacyTest, RemoveDuplicateDocuments) {
+    const std::vector<BSONObj> contents = {createCollectionDocument(100),
+                                           createCollectionDocument(199)};
+
+    createShardedCollection(contents);
+
+    MigrationChunkClonerSourceLegacy cloner(
+        createMoveChunkRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200))),
+        kShardKeyPattern,
+        kDonorConnStr,
+        kRecipientConnStr.getServers()[0]);
+
+    {
+        auto futureStartClone = launchAsync([&]() {
+            onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
+        });
+
+        ASSERT_OK(cloner.startClone(operationContext(), UUID::gen(), _lsid, _txnNumber));
+        futureStartClone.default_timed_get();
+    }
+
+    // Ensure the initial clone documents are available
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+
+        {
+            BSONArrayBuilder arrBuilder;
+            ASSERT_OK(
+                cloner.nextCloneBatch(operationContext(), autoColl.getCollection(), &arrBuilder));
+            ASSERT_EQ(2, arrBuilder.arrSize());
+
+            const auto arr = arrBuilder.arr();
+            ASSERT_BSONOBJ_EQ(contents[0], arr[0].Obj());
+            ASSERT_BSONOBJ_EQ(contents[1], arr[1].Obj());
+        }
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
+
+        deleteDocsInShardedCollection(createCollectionDocument(100));
+        insertDocsInShardedCollection({createCollectionDocument(100)});
+        deleteDocsInShardedCollection(createCollectionDocument(100));
+
+        updateDocsInShardedCollection(createCollectionDocument(199),
+                                      createCollectionDocumentForUpdate(199, 198));
+        updateDocsInShardedCollection(createCollectionDocumentForUpdate(199, 198),
+                                      createCollectionDocumentForUpdate(199, 197));
+
+        WriteUnitOfWork wuow(operationContext());
+
+        cloner.onDeleteOp(operationContext(), createCollectionDocument(100), {}, {});
+        cloner.onInsertOp(operationContext(), createCollectionDocument(100), {});
+        cloner.onDeleteOp(operationContext(), createCollectionDocument(100), {}, {});
+
+        cloner.onUpdateOp(operationContext(),
+                          createCollectionDocument(199),
+                          createCollectionDocumentForUpdate(199, 198),
+                          {},
+                          {});
+        cloner.onUpdateOp(operationContext(),
+                          createCollectionDocument(199),
+                          createCollectionDocumentForUpdate(199, 197),
+                          {},
+                          {});
+
+        wuow.commit();
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+        {
+            BSONObjBuilder modsBuilder;
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), autoColl.getDb(), &modsBuilder));
+
+            const auto modsObj = modsBuilder.obj();
+            ASSERT_EQ(1U, modsObj["reload"].Array().size());
+            ASSERT_BSONOBJ_EQ(createCollectionDocumentForUpdate(199, 197),
+                              modsObj["reload"].Array()[0].Obj());
+            ASSERT_EQ(1U, modsObj["deleted"].Array().size());
+            ASSERT_BSONOBJ_EQ(BSON("_id" << 100), modsObj["deleted"].Array()[0].Obj());
+        }
+    }
+
+    auto futureCommit = launchAsync([&]() {
+        onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
+    });
+
+    ASSERT_OK(cloner.commitClone(operationContext()));
+    futureCommit.default_timed_get();
+}
+
 
 TEST_F(MigrationChunkClonerSourceLegacyTest, OneLargeDocumentTransferMods) {
     const std::vector<BSONObj> contents = {createCollectionDocument(1)};

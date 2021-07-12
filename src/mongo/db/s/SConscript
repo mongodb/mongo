@@ -608,3 +608,15 @@ env.CppUnitTest(
         'resharding_util',
     ],
 )
+
+env.Benchmark(
+    target='migration_chunk_cloner_source_legacy_bm',
+    source=[
+        'migration_chunk_cloner_source_legacy_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        'sharding_runtime_d'
+    ],
+)

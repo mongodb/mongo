@@ -974,17 +974,22 @@ long long xferMods(BSONArrayBuilder* arr,
         return initialSize;
     }
 
+    stdx::unordered_set<absl::string_view> addedSet;
     auto iter = modsList->begin();
     for (; iter != modsList->end(); ++iter) {
         auto idDoc = *iter;
+        absl::string_view idDocView(idDoc.objdata(), idDoc.objsize());
 
-        BSONObj fullDoc;
-        if (extractDocToAppendFn(idDoc, &fullDoc)) {
-            if (arr->arrSize() &&
-                (arr->len() + fullDoc.objsize() + kFixedCommandOverhead) > maxSize) {
-                break;
+        if (addedSet.find(idDocView) == addedSet.end()) {
+            addedSet.insert(idDocView);
+            BSONObj fullDoc;
+            if (extractDocToAppendFn(idDoc, &fullDoc)) {
+                if (arr->arrSize() &&
+                    (arr->len() + fullDoc.objsize() + kFixedCommandOverhead) > maxSize) {
+                    break;
+                }
+                arr->append(fullDoc);
             }
-            arr->append(fullDoc);
         }
     }
 
