@@ -1172,6 +1172,11 @@ public:
 
             invariant(!_commandObj.isEmpty());
 
+            if (const auto& shardVersion = _commandObj.getField("shardVersion");
+                !shardVersion.eoo()) {
+                bob->append(shardVersion);
+            }
+
             bob->append("find", _commandObj["update"].String());
             extractQueryDetails(_updateOpObj, bob);
             bob->append("batchSize", 1);
