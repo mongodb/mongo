@@ -134,6 +134,7 @@ void abortIndexBuilds(OperationContext* opCtx,
         indexBuildsCoordinator->abortDatabaseIndexBuilds(opCtx, nss.db(), reason);
     } else if (commandType == OplogEntry::CommandType::kDrop ||
                commandType == OplogEntry::CommandType::kDropIndexes ||
+               commandType == OplogEntry::CommandType::kCollMod ||
                commandType == OplogEntry::CommandType::kRenameCollection) {
         const boost::optional<UUID> collUUID =
             CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss);

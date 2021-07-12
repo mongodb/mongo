@@ -57,6 +57,8 @@ let secondary = rst.restart(1, {
 checkLog.containsJson(secondary, 21138);
 
 assert.commandWorked(coll.insert({a: 2}));
+assert.commandWorked(coll.hideIndex({a: 1}));
+assert.commandWorked(coll.unhideIndex({a: 1}));
 assert.commandWorked(coll.dropIndex({a: 1}));
 
 IndexBuildTest.pauseIndexBuilds(secondary);
