@@ -58,7 +58,7 @@ Note: In order to compile C-based Python modules, you'll also need the
 Python and OpenSSL C headers. Run:
 
 * Fedora/RHEL - `dnf install python3-devel openssl-devel`
-* Ubuntu/Debian - `apt-get install python3.7-dev libssl-dev`
+* Ubuntu/Debian - `apt install python-dev-is-python3 libssl-dev`
 
 
 SCons
