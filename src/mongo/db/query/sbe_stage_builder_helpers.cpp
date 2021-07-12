@@ -169,6 +169,10 @@ std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(
                         makeNot(makeFunction("exists", std::move(numericConvert32))));
 }
 
+std::unique_ptr<sbe::EExpression> generateNonTimestampCheck(const sbe::EVariable& var) {
+    return makeNot(makeFunction("isTimestamp", var.clone()));
+}
+
 template <>
 std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(
     std::unique_ptr<sbe::EExpression> defaultCase) {

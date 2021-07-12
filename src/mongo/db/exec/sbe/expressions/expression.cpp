@@ -456,6 +456,8 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"ftsMatch", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::ftsMatch, false}},
     {"generateSortKey",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::generateSortKey, false}},
+    {"tsSecond", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsSecond, false}},
+    {"tsIncrement", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsIncrement, false}},
 };
 
 /**
@@ -503,6 +505,8 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
      InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsMinKey, false}},
     {"isMaxKey",
      InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsMaxKey, false}},
+    {"isTimestamp",
+     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsTimestamp, false}},
     {"sum", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendSum, true}},
     {"min", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendMin, true}},
     {"max", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendMax, true}},

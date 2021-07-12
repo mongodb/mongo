@@ -125,6 +125,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // isRecordId
     0,  // isMinKey
     0,  // isMaxKey
+    0,  // isTimestamp
     0,  // typeMatch
 
     0,  // function is special, the stack offset is encoded in the instruction itself
@@ -3082,6 +3083,32 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinFtsMatch(ArityT
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(matches)};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinTsSecond(ArityType arity) {
+    invariant(arity == 1);
+
+    auto [inputValueOwn, inputTypeTag, inputValue] = getFromStack(0);
+
+    if (inputTypeTag != value::TypeTags::Timestamp) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto timestamp = Timestamp(value::bitcastTo<uint64_t>(inputValue));
+    return {false, value::TypeTags::NumberInt64, value::bitcastFrom<uint64_t>(timestamp.getSecs())};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinTsIncrement(ArityType arity) {
+    invariant(arity == 1);
+
+    auto [inputValueOwn, inputTypeTag, inputValue] = getFromStack(0);
+
+    if (inputTypeTag != value::TypeTags::Timestamp) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto timestamp = Timestamp(value::bitcastTo<uint64_t>(inputValue));
+    return {false, value::TypeTags::NumberInt64, value::bitcastFrom<uint64_t>(timestamp.getInc())};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           ArityType arity) {
     switch (f) {
@@ -3247,6 +3274,10 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinFtsMatch(arity);
         case Builtin::generateSortKey:
             return builtinGenerateSortKey(arity);
+        case Builtin::tsSecond:
+            return builtinTsSecond(arity);
+        case Builtin::tsIncrement:
+            return builtinTsIncrement(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -4139,6 +4170,20 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                         topStack(false,
                                  value::TypeTags::Boolean,
                                  value::bitcastFrom<bool>(tag == value::TypeTags::MaxKey));
+                    }
+
+                    if (owned) {
+                        value::releaseValue(tag, val);
+                    }
+                    break;
+                }
+                case Instruction::isTimestamp: {
+                    auto [owned, tag, val] = getFromStack(0);
+
+                    if (tag != value::TypeTags::Nothing) {
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(tag == value::TypeTags::Timestamp));
                     }
 
                     if (owned) {

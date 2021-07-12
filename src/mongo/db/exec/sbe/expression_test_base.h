@@ -167,6 +167,10 @@ protected:
         return {value::TypeTags::Boolean, value::bitcastFrom<bool>(value)};
     }
 
+    std::pair<value::TypeTags, value::Value> makeTimestamp(Timestamp timestamp) {
+        return {value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(timestamp.asULL())};
+    }
+
 private:
     value::SlotIdGenerator _slotIdGenerator;
     CoScanStage _emptyStage{kEmptyPlanNodeId};

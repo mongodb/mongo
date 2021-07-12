@@ -2736,11 +2736,51 @@ public:
     }
 
     void visit(const ExpressionTsSecond* expr) final {
-        unsupportedExpression("$tsSecond");
+        _context->ensureArity(1);
+
+        auto tsSecondExpr = makeLocalBind(
+            _context->state.frameIdGenerator,
+            [&](sbe::EVariable operand) {
+                // The branching is as follows,
+                // *  if the input value is null or missing, then return null
+                // *  if the input value is not timestamp, then throw an exception
+                // *  else, create a builtin function with the name 'tsSecond'
+                return buildMultiBranchConditional(
+                    CaseValuePair{generateNullOrMissing(operand),
+                                  makeConstant(sbe::value::TypeTags::Null, 0)},
+                    CaseValuePair{generateNonTimestampCheck(operand),
+                                  sbe::makeE<sbe::EFail>(
+                                      ErrorCodes::Error{5687400},
+                                      str::stream() << expr->getOpName()
+                                                    << " expects argument of type timestamp")},
+                    makeFunction("tsSecond", operand.clone()));
+            },
+            _context->popExpr());
+        _context->pushExpr(std::move(tsSecondExpr));
     }
 
     void visit(const ExpressionTsIncrement* expr) final {
-        unsupportedExpression("$tsIncrement");
+        _context->ensureArity(1);
+
+        auto tsIncrementExpr = makeLocalBind(
+            _context->state.frameIdGenerator,
+            [&](sbe::EVariable operand) {
+                // The branching is as follows,
+                // *  if the input value is null or missing, then return null
+                // *  if the input value is not timestamp, then throw an exception
+                // *  else, create a builtin function with the name 'tsIncrement'
+                return buildMultiBranchConditional(
+                    CaseValuePair{generateNullOrMissing(operand),
+                                  makeConstant(sbe::value::TypeTags::Null, 0)},
+                    CaseValuePair{generateNonTimestampCheck(operand),
+                                  sbe::makeE<sbe::EFail>(
+                                      ErrorCodes::Error{5687401},
+                                      str::stream() << expr->getOpName()
+                                                    << " expects argument of type timestamp")},
+                    makeFunction("tsIncrement", operand.clone()));
+            },
+            _context->popExpr());
+        _context->pushExpr(std::move(tsIncrementExpr));
     }
 
 private:

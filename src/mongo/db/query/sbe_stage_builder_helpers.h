@@ -125,6 +125,8 @@ std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EVariable& v
 std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(
     const sbe::EVariable& var);
 
+std::unique_ptr<sbe::EExpression> generateNonTimestampCheck(const sbe::EVariable& var);
+
 /**
  * A pair representing a 1) true/false condition and 2) the value that should be returned if that
  * condition evaluates to true.

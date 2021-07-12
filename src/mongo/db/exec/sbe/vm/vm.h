@@ -260,6 +260,7 @@ struct Instruction {
         isRecordId,
         isMinKey,
         isMaxKey,
+        isTimestamp,
         typeMatch,
 
         function,
@@ -363,6 +364,8 @@ enum class Builtin : uint8_t {
     getRegexFlags,
     ftsMatch,
     generateSortKey,
+    tsSecond,
+    tsIncrement,
 };
 
 using SmallArityType = uint8_t;
@@ -471,6 +474,9 @@ public:
     }
     void appendIsMaxKey() {
         appendSimpleInstruction(Instruction::isMaxKey);
+    }
+    void appendIsTimestamp() {
+        appendSimpleInstruction(Instruction::isTimestamp);
     }
     void appendTypeMatch(uint32_t typeMask);
     void appendFunction(Builtin f, ArityType arity);
@@ -776,6 +782,8 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinGetRegexFlags(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinFtsMatch(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinGenerateSortKey(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinTsSecond(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinTsIncrement(ArityType arity);
 
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 

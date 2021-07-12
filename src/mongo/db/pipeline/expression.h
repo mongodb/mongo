@@ -4020,14 +4020,10 @@ public:
     static constexpr const char* const opName = "$tsSecond";
 
     explicit ExpressionTsSecond(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionTsSecond, 1>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionTsSecond, 1>(expCtx) {}
 
     ExpressionTsSecond(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionTsSecond, 1>(expCtx, std::move(children)) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionTsSecond, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
@@ -4049,14 +4045,10 @@ public:
     static constexpr const char* const opName = "$tsIncrement";
 
     explicit ExpressionTsIncrement(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionTsIncrement, 1>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionTsIncrement, 1>(expCtx) {}
 
     ExpressionTsIncrement(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionTsIncrement, 1>(expCtx, std::move(children)) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionTsIncrement, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
