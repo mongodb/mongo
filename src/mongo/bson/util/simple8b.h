@@ -55,7 +55,9 @@ public:
     std::vector<Value> getAllInts();
 
     /**
-     * Appends a value to the Simple8b chain of words.
+     * Checks if we can append val to an existing RLE and handles the ending of a RLE.
+     * The default RLE value at the beginning is 0.
+     * Otherwise, appends a value to the Simple8b chain of words.
      * Return true if successfully appended and false otherwise.
      */
     bool append(uint64_t val);
@@ -67,9 +69,9 @@ public:
     void skip();
 
     /**
-     * Stores all values in _pendingValues into _buffered even if the Simple8b word will not be
-     * optimal and use a larger selector than necessary because we don't have enough integers
-     * to use one with more slots.
+     * Stores all values for RLE or in _pendingValues into _buffered even if the Simple8b word
+     * will not be optimal and use a larger selector than necessary because we don't have
+     * enough integers to use one with more slots.
      */
     void flush();
 
@@ -103,7 +105,30 @@ private:
      * into the passed in vector and the index values starts from the passed in index variable.
      * When the selector is invalid, nothing will be appended.
      */
-    void _decode(uint64_t simple8bWord, uint32_t* index, std::vector<Value>* decodedValues) const;
+    void _decode(uint64_t simple8bWord, uint32_t* index, std::vector<Value>* decodedValues);
+
+    /**
+     * When an RLE ends because of inconsecutive values, check if there are enough
+     * consecutive values for a RLE value and/or any values to be appended to _pendingValues.
+     */
+    void _handleRleTermination();
+
+    /**
+     * Based on _rleCount, create a RLE Simple8b word if possible.
+     * If _rleCount is not large enough, do nothing.
+     */
+    void _appendRleEncoding();
+
+    /**
+     * Appends a value to the Simple8b chain of words.
+     * Return true if successfully appended and false otherwise.
+     */
+    bool _appendValue(uint64_t value, bool tryRle);
+
+    /**
+     * Appends a skip to _pendingValues and forms a new Simple8b word if there is no space.
+     */
+    void _appendSkip();
 
     /**
      * Takes a vector of integers to be compressed into a 64 bit word.
@@ -115,13 +140,27 @@ private:
      */
     uint64_t _encode(uint8_t selector, uint8_t endIdx);
 
+    /*
+     * Checks to see if RLE is possible and/or ongoing.
+     */
+    bool _rlePossible();
+
     struct PendingValue {
         bool skip;
         uint64_t val;
     };
 
-    BufBuilder _buffer;
+    // The number of bits used by the largest integer in _pendingValues.
     uint8_t _currMaxBitLen = 0;
+
+    // If RLE is ongoing, the number of consecutive repeats of lastValueInPrevWord.
+    uint32_t _rleCount = 0;
+    // If RLE is ongoing, the last value in the previous Simple8b word.
+    PendingValue _lastValueInPrevWord = {false, 0};
+
+    // The binary buffer storing all completed Simple8b words.
+    BufBuilder _buffer;
+    // A buffer of values that have not been added to _buffer yet.
     std::deque<PendingValue> _pendingValues;
 };
 

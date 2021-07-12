@@ -35,11 +35,14 @@
 namespace mongo {
 
 namespace {
-static constexpr uint8_t kMaxSelector = 14;  // TODO (SERVER-57794): Change to 15.
+static constexpr uint8_t kRleSelector = 15;
+static constexpr uint8_t kMaxSelector = 14;
+static constexpr uint8_t kMaxRleCout = 16;
 static constexpr uint8_t kMinSelector = 1;
 static constexpr uint64_t kSelectorMask = 0x000000000000000F;
 static constexpr uint8_t kSelectorBits = 4;
 static constexpr uint8_t kDataBits = 60;
+static constexpr uint8_t kRleMinSize = 120;
 
 // Pass the selector as the index to get the corresponding mask.
 // Get the maskSize by getting the number of bits for the selector. Then 2^maskSize - 1.
@@ -74,6 +77,13 @@ uint8_t _countBits(uint64_t value) {
     return 64 - countLeadingZeros64(value + 1);
 }
 
+void _createRleEncoding(uint8_t count, BufBuilder& buffer) {
+    uint64_t rleEncoding = kRleSelector;
+    // We will store (count - 1) during encoding and execute (count + 1) during decoding.
+    rleEncoding |= (count - 1) << kSelectorBits;
+    buffer.appendNum(tagLittleEndian(rleEncoding));
+}
+
 }  // namespace
 
 std::vector<Simple8b::Value> Simple8b::getAllInts() {
@@ -103,48 +113,82 @@ std::vector<Simple8b::Value> Simple8b::getAllInts() {
         ++index;
     }
 
+    if (_rleCount > 0) {
+        if ((values.empty() && index != 0) ||
+            (!values.empty() && values.back().index + 1 < index)) {
+            // The last value in the previous word is a skip. Do not add anything.
+            return values;
+        }
+
+        // If RLE started on the first Simple8b word, use default value 0.
+        uint64_t value = 0;
+        if (!values.empty()) {
+            // There was a previous word, use the last value in that word (that is not a skip).
+            value = values.back().val;
+        }
+
+        for (uint32_t i = 0; i < _rleCount; ++i) {
+            // Then add all repeating integers that have been kept for RLE.
+            values.push_back({index, value});
+            ++index;
+        }
+    }
+
     return values;
 }
 
 bool Simple8b::append(uint64_t value) {
-    uint8_t valueNumBits = _countBits(value);
+    // TODO (SERVER-58520): Remove invariants before release.
+    // There should be no values in _pendingValues if RLE is happening and vice versa.
+    invariant(_rleCount == 0 || _pendingValues.empty());
 
-    // Check if the amount of bits needed is more than the largest selector allows.
-    if (countLeadingZeros64(value) < kSelectorBits)
-        return false;
-
-    if (_doesIntegerFitInCurrentWord(valueNumBits)) {
-        // If the integer fits in the current word, add it and update global variables if necessary.
-        _currMaxBitLen = std::max(_currMaxBitLen, valueNumBits);
-        _pendingValues.push_back({false, value});
-    } else {
-        // If the integer does not fit in the current word, convert the integers into simple8b
-        // word(s) with no unused buckets until the new value can be added to _pendingValues. Then
-        // add the Simple8b word(s) to the buffer. Finally add the new integer and update any global
-        // variables.
-
-        do {
-            uint64_t simple8bWord = _encodeLargestPossibleWord();
-            _buffer.appendNum(tagLittleEndian(simple8bWord));
-        } while (!_doesIntegerFitInCurrentWord(valueNumBits));
-
-        _pendingValues.push_back({false, value});
-        _currMaxBitLen = std::max(_currMaxBitLen, valueNumBits);
+    if (_rlePossible()) {
+        if (_lastValueInPrevWord.val == value) {
+            // We can continue to build the RLE word.
+            ++_rleCount;
+            return true;
+        }
+        _handleRleTermination();
     }
 
-    return true;
+    // RLE is not possible in the current word. Add current word normally.
+    return _appendValue(value, true);
 }
 
 void Simple8b::skip() {
-    // Push true into skip and the dummy value, 0, into currNum. We use the dummy value, 0,
-    // because it takes 1 bit and it will not affect _currMaxBitLen calculations.
-    _pendingValues.push_back({true, 0});
+    // TODO (SERVER-58520): Remove invariants before release.
+    // There should be no values in _pendingValues if RLE is happening and vice versa.
+    invariant(_rleCount == 0 || _pendingValues.empty());
+
+    if (_rlePossible() && _lastValueInPrevWord.skip) {
+        ++_rleCount;
+        return;
+    }
+
+    _handleRleTermination();
+    _appendSkip();
 }
 
 void Simple8b::flush() {
-    while (!_pendingValues.empty()) {
-        uint64_t simple8bWord = _encodeLargestPossibleWord();
-        _buffer.appendNum(tagLittleEndian(simple8bWord));
+    // TODO (SERVER-58520): Remove invariants before release.
+    // There should be no values in _pendingValues if RLE is happening and vice versa.
+    invariant(_rleCount == 0 || _pendingValues.empty());
+
+    // Flush repeating integers that have been kept for RLE.
+    _handleRleTermination();
+
+    // Flush buffered values in _pendingValues.
+    if (!_pendingValues.empty()) {
+        PendingValue lastPendingValue = _pendingValues.back();
+        do {
+            uint64_t simple8bWord = _encodeLargestPossibleWord();
+            _buffer.appendNum(tagLittleEndian(simple8bWord));
+        } while (!_pendingValues.empty());
+
+        // There are no more words in _pendingValues and RLE is possible.
+        // However, the _rleCount is 0 because we have not read any of the values in the next word.
+        _rleCount = 0;
+        _lastValueInPrevWord = lastPendingValue;
     }
 }
 
@@ -205,10 +249,40 @@ int64_t Simple8b::_encodeLargestPossibleWord() {
 
 void Simple8b::_decode(const uint64_t simple8bWord,
                        uint32_t* index,
-                       std::vector<Simple8b::Value>* decodedValues) const {
+                       std::vector<Simple8b::Value>* decodedValues) {
     uint8_t selector = simple8bWord & kSelectorMask;
     if (selector < kMinSelector)
         return;
+
+    if (selector == kRleSelector) {
+        // RLE case.
+        uint64_t mask = kSelectorMask << kSelectorBits;
+        uint8_t count = (simple8bWord & mask) >> kSelectorBits;
+
+        if (*index == 0) {
+            // We stored (count - 1) during encoding, so we use (count + 1) during decoding.
+            for (uint32_t i = 0; i < (uint32_t)(count + 1) * kRleMinSize; ++i) {
+                // If there is a RLE as the first value, store 0's.
+                decodedValues->push_back({*index, 0});
+                ++(*index);
+            }
+        }
+
+        if (*index > decodedValues->back().index + 1) {
+            // The previous value was skip.
+            (*index) += (count + 1) * kRleMinSize;
+            return;
+        }
+
+        uint64_t previousValue = decodedValues->back().val;
+        // We stored (count - 1) during encoding, so we use (count + 1) during decoding.
+        for (uint32_t i = 0; i < (uint32_t)(count + 1) * kRleMinSize; ++i) {
+            decodedValues->push_back({*index, previousValue});
+            ++(*index);
+        }
+
+        return;
+    }
 
     uint8_t bitsPerInteger = _bitsPerIntForSelector[selector];
     uint8_t integersCoded = _intsCodedForSelector[selector];
@@ -220,17 +294,118 @@ void Simple8b::_decode(const uint64_t simple8bWord,
         uint64_t mask = unshiftedMask << startIdx;
         uint64_t value = (simple8bWord & mask) >> startIdx;
 
-        // If it is not a skip encoding, add it to the decoded values.
-        if (unshiftedMask != value)
+        if (unshiftedMask != value) {
+            // value is not skip.
             decodedValues->push_back({*index, value});
+        }
 
         ++(*index);
     }
 }
 
+void Simple8b::_handleRleTermination() {
+    if (_rleCount == 0)
+        return;
+
+    // Try to create a RLE Simple8b word.
+    _appendRleEncoding();
+
+    // Add any values that could not be encoded in RLE.
+    while (_rleCount > 0) {
+        if (_lastValueInPrevWord.skip) {
+            _appendSkip();
+        } else {
+            _appendValue(_lastValueInPrevWord.val, false);
+        }
+        --_rleCount;
+    }
+}
+
+
+void Simple8b::_appendRleEncoding() {
+    uint8_t count = _rleCount / kRleMinSize;
+
+    if (count < 1) {
+        // Insufficent count to create RLE encoding.
+        return;
+    }
+
+    while (count > kMaxRleCout) {
+        // If one RLE word is insufficient, use multiple RLE words.
+        _createRleEncoding(kMaxRleCout, _buffer);
+        count -= kMaxRleCout;
+    }
+
+    _createRleEncoding(count, _buffer);
+
+    _rleCount %= kRleMinSize;
+}
+
+
+bool Simple8b::_appendValue(uint64_t value, bool tryRle) {
+    uint8_t valueNumBits = _countBits(value);
+
+    // Check if the amount of bits needed is more than the largest selector allows.
+    if (countLeadingZeros64(value) < kSelectorBits)
+        return false;
+
+    if (_doesIntegerFitInCurrentWord(valueNumBits)) {
+        // If the integer fits in the current word, add it and update global variables if necessary.
+        _currMaxBitLen = std::max(_currMaxBitLen, valueNumBits);
+        _pendingValues.push_back({false, value});
+    } else {
+        // If the integer does not fit in the current word, convert the integers into simple8b
+        // word(s) with no unused buckets until the new value can be added to _pendingValues. Then
+        // add the Simple8b word(s) to the buffer. Finally add the new integer and update any global
+        // variables.
+        PendingValue lastPendingValue = _pendingValues.back();
+        do {
+            uint64_t simple8bWord = _encodeLargestPossibleWord();
+            _buffer.appendNum(tagLittleEndian(simple8bWord));
+        } while (!_doesIntegerFitInCurrentWord(valueNumBits));
+
+        if (tryRle && _pendingValues.empty() && lastPendingValue.val == value) {
+            // There are no more words in _pendingValues and the last element of the last Simple8b
+            // word is the same as the new value. Therefore, start RLE.
+            _rleCount = 1;
+            _lastValueInPrevWord = lastPendingValue;
+        } else {
+            _pendingValues.push_back({false, value});
+            _currMaxBitLen = std::max(_currMaxBitLen, valueNumBits);
+        }
+    }
+
+    return true;
+}
+
+void Simple8b::_appendSkip() {
+    if (!_pendingValues.empty()) {
+        bool isLastValueSkip = _pendingValues.back().skip;
+
+        // There is never a case where we need to write more than one Simple8b word
+        // because we only need 1 bit for skip.
+        if (!_doesIntegerFitInCurrentWord(1)) {
+            // Form Simple8b word if skip can not fit.
+            uint64_t simple8bWord = _encodeLargestPossibleWord();
+            _buffer.appendNum(tagLittleEndian(simple8bWord));
+        }
+
+        if (_pendingValues.empty() && isLastValueSkip) {
+            // It is possible to start RLE.
+            _rleCount = 1;
+            _lastValueInPrevWord = {true, 0};
+            return;
+        }
+    }
+
+    // Push true into skip and the dummy value, 0, into currNum. We use the dummy value, 0,
+    // because it takes 1 bit and it will not affect _currMaxBitLen calculations.
+    _pendingValues.push_back({true, 0});
+}
+
 uint64_t Simple8b::_encode(uint8_t selector, uint8_t endIdx) {
     // TODO (SERVER-57808): create global error code.
-    if (selector > kMaxSelector || selector < kMinSelector)
+    if (selector > kRleSelector || selector < kMinSelector)
         return errCode;
 
     uint8_t bitsPerInteger = _bitsPerIntForSelector[selector];
@@ -246,6 +421,10 @@ uint64_t Simple8b::_encode(uint8_t selector, uint8_t endIdx) {
     }
 
     return encodedWord;
+}
+
+bool Simple8b::_rlePossible() {
+    return _pendingValues.empty() || _rleCount != 0;
 }
 
 }  // namespace mongo

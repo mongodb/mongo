@@ -99,7 +99,7 @@ TEST(Simple8b, OnlySkip) {
 TEST(Simple8b, OneValuePending) {
     Simple8b s8b;
 
-    std::vector<uint64_t> expectedInts = {1};
+    std::vector<uint64_t> expectedInts{1};
     testAppendAndGetAllInts(s8b, expectedInts);
 
     // The selector is 14 and there is only 1 bucket with the value 1.
@@ -110,7 +110,7 @@ TEST(Simple8b, OneValuePending) {
 TEST(Simple8b, MaxValuePending) {
     Simple8b s8b;
 
-    std::vector<uint64_t> expectedInts = {0xFFFFFFFFFFFFFFE};
+    std::vector<uint64_t> expectedInts{0xFFFFFFFFFFFFFFE};
     testAppendAndGetAllInts(s8b, expectedInts);
 
     // The selector is 14 and there is only 1 bucket with the max possible value 0xFFFFFFFFFFFFFFE.
@@ -121,7 +121,7 @@ TEST(Simple8b, MaxValuePending) {
 TEST(Simple8b, MultipleValuesPending) {
     Simple8b s8b;
 
-    std::vector<uint64_t> expectedInts = {1, 2, 3};
+    std::vector<uint64_t> expectedInts{1, 2, 3};
     testAppendAndGetAllInts(s8b, expectedInts);
 
     // The selector is 12 and there are 3 bucket with the values 1, 2 and 3.
@@ -181,24 +181,6 @@ TEST(Simple8b, FullBufferAndPending) {
         0x52, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,  // 2nd word.
         0x52, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,  // 3rd word.
         0x52, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55   // 4th word.
-    };
-    testFlush(s8b, expectedChar);
-}
-
-TEST(Simple8b, TwoFullBuffersAndPending) {
-    Simple8b s8b;
-
-    std::vector<uint64_t> expectedInts(180, 1);
-    testAppendAndGetAllInts(s8b, expectedInts);
-
-    // The selector is 2 and there are 30 bucket with the same value 0b01. 0x55 = 0b01010101.
-    std::vector<uint8_t> expectedChar{
-        0x52, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,  // 1st word.
-        0x52, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,  // 2nd word.
-        0x52, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,  // 3rd word.
-        0x52, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,  // 4th word.
-        0x52, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,  // 5th word.
-        0x52, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55   // 6th word.
     };
     testFlush(s8b, expectedChar);
 }
@@ -475,7 +457,7 @@ TEST(Simple8b, LeadingSkips) {
     s8b.skip();
     s8b.skip();
 
-    std::vector<uint64_t> expectedInts = {3, 8, 13};
+    std::vector<uint64_t> expectedInts{3, 8, 13};
     std::vector<Simple8b::Value> expectedValues;
     for (size_t i = 0; i < expectedInts.size(); ++i) {
         expectedValues.push_back({(uint32_t)i + numSkips, expectedInts[i]});
@@ -499,7 +481,7 @@ TEST(Simple8b, WordOfSkips) {
         s8b.skip();
 
     uint64_t numWithMoreThanThirtyBits = 1ull << 30;
-    std::vector<uint64_t> expectedInts = {numWithMoreThanThirtyBits};
+    std::vector<uint64_t> expectedInts{numWithMoreThanThirtyBits};
     std::vector<Simple8b::Value> expectedValues;
     expectedValues.push_back({(uint32_t)numSkips, numWithMoreThanThirtyBits});
     ASSERT_TRUE(s8b.append(numWithMoreThanThirtyBits));
@@ -534,17 +516,17 @@ TEST(Simple8b, WordOfSkips) {
 TEST(Simple8b, MultipleFlushes) {
     Simple8b s8b;
 
-    std::vector<uint64_t> values = {1};
-    for (size_t i = 0; i < values.size(); ++i) {
-        ASSERT_TRUE(s8b.append(values[i]));
-    }
+    std::vector<Simple8b::Value> expectedValues;
+    expectedValues.push_back({0, 1});
+    expectedValues.push_back({1, 2});
+    ASSERT_TRUE(s8b.append(expectedValues[0].val));
 
     s8b.flush();
 
-    values[0] = 2;
-    for (size_t i = 0; i < values.size(); ++i) {
-        ASSERT_TRUE(s8b.append(values[i]));
-    }
+    ASSERT_TRUE(s8b.append(expectedValues[1].val));
+
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
+    assertVectorsEqual(values, expectedValues);
 
     std::vector<uint8_t> expectedChar{
         // The selector is 14 and there is only 1 bucket with the value 1.
@@ -565,6 +547,233 @@ TEST(Simple8b, MultipleFlushes) {
         0x0,
         0x0,
         0x0  // 2nd word.
+    };
+    testFlush(s8b, expectedChar);
+}
+
+TEST(Simple8b, Rle) {
+    Simple8b s8b;
+
+    std::vector<uint64_t> expectedInts(180, 1);
+    testAppendAndGetAllInts(s8b, expectedInts);
+
+    std::vector<uint8_t> expectedChar{
+        // The selector is 2 and there are 30 bucket with the same value 0b01.
+        0x52,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,  // 1st word.
+        // The selector is 15 and the word is RLE encoding with count = 1.
+        0x0F,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,  // 2nd word.
+        // The selector is 2 and there are 30 bucket with the same value 0b01.
+        0x52,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,  // 3rd word.
+    };
+    testFlush(s8b, expectedChar);
+}
+
+TEST(Simple8b, RleFlush) {
+    Simple8b s8b;
+
+    std::vector<uint64_t> expectedInts(121, 1);
+    std::vector<Simple8b::Value> expectedValues{};
+
+    ASSERT_TRUE(s8b.append(expectedInts[0]));
+    expectedValues.push_back({0, expectedInts[0]});
+    s8b.flush();
+
+    for (size_t i = 1; i < expectedInts.size(); ++i) {
+        expectedValues.push_back({(uint32_t)i, expectedInts[i]});
+        ASSERT_TRUE(s8b.append(expectedInts[i]));
+    }
+
+    std::vector<Simple8b::Value> values = s8b.getAllInts();
+    assertVectorsEqual(values, expectedValues);
+
+    std::vector<uint8_t> expectedChar{
+        // The selector is 15 and there is only 1 bucket with the value 1.
+        0x1E,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,  // 1st word.
+        // The selector is 15 and the word is RLE encoding with count = 1.
+        0x0F,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,  // 2nd word.
+    };
+    testFlush(s8b, expectedChar);
+}
+
+TEST(Simple8b, MultipleRleWords) {
+    Simple8b s8b;
+
+    std::vector<uint64_t> expectedInts(30 + (16 * 120 * 2), 1);
+    testAppendAndGetAllInts(s8b, expectedInts);
+
+    std::vector<uint8_t> expectedChar{
+        // The selector is 2 and there are 30 bucket with the same value 0b01.
+        0x52,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,  // 1st word.
+        // The selector is 15 and the word is RLE with max count = 16.
+        0xFF,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,  // 2nd word.
+        // The selector is 15 and the word is RLE with max count = 16.
+        0xFF,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,  // 3rd word.
+    };
+    testFlush(s8b, expectedChar);
+}
+
+TEST(Simple8b, RleSkip) {
+    Simple8b s8b;
+
+    int numSkips = 240;
+    for (int i = 0; i < numSkips; ++i)
+        s8b.skip();
+
+    std::vector<uint64_t> expectedInts{};
+    testAppendAndGetAllInts(s8b, expectedInts);
+
+    std::vector<uint8_t> expectedChar{
+        // The selector is 1 and there are 60 bucket with skip.
+        0xF1,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,  // 1st word.
+        // The selector is 15 and the word is RLE encoding with count = 1.
+        0x0F,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,  // 2nd word.
+        // The selector is 1 and there are 60 bucket with skip.
+        0xF1,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,  // 3rd word.
+    };
+    testFlush(s8b, expectedChar);
+}
+
+TEST(Simple8b, RleChangeOfValue) {
+    Simple8b s8b;
+
+    std::vector<uint64_t> expectedInts(300, 1);
+    expectedInts.push_back(7);
+    testAppendAndGetAllInts(s8b, expectedInts);
+
+    std::vector<uint8_t> expectedChar{
+        // The selector is 2 and there are 30 bucket with the same value 0b01.
+        0x52,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,  // 1st word.
+        // The selector is 15 and the word is RLE encoding with count = 2.
+        0x1F,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,  // 2nd word.
+        // The selector is 2 and there are 30 bucket with the same value 0b01.
+        0x52,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,  // 3rd word.
+        // The selector is 14 and there is only one bucket with the value 7.
+        0x7E,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,  // 4th word.
+    };
+    testFlush(s8b, expectedChar);
+}
+
+TEST(Simple8b, RleDefaultValue) {
+    Simple8b s8b;
+
+    std::vector<uint64_t> expectedInts(240, 0);
+    testAppendAndGetAllInts(s8b, expectedInts);
+
+    std::vector<uint8_t> expectedChar{
+        // The selector is 15 and the word is RLE encoding with count = 2.
+        0x1F,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,  // 1st word.
     };
     testFlush(s8b, expectedChar);
 }
