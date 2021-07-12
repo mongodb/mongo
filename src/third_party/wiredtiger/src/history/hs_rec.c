@@ -523,13 +523,13 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi,
         hs_inserted = squashed = false;
 
         /*
-         * Flush the updates on stack. Stopping once we run out or we reach the onpage upd start
-         * time point, we can squash updates with the same start time point as the onpage update
-         * away.
+         * Flush the updates on stack. Stopping once we run out or we reach the onpage update or we
+         * encounter a prepared update.
          */
         modify_cnt = 0;
-        for (; updates.size > 0; tmp = full_value, full_value = prev_full_value,
-                                 prev_full_value = tmp, upd = prev_upd) {
+        for (; updates.size > 0 && upd->prepare_state != WT_PREPARE_INPROGRESS;
+             tmp = full_value, full_value = prev_full_value, prev_full_value = tmp,
+             upd = prev_upd) {
             /* We should never insert the onpage value to the history store. */
             WT_ASSERT(session, upd != list->onpage_upd);
             WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD || upd->type == WT_UPDATE_MODIFY);
