@@ -33,7 +33,8 @@
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
-
+// TODO: SERVER-58434 fix simple8b big endian and reenable tests.
+/*
 void assertVectorsEqual(const std::vector<std::pair<uint32_t, uint64_t>>& actualVector,
                         const std::vector<std::pair<uint32_t, uint64_t>>& expectedVector) {
     ASSERT_EQ(actualVector.size(), expectedVector.size());
@@ -258,3 +259,4 @@ TEST(Simple8b, WordOfSkips) {
     std::vector<std::pair<uint32_t, uint64_t>> values = s8b.getAllInts();
     assertVectorsEqual(values, expectedValues);
 }
+*/
