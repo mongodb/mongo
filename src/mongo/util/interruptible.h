@@ -359,36 +359,9 @@ public:
     bool waitForConditionOrInterruptUntil(stdx::condition_variable& cv,
                                           LockT& m,
                                           Date_t finalDeadline,
-                                          PredicateT pred,
-                                          AtomicWord<Microseconds::rep>* waitTimer = nullptr) {
+                                          PredicateT pred) {
         WaitContext waitContext(this);
         auto latchName = getLatchName(m);
-
-        /**
-         * Apparatus to measure the approximate time spent in this function (waiting time).
-         * The waiting duration is incrementally added to the atomic word upon:
-         * * Waking from a condition wait (i.e., return from
-         *   waitForConditionOrInterruptNoAssertUntil).
-         * * Returning from the function.
-         */
-        boost::optional<Microseconds::rep> timeOfLastReport;
-        auto advanceWaitTimer = [&]() {
-            invariant(timeOfLastReport);
-            auto now = mongo::curTimeMicros64();
-            auto inc = now - timeOfLastReport.get();
-            waitTimer->fetchAndAdd(inc);
-            timeOfLastReport = now;
-        };
-        ON_BLOCK_EXIT([&]() {
-            if (!waitTimer)
-                return;
-
-            // Never called `waitUntil()`, so waitTime == 0
-            if (!timeOfLastReport)
-                return;
-
-            advanceWaitTimer();
-        });
 
         auto handleInterruptAndAssert = [&](Status status, WakeSpeed speed) {
             _onWake(latchName, WakeReason::kInterrupt, speed);
@@ -409,15 +382,7 @@ public:
             // If the result of waitForConditionOrInterruptNoAssertUntil() is non-spurious, return
             // a WakeReason. Otherwise, return boost::none
 
-            if (!timeOfLastReport)
-                timeOfLastReport = mongo::curTimeMicros64();
-
             auto swResult = waitForConditionOrInterruptNoAssertUntil(cv, m, deadline);
-
-            if (MONGO_unlikely(waitTimer)) {
-                advanceWaitTimer();
-            }
-
             if (!swResult.isOK()) {
                 handleInterruptAndAssert(swResult.getStatus(), speed);
             }
@@ -489,11 +454,8 @@ public:
      * deadline expiration.
      */
     template <typename LockT, typename PredicateT>
-    void waitForConditionOrInterrupt(stdx::condition_variable& cv,
-                                     LockT& m,
-                                     PredicateT pred,
-                                     AtomicWord<Microseconds::rep>* waitTimer = nullptr) {
-        waitForConditionOrInterruptUntil(cv, m, Date_t::max(), std::move(pred), waitTimer);
+    void waitForConditionOrInterrupt(stdx::condition_variable& cv, LockT& m, PredicateT pred) {
+        waitForConditionOrInterruptUntil(cv, m, Date_t::max(), std::move(pred));
     }
 
     /**
@@ -504,10 +466,9 @@ public:
     bool waitForConditionOrInterruptFor(stdx::condition_variable& cv,
                                         LockT& m,
                                         Milliseconds ms,
-                                        PredicateT pred,
-                                        AtomicWord<Microseconds::rep>* waitTimer = nullptr) {
+                                        PredicateT pred) {
         return waitForConditionOrInterruptUntil(
-            cv, m, getExpirationDateForWaitForValue(ms), std::move(pred), waitTimer);
+            cv, m, getExpirationDateForWaitForValue(ms), std::move(pred));
     }
 
     /**
