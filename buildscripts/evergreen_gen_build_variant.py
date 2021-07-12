@@ -200,10 +200,7 @@ class GenerateBuildVariantOrchestrator:
         :return: Parameters for how task should be split.
         """
         task = remove_gen_suffix(task_def.name)
-        run_func = task_def.generate_resmoke_tasks_command
-        if run_func is None:
-            run_func = task_def.generate_implicit_multiversion_command()
-        run_vars = run_func.get("vars", {})
+        run_vars = task_def.generate_resmoke_tasks_command.get("vars", {})
 
         suite = run_vars.get("suite", task)
         return SuiteSplitParameters(
@@ -245,11 +242,11 @@ class GenerateBuildVariantOrchestrator:
 
         :param task_def: Task definition in evergreen project config.
         :param build_variant: Name of Build Variant being generated.
+        :param is_sharded: True if the tasks being generated are for a sharded config.
+        :param version_config: List of version configurations to generate.
         :return: Parameters for how task should be generated.
         """
-        run_func = task_def.generate_implicit_multiversion_command()
-        run_vars = run_func["vars"]
-
+        run_vars = task_def.generate_resmoke_tasks_command["vars"]
         task = remove_gen_suffix(task_def.name)
 
         return MultiversionGenTaskParams(
@@ -271,14 +268,12 @@ class GenerateBuildVariantOrchestrator:
 
         :param task_def: Task definition in evergreen project config.
         :param build_variant: Name of Build Variant being generated.
+        :param is_sharded: True task if for a sharded configuration.
+        :param version_config: List of version configs task is being generated for.
         :return: Parameters for how a fuzzer task should be generated.
         """
         variant = self.evg_project_config.get_variant(build_variant)
-        if is_sharded is not None or version_config is not None:
-            run_func = task_def.generate_implicit_multiversion_command()
-        else:
-            run_func = task_def.generate_fuzzer_tasks_command()
-        run_vars = run_func["vars"]
+        run_vars = task_def.generate_resmoke_tasks_command["vars"]
         run_vars = {k: translate_run_var(v, variant) for k, v in run_vars.items()}
 
         return FuzzerGenTaskParams(
@@ -340,31 +335,35 @@ class GenerateBuildVariantOrchestrator:
                 task_def = self.evg_project_config.get_task(task_name)
                 if task_def.is_generate_resmoke_task:
                     tasks_to_hide.add(task_name)
-                    split_params = self.task_def_to_split_params(task_def, build_variant_name)
-                    gen_params = self.task_def_to_gen_params(task_def, build_variant_name)
-                    jobs.append(exe.submit(builder.generate_suite, split_params, gen_params))
-                elif task_def.is_generate_fuzzer_task():
-                    tasks_to_hide.add(task_name)
-                    fuzzer_params = self.task_def_to_fuzzer_params(task_def, build_variant_name)
-                    jobs.append(exe.submit(builder.generate_fuzzer, fuzzer_params))
-                elif task_def.is_generate_implicit_multiversion_task():
-                    tasks_to_hide.add(task_name)
-                    run_func = task_def.generate_implicit_multiversion_command()
-                    run_vars = run_func["vars"]
-                    is_jstestjuzz = run_vars.get("is_jstestfuzz", False)
-                    suite = run_vars["suite"]
-                    is_sharded = self.multiversion_util.is_suite_sharded(suite)
-                    version_list = get_version_configs(is_sharded)
-                    if is_jstestjuzz:
+
+                    is_sharded = None
+                    version_list = None
+                    run_vars = task_def.generate_resmoke_tasks_command["vars"]
+                    suite = run_vars.get("suite")
+                    is_jstestfuzz = run_vars.get("is_jstestfuzz", False)
+                    implicit_multiversion = run_vars.get("implicit_multiversion", False)
+
+                    if implicit_multiversion:
+                        assert suite is not None
+                        is_sharded = self.multiversion_util.is_suite_sharded(suite)
+                        version_list = get_version_configs(is_sharded)
+
+                    if is_jstestfuzz:
                         fuzzer_params = self.task_def_to_fuzzer_params(
                             task_def, build_variant_name, is_sharded, version_list)
                         jobs.append(exe.submit(builder.generate_fuzzer, fuzzer_params))
                     else:
                         split_params = self.task_def_to_split_params(task_def, build_variant_name)
-                        gen_params = self.task_def_to_mv_gen_params(task_def, build_variant_name,
-                                                                    is_sharded, version_list)
-                        jobs.append(
-                            exe.submit(builder.add_multiversion_suite, split_params, gen_params))
+                        if implicit_multiversion:
+                            gen_params = self.task_def_to_mv_gen_params(
+                                task_def, build_variant_name, is_sharded, version_list)
+                            jobs.append(
+                                exe.submit(builder.add_multiversion_suite, split_params,
+                                           gen_params))
+                        else:
+                            gen_params = self.task_def_to_gen_params(task_def, build_variant_name)
+                            jobs.append(
+                                exe.submit(builder.generate_suite, split_params, gen_params))
 
             [j.result() for j in jobs]  # pylint: disable=expression-not-assigned
 
