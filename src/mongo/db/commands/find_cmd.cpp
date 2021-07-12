@@ -586,6 +586,7 @@ public:
                 keyBob.append("collation", 1);
                 keyBob.append("min", 1);
                 keyBob.append("max", 1);
+                keyBob.append("shardVersion", 1);
                 return keyBob.obj();
             }();
 
