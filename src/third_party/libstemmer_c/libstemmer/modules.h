@@ -8,6 +8,7 @@
  * russian, spanish, swedish, turkish
  */
 
+#include "../src_c/stem_UTF_8_czech.h"
 #include "../src_c/stem_ISO_8859_1_danish.h"
 #include "../src_c/stem_UTF_8_danish.h"
 #include "../src_c/stem_ISO_8859_1_dutch.h"
@@ -34,6 +35,7 @@
 #include "../src_c/stem_UTF_8_romanian.h"
 #include "../src_c/stem_KOI8_R_russian.h"
 #include "../src_c/stem_UTF_8_russian.h"
+#include "../src_c/stem_UTF_8_slovak.h"
 #include "../src_c/stem_ISO_8859_1_spanish.h"
 #include "../src_c/stem_UTF_8_spanish.h"
 #include "../src_c/stem_ISO_8859_1_swedish.h"
@@ -68,6 +70,9 @@ struct stemmer_modules {
   int (*stem)(struct SN_env *);
 };
 static struct stemmer_modules modules[] = {
+  {"cz", ENC_UTF_8, czech_UTF_8_create_env, czech_UTF_8_close_env, czech_UTF_8_stem},
+  {"czk", ENC_UTF_8, czech_UTF_8_create_env, czech_UTF_8_close_env, czech_UTF_8_stem},
+  {"czech", ENC_UTF_8, czech_UTF_8_create_env, czech_UTF_8_close_env, czech_UTF_8_stem},
   {"da", ENC_ISO_8859_1, danish_ISO_8859_1_create_env, danish_ISO_8859_1_close_env, danish_ISO_8859_1_stem},
   {"da", ENC_UTF_8, danish_UTF_8_create_env, danish_UTF_8_close_env, danish_UTF_8_stem},
   {"dan", ENC_ISO_8859_1, danish_ISO_8859_1_create_env, danish_ISO_8859_1_close_env, danish_ISO_8859_1_stem},
@@ -154,6 +159,9 @@ static struct stemmer_modules modules[] = {
   {"rus", ENC_UTF_8, russian_UTF_8_create_env, russian_UTF_8_close_env, russian_UTF_8_stem},
   {"russian", ENC_KOI8_R, russian_KOI8_R_create_env, russian_KOI8_R_close_env, russian_KOI8_R_stem},
   {"russian", ENC_UTF_8, russian_UTF_8_create_env, russian_UTF_8_close_env, russian_UTF_8_stem},
+  {"sk", ENC_UTF_8, slovak_UTF_8_create_env, slovak_UTF_8_close_env, slovak_UTF_8_stem},
+  {"svk", ENC_UTF_8, slovak_UTF_8_create_env, slovak_UTF_8_close_env, slovak_UTF_8_stem},
+  {"slovak", ENC_UTF_8, slovak_UTF_8_create_env, slovak_UTF_8_close_env, slovak_UTF_8_stem},
   {"spa", ENC_ISO_8859_1, spanish_ISO_8859_1_create_env, spanish_ISO_8859_1_close_env, spanish_ISO_8859_1_stem},
   {"spa", ENC_UTF_8, spanish_UTF_8_create_env, spanish_UTF_8_close_env, spanish_UTF_8_stem},
   {"spanish", ENC_ISO_8859_1, spanish_ISO_8859_1_create_env, spanish_ISO_8859_1_close_env, spanish_ISO_8859_1_stem},
@@ -170,6 +178,7 @@ static struct stemmer_modules modules[] = {
   {0,ENC_UNKNOWN,0,0,0}
 };
 static const char * algorithm_names[] = {
+  "czech", 
   "danish", 
   "dutch", 
   "english", 
@@ -183,6 +192,7 @@ static const char * algorithm_names[] = {
   "portuguese", 
   "romanian", 
   "russian", 
+  "slovak", 
   "spanish", 
   "swedish", 
   "turkish", 
