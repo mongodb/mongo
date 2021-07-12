@@ -360,7 +360,7 @@ ReplicationCoordinator::ApplierState ReplicationCoordinatorMock::getApplierState
     return ApplierState::Running;
 }
 
-void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*, long long) {}
+void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*, long long) noexcept {}
 
 void ReplicationCoordinatorMock::signalUpstreamUpdater() {}
 

@@ -170,7 +170,7 @@ public:
 
     ApplierState getApplierState() override;
 
-    void signalDrainComplete(OperationContext*, long long) override;
+    void signalDrainComplete(OperationContext*, long long) noexcept override;
 
     void signalUpstreamUpdater() override;
 

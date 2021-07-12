@@ -429,7 +429,7 @@ void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
 }
 
-void ReplCoordTest::signalDrainComplete(OperationContext* opCtx) {
+void ReplCoordTest::signalDrainComplete(OperationContext* opCtx) noexcept {
     // Writes that occur in code paths that call signalDrainComplete are expected to be excluded
     // from Flow Control.
     opCtx->setShouldParticipateInFlowControl(false);

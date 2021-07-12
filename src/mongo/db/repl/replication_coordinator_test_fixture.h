@@ -286,7 +286,7 @@ protected:
     /**
      * Transition the ReplicationCoordinator from drain mode to being fully primary/master.
      */
-    void signalDrainComplete(OperationContext* opCtx);
+    void signalDrainComplete(OperationContext* opCtx) noexcept;
 
     /**
      * Shuts down the objects under test.

@@ -591,7 +591,8 @@ public:
      * steps down and steps up so quickly that the applier signals drain complete in the wrong
      * term.
      */
-    virtual void signalDrainComplete(OperationContext* opCtx, long long termWhenBufferIsEmpty) = 0;
+    virtual void signalDrainComplete(OperationContext* opCtx,
+                                     long long termWhenBufferIsEmpty) noexcept = 0;
 
     /**
      * Signals the sync source feedback thread to wake up and send a handshake and

@@ -189,7 +189,7 @@ ReplicationCoordinator::ApplierState ReplicationCoordinatorNoOp::getApplierState
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::signalDrainComplete(OperationContext*, long long) {
+void ReplicationCoordinatorNoOp::signalDrainComplete(OperationContext*, long long) noexcept {
     MONGO_UNREACHABLE;
 }
 

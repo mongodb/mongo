@@ -217,7 +217,7 @@ public:
     virtual ApplierState getApplierState() override;
 
     virtual void signalDrainComplete(OperationContext* opCtx,
-                                     long long termWhenBufferIsEmpty) override;
+                                     long long termWhenBufferIsEmpty) noexcept override;
 
     virtual void signalUpstreamUpdater() override;
 

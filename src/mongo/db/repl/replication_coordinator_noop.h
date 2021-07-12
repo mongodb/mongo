@@ -161,7 +161,7 @@ public:
 
     ApplierState getApplierState() final;
 
-    void signalDrainComplete(OperationContext*, long long) final;
+    void signalDrainComplete(OperationContext*, long long) noexcept final;
 
     void signalUpstreamUpdater() final;
 

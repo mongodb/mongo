@@ -1096,7 +1096,7 @@ ReplicationCoordinator::ApplierState ReplicationCoordinatorImpl::getApplierState
 }
 
 void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
-                                                     long long termWhenBufferIsEmpty) {
+                                                     long long termWhenBufferIsEmpty) noexcept {
     // This logic is a little complicated in order to avoid acquiring the RSTL in mode X
     // unnecessarily.  This is important because the applier may call signalDrainComplete()
     // whenever it wants, not only when the ReplicationCoordinator is expecting it.

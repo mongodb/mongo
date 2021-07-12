@@ -183,7 +183,7 @@ public:
 
     virtual ApplierState getApplierState();
 
-    virtual void signalDrainComplete(OperationContext*, long long);
+    virtual void signalDrainComplete(OperationContext*, long long) noexcept;
 
     virtual void signalUpstreamUpdater();
 
