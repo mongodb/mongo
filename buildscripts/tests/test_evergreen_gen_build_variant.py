@@ -1,26 +1,10 @@
 """Unit tests for the generate_resmoke_suite script."""
-from datetime import datetime, timedelta
-import json
-import os
-from tempfile import TemporaryDirectory
-import sys
 import unittest
 
-import inject
-import requests
-import yaml
-from mock import patch, MagicMock
-from evergreen import EvergreenApi
+from mock import MagicMock
 
 from buildscripts import evergreen_gen_build_variant as under_test
-from buildscripts.ciconfig.evergreen import Variant, Task, EvergreenProjectConfig
-from buildscripts.evergreen_gen_build_variant import EvgExpansions
-from buildscripts.task_generation.gen_config import GenerationConfiguration
-from buildscripts.task_generation.resmoke_proxy import ResmokeProxyConfig
-from buildscripts.task_generation.suite_split import SuiteSplitConfig
-from buildscripts.task_generation.suite_split_strategies import SplitStrategy, FallbackStrategy, \
-    greedy_division, round_robin_fallback
-from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
+from buildscripts.ciconfig.evergreen import Variant, Task
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 # pylint: disable=too-many-locals,too-many-lines,too-many-public-methods,no-value-for-parameter
@@ -41,13 +25,13 @@ def build_mock_build_variant(expansions=None, task_list=None):
     return Variant(config, task_map, {})
 
 
-def build_mock_task(name, run_cmd, run_vars=None):
+def build_mock_task(name, run_vars=None):
     config = {
         "name":
             name, "commands": [
                 {"func": "do setup"},
                 {
-                    "func": run_cmd,
+                    "func": "generate resmoke tasks",
                     "vars": run_vars if run_vars else {},
                 },
             ]
@@ -135,7 +119,7 @@ class TestTaskDefToSplitParams(unittest.TestCase):
         run_vars = {
             "resmoke_args": "run tests",
         }
-        mock_task_def = build_mock_task("my_task", "generate resmoke tasks", run_vars)
+        mock_task_def = build_mock_task("my_task", run_vars)
         mock_orchestrator = build_mock_orchestrator(task_def_list=[mock_task_def])
 
         split_param = mock_orchestrator.task_def_to_split_params(mock_task_def, "build_variant")
@@ -150,7 +134,7 @@ class TestTaskDefToSplitParams(unittest.TestCase):
             "resmoke_args": "run tests",
             "suite": "the suite",
         }
-        mock_task_def = build_mock_task("my_task", "generate resmoke tasks", run_vars)
+        mock_task_def = build_mock_task("my_task", run_vars)
         mock_orchestrator = build_mock_orchestrator(task_def_list=[mock_task_def])
 
         split_param = mock_orchestrator.task_def_to_split_params(mock_task_def, "build_variant")
@@ -166,7 +150,7 @@ class TestTaskDefToGenParams(unittest.TestCase):
         run_vars = {
             "resmoke_args": "run tests",
         }
-        mock_task_def = build_mock_task("my_task", "generate resmoke tasks", run_vars)
+        mock_task_def = build_mock_task("my_task", run_vars)
         mock_orchestrator = build_mock_orchestrator(task_def_list=[mock_task_def])
 
         gen_params = mock_orchestrator.task_def_to_gen_params(mock_task_def, "build_variant")
@@ -184,7 +168,7 @@ class TestTaskDefToGenParams(unittest.TestCase):
             "use_large_distro": "true",
             "require_multiversion": True,
         }
-        mock_task_def = build_mock_task("my_task", "generate resmoke tasks", run_vars)
+        mock_task_def = build_mock_task("my_task", run_vars)
         build_expansions = {"large_distro_name": "my large distro"}
         mock_orchestrator = build_mock_orchestrator(build_expansions=build_expansions,
                                                     task_def_list=[mock_task_def])
@@ -205,7 +189,7 @@ class TestTaskDefToFuzzerParams(unittest.TestCase):
             "num_files": "5",
             "num_tasks": "3",
         }
-        mock_task_def = build_mock_task("my_task", "generate fuzzer tasks", run_vars)
+        mock_task_def = build_mock_task("my_task", run_vars)
         mock_orchestrator = build_mock_orchestrator(task_def_list=[mock_task_def])
         fuzzer_params = mock_orchestrator.task_def_to_fuzzer_params(mock_task_def, "build_variant")
 
@@ -226,7 +210,7 @@ class TestTaskDefToFuzzerParams(unittest.TestCase):
             "use_large_distro": "true",
             "npm_command": "aggfuzzer",
         }
-        mock_task_def = build_mock_task("my_task", "generate fuzzer tasks", run_vars)
+        mock_task_def = build_mock_task("my_task", run_vars)
         build_expansions = {"large_distro_name": "my large distro"}
         mock_orchestrator = build_mock_orchestrator(build_expansions=build_expansions,
                                                     task_def_list=[mock_task_def])
@@ -248,11 +232,16 @@ class TestGenerateBuildVariant(unittest.TestCase):
         gen_run_vars = {
             "resmoke_args": "run tests",
         }
-        mv_gen_run_vars = {"resmoke_args": "run tests", "suite": "multiversion suite"}
+        mv_gen_run_vars = {
+            "resmoke_args": "run tests",
+            "suite": "multiversion suite",
+            "implicit_multiversion": "True",
+        }
         fuzz_run_vars = {
             "name": "my_fuzzer",
             "num_files": "5",
             "num_tasks": "3",
+            "is_jstestfuzz": "True",
         }
         mv_fuzz_run_vars = {
             "name": "my_fuzzer",
@@ -260,14 +249,13 @@ class TestGenerateBuildVariant(unittest.TestCase):
             "num_tasks": "3",
             "is_jstestfuzz": "True",
             "suite": "aggfuzzer",
+            "implicit_multiversion": "True",
         }
         mock_task_defs = [
-            build_mock_task("my_gen_task", "generate resmoke tasks", gen_run_vars),
-            build_mock_task("my_fuzzer_task", "generate fuzzer tasks", fuzz_run_vars),
-            build_mock_task("my_mv_fuzzer_task", "generate implicit multiversion tasks",
-                            mv_fuzz_run_vars),
-            build_mock_task("my_mv_gen_task", "generate implicit multiversion tasks",
-                            mv_gen_run_vars),
+            build_mock_task("my_gen_task", gen_run_vars),
+            build_mock_task("my_fuzzer_task", fuzz_run_vars),
+            build_mock_task("my_mv_fuzzer_task", mv_fuzz_run_vars),
+            build_mock_task("my_mv_gen_task", mv_gen_run_vars),
         ]
         mock_orchestrator = build_mock_orchestrator(task_def_list=mock_task_defs)
         builder = MagicMock()

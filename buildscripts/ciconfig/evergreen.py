@@ -124,38 +124,12 @@ class Task(object):
     @property
     def generate_resmoke_tasks_command(self):
         """Return the 'generate resmoke tasks' command if found, or None."""
-        func = self.find_func_command("generate resmoke tasks")
-        return func if func is not None else self.find_func_command(
-            "generate randomized multiversion tasks")
-
-    @property
-    def generate_randomized_multiversion_command(self):
-        """Return the 'generate resmoke tasks' command if found, or None."""
-        return self.find_func_command("generate randomized multiversion tasks")
+        return self.find_func_command("generate resmoke tasks")
 
     @property
     def is_generate_resmoke_task(self) -> bool:
         """Return True if 'generate resmoke tasks' command is found."""
-        return (self.generate_resmoke_tasks_command is not None
-                or self.generate_randomized_multiversion_command is not None)
-
-    def generate_fuzzer_tasks_command(self):
-        """Return the 'generate fuzzer tasks' command if found, or None."""
-        func = self.find_func_command("generate fuzzer tasks")
-        return func
-
-    def is_generate_fuzzer_task(self) -> bool:
-        """Return True if 'generate fuzzer tasks' command is found."""
-        return self.generate_fuzzer_tasks_command() is not None
-
-    def generate_implicit_multiversion_command(self):
-        """Return the 'generate implicit multiversion tasks' command if found, or None."""
-        func = self.find_func_command("generate implicit multiversion tasks")
-        return func
-
-    def is_generate_implicit_multiversion_task(self) -> bool:
-        """Return True if 'generate implicit multiverion tasks' command is found."""
-        return self.generate_implicit_multiversion_command() is not None
+        return self.generate_resmoke_tasks_command is not None
 
     @property
     def run_tests_command(self):

@@ -96,8 +96,6 @@ class GenTaskService:
         :param build_variant: Build variant to add generated configuration to.
         :param gen_params: Parameters to configuration how tasks are generated.
         """
-        # self.build_tasks = self.evg_api.tasks_by_build(self.options.build_id)
-
         execution_tasks = self.resmoke_gen_task_service.generate_tasks(generated_suite, gen_params)
         distros = self._get_distro(build_variant.name, gen_params.use_large_distro,
                                    gen_params.large_distro_name)
@@ -114,8 +112,6 @@ class GenTaskService:
         :param build_variant: Build variant to add generated configuration to.
         :param gen_params: Parameters to configuration how tasks are generated.
         """
-        # self.build_tasks = self.evg_api.tasks_by_build(self.options.build_id)
-
         execution_tasks = self.multiversion_gen_task_service.generate_tasks(
             generated_suite, gen_params)
         distros = self._get_distro(build_variant.name, gen_params.use_large_distro,
