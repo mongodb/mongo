@@ -2541,7 +2541,7 @@ tasks:
             virtualenv -p python3 venv
             source venv/bin/activate
             pip3 install lorem pymongo
-            ./run_many_coll.sh ../../mongo/build/install/bin/mongod config/many-collection-testing many-collection clean-and-populate
+            ./run_many_coll.sh ../../mongo/build/install/bin/mongod mongodb.log config/many-collection-testing many-collection clean-and-populate
 
   - name: cyclomatic-complexity
     commands:
