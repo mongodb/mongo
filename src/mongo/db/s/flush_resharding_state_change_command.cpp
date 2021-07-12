@@ -35,18 +35,44 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_loader.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 
 namespace mongo {
 namespace {
+
+void doNoopWrite(OperationContext* opCtx, const NamespaceString& nss) {
+    writeConflictRetry(
+        opCtx, "_flushReshardingStateChange no-op", NamespaceString::kRsOplogNamespace.ns(), [&] {
+            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+
+            const std::string msg = str::stream()
+                << "no-op for _flushReshardingStateChange on " << nss;
+            WriteUnitOfWork wuow(opCtx);
+            opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
+                opCtx,
+                {},
+                boost::none,
+                BSON("msg" << msg),
+                boost::none,
+                boost::none,
+                boost::none,
+                boost::none,
+                boost::none);
+            wuow.commit();
+        });
+}
 
 class FlushReshardingStateChangeCmd final : public TypedCommand<FlushReshardingStateChangeCmd> {
 public:
@@ -101,11 +127,27 @@ public:
                     "Can't call _flushReshardingStateChange if in read-only mode",
                     !storageGlobalParams.readOnly);
 
-            onShardVersionMismatch(opCtx, ns(), boost::none /* shardVersionReceived */);
+            ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor())
+                .then([svcCtx = opCtx->getServiceContext(), nss = ns()] {
+                    ThreadClient tc("FlushReshardingStateChange", svcCtx);
+                    {
+                        stdx::lock_guard<Client> lk(*tc.get());
+                        tc->setSystemOperationKillableByStepdown(lk);
+                    }
 
-            CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, ns());
+                    auto opCtx = tc->makeOperationContext();
+                    onShardVersionMismatch(
+                        opCtx.get(), nss, boost::none /* shardVersionReceived */);
+                })
+                .onError([](const Status& status) {
+                    LOGV2_WARNING(5808100,
+                                  "Error on deferred _flushReshardingStateChange execution",
+                                  "error"_attr = redact(status));
+                })
+                .getAsync([](auto) {});
 
-            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+            // Ensure the command isn't run on a stale primary.
+            doNoopWrite(opCtx, ns());
         }
     };
 } _flushReshardingStateChange;
