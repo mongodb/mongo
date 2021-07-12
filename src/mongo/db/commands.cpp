@@ -673,7 +673,6 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
      * Default value is used to suppress the uassert for `errorExtraInfo` if `errorCode` is not set.
      */
     long long errorCode = ErrorCodes::OK;
-    bool hasExtraInfo;
     /**
      * errorExtraInfo only holds a reference to the BSONElement of the parent object (data).
      * The copy constructor of BSONObj handles cloning to keep references valid outside the scope.
@@ -715,35 +714,60 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                       "command"_attr = cmd->getName());
             }
 
+            auto tassert = [&] {
+                bool b;
+                Status st = bsonExtractBooleanField(data, "tassert", &b);
+                if (st == ErrorCodes::NoSuchKey) {
+                    return false;
+                }
+                uassertStatusOK(st);
+                return b;
+            }();
+
+            auto raise = [&](const Status& status) {
+                if (tassert) {
+                    tassert(status);
+                } else {
+                    uassertStatusOK(status);
+                }
+            };
+
+            static constexpr auto failpointMsg = "Failing command via 'failCommand' failpoint"_sd;
+
             if (closeConnection) {
                 opCtx->getClient()->session()->end();
                 LOGV2(20431,
                       "Failing {command} via 'failCommand' failpoint: closing connection",
-                      "Failing command via 'failCommand' failpoint: closing connection",
                       "command"_attr = cmd->getName());
-                uasserted(50985, "Failing command due to 'failCommand' failpoint");
+                raise(Status(tassert ? ErrorCodes::Error(5704000) : ErrorCodes::Error(50985),
+                             failpointMsg));
             }
 
-            if (hasExtraInfo) {
+            auto errorExtraInfo = [&]() -> boost::optional<BSONObj> {
+                BSONElement e;
+                Status st = bsonExtractTypedField(data, "errorExtraInfo", BSONType::Object, &e);
+                if (st == ErrorCodes::NoSuchKey)
+                    return {};  // It's optional. Missing is allowed. Other errors aren't.
+                uassertStatusOK(st);
+                return {e.Obj()};
+            }();
+
+            if (errorExtraInfo) {
                 LOGV2(20434,
                       "Failing {command} via 'failCommand' failpoint: returning {errorCode} and "
                       "{errorExtraInfo}",
-                      "Failing command via 'failCommand' failpoint",
                       "command"_attr = cmd->getName(),
                       "errorCode"_attr = errorCode,
                       "errorExtraInfo"_attr = errorExtraInfo);
-                uassertStatusOK(Status(ErrorCodes::Error(errorCode),
-                                       "Failing command due to 'failCommand' failpoint",
-                                       errorExtraInfo.Obj()));
+                raise(Status(ErrorCodes::Error(errorCode), failpointMsg, *errorExtraInfo));
+
             } else if (hasErrorCode) {
                 LOGV2(
                     20435,
                     "Failing command {command} via 'failCommand' failpoint: returning {errorCode}",
-                    "Failing command via 'failCommand' failpoint",
                     "command"_attr = cmd->getName(),
                     "errorCode"_attr = errorCode);
-                uasserted(ErrorCodes::Error(errorCode),
-                          "Failing command due to 'failCommand' failpoint");
+                raise(Status(ErrorCodes::Error(errorCode), failpointMsg));
             }
         },
         [&](const BSONObj& data) {
@@ -752,9 +776,6 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                 closeConnection;
             hasErrorCode = data.hasField("errorCode") &&
                 bsonExtractIntegerField(data, "errorCode", &errorCode).isOK();
-            hasExtraInfo = data.hasField("errorExtraInfo") &&
-                bsonExtractTypedField(data, "errorExtraInfo", BSONType::Object, &errorExtraInfo)
-                    .isOK();
             blockConnection = data.hasField("blockConnection") &&
                 bsonExtractBooleanField(data, "blockConnection", &blockConnection).isOK() &&
                 blockConnection;
