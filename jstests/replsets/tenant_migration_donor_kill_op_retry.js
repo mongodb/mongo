@@ -84,64 +84,6 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
 }
 
 {
-    jsTestLog(
-        "Test that killing the recipientSyncData command on the recipient will trigger the donor " +
-        "to retry sending recipientSyncData command.");
-
-    const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: tenantMigrationTest.getRecipientConnString(),
-        tenantId: makeTenantId(),
-
-    };
-
-    let fp = configureFailPoint(tenantMigrationTest.getRecipientPrimary(), "failCommand", {
-        failInternalCommands: true,
-        blockConnection: true,
-        blockTimeMS: kDelayMS,
-        failCommands: ["recipientSyncData"],
-    });
-
-    const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
-
-    const runMigrationThread =
-        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
-    runMigrationThread.start();
-    fp.wait();
-
-    const res = assert.commandWorked(tenantMigrationTest.getRecipientPrimary().adminCommand({
-        currentOp: true,
-        $or: [
-            {"command.$truncated": {$exists: true}},
-            {"command.recipientSyncData": {$exists: true}}
-        ]
-    }));
-
-    // If the recipientSyncData command has been truncated, we check if the truncated command
-    // contains "recipientSyncData".
-    let opid;
-    for (let op of res.inprog) {
-        if (op.command.recipientSyncData) {
-            opid = op.opid;
-        } else {
-            if (op.command.$truncated.includes("recipientSyncData")) {
-                opid = op.opid;
-            }
-        }
-    }
-    assert(opid);
-
-    assert.commandWorked(
-        tenantMigrationTest.getRecipientPrimary().adminCommand({killOp: 1, op: opid}));
-
-    fp.off();
-    runMigrationThread.join();
-
-    TenantMigrationTest.assertCommitted(runMigrationThread.returnData());
-    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
-}
-
-{
     // This section tests the behavior during TenantMigrationDonorService creation.
     let fpNames = [
         "pauseTenantMigrationBeforeCreatingStateDocumentTTLIndex",

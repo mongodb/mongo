@@ -183,6 +183,15 @@ function testDonorRetryRecipientForgetMigrationCmdOnError(errorCode) {
     testDonorRetryRecipientForgetMigrationCmdOnError(ErrorCodes.ShutdownInProgress);
 })();
 
+(() => {
+    jsTest.log("Test that the donor retries recipientForgetMigration on interruption errors");
+    // Test an error code that is in the 'Interruption' category but not in the 'isRetriable'
+    // category.
+    const interruptionErrorCode = ErrorCodes.MaxTimeMSExpired;
+    assert(ErrorCodes.isInterruption(interruptionErrorCode));
+    testDonorRetryRecipientForgetMigrationCmdOnError(interruptionErrorCode);
+})();
+
 // Each donor state doc is updated three times throughout the lifetime of a tenant migration:
 // - Set the "state" to "blocking"
 // - Set the "state" to "commit"/"abort"
