@@ -59,3 +59,8 @@ feature_flags:
       description: "Feature flag for allowing $lookup/$graphLookup into a sharded collection"
       cpp_varname: gFeatureFlagShardedLookup 
       default: false
+
+    featureFlagChangeStreamsPreAndPostImages:
+      description: "Feature flag for allowing usage of point-in-time pre- and post-images of documents in change streams"
+      cpp_varname: gFeatureFlagChangeStreamsPreAndPostImages
+      default: false
