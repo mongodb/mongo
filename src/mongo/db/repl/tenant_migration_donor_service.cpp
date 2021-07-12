@@ -88,13 +88,21 @@ bool shouldStopInsertingDonorStateDoc(Status status) {
     return status.isOK() || status == ErrorCodes::ConflictingOperationInProgress;
 }
 
-bool shouldStopSendingRecipientCommand(Status status) {
+bool shouldStopSendingRecipientForgetMigrationCommand(Status status) {
     return status.isOK() ||
         !(ErrorCodes::isRetriableError(status) ||
           // Returned if findHost() is unable to target the recipient in 15 seconds, which may
           // happen after a failover.
           status == ErrorCodes::FailedToSatisfyReadPreference ||
           ErrorCodes::isInterruption(status));
+}
+
+bool shouldStopSendingRecipientSyncDataCommand(Status status) {
+    return status.isOK() ||
+        !(ErrorCodes::isRetriableError(status) ||
+          // Returned if findHost() is unable to target the recipient in 15 seconds, which may
+          // happen after a failover.
+          status == ErrorCodes::FailedToSatisfyReadPreference);
 }
 
 bool shouldStopFetchingRecipientClusterTimeKeyDocs(Status status) {
@@ -645,6 +653,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const BSONObj& cmdObj,
     const CancellationToken& token) {
+    const bool isRecipientSyncDataCmd = cmdObj.hasField(RecipientSyncData::kCommandName);
     return AsyncTry(
                [this, self = shared_from_this(), executor, recipientTargeterRS, cmdObj, token] {
                    return recipientTargeterRS->findHost(kPrimaryOnlyReadPreference, token)
@@ -673,7 +682,16 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
                                });
                        });
                })
-        .until([token](Status status) { return shouldStopSendingRecipientCommand(status); })
+        .until([token, cmdObj, isRecipientSyncDataCmd](Status status) {
+            if (isRecipientSyncDataCmd) {
+                return shouldStopSendingRecipientSyncDataCommand(status);
+            } else {
+                // If the recipient command is not 'recipientSyncData', it must be
+                // 'recipientForgetMigration'.
+                invariant(cmdObj.hasField(RecipientForgetMigration::kCommandName));
+                return shouldStopSendingRecipientForgetMigrationCommand(status);
+            }
+        })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, token);
 }
