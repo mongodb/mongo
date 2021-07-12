@@ -9,6 +9,7 @@
 # List all the main algorithms for each language, in UTF-8, and also with
 # the most commonly used encoding.
 
+czech           UTF_8                   czech,cz,czk
 danish          UTF_8,ISO_8859_1        danish,da,dan
 dutch           UTF_8,ISO_8859_1        dutch,nl,dut,nld
 english         UTF_8,ISO_8859_1        english,en,eng
@@ -21,6 +22,7 @@ norwegian       UTF_8,ISO_8859_1        norwegian,no,nor
 portuguese      UTF_8,ISO_8859_1        portuguese,pt,por
 romanian        UTF_8,ISO_8859_2        romanian,ro,rum,ron
 russian         UTF_8,KOI8_R            russian,ru,rus
+slovak          UTF_8                   slovak,sk,svk
 spanish         UTF_8,ISO_8859_1        spanish,es,esl,spa
 swedish         UTF_8,ISO_8859_1        swedish,sv,swe
 turkish         UTF_8                   turkish,tr,tur
