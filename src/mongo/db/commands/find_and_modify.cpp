@@ -538,6 +538,7 @@ public:
             BSONObjBuilder keyBob;
             keyBob.append("sort", 1);
             keyBob.append("collation", 1);
+            keyBob.append("shardVersion", 1);
             return keyBob.obj();
         }();
 
