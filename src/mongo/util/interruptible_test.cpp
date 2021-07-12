@@ -62,65 +62,33 @@ class DummyInterruptible final : public Interruptible {
     StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
         stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override {
         while (Date_t::now() < deadline) {
-            sleepmillis(duration_cast<Milliseconds>(precision).count());
+            sleepmillis(duration_cast<Milliseconds>(kPrecision).count());
         }
         return stdx::cv_status::timeout;
     }
 
 public:
-    const Milliseconds precision = Milliseconds(5);
+    // To accommodate for OS scheduling and timing inaccuracies.
+    static constexpr auto kPrecision = Milliseconds(5);
 };
 
-TEST(Interruptible, WaitForConditionOrInterruptTimed) {
+
+TEST(Interruptible, WaitUntilDeadline) {
     auto interruptible = std::make_unique<DummyInterruptible>();
     const auto sleepFor = Milliseconds(500);
 
     auto mutex = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
     stdx::unique_lock<Latch> lk(mutex);
-    AtomicWord<Microseconds::rep> waitTimer(0);
 
     const auto start = Date_t::now();
-    Date_t deadline = Date_t::now() + sleepFor;
-    interruptible->waitForConditionOrInterruptUntil(cv,
-                                                    lk,
-                                                    deadline,
-                                                    [&, oldWaitTimer = 0]() mutable {
-                                                        /**
-                                                         * Make sure it never resets the waitTimer.
-                                                         * waitTimer should always monotonically
-                                                         * increase.
-                                                         */
-                                                        ASSERT_GTE(waitTimer.load(), oldWaitTimer);
-                                                        oldWaitTimer = waitTimer.load();
-                                                        return false;
-                                                    },
-                                                    &waitTimer);
+    Date_t deadline = start + sleepFor;
+    interruptible->waitForConditionOrInterruptUntil(cv, lk, deadline, []() { return false; });
     const auto end = Date_t::now();
 
-    const auto duration = duration_cast<Milliseconds>(end - start);
-    ASSERT_GTE(duration + interruptible->precision, sleepFor);
-    /**
-     * The following assumes the testing environment is not heavily contended.
-     * So long as the OS scheduler does not take more than 5~ms to reschedule
-     * this thread, the following assertion should pass.
-     */
-    ASSERT_LTE(duration_cast<Microseconds>(sleepFor).count(),
-               waitTimer.load() + duration_cast<Microseconds>(interruptible->precision).count());
+    ASSERT_GTE(end, deadline - DummyInterruptible::kPrecision);
+    ASSERT_LTE(end, deadline + DummyInterruptible::kPrecision);
     ASSERT_FALSE(interruptible->isWaitingForConditionOrInterrupt());
-}
-
-TEST(Interruptible, ZeroWaitTimeForImmediateReturn) {
-    auto interruptible = std::make_unique<DummyInterruptible>();
-    auto mutex = MONGO_MAKE_LATCH();
-    stdx::condition_variable cv;
-    stdx::unique_lock<Latch> lk(mutex);
-    AtomicWord<Microseconds::rep> waitTimer(0);
-    Date_t deadline = Date_t::now() + Milliseconds(100);
-
-    interruptible->waitForConditionOrInterruptUntil(
-        cv, lk, deadline, [&]() { return true; }, &waitTimer);
-    ASSERT_EQ(waitTimer.load(), 0);
 }
 
 }  // namespace
