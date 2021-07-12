@@ -329,5 +329,83 @@ BENCHMARK(BM_DateTruncEvaluateMonth6UTCValue2030);
 BENCHMARK(BM_DateTruncEvaluateYear1NewYorkValue2020);
 BENCHMARK(BM_DateTruncEvaluateYear1UTCValue2020);
 BENCHMARK(BM_DateTruncEvaluateYear1NewYorkValue2100);
+
+/**
+ * Tests performance of 'evaluate()' of $getField expression.
+ */
+void BM_GetFieldEvaluateExpression(benchmark::State& state) {
+    BSONObjBuilder objBuilder;
+    objBuilder << "field"
+               << "x.y$z"
+               << "input"
+               << BSON("$const" << BSON("x.y$z"
+                                        << "abc"));
+
+    testExpression(BSON("$getField" << objBuilder.obj()), state);
+}
+
+void BM_GetFieldEvaluateShortSyntaxExpression(benchmark::State& state) {
+    testExpression(BSON("$getField" << BSON("$const"
+                                            << "$foo")),
+                   state);
+}
+
+void BM_GetFieldNestedExpression(benchmark::State& state) {
+    BSONObjBuilder innerObjBuilder;
+    innerObjBuilder << "field"
+                    << "a.b"
+                    << "input" << BSON("$const" << BSON("a.b" << BSON("c" << 123)));
+    BSONObjBuilder outerObjBuilder;
+    outerObjBuilder << "field"
+                    << "c"
+                    << "input" << BSON("$getField" << innerObjBuilder.obj());
+    testExpression(BSON("$getField" << outerObjBuilder.obj()), state);
+}
+
+BENCHMARK(BM_GetFieldEvaluateExpression);
+BENCHMARK(BM_GetFieldEvaluateShortSyntaxExpression);
+BENCHMARK(BM_GetFieldNestedExpression);
+
+/**
+ * Tests performance of 'evaluate()' of $setField and $unsetField expressions.
+ */
+void testSetFieldExpression(std::string fieldname,
+                            std::string oldFieldValue,
+                            std::string newFieldValue,
+                            benchmark::State& state) {
+    BSONObjBuilder objBuilder;
+    objBuilder << "field" << fieldname << "input"
+               << BSON("$const" << BSON(fieldname << oldFieldValue << "f1" << 1 << "f2" << 2))
+               << "value" << newFieldValue;
+
+    testExpression(BSON("$setField" << objBuilder.obj()), state);
+}
+
+void BM_SetFieldEvaluateExpression(benchmark::State& state) {
+    testSetFieldExpression("a.b", "x", "y", state);
+}
+
+// The following two functions test different syntax for equivalent expressions:
+// $unsetField is an alias for $setField with $$REMOVE.
+void BM_SetFieldWithRemoveExpression(benchmark::State& state) {
+    testSetFieldExpression("a$b", "x", "$$REMOVE", state);
+}
+
+void BM_UnsetFieldEvaluateExpression(benchmark::State& state) {
+    BSONObjBuilder objBuilder;
+    objBuilder << "field"
+               << "a$b.c"
+               << "input"
+               << BSON("$const" << BSON("a$b.c"
+                                        << "x"
+                                        << "f1" << 1 << "f2" << 2));
+
+    testExpression(BSON("$unsetField" << objBuilder.obj()), state);
+}
+
+BENCHMARK(BM_SetFieldEvaluateExpression);
+BENCHMARK(BM_SetFieldWithRemoveExpression);
+BENCHMARK(BM_UnsetFieldEvaluateExpression);
+
 }  // namespace
 }  // namespace mongo
