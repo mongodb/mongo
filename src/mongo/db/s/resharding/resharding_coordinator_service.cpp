@@ -467,7 +467,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
 }
 
 void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
-                                     std::vector<ChunkType> initialChunks,
+                                     const std::vector<ChunkType>& initialChunks,
                                      std::vector<BSONObj> newZones,
                                      TxnNumber txnNumber) {
     // Insert new initial chunk documents for temp nss
@@ -696,6 +696,7 @@ void writeParticipantShardsAndTempCollInfo(
 
             // Insert the config.collections entry for the temporary resharding collection. The
             // chunks all have the same epoch, so picking the last chunk here is arbitrary.
+            invariant(initialChunks.size() != 0);
             auto chunkVersion = initialChunks.back().getVersion();
             writeToConfigCollectionsForTempNss(
                 opCtx, updatedCoordinatorDoc, chunkVersion, CollationSpec::kSimpleSpec, txnNumber);
