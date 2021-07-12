@@ -58,6 +58,7 @@
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/request_types/commit_reshard_collection_gen.h"
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
+#include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/fail_point.h"
@@ -592,6 +593,13 @@ void executeMetadataChangesInTxn(
                                             });
 }
 
+BSONObj makeFlushRoutingTableCacheUpdatesCmd(const NamespaceString& nss) {
+    auto cmd = _flushRoutingTableCacheUpdatesWithWriteConcern(nss);
+    cmd.setSyncFromConfig(true);
+    cmd.setDbName(nss.db());
+    return CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({})).getOwned();
+}
+
 }  // namespace
 
 namespace resharding {
@@ -1065,9 +1073,9 @@ ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsReshard
                    })
                    .then([this, executor] {
                        pauseBeforeTellDonorToRefresh.pauseWhileSet();
-                       _tellAllDonorsToRefresh(executor);
+                       _establishAllDonorsAsParticipants(executor);
                    })
-                   .then([this, executor] { _tellAllRecipientsToRefresh(executor); })
+                   .then([this, executor] { _establishAllRecipientsAsParticipants(executor); })
                    .onCompletion([this](Status status) {
                        // Swap back to using operation contexts canceled upon abort until ready to
                        // persist the decision or unrecoverable error.
@@ -1236,7 +1244,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_commitAndFinishReshardOper
                        return _commit(updatedCoordinatorDoc);
                    })
                    .then([this, executor] {
-                       _tellAllParticipantsToRefresh(_coordinatorDoc.getSourceNss(), executor);
+                       _tellAllParticipantsToCommit(_coordinatorDoc.getSourceNss(), executor);
                    })
                    .then([this] { _updateChunkImbalanceMetrics(_coordinatorDoc.getSourceNss()); })
                    .then([this, executor] { return _awaitAllParticipantShardsDone(executor); })
@@ -1272,6 +1280,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_commitAndFinishReshardOper
                         "error"_attr = redact(status));
         });
 }
+
 SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& stepdownToken) noexcept {
@@ -1730,11 +1739,66 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
 }
 
+void ReshardingCoordinatorService::ReshardingCoordinator::_sendCommandToAllParticipants(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const BSONObj& command) {
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto donorShardIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
+    auto recipientShardIds =
+        extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
+    std::set<ShardId> participantShardIds{donorShardIds.begin(), donorShardIds.end()};
+    participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
+
+    _reshardingCoordinatorExternalState->sendCommandToShards(
+        opCtx.get(),
+        NamespaceString::kAdminDb,
+        command,
+        {participantShardIds.begin(), participantShardIds.end()},
+        **executor);
+}
+
+void ReshardingCoordinatorService::ReshardingCoordinator::_sendCommandToAllRecipients(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const BSONObj& command) {
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto recipientShardIds =
+        extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
+
+    _reshardingCoordinatorExternalState->sendCommandToShards(
+        opCtx.get(),
+        NamespaceString::kAdminDb,
+        command,
+        {recipientShardIds.begin(), recipientShardIds.end()},
+        **executor);
+}
+
+void ReshardingCoordinatorService::ReshardingCoordinator::_sendCommandToAllDonors(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const BSONObj& command) {
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto donorShardIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
+
+    _reshardingCoordinatorExternalState->sendCommandToShards(
+        opCtx.get(),
+        NamespaceString::kAdminDb,
+        command,
+        {donorShardIds.begin(), donorShardIds.end()},
+        **executor);
+}
+
+void ReshardingCoordinatorService::ReshardingCoordinator::_establishAllDonorsAsParticipants(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
+    auto flushCmd = makeFlushRoutingTableCacheUpdatesCmd(_coordinatorDoc.getSourceNss());
+    _sendCommandToAllDonors(executor, flushCmd);
+}
+
+void ReshardingCoordinatorService::ReshardingCoordinator::_establishAllRecipientsAsParticipants(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
+    auto flushCmd = makeFlushRoutingTableCacheUpdatesCmd(_coordinatorDoc.getTempReshardingNss());
+    _sendCommandToAllRecipients(executor, flushCmd);
+}
+
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    auto recipientIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
-
     NamespaceString nssToRefresh;
     // Refresh the temporary namespace if the coordinator is in a state prior to 'kCommitting'.
     // A refresh of recipients while in 'kCommitting' should be accompanied by a refresh of
@@ -1747,68 +1811,30 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRe
 
     auto refreshCmd =
         createFlushReshardingStateChangeCommand(nssToRefresh, _coordinatorDoc.getReshardingUUID());
-
-    _reshardingCoordinatorExternalState->sendCommandToShards(
-        opCtx.get(),
-        NamespaceString::kAdminDb,
-        refreshCmd,
-        {recipientIds.begin(), recipientIds.end()},
-        **executor);
+    _sendCommandToAllRecipients(executor, refreshCmd);
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllDonorsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    auto donorIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
-
     auto refreshCmd = createFlushReshardingStateChangeCommand(_coordinatorDoc.getSourceNss(),
                                                               _coordinatorDoc.getReshardingUUID());
-    _reshardingCoordinatorExternalState->sendCommandToShards(opCtx.get(),
-                                                             NamespaceString::kAdminDb,
-                                                             refreshCmd,
-                                                             {donorIds.begin(), donorIds.end()},
-                                                             **executor);
+    _sendCommandToAllDonors(executor, refreshCmd);
 }
 
-void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsToRefresh(
+void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsToCommit(
     const NamespaceString& nss, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-
-    auto donorShardIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
-    auto recipientShardIds =
-        extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
-    std::set<ShardId> participantShardIds{donorShardIds.begin(), donorShardIds.end()};
-    participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
-
     auto commitCmd =
         createShardsvrCommitReshardCollectionCmd(nss, _coordinatorDoc.getReshardingUUID());
-    _reshardingCoordinatorExternalState->sendCommandToShards(
-        opCtx.get(),
-        NamespaceString::kAdminDb,
-        commitCmd,
-        {participantShardIds.begin(), participantShardIds.end()},
-        **executor);
+    _sendCommandToAllParticipants(executor, commitCmd);
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsToAbort(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, bool isUserAborted) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-
-    auto donorShardIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
-    auto recipientShardIds =
-        extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
-    std::set<ShardId> participantShardIds{donorShardIds.begin(), donorShardIds.end()};
-    participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
-
     ShardsvrAbortReshardCollection abortCmd(_coordinatorDoc.getReshardingUUID(), isUserAborted);
     abortCmd.setDbName("admin");
-
-    sharding_util::sendCommandToShards(opCtx.get(),
-                                       NamespaceString::kAdminDb,
-                                       abortCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
-                                                            << WriteConcernOptions::Majority)),
-                                       {participantShardIds.begin(), participantShardIds.end()},
-                                       **executor);
+    _sendCommandToAllParticipants(executor,
+                                  abortCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
+                                                       << WriteConcernOptions::Majority)));
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_updateChunkImbalanceMetrics(

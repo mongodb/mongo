@@ -411,6 +411,30 @@ private:
         boost::optional<Status> abortReason = boost::none);
 
     /**
+     * Sends the command to the specified participants asynchronously.
+     */
+    void _sendCommandToAllParticipants(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const BSONObj& command);
+    void _sendCommandToAllDonors(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                 const BSONObj& command);
+    void _sendCommandToAllRecipients(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                     const BSONObj& command);
+
+    /**
+     * Sends '_flushRoutingTableCacheUpdatesWithWriteConcern' to ensure donor state machine creation
+     * by the time the refresh completes.
+     */
+    void _establishAllDonorsAsParticipants(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
+     * Sends '_flushRoutingTableCacheUpdatesWithWriteConcern' to ensure recipient state machine
+     * creation by the time the refresh completes.
+     */
+    void _establishAllRecipientsAsParticipants(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
      * Sends '_flushReshardingStateChange' to all recipient shards.
      *
      * When the coordinator is in a state before 'kCommitting', refreshes the temporary
@@ -425,9 +449,9 @@ private:
     void _tellAllDonorsToRefresh(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
-     * Sends '_flushReshardingStateChange' for the original namespace to all participant shards.
+     * Sends '_shardsvrCommitReshardCollection' to all participant shards.
      */
-    void _tellAllParticipantsToRefresh(
+    void _tellAllParticipantsToCommit(
         const NamespaceString& nss, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
