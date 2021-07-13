@@ -114,13 +114,13 @@ public:
         boost::optional<long long> maxSplitPoints;
         BSONElement maxSplitPointsElem = jsobj["maxSplitPoints"];
         if (maxSplitPointsElem.isNumber()) {
-            maxSplitPoints = maxSplitPointsElem.numberLong();
+            maxSplitPoints = maxSplitPointsElem.safeNumberLong();
         }
 
         boost::optional<long long> maxChunkObjects;
         BSONElement maxChunkObjectsElem = jsobj["maxChunkObjects"];
         if (maxChunkObjectsElem.isNumber()) {
-            maxChunkObjects = maxChunkObjectsElem.numberLong();
+            maxChunkObjects = maxChunkObjectsElem.safeNumberLong();
         }
 
         boost::optional<long long> maxChunkSizeBytes;
@@ -128,9 +128,9 @@ public:
         BSONElement maxSizeBytesElem = jsobj["maxChunkSizeBytes"];
         // Use maxChunkSize if present otherwise maxChunkSizeBytes
         if (maxSizeElem.isNumber()) {
-            maxChunkSizeBytes = maxSizeElem.numberLong() * 1 << 20;
+            maxChunkSizeBytes = maxSizeElem.safeNumberLong() * 1 << 20;
         } else if (maxSizeBytesElem.isNumber()) {
-            maxChunkSizeBytes = maxSizeBytesElem.numberLong();
+            maxChunkSizeBytes = maxSizeBytesElem.safeNumberLong();
         }
 
         auto splitKeys = splitVector(opCtx,
