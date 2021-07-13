@@ -540,6 +540,23 @@ TEST_F(AsyncTryUntilTest, CanceledTryUntilLoopWithBackoffDoesNotExecuteIfAlready
     ASSERT_EQ(counter, 0);
 }
 
+TEST_F(AsyncTryUntilTest, UntilBodyPropagatesErrorToCaller) {
+    const auto error = Status(ErrorCodes::InternalError, "Some error");
+    auto resultFut = AsyncTry([] {})
+                         .until([&](Status status) -> bool { iasserted(error); })
+                         .on(executor(), CancellationToken::uncancelable());
+    ASSERT_EQ(resultFut.getNoThrow(), error);
+}
+
+TEST_F(AsyncTryUntilTest, UntilWithDelayBodyPropagatesErrorToCaller) {
+    const auto error = Status(ErrorCodes::InternalError, "Some error");
+    auto resultFut = AsyncTry([] {})
+                         .until([&](Status status) -> bool { iasserted(error); })
+                         .withDelayBetweenIterations(Seconds(10))
+                         .on(executor(), CancellationToken::uncancelable());
+    ASSERT_EQ(resultFut.getNoThrow(), error);
+}
+
 template <typename T>
 std::pair<std::vector<Promise<T>>, std::vector<Future<T>>> makePromisesAndFutures(size_t size) {
     std::vector<Future<T>> inputFutures;

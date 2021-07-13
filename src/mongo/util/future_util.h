@@ -29,6 +29,8 @@
 #pragma once
 
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/static_immortal.h"
 
@@ -167,7 +169,19 @@ private:
                                   StatusOrStatusWith<ReturnType>&& swResult) mutable {
                         if (cancelToken.isCanceled()) {
                             resultPromise.setError(asyncTryCanceledStatus());
-                        } else if (shouldStopIteration(swResult)) {
+                            return;
+                        }
+
+                        const auto swShouldStop = [&]() -> StatusWith<bool> {
+                            try {
+                                return shouldStopIteration(swResult);
+                            } catch (...) {
+                                return exceptionToStatus();
+                            }
+                        }();
+                        if (MONGO_unlikely(!swShouldStop.isOK())) {
+                            resultPromise.setError(swShouldStop.getStatus());
+                        } else if (swShouldStop.getValue()) {
                             resultPromise.setFrom(std::move(swResult));
                         } else {
                             // Retry after a delay.
@@ -330,7 +344,19 @@ private:
                                       StatusOrStatusWith<ReturnType>&& swResult) mutable {
                             if (cancelToken.isCanceled()) {
                                 resultPromise.setError(asyncTryCanceledStatus());
-                            } else if (shouldStopIteration(swResult)) {
+                                return;
+                            }
+
+                            const auto swShouldStop = [&]() -> StatusWith<bool> {
+                                try {
+                                    return shouldStopIteration(swResult);
+                                } catch (...) {
+                                    return exceptionToStatus();
+                                }
+                            }();
+                            if (MONGO_unlikely(!swShouldStop.isOK())) {
+                                resultPromise.setError(swShouldStop.getStatus());
+                            } else if (swShouldStop.getValue()) {
                                 resultPromise.setFrom(std::move(swResult));
                             } else {
                                 runImpl(std::move(resultPromise));
