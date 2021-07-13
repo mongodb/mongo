@@ -64,10 +64,6 @@ void dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) 
         }
     }();
 
-    if (knownNss) {
-        uassertStatusOK(shardmetadatautil::dropChunksAndDeleteCollectionsEntry(opCtx, nss));
-    }
-
     LOGV2_DEBUG(5515100,
                 1,
                 "Dropped target collection locally on renameCollection participant",
@@ -319,12 +315,19 @@ SemiFuture<void> RenameParticipantInstance::run(
                 clearFilteringMetadata(toNss());
 
                 // Force the refresh of the catalog cache for both source and destination
-                // collections to purge outdated information
+                // collections to purge outdated information.
+                //
+                // (SERVER-58465) Note that we have to wait for the asynchronous tasks submitted to
+                // the background thread of the ShardServerCatalogCacheLoader because those tasks
+                // might conflict with the next refresh if the loader relies on UUID-based
+                // config.cache.chunks.* collections.
                 const auto catalog = Grid::get(opCtx)->catalogCache();
                 uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, fromNss()));
-                uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, toNss()));
                 CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, fromNss());
+
+                uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, toNss()));
                 CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, toNss());
+
                 repl::ReplClientInfo::forClient(opCtx->getClient())
                     .setLastOpToSystemLastOpTime(opCtx);
 
