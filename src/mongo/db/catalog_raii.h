@@ -459,8 +459,6 @@ private:
     ShouldNotConflictWithSecondaryBatchApplicationBlock
         _shouldNotConflictWithSecondaryBatchApplicationBlock;
     boost::optional<Lock::GlobalLock> _globalLock;
-    boost::optional<Lock::DBLock> _dbWriteLock;
-    boost::optional<Lock::CollectionLock> _collWriteLock;
     LocalOplogInfo* _oplogInfo;
     const CollectionPtr* _oplog;
 };
