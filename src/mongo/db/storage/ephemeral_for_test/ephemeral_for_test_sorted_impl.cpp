@@ -97,7 +97,7 @@ private:
 // Helper to interpret index data buffer for unique index
 class UniqueIndexData {
 public:
-    UniqueIndexData() : _size(0), _begin(nullptr), _end(nullptr) {}
+    UniqueIndexData() : _size(0), _begin(nullptr), _end(nullptr), _keyFormat(KeyFormat::Long) {}
     UniqueIndexData(const std::string& indexData, KeyFormat keyFormat) {
         std::memcpy(&_size, indexData.data(), sizeof(uint64_t));
         _begin = reinterpret_cast<const uint8_t*>(indexData.data() + sizeof(uint64_t));
