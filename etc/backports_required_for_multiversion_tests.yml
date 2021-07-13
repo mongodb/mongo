@@ -141,6 +141,24 @@ all:
     test_file: jstests/concurrency/fsm_workloads/findAndModify_flip_location.js
   - ticket: SERVER-57476
     test_file: jstests/replsets/assert_on_prepare_conflict_with_hole.js
+  - ticket: SERVER-52906
+    test_file: jstests/sharding/prepare_transaction_then_migrate.js
+  - ticket: SERVER-52906
+    test_file: jstests/sharding/migration_waits_for_majority_commit.js
+  - ticket: SERVER-52906
+    test_file: jstests/sharding/migration_ignore_interrupts_1.js
+  - ticket: SERVER-52906
+    test_file: jstests/sharding/migration_ignore_interrupts_3.js
+  - ticket: SERVER-52906
+    test_file: jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
+  - ticket: SERVER-52906
+    test_file: jstests/sharding/movechunk_parallel.js
+  - ticket: SERVER-52906
+    test_file: jstests/sharding/txn_writes_during_movechunk.js
+  - ticket: SERVER-52906
+    test_file: jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
+  - ticket: SERVER-52906
+    test_file: jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
 
 suites:
 

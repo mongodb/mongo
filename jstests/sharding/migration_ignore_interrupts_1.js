@@ -43,10 +43,10 @@ assert.commandWorked(admin.runCommand(
 jsTest.log("Set up complete, now proceeding to test that migration interruptions fail.");
 
 // Start a migration between shard0 and shard1 on coll1 and then pause it
-pauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
+pauseMigrateAtStep(shard1, migrateStepNames.rangeDeletionTaskScheduled);
 var joinMoveChunk = moveChunkParallel(
     staticMongod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
-waitForMigrateStep(shard1, migrateStepNames.deletedPriorDataInRange);
+waitForMigrateStep(shard1, migrateStepNames.rangeDeletionTaskScheduled);
 
 assert.commandFailedWithCode(
     admin.runCommand({moveChunk: ns1, find: {a: -10}, to: st.shard2.shardName}),
@@ -64,7 +64,7 @@ assert.commandFailedWithCode(
     "(3) A shard should not be able to be both a donor and recipient of migrations.");
 
 // Finish migration
-unpauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
+unpauseMigrateAtStep(shard1, migrateStepNames.rangeDeletionTaskScheduled);
 assert.doesNotThrow(function() {
     joinMoveChunk();
 });

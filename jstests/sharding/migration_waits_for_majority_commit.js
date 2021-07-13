@@ -24,7 +24,7 @@ assert.commandWorked(st.s.adminCommand({split: "test.foo", middle: {_id: 0}}));
 assert.eq(1, testDB.foo.find().readConcern("majority").itcount());
 
 // Advance a migration to the beginning of the cloning phase.
-pauseMigrateAtStep(st.rs1.getPrimary(), 2);
+pauseMigrateAtStep(st.rs1.getPrimary(), migrateStepNames.rangeDeletionTaskScheduled);
 
 // For startParallelOps to write its state
 let staticMongod = MongoRunner.runMongod({});
@@ -39,7 +39,7 @@ let awaitMigration = moveChunkParallel(staticMongod,
 
 // Wait for the migration to reach the failpoint and allow any writes to become majority committed
 // before pausing replication.
-waitForMigrateStep(st.rs1.getPrimary(), 2);
+waitForMigrateStep(st.rs1.getPrimary(), migrateStepNames.rangeDeletionTaskScheduled);
 st.rs1.awaitLastOpCommitted();
 
 // Disable replication on the recipient shard's secondary node, so the recipient shard's majority
@@ -50,7 +50,7 @@ assert.commandWorked(
     "failed to enable fail point on secondary");
 
 // Allow the migration to begin cloning.
-unpauseMigrateAtStep(st.rs1.getPrimary(), 2);
+unpauseMigrateAtStep(st.rs1.getPrimary(), migrateStepNames.rangeDeletionTaskScheduled);
 
 // The migration should fail to commit without being able to advance the majority commit point.
 if (jsTestOptions().mongosBinVersion == "last-stable") {

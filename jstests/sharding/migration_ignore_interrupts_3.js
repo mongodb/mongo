@@ -54,11 +54,11 @@ jsTest.log("Set up complete, now proceeding to test that migration interruption 
 
 // Start coll1 migration to shard1: pause recipient after delete step, donor before interrupt
 // check.
-pauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
+pauseMigrateAtStep(shard1, migrateStepNames.rangeDeletionTaskScheduled);
 pauseMoveChunkAtStep(shard0, moveChunkStepNames.startedMoveChunk);
 const joinMoveChunk = moveChunkParallel(
     staticMongod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
-waitForMigrateStep(shard1, migrateStepNames.deletedPriorDataInRange);
+waitForMigrateStep(shard1, migrateStepNames.rangeDeletionTaskScheduled);
 
 // Abort migration on donor side, recipient is unaware.
 killRunningMoveChunk(admin);
@@ -69,13 +69,13 @@ assert.throws(function() {
 });
 
 // Start coll2 migration to shard2, pause recipient after delete step.
-pauseMigrateAtStep(shard2, migrateStepNames.deletedPriorDataInRange);
+pauseMigrateAtStep(shard2, migrateStepNames.rangeDeletionTaskScheduled);
 const joinMoveChunk2 = moveChunkParallel(
     staticMongod, st.s0.host, {a: 0}, null, coll2.getFullName(), st.shard2.shardName);
-waitForMigrateStep(shard2, migrateStepNames.deletedPriorDataInRange);
+waitForMigrateStep(shard2, migrateStepNames.rangeDeletionTaskScheduled);
 
 jsTest.log('Releasing coll1 migration recipient, whose clone command should fail....');
-unpauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
+unpauseMigrateAtStep(shard1, migrateStepNames.rangeDeletionTaskScheduled);
 assert.soon(function() {
     // Wait for the destination shard to report that it is not in an active migration.
     var res = shard1.adminCommand({'_recvChunkStatus': 1});
@@ -86,7 +86,7 @@ assert.eq(
     0, shard1Coll1.find().itcount(), "shard1 cloned documents despite donor migration abortion.");
 
 jsTest.log('Finishing coll2 migration, which should succeed....');
-unpauseMigrateAtStep(shard2, migrateStepNames.deletedPriorDataInRange);
+unpauseMigrateAtStep(shard2, migrateStepNames.rangeDeletionTaskScheduled);
 assert.doesNotThrow(function() {
     joinMoveChunk2();
 });
