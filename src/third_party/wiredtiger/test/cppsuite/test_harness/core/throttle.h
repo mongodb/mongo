@@ -29,55 +29,23 @@
 #ifndef THROTTLE_H
 #define THROTTLE_H
 
-#include <thread>
 #include <string>
 
-#include "configuration.h"
+/* Forward declarations for classes to reduce compilation time and modules coupling. */
+class configuration;
 
 namespace test_harness {
 class throttle {
     public:
-    explicit throttle(const std::string &throttle_rate)
-    {
-        std::string magnitude;
-        uint64_t multiplier = 0;
-        /*
-         * Find the ms, s, or m in the string. Searching for "ms" first as the following two
-         * searches would match as well.
-         */
-        size_t pos = throttle_rate.find("ms");
-        if (pos != std::string::npos)
-            multiplier = 1;
-        else {
-            pos = throttle_rate.find("s");
-            if (pos != std::string::npos)
-                multiplier = 1000;
-            else {
-                pos = throttle_rate.find("m");
-                if (pos != std::string::npos)
-                    multiplier = 60 * 1000;
-                else
-                    testutil_die(-1, "no rate specifier given");
-            }
-        }
-        magnitude = throttle_rate.substr(0, pos);
-        /* This will throw if it can't cast, which is fine. */
-        _ms = std::stoi(magnitude) * multiplier;
-    }
+    explicit throttle(const std::string &throttle_rate);
 
     /* Use optional and default to 1s per op in case something doesn't define this. */
-    explicit throttle(configuration *config) : throttle(config->get_optional_string(OP_RATE, "1s"))
-    {
-    }
+    explicit throttle(configuration *config);
 
     /* Default to a second per operation. */
-    throttle() : throttle("1s") {}
+    throttle();
 
-    void
-    sleep()
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(_ms));
-    }
+    void sleep();
 
     private:
     uint64_t _ms = 1000;

@@ -26,37 +26,50 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef THREAD_MANAGER_H
-#define THREAD_MANAGER_H
-
 #include <thread>
-#include <vector>
+
+#include "configuration.h"
+#include "test_harness/util/api_const.h"
+#include "throttle.h"
 
 namespace test_harness {
-/* Class that handles threads, from their initialization to their deletion. */
-class thread_manager {
-    public:
-    ~thread_manager();
-
+throttle::throttle(const std::string &throttle_rate)
+{
+    std::string magnitude;
+    uint64_t multiplier = 0;
     /*
-     * Generic function to create threads that call member function of classes.
+     * Find the ms, s, or m in the string. Searching for "ms" first as the following two searches
+     * would match as well.
      */
-    template <typename Callable, typename... Args>
-    void
-    add_thread(Callable &&fct, Args &&... args)
-    {
-        std::thread *t = new std::thread(fct, std::forward<Args>(args)...);
-        _workers.push_back(t);
+    size_t pos = throttle_rate.find("ms");
+    if (pos != std::string::npos)
+        multiplier = 1;
+    else {
+        pos = throttle_rate.find("s");
+        if (pos != std::string::npos)
+            multiplier = 1000;
+        else {
+            pos = throttle_rate.find("m");
+            if (pos != std::string::npos)
+                multiplier = 60 * 1000;
+            else
+                testutil_die(-1, "no rate specifier given");
+        }
     }
+    magnitude = throttle_rate.substr(0, pos);
+    /* This will throw if it can't cast, which is fine. */
+    _ms = std::stoi(magnitude) * multiplier;
+}
 
-    /*
-     * Complete the operations for all threads.
-     */
-    void join();
+/* Use optional and default to 1s per op in case something doesn't define this. */
+throttle::throttle(configuration *config) : throttle(config->get_optional_string(OP_RATE, "1s")) {}
 
-    private:
-    std::vector<std::thread *> _workers;
-};
+/* Default to a second per operation. */
+throttle::throttle() : throttle("1s") {}
+
+void
+throttle::sleep()
+{
+    std::this_thread::sleep_for(std::chrono::milliseconds(_ms));
+}
 } // namespace test_harness
-
-#endif

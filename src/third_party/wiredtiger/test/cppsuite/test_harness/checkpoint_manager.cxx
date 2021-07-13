@@ -26,37 +26,32 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef THREAD_MANAGER_H
-#define THREAD_MANAGER_H
-
-#include <thread>
-#include <vector>
+#include "checkpoint_manager.h"
+#include "connection_manager.h"
+#include "util/api_const.h"
+#include "util/logger.h"
 
 namespace test_harness {
-/* Class that handles threads, from their initialization to their deletion. */
-class thread_manager {
-    public:
-    ~thread_manager();
+checkpoint_manager::checkpoint_manager(configuration *configuration)
+    : component(CHECKPOINT_MANAGER, configuration)
+{
+}
 
-    /*
-     * Generic function to create threads that call member function of classes.
-     */
-    template <typename Callable, typename... Args>
-    void
-    add_thread(Callable &&fct, Args &&... args)
-    {
-        std::thread *t = new std::thread(fct, std::forward<Args>(args)...);
-        _workers.push_back(t);
-    }
+void
+checkpoint_manager::load()
+{
+    /* Load the general component things. */
+    component::load();
 
-    /*
-     * Complete the operations for all threads.
-     */
-    void join();
+    /* Create session that we'll use for checkpointing. */
+    if (_enabled)
+        _session = connection_manager::instance().create_session();
+}
 
-    private:
-    std::vector<std::thread *> _workers;
-};
+void
+checkpoint_manager::do_work()
+{
+    logger::log_msg(LOG_INFO, "Running checkpoint");
+    testutil_check(_session->checkpoint(_session.get(), nullptr));
+}
 } // namespace test_harness
-
-#endif

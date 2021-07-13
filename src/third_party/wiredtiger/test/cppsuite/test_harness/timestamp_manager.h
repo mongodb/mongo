@@ -30,11 +30,12 @@
 #define TIMESTAMP_MANAGER_H
 
 #include <atomic>
-#include <chrono>
-#include <sstream>
-#include <thread>
+#include <string>
 
 #include "core/component.h"
+
+/* Forward declarations for classes to reduce compilation time and modules coupling. */
+class configuration;
 
 namespace test_harness {
 /*
@@ -46,109 +47,24 @@ namespace test_harness {
  */
 class timestamp_manager : public component {
     public:
-    timestamp_manager(configuration *config) : component("timestamp_manager", config) {}
+    static const std::string decimal_to_hex(uint64_t value);
 
-    void
-    load() override final
-    {
-        component::load();
-        int64_t oldest_lag = _config->get_int(OLDEST_LAG);
-        testutil_assert(oldest_lag >= 0);
-        /* Cast and then shift left to match the seconds position. */
-        _oldest_lag = oldest_lag;
-        _oldest_lag <<= 32;
+    public:
+    timestamp_manager(configuration *config);
 
-        int64_t stable_lag = _config->get_int(STABLE_LAG);
-        testutil_assert(stable_lag >= 0);
-        /* Cast and then shift left to match the seconds position. */
-        _stable_lag = stable_lag;
-        _stable_lag <<= 32;
-    }
-
-    void
-    do_work() override final
-    {
-        std::string config;
-        /* latest_ts_s represents the time component of the latest timestamp provided. */
-        wt_timestamp_t latest_ts_s;
-
-        /* Timestamps are checked periodically. */
-        latest_ts_s = get_time_now_s();
-
-        /*
-         * Keep a time window between the latest and stable ts less than the max defined in the
-         * configuration.
-         */
-        testutil_assert(latest_ts_s >= _stable_ts);
-        if ((latest_ts_s - _stable_ts) > _stable_lag) {
-            log_msg(LOG_INFO, "Timestamp_manager: Stable timestamp expired.");
-            _stable_ts = latest_ts_s;
-            config += std::string(STABLE_TS) + "=" + decimal_to_hex(_stable_ts);
-        }
-
-        /*
-         * Keep a time window between the stable and oldest ts less than the max defined in the
-         * configuration.
-         */
-        wt_timestamp_t new_oldest_ts = _oldest_ts;
-        testutil_assert(_stable_ts >= _oldest_ts);
-        if ((_stable_ts - _oldest_ts) > _oldest_lag) {
-            log_msg(LOG_INFO, "Timestamp_manager: Oldest timestamp expired.");
-            new_oldest_ts = _stable_ts - _oldest_lag;
-            if (!config.empty())
-                config += ",";
-            config += std::string(OLDEST_TS) + "=" + decimal_to_hex(new_oldest_ts);
-        }
-
-        /*
-         * Save the new timestamps. Any timestamps that we're viewing from another thread should be
-         * set AFTER we've saved the new timestamps to avoid races where we sweep data that is not
-         * yet obsolete.
-         */
-        if (!config.empty()) {
-            connection_manager::instance().set_timestamp(config);
-            _oldest_ts = new_oldest_ts;
-        }
-    }
+    void load() override final;
+    void do_work() override final;
 
     /*
      * Get a unique timestamp.
      */
-    wt_timestamp_t
-    get_next_ts()
-    {
-        uint64_t current_time = get_time_now_s();
-        uint64_t increment = _increment_ts.fetch_add(1);
-        current_time |= (increment & 0x00000000FFFFFFFF);
-        return (current_time);
-    }
+    wt_timestamp_t get_next_ts();
 
-    static const std::string
-    decimal_to_hex(uint64_t value)
-    {
-        std::stringstream ss;
-        ss << std::hex << value;
-        std::string res(ss.str());
-        return (res);
-    }
-
-    wt_timestamp_t
-    get_oldest_ts() const
-    {
-        return (_oldest_ts);
-    }
+    wt_timestamp_t get_oldest_ts() const;
 
     private:
     /* Get the current time in seconds, bit shifted to the expected location. */
-    uint64_t
-    get_time_now_s() const
-    {
-        auto now = std::chrono::system_clock::now().time_since_epoch();
-        uint64_t current_time_s =
-          static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(now).count())
-          << 32;
-        return (current_time_s);
-    }
+    uint64_t get_time_now_s() const;
 
     private:
     std::atomic<wt_timestamp_t> _increment_ts{0};

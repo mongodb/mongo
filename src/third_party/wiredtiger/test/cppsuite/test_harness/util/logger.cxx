@@ -26,47 +26,27 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef DEBUG_UTILS_H
-#define DEBUG_UTILS_H
-
-/* Following definitions are required in order to use printing format specifiers in C++. */
-#define __STDC_LIMIT_MACROS
-#define __STDC_FORMAT_MACROS
-
 #include <chrono>
 #include <iostream>
 #include <mutex>
 #include <sstream>
 #include <thread>
 
-extern "C" {
-#include "test_util.h"
-}
+#include "logger.h"
 
 /* Define helpful functions related to debugging. */
 namespace test_harness {
-
-/* Possible log levels. If you change anything here make sure you update LOG_LEVELS accordingly. */
-#define LOG_ERROR 0
-#define LOG_WARN 1
-#define LOG_INFO 2
-/*
- * The trace log level can incur a performance overhead since the current logging implementation
- * requires per-line locking.
- */
-#define LOG_TRACE 3
-
 /* Order of elements in this array corresponds to the definitions above. */
 const char *const LOG_LEVELS[] = {"ERROR", "WARN", "INFO", "TRACE"};
 
-/* Current log level */
-static int64_t _trace_level = LOG_WARN;
-
-/* Include date in the logs if enabled. */
-static bool _include_date = true;
-
 /* Mutex used by logger to synchronize printing. */
-extern std::mutex _logger_mtx;
+static std::mutex _logger_mtx;
+
+/* Set default log level. */
+int64_t logger::trace_level = LOG_WARN;
+
+/* Include date in the logs by default. */
+bool logger::include_date = true;
 
 void
 get_time(char *time_buf, size_t buf_size)
@@ -84,7 +64,7 @@ get_time(char *time_buf, size_t buf_size)
     tm = localtime_r(&time_epoch_sec, &_tm);
 
     alloc_size =
-      strftime(time_buf, buf_size, _include_date ? "[%Y-%m-%dT%H:%M:%S" : "[%H:%M:%S", tm);
+      strftime(time_buf, buf_size, logger::include_date ? "[%Y-%m-%dT%H:%M:%S" : "[%H:%M:%S", tm);
 
     testutil_assert(alloc_size <= buf_size);
     WT_IGNORE_RET(__wt_snprintf(&time_buf[alloc_size], buf_size - alloc_size, ".%" PRIu64 "Z]",
@@ -92,10 +72,10 @@ get_time(char *time_buf, size_t buf_size)
 }
 
 /* Used to print out traces for debugging purpose. */
-static void
-log_msg(int64_t trace_type, const std::string &str)
+void
+logger::log_msg(int64_t trace_type, const std::string &str)
 {
-    if (_trace_level >= trace_type) {
+    if (logger::trace_level >= trace_type) {
         testutil_assert(
           trace_type >= LOG_ERROR && trace_type < sizeof(LOG_LEVELS) / sizeof(LOG_LEVELS[0]));
 
@@ -114,5 +94,3 @@ log_msg(int64_t trace_type, const std::string &str)
     }
 }
 } // namespace test_harness
-
-#endif

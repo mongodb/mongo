@@ -30,34 +30,21 @@
 #define RANDOM_GENERATOR_H
 
 #include <random>
+#include <string>
 
 namespace test_harness {
-
 /* Helper class to generate random values using uniform distributions. */
 class random_generator {
+    public:
+    static random_generator &instance();
+
     public:
     /* No copies of the singleton allowed. */
     random_generator(random_generator const &) = delete;
     random_generator &operator=(random_generator const &) = delete;
 
-    static random_generator &
-    instance()
-    {
-        thread_local random_generator _instance;
-        return (_instance);
-    }
-
     /* Generate a random string of a given length. */
-    std::string
-    generate_string(std::size_t length)
-    {
-        std::string random_string;
-
-        for (std::size_t i = 0; i < length; ++i)
-            random_string += _characters[_distribution(_generator)];
-
-        return (random_string);
-    }
+    std::string generate_string(std::size_t length);
 
     /* Generate a random integer between min and max. */
     template <typename T>
@@ -69,11 +56,7 @@ class random_generator {
     }
 
     private:
-    random_generator()
-    {
-        _generator = std::mt19937(std::random_device{}());
-        _distribution = std::uniform_int_distribution<>(0, _characters.size() - 1);
-    }
+    random_generator();
 
     std::mt19937 _generator;
     std::uniform_int_distribution<> _distribution;

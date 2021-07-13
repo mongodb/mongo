@@ -29,45 +29,25 @@
 #ifndef CHECKPOINT_MANAGER_H
 #define CHECKPOINT_MANAGER_H
 
-#include "util/api_const.h"
-#include "connection_manager.h"
+#include "core/component.h"
+#include "util/scoped_types.h"
 
 namespace test_harness {
-
 class checkpoint_manager : public component {
     public:
-    explicit checkpoint_manager(configuration *configuration)
-        : component(CHECKPOINT_MANAGER, configuration)
-    {
-    }
+    explicit checkpoint_manager(configuration *configuration);
     virtual ~checkpoint_manager() = default;
 
     /* Delete the copy constructor and the assignment operator. */
     checkpoint_manager(const checkpoint_manager &) = delete;
     checkpoint_manager &operator=(const checkpoint_manager &) = delete;
 
-    void
-    load() override final
-    {
-        /* Load the general component things. */
-        component::load();
-
-        /* Create session that we'll use for checkpointing. */
-        if (_enabled)
-            _session = connection_manager::instance().create_session();
-    }
-
-    void
-    do_work() override final
-    {
-        log_msg(LOG_INFO, "Running checkpoint");
-        testutil_check(_session->checkpoint(_session.get(), nullptr));
-    }
+    void load() override final;
+    void do_work() override final;
 
     private:
     scoped_session _session;
 };
-
 } // namespace test_harness
 
 #endif

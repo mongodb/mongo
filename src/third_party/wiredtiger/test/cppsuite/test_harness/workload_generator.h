@@ -30,15 +30,17 @@
 #define WORKLOAD_GENERATOR_H
 
 #include <algorithm>
-#include <atomic>
 #include <functional>
-#include <map>
 
-#include "core/throttle.h"
-#include "workload/database_model.h"
+#include "core/component.h"
+#include "workload/thread_context.h"
+#include "thread_manager.h"
 #include "workload/database_operation.h"
-#include "workload/random_generator.h"
-#include "workload/workload_tracking.h"
+
+/* Forward declarations for classes to reduce compilation time and modules coupling. */
+class configuration;
+class database;
+class workload_tracking;
 
 namespace test_harness {
 /*
@@ -46,27 +48,12 @@ namespace test_harness {
  */
 class operation_config {
     public:
-    operation_config(configuration *config, thread_type type)
-        : config(config), type(type), thread_count(config->get_int(THREAD_COUNT))
-    {
-    }
+    operation_config(configuration *config, thread_type type);
 
     /* Returns a function pointer to the member function of the supplied database operation. */
-    std::function<void(test_harness::thread_context *)>
-    get_func(database_operation *dbo)
-    {
-        switch (type) {
-        case thread_type::INSERT:
-            return (std::bind(&database_operation::insert_operation, dbo, std::placeholders::_1));
-        case thread_type::READ:
-            return (std::bind(&database_operation::read_operation, dbo, std::placeholders::_1));
-        case thread_type::UPDATE:
-            return (std::bind(&database_operation::update_operation, dbo, std::placeholders::_1));
-        default:
-            /* This may cause a separate testutil_die in type_string but that should be okay. */
-            testutil_die(EINVAL, "unexpected thread_type: %s", type_string(type).c_str());
-        }
-    }
+    std::function<void(test_harness::thread_context *)> get_func(database_operation *dbo);
+
+    public:
     configuration *config;
     const thread_type type;
     const int64_t thread_count;
@@ -78,91 +65,20 @@ class operation_config {
 class workload_generator : public component {
     public:
     workload_generator(configuration *configuration, database_operation *db_operation,
-      timestamp_manager *timestamp_manager, workload_tracking *tracking, database &database)
-        : component("workload_generator", configuration), _database(database),
-          _database_operation(db_operation), _timestamp_manager(timestamp_manager),
-          _tracking(tracking)
-    {
-    }
+      timestamp_manager *timestamp_manager, workload_tracking *tracking, database &database);
 
-    ~workload_generator()
-    {
-        for (auto &it : _workers)
-            delete it;
-    }
+    ~workload_generator();
 
     /* Delete the copy constructor and the assignment operator. */
     workload_generator(const workload_generator &) = delete;
     workload_generator &operator=(const workload_generator &) = delete;
 
     /* Do the work of the main part of the workload. */
-    void
-    run() override final
-    {
-        configuration *populate_config;
-        std::vector<operation_config> operation_configs;
-        uint64_t thread_id = 0;
+    void run() override final;
+    void finish() override final;
 
-        /* Retrieve useful parameters from the test configuration. */
-        operation_configs.push_back(
-          operation_config(_config->get_subconfig(INSERT_CONFIG), thread_type::INSERT));
-        operation_configs.push_back(
-          operation_config(_config->get_subconfig(READ_CONFIG), thread_type::READ));
-        operation_configs.push_back(
-          operation_config(_config->get_subconfig(UPDATE_CONFIG), thread_type::UPDATE));
-        populate_config = _config->get_subconfig(POPULATE_CONFIG);
-
-        /* Populate the database. */
-        _database_operation->populate(_database, _timestamp_manager, populate_config, _tracking);
-        _db_populated = true;
-        delete populate_config;
-
-        /* Generate threads to execute read operations on the collections. */
-        for (auto &it : operation_configs) {
-            log_msg(LOG_INFO,
-              "Workload_generator: Creating " + std::to_string(it.thread_count) + " " +
-                type_string(it.type) + " threads.");
-            for (size_t i = 0; i < it.thread_count && _running; ++i) {
-                thread_context *tc = new thread_context(
-                  thread_id++, it.type, it.config, _timestamp_manager, _tracking, _database);
-                _workers.push_back(tc);
-                _thread_manager.add_thread(it.get_func(_database_operation), tc);
-            }
-            /*
-             * Don't forget to delete the config we created earlier. While we do pass the config
-             * into the thread context it is not saved, so we are safe to do this.
-             */
-            delete it.config;
-
-            /*
-             * Reset the thread_id counter to 0 as we're only interested in knowing per operation
-             * type which thread we are.
-             */
-            thread_id = 0;
-        }
-    }
-
-    void
-    finish() override final
-    {
-        component::finish();
-        for (const auto &it : _workers)
-            it->finish();
-        _thread_manager.join();
-        log_msg(LOG_TRACE, "Workload generator: run stage done");
-    }
-
-    database &
-    get_database()
-    {
-        return (_database);
-    }
-
-    bool
-    db_populated() const
-    {
-        return (_db_populated);
-    }
+    database &get_database();
+    bool db_populated() const;
 
     private:
     database &_database;

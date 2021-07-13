@@ -11,7 +11,26 @@ all:
 all_TESTS=
 noinst_PROGRAMS=
 
-run_SOURCES = tests/run.cxx
+run_SOURCES = test_harness/core/component.cxx \
+              test_harness/core/configuration.cxx \
+              test_harness/core/throttle.cxx \
+              test_harness/util/logger.cxx \
+              test_harness/util/scoped_types.cxx \
+              test_harness/workload/database_model.cxx \
+              test_harness/workload/database_operation.cxx \
+              test_harness/workload/random_generator.cxx \
+              test_harness/workload/thread_context.cxx \
+              test_harness/workload/workload_tracking.cxx \
+              test_harness/workload/workload_validation.cxx \
+              test_harness/checkpoint_manager.cxx \
+              test_harness/connection_manager.cxx \
+              test_harness/runtime_monitor.cxx \
+              test_harness/test.cxx \
+              test_harness/thread_manager.cxx \
+              test_harness/timestamp_manager.cxx \
+              test_harness/workload_generator.cxx \
+              tests/run.cxx
+
 noinst_PROGRAMS += run
 all_TESTS += run
 

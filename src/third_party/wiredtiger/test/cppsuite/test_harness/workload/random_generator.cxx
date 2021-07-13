@@ -26,37 +26,30 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef THREAD_MANAGER_H
-#define THREAD_MANAGER_H
-
-#include <thread>
-#include <vector>
+#include "random_generator.h"
 
 namespace test_harness {
-/* Class that handles threads, from their initialization to their deletion. */
-class thread_manager {
-    public:
-    ~thread_manager();
+random_generator &
+random_generator::instance()
+{
+    thread_local random_generator _instance;
+    return (_instance);
+}
 
-    /*
-     * Generic function to create threads that call member function of classes.
-     */
-    template <typename Callable, typename... Args>
-    void
-    add_thread(Callable &&fct, Args &&... args)
-    {
-        std::thread *t = new std::thread(fct, std::forward<Args>(args)...);
-        _workers.push_back(t);
-    }
+std::string
+random_generator::generate_string(std::size_t length)
+{
+    std::string random_string;
 
-    /*
-     * Complete the operations for all threads.
-     */
-    void join();
+    for (std::size_t i = 0; i < length; ++i)
+        random_string += _characters[_distribution(_generator)];
 
-    private:
-    std::vector<std::thread *> _workers;
-};
+    return (random_string);
+}
+
+random_generator::random_generator()
+{
+    _generator = std::mt19937(std::random_device{}());
+    _distribution = std::uniform_int_distribution<>(0, _characters.size() - 1);
+}
 } // namespace test_harness
-
-#endif

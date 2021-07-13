@@ -26,36 +26,50 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef THREAD_MANAGER_H
-#define THREAD_MANAGER_H
+#ifndef DEBUG_UTILS_H
+#define DEBUG_UTILS_H
 
+/* Following definitions are required in order to use printing format specifiers in C++. */
+#define __STDC_LIMIT_MACROS
+#define __STDC_FORMAT_MACROS
+
+#include <chrono>
+#include <iostream>
+#include <mutex>
+#include <sstream>
 #include <thread>
-#include <vector>
 
+extern "C" {
+#include "test_util.h"
+}
+
+/* Define helpful functions related to debugging. */
 namespace test_harness {
-/* Class that handles threads, from their initialization to their deletion. */
-class thread_manager {
+
+/* Possible log levels. If you change anything here make sure you update LOG_LEVELS accordingly. */
+#define LOG_ERROR 0
+#define LOG_WARN 1
+#define LOG_INFO 2
+/*
+ * The trace log level can incur a performance overhead since the current logging implementation
+ * requires per-line locking.
+ */
+#define LOG_TRACE 3
+
+class logger {
     public:
-    ~thread_manager();
+    /* Current log level. Default is LOG_WARN. */
+    static int64_t trace_level;
 
-    /*
-     * Generic function to create threads that call member function of classes.
-     */
-    template <typename Callable, typename... Args>
-    void
-    add_thread(Callable &&fct, Args &&... args)
-    {
-        std::thread *t = new std::thread(fct, std::forward<Args>(args)...);
-        _workers.push_back(t);
-    }
+    /* Include date in the logs if enabled. Default is true. */
+    static bool include_date;
 
-    /*
-     * Complete the operations for all threads.
-     */
-    void join();
+    public:
+    /* Used to print out traces for debugging purpose. */
+    static void log_msg(int64_t trace_type, const std::string &str);
 
-    private:
-    std::vector<std::thread *> _workers;
+    /* Make sure the class will not be instantiated. */
+    logger() = delete;
 };
 } // namespace test_harness
 

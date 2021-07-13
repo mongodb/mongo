@@ -26,37 +26,55 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef THREAD_MANAGER_H
-#define THREAD_MANAGER_H
-
-#include <thread>
-#include <vector>
+#include "component.h"
+#include "test_harness/util/api_const.h"
 
 namespace test_harness {
-/* Class that handles threads, from their initialization to their deletion. */
-class thread_manager {
-    public:
-    ~thread_manager();
+component::component(const std::string &name, configuration *config) : _name(name), _config(config)
+{
+}
 
-    /*
-     * Generic function to create threads that call member function of classes.
-     */
-    template <typename Callable, typename... Args>
-    void
-    add_thread(Callable &&fct, Args &&... args)
-    {
-        std::thread *t = new std::thread(fct, std::forward<Args>(args)...);
-        _workers.push_back(t);
+component::~component()
+{
+    delete _config;
+}
+
+void
+component::load()
+{
+    logger::log_msg(LOG_INFO, "Loading component: " + _name);
+    _enabled = _config->get_optional_bool(ENABLED, true);
+    _throttle = throttle(_config);
+    /* If we're not enabled we shouldn't be running. */
+    _running = _enabled;
+}
+
+void
+component::run()
+{
+    logger::log_msg(LOG_INFO, "Running component: " + _name);
+    while (_enabled && _running) {
+        do_work();
+        _throttle.sleep();
     }
+}
 
-    /*
-     * Complete the operations for all threads.
-     */
-    void join();
+void
+component::do_work()
+{
+    /* Not implemented. */
+}
 
-    private:
-    std::vector<std::thread *> _workers;
-};
+bool
+component::enabled() const
+{
+    return (_enabled);
+}
+
+void
+component::finish()
+{
+    logger::log_msg(LOG_INFO, "Finishing component: " + _name);
+    _running = false;
+}
 } // namespace test_harness
-
-#endif

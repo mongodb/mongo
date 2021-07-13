@@ -39,12 +39,8 @@ namespace test_harness {
  */
 class component {
     public:
-    component(const std::string &name, configuration *config) : _name(name), _config(config) {}
-
-    virtual ~component()
-    {
-        delete _config;
-    }
+    component(const std::string &name, configuration *config);
+    virtual ~component();
 
     /* Delete the copy constructor and the assignment operator. */
     component(const component &) = delete;
@@ -54,15 +50,7 @@ class component {
      * The load function should perform all tasks required to setup the component for the main phase
      * of the test. An example operation performed in the load phase would be populating a database.
      */
-    virtual void
-    load()
-    {
-        log_msg(LOG_INFO, "Loading component: " + _name);
-        _enabled = _config->get_optional_bool(ENABLED, true);
-        _throttle = throttle(_config);
-        /* If we're not enabled we shouldn't be running. */
-        _running = _enabled;
-    }
+    virtual void load();
 
     /*
      * The run function provides a top level loop that calls the do_work function every X seconds as
@@ -71,39 +59,18 @@ class component {
      *
      * If a component does not wish to use the standard run function, it can be overloaded.
      */
-    virtual void
-    run()
-    {
-        log_msg(LOG_INFO, "Running component: " + _name);
-        while (_enabled && _running) {
-            do_work();
-            _throttle.sleep();
-        }
-    }
+    virtual void run();
 
-    virtual void
-    do_work()
-    {
-        /* Not implemented. */
-    }
+    virtual void do_work();
 
-    bool
-    enabled() const
-    {
-        return (_enabled);
-    }
+    bool enabled() const;
 
     /*
      * The finish phase is a cleanup phase. Created objects are destroyed here and any final testing
      * requirements can be performed in this phase. An example could be the verification of the
      * database, or checking some relevant statistics.
      */
-    virtual void
-    finish()
-    {
-        log_msg(LOG_INFO, "Finishing component: " + _name);
-        _running = false;
-    }
+    virtual void finish();
 
     protected:
     bool _enabled = false;

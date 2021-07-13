@@ -50,10 +50,10 @@ class hs_cleanup : public test {
         WT_DECL_RET;
         const char *key_tmp;
         scoped_session session = connection_manager::instance().create_session();
-        collection &coll = tc->database.get_collection(tc->id);
+        collection &coll = tc->db.get_collection(tc->id);
 
         /* In this test each thread gets a single collection. */
-        testutil_assert(tc->database.get_collection_count() == tc->thread_count);
+        testutil_assert(tc->db.get_collection_count() == tc->thread_count);
         scoped_cursor cursor = session.open_scoped_cursor(coll.name.c_str());
 
         /* We don't know the keyrange we're operating over here so we can't be much smarter here. */

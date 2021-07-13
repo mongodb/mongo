@@ -16,15 +16,15 @@ class test_hs24(wttest.WiredTigerTestCase):
     value3 = 'c' * 500
     value4 = 'd' * 500
     def test_zero_ts(self):
-        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.session.create(self.uri, 'key_format=i,value_format=S')
         self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
         for i in range(0, 2000):
             self.session.begin_transaction()
-            cursor[str(i)] = self.value1
+            cursor[i] = self.value1
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(4))
             self.session.begin_transaction()
-            cursor[str(i)] = self.value2
+            cursor[i] = self.value2
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
         cursor.close()
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(5))
@@ -43,8 +43,8 @@ class test_hs24(wttest.WiredTigerTestCase):
         # version in the history store as well.
         newer_data_visible = False
         for i in range(0, 2000):
-            cursor.set_key(str(i))
-            cursor2.set_key(str(i))
+            cursor.set_key(i)
+            cursor2.set_key(i)
             ret = cursor.search()
             ret2 = cursor2.search()
             if not newer_data_visible:
@@ -62,22 +62,22 @@ class test_hs24(wttest.WiredTigerTestCase):
         cursor = session.open_cursor(self.uri)
         for i in range(0, 2000):
             session.begin_transaction()
-            cursor.set_key(str(i))
+            cursor.set_key(i)
             cursor.remove()
             session.commit_transaction()
         cursor.close()
         session.close()
 
     def test_zero_commit(self):
-        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.session.create(self.uri, 'key_format=i,value_format=S')
         self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
         for i in range(0, 2000):
             self.session.begin_transaction()
-            cursor[str(i)] = self.value1
+            cursor[i] = self.value1
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(4))
             self.session.begin_transaction()
-            cursor[str(i)] = self.value2
+            cursor[i] = self.value2
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
         cursor.close()
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(4))
@@ -92,7 +92,7 @@ class test_hs24(wttest.WiredTigerTestCase):
         # commit thread before the checkpoint starts or value1.
         newer_data_visible = False
         for i in range(0, 2000):
-            value = cursor[str(i)]
+            value = cursor[i]
             if not newer_data_visible:
                 newer_data_visible = value != self.value3
             if newer_data_visible:
@@ -106,26 +106,26 @@ class test_hs24(wttest.WiredTigerTestCase):
         cursor = session.open_cursor(self.uri)
         for i in range(0, 2000):
             session.begin_transaction()
-            cursor[str(i)] = self.value3
+            cursor[i] = self.value3
             session.commit_transaction()
         cursor.close()
         session.close()
 
     def test_out_of_order_ts(self):
-        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.session.create(self.uri, 'key_format=i,value_format=S')
         self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
         for i in range(0, 2000):
             self.session.begin_transaction()
-            cursor[str(i)] = self.value1
+            cursor[i] = self.value1
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(4))
             self.session.begin_transaction()
-            cursor[str(i)] = self.value2
+            cursor[i] = self.value2
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(4))
         for i in range(0, 2000):
             self.session.begin_transaction()
-            cursor[str(i)] = self.value3
+            cursor[i] = self.value3
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(6))
         cursor.close()
         thread = threading.Thread(target=self.out_of_order_ts_commits)
@@ -140,7 +140,7 @@ class test_hs24(wttest.WiredTigerTestCase):
         # checkpoint starts or value1.
         newer_data_visible = False
         for i in range(0, 2000):
-            value = cursor[str(i)]
+            value = cursor[i]
             if not newer_data_visible:
                 newer_data_visible = value != self.value4
             if newer_data_visible:
@@ -154,7 +154,7 @@ class test_hs24(wttest.WiredTigerTestCase):
         cursor = session.open_cursor(self.uri)
         for i in range(0, 2000):
             session.begin_transaction()
-            cursor[str(i)] = self.value4
+            cursor[i] = self.value4
             session.commit_transaction('commit_timestamp=' + timestamp_str(4))
         cursor.close()
         session.close()
