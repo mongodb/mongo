@@ -218,6 +218,8 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
     // Current code only supports replacement update.
     dassert(UpdateDriver::isDocReplacement(updateRequest.getUpdateModification()));
 
+    // TODO SERVER-58243: evaluate whether this is safe or whether acquiring the lock can block.
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     AutoGetCollection collection(
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IX);
 
@@ -1557,6 +1559,9 @@ void TransactionParticipant::Participant::abortTransaction(OperationContext* opC
 }
 
 void TransactionParticipant::Participant::_abortActivePreparedTransaction(OperationContext* opCtx) {
+    // TODO SERVER-58243: evaluate whether this is safe or whether acquiring the lock can block.
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+
     // Re-acquire the RSTL to prevent state transitions while aborting the transaction. Since the
     // transaction was prepared, we dropped it on preparing the transaction. We do not need to
     // reacquire the PBWM because if we're not the primary we will uassert anyways.

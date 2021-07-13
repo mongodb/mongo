@@ -121,6 +121,8 @@ protected:
     std::vector<BSONObj> getNOplogEntries(OperationContext* opCtx, int numExpected) {
         std::vector<BSONObj> allOplogEntries;
         repl::OplogInterfaceLocal oplogInterface(opCtx);
+
+        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
         auto oplogIter = oplogInterface.makeIterator();
         while (true) {
             StatusWith<std::pair<BSONObj, RecordId>> swEntry = oplogIter->next();

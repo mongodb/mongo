@@ -168,6 +168,8 @@ void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext*
     const NamespaceString deletedNss(deletedCollection);
 
     // Need the WUOW to retain the lock for CollectionVersionLogOpHandler::commit().
+    // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     AutoGetCollection autoColl(opCtx, deletedNss, MODE_IX);
 
     opCtx->recoveryUnit()->registerChange(
@@ -347,6 +349,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             updateDoc, ShardCollectionType::kRefreshingFieldName);
 
         // Need the WUOW to retain the lock for CollectionVersionLogOpHandler::commit().
+        // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
+        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, updatedNss, MODE_IX);
         if (refreshingFieldNewVal.isBoolean() && !refreshingFieldNewVal.boolean()) {
             opCtx->recoveryUnit()->registerChange(
@@ -384,6 +388,9 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             updateDoc, ShardDatabaseType::enterCriticalSectionCounter.name());
 
         if (enterCriticalSectionCounterFieldNewVal.ok()) {
+            // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can
+            // block.
+            AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
             AutoGetDb autoDb(opCtx, db, MODE_X);
             auto dss = DatabaseShardingState::get(opCtx, db);
             dss->clearDatabaseInfo(opCtx);
@@ -481,6 +488,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
             50772,
             bsonExtractStringField(documentId, ShardDatabaseType::name.name(), &deletedDatabase));
 
+        // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
+        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
         AutoGetDb autoDb(opCtx, deletedDatabase, MODE_X);
         auto dss = DatabaseShardingState::get(opCtx, deletedDatabase);
         dss->clearDatabaseInfo(opCtx);

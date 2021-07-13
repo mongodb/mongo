@@ -86,6 +86,10 @@ public:
         _db = autoDb.ensureDbExists();
         invariant(_db);
 
+        // Create any additional databases used throughout the test.
+        ASSERT(AutoGetDb(operationContext(), "db1", MODE_X).ensureDbExists());
+        ASSERT(AutoGetDb(operationContext(), "db2", MODE_X).ensureDbExists());
+
         auto durableViewCatalogUnique = std::make_unique<DurableViewCatalogImpl>(_db);
         durableViewCatalog = durableViewCatalogUnique.get();
 
@@ -94,9 +98,6 @@ public:
             operationContext(),
             NamespaceString("db", NamespaceString::kSystemDotViewsCollectionName)));
 
-        // Create any additional databases used throughout the test.
-        ASSERT(AutoGetDb(operationContext(), "db1", MODE_X).ensureDbExists());
-        ASSERT(AutoGetDb(operationContext(), "db2", MODE_X).ensureDbExists());
         wuow.commit();
     }
 

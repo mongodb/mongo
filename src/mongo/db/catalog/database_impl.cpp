@@ -110,7 +110,7 @@ PseudoRandom uniqueCollectionNamespacePseudoRandom(Date_t::now().asInt64());
 Mutex uniqueCollectionNamespaceMutex = MONGO_MAKE_LATCH("DatabaseUniqueCollectionNamespaceMutex");
 
 void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
-    Lock::DBLock dblock(opCtx, nss.db(), MODE_IS);
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IS));
     auto dss = DatabaseShardingState::get(opCtx, nss.db().toString());
     if (!dss) {
         return;
@@ -496,6 +496,8 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
           "dropPendingName"_attr = dpns,
           "dropOpTime"_attr = dropOpTime);
     {
+        // This is a uniquely generated drop-pending namespace that no other operations are using.
+        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
         Lock::CollectionLock collLk(opCtx, dpns, MODE_X);
         fassert(40464, renameCollection(opCtx, nss, dpns, stayTemp));
     }

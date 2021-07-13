@@ -261,6 +261,10 @@ void writeToImageCollection(OperationContext* opCtx,
                             const BSONObj& dataImage,
                             const StringData& invalidatedReason,
                             bool* upsertConfigImage) {
+    // In practice, this lock acquisition on kConfigImagesNamespace cannot block. The only time a
+    // stronger lock acquisition is taken on this namespace is during step up to create the
+    // collection.
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     AutoGetCollection autoColl(opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
     repl::ImageEntry imageEntry;
     imageEntry.set_id(sessionId);

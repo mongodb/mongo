@@ -272,6 +272,11 @@ void writeToImageCollection(OperationContext* opCtx,
     imageEntry.setImage(dataImage);
 
     repl::UnreplicatedWritesBlock unreplicated(opCtx);
+
+    // In practice, this lock acquisition on kConfigImagesNamespace cannot block. The only time a
+    // stronger lock acquisition is taken on this namespace is during step up to create the
+    // collection.
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     AutoGetCollection imageCollectionRaii(
         opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
     UpdateResult res = Helpers::upsert(

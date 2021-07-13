@@ -840,6 +840,14 @@ void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSna
 LockResult LockerImpl::_lockBegin(OperationContext* opCtx, ResourceId resId, LockMode mode) {
     dassert(!getWaitingResource().isValid());
 
+    // Operations which are holding open an oplog hole cannot block when acquiring locks.
+    if (opCtx && !shouldAllowLockAcquisitionOnTimestampedUnitOfWork()) {
+        invariant(!opCtx->recoveryUnit()->isTimestamped(),
+                  str::stream()
+                      << "Operation holding open an oplog hole tried to acquire locks. ResourceId: "
+                      << resId << ", mode: " << modeName(mode));
+    }
+
     LockRequest* request;
     bool isNew = true;
 
@@ -918,6 +926,15 @@ void LockerImpl::_lockComplete(OperationContext* opCtx,
                                ResourceId resId,
                                LockMode mode,
                                Date_t deadline) {
+    // Operations which are holding open an oplog hole cannot block when acquiring locks. Lock
+    // requests entering this function have been queued up and will be granted the lock as soon as
+    // the lock is released, which is a blocking operation.
+    if (opCtx && !shouldAllowLockAcquisitionOnTimestampedUnitOfWork()) {
+        invariant(!opCtx->recoveryUnit()->isTimestamped(),
+                  str::stream()
+                      << "Operation holding open an oplog hole tried to acquire locks. ResourceId: "
+                      << resId << ", mode: " << modeName(mode));
+    }
 
     // Clean up the state on any failed lock attempts.
     auto unlockOnErrorGuard = makeGuard([&] {

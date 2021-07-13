@@ -82,6 +82,8 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
         return;
     }
 
+    // TODO SERVER-58222: evaluate whether this is safe or whether acquiring the lock can block.
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     Lock::DBLock dblock(opCtx, nss.db(), MODE_IS);
     auto dss = DatabaseShardingState::get(opCtx, nss.db().toString());
     if (!dss) {

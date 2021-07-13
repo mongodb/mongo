@@ -105,13 +105,14 @@ boost::optional<Timestamp> _calculatePin(OperationContext* opCtx) {
         scopeGuard.dismiss();
     }
 
-    AutoGetCollectionForRead autoColl(opCtx, NamespaceString::kDonorReshardingOperationsNamespace);
-    if (!autoColl) {
+    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+        opCtx, NamespaceString::kDonorReshardingOperationsNamespace);
+    if (!collection) {
         return boost::none;
     }
 
     Timestamp ret = Timestamp::max();
-    auto cursor = autoColl->getCursor(opCtx);
+    auto cursor = collection->getCursor(opCtx);
     for (auto doc = cursor->next(); doc; doc = cursor->next()) {
         if (auto fetchTs = parseNewMinFetchTimestampValue(doc.get().data.toBson()); fetchTs) {
             ret = std::min(ret, fetchTs.get());
