@@ -84,7 +84,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback& extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
-    const ProjectionPolicies& projectionPolicies) {
+    const ProjectionPolicies& projectionPolicies,
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline) {
     auto status = query_request_helper::validateFindCommandRequest(*findCommand);
     if (!status.isOK()) {
         return status;
@@ -147,7 +148,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                  std::move(findCommand),
                  parsingCanProduceNoopMatchNodes(extensionsCallback, allowedFeatures),
                  std::move(me),
-                 projectionPolicies);
+                 projectionPolicies,
+                 std::move(pipeline));
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -170,6 +172,11 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
         return status;
     }
 
+    tassert(5842500,
+            "Cannot create a sub-query from an existing CanonicalQuery that carries a non-empty "
+            "pipeline",
+            baseQuery.pipeline().empty());
+
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
     cq->setExplain(baseQuery.getExplain());
@@ -178,7 +185,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                                  std::move(findCommand),
                                  baseQuery.canHaveNoopMatchNodes(),
                                  root->shallowClone(),
-                                 ProjectionPolicies::findProjectionPolicies());
+                                 ProjectionPolicies::findProjectionPolicies(),
+                                 {} /* an empty pipeline */);
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -191,7 +199,8 @@ Status CanonicalQuery::init(OperationContext* opCtx,
                             std::unique_ptr<FindCommandRequest> findCommand,
                             bool canHaveNoopMatchNodes,
                             std::unique_ptr<MatchExpression> root,
-                            const ProjectionPolicies& projectionPolicies) {
+                            const ProjectionPolicies& projectionPolicies,
+                            std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline) {
     _expCtx = expCtx;
     _findCommand = std::move(findCommand);
 
@@ -227,6 +236,8 @@ Status CanonicalQuery::init(OperationContext* opCtx,
 
         _metadataDeps = _proj->metadataDeps();
     }
+
+    _pipeline = std::move(pipeline);
 
     if (_proj && _proj->metadataDeps()[DocumentMetadataFields::kSortKey] &&
         _findCommand->getSort().isEmpty()) {

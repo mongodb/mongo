@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_policies.h"
@@ -83,8 +84,8 @@ public:
         const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
         MatchExpressionParser::AllowedFeatureSet allowedFeatures =
             MatchExpressionParser::kDefaultSpecialFeatures,
-        const ProjectionPolicies& projectionPolicies =
-            ProjectionPolicies::findProjectionPolicies());
+        const ProjectionPolicies& projectionPolicies = ProjectionPolicies::findProjectionPolicies(),
+        std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline = {});
 
     /**
      * For testing or for internal clients to use.
@@ -244,6 +245,10 @@ public:
         return _expCtx.get();
     }
 
+    const std::vector<std::unique_ptr<InnerPipelineStageInterface>>& pipeline() const {
+        return _pipeline;
+    }
+
 private:
     // You must go through canonicalize to create a CanonicalQuery.
     CanonicalQuery() {}
@@ -253,7 +258,8 @@ private:
                 std::unique_ptr<FindCommandRequest> findCommand,
                 bool canHaveNoopMatchNodes,
                 std::unique_ptr<MatchExpression> root,
-                const ProjectionPolicies& projectionPolicies);
+                const ProjectionPolicies& projectionPolicies,
+                std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline);
 
     // Initializes '_sortPattern', adding any metadata dependencies implied by the sort.
     //
@@ -270,6 +276,8 @@ private:
     boost::optional<projection_ast::Projection> _proj;
 
     boost::optional<SortPattern> _sortPattern;
+
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>> _pipeline;
 
     // Keeps track of what metadata has been explicitly requested.
     QueryMetadataBitSet _metadataDeps;
