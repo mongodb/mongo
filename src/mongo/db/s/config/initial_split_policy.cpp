@@ -34,6 +34,7 @@
 #include "mongo/db/s/config/initial_split_policy.h"
 
 #include "mongo/client/read_preference.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -833,7 +834,10 @@ void ReshardingSplitPolicy::_appendSplitPointsFromSample(BSONObjSet* splitPoints
     auto nextKey = _samples->getNext();
 
     while (nextKey && nRemaining > 0) {
-        auto result = splitPoints->insert(shardKey.extractShardKeyFromDoc(*nextKey));
+        // if key is hashed, nextKey values are already hashed
+        auto result = splitPoints->insert(
+            dotted_path_support::extractElementsBasedOnTemplate(*nextKey, shardKey.toBSON())
+                .getOwned());
 
         if (result.second) {
             nRemaining--;

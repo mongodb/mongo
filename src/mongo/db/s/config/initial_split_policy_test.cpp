@@ -1864,9 +1864,9 @@ TEST_F(ReshardingInitSplitTest, HashedShardKey) {
     shardRegistry()->reload(operationContext());
 
     std::list<BSONObj> mockSamples;
-    mockSamples.push_back(BSON("x" << 10 << "y" << 10));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 20));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 30));
+    mockSamples.push_back(BSON("x" << 10 << "y" << 7766103514953448109));
+    mockSamples.push_back(BSON("x" << 10 << "y" << -9117533237618642180));
+    mockSamples.push_back(BSON("x" << 10 << "y" << -1196399207910989725));
 
     auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
 
