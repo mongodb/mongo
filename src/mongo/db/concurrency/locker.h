@@ -478,6 +478,17 @@ public:
     }
 
     /**
+     * If set to true, this opts out of a fatal assertion where operations which are holding open an
+     * oplog hole cannot try to acquire subsequent locks.
+     */
+    void setAllowLockAcquisitionOnTimestampedUnitOfWork(bool newValue) {
+        _shouldAllowLockAcquisitionOnTimestampedUnitOfWork = newValue;
+    }
+    bool shouldAllowLockAcquisitionOnTimestampedUnitOfWork() const {
+        return _shouldAllowLockAcquisitionOnTimestampedUnitOfWork;
+    }
+
+    /**
      * This will opt out of the ticket mechanism. This should be used sparingly for special purpose
      * threads, such as FTDC and committing or aborting prepared transactions.
      */
@@ -538,6 +549,7 @@ protected:
 
 private:
     bool _shouldConflictWithSecondaryBatchApplication = true;
+    bool _shouldAllowLockAcquisitionOnTimestampedUnitOfWork = false;
     bool _shouldAcquireTicket = true;
     std::string _debugInfo;  // Extra info about this locker for debugging purpose
 };
@@ -598,6 +610,39 @@ public:
 private:
     Locker* const _lockState;
     const bool _originalShouldConflict;
+};
+
+/**
+ * RAII-style class to opt out of a fatal assertion where operations that set a timestamp on a
+ * WriteUnitOfWork cannot try to acquire subsequent locks. When an operation is writing at a
+ * specific timestamp, it creates an oplog hole at that timestamp. The oplog visibility rules only
+ * makes oplog entries visible that are before the earliest oplog hole.
+ *
+ * Given that, the following is an example scenario that could result in a resource deadlock:
+ * Op 1: Creates an oplog hole at Timestamp(5), then tries to acquire an exclusive lock.
+ * Op 2: Holds the exclusive lock Op 1 is waiting for, while this operation is waiting for some
+ *       operation beyond Timestamp(5) to become visible in the oplog.
+ */
+class AllowLockAcquisitionOnTimestampedUnitOfWork {
+    AllowLockAcquisitionOnTimestampedUnitOfWork(
+        const AllowLockAcquisitionOnTimestampedUnitOfWork&) = delete;
+    AllowLockAcquisitionOnTimestampedUnitOfWork& operator=(
+        const AllowLockAcquisitionOnTimestampedUnitOfWork&) = delete;
+
+public:
+    explicit AllowLockAcquisitionOnTimestampedUnitOfWork(Locker* lockState)
+        : _lockState(lockState),
+          _originalValue(_lockState->shouldAllowLockAcquisitionOnTimestampedUnitOfWork()) {
+        _lockState->setAllowLockAcquisitionOnTimestampedUnitOfWork(true);
+    }
+
+    ~AllowLockAcquisitionOnTimestampedUnitOfWork() {
+        _lockState->setAllowLockAcquisitionOnTimestampedUnitOfWork(_originalValue);
+    }
+
+private:
+    Locker* const _lockState;
+    bool _originalValue;
 };
 
 }  // namespace mongo
