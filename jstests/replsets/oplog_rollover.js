@@ -76,27 +76,32 @@ function doTest(storageEngine) {
     // switch to a coarser-grained mode to only test that oplog truncation will eventually
     // happen when oplog size exceeds the configured maximum.
     if (primary.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
+        const awaitCheckpointer = function(timestamp) {
+            assert.soon(
+                () => {
+                    const primaryTimestamp =
+                        assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}))
+                            .lastStableRecoveryTimestamp;
+                    const secondaryTimestamp =
+                        assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}))
+                            .lastStableRecoveryTimestamp;
+                    jsTestLog("Awaiting last stable recovery timestamp " +
+                              `(primary: ${tojson(primaryTimestamp)}, secondary: ${
+                                  tojson(secondaryTimestamp)}) ` +
+                              `target: ${tojson(timestamp)}`);
+                    return ((timestampCmp(primaryTimestamp, timestamp) >= 0) &&
+                            (timestampCmp(secondaryTimestamp, timestamp) >= 0));
+                },
+                "Timeout waiting for checkpointing to catch up",
+                ReplSetTest.kDefaultTimeoutMS,
+                2000);
+        };
+
         // Wait for checkpointing/stable timestamp to catch up with the second insert so oplog
-        // entry of the first insert is allowed to be deleted by the oplog truncater thread when
-        // a new oplog stone is created. "inMemory" WT engine does not run checkpoint thread and
-        // lastStableRecoveryTimestamp is the stable timestamp in this case.
-        assert.soon(
-            () => {
-                const primaryTimestamp =
-                    assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}))
-                        .lastStableRecoveryTimestamp;
-                const secondaryTimestamp =
-                    assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}))
-                        .lastStableRecoveryTimestamp;
-                jsTestLog("Awaiting last stable recovery timestamp " +
-                          `(primary: ${primaryTimestamp}, secondary: ${secondaryTimestamp}) ` +
-                          `target: ${secondInsertTimestamp}`);
-                return ((timestampCmp(primaryTimestamp, secondInsertTimestamp) >= 0) &&
-                        (timestampCmp(secondaryTimestamp, secondInsertTimestamp) >= 0));
-            },
-            "Timeout waiting for checkpointing to catch up with the second insert",
-            ReplSetTest.kDefaultTimeoutMS,
-            2000);
+        // entry of the first insert is allowed to be deleted by the oplog cap maintainer thread
+        // when a new oplog stone is created. "inMemory" WT engine does not run checkpoint
+        // thread and lastStableRecoveryTimestamp is the stable timestamp in this case.
+        awaitCheckpointer(secondInsertTimestamp);
 
         // Insert the third document which will trigger a new oplog stone to be created. The
         // oplog truncater thread will then be unblocked on the creation of the new oplog stone
@@ -109,6 +114,12 @@ function doTest(storageEngine) {
                     {documents: [{_id: 2, longString: longString}], writeConcern: {w: 2}}))
                 .operationTime;
         jsTestLog("Third insert timestamp: " + thirdInsertTimestamp);
+
+        // There is a race between how we calculate the pinnedOplog and checkpointing. The timestamp
+        // of the pinnedOplog could be less than the actual stable timestamp used in a checkpoint.
+        // Wait for the checkpointer to run for another round to make sure the first insert oplog is
+        // not pinned.
+        awaitCheckpointer(thirdInsertTimestamp);
 
         // Verify that there are three oplog entries while the oplog cap maintainer thread is
         // paused.
