@@ -1315,6 +1315,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         sr->shutdown();
     }
 
+    if (ShardingState::get(serviceContext)->enabled()) {
+        TransactionCoordinatorService::get(serviceContext)->shutdown();
+    }
+
     // Validator shutdown must be called after setKillAllOperations is called. Otherwise, this can
     // deadlock.
     if (auto validator = LogicalTimeValidator::get(serviceContext)) {

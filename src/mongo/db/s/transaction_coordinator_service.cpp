@@ -179,6 +179,10 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
     joinPreviousRound();
 
     stdx::lock_guard<Latch> lg(_mutex);
+    if (_isShuttingDown) {
+        return;
+    }
+
     invariant(!_catalogAndScheduler);
     _catalogAndScheduler = std::make_shared<CatalogAndScheduler>(opCtx->getServiceContext());
 
@@ -264,12 +268,25 @@ void TransactionCoordinatorService::onStepDown() {
     _catalogAndSchedulerToCleanup->onStepDown();
 }
 
+void TransactionCoordinatorService::shutdown() {
+    {
+        stdx::lock_guard<Latch> lg(_mutex);
+        _isShuttingDown = true;
+    }
+
+    onStepDown();
+    joinPreviousRound();
+}
+
 void TransactionCoordinatorService::onShardingInitialization(OperationContext* opCtx,
                                                              bool isPrimary) {
     if (!isPrimary)
         return;
 
     stdx::lock_guard<Latch> lg(_mutex);
+    if (_isShuttingDown) {
+        return;
+    }
 
     invariant(!_catalogAndScheduler);
     _catalogAndScheduler = std::make_shared<CatalogAndScheduler>(opCtx->getServiceContext());
@@ -289,18 +306,26 @@ TransactionCoordinatorService::_getCatalogAndScheduler(OperationContext* opCtx) 
 }
 
 void TransactionCoordinatorService::joinPreviousRound() {
+    stdx::unique_lock<Latch> ul(_mutex);
+
     // onStepDown must have been called
     invariant(!_catalogAndScheduler);
 
     if (!_catalogAndSchedulerToCleanup)
         return;
 
+    auto schedulerToCleanup = _catalogAndSchedulerToCleanup;
+
+    ul.unlock();
+
     LOGV2(22454, "Waiting for coordinator tasks from previous term to complete");
 
     // Block until all coordinators scheduled the previous time the service was primary to have
     // drained. Because the scheduler was interrupted, it should be extremely rare for there to be
     // any coordinators left, so if this actually causes blocking, it would most likely be a bug.
-    _catalogAndSchedulerToCleanup->join();
+    schedulerToCleanup->join();
+
+    ul.lock();
     _catalogAndSchedulerToCleanup.reset();
 }
 

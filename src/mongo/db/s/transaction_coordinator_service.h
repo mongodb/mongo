@@ -103,6 +103,11 @@ public:
     void onStepDown();
 
     /**
+     * Shuts down this service. This will no longer be usable once shutdown is called.
+     */
+    void shutdown();
+
+    /**
      * Called when an already established replica set is added as a shard to a cluster. Ensures that
      * the TransactionCoordinator service is started up if the replica set is currently primary.
      */
@@ -151,6 +156,9 @@ private:
     // The catalog + scheduler instantiated at the last step-up attempt. When nullptr, it means
     // onStepUp has not been called yet after the last stepDown (or construction).
     std::shared_ptr<CatalogAndScheduler> _catalogAndScheduler;
+
+    // Sets to false once shutdown was called at least once.
+    bool _isShuttingDown{false};
 };
 
 }  // namespace mongo
