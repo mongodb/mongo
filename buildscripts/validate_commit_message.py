@@ -28,12 +28,12 @@
 #
 """Validate that the commit message is ok."""
 import argparse
-import os
 import re
-import subprocess
 import sys
 import logging
+from evergreen import RetryingEvergreenApi
 
+EVG_CONFIG_FILE = "./.evergreen.yml"
 LOGGER = logging.getLogger(__name__)
 
 COMMON_PUBLIC_PATTERN = r'''
@@ -121,29 +121,28 @@ def main(argv=None):
         usage="Validate the commit message. "
         "It validates the latest message when no arguments are provided.")
     parser.add_argument(
-        "message",
-        metavar="commit message",
-        nargs="*",
-        help="The commit message to validate",
+        "version_id",
+        metavar="version id",
+        help="The id of the version to validate",
     )
     args = parser.parse_args(argv)
+    evg_api = RetryingEvergreenApi.get_api(config_file=EVG_CONFIG_FILE)
 
-    if not args.message:
-        print('Validating last git commit message')
-        result = subprocess.check_output(GIT_SHOW_COMMAND)
-        message = result.decode('utf-8')
-    else:
-        message = " ".join(args.message)
+    code_changes = evg_api.patch_by_id(args.version_id).module_code_changes
 
-    if any(valid_pattern.match(message) for valid_pattern in VALID_PATTERNS):
-        return STATUS_OK
-    else:
-        if any(private_pattern.match(message) for private_pattern in PRIVATE_PATTERNS):
-            error_type = "Found a reference to a private project"
-        else:
-            error_type = "Found a commit without a ticket"
-        LOGGER.error(f"{error_type}\n{message}")  # pylint: disable=logging-fstring-interpolation
-        return STATUS_ERROR
+    for change in code_changes:
+        for message in change.commit_messages:
+            if any(valid_pattern.match(message) for valid_pattern in VALID_PATTERNS):
+                continue
+            elif any(private_pattern.match(message) for private_pattern in PRIVATE_PATTERNS):
+                error_type = "Found a reference to a private project"
+            else:
+                error_type = "Found a commit without a ticket"
+            if error_type:
+                LOGGER.error(f"{error_type}\n{message}")  # pylint: disable=logging-fstring-interpolation
+                return STATUS_ERROR
+
+    return STATUS_OK
 
 
 if __name__ == "__main__":

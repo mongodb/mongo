@@ -6910,6 +6910,7 @@ tasks:
   - *kill_processes
   - *cleanup_environment
   - func: "set up venv"
+  - func: "configure evergreen api credentials"
   - command: subprocess.exec
     type: test
     params:
