@@ -31,8 +31,6 @@ selector:
   - jstests/core/txns/transactions_profiling.js
   # The downstream syncing node affects the top output.
   - jstests/core/top.js
-  # TODO(SERVER-56019): Test hangs in burn_in_tests configuration.
-  - jstests/core/timeseries/timeseries_index.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
