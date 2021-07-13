@@ -13,6 +13,7 @@ from shrub.v2 import ShrubProject, BuildVariant, ExistingTask
 from evergreen.api import RetryingEvergreenApi, EvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
+from buildscripts.patch_builds.task_generation import validate_task_generation_limit
 
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -178,6 +179,8 @@ def burn_in(task_expansions: Dict[str, Any], evg_conf: EvergreenProjectConfig,
     _generate_evg_tasks(evergreen_api, shrub_project, task_expansions, build_variant_map, repos,
                         evg_conf)
 
+    if not validate_task_generation_limit(shrub_project):
+        sys.exit(1)
     write_file_to_dir(CONFIG_DIRECTORY, CONFIG_FILE, shrub_project.json())
 
 

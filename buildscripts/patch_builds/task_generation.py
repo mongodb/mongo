@@ -10,6 +10,19 @@ from structlog import get_logger
 LOGGER = get_logger(__name__)
 MAX_SHRUB_TASKS_FOR_SINGLE_TASK = 1000
 
+MAX_GEN_TASKS_ERR = """
+********************************************************************************
+It appears we are trying to generate more tasks than are supported by burn_in.
+This likely means that a large number of tests have been changed in this patch
+build. 
+
+burn_in supports of a max of {max_tasks} and your patch requires {patch_tasks}.
+
+If you would like to validate your changes with burn_in, you will need to break
+your patch up into patches that each touch a fewer number of tests.
+********************************************************************************
+"""
+
 
 def resmoke_commands(run_tests_fn_name: str, run_tests_vars: Dict[str, Any],
                      timeout_info: TimeoutInfo,
@@ -91,6 +104,9 @@ def validate_task_generation_limit(shrub_project: ShrubProject) -> bool:
     """
     tasks_to_create = len(shrub_project.all_tasks())
     if tasks_to_create > MAX_SHRUB_TASKS_FOR_SINGLE_TASK:
+        print(
+            MAX_GEN_TASKS_ERR.format(max_tasks=MAX_SHRUB_TASKS_FOR_SINGLE_TASK,
+                                     patch_tasks=tasks_to_create))
         LOGGER.warning("Attempting to create more tasks than max, aborting", tasks=tasks_to_create,
                        max=MAX_SHRUB_TASKS_FOR_SINGLE_TASK)
         return False
