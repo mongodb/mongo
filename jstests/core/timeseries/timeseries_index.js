@@ -130,9 +130,6 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(coll.dropIndex('hide2'), 'failed to drop index: hide2');
 
         // Check that we are able to create the index as hidden.
-        // TODO(SERVER-56019): This test case tends to be problematic in the burn_in_tests suite
-        // under
-        //                     the replica_sets_initsync_jscore_passthrough subtask.
         assert.commandWorked(coll.createIndex(keyForCreate, {name: 'hide3', hidden: true}),
                              'failed to create index: ' + tojson(keyForCreate));
         assert.commandFailedWithCode(assert.throws(() => bucketsColl.find().hint(hint).toArray()),
