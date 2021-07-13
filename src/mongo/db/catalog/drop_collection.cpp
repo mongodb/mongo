@@ -374,8 +374,8 @@ Status dropCollection(OperationContext* opCtx,
                 audit::logDropView(opCtx->getClient(), collectionName, "", {}, status.code());
                 return status;
             }
-
-            if (view->timeseries()) {
+            if (view->timeseries() &&
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, view->viewOn())) {
                 return dropTimeseries(view->viewOn(), true);
             }
 
