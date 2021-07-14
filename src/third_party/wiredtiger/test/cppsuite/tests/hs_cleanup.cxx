@@ -49,12 +49,12 @@ class hs_cleanup : public test {
     {
         WT_DECL_RET;
         const char *key_tmp;
-        scoped_session session = connection_manager::instance().create_session();
+
         collection &coll = tc->db.get_collection(tc->id);
 
         /* In this test each thread gets a single collection. */
         testutil_assert(tc->db.get_collection_count() == tc->thread_count);
-        scoped_cursor cursor = session.open_scoped_cursor(coll.name.c_str());
+        scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name.c_str());
 
         /* We don't know the keyrange we're operating over here so we can't be much smarter here. */
         while (tc->running()) {
@@ -70,7 +70,7 @@ class hs_cleanup : public test {
             testutil_check(cursor->get_key(cursor.get(), &key_tmp));
 
             /* Start a transaction if possible. */
-            tc->transaction.try_begin(tc->session.get(), "");
+            tc->transaction.try_begin();
 
             /*
              * The retrieved key needs to be passed inside the update function. However, the update
@@ -81,10 +81,10 @@ class hs_cleanup : public test {
                 continue;
 
             /* Commit our transaction. */
-            tc->transaction.try_commit(tc->session.get(), "");
+            tc->transaction.try_commit();
         }
         /* Ensure our last transaction is resolved. */
         if (tc->transaction.active())
-            tc->transaction.commit(tc->session.get(), "");
+            tc->transaction.commit();
     }
 };

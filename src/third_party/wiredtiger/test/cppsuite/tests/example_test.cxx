@@ -29,8 +29,8 @@
 #include "test_harness/test.h"
 
 /*
- * Class that defines operations that do nothing as an example.
- * This shows how database operations can be overriden and customized.
+ * Class that defines operations that do nothing as an example. This shows how database operations
+ * can be overriden and customized.
  */
 class example_test : public test_harness::test {
     public:
@@ -38,8 +38,8 @@ class example_test : public test_harness::test {
 
     void
     populate(test_harness::database &database, test_harness::timestamp_manager *_timestamp_manager,
-      test_harness::configuration *_config, test_harness::workload_tracking *tracking)
-       override final
+      test_harness::configuration *_config,
+      test_harness::workload_tracking *tracking) override final
     {
         std::cout << "populate: nothing done." << std::endl;
     }

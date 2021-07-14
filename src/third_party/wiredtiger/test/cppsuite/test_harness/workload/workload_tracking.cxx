@@ -99,9 +99,6 @@ workload_tracking::do_work()
     /* Take a copy of the oldest so that we sweep with a consistent timestamp. */
     oldest_ts = _tsm.get_oldest_ts();
 
-    /* If we have a position, give it up. */
-    testutil_check(_sweep_cursor->reset(_sweep_cursor.get()));
-
     while ((ret = _sweep_cursor->prev(_sweep_cursor.get())) == 0) {
         testutil_check(_sweep_cursor->get_key(_sweep_cursor.get(), &collection_id, &key, &ts));
         testutil_check(_sweep_cursor->get_value(_sweep_cursor.get(), &op_type, &value));
@@ -143,6 +140,9 @@ workload_tracking::do_work()
     if (ret != WT_NOTFOUND)
         testutil_die(LOG_ERROR,
           "Tracking table sweep failed: cursor->next() returned an unexpected error %d.", ret);
+
+    /* If we have a position, give it up. */
+    testutil_check(_sweep_cursor->reset(_sweep_cursor.get()));
 }
 
 void

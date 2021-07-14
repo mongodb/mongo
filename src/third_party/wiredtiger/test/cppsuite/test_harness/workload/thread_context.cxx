@@ -26,7 +26,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "../connection_manager.h"
 #include "../core/configuration.h"
 #include "../timestamp_manager.h"
 #include "../util/api_const.h"
@@ -37,8 +36,8 @@
 namespace test_harness {
 /* transaction_context class implementation */
 transaction_context::transaction_context(
-  configuration *config, timestamp_manager *timestamp_manager)
-    : _timestamp_manager(timestamp_manager)
+  configuration *config, timestamp_manager *timestamp_manager, WT_SESSION *session)
+    : _timestamp_manager(timestamp_manager), _session(session)
 {
     /* Use optional here as our populate threads don't define this configuration. */
     configuration *transaction_config = config->get_optional_subconfig(OPS_PER_TRANSACTION);
@@ -62,10 +61,11 @@ transaction_context::add_op()
 }
 
 void
-transaction_context::begin(WT_SESSION *session, const std::string &config)
+transaction_context::begin(const std::string &config)
 {
     testutil_assert(!_in_txn);
-    testutil_check(session->begin_transaction(session, config.empty() ? nullptr : config.c_str()));
+    testutil_check(
+      _session->begin_transaction(_session, config.empty() ? nullptr : config.c_str()));
     /* This randomizes the number of operations to be executed in one transaction. */
     _target_op_count =
       random_generator::instance().generate_integer<int64_t>(_min_op_count, _max_op_count);
@@ -74,53 +74,54 @@ transaction_context::begin(WT_SESSION *session, const std::string &config)
 }
 
 void
-transaction_context::try_begin(WT_SESSION *session, const std::string &config)
+transaction_context::try_begin(const std::string &config)
 {
     if (!_in_txn)
-        begin(session, config);
+        begin(config);
 }
 
 void
-transaction_context::commit(WT_SESSION *session, const std::string &config)
-{
-    testutil_assert(_in_txn);
-    testutil_check(session->commit_transaction(session, config.empty() ? nullptr : config.c_str()));
-    _op_count = 0;
-    _in_txn = false;
-}
-
-void
-transaction_context::try_commit(WT_SESSION *session, const std::string &config)
-{
-    if (can_commit_rollback())
-        commit(session, config);
-}
-
-void
-transaction_context::rollback(WT_SESSION *session, const std::string &config)
+transaction_context::commit(const std::string &config)
 {
     testutil_assert(_in_txn);
     testutil_check(
-      session->rollback_transaction(session, config.empty() ? nullptr : config.c_str()));
+      _session->commit_transaction(_session, config.empty() ? nullptr : config.c_str()));
     _op_count = 0;
     _in_txn = false;
 }
 
 void
-transaction_context::try_rollback(WT_SESSION *session, const std::string &config)
+transaction_context::try_commit(const std::string &config)
 {
     if (can_commit_rollback())
-        rollback(session, config);
+        commit(config);
 }
 
 void
-transaction_context::set_commit_timestamp(WT_SESSION *session, wt_timestamp_t ts)
+transaction_context::rollback(const std::string &config)
+{
+    testutil_assert(_in_txn);
+    testutil_check(
+      _session->rollback_transaction(_session, config.empty() ? nullptr : config.c_str()));
+    _op_count = 0;
+    _in_txn = false;
+}
+
+void
+transaction_context::try_rollback(const std::string &config)
+{
+    if (can_commit_rollback())
+        rollback(config);
+}
+
+void
+transaction_context::set_commit_timestamp(wt_timestamp_t ts)
 {
     /* We don't want to set zero timestamps on transactions if we're not using timestamps. */
     if (!_timestamp_manager->enabled())
         return;
     std::string config = std::string(COMMIT_TS) + "=" + timestamp_manager::decimal_to_hex(ts);
-    testutil_check(session->timestamp_transaction(session, config.c_str()));
+    testutil_check(_session->timestamp_transaction(_session, config.c_str()));
 }
 
 bool
@@ -131,9 +132,11 @@ transaction_context::can_commit_rollback()
 
 /* thread_context class implementation */
 thread_context::thread_context(uint64_t id, thread_type type, configuration *config,
-  timestamp_manager *timestamp_manager, workload_tracking *tracking, database &dbase)
+  scoped_session &&created_session, timestamp_manager *timestamp_manager,
+  workload_tracking *tracking, database &dbase)
     : id(id), type(type), db(dbase), tsm(timestamp_manager), tracking(tracking),
-      transaction(transaction_context(config, timestamp_manager)),
+      session(std::move(created_session)),
+      transaction(transaction_context(config, timestamp_manager, session.get())),
       /* These won't exist for certain threads which is why we use optional here. */
       collection_count(config->get_optional_int(COLLECTION_COUNT, 1)),
       key_count(config->get_optional_int(KEY_COUNT_PER_COLLECTION, 1)),
@@ -141,9 +144,7 @@ thread_context::thread_context(uint64_t id, thread_type type, configuration *con
       value_size(config->get_optional_int(VALUE_SIZE, 1)),
       thread_count(config->get_int(THREAD_COUNT))
 {
-    session = connection_manager::instance().create_session();
     _throttle = throttle(config);
-
     if (tracking->enabled())
         op_track_cursor = session.open_scoped_cursor(tracking->get_operation_table_name().c_str());
 
@@ -176,14 +177,14 @@ thread_context::update(scoped_cursor &cursor, uint64_t collection_id, const std:
     testutil_assert(tracking != nullptr);
     testutil_assert(cursor.get() != nullptr);
 
-    transaction.set_commit_timestamp(session.get(), ts);
+    transaction.set_commit_timestamp(ts);
     value = random_generator::instance().generate_string(value_size);
     cursor->set_key(cursor.get(), key.c_str());
     cursor->set_value(cursor.get(), value.c_str());
     ret = cursor->update(cursor.get());
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
-            transaction.rollback(session.get(), "");
+            transaction.rollback();
             return (false);
         } else
             testutil_die(ret, "unhandled error while trying to update a key");
@@ -192,7 +193,7 @@ thread_context::update(scoped_cursor &cursor, uint64_t collection_id, const std:
       tracking_operation::INSERT, collection_id, key.c_str(), value.c_str(), ts, op_track_cursor);
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
-            transaction.rollback(session.get(), "");
+            transaction.rollback();
             return (false);
         } else
             testutil_die(
@@ -215,7 +216,7 @@ thread_context::insert(scoped_cursor &cursor, uint64_t collection_id, uint64_t k
      * it will return a value for the tracking table.
      */
     wt_timestamp_t ts = tsm->get_next_ts();
-    transaction.set_commit_timestamp(session.get(), ts);
+    transaction.set_commit_timestamp(ts);
 
     key = key_to_string(key_id);
     value = random_generator::instance().generate_string(value_size);
@@ -225,7 +226,7 @@ thread_context::insert(scoped_cursor &cursor, uint64_t collection_id, uint64_t k
     ret = cursor->insert(cursor.get());
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
-            transaction.rollback(session.get(), "");
+            transaction.rollback();
             return (false);
         } else
             testutil_die(ret, "unhandled error while trying to insert a key");
@@ -234,7 +235,7 @@ thread_context::insert(scoped_cursor &cursor, uint64_t collection_id, uint64_t k
       tracking_operation::INSERT, collection_id, key.c_str(), value.c_str(), ts, op_track_cursor);
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
-            transaction.rollback(session.get(), "");
+            transaction.rollback();
             return (false);
         } else
             testutil_die(
