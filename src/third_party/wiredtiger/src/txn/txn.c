@@ -890,6 +890,15 @@ __txn_commit_timestamps_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_
           __wt_timestamp_to_string(op_ts, ts_string[0]),
           __wt_timestamp_to_string(prev_op_durable_ts, ts_string[1])));
 
+    if (FLD_ISSET(ts_flags, WT_DHANDLE_TS_ORDERED) && prev_op_durable_ts != WT_TS_NONE &&
+      !txn_has_ts)
+        WT_RET(
+          __wt_msg(session,
+            WT_COMMIT_TS_VERB_PREFIX "committing a transaction that updates a value without "
+                                     "a timestamp while the previous update (%s) is timestamped "
+                                     "on a table configured for strict ordering",
+            __wt_timestamp_to_string(prev_op_durable_ts, ts_string[1])));
+
     if (FLD_ISSET(ts_flags, WT_DHANDLE_TS_MIXED_MODE) && F_ISSET(txn, WT_TXN_HAS_TS_COMMIT) &&
       op_ts != WT_TS_NONE && prev_op_durable_ts > op_ts)
         WT_RET(__wt_msg(session,
