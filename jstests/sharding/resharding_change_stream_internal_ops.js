@@ -1,6 +1,7 @@
 // Tests that internal resharding ops are exposed as change stream events during a
 // resharding operation. Internal resharding ops include:
 // 1. reshardBegin
+// 2. reshardDoneCatchUp
 //
 // @tags: [
 //   requires_majority_read_concern,
@@ -13,6 +14,7 @@
 
 load('jstests/libs/change_stream_util.js');
 load("jstests/libs/discover_topology.js");
+load("jstests/libs/uuid_util.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
 
 // Use a higher frequency for periodic noops to speed up the test.
@@ -30,6 +32,7 @@ const collName = "coll";
 const ns = kDbName + "." + collName;
 
 const donorShardNames = reshardingTest.donorShardNames;
+const recipientShardNames = reshardingTest.recipientShardNames;
 const sourceCollection = reshardingTest.createShardedCollection({
     ns: ns,
     shardKeyPattern: {oldKey: 1},
@@ -41,7 +44,6 @@ const sourceCollection = reshardingTest.createShardedCollection({
 });
 
 const mongos = sourceCollection.getMongo();
-const recipientShardNames = reshardingTest.recipientShardNames;
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 
 const donor0 = new Mongo(topology.shards[donorShardNames[0]].primary);
@@ -53,6 +55,12 @@ const donor1 = new Mongo(topology.shards[donorShardNames[1]].primary);
 const cstDonor1 = new ChangeStreamTest(donor1.getDB(kDbName));
 let changeStreamsCursorDonor1 = cstDonor1.startWatchingChanges(
     {pipeline: [{$changeStream: {showMigrationEvents: true}}], collection: collName});
+
+const recipient0 = new Mongo(topology.shards[recipientShardNames[0]].primary);
+const cstRecipient0 = new ChangeStreamTest(recipient0.getDB(kDbName));
+
+let reshardingUUID;
+let changeStreamsCursorRecipient0;
 
 reshardingTest.withReshardingInBackground(
     {
@@ -66,13 +74,19 @@ reshardingTest.withReshardingInBackground(
             {min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]},
         ],
     },
-    () => {
+    (tempNs) => {
         // Wait until participants are aware of the resharding operation.
         reshardingTest.awaitCloneTimestampChosen();
 
         const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne();
-        const reshardingUUID = coordinatorDoc._id;
+        reshardingUUID = coordinatorDoc._id;
 
+        changeStreamsCursorRecipient0 = cstRecipient0.startWatchingChanges({
+            pipeline: [{$changeStream: {showMigrationEvents: true, allowToRunOnSystemNS: true}}],
+            collection: tempNs.substring(tempNs.indexOf('.') + 1)
+        });
+
+        // Check for reshardBegin event on both donors.
         const expectedReshardBeginEvent = {
             reshardingUUID: reshardingUUID,
             operationType: "reshardBegin"
@@ -82,6 +96,20 @@ reshardingTest.withReshardingInBackground(
             {cursor: changeStreamsCursorDonor0, expectedChanges: [expectedReshardBeginEvent]});
         cstDonor1.assertNextChangesEqual(
             {cursor: changeStreamsCursorDonor1, expectedChanges: [expectedReshardBeginEvent]});
+    },
+    {
+        postDecisionPersistedFn: () => {
+            // Check for reshardDoneCatchUp event on the recipient.
+            const expectedReshardDoneCatchUpEvent = {
+                reshardingUUID: reshardingUUID,
+                operationType: "reshardDoneCatchUp"
+            };
+
+            cstRecipient0.assertNextChangesEqual({
+                cursor: changeStreamsCursorRecipient0,
+                expectedChanges: [expectedReshardDoneCatchUpEvent]
+            });
+        }
     });
 
 reshardingTest.teardown();

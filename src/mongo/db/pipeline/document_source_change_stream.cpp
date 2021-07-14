@@ -97,6 +97,7 @@ constexpr StringData DocumentSourceChangeStream::kRenameCollectionOpType;
 constexpr StringData DocumentSourceChangeStream::kDropDatabaseOpType;
 constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
 constexpr StringData DocumentSourceChangeStream::kReshardBeginOpType;
+constexpr StringData DocumentSourceChangeStream::kReshardDoneCatchUpOpType;
 constexpr StringData DocumentSourceChangeStream::kNewShardDetectedOpType;
 
 constexpr StringData DocumentSourceChangeStream::kRegexAllCollections;
