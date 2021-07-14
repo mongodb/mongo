@@ -2330,12 +2330,12 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
                                                     NamespaceString(),
                                                     std::move(currentSolution));
             if (exec.isOK()) {
-                LOGV2_DEBUG(20932,
-                            2,
-                            "Using fast distinct",
-                            "query"_attr = redact(parsedDistinct->getQuery()->toStringShort()),
-                            "planSummary"_attr =
-                                exec.getValue()->getPlanExplainer().getPlanSummary());
+                LOGV2_DEBUG(
+                    20932,
+                    2,
+                    "Using fast distinct",
+                    "query"_attr = redact(exec.getValue()->getCanonicalQuery()->toStringShort()),
+                    "planSummary"_attr = exec.getValue()->getPlanExplainer().getPlanSummary());
             }
 
             return exec;
