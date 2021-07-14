@@ -45,6 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_group.h"
 #include "mongo/db/read_concern.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -729,11 +730,6 @@ void ShardServerCatalogCacheLoader::_waitForTasksToCompleteAndRenameChunks(
 
     waitForCollectionFlush(opCtx, nss);
 
-    // Update the timestamp on the specific shard collection according to the current FCV. This is
-    // necessary to allow access to the shards cache using the correct namespace, i.e. based on
-    // collection namespace or UUID.
-    updateTimestampOnShardCollections(opCtx, nss, timestamp);
-
     // Determine the renaming logic according to the current FCV. Namely:
     //  - FCV 5.0 (or higher): NS-based chunks collection to be converted to UUID-based one
     //  - FCV 4.4 (or lower): UUID-based chunks collection to be converted to NS-based one
@@ -747,7 +743,19 @@ void ShardServerCatalogCacheLoader::_waitForTasksToCompleteAndRenameChunks(
         }
     }();
 
-    uassertStatusOK(renameCollection(opCtx, fromChunksNss, toChunksNss, {}));
+    if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toChunksNss)) {
+        uassertStatusOK(renameCollection(opCtx, fromChunksNss, toChunksNss, {}));
+    }
+
+    // Update the timestamp on the specific shard collection according to the current FCV. This is
+    // necessary to allow access to the shards cache using the correct namespace, i.e. based on
+    // collection namespace or UUID.
+    updateTimestampOnShardCollections(opCtx, nss, timestamp);
+
+    WriteConcernResult ignoreResult;
+    const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    uassertStatusOK(waitForWriteConcern(
+        opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
 
     LOGV2(3463206,
           "Renamed chunks cache",
