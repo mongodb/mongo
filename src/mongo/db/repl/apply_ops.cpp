@@ -430,6 +430,12 @@ Status applyOps(OperationContext* opCtx,
         }
     }
 
+    LOGV2_DEBUG(5854600,
+                2,
+                "applyOps command",
+                "dbName"_attr = redact(dbName),
+                "cmd"_attr = redact(applyOpCmd));
+
     if (!info.isAtomic()) {
         return _applyOps(opCtx, info, oplogApplicationMode, result, &numApplied, nullptr);
     }
