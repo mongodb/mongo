@@ -161,8 +161,10 @@ BSONObj buildMatchFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     //     a) migrateChunkToNewShard: A chunk gets migrated to a new shard that doesn't have any
     //     chunks.
     //     b) reshardBegin: A resharding operation begins.
-    static const std::vector<StringData> internalOpTypes = {"migrateChunkToNewShard",
-                                                            "reshardBegin"};
+    //     c) reshardDoneCatchUp: Data is now strictly consistent on the temporary resharding
+    //        collection.
+    static const std::vector<StringData> internalOpTypes = {
+        "migrateChunkToNewShard", "reshardBegin", "reshardDoneCatchUp"};
     BSONArrayBuilder internalOpTypeOrBuilder;
     for (const auto& eventName : internalOpTypes) {
         internalOpTypeOrBuilder.append(BSON("o2.type" << eventName));

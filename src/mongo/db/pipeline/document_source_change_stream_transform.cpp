@@ -332,6 +332,12 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                              input.getNestedField("o2.reshardingUUID"));
                 documentKey = Value(Document{{DocumentSourceChangeStream::kIdField,
                                               input[repl::OplogEntry::kObject2FieldName]}});
+            } else if (o2Type.getString() == "reshardDoneCatchUp"_sd) {
+                operationType = DocumentSourceChangeStream::kReshardDoneCatchUpOpType;
+                doc.addField(DocumentSourceChangeStream::kReshardingUuidField,
+                             input.getNestedField("o2.reshardingUUID"));
+                documentKey = Value(Document{{DocumentSourceChangeStream::kIdField,
+                                              input[repl::OplogEntry::kObject2FieldName]}});
             } else {
                 // We should never see an unknown noop entry.
                 MONGO_UNREACHABLE_TASSERT(5052201);
@@ -379,7 +385,8 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     // Invalidation, topology change, and resharding events have fewer fields.
     if (operationType == DocumentSourceChangeStream::kInvalidateOpType ||
         operationType == DocumentSourceChangeStream::kNewShardDetectedOpType ||
-        operationType == DocumentSourceChangeStream::kReshardBeginOpType) {
+        operationType == DocumentSourceChangeStream::kReshardBeginOpType ||
+        operationType == DocumentSourceChangeStream::kReshardDoneCatchUpOpType) {
         return doc.freeze();
     }
 

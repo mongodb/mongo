@@ -652,12 +652,10 @@ void ReshardingRecipientService::RecipientStateMachine::_writeStrictConsistencyO
     auto generateOplogEntry = [&]() {
         ReshardingChangeEventO2Field changeEvent{_metadata.getReshardingUUID(),
                                                  ReshardingChangeEventEnum::kReshardDoneCatchUp};
-        auto sourceNss = _metadata.getSourceNss();
-        auto ns = constructTemporaryReshardingNss(sourceNss.db(), _metadata.getReshardingUUID());
 
         repl::MutableOplogEntry oplog;
         oplog.setOpType(repl::OpTypeEnum::kNoop);
-        oplog.setNss(ns);
+        oplog.setNss(_metadata.getTempReshardingNss());
         oplog.setUuid(_metadata.getReshardingUUID());
         oplog.setObject(BSON("msg"
                              << "The temporary resharding collection now has a "

@@ -166,6 +166,7 @@ public:
     static constexpr StringData kDropDatabaseOpType = "dropDatabase"_sd;
     static constexpr StringData kInvalidateOpType = "invalidate"_sd;
     static constexpr StringData kReshardBeginOpType = "reshardBegin"_sd;
+    static constexpr StringData kReshardDoneCatchUpOpType = "reshardDoneCatchUp"_sd;
     // Internal op type to signal mongos to open cursors on new shards.
     static constexpr StringData kNewShardDetectedOpType = "kNewShardDetected"_sd;
 

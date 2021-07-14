@@ -607,8 +607,7 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
               ErrorCodes::InterruptedDueToReplStateChange);
 
     DBDirectClient client(opCtx.get());
-    NamespaceString sourceNss =
-        constructTemporaryReshardingNss("sourcedb", doc.getReshardingUUID());
+    NamespaceString sourceNss = constructTemporaryReshardingNss("sourcedb", doc.getSourceUUID());
 
     auto cursor = client.query(NamespaceString(NamespaceString::kRsOplogNamespace.ns()),
                                BSON("ns" << sourceNss.toString()));
