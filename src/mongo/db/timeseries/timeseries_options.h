@@ -58,6 +58,11 @@ int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity);
  */
 int getBucketRoundingSecondsFromGranularity(BucketGranularityEnum granularity);
 
+StatusWith<std::pair<TimeseriesOptions, bool>> applyTimeseriesOptionsModifications(
+    const TimeseriesOptions& current, const BSONObj& mod);
+
+BSONObj generateViewPipeline(const TimeseriesOptions& options, bool asArray);
+
 bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& option2);
 }  // namespace timeseries
 }  // namespace mongo

@@ -110,8 +110,8 @@ namespace {
  * Returns a CollMod on the underlying buckets collection of the time-series collection.
  * Returns null if 'origCmd' is not for a time-series collection.
  */
-std::unique_ptr<CollMod> makeTimeseriesCollModCommand(OperationContext* opCtx,
-                                                      const CollMod& origCmd) {
+std::unique_ptr<CollMod> makeTimeseriesBucketsCollModCommand(OperationContext* opCtx,
+                                                             const CollMod& origCmd) {
     const auto& origNs = origCmd.getNamespace();
 
     auto timeseriesOptions = timeseries::getTimeseriesOptions(opCtx, origNs);
@@ -148,6 +148,43 @@ std::unique_ptr<CollMod> makeTimeseriesCollModCommand(OperationContext* opCtx,
 
     return cmd;
 }
+
+/**
+ * Returns a CollMod on the view definition of the time-series collection.
+ * Returns null if 'origCmd' is not for a time-series collection or if the view definition need not
+ * be changed.
+ */
+std::unique_ptr<CollMod> makeTimeseriesViewCollModCommand(OperationContext* opCtx,
+                                                          const CollMod& origCmd) {
+    const auto& ns = origCmd.getNamespace();
+
+    auto timeseriesOptions = timeseries::getTimeseriesOptions(opCtx, ns);
+
+    // Return early with null if we are not working with a time-series collection.
+    if (!timeseriesOptions) {
+        return {};
+    }
+
+    auto& tsMod = origCmd.getTimeseries();
+    if (tsMod) {
+        auto res =
+            timeseries::applyTimeseriesOptionsModifications(*timeseriesOptions, tsMod->toBSON());
+        if (res.isOK()) {
+            auto& [newOptions, changed] = res.getValue();
+            if (changed) {
+                auto cmd = std::make_unique<CollMod>(ns);
+                constexpr bool asArray = false;
+                std::vector<BSONObj> pipeline = {
+                    timeseries::generateViewPipeline(newOptions, asArray)};
+                cmd->setPipeline(std::move(pipeline));
+                return cmd;
+            }
+        }
+    }
+
+    return {};
+}
+
 
 class CmdDropDatabase : public DropDatabaseCmdVersion1Gen<CmdDropDatabase> {
 public:
@@ -580,12 +617,29 @@ public:
         //   time-series collection, which are important for maintaining the view-bucket
         //   relationship.
         //
-        // 'timeseriesCmd' is null if the request namespace does not refer to a time-series
-        // collection. Otherwise, transforms the user time-series index request to one on the
-        // underlying bucket.
-        auto timeseriesCmd = makeTimeseriesCollModCommand(opCtx, requestParser.request());
-        if (timeseriesCmd) {
-            cmd = timeseriesCmd.get();
+        // 'timeseriesBucketsCmd' is null if the request namespace does not refer to a time-series
+        // collection. Otherwise, transforms the user time-series collMod request to one on the
+        // underlying bucket collection.
+        auto timeseriesBucketsCmd =
+            makeTimeseriesBucketsCollModCommand(opCtx, requestParser.request());
+        if (timeseriesBucketsCmd) {
+            // We additionally create a special, limited collMod command for the view definition
+            // itself if the pipeline needs to be updated to reflect changed timeseries options.
+            // This operation is completed first. In the case that we get a partial update where
+            // only one of the two collMod operations fully completes (e.g. replication rollback),
+            // having the view pipeline update without updating the timeseries options on the
+            // buckets collection will result in sub-optimal performance, but correct behavior.
+            // If the timeseries options were updated without updating the view pipeline, we could
+            // end up with incorrect query behavior (namely data missing from some queries).
+            auto timeseriesViewCmd =
+                makeTimeseriesViewCollModCommand(opCtx, requestParser.request());
+            if (timeseriesViewCmd) {
+                uassertStatusOK(collMod(opCtx,
+                                        timeseriesViewCmd->getNamespace(),
+                                        timeseriesViewCmd->toBSON(BSONObj()),
+                                        &result));
+            }
+            cmd = timeseriesBucketsCmd.get();
         }
 
         uassertStatusOK(collMod(opCtx, cmd->getNamespace(), cmd->toBSON(BSONObj()), &result));

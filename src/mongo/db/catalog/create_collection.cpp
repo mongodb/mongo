@@ -338,21 +338,8 @@ Status _createTimeseries(OperationContext* opCtx,
         CollectionOptions viewOptions;
         viewOptions.viewOn = bucketsNs.coll().toString();
         viewOptions.collation = options.collation;
-
-        if (options.timeseries->getMetaField()) {
-            viewOptions.pipeline = BSON_ARRAY(BSON(
-                "$_internalUnpackBucket"
-                << BSON("timeField" << options.timeseries->getTimeField() << "metaField"
-                                    << *options.timeseries->getMetaField() << "bucketMaxSpanSeconds"
-                                    << *options.timeseries->getBucketMaxSpanSeconds() << "exclude"
-                                    << BSONArray())));
-        } else {
-            viewOptions.pipeline = BSON_ARRAY(BSON(
-                "$_internalUnpackBucket"
-                << BSON("timeField" << options.timeseries->getTimeField() << "bucketMaxSpanSeconds"
-                                    << *options.timeseries->getBucketMaxSpanSeconds() << "exclude"
-                                    << BSONArray())));
-        }
+        constexpr bool asArray = true;
+        viewOptions.pipeline = timeseries::generateViewPipeline(*options.timeseries, asArray);
 
         // Create the time-series view.
         auto status = db->userCreateNS(opCtx, ns, viewOptions);

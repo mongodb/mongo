@@ -114,35 +114,6 @@ struct CollModRequest {
     bool recordPreImages = false;
 };
 
-bool isValidTimeseriesGranularityTransition(BucketGranularityEnum current,
-                                            BucketGranularityEnum target) {
-    bool validTransition = true;
-    if (current == target) {
-        return validTransition;
-    }
-
-    switch (current) {
-        case BucketGranularityEnum::Seconds: {
-            if (target != BucketGranularityEnum::Minutes) {
-                validTransition = false;
-            }
-            break;
-        }
-        case BucketGranularityEnum::Minutes: {
-            if (target != BucketGranularityEnum::Hours) {
-                validTransition = false;
-            }
-            break;
-        }
-        case BucketGranularityEnum::Hours: {
-            validTransition = false;
-            break;
-        }
-    }
-
-    return validTransition;
-}
-
 StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const CollectionPtr& coll,
@@ -375,19 +346,6 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 return Status(ErrorCodes::InvalidOptions,
                               str::stream() << "option only supported on a timeseries collection: "
                                             << fieldName);
-            }
-
-            if (e.Obj().hasField("granularity")) {
-                BSONElement elem = e.Obj().getField("granularity");
-                BucketGranularityEnum target = BucketGranularity_parse(
-                    IDLParserErrorContext("BucketGranularity"), elem.valueStringData());
-                if (!isValidTimeseriesGranularityTransition(tsOptions->getGranularity(), target)) {
-                    return Status(
-                        ErrorCodes::InvalidOptions,
-                        str::stream()
-                            << "Invalid transition for timeseries.granularity. Can only transition "
-                               "from 'seconds' to 'minutes' or 'minutes' to 'hours'.");
-                }
             }
 
             cmr.timeseries = e;
@@ -677,21 +635,10 @@ Status _collModInternal(OperationContext* opCtx,
         }
 
         if (ts.isABSONObj()) {
-            TimeseriesOptions newOptions = *oldCollOptions.timeseries;
-            bool changed = false;
-
-            if (ts.Obj().hasField("granularity")) {
-                BSONElement granularityElem = ts.Obj().getField("granularity");
-                BucketGranularityEnum target = BucketGranularity_parse(
-                    IDLParserErrorContext("BucketGranularity"), granularityElem.valueStringData());
-                if (target != oldCollOptions.timeseries->getGranularity()) {
-                    newOptions.setGranularity(target);
-                    newOptions.setBucketMaxSpanSeconds(
-                        timeseries::getMaxSpanSecondsFromGranularity(target));
-                    changed = true;
-                }
-            }
-
+            auto res = timeseries::applyTimeseriesOptionsModifications(*oldCollOptions.timeseries,
+                                                                       ts.Obj());
+            uassertStatusOK(res);
+            auto [newOptions, changed] = res.getValue();
             if (changed) {
                 coll.getWritableCollection()->setTimeseriesOptions(opCtx, newOptions);
             }

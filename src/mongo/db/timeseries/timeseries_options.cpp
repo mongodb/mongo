@@ -37,6 +37,45 @@ namespace mongo {
 
 namespace timeseries {
 
+namespace {
+
+BSONObj wrapInArrayIf(bool doWrap, BSONObj&& obj) {
+    if (doWrap) {
+        return (::mongo::BSONArrayBuilder() << std::move(obj)).arr();
+    }
+    return std::move(obj);
+}
+
+
+bool isValidTimeseriesGranularityTransition(BucketGranularityEnum current,
+                                            BucketGranularityEnum target) {
+    bool validTransition = true;
+    if (current == target) {
+        return validTransition;
+    }
+
+    switch (current) {
+        case BucketGranularityEnum::Seconds: {
+            // Both minutes and hours are allowed.
+            break;
+        }
+        case BucketGranularityEnum::Minutes: {
+            if (target != BucketGranularityEnum::Hours) {
+                validTransition = false;
+            }
+            break;
+        }
+        case BucketGranularityEnum::Hours: {
+            validTransition = false;
+            break;
+        }
+    }
+
+    return validTransition;
+}
+
+}  // namespace
+
 boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
                                                         const NamespaceString& nss) {
     auto bucketsNs = nss.makeTimeseriesBucketsNamespace();
@@ -78,6 +117,48 @@ int getBucketRoundingSecondsFromGranularity(BucketGranularityEnum granularity) {
     }
     MONGO_UNREACHABLE;
 }
+
+StatusWith<std::pair<TimeseriesOptions, bool>> applyTimeseriesOptionsModifications(
+    const TimeseriesOptions& currentOptions, const BSONObj& mod) {
+    TimeseriesOptions newOptions = currentOptions;
+    bool changed = false;
+
+    if (mod.hasField("granularity")) {
+        BSONElement granularityElem = mod.getField("granularity");
+        BucketGranularityEnum target = BucketGranularity_parse(
+            IDLParserErrorContext("BucketGranularity"), granularityElem.valueStringData());
+        if (target != currentOptions.getGranularity()) {
+            if (!isValidTimeseriesGranularityTransition(currentOptions.getGranularity(), target)) {
+                return Status{ErrorCodes::InvalidOptions,
+                              "Invalid transition for timeseries.granularity. Can only transition "
+                              "from 'seconds' to 'minutes' or 'minutes' to 'hours'."};
+            }
+            newOptions.setGranularity(target);
+            newOptions.setBucketMaxSpanSeconds(
+                timeseries::getMaxSpanSecondsFromGranularity(target));
+            changed = true;
+        }
+    }
+
+    return std::make_pair(newOptions, changed);
+}
+
+BSONObj generateViewPipeline(const TimeseriesOptions& options, bool asArray) {
+    if (options.getMetaField()) {
+        return wrapInArrayIf(
+            asArray,
+            BSON("$_internalUnpackBucket" << BSON(
+                     "timeField" << options.getTimeField() << "metaField" << *options.getMetaField()
+                                 << "bucketMaxSpanSeconds" << *options.getBucketMaxSpanSeconds()
+                                 << "exclude" << BSONArray())));
+    }
+    return wrapInArrayIf(
+        asArray,
+        BSON("$_internalUnpackBucket" << BSON(
+                 "timeField" << options.getTimeField() << "bucketMaxSpanSeconds"
+                             << *options.getBucketMaxSpanSeconds() << "exclude" << BSONArray())));
+}
+
 bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& option2) {
     const auto option1BucketSpan = option1.getBucketMaxSpanSeconds()
         ? *option1.getBucketMaxSpanSeconds()
