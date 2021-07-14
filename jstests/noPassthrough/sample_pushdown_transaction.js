@@ -1,6 +1,9 @@
 /**
  * Verify that $sample push down works properly in a transaction. This test was designed to
  * reproduce SERVER-57642.
+ *
+ * Requires WiredTiger for random cursor support.
+ * @tags: [requires_wiredtiger, requires_replication]
  */
 (function() {
 'use strict';
