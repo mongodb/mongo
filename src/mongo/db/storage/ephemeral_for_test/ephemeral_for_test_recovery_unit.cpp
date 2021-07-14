@@ -54,7 +54,7 @@ RecoveryUnit::~RecoveryUnit() {
 
 void RecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
     invariant(!_inUnitOfWork(), toString(_getState()));
-    _setState(State::kInactiveInUnitOfWork);
+    _setState(_isActive() ? State::kActive : State::kInactiveInUnitOfWork);
 }
 
 void RecoveryUnit::doCommitUnitOfWork() {
@@ -117,6 +117,7 @@ void RecoveryUnit::doAbandonSnapshot() {
     _dirty = false;
     _isTimestamped = false;
     _setMergeNull();
+    _setState(State::kInactive);
 }
 
 void RecoveryUnit::makeDirty() {
@@ -124,6 +125,9 @@ void RecoveryUnit::makeDirty() {
         throw WriteConflictException();
     }
     _dirty = true;
+    if (!_isActive()) {
+        _setState(_inUnitOfWork() ? State::kActive : State::kActiveNotInUnitOfWork);
+    }
 }
 
 bool RecoveryUnit::forkIfNeeded() {
