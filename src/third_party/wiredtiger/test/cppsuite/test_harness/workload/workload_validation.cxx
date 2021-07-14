@@ -40,7 +40,7 @@ workload_validation::validate(const std::string &operation_table_name,
     WT_DECL_RET;
     wt_timestamp_t tracked_timestamp;
     std::vector<uint64_t> created_collections, deleted_collections;
-    uint64_t collection_counter, expected_collection_id, tracked_collection_id;
+    uint64_t tracked_collection_id;
     const char *tracked_key, *tracked_value;
     int tracked_op_type;
     uint64_t current_collection_id = 0;
@@ -191,7 +191,7 @@ workload_validation::update_data_model(const tracking_operation &operation,
         if (it == collection.end())
             testutil_die(LOG_ERROR,
               "Validation failed: key deleted that doesn't exist. Collection id: %lu Key: %s",
-              collection_id, it->first.c_str());
+              collection_id, key);
         else if (it->second.exists == false)
             /* The key has been deleted twice. */
             testutil_die(LOG_ERROR,

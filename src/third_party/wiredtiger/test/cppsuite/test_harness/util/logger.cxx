@@ -52,7 +52,6 @@ void
 get_time(char *time_buf, size_t buf_size)
 {
     size_t alloc_size;
-    struct timespec tsp;
     struct tm *tm, _tm;
 
     /* Get time since epoch in nanoseconds. */
@@ -62,6 +61,7 @@ get_time(char *time_buf, size_t buf_size)
     time_t time_epoch_sec = epoch_nanosec / WT_BILLION;
 
     tm = localtime_r(&time_epoch_sec, &_tm);
+    testutil_assert(tm != nullptr);
 
     alloc_size =
       strftime(time_buf, buf_size, logger::include_date ? "[%Y-%m-%dT%H:%M:%S" : "[%H:%M:%S", tm);

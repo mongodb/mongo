@@ -121,6 +121,10 @@ database_operation::insert_operation(thread_context *tc)
 {
     /* Helper struct which stores a pointer to a collection and a cursor associated with it. */
     struct collection_cursor {
+        collection_cursor(collection &coll, scoped_cursor &&cursor)
+            : coll(coll), cursor(std::move(cursor))
+        {
+        }
         collection &coll;
         scoped_cursor cursor;
     };

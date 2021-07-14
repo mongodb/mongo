@@ -41,7 +41,9 @@ extern "C" {
 
 namespace test_harness {
 struct key_state {
-    bool exists;
+    key_state() = default;
+    key_state(bool exists, const key_value_t &value) : exists(exists), value(value) {}
+    bool exists = false;
     key_value_t value;
 };
 typedef std::map<key_value_t, key_state> validation_collection;

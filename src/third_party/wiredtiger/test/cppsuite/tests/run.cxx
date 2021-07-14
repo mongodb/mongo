@@ -155,12 +155,12 @@ main(int argc, char *argv[])
             print_help();
             return 0;
         } else if (std::string(argv[i]) == "-C") {
-            if ((i + 1) < argc)
+            if ((i + 1) < argc) {
                 wt_open_config = argv[++i];
-            /* Add a comma to the front if the user didn't supply one. */
-            if (wt_open_config[0] != ',')
-                wt_open_config.insert(0, 1, ',');
-            else
+                /* Add a comma to the front if the user didn't supply one. */
+                if (wt_open_config[0] != ',')
+                    wt_open_config.insert(0, 1, ',');
+            } else
                 error_code = -1;
         } else if (std::string(argv[i]) == "-c") {
             if (!config_filename.empty()) {
