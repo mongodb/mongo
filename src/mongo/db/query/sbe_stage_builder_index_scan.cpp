@@ -304,9 +304,11 @@ generateOptimizedMultiIntervalIndexScan(
     //      {l: KS(...), h: KS(...)}, ... ]
     auto [boundsTag, boundsVal] = sbe::value::makeNewArray();
     auto arr = sbe::value::getArrayView(boundsVal);
+    arr->reserve(intervals.size());
     for (auto&& [lowKey, highKey] : intervals) {
         auto [tag, val] = sbe::value::makeNewObject();
         auto obj = sbe::value::getObjectView(val);
+        obj->reserve(2);
         obj->push_back("l"_sd,
                        sbe::value::TypeTags::ksValue,
                        sbe::value::bitcastFrom<KeyString::Value*>(lowKey.release()));

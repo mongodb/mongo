@@ -443,9 +443,15 @@ public:
             ValueGuard guard{tag, val};
             // Reserve space in all vectors, they are the same size. We arbitrarily picked _typeTags
             // to determine the size.
-            reserve(_typeTags.size() + 1);
+            if (_typeTags.capacity() == _typeTags.size()) {
+                // Reserve double capacity.
+                // Note: we are not concerned about the overflow in the operation below, as the size
+                // of 'Value' is 8 bytes. Consequently, the maximum capacity ever is 2^64/8 = 2^61.
+                // We can freely shift 2^61 << 1 without any overflow.
+                // Note: the case of '_typeTags.capacity() == 1' is handled inside 'reserve' itself.
+                reserve(_typeTags.capacity() << 1);
+            }
             _names.emplace_back(std::string(name));
-
             _typeTags.push_back(tag);
             _values.push_back(val);
 
@@ -520,8 +526,14 @@ public:
             ValueGuard guard{tag, val};
             // Reserve space in all vectors, they are the same size. We arbitrarily picked _typeTags
             // to determine the size.
-            reserve(_typeTags.size() + 1);
-
+            if (_typeTags.capacity() == _typeTags.size()) {
+                // Reserve double capacity.
+                // Note: we are not concerned about the overflow in the operation below, as the size
+                // of 'Value' is 8 bytes. Consequently, the maximum capacity ever is 2^64/8 = 2^61.
+                // We can freely shift 2^61 << 1 without any overflow.
+                // Note: the case of '_typeTags.capacity() == 1' is handled inside 'reserve' itself.
+                reserve(_typeTags.capacity() << 1);
+            }
             _typeTags.push_back(tag);
             _values.push_back(val);
 

@@ -725,9 +725,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     sbe::value::ValueGuard inputGuard{inputTag, inputVal};
     auto inputView = sbe::value::getArrayView(inputVal);
 
-    for (auto& doc : vsn->docs) {
-        auto [tag, val] = makeValue(doc);
-        inputView->push_back(tag, val);
+    if (vsn->docs.size()) {
+        inputView->reserve(vsn->docs.size());
+        for (auto& doc : vsn->docs) {
+            auto [tag, val] = makeValue(doc);
+            inputView->push_back(tag, val);
+        }
     }
 
     inputGuard.reset();

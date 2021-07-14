@@ -96,10 +96,12 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
             auto cnt = buf.read<LittleEndian<size_t>>();
             auto [arrTag, arrVal] = makeNewArray();
             auto arr = getArrayView(arrVal);
-            arr->reserve(cnt);
-            for (size_t idx = 0; idx < cnt; ++idx) {
-                auto [tag, val] = deserializeValue(buf);
-                arr->push_back(tag, val);
+            if (cnt) {
+                arr->reserve(cnt);
+                for (size_t idx = 0; idx < cnt; ++idx) {
+                    auto [tag, val] = deserializeValue(buf);
+                    arr->push_back(tag, val);
+                }
             }
             tag = arrTag;
             val = arrVal;
@@ -109,10 +111,12 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
             auto cnt = buf.read<LittleEndian<size_t>>();
             auto [arrTag, arrVal] = makeNewArraySet();
             auto arr = getArraySetView(arrVal);
-            arr->reserve(cnt);
-            for (size_t idx = 0; idx < cnt; ++idx) {
-                auto [tag, val] = deserializeValue(buf);
-                arr->push_back(tag, val);
+            if (cnt) {
+                arr->reserve(cnt);
+                for (size_t idx = 0; idx < cnt; ++idx) {
+                    auto [tag, val] = deserializeValue(buf);
+                    arr->push_back(tag, val);
+                }
             }
             tag = arrTag;
             val = arrVal;
@@ -122,11 +126,13 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
             auto cnt = buf.read<LittleEndian<size_t>>();
             auto [objTag, objVal] = makeNewObject();
             auto obj = getObjectView(objVal);
-            obj->reserve(cnt);
-            for (size_t idx = 0; idx < cnt; ++idx) {
-                auto fieldName = buf.readCStr();
-                auto [tag, val] = deserializeValue(buf);
-                obj->push_back({fieldName.rawData(), fieldName.size()}, tag, val);
+            if (cnt) {
+                obj->reserve(cnt);
+                for (size_t idx = 0; idx < cnt; ++idx) {
+                    auto fieldName = buf.readCStr();
+                    auto [tag, val] = deserializeValue(buf);
+                    obj->push_back(fieldName, tag, val);
+                }
             }
             tag = objTag;
             val = objVal;

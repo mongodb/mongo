@@ -848,14 +848,16 @@ void generateBitTest(MatchExpressionVisitorContext* context,
         // checking if an item has already been seen.
         auto [bitPosTag, bitPosVal] = sbe::value::makeNewArray();
         auto arr = sbe::value::getArrayView(bitPosVal);
-        arr->reserve(bitPositions.size());
+        if (bitPositions.size()) {
+            arr->reserve(bitPositions.size());
 
-        std::set<uint32_t> seenBits;
-        for (size_t index = 0; index < bitPositions.size(); ++index) {
-            auto currentBit = bitPositions[index];
-            if (auto result = seenBits.insert(currentBit); result.second) {
-                arr->push_back(sbe::value::TypeTags::NumberInt64,
-                               sbe::value::bitcastFrom<int64_t>(currentBit));
+            std::set<uint32_t> seenBits;
+            for (size_t index = 0; index < bitPositions.size(); ++index) {
+                auto currentBit = bitPositions[index];
+                if (auto result = seenBits.insert(currentBit); result.second) {
+                    arr->push_back(sbe::value::TypeTags::NumberInt64,
+                                   sbe::value::bitcastFrom<int64_t>(currentBit));
+                }
             }
         }
 
@@ -1441,18 +1443,21 @@ public:
 
         auto hasArray = false;
         auto hasNull = false;
-        for (auto&& equality : equalities) {
-            auto [tagView, valView] =
-                sbe::bson::convertFrom<true>(equality.rawdata(),
-                                             equality.rawdata() + equality.size(),
-                                             equality.fieldNameSize() - 1);
+        if (equalities.size()) {
+            arrSet->reserve(equalities.size());
+            for (auto&& equality : equalities) {
+                auto [tagView, valView] =
+                    sbe::bson::convertFrom<true>(equality.rawdata(),
+                                                 equality.rawdata() + equality.size(),
+                                                 equality.fieldNameSize() - 1);
 
-            hasNull |= tagView == sbe::value::TypeTags::Null;
-            hasArray |= sbe::value::isArray(tagView);
+                hasNull |= tagView == sbe::value::TypeTags::Null;
+                hasArray |= sbe::value::isArray(tagView);
 
-            // An ArraySet assumes ownership of it's values so we have to make a copy here.
-            auto [tag, val] = sbe::value::copyValue(tagView, valView);
-            arrSet->push_back(tag, val);
+                // An ArraySet assumes ownership of it's values so we have to make a copy here.
+                auto [tag, val] = sbe::value::copyValue(tagView, valView);
+                arrSet->push_back(tag, val);
+            }
         }
 
         const auto traversalMode = hasArray ? LeafTraversalMode::kArrayAndItsElements
@@ -1495,12 +1500,14 @@ public:
 
             auto arr = sbe::value::getArrayView(arrVal);
 
-            arr->reserve(regexes.size());
+            if (regexes.size()) {
+                arr->reserve(regexes.size());
 
-            for (auto&& r : regexes) {
-                auto [regexTag, regexVal] =
-                    sbe::value::makeNewPcreRegex(r->getString(), r->getFlags());
-                arr->push_back(regexTag, regexVal);
+                for (auto&& r : regexes) {
+                    auto [regexTag, regexVal] =
+                        sbe::value::makeNewPcreRegex(r->getString(), r->getFlags());
+                    arr->push_back(regexTag, regexVal);
+                }
             }
 
             auto makePredicate =

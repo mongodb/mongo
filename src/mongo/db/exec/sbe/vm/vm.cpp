@@ -875,10 +875,13 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArray(ArityT
 
     auto arr = value::getArrayView(val);
 
-    for (ArityType idx = 0; idx < arity; ++idx) {
-        auto [owned, tag, val] = getFromStack(idx);
-        auto [tagCopy, valCopy] = value::copyValue(tag, val);
-        arr->push_back(tagCopy, valCopy);
+    if (arity) {
+        arr->reserve(arity);
+        for (ArityType idx = 0; idx < arity; ++idx) {
+            auto [owned, tag, val] = getFromStack(idx);
+            auto [tagCopy, valCopy] = value::copyValue(tag, val);
+            arr->push_back(tagCopy, valCopy);
+        }
     }
 
     guard.reset();
@@ -914,12 +917,18 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArrayFromRan
     auto isPositiveStep = stepVal > 0;
 
     if (isPositiveStep) {
-        for (auto i = startVal; i < endVal; i += stepVal) {
-            arr->push_back(value::TypeTags::NumberInt32, value::bitcastTo<int32_t>(i));
+        if (startVal < endVal) {
+            arr->reserve(1 + (endVal - startVal) / stepVal);
+            for (auto i = startVal; i < endVal; i += stepVal) {
+                arr->push_back(value::TypeTags::NumberInt32, value::bitcastTo<int32_t>(i));
+            }
         }
     } else {
-        for (auto i = startVal; i > endVal; i += stepVal) {
-            arr->push_back(value::TypeTags::NumberInt32, value::bitcastTo<int32_t>(i));
+        if (startVal > endVal) {
+            arr->reserve(1 + (startVal - endVal) / (-stepVal));
+            for (auto i = startVal; i > endVal; i += stepVal) {
+                arr->push_back(value::TypeTags::NumberInt32, value::bitcastTo<int32_t>(i));
+            }
         }
     }
 
@@ -931,6 +940,11 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewObj(ArityTyp
     std::vector<value::TypeTags> typeTags;
     std::vector<value::Value> values;
     std::vector<std::string> names;
+
+    size_t tmpVectorLen = arity >> 1;
+    typeTags.reserve(tmpVectorLen);
+    values.reserve(tmpVectorLen);
+    names.reserve(tmpVectorLen);
 
     for (ArityType idx = 0; idx < arity; idx += 2) {
         {
@@ -953,9 +967,12 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewObj(ArityTyp
     auto obj = value::getObjectView(val);
     value::ValueGuard guard{tag, val};
 
-    for (size_t idx = 0; idx < typeTags.size(); ++idx) {
-        auto [tagCopy, valCopy] = value::copyValue(typeTags[idx], values[idx]);
-        obj->push_back(names[idx], tagCopy, valCopy);
+    if (typeTags.size()) {
+        obj->reserve(typeTags.size());
+        for (size_t idx = 0; idx < typeTags.size(); ++idx) {
+            auto [tagCopy, valCopy] = value::copyValue(typeTags[idx], values[idx]);
+            obj->push_back(names[idx], tagCopy, valCopy);
+        }
     }
 
     guard.reset();
@@ -1544,6 +1561,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateToParts(Ari
     auto [dateObjTag, dateObjVal] = value::makeNewObject();
     value::ValueGuard guard{dateObjTag, dateObjVal};
     auto dateObj = value::getObjectView(dateObjVal);
+    dateObj->reserve(7);
     dateObj->push_back("year", value::TypeTags::NumberInt32, dateParts.year);
     dateObj->push_back("month", value::TypeTags::NumberInt32, dateParts.month);
     dateObj->push_back("day", value::TypeTags::NumberInt32, dateParts.dayOfMonth);
@@ -1582,6 +1600,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsoDateToParts(
     auto [dateObjTag, dateObjVal] = value::makeNewObject();
     value::ValueGuard guard{dateObjTag, dateObjVal};
     auto dateObj = value::getObjectView(dateObjVal);
+    dateObj->reserve(7);
     dateObj->push_back("isoWeekYear", value::TypeTags::NumberInt32, dateParts.year);
     dateObj->push_back("isoWeek", value::TypeTags::NumberInt32, dateParts.weekOfYear);
     dateObj->push_back("isoDayOfWeek", value::TypeTags::NumberInt32, dateParts.dayOfWeek);
@@ -2459,19 +2478,22 @@ std::tuple<bool, value::TypeTags, value::Value> buildRegexMatchResultObject(
     // hold the (start, limit) pairs of indexes, for each of the capture groups. We skip the first
     // two elements and start iteration from 3rd element so that we only construct the strings for
     // capture groups.
-    for (size_t i = 0; i < numCaptures; ++i) {
-        const auto start = capturesBuffer[2 * (i + 1)];
-        const auto limit = capturesBuffer[2 * (i + 1) + 1];
-        if (!verifyBounds(start, limit, true)) {
-            return {false, value::TypeTags::Nothing, 0};
-        }
+    if (numCaptures) {
+        arrayView->reserve(numCaptures);
+        for (size_t i = 0; i < numCaptures; ++i) {
+            const auto start = capturesBuffer[2 * (i + 1)];
+            const auto limit = capturesBuffer[2 * (i + 1) + 1];
+            if (!verifyBounds(start, limit, true)) {
+                return {false, value::TypeTags::Nothing, 0};
+            }
 
-        if (start == -1 && limit == -1) {
-            arrayView->push_back(value::TypeTags::Null, 0);
-        } else {
-            auto captureString = inputString.substr(start, limit - start);
-            auto [tag, val] = value::makeNewString(captureString);
-            arrayView->push_back(tag, val);
+            if (start == -1 && limit == -1) {
+                arrayView->push_back(value::TypeTags::Null, 0);
+            } else {
+                auto captureString = inputString.substr(start, limit - start);
+                auto [tag, val] = value::makeNewString(captureString);
+                arrayView->push_back(tag, val);
+            }
         }
     }
 
@@ -2822,11 +2844,14 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinExtractSubArray
         }();
 
         size_t end = convertedStart + std::min(length, arraySize - convertedStart);
+        if (convertedStart < end) {
+            resultView->reserve(end - convertedStart);
 
-        for (size_t i = convertedStart; i < end; i++) {
-            auto [tag, value] = arrayView->getAt(i);
-            auto [copyTag, copyValue] = value::copyValue(tag, value);
-            resultView->push_back(copyTag, copyValue);
+            for (size_t i = convertedStart; i < end; i++) {
+                auto [tag, value] = arrayView->getAt(i);
+                auto [copyTag, copyValue] = value::copyValue(tag, value);
+                resultView->push_back(copyTag, copyValue);
+            }
         }
     } else {
         auto advance = [](value::ArrayEnumerator& enumerator, size_t offset) {
@@ -2972,11 +2997,13 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(Ar
     if (inputType == value::TypeTags::Array) {
         auto inputView = value::getArrayView(inputVal);
         size_t inputSize = inputView->size();
-        resultView->reserve(inputSize);
-        for (size_t i = 0; i < inputSize; i++) {
-            auto [origTag, origVal] = inputView->getAt(inputSize - 1 - i);
-            auto [copyTag, copyVal] = copyValue(origTag, origVal);
-            resultView->push_back(copyTag, copyVal);
+        if (inputSize) {
+            resultView->reserve(inputSize);
+            for (size_t i = 0; i < inputSize; i++) {
+                auto [origTag, origVal] = inputView->getAt(inputSize - 1 - i);
+                auto [copyTag, copyVal] = copyValue(origTag, origVal);
+                resultView->push_back(copyTag, copyVal);
+            }
         }
 
         resultGuard.reset();
@@ -2992,7 +3019,6 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(Ar
             // Reserve space to avoid resizing on push_back calls.
             auto arraySetView = value::getArraySetView(inputVal);
             inputContents.reserve(arraySetView->size());
-            resultView->reserve(arraySetView->size());
         }
 
         while (!enumerator.atEnd()) {
@@ -3000,10 +3026,14 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(Ar
             enumerator.advance();
         }
 
-        // Run through the array backwards and copy into the result array.
-        for (auto it = inputContents.rbegin(); it != inputContents.rend(); ++it) {
-            auto [copyTag, copyVal] = copyValue(it->first, it->second);
-            resultView->push_back(copyTag, copyVal);
+        if (inputContents.size()) {
+            resultView->reserve(inputContents.size());
+
+            // Run through the array backwards and copy into the result array.
+            for (auto it = inputContents.rbegin(); it != inputContents.rend(); ++it) {
+                auto [copyTag, copyVal] = copyValue(it->first, it->second);
+                resultView->push_back(copyTag, copyVal);
+            }
         }
 
         resultGuard.reset();
