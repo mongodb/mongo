@@ -17,6 +17,13 @@ function testRS(opts, succeed) {
         rs.initiate();
         assert.commandWorked(rs.getPrimary().getDB('admin').runCommand({hello: 1}));
     } else {
+        // By default, rs.initiate takes a very long time to timeout. We should shorten this
+        // period, because we expect it to fail. ReplSetTest has both a static and local copy
+        // of kDefaultTimeOutMS, so we must override both.
+        const oldTimeout = ReplSetTest.kDefaultTimeoutMS;
+        const shortTimeout = 2 * 60 * 1000;
+        ReplSetTest.kDefaultTimeoutMS = shortTimeout;
+        rs.kDefaultTimeoutMS = shortTimeout;
         // The rs.initiate will fail in an assert.soon, which would ordinarily trigger the hang
         // analyzer.  We don't want that to happen, so we disable it here.
         MongoRunner.runHangAnalyzer.disable();
@@ -25,6 +32,7 @@ function testRS(opts, succeed) {
                 rs.initiate();
             });
         } finally {
+            ReplSetTest.kDefaultTimeoutMS = oldTimeout;
             MongoRunner.runHangAnalyzer.enable();
         }
         TestData.skipCheckDBHashes = true;
