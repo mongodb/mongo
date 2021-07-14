@@ -72,7 +72,6 @@
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/vector_clock.h"
@@ -529,13 +528,6 @@ Status _checkValidFilterExpressions(MatchExpression* expression, int level = 0) 
                     return status;
             }
             return Status::OK();
-        case MatchExpression::GEO:
-            if (feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                return Status::OK();
-            }
-            return Status(ErrorCodes::CannotCreateIndex,
-                          "$geoWithin only supported in partialFilterExpression in v5.0");
         case MatchExpression::EQ:
         case MatchExpression::LT:
         case MatchExpression::LTE:
