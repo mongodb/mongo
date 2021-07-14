@@ -1,8 +1,8 @@
 /**
- * This file tests that if a user initiates a write that becomes a noop due to being a duplicate
- * operation, that we still wait for write concern. This is because we must wait for write concern
- * on the write that made this a noop so that we can be sure it doesn't get rolled back if we
- * acknowledge it.
+ * This file tests that if a user initiates a write that becomes a noop either due to being a
+ * duplicate operation or due to errors relying on data reads, that we still wait for write concern.
+ * This is because we must wait for write concern on the write that made this a noop so that we can
+ * be sure it doesn't get rolled back if we acknowledge it.
  */
 
 (function() {
@@ -49,6 +49,7 @@ function dropTestCollection() {
 // }
 var commands = [];
 
+// 'applyOps' where the update has already been done.
 commands.push({
     req: {applyOps: [{op: "u", ns: coll.getFullName(), o: {_id: 1}, o2: {_id: 1}}]},
     setupFunc: function() {
@@ -60,6 +61,23 @@ commands.push({
         assert.eq(res.results[0], true);
         assert.eq(coll.find().itcount(), 1);
         assert.eq(coll.count({_id: 1}), 1);
+    }
+});
+
+// 'applyOps' where the preCondition fails.
+commands.push({
+    req: {
+        applyOps: [{op: "i", ns: coll.getFullName(), o: {_id: 2}}],
+        preCondition: [{ns: coll.getFullName(), q: {_id: 99}, res: {_id: 99}}]
+    },
+    setupFunc: function() {
+        assert.commandWorked(coll.insert({_id: 1}));
+    },
+    confirmFunc: function(res) {
+        assert.commandFailed(res,
+                             "The applyOps command was expected to fail, but instead succeeded.");
+        assert.eq(
+            res.errmsg, "preCondition failed", "The applyOps command failed for the wrong reason.");
     }
 });
 
@@ -95,6 +113,20 @@ commands.push({
     }
 });
 
+// 'update' with immutable field error.
+commands.push({
+    req: {update: collName, updates: [{q: {_id: 1}, u: {$set: {_id: 2}}}]},
+    setupFunc: function() {
+        assert.commandWorked(coll.insert({_id: 1}));
+    },
+    confirmFunc: function(res) {
+        assert.eq(res.n, 0);
+        assert.eq(res.nModified, 0);
+        assert.eq(coll.count({_id: 1}), 1);
+    }
+});
+
+// 'delete' where the document to delete does not exist.
 commands.push({
     req: {delete: collName, deletes: [{q: {a: 1}, limit: 1}]},
     setupFunc: function() {
@@ -108,6 +140,7 @@ commands.push({
     }
 });
 
+// 'createIndexes' where the index has already been created.
 // All voting data bearing nodes are not up for this test. So 'createIndexes' command can't succeed
 // with the default index commitQuorum value "votingMembers". So, running createIndexes cmd using
 // commit quorum "majority".
@@ -160,6 +193,33 @@ commands.push({
     }
 });
 
+// 'findAndModify' with immutable field error.
+commands.push({
+    req: {findAndModify: collName, query: {_id: 1}, update: {$set: {_id: 2}}},
+    setupFunc: function() {
+        assert.commandWorked(coll.insert({_id: 1}));
+    },
+    confirmFunc: function(res) {
+        assert.commandFailedWithCode(res, ErrorCodes.ImmutableField);
+        assert.eq(coll.find().itcount(), 1);
+        assert.eq(coll.count({_id: 1}), 1);
+    }
+});
+
+// 'findAndModify' where the document to delete does not exist.
+commands.push({
+    req: {findAndModify: collName, query: {a: 1}, remove: true},
+    setupFunc: function() {
+        assert.commandWorked(coll.insert({a: 1}));
+        assert.commandWorked(coll.remove({a: 1}));
+    },
+    confirmFunc: function(res) {
+        assert.commandWorkedIgnoringWriteConcernErrors(res);
+        assert.eq(res.lastErrorObject.n, 0);
+    }
+});
+
+// 'dropDatabase' where the database has already been dropped.
 commands.push({
     req: {dropDatabase: 1},
     setupFunc: function() {
@@ -171,6 +231,7 @@ commands.push({
     }
 });
 
+// 'drop' where the collection has already been dropped.
 commands.push({
     req: {drop: collName},
     setupFunc: function() {
@@ -182,6 +243,7 @@ commands.push({
     }
 });
 
+// 'create' where the collection has already been created.
 commands.push({
     req: {create: collName},
     setupFunc: function() {
@@ -192,6 +254,7 @@ commands.push({
     }
 });
 
+// 'insert' where the document with the same _id has already been inserted.
 commands.push({
     req: {insert: collName, documents: [{_id: 1}]},
     setupFunc: function() {
