@@ -1959,12 +1959,11 @@ void ExpressionDateToString::_doAddDependencies(DepsTracker* deps) const {
 
 /* ----------------------- ExpressionDateDiff ---------------------------- */
 
-// TODO SERVER-53028: make the expression to be available for any FCV when 5.0 becomes last-lts.
 REGISTER_EXPRESSION_WITH_MIN_VERSION(dateDiff,
                                      ExpressionDateDiff::parse,
                                      AllowedWithApiStrict::kNeverInVersion1,
                                      AllowedWithClientType::kAny,
-                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+                                     boost::none);
 
 ExpressionDateDiff::ExpressionDateDiff(ExpressionContext* const expCtx,
                                        boost::intrusive_ptr<Expression> startDate,
@@ -7102,7 +7101,7 @@ REGISTER_EXPRESSION_WITH_MIN_VERSION(dateAdd,
                                      ExpressionDateAdd::parse,
                                      AllowedWithApiStrict::kNeverInVersion1,
                                      AllowedWithClientType::kAny,
-                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+                                     boost::none);
 
 boost::intrusive_ptr<Expression> ExpressionDateAdd::parse(ExpressionContext* const expCtx,
                                                           BSONElement expr,
@@ -7129,7 +7128,7 @@ REGISTER_EXPRESSION_WITH_MIN_VERSION(dateSubtract,
                                      ExpressionDateSubtract::parse,
                                      AllowedWithApiStrict::kNeverInVersion1,
                                      AllowedWithClientType::kAny,
-                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+                                     boost::none);
 
 boost::intrusive_ptr<Expression> ExpressionDateSubtract::parse(ExpressionContext* const expCtx,
                                                                BSONElement expr,
@@ -7154,12 +7153,11 @@ Value ExpressionDateSubtract::evaluateDateArithmetics(Date_t date,
 
 /* ----------------------- ExpressionDateTrunc ---------------------------- */
 
-// TODO SERVER-53028: make the expression to be available for any FCV when 5.0 becomes last-lts.
 REGISTER_EXPRESSION_WITH_MIN_VERSION(dateTrunc,
                                      ExpressionDateTrunc::parse,
                                      AllowedWithApiStrict::kNeverInVersion1,
                                      AllowedWithClientType::kAny,
-                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+                                     boost::none);
 
 ExpressionDateTrunc::ExpressionDateTrunc(ExpressionContext* const expCtx,
                                          boost::intrusive_ptr<Expression> date,

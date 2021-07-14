@@ -27,6 +27,7 @@ const unstablePipelines = [
     [{$set: {x: {$dateTrunc: {date: "$date", unit: "second", binSize: 5}}}}],
     [{$set: {x: {$dateAdd: {startDate: "$date", unit: "day", amount: 1}}}}],
     [{$set: {x: {$dateSubtract: {startDate: "$date", unit: "day", amount: 1}}}}],
+    [{$set: {x: {$dateDiff: {startDate: "$date", endDate: "$date", unit: "day"}}}}],
     [{$set: {x: {$getField: {input: "$$ROOT", field: "x"}}}}],
     [{$set: {x: {$setField: {input: "$$ROOT", field: "x", value: "foo"}}}}],
     [{$set: {x: {$tsSecond: new Timestamp(0, 0)}}}],

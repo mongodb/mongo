@@ -33,70 +33,7 @@ const testCasesLastContinuous = [
 ];
 const testCasesLastContinuousWithFeatureFlags = [];
 
-const testCasesLastStable = testCasesLastContinuous.concat([
-    // These expressions were introduced in 4.9.
-    // TODO SERVER-53028: Remove these cases when 5.0 becomes lastLTS.
-    {
-        validator: {
-            $expr: {
-                $eq: [
-                    {
-                        $dateDiff: {
-                            startDate: new Date("2020-02-02T02:02:02"),
-                            endDate: new Date("2020-02-02T03:02:02"),
-                            unit: "hour"
-                        }
-                    },
-                    0
-                ]
-            }
-        },
-        nonMatchingDocument: {a: 1},
-        lastStableErrCode: 168
-    },
-    {
-        validator: {
-            $expr: {
-                $eq: [
-                    {
-                        $dateAdd:
-                            {startDate: new Date("2020-10-10T10:00:00"), unit: "hour", amount: 1}
-                    },
-                    new Date("2020-10-10T10:00:00")
-                ]
-            }
-        },
-        nonMatchingDocument: {a: 1},
-        lastStableErrCode: 168
-    },
-    {
-        validator: {
-            $expr: {
-                $eq: [
-                    {
-                        $dateSubtract:
-                            {startDate: new Date("2020-10-10T10:00:00"), unit: "hour", amount: 1}
-                    },
-                    new Date("2020-10-10T10:00:00")
-                ]
-            }
-        },
-        nonMatchingDocument: {a: 1},
-        lastStableErrCode: 168
-    },
-    {
-        validator: {
-            $expr: {
-                $eq: [
-                    {$dateTrunc: {date: new Date("2020-02-02T02:02:02"), unit: "hour"}},
-                    new Date("2020-02-02T02:02:02")
-                ]
-            }
-        },
-        nonMatchingDocument: {a: 1},
-        lastStableErrCode: 168
-    },
-]);
+const testCasesLastStable = testCasesLastContinuous.concat([]);
 const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([]);
 
 // Tests Feature Compatibility Version behavior of the validator of a collection by executing test

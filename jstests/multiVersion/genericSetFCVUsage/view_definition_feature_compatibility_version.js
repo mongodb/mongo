@@ -25,36 +25,7 @@ const testCasesLastContinuousWithFeatureFlags = [];
 
 // Anything that's incompatible with the last continuous release is incompatible with the last
 // stable release.
-const testCasesLastStable = testCasesLastContinuous.concat([
-    [
-        // TODO SERVER-53028: Remove these cases when 5.0 becomes lastLTS.
-        {
-            $project: {
-                x: {
-                    $dateDiff: {
-                        startDate: new Date("2020-02-02T02:02:02"),
-                        endDate: new Date("2020-02-02T03:02:02"),
-                        unit: "hour"
-                    }
-                }
-            }
-        }
-    ],
-    [{
-        $project:
-            {y: {$dateAdd: {startDate: new Date("2020-02-02T02:02:02"), unit: "week", amount: 1}}}
-    }],
-    [{
-        $project: {
-            z: {
-                $dateSubtract: {startDate: new Date("2020-02-02T02:02:02"), unit: "hour", amount: 3}
-            }
-        }
-    }],
-    [{$project: {x: {$dateTrunc: {date: new Date("2020-02-02T02:02:02"), unit: "month"}}}}],
-    [{$group: {_id: null, count: {$count: {}}}}],
-    [{$bucket: {groupBy: "$a", boundaries: [0, 1], output: {count: {$count: {}}}}}],
-]);
+const testCasesLastStable = testCasesLastContinuous.concat([]);
 
 const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([
     [{$setWindowFields: {sortBy: {_id: 1}, output: {sum: {$sum: {input: "$val"}}}}}],
