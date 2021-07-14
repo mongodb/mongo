@@ -7,6 +7,9 @@
 "use strict";
 
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.isMongos().
+load(
+    "jstests/libs/auto_retry_transaction_in_sharding.js");  // For
+                                                            // retryOnceOnTransientAndRestartTxnOnMongos().
 
 const dbName = jsTestName();
 const collName = "test";
@@ -42,10 +45,6 @@ for (const txnInitiatingParams of apiParamCombos) {
             const session = db.getMongo().startSession();
             const sessionDb = session.getDatabase(dbName);
 
-            session.startTransaction();
-            assert.commandWorked(sessionDb.runCommand(
-                addApiParams({insert: collName, documents: [{}, {}, {}]}, txnInitiatingParams)));
-
             function checkCommand(db, command) {
                 const commandWithParams = addApiParams(command, txnContinuingParams);
                 jsTestLog(`Session ${session.getSessionId().id}, ` +
@@ -63,10 +62,16 @@ for (const txnInitiatingParams of apiParamCombos) {
                 }
             }
 
-            /*
-             * Check "insert" with API params in a transaction.
-             */
-            checkCommand(sessionDb, {insert: collName, documents: [{}]});
+            session.startTransaction();
+            retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+                assert.commandWorked(sessionDb.runCommand(addApiParams(
+                    {insert: collName, documents: [{}, {}, {}]}, txnInitiatingParams)));
+
+                /*
+                 * Check "insert" with API params in a transaction.
+                 */
+                checkCommand(sessionDb, {insert: collName, documents: [{}]});
+            }, {});
 
             /*
              * Check "commitTransaction" or "abortTransaction".
