@@ -5,7 +5,6 @@
  * @tags: [
  *   requires_fcv_49,
  *   uses_atclustertime,
- *   resource_intensive
  * ]
  */
 (function() {
@@ -13,12 +12,7 @@
 
 load("jstests/sharding/libs/find_chunks_util.js");
 
-// The total size of the zones and chunks documents that the config server writes in a single
-// replica set transaction totals to around 60 MB. WWhen combined with the other operations and
-// transactions occurring in the config server, this large transaction causes WiredTiger to run out
-// of dirty cache space. Hence, we need to increase the wiredTigerCacheSizeGB to 5 GB.
-const st =
-    new ShardingTest({mongos: 1, shards: 2, other: {configOptions: {wiredTigerCacheSizeGB: 5}}});
+const st = new ShardingTest({mongos: 1, shards: 2});
 
 const kDbName = 'db';
 const collName = 'foo';
@@ -28,7 +22,8 @@ const mongos = st.s;
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
-let nZones = 175000;
+// TODO SERVER-SERVER-57095 increase the number of zones
+let nZones = 10000;
 let zones = [];
 let shard0Zones = [];
 let shard1Zones = [];
