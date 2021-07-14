@@ -1390,6 +1390,12 @@ public:
                     "Time-series updates are not enabled",
                     feature_flags::gTimeseriesUpdatesAndDeletes.isEnabled(
                         serverGlobalParams.featureCompatibility));
+            uassert(
+                ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream()
+                    << "Cannot perform a multi-document transaction on a time-series collection: "
+                    << ns(),
+                !opCtx->inMultiDocumentTransaction());
 
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "Cannot perform an update on a time-series collection "
@@ -1542,6 +1548,12 @@ public:
                     "Time-series deletes are not enabled",
                     feature_flags::gTimeseriesUpdatesAndDeletes.isEnabled(
                         serverGlobalParams.featureCompatibility));
+            uassert(
+                ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream()
+                    << "Cannot perform a multi-document transaction on a time-series collection: "
+                    << ns(),
+                !opCtx->inMultiDocumentTransaction());
 
             auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
                 opCtx, ns().makeTimeseriesBucketsNamespace());
