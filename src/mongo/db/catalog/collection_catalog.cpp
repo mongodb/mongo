@@ -925,14 +925,12 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
                                            CollectionUUID uuid,
                                            std::shared_ptr<Collection> coll) {
     auto ns = coll->ns();
-    bool conflict = _collections.find(ns) != _collections.end();
-    if (!conflict) {
-        auto it = _views.find(ns.db());
-        if (it != _views.end()) {
-            conflict = it->second.contains(ns);
-        }
+    if (auto it = _views.find(ns.db()); it != _views.end()) {
+        uassert(ErrorCodes::NamespaceExists,
+                str::stream() << "View already exists. NS: " << ns,
+                !it->second.contains(ns));
     }
-    if (conflict) {
+    if (_collections.find(ns) != _collections.end()) {
         auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
         auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(ns);
         // If we have an uncommitted drop of this collection we can defer the creation, the register
