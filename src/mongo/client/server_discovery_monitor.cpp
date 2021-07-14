@@ -437,7 +437,9 @@ Milliseconds SingleServerDiscoveryMonitor::_currentRefreshPeriod(WithLock,
     if (scheduleImmediately)
         return Milliseconds(0);
 
-    return (_isExpedited) ? sdam::SdamConfiguration::kMinHeartbeatFrequency : _heartbeatFrequency;
+    // The _overrideRefreshPeriod() supports fail injection.
+    return (_isExpedited) ? sdam::SdamConfiguration::kMinHeartbeatFrequency
+                          : _overrideRefreshPeriod(_heartbeatFrequency);
 }
 
 void SingleServerDiscoveryMonitor::disableExpeditedChecking() {

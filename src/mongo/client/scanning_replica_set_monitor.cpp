@@ -246,7 +246,7 @@ void ScanningReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy s
         return;
     }
 
-    Milliseconds period = refreshPeriod;
+    Milliseconds period = _getRefreshPeriod();  // Supports fail injection.
     if (isExpedited) {
         period = std::min<Milliseconds>(period, kExpeditedRefreshPeriod);
     }
@@ -495,14 +495,20 @@ bool ScanningReplicaSetMonitor::isKnownToHaveGoodPrimary() const {
     return false;
 }
 
-Seconds ScanningReplicaSetMonitor::getDefaultRefreshPeriod() {
-    Seconds r = kDefaultRefreshPeriod;
+Seconds ScanningReplicaSetMonitor::_getRefreshPeriod() {
+    boost::optional<Seconds> failInjected = _getFailInjectedRefreshPeriod();
+    return failInjected ? *failInjected : kDefaultRefreshPeriod;
+}
+
+boost::optional<Seconds> ScanningReplicaSetMonitor::_getFailInjectedRefreshPeriod() {
+    boost::optional<Seconds> result;
     static constexpr auto kPeriodField = "period"_sd;
     globalFailPointRegistry()
         .find("modifyReplicaSetMonitorDefaultRefreshPeriod")
-        ->executeIf([&r](const BSONObj& data) { r = Seconds{data.getIntField(kPeriodField)}; },
-                    [](const BSONObj& data) { return data.hasField(kPeriodField); });
-    return r;
+        ->executeIf(
+            [&result](const BSONObj& data) { result = Seconds{data.getIntField(kPeriodField)}; },
+            [](const BSONObj& data) { return data.hasField(kPeriodField); });
+    return result;
 }
 
 void ScanningReplicaSetMonitor::runScanForMockReplicaSet() {
@@ -1138,7 +1144,7 @@ SetState::SetState(const MongoURI& uri,
       seedNodes(setUri.getServers().begin(), setUri.getServers().end()),
       latencyThresholdMicros(serverGlobalParams.defaultLocalThresholdMillis * int64_t(1000)),
       rand(std::random_device()()),
-      refreshPeriod(getDefaultRefreshPeriod()) {
+      refreshPeriod(_getRefreshPeriod()) {
     uassert(13642, "Replica set seed list can't be empty", !seedNodes.empty());
 
     if (name.empty())

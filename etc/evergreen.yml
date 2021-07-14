@@ -5518,7 +5518,16 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
-  name: sharding_last_lts_mongos_and_mixed_shards_gen
+  name: sharding_hello_failures_gen
+  tags: ["concurrency", "large", "sharded"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_args: --storageEngine=wiredTiger
+      use_large_distro: "true"
+      resmoke_jobs_max: 1
+
+- name: sharding_last_lts_mongos_and_mixed_shards_gen
   tags: ["sharding", "common", "multiversion"]
   commands:
   - func: "generate resmoke tasks"

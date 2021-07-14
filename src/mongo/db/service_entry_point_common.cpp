@@ -1882,6 +1882,9 @@ Future<void> executeCommand(std::shared_ptr<HandleRequest::ExecutionContext> exe
                     "Run command {db}.$cmd {commandArgs}",
                     "About to run the command",
                     "db"_attr = request.getDatabase(),
+                    "client"_attr = (opCtx->getClient() && opCtx->getClient()->hasRemote()
+                                         ? opCtx->getClient()->getRemote().toString()
+                                         : ""),
                     "commandArgs"_attr = redact(
                         ServiceEntryPointCommon::getRedactedCopyForLogging(c, request.body)));
 

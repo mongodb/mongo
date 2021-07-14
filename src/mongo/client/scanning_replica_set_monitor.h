@@ -123,11 +123,6 @@ public:
 
     bool isKnownToHaveGoodPrimary() const override;
 
-    /**
-     * Returns the refresh period that is given to all new SetStates.
-     */
-    static Seconds getDefaultRefreshPeriod();
-
     //
     // internal types (defined in scanning_replica_set_monitor_internal.h)
     //
@@ -160,11 +155,22 @@ private:
         const ReadPreferenceSetting& readPref,
         Milliseconds maxWait,
         const std::vector<HostAndPort>& excludedHosts);
+
     /**
      * If no scan is in-progress, this function is responsible for setting up a new scan. Otherwise,
      * does nothing.
      */
     static void _ensureScanInProgress(const SetStatePtr&);
+
+    /**
+     * Returns the refresh period that is given to all new SetStates.
+     */
+    static Seconds _getRefreshPeriod();
+
+    /**
+     * Returns fail injected refresh period, if fail point is set.
+     */
+    static boost::optional<Seconds> _getFailInjectedRefreshPeriod();
 
     const SetStatePtr _state;
 };

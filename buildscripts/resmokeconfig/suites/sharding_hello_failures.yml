@@ -1,0 +1,44 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+  - jstests/concurrency/fsm_workloads/update_and_bulk_insert.js
+  - jstests/concurrency/fsm_workloads/update_array.js
+  - jstests/concurrency/fsm_workloads/update_check_index.js
+  - jstests/concurrency/fsm_workloads/update_inc.js
+  - jstests/concurrency/fsm_workloads/update_multifield.js
+  - jstests/concurrency/fsm_workloads/update_ordered_bulk_inc.js
+  - jstests/concurrency/fsm_workloads/update_rename.js
+  - jstests/concurrency/fsm_workloads/update_replace.js
+  - jstests/concurrency/fsm_workloads/update_simple.js
+  - jstests/concurrency/fsm_workloads/update_simple_noindex.js
+  - jstests/concurrency/fsm_workloads/update_where.js
+
+executor:
+  hooks:
+  - class: HelloDelays
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        logComponentVerbosity:
+          verbosity: 0
+          command: 1
+          network:
+            verbosity: 1
+            asio: 2
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        logComponentVerbosity:
+          verbosity: 0
+          command: 1
+          network:
+            verbosity: 1
+            asio: 2
+    enable_sharding:
+    - test
+    num_rs_nodes_per_shard: 3
+    shard_options:
+      all_nodes_electable: true
