@@ -190,24 +190,26 @@ class GenerateBuildVariantOrchestrator:
         build_variant = self.evg_project_config.get_variant(build_variant_name)
         return build_variant.expansion(expansion)
 
-    @staticmethod
-    def task_def_to_split_params(task_def: Task, build_variant: str) -> SuiteSplitParameters:
+    def task_def_to_split_params(self, task_def: Task,
+                                 build_variant_gen: str) -> SuiteSplitParameters:
         """
         Build parameters for how a task should be split based on its task definition.
 
         :param task_def: Task definition in evergreen project config.
-        :param build_variant: Name of Build Variant being generated.
+        :param build_variant_gen: Name of Build Variant being generated.
         :return: Parameters for how task should be split.
         """
+        build_variant = self.evg_project_config.get_variant(build_variant_gen)
         task = remove_gen_suffix(task_def.name)
         run_vars = task_def.generate_resmoke_tasks_command.get("vars", {})
 
         suite = run_vars.get("suite", task)
         return SuiteSplitParameters(
-            build_variant=build_variant,
+            build_variant=build_variant_gen,
             task_name=task,
             suite_name=suite,
             filename=suite,
+            is_asan=build_variant.is_asan_build(),
         )
 
     def task_def_to_gen_params(self, task_def: Task, build_variant: str) -> ResmokeGenTaskParams:
