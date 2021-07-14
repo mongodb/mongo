@@ -405,7 +405,7 @@ class SuiteSplitService:
         clean_every_n_cadence = self._get_clean_every_n_cadence(suite_name, is_asan)
         avg_clean_every_n_runtime = historic_stats.get_avg_hook_runtime(CLEAN_EVERY_N_HOOK)
         LOGGER.debug("task hook overhead", cadence=clean_every_n_cadence,
-                     runtime=avg_clean_every_n_runtime)
+                     runtime=avg_clean_every_n_runtime, is_asan=is_asan)
         if avg_clean_every_n_runtime != 0:
             n_expected_runs = test_count / clean_every_n_cadence
             return n_expected_runs * avg_clean_every_n_runtime
