@@ -203,12 +203,18 @@ void DocumentSourceGraphLookUp::doDispose() {
     _visited.clear();
 }
 
+bool DocumentSourceGraphLookUp::foreignShardedGraphLookupAllowed() const {
+    return feature_flags::gFeatureFlagShardedLookup.isEnabled(
+               serverGlobalParams.featureCompatibility) &&
+        !pExpCtx->opCtx->inMultiDocumentTransaction();
+}
+
 void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
     long long depth = 0;
     bool shouldPerformAnotherQuery;
     do {
-        if (!feature_flags::gFeatureFlagShardedLookup.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+        const auto allowForeignSharded = foreignShardedGraphLookupAllowed();
+        if (!allowForeignSharded) {
             // Enforce that the foreign collection must be unsharded for $graphLookup.
             _fromExpCtx->mongoProcessInterface->setExpectedShardVersion(
                 _fromExpCtx->opCtx, _fromExpCtx->ns, ChunkVersion::UNSHARDED());
@@ -242,8 +248,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             pipelineOpts.optimize = true;
             pipelineOpts.attachCursorSource = true;
             // By default, $graphLookup doesn't support a sharded 'from' collection.
-            pipelineOpts.shardTargetingPolicy = feature_flags::gFeatureFlagShardedLookup.isEnabled(
-                                                    serverGlobalParams.featureCompatibility)
+            pipelineOpts.shardTargetingPolicy = allowForeignSharded
                 ? ShardTargetingPolicy::kAllowed
                 : ShardTargetingPolicy::kNotAllowed;
             _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
@@ -391,13 +396,17 @@ void DocumentSourceGraphLookUp::performSearch() {
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
         // If lookup on a sharded collection is disallowed and the foreign collection is sharded,
         // throw a custom exception.
-        if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
+        if (auto staleInfo = ex.extraInfo<StaleConfigInfo>(); staleInfo &&
+            staleInfo->getVersionWanted() &&
+            staleInfo->getVersionWanted() != ChunkVersion::UNSHARDED()) {
+            uassert(3904801,
+                    "Cannot run $graphLookup with a sharded foreign collection in a transaction",
+                    !feature_flags::gFeatureFlagShardedLookup.isEnabled(
+                        serverGlobalParams.featureCompatibility) ||
+                        !pExpCtx->opCtx->inMultiDocumentTransaction());
             uassert(31428,
                     "Cannot run $graphLookup with sharded foreign collection",
-                    feature_flags::gFeatureFlagShardedLookup.isEnabled(
-                        serverGlobalParams.featureCompatibility) ||
-                        !staleInfo->getVersionWanted() ||
-                        staleInfo->getVersionWanted() == ChunkVersion::UNSHARDED());
+                    foreignShardedGraphLookupAllowed());
         }
         throw;
     }

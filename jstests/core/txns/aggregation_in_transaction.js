@@ -34,9 +34,6 @@ const foreignDoc = {
 assert.commandWorked(foreignColl.insert(foreignDoc, {writeConcern: {w: "majority"}}));
 
 const isForeignSharded = FixtureHelpers.isSharded(foreignColl);
-const getShardedLookupParam = testDB.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
 
 const txnOptions = {
     readConcern: {level: "snapshot"}
@@ -75,12 +72,7 @@ withTxnAndAutoRetryOnMongos(session, () => {
 
     // Perform aggregations that look at other collections.
     // TODO: SERVER-39162 Sharded $lookup is not supported in transactions.
-
-    // If the flag allowing $lookup into a sharded collection is enabled, do not run the following
-    // test because an invariant fails during the aggregation of the pipeline in a transaction
-    // where the collection is unsharded.
-    // TODO SERVER-57957: Possibly remove '&& !isShardedLookupEnabled' in this check.
-    if (!isForeignSharded && !isShardedLookupEnabled) {
+    if (!isForeignSharded) {
         const lookupDoc = Object.merge(testDoc, {lookup: [foreignDoc]});
         cursor = coll.aggregate({
                 $lookup: {
@@ -104,9 +96,6 @@ withTxnAndAutoRetryOnMongos(session, () => {
             });
         assert.docEq(cursor.next(), lookupDoc);
         assert(!cursor.hasNext());
-    } else {
-        // TODO SERVER-39048: Test that $lookup on sharded collection is banned
-        // within a transaction.
     }
 
     jsTestLog("Testing $count within a transaction.");

@@ -102,8 +102,7 @@ public:
         HostTypeRequirement hostRequirement =
             (pExpCtx->inMongos &&
              pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _from) &&
-             feature_flags::gFeatureFlagShardedLookup.isEnabled(
-                 serverGlobalParams.featureCompatibility))
+             foreignShardedGraphLookupAllowed())
             ? HostTypeRequirement::kNone
             : HostTypeRequirement::kPrimaryShard;
 
@@ -227,6 +226,11 @@ private:
      * Returns whether '_visited' was updated, and thus, whether the search should recurse.
      */
     bool addToVisitedAndFrontier(Document result, long long depth);
+
+    /**
+     * Returns true if 'featureFlagShardedLookup' is enabled and we are not in a transaction.
+     */
+    bool foreignShardedGraphLookupAllowed() const;
 
     // $graphLookup options.
     NamespaceString _from;

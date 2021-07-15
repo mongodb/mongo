@@ -310,6 +310,11 @@ private:
      */
     void appendSpecificExecStats(MutableDocument& doc) const;
 
+    /**
+     * Returns true if 'featureFlagShardedLookup' is enabled and we are not in a transaction.
+     */
+    bool foreignShardedLookupAllowed() const;
+
     DocumentSourceLookupStats _stats;
 
     NamespaceString _fromNs;
