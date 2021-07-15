@@ -1,9 +1,7 @@
 /**
  * Tests that resource consumption metrics are reported in the profiler.
  *
- * // TODO SERVER-57474: enable this test.
  * @tags: [
- *   __TEMPORARILY_DISABLED__,
  *   requires_capped,
  *   requires_fcv_47,
  *   requires_replication,
@@ -1034,7 +1032,7 @@ const operations = [
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
             assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 100);
-            assert.eq(profileDoc.sorterSpills, 101);
+            assert.eq(profileDoc.sorterSpills, 100);
             assert.eq(profileDoc.docUnitsReturned, 100);
         },
     },
@@ -1461,7 +1459,8 @@ const testOperation = (db, operation) => {
 };
 
 const setParams = {
-    profileOperationResourceConsumptionMetrics: true
+    profileOperationResourceConsumptionMetrics: true,
+    internalQueryExecYieldPeriodMS: 5000
 };
 
 const runTest = (db) => {
