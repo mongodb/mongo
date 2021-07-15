@@ -6963,6 +6963,23 @@ tasks:
     - func: "configure evergreen api credentials"
     - func: "update patch failure history"
 
+- name: check_feature_flag_tags
+  tags: []
+  patch_only: true
+  commands:
+    - command: manifest.load
+    - func: "git get project and add git tag"
+    - *f_expansions_write
+    - *kill_processes
+    - *cleanup_environment
+    - func: "set up venv"
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/feature_flag_tags_check.sh"
+
 #######################################
 #             Task Groups             #
 #######################################
@@ -9059,6 +9076,7 @@ buildvariants:
   - name: test_api_version_compatibility
   - name: burn_in_tests_gen
   - name: burn_in_tests_multiversion_gen
+  - name: check_feature_flag_tags
   - name: check_for_todos
   - name: .aggfuzzer
   - name: .aggregation

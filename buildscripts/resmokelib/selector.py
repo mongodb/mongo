@@ -123,6 +123,8 @@ class TestFileExplorer(object):
         if tagged_tests is None:
             tagged_tests = collections.defaultdict(list)
 
+        if tag_files is None:
+            tag_files = []
         for tag_file in tag_files:
             if tag_file and os.path.exists(tag_file):
                 tags_conf = _tags.TagsConfig.from_file(tag_file)
