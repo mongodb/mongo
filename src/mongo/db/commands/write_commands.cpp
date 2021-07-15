@@ -127,11 +127,16 @@ bool isMetaFieldFirstElementOfDottedPathField(StringData metaField, StringData f
 }
 
 // Recurses through the mutablebson element query and replaces any occurences of the
-// metaField with "meta" accounting for queries that may be in dot notation.
-void replaceTimeseriesQueryMetaFieldName(mutablebson::Element elem, const StringData& metaField) {
+// metaField with "meta" accounting for queries that may be in dot notation. shouldReplaceFieldValue
+// is set for $expr queries when "$" + the metaField should be subsitutited for "$meta".
+void replaceTimeseriesQueryMetaFieldName(mutablebson::Element elem,
+                                         const StringData& metaField,
+                                         bool shouldReplaceFieldValue = false) {
     if (metaField.empty()) {
         return;
     }
+    shouldReplaceFieldValue = (elem.getFieldName() != "$literal") &&
+        (shouldReplaceFieldValue || (elem.getFieldName() == "$expr"));
     if (isMetaFieldFirstElementOfDottedPathField(metaField, elem.getFieldName())) {
         size_t dotIndex = elem.getFieldName().find('.');
         dotIndex >= elem.getFieldName().size()
@@ -140,9 +145,21 @@ void replaceTimeseriesQueryMetaFieldName(mutablebson::Element elem, const String
                   "meta" +
                   elem.getFieldName().substr(dotIndex, elem.getFieldName().size() - dotIndex)));
     }
+    // Substitute element fieldValue with "$meta" if element is a subField of $expr, not a subField
+    // of $literal, and the element fieldValue is "$" + the metaField.
+    else if (shouldReplaceFieldValue && elem.isType(BSONType::String) &&
+             isMetaFieldFirstElementOfDottedPathField("$" + metaField, elem.getValueString())) {
+        size_t dotIndex = elem.getValueString().find('.');
+        dotIndex >= elem.getValueString().size()
+            ? invariantStatusOK(elem.setValueString("$meta"))
+            : invariantStatusOK(elem.setValueString(
+                  "$meta" +
+                  elem.getValueString().substr(dotIndex, elem.getValueString().size() - dotIndex)));
+    }
     if (elem.hasChildren()) {
         for (size_t i = 0; i < elem.countChildren(); ++i) {
-            replaceTimeseriesQueryMetaFieldName(elem.findNthChild(i), metaField);
+            replaceTimeseriesQueryMetaFieldName(
+                elem.findNthChild(i), metaField, shouldReplaceFieldValue);
         }
     }
 }
@@ -1579,6 +1596,8 @@ public:
             write_ops::DeleteCommandRequest timeseriesDeleteReq(
                 ns().makeTimeseriesBucketsNamespace(), timeseriesDeletes);
             timeseriesDeleteReq.setWriteCommandRequestBase(request().getWriteCommandRequestBase());
+            timeseriesDeleteReq.setLet(request().getLet());
+            timeseriesDeleteReq.setLegacyRuntimeConstants(request().getLegacyRuntimeConstants());
 
             auto reply = write_ops_exec::performDeletes(
                 opCtx, timeseriesDeleteReq, OperationSource::kTimeseries);

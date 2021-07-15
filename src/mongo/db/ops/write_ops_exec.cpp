@@ -571,19 +571,22 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 }
 
 // TODO: SERVER-58382 Handle time-series collections without a metaField.
-template <typename OpEntry>
+template <typename OpEntry, typename WholeOp>
 bool isTimeseriesMetaFieldOnlyQuery(OperationContext* opCtx,
                                     const NamespaceString& ns,
-                                    OpEntry& opEntry) {
+                                    const OpEntry& opEntry,
+                                    const WholeOp& wholeOp) {
 
-    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, nullptr, ns));
+    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(
+        opCtx, nullptr, ns, wholeOp.getLegacyRuntimeConstants(), wholeOp.getLet()));
 
     std::vector<BSONObj> rawPipeline{BSON("$match" << opEntry.getQ())};
     DepsTracker dependencies = Pipeline::parse(rawPipeline, expCtx)->getDependencies({});
     return std::all_of(
         dependencies.fields.begin(), dependencies.fields.end(), [](const auto& dependency) {
             StringData queryField(dependency);
-            return queryField.substr(0, queryField.find('.')) == "meta";
+            StringData querySubStr = queryField.substr(0, queryField.find('.'));
+            return querySubStr == "meta" || querySubStr == "$meta";
         });
 }
 
@@ -1154,7 +1157,8 @@ WriteResult performDeletes(OperationContext* opCtx,
                         str::stream() << "Cannot perform a delete on a time-series collection "
                                          "when querying on a field that is not the metaField: "
                                       << wholeOp.getNamespace(),
-                        isTimeseriesMetaFieldOnlyQuery(opCtx, wholeOp.getNamespace(), singleOp));
+                        isTimeseriesMetaFieldOnlyQuery(
+                            opCtx, wholeOp.getNamespace(), singleOp, wholeOp));
                 uassert(ErrorCodes::IllegalOperation,
                         str::stream() << "Cannot perform a delete with limit: 1 on a "
                                          "time-series collection: "
