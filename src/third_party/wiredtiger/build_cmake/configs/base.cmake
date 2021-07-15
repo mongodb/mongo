@@ -142,6 +142,16 @@ config_bool(
 )
 
 config_bool(
+    ENABLE_SODIUM
+    "Build the libsodium encryption extension"
+    DEFAULT OFF
+    DEPENDS "HAVE_LIBSODIUM"
+    # Specifically throw a fatal error if a user tries to enable the libsodium encryptor without
+    # actually having the library available (as opposed to silently defaulting to OFF).
+    DEPENDS_ERROR ON "Failed to find sodium library"
+)
+
+config_bool(
     ENABLE_TCMALLOC
     "Use TCMalloc as the backend allocator"
     DEFAULT OFF

@@ -1419,6 +1419,8 @@ config_map_encryption(const char *s, u_int *vp)
         *vp = ENCRYPT_NONE;
     else if (strcmp(s, "rotn-7") == 0)
         *vp = ENCRYPT_ROTN_7;
+    else if (strcmp(s, "sodium") == 0)
+        *vp = ENCRYPT_SODIUM;
     else
         testutil_die(EINVAL, "illegal encryption configuration: %s", s);
 }

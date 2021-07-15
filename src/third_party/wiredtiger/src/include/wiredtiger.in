@@ -4053,17 +4053,15 @@ struct __wt_data_source {
 /*!
  * The interface implemented by applications to provide custom encryption.
  *
- * Encryptors must implement the WT_ENCRYPTOR interface: the
- * WT_ENCRYPTOR::encrypt, WT_ENCRYPTOR::decrypt and WT_ENCRYPTOR::sizing
- * callbacks must be specified, WT_ENCRYPTOR::customize and
- * WT_ENCRYPTOR::terminate are optional.  To build your own encryptor, use
- * one of the encryptors in \c ext/encryptors as a template:
- * \c ext/encryptors/nop_encrypt is a simple encryptor that passes through
- * data unchanged, and is a reasonable starting point;
- * \c ext/encryptors/rotn_encrypt is an encryptor implementing
- * a simple rotation cipher, it shows the use of \c keyid, \c secretkey,
- * and implements the WT_ENCRYPTOR::customize and
- * WT_ENCRYPTOR::terminate callbacks.
+ * Encryptors must implement the WT_ENCRYPTOR interface: the WT_ENCRYPTOR::encrypt,
+ * WT_ENCRYPTOR::decrypt and WT_ENCRYPTOR::sizing callbacks must be specified,
+ * WT_ENCRYPTOR::customize and WT_ENCRYPTOR::terminate are optional.  To build your own
+ * encryptor, use one of the encryptors in \c ext/encryptors as a template: \c
+ * ext/encryptors/sodium_encrypt uses the open-source libsodium cryptographic library, and
+ * \c ext/encryptors/nop_encrypt is a simple template that passes through data unchanged,
+ * and is a reasonable starting point.  \c ext/encryptors/rotn_encrypt is an encryptor
+ * implementing a simple (insecure) rotation cipher meant for testing.  See @ref
+ * encryption "the encryptors page" for further information.
  *
  * Applications register their implementation with WiredTiger by calling
  * WT_CONNECTION::add_encryptor.
@@ -4075,18 +4073,19 @@ struct __wt_encryptor {
 	/*!
 	 * Callback to encrypt a chunk of data.
 	 *
-	 * WT_ENCRYPTOR::encrypt takes a source buffer and a destination
-	 * buffer.  The callback encrypts the source buffer (plain text)
-	 * into the destination buffer.
+	 * WT_ENCRYPTOR::encrypt takes a source buffer and a destination buffer. The
+	 * callback encrypts the source buffer (plain text) into the destination buffer.
 	 *
-	 * On entry, \c src will point to memory, with the length of the memory
-	 * in \c src_len.  After successful completion, the callback should
-	 * return \c 0 and set \c result_lenp to the number of bytes required
-	 * for the encrypted representation.
+	 * On entry, \c src will point to a block of memory to encrypt, with the length of
+	 * the block in \c src_len.
 	 *
-	 * On entry, \c dst points to the destination buffer with a length
-	 * of \c dst_len.  The destination buffer will be at least src_len
-	 * plus the size returned by that WT_ENCRYPT::sizing.
+	 * On entry, \c dst points to the destination buffer with a length of \c dst_len.
+	 * The destination buffer will be at least src_len plus the size returned by that
+	 * WT_ENCRYPT::sizing.
+	 *
+	 * After successful completion, the callback should return \c 0 and set \c
+	 * result_lenp to the number of bytes required for the encrypted representation,
+	 * which should be less than or equal to \c dst_len.
 	 *
 	 * This callback cannot be NULL.
 	 *
@@ -4107,20 +4106,20 @@ struct __wt_encryptor {
 	/*!
 	 * Callback to decrypt a chunk of data.
 	 *
-	 * WT_ENCRYPTOR::decrypt takes a source buffer and a destination
-	 * buffer.  The contents are switched from \c encrypt: the
-	 * source buffer is the encrypted value, and the destination buffer is
-	 * sized to be the original size.  If the callback successfully
-	 * decrypts the source buffer to the destination buffer, it returns
-	 * 0.  If an error occurs, it returns an errno or WiredTiger error code.
+	 * WT_ENCRYPTOR::decrypt takes a source buffer and a destination buffer. The
+	 * contents are switched from \c encrypt: the source buffer is the encrypted
+	 * value, and the destination buffer is sized to be the original size of the
+	 * decrypted data. If the callback successfully decrypts the source buffer to the
+	 * destination buffer, it returns 0. If an error occurs, it returns an errno or
+	 * WiredTiger error code.
 	 *
-	 * On entry, \c src will point to memory, with the length of the memory
-	 * in \c src_len.  After successful completion, the callback should
-	 * return \c 0 and set \c result_lenp to the number of bytes required
-	 * for the decrypted representation.
+	 * On entry, \c src will point to memory, with the length of the memory in \c
+	 * src_len. After successful completion, the callback should return \c 0 and set
+	 * \c result_lenp to the number of bytes required for the decrypted
+	 * representation.
 	 *
-	 * If the \c dst buffer is not big enough to hold the decrypted
-	 * data, the callback should return an error.
+	 * If the \c dst buffer is not big enough to hold the decrypted data, the callback
+	 * should return an error.
 	 *
 	 * This callback cannot be NULL.
 	 *
@@ -4141,24 +4140,26 @@ struct __wt_encryptor {
 	/*!
 	 * Callback to size a destination buffer for encryption.
 	 *
-	 * WT_ENCRYPTOR::sizing is an callback that returns the number
-	 * of additional bytes that is needed when encrypting a
-	 * text buffer.  This is always necessary, since encryptors
-	 * typically generate encrypted text that is larger than the
-	 * plain text input. Without such a call, WiredTiger would
-	 * have no way to know the worst case for the encrypted buffer size.
-	 * The WiredTiger encryption infrastructure assumes that
-	 * buffer sizing is not dependent on the number of bytes
-	 * of input, that there is a one to one relationship in number
-	 * of bytes needed between input and output.
+	 * WT_ENCRYPTOR::sizing is an callback that returns the number of additional bytes
+	 * that is needed when encrypting a data block. This is always necessary, since
+	 * encryptors should always generate some sort of cryptographic checksum as well
+	 * as the ciphertext. Without such a call, WiredTiger would have no way to know
+	 * the worst case for the encrypted buffer size.
+	 *
+	 * The WiredTiger encryption infrastructure assumes that buffer sizing is not
+	 * dependent on the number of bytes of input, that there is a one-to-one
+	 * relationship in number of bytes needed between input and output. This means
+	 * that if the encryption uses a block cipher in such a way that the input size
+	 * needs to be padded to the cipher block size, the sizing method should return
+	 * the worst case to ensure enough space is available.
 	 *
 	 * This callback cannot be NULL.
 	 *
-	 * The callback should set \c expansion_constantp to the additional
-	 * number of bytes needed.
+	 * The callback should set \c expansion_constantp to the additional number of
+	 * bytes needed.
 	 *
-	 * @param[out] expansion_constantp the additional number of bytes needed
-	 *    when encrypting.
+	 * @param[out] expansion_constantp the additional number of bytes needed when
+	 *    encrypting.
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
 	 * @snippet nop_encrypt.c WT_ENCRYPTOR sizing
@@ -4167,17 +4168,36 @@ struct __wt_encryptor {
 	    size_t *expansion_constantp);
 
 	/*!
-	 * If non-NULL, this callback is called to customize the encryptor.
-	 * The customize function is called whenever a keyid is used for the
-	 * first time with this encryptor, whether it be in
-	 * the ::wiredtiger_open call or the WT_SESSION::create
-	 * call. This gives the algorithm an
-	 * opportunity to retrieve and save keys in a customized encryptor.
-	 * If the callback returns a non-NULL encryptor, that instance
-	 * is used instead of this one for any callbacks.
+	 * If non-NULL, this callback is called to load keys into the encryptor. (That
+	 * is, "customize" it for a given key.) The customize function is called whenever
+	 * a new keyid is used for the first time with this encryptor, whether it be in
+	 * the ::wiredtiger_open call or the WT_SESSION::create call. This should create a
+	 * new encryptor instance and insert the requested key in it.
 	 *
-	 * @param[in] encrypt_config the "encryption" portion of the
-	 *    configuration from the wiredtiger_open or WT_SESSION::create call
+	 * The key may be specified either via \c keyid or \c secretkey in the \c
+	 * encrypt_config parameter. In the former case, the encryptor should look up the
+	 * requested key ID with whatever key management service is in use and install it
+	 * in the new encryptor. In the latter case, the encryptor should save the
+	 * provided secret key (or some transformation of it) in the new
+	 * encryptor. Further encryption with the same \c keyid will use this new
+	 * encryptor instance. (In the case of \c secretkey, only one key can be
+	 * configured, for the system encryption, and the new encryptor will be used for
+	 * all encryption involving it.) See @ref encryption for more information.
+	 *
+	 * This callback may return NULL as the new encryptor, in which case the original
+	 * encryptor will be used for further operations on the selected key. Unless this
+	 * happens, the original encryptor structure created during extension
+	 * initialization will never be used for encryption or decryption.
+	 *
+	 * This callback may itself be NULL, in which case it is not called, but in that
+	 * case there is no way to configure a key. This may be suitable for an
+	 * environment where a key management service returns a single key under a
+	 * well-known name that can be compiled in, but in a more general environment is
+	 * not a useful approach. One should of course never compile in actual keys!
+	 *
+	 * @param[in] encrypt_config the "encryption" portion of the configuration from
+	 *    the wiredtiger_open or WT_SESSION::create call, containing the \c keyid or
+	 *    \c secretkey setting.
 	 * @param[out] customp the new modified encryptor, or NULL.
 	 * @returns zero for success, non-zero to indicate an error.
 	 */
@@ -4185,13 +4205,12 @@ struct __wt_encryptor {
 	    WT_CONFIG_ARG *encrypt_config, WT_ENCRYPTOR **customp);
 
 	/*!
-	 * If non-NULL, a callback performed when the database is closed.
-	 * It is called for each encryptor that was added using
-	 * WT_CONNECTION::add_encryptor or returned by the
-	 * WT_ENCRYPTOR::customize callback.
+	 * If non-NULL, a callback performed when the database is closed. It is called for
+	 * each encryptor that was added using WT_CONNECTION::add_encryptor or returned by
+	 * the WT_ENCRYPTOR::customize callback.
 	 *
-	 * The WT_ENCRYPTOR::terminate callback is intended to allow cleanup,
-	 * the handle will not be subsequently accessed by WiredTiger.
+	 * The WT_ENCRYPTOR::terminate callback is intended to allow cleanup; the handle
+	 * will not be subsequently accessed by WiredTiger.
 	 *
 	 * @snippet nop_encrypt.c WT_ENCRYPTOR terminate
 	 */

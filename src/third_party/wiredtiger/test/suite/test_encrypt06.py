@@ -36,9 +36,22 @@ from wtscenario import make_scenarios
 
 # Test encryption, when on, does not leak any information
 class test_encrypt06(wttest.WiredTigerTestCase):
+    # To test the sodium encryptor, we use secretkey= rather than
+    # setting a keyid, because for a "real" (vs. test-only) encryptor,
+    # keyids require some kind of key server, and (a) setting one up
+    # for testing would be a nuisance and (b) currently the sodium
+    # encryptor doesn't support any anyway.
+    #
+    # Note that secretkey= is apparently not allowed with per-table
+    # encryption, so we don't test that.
+    #
+    # It expects secretkey= to provide a hex-encoded 256-bit chacha20 key.
+    # This key will serve for testing purposes.
+    sodium_testkey = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 
     key11 = ',keyid=11,secretkey=XYZ'
     key13 = ',keyid=13'
+    sodiumkey = ',secretkey=' + sodium_testkey
 
     # Test with various combinations of tables with or without indices
     # and column groups, also with LSM.  When 'match' is False, we
@@ -85,6 +98,10 @@ class test_encrypt06(wttest.WiredTigerTestCase):
             sys_encrypt='rotn', sys_encrypt_args=key11,
             table0_encrypt='rotn', table0_encrypt_args=key13,
             table1_encrypt='none', table1_encrypt_args='')),
+        ('sodium-implied', dict(
+            sys_encrypt='sodium', sys_encrypt_args=sodiumkey,
+            table0_encrypt=None, table0_encrypt_args='',
+            table1_encrypt=None, table1_encrypt_args='')),
     ]
     scenarios = make_scenarios(encrypt, storagetype)
     nrecords = 1000

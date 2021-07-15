@@ -129,6 +129,10 @@ func_ok()
 	    -e '/int rotn_terminate$/d' \
 	    -e '/int snappy_pre_size$/d' \
 	    -e '/int snappy_terminate$/d' \
+	    -e '/int sodium_configure$/d' \
+	    -e '/int sodium_error$/d' \
+	    -e '/int sodium_sizing$/d' \
+	    -e '/int sodium_terminate$/d' \
 	    -e '/int subtest_error_handler$/d' \
 	    -e '/int test_hs_workload$/d' \
 	    -e '/int uri2name$/d' \

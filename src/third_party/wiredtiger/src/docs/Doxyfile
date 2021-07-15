@@ -976,6 +976,7 @@ EXAMPLE_PATH           = ../../examples/c \
                          ../../ext/compressors/nop \
                          ../../ext/encryptors/nop \
                          ../../ext/encryptors/rotn \
+                         ../../ext/encryptors/sodium \
                          ../../examples/python \
                          ../../test/fuzz
 

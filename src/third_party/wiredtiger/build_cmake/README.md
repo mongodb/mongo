@@ -89,6 +89,7 @@ There are a number of additional configuration options you can pass to the CMake
 * `-DENABLE_SNAPPY=1` : Build the snappy compressor extension
 * `-DENABLE_ZLIB=1` : Build the zlib compressor extension
 * `-DENABLE_ZSTD=1` : Build the libzstd compressor extension
+* `-DENABLE_SODIUM=1` : Build the libsodium encryptor extension
 * `-DHAVE_DIAGNOSTIC=1` : Enable WiredTiger diagnostics
 * `-DHAVE_ATTACH=1` : Enable to pause for debugger attach on failure
 * `-DENABLE_STRICT=1` : Compile with strict compiler warnings enabled

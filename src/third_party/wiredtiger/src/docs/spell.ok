@@ -140,6 +140,7 @@ WiredTigerRollbackException
 WiredTigerStat
 WiredTigerTestCase
 WiredTigerTmplog
+XChaCha
 XRay
 Yann
 Za
@@ -218,6 +219,8 @@ cppsuite
 cpu
 crashless
 crc
+cryptographic
+cryptographically
 csuite
 ctest
 curfile
@@ -271,6 +274,7 @@ dups
 encrypt
 encryptor
 encryptors
+encryptor's
 endcode
 endcond
 endian
@@ -382,6 +386,7 @@ libdir
 libfuzzer
 libhe
 libkvs
+libsodium
 libtool
 libwiredtiger
 lifecycle

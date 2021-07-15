@@ -21,10 +21,12 @@ AH_TEMPLATE(HAVE_BUILTIN_EXTENSION_ZLIB,
 	    [Zlib support automatically loaded.])
 AH_TEMPLATE(HAVE_BUILTIN_EXTENSION_ZSTD,
 	    [ZSTD support automatically loaded.])
+AH_TEMPLATE(HAVE_BUILTIN_EXTENSION_SODIUM,
+	    [Sodium support automatically loaded.])
 AC_MSG_CHECKING(if --with-builtins option specified)
 AC_ARG_WITH(builtins,
 	[AS_HELP_STRING([--with-builtins],
-	    [builtin extension names (lz4, snappy, zlib, zstd).])],
+	    [builtin extension names (lz4, snappy, zlib, zstd, sodium).])],
 	    [with_builtins=$withval],
 	    [with_builtins=])
 
@@ -40,6 +42,8 @@ for builtin_i in $builtin_list; do
 		wt_cv_with_builtin_extension_zlib=yes;;
 	zstd)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_ZSTD)
 		wt_cv_with_builtin_extension_zstd=yes;;
+	sodium)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_SODIUM)
+		wt_cv_with_builtin_extension_sodium=yes;;
 	*)	AC_MSG_ERROR([Unknown builtin extension "$builtin_i"]);;
 	esac
 done
@@ -51,6 +55,8 @@ AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_ZLIB],
     [test "$wt_cv_with_builtin_extension_zlib" = "yes"])
 AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_ZSTD],
     [test "$wt_cv_with_builtin_extension_zstd" = "yes"])
+AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_SODIUM],
+    [test "$wt_cv_with_builtin_extension_sodium" = "yes"])
 AC_MSG_RESULT($with_builtins)
 
 AH_TEMPLATE(HAVE_DIAGNOSTIC, [Define to 1 for diagnostic tests.])
@@ -136,6 +142,32 @@ if test "$wt_cv_enable_lz4" = "yes"; then
 	    [AC_MSG_ERROR([--enable-lz4 requires lz4 library with LZ4_compress_destSize support])])
 fi
 AM_CONDITIONAL([LZ4], [test "$wt_cv_enable_lz4" = "yes"])
+
+AC_MSG_CHECKING(if --enable-sodium option specified)
+AC_ARG_ENABLE(sodium,
+	[AS_HELP_STRING([--enable-sodium],
+	    [Build the libsodium encryptor extension.])], r=$enableval, r=no)
+case "$r" in
+no)	if test "$wt_cv_with_builtin_extension_sodium" = "yes"; then
+		wt_cv_enable_sodium=yes
+	else
+		wt_cv_enable_sodium=no
+	fi
+	;;
+*)	if test "$wt_cv_with_builtin_extension_sodium" = "yes"; then
+		AC_MSG_ERROR(
+		   [Only one of --enable-sodium --with-builtins=sodium allowed])
+	fi
+	wt_cv_enable_sodium=yes;;
+esac
+AC_MSG_RESULT($wt_cv_enable_sodium)
+if test "$wt_cv_enable_sodium" = "yes"; then
+	AC_CHECK_HEADER(sodium.h,,
+	    [AC_MSG_ERROR([--enable-sodium requires sodium.h])])
+	AC_CHECK_LIB(sodium, sodium_init,,
+	    [AC_MSG_ERROR([--enable-sodium requires sodium library])])
+fi
+AM_CONDITIONAL([SODIUM], [test "$wt_cv_enable_sodium" = "yes"])
 
 AC_MSG_CHECKING(if --enable-tcmalloc option specified)
 AC_ARG_ENABLE(tcmalloc,

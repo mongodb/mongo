@@ -589,6 +589,7 @@ celsius
 centric
 cfg
 cfko
+chacha
 change's
 changelog
 chdir
@@ -606,6 +607,7 @@ chk
 chmod
 chongo
 cip
+ciphertext
 cjoin
 ckpt
 ckptfrag
@@ -648,6 +650,7 @@ createCStream
 crypto
 cryptobad
 cryptographic
+cryptographically
 cstring
 csuite
 csv
@@ -863,6 +866,7 @@ gobare
 goesc
 gostring
 gostruct
+goto
 goutf
 gt
 handleops
@@ -961,6 +965,7 @@ kb
 kbits
 keycmp
 keyid
+keyids
 keylen
 keyv
 kmsid
@@ -985,6 +990,7 @@ lf
 lfence
 libdatasource
 libs
+libsodium
 libtool
 libwiredtiger
 linkers
@@ -1104,6 +1110,7 @@ nocase
 noclear
 nocrypto
 nolock
+nonces
 nonliteral
 noop
 nop
@@ -1378,6 +1385,7 @@ tokname
 tokstart
 toktype
 tolower
+toolchain
 toplevel
 totalsec
 toupper
@@ -1409,6 +1417,7 @@ unbare
 unbuffered
 uncompressed
 uncompressing
+uncustomized
 undef
 underflowed
 unencrypted

@@ -41,6 +41,16 @@ from wtscenario import make_scenarios
 
 # Test basic encryption
 class test_encrypt02(wttest.WiredTigerTestCase, suite_subprocess):
+    # To test the sodium encryptor, we use secretkey= rather than
+    # setting a keyid, because for a "real" (vs. test-only) encryptor,
+    # keyids require some kind of key server, and (a) setting one up
+    # for testing would be a nuisance and (b) currently the sodium
+    # encryptor doesn't support any anyway.
+    #
+    # It expects secretkey= to provide a hex-encoded 256-bit chacha20 key.
+    # This key will serve for testing purposes.
+    sodium_testkey = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+
     uri = 'file:test_encrypt02'
     encrypt_type = [
         ('noarg', dict( encrypt_args='name=rotn', secret_arg=None)),
@@ -48,6 +58,8 @@ class test_encrypt02(wttest.WiredTigerTestCase, suite_subprocess):
         ('pass', dict( encrypt_args='name=rotn', secret_arg='ABC')),
         ('keyid-pass', dict(
             encrypt_args='name=rotn,keyid=11', secret_arg='ABC')),
+        ('sodium-pass', dict( encrypt_args='name=sodium', secret_arg=sodium_testkey)),
+        # The other combinations for sodium, which are rejected, are checked in encrypt08.
     ]
     scenarios = make_scenarios(encrypt_type)
 
@@ -55,6 +67,7 @@ class test_encrypt02(wttest.WiredTigerTestCase, suite_subprocess):
         # Load the compression extension, skip the test if missing
         extlist.skip_if_missing = True
         extlist.extension('encryptors', 'rotn')
+        extlist.extension('encryptors', 'sodium')
 
     nrecords = 5000
     bigvalue = "abcdefghij" * 1001    # len(bigvalue) = 10010

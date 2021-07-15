@@ -1,124 +1,189 @@
 /*! @page encryption Encryptors
 
 @section encryption_overview Overview of Encryption in WiredTiger
-@ref encryption_custom "Custom encryption engines" may be used to
-extend WiredTiger.  WiredTiger does not currently offer builtin
-support for any particular encryption algorithm.
-@ref encryption_examples "Example encryption code" is provided
-to demonstrate how encryption extensions are created.
+This section explains how to configure and work with encryption in WiredTiger.
 
-\warning The encryption infrastructure included in WiredTiger, when used with a
-strong encryption algorithm, is intended to protect data stored in files
-(that is, <em>encryption at rest</em>). The table content (keys, values),
-the metadata pertaining to data (table, index, column names, and other
-configuration information) as well as the database log files are encrypted
-on disk.  Decryption occurs when the data is read into memory; thus an
-attacker having the ability to directly read system memory will have access
-to unencrypted data. Many systems may also page memory to a backing disk
-under load. Access to any such \em paging or \em swap devices must be
-considered when planning the security of a system.
+WiredTiger now provides built-in support for encryption with an extension using the
+open-source <a href=https://libsodium.org>libsodium</a> cryptography library. Application
+developers may also write their own @ref encryption_custom "custom encryption extensions".
+Three example extensions are provided for expository and testing purposes.
 
-The encryption extension must be loaded in the ::wiredtiger_open call.
-See @subpage_single extensions for details on how extensions are loaded.
-Also, encryption is specified using \c encryption= in the configuration
-for the ::wiredtiger_open call. This configuration establishes
-the encryption algorithm and keys to be used for database log files and a subset
-of the WiredTiger metadata files. By default, this same encryption
-is also used for all data files. We call this the <em>system</em> encryption.
+\warning The encryption infrastructure included in WiredTiger, when used with an extension
+providing a strong encryption algorithm, is intended only to protect data stored in files
+(that is, it provides <em>encryption at rest</em>). The table content (keys, values), the
+metadata pertaining to data (table, index, column names, and other configuration
+information) as well as the database log files are encrypted on disk. However, it does not
+protect data in memory while the database is running. Decryption occurs when the data is
+read into memory; thus an attacker having the ability to directly read system memory will
+have access to unencrypted data. Many systems may also page memory to a backing disk under
+load. The security of any such \em paging or \em swap devices must be considered when
+planning the security of a system; in general, they should be disabled or themselves
+encrypted using operating system or storage system facilities.
 
-It is also possible to use different encryption options when individual
-data files are first created, using the \c encryption= configuration in
-the WT_SESSION::create call.  Such options override the default
-(<em>system</em>) encryption that was indicated in the ::wiredtiger_open
-call for the individual data file. It is possible to turn encryption off
-for individual files, to use a different encryptor, or to specify a
-different \c keyid.
+@section encryption_use Using an encryption extension
+Enabling encryption involves two steps: first, loading the encryptor extension, and
+second, enabling and configuring it. Extensions must be loaded in the ::wiredtiger_open
+call. See @subpage_single extensions for details about how extensions are loaded.
 
-Overriding the system encryption for a table does not override
-the system encryption for indices on that table, nor does it override
-the system encryption for column groups specified on that table.
-Encryption for column groups and indices must be specified when they
-are created, if they are to be different than the system encryption.
+Encryption must be enabled first for the overall database (the <em>system</em> encryption)
+by passing the encryption configuration (described shortly) to the ::wiredtiger_open call.
+This establishes the encryption algorithm and keys to be used for database log files and a
+subset of the WiredTiger metadata files. By default, this same encryption is also used for
+all data files.
 
-It is an error to specify encryption in a WT_SESSION::create call when it
-was not specified in the ::wiredtiger_open call. This prevents accidental
-exposure of the file's data in log files, which would be written in the
-clear in such a scenario.
+Encryption may also be enabled separately for individual tables, column groups, and
+indices, by passing a different encryption configuration to the WT_SESSION::create call.
+This configuration overrides the system encryption for the data file so created. It may
+use a different encryptor and/or different key (except as noted below). It is also
+possible to disable encryption for individual tables; this is of course usually
+undesirable, but possibly a reasonable option for high-churn low-value data.
 
-\warning When using separate keys for individual data files or tables, the
-key used for the \em system encryption continues to have fundamental
-importance.  The database log, protected by the \em system encryption,
-contains a shared stream of changes to all data files. Thus, if the \em
-system key is exposed, even when per-file keys are not exposed, an attacker
-can read database log files, and hence has access to data in individual
-files.
+Each table, column group, and index that is to have encryption different from the system
+encryption must be configured explicitly; encryption configuration is not inherited by
+column groups or indices from the table they apply to. Such encryption must be specified
+when the data file is created; otherwise the system encryption is used.
 
-@section encryption_parameters Encryption keyid and secretkey
+It is an error to specify encryption in a WT_SESSION::create call when it was not
+specified in the ::wiredtiger_open call. This prevents accidental exposure of the file's
+data in log files, which would be written in the clear in such a scenario.
 
-Two parameters, \c keyid and \c secretkey, may be specified
-when configuring encryption for ::wiredtiger_open to allow the possibility
-of varying the algorithm according to different keys.
+\warning When using separate keys for individual data files or tables, the key used for
+the system encryption continues to have fundamental importance. The database log,
+protected by the system encryption, contains a shared stream of changes to all data
+files. Thus, if the system key is exposed, even when per-file keys are not exposed, an
+attacker can read database log files, and hence has access to data in individual files.
 
-The configuration parameter <code>encryption=(keyid=<em>identifier</em>)</code>
-may be used in ::wiredtiger_open or WT_SESSION::create calls. This is intended
-to reference a key stored using a Key Management Solution (KMS).
-The \c keyid given to ::wiredtiger_open is stored in the clear in
-WiredTiger configuration files; it should never contain sensitive
-information.  As an example, with a \c keyid of \c "customerABC",
-the encryptor would consult the KMS to return a key previously stored
-for \c "customerABC". The encryptor will use the returned key when
-applying the encryption.  To effectively use the \c keyid, a custom
-encryptor must implement the WT_ENCRYPTOR::customize callback.
-It is during \c customize that the encryptor has an opportunity to use
-the \c keyid to fetch the actual key. The \c customize function is
-called on the first use of a \c keyid, and the same \em customized encryptor
-will be used with each use of the same \c keyid.
+Note that because every encryptor providing strong encryption should also include a
+cryptographically strong checksum, WiredTiger's own block checksums can safely be disabled.
+See WT_SESSION::create.
 
-The configuration parameter <code>encryption=(secretkey)</code> is used
-only in the ::wiredtiger_open call. The value of the secretkey
-is never stored on disk in any form, so it must always be provided
-when WiredTiger is reopened (again, with the ::wiredtiger_open call).
-The secretkey is available to the encryptor during the
-WT_ENCRYPTOR::customize callback, during which the encryptor may
-be \em customized to keep the secretkey or a transformation of it
-for use during the WT_ENCRYPTOR::encrypt and WT_ENCRYPTOR::decrypt callbacks.
+@section encryption_config Encryption configuration
+Encryption is configured using the \c encryption= configuration parameter. As noted above
+this must be passed to ::wiredtiger_open and may also be passed to WT_SESSION::create. The
+value of \c encryption= is a nested configuration string with up to three parameters. The
+first should be \c name= to select the encryption extension to use. This is the name of
+the encryptor and should be the string the encryptor's initialization method passed to
+WT_CONNECTION::add_encryptor. For the built-in libsodium extension, this name is "sodium".
+The other parameters, \c keyid and \c secretkey, are used to specify the encryption key.
+To disable encryption for an individual table the reserved value \c name=none may be
+passed when creating it. (As is noted above, this is usually not desirable.)
 
-If a \c secretkey is used, it must be provided using the \c -E option
-when using the \c wt utility. Specifying \c keyid is not needed with the \c wt
-utility, as the \c keyid is stored in the clear on disk by WiredTiger.
-Any additional \c keyid values needed to decrypt data files
-are stored in WiredTiger metadata using the system encryptor.
+@section encryption_keyid Keys via key ID
+The configuration parameter <code>encryption=(keyid=<em>identifier</em>)</code> may be
+used in ::wiredtiger_open or WT_SESSION::create calls. This is intended to reference a key
+stored using a Key Management Solution (KMS). The \c keyid given to ::wiredtiger_open is
+stored in the clear in WiredTiger configuration files; it should never contain sensitive
+information. Consequently, however, it need only be specified when the database is
+created; it is remembered thereafter. Additional \c keyid values may be used freely for
+different database files. These are stored in WiredTiger metadata using the system
+encryption.
 
-@section encryption_custom Custom encryption engines
+As an example, with a \c keyid of \c "customerABC", the encryptor would consult the KMS to
+return a key previously stored for \c "customerABC". The encryptor would then use the
+returned key when encrypting.
 
-WiredTiger may be extended by adding custom encryption engines
-that we call \em encryptors. Custom encryptors must be coded in the C language.
-Once packaged, they can be used in any language.
+@section encryption_secretkey Keys via explicit secret key
+The configuration parameter <code>encryption=(secretkey=<em>key</em>)</code> is used only
+in the ::wiredtiger_open call. The value of the secret key is never stored on disk in any
+form, so it must always be provided when WiredTiger is reopened (again, with the
+::wiredtiger_open call). It may <em>not</em> be passed to WT_SESSION::create; consequently
+if no KMS is available different keys cannot be used for individual tables.
 
-See @subpage_single extensions for general details on extending WiredTiger,
-and see WT_ENCRYPTOR for the encryptor interface.
+If a \c secretkey is used, it must be provided using the \c -E command-line option when
+using the \c wt utility. Specifying \c keyid is not needed with the \c wt utility, as the
+\c keyid is stored in the clear on disk by WiredTiger. Note that while the \c wt utility
+takes some steps to prevent it, on most systems it is possible to see command-line
+arguments using operating system facilities. This creates some risk of exposure that must
+be considered. Using a KMS is probably preferable where possible. Alternatively, one might
+avoid using the \c wt utility entirely when using encryption, as it is not necessary.
 
-Custom encryptors are registered by calling WT_CONNECTION::add_encryptor,
-this creates an encryptor name that may be referenced using the
-<code>encryption=(name=...</code> configuration string in the ::wiredtiger_open
-or WT_SESSION::create call.
+Both \c keyid and \c secretkey values are not interpreted by the configuration framework;
+their exact interpretation and the sets of possible values are determined by the encryptor
+in use.
 
-@section encryption_examples Encryption examples
+@section encryption_custom Custom encryption extensions
 
-There are two kinds of example code with overlapping functionality.
-A simple, self contained encryption example is in @ex_ref{ex_encrypt.c}.
-This example includes a small encryptor that rotates letters in the
-alphabet by a fixed amount, based on the value of \c keyid.  This example
-also shows how encryption is configured within an application.
-The second set of examples are in \c ext/encryptors.  These are
-encryptors only (no application level code), showing how encryptors
-might be packaged in a loadable shared library.
-@ex_ref{nop_encrypt.c} merely copies its input to its output.
-@ex_ref{rotn_encrypt.c} is an extended version of the example that
-rotates the alphabet.  It adds a twist in that a \c secretkey can
-be specified, changing the rotation per letter.  The Python test suite
-uses the rotn encryptor to help test the encryption framework.
+Applications may provide their own encryption extensions. Custom encryptors must be coded
+in the C language. Once packaged, they can be used in any language. For further
+information, see: @ref extensions "general information on extending WiredTiger", and the
+encryptor interface WT_ENCRYPTOR.
 
-Please note that these samples are for demonstration use only.
-They do not provide any security.
+A simple example @ref ex_encrypt.c "application with its own encryptor" is provided to
+demonstrate how this may be done. It shows both how to install a custom extension and
+then how to configure it. (Note, however, that it uses a trivial "encryption" that
+provides no security.)
+
+Three additional encryptor extensions are included with WiredTiger. These are built as
+shared libraries to show how that can be done.
+
+@section encryption_sodium The libsodium encryption extension
+The "sodium" encryptor uses the open source <a href=https://libsodium.org>libsodium</a>
+cryptography library. It currently has no support for key management and thus does not
+support \c keyid configurations, only \c secretkey. The \c secretkey is expected to be a
+256-bit XChaCha20 key encoded in hex (with no leading <tt>0x</tt>). This is not directly
+suitable for applications that wish to use manually-entered passwords or passphrases.
+Applications for which these restrictions are unsuitable can copy the @ref
+sodium_encrypt.c "extension code" and extend it as needed, using additional material from
+libsodium or other libraries.
+
+The sodium encryptor is intended to protect against disclosure of data, such as might
+otherwise happen with a database on a stolen laptop. It may provide some protection
+against malicious corruption of a database by an adversary with write access to the
+database files, but is not intended for this purpose and should not be relied upon in this
+context. (Note that on most operating systems, and in most situations, an adversary with
+write access to the database files is highly likely to also be able to read data out of
+memory while the database is running, and change it as well, so this limitation is not
+necessarily important.)
+
+To use the encryptor, first install libsodium; then you can compile WiredTiger with the
+extension by passing the \c --enable-sodium option to configure, or the argument \c
+-DENABLE_SODIUM=1 to cmake.
+
+If libsodium is installed in a location not normally searched by the compiler toolchain,
+you'll need to modify the \c CPPFLAGS and \c LDFLAGS to indicate these locations. For
+example, with the libsodium includes and libraries installed in \c /usr/local/include and
+\c /usr/local/lib, you would run configure with the following additional arguments:
+
+@code
+--enable-sodium CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+@endcode
+
+Alternatively you would run cmake with the following additional arguments:
+
+@code
+-DENABLE_SODIUM=1 -DCMAKE_INCLUDE_PATH=/usr/local/include -DCMAKE_LIBRARY_PATH=/usr/local/lib
+@endcode
+
+When opening the WiredTiger database, load the libsodium plugin library as an extension.
+For example, with the WiredTiger library installed in \c /usr/local/lib, you would use the
+following code:
+
+@snippet ex_all.c Configure sodium extension
+
+where \c secretkey comes from some suitable place. (Never compile in cryptographic keys.)
+
+Because this encryptor includes a cryptographically strong checksum, it is safe to
+disable WiredTiger's own block checksums.
+
+@section encryption_nop The nop encryption extension
+The "nop" encryptor is a skeleton extension into which suitable cryptographic code may be
+inserted. It is @ref nop_encrypt.c "provided as a framework" for developers writing
+custom encryptors to copy as a means of getting started. It does not do anything and
+should obviously not be used in production.
+
+@section encryption_rotn The rotn encryption extension
+The "rotn" encryptor is a test extension that performs either of two forms of trivial
+"encryption". It is used for testing the encryption framework. It provides no security
+and should never be used in production.
+
+@section encryption_ex The ex_encrypt example
+The @ex_ref{ex_encrypt.c} example (mentioned above) provides a runnable example of a
+simple application that loads a custom encryptor compiled into the application (rather
+than as a plugin library). The "encryption" it uses is trivial and should never be used
+in production.
+
+\warning Developers writing custom encryptor extensions should be sure to consult
+appropriate references to ensure that what they do is cryptographically sound and
+addresses the threat model they have in mind. Proper use of cryptographic primitives and
+constructions is a complex topic far beyond the scope of this documentation.
  */

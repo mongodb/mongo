@@ -272,6 +272,13 @@ config_lib(
 )
 
 config_lib(
+    HAVE_LIBSODIUM
+    "sodium library exists."
+    LIB "sodium"
+    HEADER "sodium.h"
+)
+
+config_lib(
     HAVE_LIBTCMALLOC
     "tcmalloc library exists."
     LIB "tcmalloc"

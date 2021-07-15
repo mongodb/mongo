@@ -89,6 +89,36 @@ encryptor(uint32_t encrypt_flag)
     case ENCRYPT_ROTN_7:
         p = "rotn,keyid=7";
         break;
+    case ENCRYPT_SODIUM:
+        p = "sodium,secretkey=" SODIUM_TESTKEY;
+        break;
+    default:
+        testutil_die(EINVAL, "illegal encryption flag: %#" PRIx32, encrypt_flag);
+        /* NOTREACHED */
+    }
+    return (p);
+}
+
+/*
+ * encryptor_at_open --
+ *     Configure encryption for wts_open().
+ *
+ * This must set any secretkey. When keyids are in use it can return NULL.
+ */
+static const char *
+encryptor_at_open(uint32_t encrypt_flag)
+{
+    const char *p;
+
+    p = NULL;
+    switch (encrypt_flag) {
+    case ENCRYPT_NONE:
+        break;
+    case ENCRYPT_ROTN_7:
+        break;
+    case ENCRYPT_SODIUM:
+        p = "sodium,secretkey=" SODIUM_TESTKEY;
+        break;
     default:
         testutil_die(EINVAL, "illegal encryption flag: %#" PRIx32, encrypt_flag);
         /* NOTREACHED */
@@ -154,6 +184,7 @@ create_database(const char *home, WT_CONNECTION **connp)
     WT_CONNECTION *conn;
     size_t max;
     char config[8 * 1024], *p;
+    const char *enc;
 
     p = config;
     max = sizeof(config);
@@ -190,8 +221,11 @@ create_database(const char *home, WT_CONNECTION **connp)
           compressor(g.c_logging_compression_flag));
 
     /* Encryption. */
-    if (g.c_encryption)
-        CONFIG_APPEND(p, ",encryption=(name=%s)", encryptor(g.c_encryption_flag));
+    if (g.c_encryption) {
+        enc = encryptor(g.c_encryption_flag);
+        if (enc != NULL)
+            CONFIG_APPEND(p, ",encryption=(name=%s)", enc);
+    }
 
 /* Miscellaneous. */
 #ifdef HAVE_POSIX_MEMALIGN
@@ -255,11 +289,12 @@ create_database(const char *home, WT_CONNECTION **connp)
     CONFIG_APPEND(p, "]");
 
     /* Extensions. */
-    CONFIG_APPEND(p, ",extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
+    CONFIG_APPEND(p, ",extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
       g.c_reverse ? REVERSE_PATH : "", access(LZ4_PATH, R_OK) == 0 ? LZ4_PATH : "",
       access(ROTN_PATH, R_OK) == 0 ? ROTN_PATH : "",
       access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
-      access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "", access(ZSTD_PATH, R_OK) == 0 ? ZSTD_PATH : "");
+      access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "", access(ZSTD_PATH, R_OK) == 0 ? ZSTD_PATH : "",
+      access(SODIUM_PATH, R_OK) == 0 ? SODIUM_PATH : "");
 
     /*
      * Put configuration file configuration options second to last. Put command line configuration
@@ -428,19 +463,28 @@ void
 wts_open(const char *home, WT_CONNECTION **connp, WT_SESSION **sessionp, bool allow_verify)
 {
     WT_CONNECTION *conn;
-    const char *config;
+    size_t max;
+    char config[1024], *p;
+    const char *enc;
 
     *connp = NULL;
     *sessionp = NULL;
+
+    p = config;
+    max = sizeof(config);
+    config[0] = '\0';
+
+    enc = encryptor_at_open(g.c_encryption_flag);
+    if (enc != NULL)
+        CONFIG_APPEND(p, ",encryption=(name=%s)", enc);
 
     /* If in-memory, there's only a single, shared WT_CONNECTION handle. */
     if (g.c_in_memory != 0)
         conn = g.wts_conn_inmemory;
     else {
-        config = "";
 #if WIREDTIGER_VERSION_MAJOR >= 10
         if (g.c_verify && allow_verify)
-            config = ",verify_metadata=true";
+            CONFIG_APPEND(p, ",verify_metadata=true");
 #else
         WT_UNUSED(allow_verify);
 #endif

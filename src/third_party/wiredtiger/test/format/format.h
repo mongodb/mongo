@@ -59,6 +59,20 @@
 #define ROTN_PATH EXTPATH "encryptors/rotn/.libs/libwiredtiger_rotn.so"
 #endif
 
+#ifndef SODIUM_PATH
+#define SODIUM_PATH EXTPATH "encryptors/sodium/.libs/libwiredtiger_sodium.so"
+#endif
+
+/*
+ * To test the sodium encryptor, we use secretkey= rather than setting a keyid, because for a "real"
+ * (vs. test-only) encryptor, keyids require some kind of key server, and (a) setting one up for
+ * testing would be a nuisance and (b) currently the sodium encryptor doesn't support any anyway.
+ *
+ * It expects secretkey= to provide a hex-encoded 256-bit chacha20 key. This key will serve for
+ * testing purposes.
+ */
+#define SODIUM_TESTKEY "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
 #undef M
 #define M(v) ((v)*WT_MILLION) /* Million */
 #undef KILOBYTE
@@ -288,6 +302,7 @@ typedef struct {
 
 #define ENCRYPT_NONE 1
 #define ENCRYPT_ROTN_7 2
+#define ENCRYPT_SODIUM 3
     u_int c_encryption_flag; /* Encryption flag value */
 
 /* The page must be a multiple of the allocation size, and 512 always works. */
