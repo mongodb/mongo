@@ -130,6 +130,8 @@ public:
             auto const shardingState = ShardingState::get(opCtx);
             uassertStatusOK(shardingState->canAcceptShardedCommands());
 
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
+
             FixedFCVRegion fixedFCVRegion(opCtx);
 
             const bool useNewPath =
