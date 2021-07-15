@@ -112,6 +112,10 @@ struct PlanSummaryStats {
 
     // Was a replan triggered during the execution of this query?
     std::optional<std::string> replanReason;
+
+    // Score calculated for the plan by PlanRanker. Only set if there were multiple candidate plans
+    // and allPlansExecution verbosity mode is selected.
+    boost::optional<double> score;
 };
 
 }  // namespace mongo

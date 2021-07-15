@@ -639,6 +639,20 @@ const boost::optional<size_t> getWinningPlanIdx(PlanStage* root) {
     return {};
 }
 
+/**
+ * If 'root' has a MultiPlanStage returns the score of its best plan.
+ */
+boost::optional<double> getWinningPlanScore(PlanStage* root) {
+    if (const auto mps = getMultiPlanStage(root); mps) {
+        auto bestPlanIdx = mps->bestPlanIdx();
+        tassert(5408300,
+                "Trying to get best plan index of a MultiPlanStage without winning plan",
+                bestPlanIdx);
+        return mps->getCandidateScore(*bestPlanIdx);
+    }
+    return {};
+}
+
 void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
     invariant(statsOut);
 
@@ -725,7 +739,11 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
         -> std::pair<std::unique_ptr<PlanStageStats>, const boost::optional<PlanSummaryStats>> {
         auto stats = _root->getStats();
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            return {std::move(stats), collectExecutionStatsSummary(stats.get(), winningPlanIdx)};
+            auto summary = collectExecutionStatsSummary(stats.get(), winningPlanIdx);
+            if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
+                summary.score = getWinningPlanScore(_root);
+            }
+            return {std::move(stats), summary};
         }
 
         return {std::move(stats), boost::none};
@@ -737,7 +755,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanTrialStats() const {
-    return getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+    return getWinningPlanStats(ExplainOptions::Verbosity::kExecAllPlans);
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlansStats(
@@ -758,9 +776,17 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
             BSONObjBuilder bob;
             auto stats = _root->getStats();
             statsToBSON(*stats, verbosity, i, &bob, &bob);
-            res.push_back({bob.obj(),
-                           {verbosity >= ExplainOptions::Verbosity::kExecStats,
-                            collectExecutionStatsSummary(stats.get(), i)}});
+            auto summary = [&]() -> boost::optional<PlanSummaryStats> {
+                if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+                    auto summary = collectExecutionStatsSummary(stats.get(), i);
+                    if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
+                        summary.score = mps->getCandidateScore(i);
+                    }
+                    return summary;
+                }
+                return {};
+            }();
+            res.push_back({bob.obj(), summary});
         }
     }
 

@@ -382,6 +382,9 @@ public:
 
     PlanEnumeratorExplainInfo _enumeratorExplainInfo;
 
+    // Score calculated by PlanRanker. Only present if there are multiple candidate plans.
+    boost::optional<double> score;
+
 private:
     using QsnIdGenerator = IdGenerator<PlanNodeId>;
 

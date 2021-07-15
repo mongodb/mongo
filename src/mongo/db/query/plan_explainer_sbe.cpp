@@ -299,7 +299,7 @@ PlanSummaryStats collectExecutionStatsSummary(const sbe::PlanStageStats* stats) 
 }
 
 PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
-    const QuerySolutionNode* node,
+    const QuerySolution* solution,
     const sbe::PlanStageStats* stats,
     const boost::optional<BSONObj>& execPlanDebugInfo,
     ExplainOptions::Verbosity verbosity) {
@@ -307,6 +307,9 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         auto summary = collectExecutionStatsSummary(stats);
+        if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
+            summary.score = solution->score;
+        }
         statsToBSON(stats, &bob, &bob);
         // At the 'kQueryPlanner' verbosity level we use the QSN-derived format for the given plan,
         // and thus the winning plan and rejected plans at this verbosity should display the
@@ -317,7 +320,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
         return {bob.obj(), std::move(summary)};
     }
 
-    statsToBSON(node, &bob, &bob);
+    statsToBSON(solution->root(), &bob, &bob);
     invariant(execPlanDebugInfo);
     return {BSON("queryPlan" << bob.obj() << "slotBasedPlan" << *execPlanDebugInfo), boost::none};
 }
@@ -484,7 +487,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
     invariant(_solution);
     auto stats = _root->getStats(true /* includeDebugInfo  */);
     return buildPlanStatsDetails(
-        _solution->root(), stats.get(), buildExecPlanDebugInfo(_root, _rootData), verbosity);
+        _solution, stats.get(), buildExecPlanDebugInfo(_root, _rootData), verbosity);
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() const {
@@ -492,14 +495,14 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() con
     if (_rootData->savedStatsOnEarlyExit) {
         invariant(_solution);
         return buildPlanStatsDetails(
-            _solution->root(),
+            _solution,
             _rootData->savedStatsOnEarlyExit.get(),
             // This parameter is not used in `buildPlanStatsDetails` if the last parameter is
-            // `ExplainOptions::Verbosity::kExecStats`, as is the case here.
+            // `ExplainOptions::Verbosity::kExecAllPlans`, as is the case here.
             boost::none,
-            ExplainOptions::Verbosity::kExecStats);
+            ExplainOptions::Verbosity::kExecAllPlans);
     }
-    return getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+    return getWinningPlanStats(ExplainOptions::Verbosity::kExecAllPlans);
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansStats(
@@ -517,7 +520,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
         auto stats = candidate.root->getStats(true /* includeDebugInfo  */);
         auto execPlanDebugInfo = buildExecPlanDebugInfo(candidate.root.get(), &candidate.data);
         res.push_back(buildPlanStatsDetails(
-            candidate.solution->root(), stats.get(), execPlanDebugInfo, verbosity));
+            candidate.solution.get(), stats.get(), execPlanDebugInfo, verbosity));
     }
     return res;
 }

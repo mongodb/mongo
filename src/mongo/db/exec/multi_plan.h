@@ -78,8 +78,10 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
+    boost::optional<double> getCandidateScore(size_t candidateIdx) const;
+
     /**
-     * Adsd a new candidate plan to be considered for selection by the MultiPlanStage trial period.
+     * Adds a new candidate plan to be considered for selection by the MultiPlanStage trial period.
      */
     void addPlan(std::unique_ptr<QuerySolution> solution,
                  std::unique_ptr<PlanStage> root,

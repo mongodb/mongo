@@ -159,11 +159,16 @@ void generatePlannerInfo(PlanExecutor* exec,
  * section, but will not affect the reporting of timing for individual stages. If 'totalTimeMillis'
  * is not set, we use the approximate timing information collected by the stages.
  *
+ * The 'isTrialPeriodInfo' value indicates whether the function was called to generate the
+ * stats collected during the trial period of the plan selection phase, i.e is this section being
+ * generated for the 'allPlansExecution' field.
+ *
  * Stats are generated at the verbosity specified by 'verbosity'.
  */
 void generateSinglePlanExecutionInfo(const PlanExplainer::PlanStatsDetails& details,
                                      boost::optional<long long> totalTimeMillis,
-                                     BSONObjBuilder* out) {
+                                     BSONObjBuilder* out,
+                                     bool isTrialPeriodInfo) {
     auto&& [stats, summary] = details;
     invariant(summary);
 
@@ -181,6 +186,12 @@ void generateSinglePlanExecutionInfo(const PlanExplainer::PlanStatsDetails& deta
 
     if (summary->planFailed) {
         out->appendBool("failed", true);
+    }
+
+    // Only the scores calculated from the trial period should be outputted alongside each plan
+    // in 'allPlansExecution' and not alongside the winning plan stats in 'executionStats'.
+    if (isTrialPeriodInfo && summary->score) {
+        out->appendNumber("score", *summary->score);
     }
 
     // Add the tree of stages, with individual execution stats for each stage.
@@ -222,8 +233,10 @@ void generateExecutionInfo(PlanExecutor* exec,
     // Generate exec stats BSON for the winning plan.
     auto opCtx = exec->getOpCtx();
     auto totalTimeMillis = durationCount<Milliseconds>(CurOp::get(opCtx)->elapsedTimeTotal());
-    generateSinglePlanExecutionInfo(
-        explainer.getWinningPlanStats(verbosity), totalTimeMillis, &execBob);
+    generateSinglePlanExecutionInfo(explainer.getWinningPlanStats(verbosity),
+                                    totalTimeMillis,
+                                    &execBob,
+                                    false /* isTrialPeriodInfo */);
 
     // Also generate exec stats for all plans, if the verbosity level is high enough. These stats
     // reflect what happened during the trial period that ranked the plans.
@@ -237,12 +250,14 @@ void generateExecutionInfo(PlanExecutor* exec,
         // If the winning plan was uncontested, leave the `allPlansExecution` array empty.
         if (explainer.isMultiPlan()) {
             BSONObjBuilder planBob(allPlansBob.subobjStart());
-            generateSinglePlanExecutionInfo(*winningPlanTrialStats, boost::none, &planBob);
+            generateSinglePlanExecutionInfo(
+                *winningPlanTrialStats, boost::none, &planBob, true /* isTrialPeriodInfo */);
             planBob.doneFast();
 
             for (auto&& stats : explainer.getRejectedPlansStats(verbosity)) {
                 BSONObjBuilder planBob(allPlansBob.subobjStart());
-                generateSinglePlanExecutionInfo(stats, boost::none, &planBob);
+                generateSinglePlanExecutionInfo(
+                    stats, boost::none, &planBob, true /* isTrialPeriodInfo */);
                 planBob.doneFast();
             }
         }
@@ -414,7 +429,8 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
         BSONArrayBuilder creationBuilder(out->subarrayStart("creationExecStats"));
         for (auto&& stats : execStats) {
             BSONObjBuilder planBob(creationBuilder.subobjStart());
-            generateSinglePlanExecutionInfo(stats, boost::none, &planBob);
+            generateSinglePlanExecutionInfo(
+                stats, boost::none, &planBob, false /* isTrialPeriodInfo */);
             planBob.doneFast();
         }
         creationBuilder.doneFast();

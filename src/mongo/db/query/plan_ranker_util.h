@@ -115,6 +115,7 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
                 score += 1;
             }
 
+            candidates[i].solution->score = score;
             scoresAndCandidateIndices.push_back(std::make_pair(score, i));
         } else {
             failed.push_back(i);
