@@ -85,9 +85,12 @@ env.SConscript(
         'concurrency',
         'net',
         'options_parser',
+        'version',
     ],
     exports=[
         'env',
+        'version_extra',
+        'version_parts',
     ],
 )
 
