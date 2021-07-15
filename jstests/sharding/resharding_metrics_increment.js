@@ -25,6 +25,11 @@ function verifyDict(dict, expected) {
         if (expected[key] === undefined) {
             jsTest.log(`${key}: ${tojson(dict[key])}`);
             continue;
+        } else if (key === "oplogEntriesFetched" || key === "oplogEntriesApplied") {
+            // The fetcher writes no-op entries for each getMore that returns an empty batch. We
+            // won't know how many getMores it called however, so we can only check that the metrics
+            // are gte the number of writes we're aware of.
+            assert.gte(dict[key], expected[key]);
         } else {
             assert.eq(dict[key],
                       expected[key],

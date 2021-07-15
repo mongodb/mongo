@@ -738,7 +738,8 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
 
     // Run the aggregation
     std::vector<BSONObj> aggResult;
-    auto callback = [&aggResult](const std::vector<BSONObj>& batch) {
+    auto callback = [&aggResult](const std::vector<BSONObj>& batch,
+                                 const boost::optional<BSONObj>& postBatchResumeToken) {
         aggResult.insert(aggResult.end(),
                          std::make_move_iterator(batch.begin()),
                          std::make_move_iterator(batch.end()));

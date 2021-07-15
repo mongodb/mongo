@@ -28,7 +28,7 @@ function verifyMetrics(metrics, expected) {
     }
 }
 
-function testMetricsArePresent(mongo, expectedMetrics) {
+function testMetricsArePresent(mongo, expectedMetrics, minOplogEntriesFetchedAndApplied) {
     const stats = mongo.getDB('admin').serverStatus({});
     assert(stats.hasOwnProperty('shardingStatistics'), stats);
     const shardingStats = stats.shardingStatistics;
@@ -37,21 +37,37 @@ function testMetricsArePresent(mongo, expectedMetrics) {
 
     const metrics = shardingStats.resharding;
     verifyMetrics(metrics, expectedMetrics);
+
+    if (minOplogEntriesFetchedAndApplied !== undefined) {
+        // The fetcher writes no-op entries for each getMore that returns an empty batch. We won't
+        // know how many getMores it called however, so we can only check that the metrics are gte
+        // the number of writes we're aware of.
+        assert.eq(metrics["oplogEntriesFetched"], metrics["oplogEntriesApplied"]);
+        assert.gte(metrics["oplogEntriesFetched"], minOplogEntriesFetchedAndApplied);
+        assert.gte(metrics["oplogEntriesApplied"], minOplogEntriesFetchedAndApplied);
+    }
 }
 
-function verifyParticipantServerStatusOutput(reshardingTest, inputCollection, expectedMetrics) {
+function verifyParticipantServerStatusOutput(
+    reshardingTest, inputCollection, expectedMetrics, minOplogEntriesFetchedAndApplied) {
     const donorShardNames = reshardingTest.donorShardNames;
     const recipientShardNames = reshardingTest.recipientShardNames;
 
     const mongos = inputCollection.getMongo();
     const topology = DiscoverTopology.findConnectedNodes(mongos);
 
-    testMetricsArePresent(new Mongo(topology.shards[donorShardNames[0]].primary), expectedMetrics);
-    testMetricsArePresent(new Mongo(topology.shards[donorShardNames[1]].primary), expectedMetrics);
+    testMetricsArePresent(new Mongo(topology.shards[donorShardNames[0]].primary),
+                          expectedMetrics,
+                          minOplogEntriesFetchedAndApplied);
+    testMetricsArePresent(new Mongo(topology.shards[donorShardNames[1]].primary),
+                          expectedMetrics,
+                          minOplogEntriesFetchedAndApplied);
     testMetricsArePresent(new Mongo(topology.shards[recipientShardNames[0]].primary),
-                          expectedMetrics);
+                          expectedMetrics,
+                          minOplogEntriesFetchedAndApplied);
     testMetricsArePresent(new Mongo(topology.shards[recipientShardNames[1]].primary),
-                          expectedMetrics);
+                          expectedMetrics,
+                          minOplogEntriesFetchedAndApplied);
 }
 
 function verifyCoordinatorServerStatusOutput(inputCollection, expectedMetrics) {
@@ -206,12 +222,14 @@ var finalServerStatusMetrics = {
     "countReshardingCanceled": 0,
     "documentsCopied": 2,
     "bytesCopied": Object.bsonsize(documentsInserted[1]) + Object.bsonsize(documentsInserted[2]),
-    "oplogEntriesApplied": 2,
     "countWritesDuringCriticalSection": 0,
     "lastOpEndingChunkImbalance": 0,
 };
 
-verifyParticipantServerStatusOutput(reshardingTest, inputCollection, finalServerStatusMetrics);
+verifyParticipantServerStatusOutput(reshardingTest,
+                                    inputCollection,
+                                    finalServerStatusMetrics,
+                                    2 /* minOplogEntriesFetchedAndApplied */);
 
 // Min and max remaining times should be 0 because they are reset at the end of every resharding
 // operation.

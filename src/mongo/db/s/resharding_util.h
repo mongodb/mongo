@@ -52,6 +52,7 @@
 namespace mongo {
 
 constexpr auto kReshardFinalOpLogType = "reshardFinalOp"_sd;
+constexpr auto kReshardProgressMark = "reshardProgressMark"_sd;
 static const auto kReshardErrorMaxBytes = 2000;
 
 /**

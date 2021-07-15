@@ -69,6 +69,7 @@ public:
         Documents documents;
         struct OtherFields {
             BSONObj metadata;
+            boost::optional<BSONObj> postBatchResumeToken = boost::none;
         } otherFields;
         Microseconds elapsed = Microseconds(0);
         bool first = false;

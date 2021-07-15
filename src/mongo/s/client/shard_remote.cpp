@@ -424,7 +424,8 @@ void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
 Status ShardRemote::runAggregation(
     OperationContext* opCtx,
     const AggregateCommandRequest& aggRequest,
-    std::function<bool(const std::vector<BSONObj>& batch)> callback) {
+    std::function<bool(const std::vector<BSONObj>& batch,
+                       const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
 
     BSONObj readPrefMetadata;
 
@@ -467,7 +468,9 @@ Status ShardRemote::runAggregation(
         }
 
         try {
-            if (!callback(data.documents)) {
+            boost::optional<BSONObj> postBatchResumeToken =
+                data.documents.empty() ? data.otherFields.postBatchResumeToken : boost::none;
+            if (!callback(data.documents, postBatchResumeToken)) {
                 *nextAction = Fetcher::NextAction::kNoAction;
             }
         } catch (...) {
