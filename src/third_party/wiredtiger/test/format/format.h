@@ -275,6 +275,7 @@ typedef struct {
 #define CHECKSUM_OFF 1
 #define CHECKSUM_ON 2
 #define CHECKSUM_UNCOMPRESSED 3
+#define CHECKSUM_UNENCRYPTED 4
     u_int c_checksum_flag; /* Checksum flag value */
 
 #define COMPRESS_NONE 1

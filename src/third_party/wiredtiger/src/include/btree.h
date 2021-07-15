@@ -78,9 +78,10 @@ typedef enum __wt_btree_sync {
 } WT_BTREE_SYNC;
 
 typedef enum {
-    CKSUM_ON = 1,          /* On */
-    CKSUM_OFF = 2,         /* Off */
-    CKSUM_UNCOMPRESSED = 3 /* Uncompressed blocks only */
+    CKSUM_ON = 1,           /* On */
+    CKSUM_OFF = 2,          /* Off */
+    CKSUM_UNCOMPRESSED = 3, /* Uncompressed blocks only */
+    CKSUM_UNENCRYPTED = 4   /* Unencrypted blocks only */
 } WT_BTREE_CHECKSUM;
 
 typedef enum { /* Start position for eviction walk */

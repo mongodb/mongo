@@ -426,6 +426,7 @@ URIs
 UTF
 UltraSparc
 Unbuffered
+Unencrypted
 UnixLib
 UnlockFile
 Unmap
@@ -1405,8 +1406,8 @@ uint
 uintmax
 unbare
 unbuffered
+uncompressed
 uncompressing
-uncompresssed
 undef
 underflowed
 unencrypted

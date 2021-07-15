@@ -1085,12 +1085,13 @@ struct __wt_session {
 	 * @config{cache_resident, do not ever evict the object's pages from cache.  Not compatible
 	 * with LSM tables; see @ref tuning_cache_resident for more information., a boolean flag;
 	 * default \c false.}
-	 * @config{checksum, configure block checksums; permitted values are <code>on</code>
-	 * (checksum all blocks)\, <code>off</code> (checksum no blocks) and
-	 * <code>uncompresssed</code> (checksum only blocks which are not compressed for any
-	 * reason). The \c uncompressed setting is for applications which can rely on decompression
-	 * to fail if a block has been corrupted., a string\, chosen from the following options: \c
-	 * "on"\, \c "off"\, \c "uncompressed"; default \c uncompressed.}
+	 * @config{checksum, configure block checksums; the permitted values are \c on\, \c off\, \c
+	 * uncompressed and \c unencrypted.  The default is \c on\, in which case all block writes
+	 * include a checksum subsequently verified when the block is read.  The \c off setting does
+	 * no checksums\, the \c uncompressed setting only checksums blocks that are not
+	 * compressed\, and the \c unencrypted setting only checksums blocks that are not encrypted.
+	 * See @ref tune_checksum for more information., a string\, chosen from the following
+	 * options: \c "on"\, \c "off"\, \c "uncompressed"\, \c "unencrypted"; default \c on.}
 	 * @config{colgroups, comma-separated list of names of column groups.  Each column group is
 	 * stored separately\, keyed by the primary key of the table.  If no column groups are
 	 * specified\, all columns are stored together in a single file.  All value columns in the
