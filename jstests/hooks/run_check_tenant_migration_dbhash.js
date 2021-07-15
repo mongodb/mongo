@@ -10,8 +10,6 @@ const testDBName = "testTenantMigration";
 const dbhashCollName = "dbhashCheck";
 const tenantId = TestData.tenantId;
 const migrationId = UUID(TestData.migrationIdString);
-const retryOnNetworkErrors = TestData.networkErrorAndTxnOverrideConfig &&
-    TestData.networkErrorAndTxnOverrideConfig.retryOnNetworkErrors;
 
 let donorRst;
 let recipientRst;
@@ -36,8 +34,7 @@ while (true) {
 }
 
 // We assume every db is under the tenant being migrated.
-TenantMigrationUtil.checkTenantDBHashes(
-    donorRst, recipientRst, tenantId, excludedDBs, retryOnNetworkErrors);
+TenantMigrationUtil.checkTenantDBHashes(donorRst, recipientRst, tenantId, excludedDBs);
 
 // Mark that we have completed the dbhash check.
 assert.commandWorked(donorDB.runCommand(

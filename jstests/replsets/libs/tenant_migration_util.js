@@ -276,7 +276,6 @@ var TenantMigrationUtil = (function() {
                                  recipientRst,
                                  tenantId,
                                  excludedDBs = [],
-                                 retryOnRetryableErrors = false,
                                  msgPrefix = 'checkTenantDBHashes',
                                  ignoreUUIDs = false) {
         // Always skip db hash checks for the config, admin, and local database.
@@ -284,28 +283,8 @@ var TenantMigrationUtil = (function() {
 
         while (true) {
             try {
-                // If a cluster has authentication enabled, then we would need to also log in as
-                // users with the proper roles for each session client as well. Since authentication
-                // is only relevant in certain jstests, we can split the code path such that we only
-                // run within a session if we set the retryOnRetryableErrors flag to be true.
-                let donorPrimaryConn;
-                let recipientPrimaryConn;
-                let donorSession;
-                let recipientSession;
-
-                // In failover suites we want to run within a session to allow for retryable
-                // operations to retry.
-                if (retryOnRetryableErrors) {
-                    donorSession =
-                        new Mongo(donorRst.getPrimary().host).startSession({retryWrites: true});
-                    recipientSession =
-                        new Mongo(recipientRst.getPrimary().host).startSession({retryWrites: true});
-                    donorPrimaryConn = donorSession.getClient();
-                    recipientPrimaryConn = recipientSession.getClient();
-                } else {
-                    donorPrimaryConn = donorRst.getPrimary();
-                    recipientPrimaryConn = recipientRst.getPrimary();
-                }
+                const donorPrimaryConn = donorRst.getPrimary();
+                const recipientPrimaryConn = recipientRst.getPrimary();
 
                 // Allows listCollections and listIndexes on donor after migration for consistency
                 // checks.
@@ -333,25 +312,12 @@ var TenantMigrationUtil = (function() {
                 combinedDBNames = new Set(combinedDBNames);
 
                 for (const dbName of combinedDBNames) {
-                    let donorDBHash;
-                    let recipientDBHash;
-
-                    // If a failover occurs while we run getHashes(), it is possible that the
-                    // self._primary referenced in a ReplSetTest is currently undefined which will
-                    // cause issues when it tries to get a session from an undefined variable. Thus,
-                    // we use the underlying helper function getHashesUsingSessions() and pass in
-                    // the donor and recipient connection sessions manually to circumvent the issue.
-                    if (retryOnRetryableErrors) {
-                        donorDBHash = donorRst.getHashesUsingSessions([donorSession], dbName)[0];
-                        recipientDBHash =
-                            recipientRst.getHashesUsingSessions([recipientSession], dbName)[0];
-                    } else {
-                        // Pass in an empty array for the secondaries, since we only wish to compare
-                        // the DB hashes between the donor and recipient primary in this test.
-                        donorDBHash = assert.commandWorked(donorRst.getHashes(dbName, []).primary);
-                        recipientDBHash =
-                            assert.commandWorked(recipientRst.getHashes(dbName, []).primary);
-                    }
+                    // Pass in an empty array for the secondaries, since we only wish to compare
+                    // the DB hashes between the donor and recipient primary in this test.
+                    const donorDBHash =
+                        assert.commandWorked(donorRst.getHashes(dbName, []).primary);
+                    const recipientDBHash =
+                        assert.commandWorked(recipientRst.getHashes(dbName, []).primary);
 
                     const donorCollections = Object.keys(donorDBHash.collections);
                     const donorCollInfos = new CollInfos(donorPrimaryConn, 'donorPrimary', dbName);
@@ -438,7 +404,10 @@ var TenantMigrationUtil = (function() {
             "can't connect to new replica set primary"
         ];
 
-        return isRetryableError(error) || isNetworkError(error) ||
+        return ErrorCodes.isRetriableError(error.code) || ErrorCodes.isNetworkError(error.code) ||
+            // The following shell helper methods check if the error message contains some
+            // notion of retriability. This is in case the error does not contain an error code.
+            isRetryableError(error) || isNetworkError(error) ||
             // If there's a failover while we're running a dbhash check, the elected secondary might
             // not have set the tenantMigrationDonorAllowsNonTimestampedReads failpoint, which means
             // that the listCollections command run when we call CollInfos would throw a
