@@ -358,6 +358,8 @@ protected:
                             sbe::value::SlotId{3},
                             stage_builder::makeFunction(
                                 "max", sbe::makeE<sbe::EVariable>(sbe::value::SlotId{1}))),
+                sbe::makeSV(),
+                true,
                 boost::none, /* optional collator slot */
                 planNodeId),
             // GROUP with a collator slot.
@@ -370,6 +372,8 @@ protected:
                             sbe::value::SlotId{3},
                             stage_builder::makeFunction(
                                 "max", sbe::makeE<sbe::EVariable>(sbe::value::SlotId{1}))),
+                sbe::makeSV(),
+                true,
                 sbe::value::SlotId{4}, /* optional collator slot */
                 planNodeId),
             // LIMIT

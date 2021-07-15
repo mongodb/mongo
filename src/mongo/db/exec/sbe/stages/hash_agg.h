@@ -49,19 +49,28 @@ namespace sbe {
  * from the 'input' tree are not visible higher in tree. Stages higher in the tree can only see the
  * slots holding the group-by keys as well as those holding the corresponding aggregate values.
  *
+ * The optional 'seekKeys', if provided, limit the results returned from the hash table only to
+ * those equal to seekKeys.
+ *
+ * The 'optimizedClose' flag controls whether we can close the child subtree right after building
+ * the hash table. If true it means that we do not expect the subtree to be reopened.
+ *
  * The optional 'collatorSlot', if provided, changes the definition of string equality used when
  * determining whether two group-by keys are equal. For instance, the plan may require us to do a
  * case-insensitive group on a string field.
  *
  * Debug string representation:
  *
- *  group [<group by slots>] [slot_1 = expr_1, ..., slot_n = expr_n] collatorSlot? childStage
+ *  group [<group by slots>] [slot_1 = expr_1, ..., slot_n = expr_n] [<seek slots>]? reopen?
+ * collatorSlot? childStage
  */
 class HashAggStage final : public PlanStage {
 public:
     HashAggStage(std::unique_ptr<PlanStage> input,
                  value::SlotVector gbs,
                  value::SlotMap<std::unique_ptr<EExpression>> aggs,
+                 value::SlotVector seekKeysSlots,
+                 bool optimizedClose,
                  boost::optional<value::SlotId> collatorSlot,
                  PlanNodeId planNodeId);
 
@@ -89,10 +98,17 @@ private:
     const value::SlotVector _gbs;
     const value::SlotMap<std::unique_ptr<EExpression>> _aggs;
     const boost::optional<value::SlotId> _collatorSlot;
+    const value::SlotVector _seekKeysSlots;
+    // When this operator does not expect to be reopened (almost always) then it can close the child
+    // early.
+    const bool _optimizedClose{true};
 
     value::SlotAccessorMap _outAccessors;
     std::vector<value::SlotAccessor*> _inKeyAccessors;
     std::vector<std::unique_ptr<HashKeyAccessor>> _outKeyAccessors;
+
+    std::vector<value::SlotAccessor*> _seekKeysAccessors;
+    value::MaterializedRow _seekKeys;
 
     std::vector<std::unique_ptr<HashAggAccessor>> _outAggAccessors;
     std::vector<std::unique_ptr<vm::CodeFragment>> _aggCodes;
@@ -106,6 +122,7 @@ private:
     vm::ByteCode _bytecode;
 
     bool _compiled{false};
+    bool _childOpened{false};
 };
 }  // namespace sbe
 }  // namespace mongo

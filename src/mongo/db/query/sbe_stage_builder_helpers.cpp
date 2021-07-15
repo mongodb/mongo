@@ -445,8 +445,13 @@ EvalStage makeHashAgg(EvalStage stage,
     for (auto& [slot, _] : aggs) {
         stage.outSlots.push_back(slot);
     }
-    stage.stage = sbe::makeS<sbe::HashAggStage>(
-        std::move(stage.stage), std::move(gbs), std::move(aggs), collatorSlot, planNodeId);
+    stage.stage = sbe::makeS<sbe::HashAggStage>(std::move(stage.stage),
+                                                std::move(gbs),
+                                                std::move(aggs),
+                                                sbe::makeSV(),
+                                                true /* optimized close */,
+                                                collatorSlot,
+                                                planNodeId);
     return stage;
 }
 

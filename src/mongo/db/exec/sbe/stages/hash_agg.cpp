@@ -38,13 +38,21 @@ namespace sbe {
 HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
                            value::SlotVector gbs,
                            value::SlotMap<std::unique_ptr<EExpression>> aggs,
+                           value::SlotVector seekKeysSlots,
+                           bool optimizedClose,
                            boost::optional<value::SlotId> collatorSlot,
                            PlanNodeId planNodeId)
     : PlanStage("group"_sd, planNodeId),
       _gbs(std::move(gbs)),
       _aggs(std::move(aggs)),
-      _collatorSlot(collatorSlot) {
+      _collatorSlot(collatorSlot),
+      _seekKeysSlots(std::move(seekKeysSlots)),
+      _optimizedClose(optimizedClose) {
     _children.emplace_back(std::move(input));
+    invariant(_seekKeysSlots.empty() || _seekKeysSlots.size() == _gbs.size());
+    tassert(5843100,
+            "HashAgg stage was given optimizedClose=false and seek keys",
+            _seekKeysSlots.empty() || _optimizedClose);
 }
 
 std::unique_ptr<PlanStage> HashAggStage::clone() const {
@@ -52,8 +60,13 @@ std::unique_ptr<PlanStage> HashAggStage::clone() const {
     for (auto& [k, v] : _aggs) {
         aggs.emplace(k, v->clone());
     }
-    return std::make_unique<HashAggStage>(
-        _children[0]->clone(), _gbs, std::move(aggs), _collatorSlot, _commonStats.nodeId);
+    return std::make_unique<HashAggStage>(_children[0]->clone(),
+                                          _gbs,
+                                          std::move(aggs),
+                                          _seekKeysSlots,
+                                          _optimizedClose,
+                                          _collatorSlot,
+                                          _commonStats.nodeId);
 }
 
 void HashAggStage::prepare(CompileCtx& ctx) {
@@ -76,6 +89,12 @@ void HashAggStage::prepare(CompileCtx& ctx) {
         _inKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, slot));
         _outKeyAccessors.emplace_back(std::make_unique<HashKeyAccessor>(_htIt, counter++));
         _outAccessors[slot] = _outKeyAccessors.back().get();
+    }
+
+    // Process seek keys (if any). The keys must come from outside of the subtree (by definition) so
+    // we go directly to the compilation context.
+    for (auto& slot : _seekKeysSlots) {
+        _seekKeysAccessors.emplace_back(ctx.getAccessor(slot));
     }
 
     counter = 0;
@@ -116,45 +135,64 @@ void HashAggStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 
     _commonStats.opens++;
-    _children[0]->open(reOpen);
 
-    if (_collatorAccessor) {
-        auto [tag, collatorVal] = _collatorAccessor->getViewOfValue();
-        uassert(5402503, "collatorSlot must be of collator type", tag == value::TypeTags::collator);
-        auto collatorView = value::getCollatorView(collatorVal);
-        const value::MaterializedRowHasher hasher(collatorView);
-        const value::MaterializedRowEq equator(collatorView);
-        _ht.emplace(0, hasher, equator);
-    } else {
-        _ht.emplace();
+    if (!reOpen || !_optimizedClose) {
+        _children[0]->open(reOpen);
+        _childOpened = true;
+
+        if (_collatorAccessor) {
+            auto [tag, collatorVal] = _collatorAccessor->getViewOfValue();
+            uassert(
+                5402503, "collatorSlot must be of collator type", tag == value::TypeTags::collator);
+            auto collatorView = value::getCollatorView(collatorVal);
+            const value::MaterializedRowHasher hasher(collatorView);
+            const value::MaterializedRowEq equator(collatorView);
+            _ht.emplace(0, hasher, equator);
+        } else {
+            _ht.emplace();
+        }
+
+        _seekKeys.resize(_seekKeysAccessors.size());
+
+        while (_children[0]->getNext() == PlanState::ADVANCED) {
+            value::MaterializedRow key{_inKeyAccessors.size()};
+            // Copy keys in order to do the lookup.
+            size_t idx = 0;
+            for (auto& p : _inKeyAccessors) {
+                auto [tag, val] = p->getViewOfValue();
+                key.reset(idx++, false, tag, val);
+            }
+
+            auto [it, inserted] = _ht->try_emplace(std::move(key), value::MaterializedRow{0});
+            if (inserted) {
+                // Copy keys.
+                const_cast<value::MaterializedRow&>(it->first).makeOwned();
+                // Initialize accumulators.
+                it->second.resize(_outAggAccessors.size());
+            }
+
+            // Accumulate.
+            _htIt = it;
+            for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
+                auto [owned, tag, val] = _bytecode.run(_aggCodes[idx].get());
+                _outAggAccessors[idx]->reset(owned, tag, val);
+            }
+        }
+
+        if (_optimizedClose) {
+            _children[0]->close();
+            _childOpened = false;
+        }
     }
 
-    while (_children[0]->getNext() == PlanState::ADVANCED) {
-        value::MaterializedRow key{_inKeyAccessors.size()};
+    if (!_seekKeysAccessors.empty()) {
         // Copy keys in order to do the lookup.
         size_t idx = 0;
-        for (auto& p : _inKeyAccessors) {
+        for (auto& p : _seekKeysAccessors) {
             auto [tag, val] = p->getViewOfValue();
-            key.reset(idx++, false, tag, val);
-        }
-
-        auto [it, inserted] = _ht->try_emplace(std::move(key), value::MaterializedRow{0});
-        if (inserted) {
-            // Copy keys.
-            const_cast<value::MaterializedRow&>(it->first).makeOwned();
-            // Initialize accumulators.
-            it->second.resize(_outAggAccessors.size());
-        }
-
-        // Accumulate.
-        _htIt = it;
-        for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
-            auto [owned, tag, val] = _bytecode.run(_aggCodes[idx].get());
-            _outAggAccessors[idx]->reset(owned, tag, val);
+            _seekKeys.reset(idx++, false, tag, val);
         }
     }
-
-    _children[0]->close();
 
     _htIt = _ht->end();
 }
@@ -163,8 +201,17 @@ PlanState HashAggStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
     if (_htIt == _ht->end()) {
-        _htIt = _ht->begin();
+        // First invocation of getNext() after open().
+        if (!_seekKeysAccessors.empty()) {
+            _htIt = _ht->find(_seekKeys);
+        } else {
+            _htIt = _ht->begin();
+        }
+    } else if (!_seekKeysAccessors.empty()) {
+        // Subsequent invocation with seek keys. Return only 1 single row (if any).
+        _htIt = _ht->end();
     } else {
+        // Returning the results of the entire hash table.
         ++_htIt;
     }
 
@@ -204,6 +251,11 @@ void HashAggStage::close() {
 
     trackClose();
     _ht = boost::none;
+
+    if (_childOpened) {
+        _children[0]->close();
+        _childOpened = false;
+    }
 }
 
 std::vector<DebugPrinter::Block> HashAggStage::debugPrint() const {
@@ -232,6 +284,22 @@ std::vector<DebugPrinter::Block> HashAggStage::debugPrint() const {
         first = false;
     });
     ret.emplace_back("`]");
+
+    if (!_seekKeysSlots.empty()) {
+        ret.emplace_back("[`");
+        for (size_t idx = 0; idx < _seekKeysSlots.size(); ++idx) {
+            if (idx) {
+                ret.emplace_back("`,");
+            }
+
+            DebugPrinter::addIdentifier(ret, _seekKeysSlots[idx]);
+        }
+        ret.emplace_back("`]");
+    }
+
+    if (!_optimizedClose) {
+        ret.emplace_back("reopen");
+    }
 
     if (_collatorSlot) {
         DebugPrinter::addIdentifier(ret, *_collatorSlot);

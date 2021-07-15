@@ -81,6 +81,8 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
                    collMaxSlot,
                    stage_builder::makeFunction(
                        "collMax", collExpr->clone(), makeE<EVariable>(scanSlot))),
+            makeSV(),
+            true,
             boost::none,
             kEmptyPlanNodeId);
 
@@ -135,6 +137,8 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
             makeEM(hashAggSlot,
                    stage_builder::makeFunction(
                        "collAddToSet", std::move(collExpr), makeE<EVariable>(scanSlot))),
+            makeSV(),
+            true,
             boost::none,
             kEmptyPlanNodeId);
 
@@ -219,6 +223,8 @@ TEST_F(HashAggStageTest, HashAggCollationTest) {
                                                "sum",
                                                makeE<EConstant>(value::TypeTags::NumberInt64,
                                                                 value::bitcastFrom<int64_t>(1)))),
+                                    makeSV(),
+                                    true,
                                     boost::optional<value::SlotId>{useCollator, collatorSlot},
                                     kEmptyPlanNodeId);
 
@@ -280,6 +286,74 @@ TEST_F(HashAggStageTest, HashAggCollationTest) {
 
         assertValuesEqual(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal);
     }
+}
+
+TEST_F(HashAggStageTest, HashAggSeekKeysTest) {
+    auto ctx = makeCompileCtx();
+
+    // Create a seek slot we will use to peek into the hash table.
+    auto seekSlot = generateSlotId();
+    value::OwnedValueAccessor seekAccessor;
+    ctx->pushCorrelated(seekSlot, &seekAccessor);
+
+    // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
+    auto [inputTag, inputVal] =
+        stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
+    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+
+
+    auto [outputSlot, stage] = [this, seekSlot](value::SlotId scanSlot,
+                                                std::unique_ptr<PlanStage> scanStage) {
+        // Build a HashAggStage, group by the scanSlot and compute a simple count.
+        auto countsSlot = generateSlotId();
+
+        auto hashAggStage = makeS<HashAggStage>(
+            std::move(scanStage),
+            makeSV(scanSlot),
+            makeEM(countsSlot,
+                   stage_builder::makeFunction("sum",
+                                               makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                                value::bitcastFrom<int64_t>(1)))),
+            makeSV(seekSlot),
+            true,
+            boost::none,
+            kEmptyPlanNodeId);
+
+        return std::make_pair(countsSlot, std::move(hashAggStage));
+    }(scanSlot, std::move(scanStage));
+
+    // Let's start with '5' as our seek value.
+    seekAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(5));
+
+    // Prepare the tree and get the `SlotAccessor` for the output slot.
+    auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
+    ctx->popCorrelated();
+
+    ASSERT_TRUE(stage->getNext() == PlanState::ADVANCED);
+    auto [res1Tag, res1Val] = resultAccessor->getViewOfValue();
+    // There are '2' occurences of '5' in the input.
+    assertValuesEqual(res1Tag, res1Val, value::TypeTags::NumberInt32, value::bitcastFrom<int>(2));
+    ASSERT_TRUE(stage->getNext() == PlanState::IS_EOF);
+
+    // Reposition to '6'.
+    seekAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(6));
+    stage->open(true);
+    ASSERT_TRUE(stage->getNext() == PlanState::ADVANCED);
+    auto [res2Tag, res2Val] = resultAccessor->getViewOfValue();
+    // There are '3' occurences of '6' in the input.
+    assertValuesEqual(res2Tag, res2Val, value::TypeTags::NumberInt32, value::bitcastFrom<int>(3));
+    ASSERT_TRUE(stage->getNext() == PlanState::IS_EOF);
+
+    // Reposition to '7'.
+    seekAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(7));
+    stage->open(true);
+    ASSERT_TRUE(stage->getNext() == PlanState::ADVANCED);
+    auto [res3Tag, res3Val] = resultAccessor->getViewOfValue();
+    // There are '4' occurences of '7' in the input.
+    assertValuesEqual(res3Tag, res3Val, value::TypeTags::NumberInt32, value::bitcastFrom<int>(4));
+    ASSERT_TRUE(stage->getNext() == PlanState::IS_EOF);
+
+    stage->close();
 }
 
 }  // namespace mongo::sbe
