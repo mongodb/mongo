@@ -5,7 +5,10 @@
  * documents, and assigning each document to a random thread. Meant to be extended by workloads that
  * test operations with concurrent moveChunks. Assumes each thread has an id from [0, threadCount).
  *
- * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off];
+ * @tags: [
+ *  requires_sharding,
+ *  assumes_balancer_off,
+ * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');
 load('jstests/concurrency/fsm_workloads/sharded_base_partitioned.js');

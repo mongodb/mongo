@@ -6,8 +6,11 @@
  * Tests $merge with "whenNotMatched" set to "insert" concurrently with moveChunk operations on the
  * output collection.
  *
- * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off,
- * requires_non_retryable_writes]]
+ * @tags: [
+ *  requires_sharding,
+ *  assumes_balancer_off,
+ *  requires_non_retryable_writes,
+ *]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                 // for extendWorkload
 load('jstests/concurrency/fsm_workloads/agg_with_chunk_migrations.js');  // for $config

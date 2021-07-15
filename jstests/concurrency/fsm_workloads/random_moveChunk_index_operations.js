@@ -4,7 +4,10 @@
  * Performs a series of index operations while chunk migrations are running in the background
  * and verifies that indexes are not left in an inconsistent state.
  *
- * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off]
+ * @tags: [
+ *  requires_sharding,
+ *  assumes_balancer_off,
+ * ]
  */
 
 load("jstests/concurrency/fsm_workload_helpers/chunks.js");  // for chunk helpers

@@ -12,10 +12,9 @@
  * $config.state.aggregate: function to execute the aggregation.
  *
  * @tags: [
- *   requires_sharding,
- *   assumes_balancer_off,
- *   assumes_autosplit_off,
- *   requires_non_retryable_writes
+ *  requires_sharding,
+ *  assumes_balancer_off,
+ *  requires_non_retryable_writes,
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                 // for extendWorkload

@@ -12,7 +12,6 @@
  *
  * @tags: [
  *  requires_sharding, assumes_balancer_off,
- *  assumes_autosplit_off,
  *  requires_non_retryable_writes,
  *  # mapReduce does not support afterClusterTime.
  *  does_not_support_causal_consistency

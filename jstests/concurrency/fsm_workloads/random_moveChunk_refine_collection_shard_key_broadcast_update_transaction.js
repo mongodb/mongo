@@ -8,7 +8,6 @@
  * 4. Flushes the router's cached metadata for all sharded collections.
  *
  * @tags: [
- *   assumes_autosplit_off,
  *   assumes_balancer_off,
  *   # The init() state function populates each document owned by a particular thread with a
  *   # "counter" value. Doing so may take longer than the configured stepdown interval. It is

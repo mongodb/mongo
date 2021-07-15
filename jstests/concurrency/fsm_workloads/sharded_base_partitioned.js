@@ -18,7 +18,10 @@
  *
  *                         <===t2's partition==>
  *
- * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off]
+ * @tags: [
+ *  requires_sharding,
+ *  assumes_balancer_off,
+ * ]
  */
 
 load('jstests/concurrency/fsm_workload_helpers/chunks.js');  // for chunk helpers

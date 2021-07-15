@@ -8,7 +8,6 @@
  *   requires_fcv_50,
  *   requires_sharding,
  *   assumes_balancer_off,
- *   assumes_autosplit_off,
  *   does_not_support_causal_consistency,
  *   # TODO (SERVER-56879): Support add/remove shards in new DDL paths
  *   does_not_support_add_remove_shards,
