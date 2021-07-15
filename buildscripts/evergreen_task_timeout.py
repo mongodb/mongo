@@ -48,6 +48,7 @@ SPECIFIC_TASK_OVERRIDES = {
     "enterprise-rhel-80-64-bit-coverage": {
         "replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30),
     },
+    "macos": {"replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30), },
 
     # unittests outliers
     # repeated execution runs a suite 10 times
