@@ -263,10 +263,17 @@ executor:
     auth_options: *authOptions
   - class: ContinuousTenantMigration
     shell_options:
+      eval: >-
+        testingReplication = true;
+        load('jstests/libs/override_methods/network_error_and_txn_override.js');
+        load("jstests/libs/override_methods/set_read_and_write_concerns.js");
       global_vars:
         TestData:
           <<: *TestData
           authOptions: *authOptions
+      # We specify nodb so the shell used by each test will attempt to connect after loading the
+      # retry logic in auto_retry_on_network_error.js.
+      nodb: ""
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
   # validating the entire contents of the collection.
