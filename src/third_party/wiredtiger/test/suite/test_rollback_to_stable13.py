@@ -25,8 +25,6 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-
-import fnmatch, os, shutil, time
 from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 from wiredtiger import stat
@@ -251,5 +249,50 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
         restored_tombstones = stat_cursor[stat.conn.txn_rts_hs_restore_tombstones][2]
         self.assertEqual(restored_tombstones, nrows)
 
-if __name__ == '__main__':
-    wttest.run()
+    def test_rollback_to_stable_with_stable_remove(self):
+        nrows = 1000
+        # Prepare transactions for column store table is not yet supported.
+        if self.prepare and self.key_format == 'r':
+            self.skipTest('Prepare transactions for column store table is not yet supported')
+        # Create a table without logging.
+        uri = "table:rollback_to_stable13"
+        ds = SimpleDataSet(
+            self, uri, 0, key_format=self.key_format, value_format="S", config='split_pct=50,log=(enabled=false)')
+        ds.populate()
+        # Pin oldest and stable to timestamp 10.
+        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
+            ',stable_timestamp=' + timestamp_str(10))
+        value_a = "aaaaa" * 100
+        value_b = "bbbbb" * 100
+        value_c = "ccccc" * 100
+        # Perform several updates.
+        self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
+        # Perform several updates.
+        self.large_updates(uri, value_b, ds, nrows, self.prepare, 30)
+        # Perform several removes.
+        self.large_removes(uri, ds, nrows, self.prepare, 40)
+        # Pin stable to timestamp 50 if prepare otherwise 40.
+        if self.prepare:
+            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(50))
+        else:
+            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(40))
+        # Perform several updates and checkpoint.
+        self.large_updates(uri, value_c, ds, nrows, self.prepare, 60)
+        self.session.checkpoint()
+        # Verify data is visible and correct.
+        self.check(value_a, uri, nrows, 20)
+        self.check(None, uri, 0, 40)
+        self.check(value_c, uri, nrows, 60)
+        self.conn.rollback_to_stable()
+        # Perform several updates and checkpoint.
+        self.large_updates(uri, value_c, ds, nrows, self.prepare, 60)
+        self.session.checkpoint()
+        # Simulate a server crash and restart.
+        simulate_crash_restart(self, ".", "RESTART")
+        # Check that the correct data is seen at and after the stable timestamp.
+        self.check(None, uri, 0, 50)
+        # Check that we restore the correct value from the history store.
+        self.check(value_a, uri, nrows, 20)
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        restored_tombstones = stat_cursor[stat.conn.txn_rts_hs_restore_tombstones][2]
+        self.assertEqual(restored_tombstones, nrows)
