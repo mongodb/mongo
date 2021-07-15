@@ -389,7 +389,7 @@ class GenerateBuildVariantOrchestrator:
         LOGGER.info("Configure task", task_id=task.task_id, priority=priority)
         self.evg_api.configure_task(task.task_id, priority=priority)
 
-    def adjust_gen_tasks_priority(self, gen_tasks: Set[str]) -> None:
+    def adjust_gen_tasks_priority(self, gen_tasks: Set[str]) -> int:
         """
         Increase the priority of any "_gen" tasks.
 
@@ -407,7 +407,8 @@ class GenerateBuildVariantOrchestrator:
                 if task.display_name in gen_tasks
             ]
 
-        [j.result() for j in jobs]  # pylint: disable=expression-not-assigned
+        results = [j.result() for j in jobs]
+        return len(results)
 
 
 @click.command()
