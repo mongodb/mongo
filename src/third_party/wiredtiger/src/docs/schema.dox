@@ -66,24 +66,23 @@ struct module to describe the types of columns in a table:
   http://docs.python.org/library/struct
 
 <table>
-@hrow{Format, C Type, Java type, Python type, Notes}
+@hrow{Format, C Type, Python type, Notes}
 @row{\c x, N/A, N/A, N/A, pad byte\, no associated value}
-@row{\c b, \c int8_t, \c byte, \c int, signed byte}
-@row{\c B, \c uint8_t, \c byte, \c int, unsigned byte}
-@row{\c h, \c int16_t, \c short, \c int, signed 16-bit}
-@row{\c H, \c uint16_t, \c short, \c int, unsigned 16-bit}
-@row{\c i, \c int32_t, \c int, \c int, signed 32-bit}
-@row{\c I, \c uint32_t, \c int, \c int, unsigned 32-bit}
-@row{\c l, \c int32_t, \c int, \c int, signed 32-bit}
-@row{\c L, \c uint32_t, \c int, \c int, unsigned 32-bit}
-@row{\c q, \c int64_t, \c long, \c int, signed 64-bit}
-@row{\c Q, \c uint64_t, \c long, \c int, unsigned 64-bit}
-@row{\c r, \c uint64_t, \c long, \c int, record number}
-@row{\c s, \c char[], \c String, \c str, fixed-length string}
-@row{\c S, \c char[], \c String, \c str, NUL-terminated string}
-@row{\c t, \c uint8_t, \c byte, \c int, fixed-length bit field}
-@row{\c u, <code>WT_ITEM *</code>, <code>byte[]</code>, \c str,
-	raw byte array}
+@row{\c b, \c int8_t, \c int, signed byte}
+@row{\c B, \c uint8_t, \c int, unsigned byte}
+@row{\c h, \c int16_t, \c int, signed 16-bit}
+@row{\c H, \c uint16_t, \c int, unsigned 16-bit}
+@row{\c i, \c int32_t, \c int, signed 32-bit}
+@row{\c I, \c uint32_t, \c int, unsigned 32-bit}
+@row{\c l, \c int32_t, \c int, signed 32-bit}
+@row{\c L, \c uint32_t, \c int, unsigned 32-bit}
+@row{\c q, \c int64_t, \c int, signed 64-bit}
+@row{\c Q, \c uint64_t, \c int, unsigned 64-bit}
+@row{\c r, \c uint64_t, \c int, record number}
+@row{\c s, \c char[], \c str, fixed-length string}
+@row{\c S, \c char[], \c str, NUL-terminated string}
+@row{\c t, \c uint8_t, \c int, fixed-length bit field}
+@row{\c u, <code>WT_ITEM *</code>, \c bytes, raw byte array}
 </table>
 
 The \c 'r' type is used for record number keys in column stores.  It is

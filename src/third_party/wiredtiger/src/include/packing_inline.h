@@ -212,51 +212,55 @@ next:
     }
 }
 
-#define WT_PACK_GET(session, pv, ap)                               \
-    do {                                                           \
-        WT_ITEM *__item;                                           \
-        switch ((pv).type) {                                       \
-        case 'x':                                                  \
-            break;                                                 \
-        case 's':                                                  \
-        case 'S':                                                  \
-            (pv).u.s = va_arg(ap, const char *);                   \
-            break;                                                 \
-        case 'U':                                                  \
-        case 'u':                                                  \
-            __item = va_arg(ap, WT_ITEM *);                        \
-            (pv).u.item.data = __item->data;                       \
-            (pv).u.item.size = __item->size;                       \
-            break;                                                 \
-        case 'b':                                                  \
-        case 'h':                                                  \
-        case 'i':                                                  \
-            (pv).u.i = va_arg(ap, int);                            \
-            break;                                                 \
-        case 'B':                                                  \
-        case 'H':                                                  \
-        case 'I':                                                  \
-        case 't':                                                  \
-            (pv).u.u = va_arg(ap, unsigned int);                   \
-            break;                                                 \
-        case 'l':                                                  \
-            (pv).u.i = va_arg(ap, long);                           \
-            break;                                                 \
-        case 'L':                                                  \
-            (pv).u.u = va_arg(ap, unsigned long);                  \
-            break;                                                 \
-        case 'q':                                                  \
-            (pv).u.i = va_arg(ap, int64_t);                        \
-            break;                                                 \
-        case 'Q':                                                  \
-        case 'r':                                                  \
-        case 'R':                                                  \
-            (pv).u.u = va_arg(ap, uint64_t);                       \
-            break;                                                 \
-        default:                                                   \
-            /* User format strings have already been validated. */ \
-            return (__wt_illegal_value(session, (pv).type));       \
-        }                                                          \
+#define WT_PACK_GET(session, pv, ap)                                                   \
+    do {                                                                               \
+        WT_ITEM *__item;                                                               \
+        switch ((pv).type) {                                                           \
+        case 'x':                                                                      \
+            break;                                                                     \
+        case 's':                                                                      \
+        case 'S':                                                                      \
+            (pv).u.s = va_arg(ap, const char *);                                       \
+            break;                                                                     \
+        case 'U':                                                                      \
+        case 'u':                                                                      \
+            __item = va_arg(ap, WT_ITEM *);                                            \
+            (pv).u.item.data = __item->data;                                           \
+            (pv).u.item.size = __item->size;                                           \
+            break;                                                                     \
+        case 'b':                                                                      \
+        case 'h':                                                                      \
+        case 'i':                                                                      \
+        case 'l':                                                                      \
+            /* Use the int type as compilers promote smaller sizes to int for variadic \
+             * arguments.                                                              \
+             * Note: 'l' accommodates 4 bytes                                          \
+             */                                                                        \
+            (pv).u.i = va_arg(ap, int);                                                \
+            break;                                                                     \
+        case 'B':                                                                      \
+        case 'H':                                                                      \
+        case 'I':                                                                      \
+        case 'L':                                                                      \
+        case 't':                                                                      \
+            /* Use the int type as compilers promote smaller sizes to int for variadic \
+             * arguments.                                                              \
+             * Note: 'L' accommodates 4 bytes                                          \
+             */                                                                        \
+            (pv).u.u = va_arg(ap, unsigned int);                                       \
+            break;                                                                     \
+        case 'q':                                                                      \
+            (pv).u.i = va_arg(ap, int64_t);                                            \
+            break;                                                                     \
+        case 'Q':                                                                      \
+        case 'r':                                                                      \
+        case 'R':                                                                      \
+            (pv).u.u = va_arg(ap, uint64_t);                                           \
+            break;                                                                     \
+        default:                                                                       \
+            /* User format strings have already been validated. */                     \
+            return (__wt_illegal_value(session, (pv).type));                           \
+        }                                                                              \
     } while (0)
 
 /*
