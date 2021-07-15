@@ -106,6 +106,12 @@ class test_tiered08(wttest.WiredTigerTestCase):
         c.close()
 
     def test_tiered08(self):
+
+        # FIXME-WT-7833
+        #     This test can trigger races in file handle access during flush_tier.
+        #     We will re-enable it when that is fixed.
+        return
+
         cfg = self.conn_config()
         self.pr('Config is: ' + cfg)
         intl_page = 'internal_page_max=16K'
