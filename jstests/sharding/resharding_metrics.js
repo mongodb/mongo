@@ -124,25 +124,31 @@ function verifyCurrentOpOutput(reshardingTest, inputCollection) {
         });
     });
 
+    let expectedRecipientMetrics = {
+        "type": "op",
+        "op": "command",
+        "ns": kNamespace,
+        "originatingCommand": undefined,
+        "totalOperationTimeElapsedSecs": undefined,
+        "remainingOperationTimeEstimatedSecs": undefined,
+        "approxDocumentsToCopy": undefined,
+        "approxBytesToCopy": undefined,
+        "documentsCopied": undefined,
+        "bytesCopied": undefined,
+        "totalCopyTimeElapsedSecs": undefined,
+        "oplogEntriesFetched": undefined,
+        "oplogEntriesApplied": undefined,
+        "totalApplyTimeElapsedSecs": undefined,
+        "recipientState": undefined,
+        "opStatus": "running",
+        "oplogBatchApplyLatencyMillis": undefined,
+    };
+
     reshardingTest.recipientShardNames.forEach(function(shardName) {
-        checkCurrentOp(new Mongo(topology.shards[shardName].primary), shardName, "Recipient", {
-            "type": "op",
-            "op": "command",
-            "ns": kNamespace,
-            "originatingCommand": undefined,
-            "totalOperationTimeElapsedSecs": undefined,
-            "remainingOperationTimeEstimatedSecs": undefined,
-            "approxDocumentsToCopy": undefined,
-            "approxBytesToCopy": undefined,
-            "documentsCopied": undefined,
-            "bytesCopied": undefined,
-            "totalCopyTimeElapsedSecs": undefined,
-            "oplogEntriesFetched": undefined,
-            "oplogEntriesApplied": undefined,
-            "totalApplyTimeElapsedSecs": undefined,
-            "recipientState": undefined,
-            "opStatus": "running",
-        });
+        checkCurrentOp(new Mongo(topology.shards[shardName].primary),
+                       shardName,
+                       "Recipient",
+                       expectedRecipientMetrics);
     });
 
     checkCurrentOp(new Mongo(topology.configsvr.nodes[0]), "configsvr", "Coordinator", {
