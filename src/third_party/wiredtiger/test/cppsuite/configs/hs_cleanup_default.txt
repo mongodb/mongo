@@ -1,7 +1,7 @@
 # Configuration for hs_cleanup.
 # need to be defined.
-duration_seconds=240,
-cache_size_mb=400,
+duration_seconds=60,
+cache_size_mb=200,
 statistics_config=
 (
     type=all,
@@ -16,9 +16,16 @@ runtime_monitor=
 (
     stat_cache_size=
     (
-        enabled=false,
-        limit=100
-    )
+        enabled=true,
+        limit=1000
+    ),
+    stat_db_size=
+    (
+        enabled=true,
+        #10GB
+        limit=10000000000
+    ),
+    postrun_statistics=[cache_hs_insert:0:100000000, cc_pages_removed:0:10000000],
 ),
 timestamp_manager=
 (
@@ -32,20 +39,13 @@ workload_generator=
     populate_config=
     (
         collection_count=10,
-        key_count_per_collection=5000,
+        key_count_per_collection=500,
         key_size=100,
         thread_count=10,
         value_size=10000
     ),
-    read_config=
-    (
-        op_rate=5ms,
-        ops_per_transaction=(max=5000,min=1000),
-        thread_count=10
-    ),
     update_config=
     (
-        key_size=100,
         op_rate=10ms,
         ops_per_transaction=(max=100,min=20),
         thread_count=10,

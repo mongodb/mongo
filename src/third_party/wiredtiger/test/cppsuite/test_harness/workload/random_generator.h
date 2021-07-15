@@ -46,6 +46,9 @@ class random_generator {
     /* Generate a random string of a given length. */
     std::string generate_string(std::size_t length);
 
+    /* Generate a pseudo random string which compresses better. */
+    std::string generate_pseudo_random_string(std::size_t length);
+
     /* Generate a random integer between min and max. */
     template <typename T>
     T

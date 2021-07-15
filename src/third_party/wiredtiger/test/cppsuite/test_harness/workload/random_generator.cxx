@@ -47,6 +47,22 @@ random_generator::generate_string(std::size_t length)
     return (random_string);
 }
 
+std::string
+random_generator::generate_pseudo_random_string(std::size_t length)
+{
+    std::string random_string;
+    std::size_t start_location = _distribution(_generator);
+
+    for (std::size_t i = 0; i < length; ++i) {
+        random_string += _characters[start_location];
+        if (start_location == _characters.size() - 1)
+            start_location = 0;
+        else
+            start_location++;
+    }
+    return (random_string);
+}
+
 random_generator::random_generator()
 {
     _generator = std::mt19937(std::random_device{}());

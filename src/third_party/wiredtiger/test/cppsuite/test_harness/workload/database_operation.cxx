@@ -52,8 +52,11 @@ populate_worker(thread_context *tc)
         for (uint64_t i = 0; i < tc->key_count; ++i) {
             /* Start a txn. */
             tc->transaction.begin();
-            if (!tc->insert(cursor, coll.id, i))
-                testutil_die(-1, "Got a rollback in populate, this is currently not handled.");
+            if (!tc->insert(cursor, coll.id, i)) {
+                /* We failed to insert, and our transaction was rolled back retry. */
+                --i;
+                continue;
+            }
             tc->transaction.commit();
         }
     }
@@ -81,6 +84,9 @@ database_operation::populate(
     testutil_assert(key_size > 0);
     /* Keys must be unique. */
     testutil_assert(key_count <= pow(10, key_size));
+
+    logger::log_msg(
+      LOG_INFO, "Populate: " + std::to_string(collection_count) + " creating collections.");
 
     /* Create n collections as per the configuration. */
     for (int64_t i = 0; i < collection_count; ++i)
@@ -119,6 +125,9 @@ database_operation::populate(
 void
 database_operation::insert_operation(thread_context *tc)
 {
+    logger::log_msg(
+      LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
+
     /* Helper struct which stores a pointer to a collection and a cursor associated with it. */
     struct collection_cursor {
         collection_cursor(collection &coll, scoped_cursor &&cursor)
@@ -128,8 +137,6 @@ database_operation::insert_operation(thread_context *tc)
         collection &coll;
         scoped_cursor cursor;
     };
-    logger::log_msg(
-      LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
 
     /* Collection cursor vector. */
     std::vector<collection_cursor> ccv;
@@ -187,34 +194,29 @@ database_operation::read_operation(thread_context *tc)
 {
     logger::log_msg(
       LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
-    WT_CURSOR *cursor = nullptr;
-    WT_DECL_RET;
+
     std::map<uint64_t, scoped_cursor> cursors;
     while (tc->running()) {
         /* Get a collection and find a cached cursor. */
         collection &coll = tc->db.get_random_collection();
-        const auto &it = cursors.find(coll.id);
-        if (it == cursors.end()) {
-            auto sc = tc->session.open_scoped_cursor(coll.name.c_str());
-            cursor = sc.get();
-            cursors.emplace(coll.id, std::move(sc));
-        } else
-            cursor = it->second.get();
+
+        if (cursors.find(coll.id) == cursors.end())
+            cursors.emplace(coll.id, std::move(tc->session.open_scoped_cursor(coll.name.c_str())));
+
+        /* Do a second lookup now that we know it exists. */
+        auto &cursor = cursors[coll.id];
 
         tc->transaction.begin();
         while (tc->transaction.active() && tc->running()) {
-            ret = cursor->next(cursor);
-            /* If we get not found here we walked off the end. */
-            if (ret == WT_NOTFOUND) {
-                testutil_check(cursor->reset(cursor));
-            } else if (ret != 0)
-                testutil_die(ret, "cursor->next() failed");
+            if (tc->next(cursor) == WT_ROLLBACK)
+                /* We got an error, our transaction has been rolled back. */
+                break;
             tc->transaction.add_op();
             tc->transaction.try_rollback();
             tc->sleep();
         }
         /* Reset our cursor to avoid pinning content. */
-        testutil_check(cursor->reset(cursor));
+        testutil_check(cursor->reset(cursor.get()));
     }
     /* Make sure the last transaction is rolled back now the work is finished. */
     if (tc->transaction.active())

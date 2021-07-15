@@ -42,12 +42,14 @@ using namespace test_harness;
  */
 class hs_cleanup : public test {
     public:
-    hs_cleanup(const test_harness::test_args &args) : test(args) {}
+    hs_cleanup(const test_args &args) : test(args) {}
 
     void
     update_operation(thread_context *tc) override final
     {
-        WT_DECL_RET;
+        logger::log_msg(
+          LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
+
         const char *key_tmp;
 
         collection &coll = tc->db.get_collection(tc->id);
@@ -59,14 +61,10 @@ class hs_cleanup : public test {
         /* We don't know the keyrange we're operating over here so we can't be much smarter here. */
         while (tc->running()) {
             tc->sleep();
-            ret = cursor->next(cursor.get());
-            if (ret != 0) {
-                if (ret == WT_NOTFOUND) {
-                    testutil_check(cursor->reset(cursor.get()));
-                    continue;
-                } else
-                    testutil_die(ret, "cursor->next() failed unexpectedly.");
-            }
+
+            if (tc->next(cursor) != 0)
+                continue;
+
             testutil_check(cursor->get_key(cursor.get(), &key_tmp));
 
             /* Start a transaction if possible. */

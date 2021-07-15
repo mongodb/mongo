@@ -68,13 +68,15 @@ database::add_collection(uint64_t key_count)
     std::lock_guard<std::mutex> lg(_mtx);
     if (_session.get() == nullptr)
         _session = connection_manager::instance().create_session();
+    if (_collection_create_config.empty())
+        testutil_die(EINVAL, "database_model: no collection create config specified!");
     uint64_t next_id = _next_collection_id++;
     std::string collection_name = build_collection_name(next_id);
     /* FIX-ME-Test-Framework: This will get removed when we split the model up. */
     _collections.emplace(std::piecewise_construct, std::forward_as_tuple(next_id),
       std::forward_as_tuple(next_id, key_count, collection_name));
     testutil_check(
-      _session->create(_session.get(), collection_name.c_str(), DEFAULT_FRAMEWORK_SCHEMA));
+      _session->create(_session.get(), collection_name.c_str(), _collection_create_config.c_str()));
     _tracking->save_schema_operation(
       tracking_operation::CREATE_COLLECTION, next_id, _tsm->get_next_ts());
 }
@@ -142,5 +144,13 @@ database::set_workload_tracking(workload_tracking *tracking)
 {
     testutil_assert(_tracking == nullptr);
     _tracking = tracking;
+}
+
+void
+database::set_create_config(bool use_compression)
+{
+    _collection_create_config = use_compression ?
+      std::string(DEFAULT_FRAMEWORK_SCHEMA) + std::string(SNAPPY_BLK) :
+      DEFAULT_FRAMEWORK_SCHEMA;
 }
 } // namespace test_harness

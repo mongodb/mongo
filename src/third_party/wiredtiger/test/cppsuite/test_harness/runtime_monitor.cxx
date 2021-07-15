@@ -230,6 +230,8 @@ postrun_statistic_check::check_stat(scoped_cursor &cursor, const postrun_statist
         logger::log_msg(LOG_ERROR, error_string);
         return (false);
     }
+    logger::log_msg(LOG_INFO,
+      "runtime_monitor: Final value of stat " + stat.name + " is: " + std::to_string(stat_value));
     return (true);
 }
 

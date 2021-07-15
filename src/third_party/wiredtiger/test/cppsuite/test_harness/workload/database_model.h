@@ -105,8 +105,10 @@ class database {
     std::vector<uint64_t> get_collection_ids();
     void set_timestamp_manager(timestamp_manager *tsm);
     void set_workload_tracking(workload_tracking *tracking);
+    void set_create_config(bool use_compression);
 
     private:
+    std::string _collection_create_config = "";
     scoped_session _session;
     timestamp_manager *_tsm = nullptr;
     workload_tracking *_tracking = nullptr;

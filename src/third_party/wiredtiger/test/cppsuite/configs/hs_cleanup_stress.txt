@@ -1,0 +1,69 @@
+# Run for half an hour.
+duration_seconds=1800,
+cache_size_mb=200,
+compression_enabled=true,
+statistics_config=
+(
+    type=all,
+    enable_logging=true
+),
+checkpoint_manager=
+(
+    enabled=true,
+    op_rate=60s
+),
+runtime_monitor=
+(
+    stat_cache_size=
+    (
+        enabled=true,
+        limit=110
+    ),
+    # The data files compress to around 25MB per table at the end of a run so 250MB total.
+    # +1.4GB for the history store. With an additional 150MB margin.
+    stat_db_size=
+    (
+        enabled=true,
+        limit=1900000000,
+    ),
+    # Seems to insert around 490K records. Give it +-25K margin.
+    # Seems to remove 180K records. Give it a similar margin.
+    postrun_statistics=[cache_hs_insert:470000:515000, cc_pages_removed:170000:200000]
+),
+timestamp_manager=
+(
+    enabled=true,
+    oldest_lag=2,
+    stable_lag=5
+),
+workload_generator=
+(
+    populate_config=
+    (
+        collection_count=10,
+        key_count_per_collection=1000,
+        key_size=5,
+        thread_count=10,
+        value_size=100000
+    ),
+    read_config=
+    (
+        op_rate=5ms,
+        ops_per_transaction=(max=100,min=1),
+        thread_count=8
+    ),
+    update_config=
+    (
+        op_rate=10ms,
+        # Be careful to not aim too high with this config, if we fill the dirty cache and
+        # all threads are trying to update, they'll get pulled into eviction and will get stuck.
+        ops_per_transaction=(max=20,min=0),
+        thread_count=10,
+        value_size=100000
+    )
+),
+workload_tracking=
+(
+    enabled=true,
+    op_rate=20s
+)

@@ -60,7 +60,7 @@ class workload_tracking : public component {
     public:
     workload_tracking(configuration *_config, const std::string &operation_table_config,
       const std::string &operation_table_name, const std::string &schema_table_config,
-      const std::string &schema_table_name, timestamp_manager &tsm);
+      const std::string &schema_table_name, const bool use_compression, timestamp_manager &tsm);
 
     const std::string &get_schema_table_name() const;
     const std::string &get_operation_table_name() const;
@@ -110,6 +110,7 @@ class workload_tracking : public component {
     const std::string _operation_table_name;
     const std::string _schema_table_config;
     const std::string _schema_table_name;
+    const bool _use_compression;
     timestamp_manager &_tsm;
 };
 } // namespace test_harness

@@ -135,6 +135,14 @@ class thread_context {
      */
     bool insert(scoped_cursor &cursor, uint64_t collection_id, uint64_t key_id);
 
+    /*
+     * Generic next function.
+     *
+     * Handles rollback and not found internally, but will return the error code to the caller so
+     * the caller can distinguish between them.
+     */
+    int next(scoped_cursor &cursor);
+
     void sleep();
     bool running() const;
 

@@ -1,6 +1,6 @@
 # Used as a base test for the framework.
 duration_seconds=60,
-cache_size_mb=500,
+cache_size_mb=200,
 enable_logging=true,
 checkpoint_manager=
 (
@@ -11,9 +11,16 @@ runtime_monitor=
 (
     stat_cache_size=
     (
-        enabled=false,
-        limit=100
-    )
+        enabled=true,
+        limit=1000
+    ),
+    stat_db_size=
+    (
+        enabled=true,
+        #10GB
+        limit=10000000000
+    ),
+    postrun_statistics=[cache_hs_insert:0:100000000, cc_pages_removed:0:10000000],
 ),
 timestamp_manager=
 (
@@ -27,18 +34,18 @@ workload_generator=
     populate_config=
     (
         collection_count=100,
-        key_count_per_collection=500,
-        key_size=100,
+        key_count_per_collection=50,
+        key_size=10,
         thread_count=20,
-        value_size=2000
+        value_size=20
     ),
     insert_config=
     (
-        key_size=100,
+        key_size=10,
         op_rate=10ms,
         ops_per_transaction=(max=100,min=0),
         thread_count=5,
-        value_size=2000
+        value_size=20
     ),
     read_config=
     (
@@ -48,15 +55,13 @@ workload_generator=
     ),
     update_config=
     (
-        key_size=100,
         op_rate=15ms,
         ops_per_transaction=(max=100,min=20),
         thread_count=10,
-        value_size=2000
+        value_size=20
     )
 ),
-# Tracking is currently disabled as verification can't handle rollbacks.
 workload_tracking=
 (
-    enabled=false
+    op_rate=5s
 )

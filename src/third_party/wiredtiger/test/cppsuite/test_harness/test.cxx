@@ -48,13 +48,14 @@ test::test(const test_args &args) : _args(args)
     _timestamp_manager = new timestamp_manager(_config->get_subconfig(TIMESTAMP_MANAGER));
     _workload_tracking = new workload_tracking(_config->get_subconfig(WORKLOAD_TRACKING),
       OPERATION_TRACKING_TABLE_CONFIG, TABLE_OPERATION_TRACKING, SCHEMA_TRACKING_TABLE_CONFIG,
-      TABLE_SCHEMA_TRACKING, *_timestamp_manager);
+      TABLE_SCHEMA_TRACKING, _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager);
     _workload_generator = new workload_generator(_config->get_subconfig(WORKLOAD_GENERATOR), this,
       _timestamp_manager, _workload_tracking, _database);
     _thread_manager = new thread_manager();
 
     _database.set_timestamp_manager(_timestamp_manager);
     _database.set_workload_tracking(_workload_tracking);
+    _database.set_create_config(_config->get_bool(COMPRESSION_ENABLED));
 
     /*
      * Ordering is not important here, any dependencies between components should be resolved
@@ -93,6 +94,10 @@ test::run()
     std::string statistics_type;
     /* Build the database creation config string. */
     std::string db_create_config = CONNECTION_CREATE;
+
+    /* Enable snappy compression if required. */
+    if (_config->get_bool(COMPRESSION_ENABLED))
+        db_create_config += SNAPPY_EXT;
 
     /* Get the cache size. */
     cache_size_mb = _config->get_int(CACHE_SIZE_MB);
