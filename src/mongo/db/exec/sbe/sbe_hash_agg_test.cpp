@@ -257,6 +257,8 @@ TEST_F(HashAggStageTest, HashAggCollationTest) {
         for (size_t i = 0; i < resultsView->size(); i++) {
             resultsContents.push_back(resultsView->getAt(i));
         }
+
+        // Sort 'resultContents' in descending order
         std::sort(resultsContents.begin(),
                   resultsContents.end(),
                   [](const valuePair& lhs, const valuePair& rhs) -> bool {
@@ -265,7 +267,7 @@ TEST_F(HashAggStageTest, HashAggCollationTest) {
                       auto [compareTag, compareVal] =
                           value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
                       ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
-                      return compareVal == 1;
+                      return value::bitcastTo<int32_t>(compareVal) > 0;
                   });
 
         auto [sortedResultsTag, sortedResultsVal] = value::makeNewArray();

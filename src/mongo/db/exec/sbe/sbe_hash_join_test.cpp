@@ -123,7 +123,8 @@ TEST_F(HashJoinStageTest, HashJoinCollationTest) {
             for (size_t i = 0; i < resultsView->size(); i++) {
                 auto [tag, val] = resultsView->getAt(i);
                 auto [cmpTag, cmpVal] = compareValue(expectedTag, expectedVal, tag, val);
-                if (cmpVal == 0) {
+                if (cmpTag == value::TypeTags::NumberInt32 &&
+                    value::bitcastTo<int32_t>(cmpVal) == 0) {
                     found = true;
                     break;
                 }
