@@ -33,6 +33,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -95,4 +96,13 @@ BackupCursorExtendState BackupCursorHooks::extendBackupCursor(OperationContext* 
 bool BackupCursorHooks::isBackupCursorOpen() const {
     return false;
 }
+
+bool BackupCursorHooks::isFileReturnedByCursor(const UUID& backupId, std::string filename) {
+    MONGO_UNREACHABLE;
+}
+
+void BackupCursorHooks::addFilename(const UUID& backupId, std::string filename) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo

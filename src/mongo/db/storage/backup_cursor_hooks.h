@@ -71,6 +71,14 @@ public:
                                                        const Timestamp& extendTo);
 
     virtual bool isBackupCursorOpen() const;
+
+    /**
+     * Returns true if `filename` was returned by the backup cursor `backupId`.
+     * Used to verify filenames passed into $backupFile.
+     */
+    virtual bool isFileReturnedByCursor(const UUID& backupId, std::string filename);
+
+    virtual void addFilename(const UUID& backupId, std::string filename);
 };
 
 }  // namespace mongo
