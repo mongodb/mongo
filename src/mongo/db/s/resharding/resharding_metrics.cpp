@@ -36,6 +36,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/integer_histogram.h"
 #include "mongo/util/with_alignment.h"
 
 namespace mongo {
@@ -68,6 +69,7 @@ constexpr auto kLastOpEndingChunkImbalance = "lastOpEndingChunkImbalance";
 constexpr auto kOpCounters = "opcounters";
 constexpr auto kMinRemainingOperationTime = "minShardRemainingOperationTimeEstimatedMillis";
 constexpr auto kMaxRemainingOperationTime = "maxShardRemainingOperationTimeEstimatedMillis";
+constexpr auto kOplogBatchApplyLatencyMillis = "oplogBatchApplyLatencyMillis";
 
 using MetricsPtr = std::unique_ptr<ReshardingMetrics>;
 
@@ -218,6 +220,10 @@ public:
 
     int64_t chunkImbalanceCount = 0;
 
+    IntegerHistogram<kLatencyHistogramBucketsCount> oplogBatchApplyLatencyMillis =
+        IntegerHistogram<kLatencyHistogramBucketsCount>(kOplogBatchApplyLatencyMillis,
+                                                        latencyHistogramBuckets);
+
     // The ops done by resharding to keep up with the client writes.
     ReshardingOpCounters opCounters;
 
@@ -299,6 +305,14 @@ void ReshardingMetrics::OperationMetrics::appendCurrentOpMetrics(BSONObjBuilder*
             bob->append(kRecipientState,
                         serializeState(recipientState.get_value_or(RecipientStateEnum::kUnused)));
             bob->append(kOpStatus, ReshardingOperationStatus_serializer(opStatus));
+
+            {
+                BSONObjBuilder histogramBuilder;
+                oplogBatchApplyLatencyMillis.append(histogramBuilder, false);
+                BSONObj histogram = histogramBuilder.obj();
+                bob->appendElements(histogram);
+            }
+
             break;
         case Role::kCoordinator:
             bob->append(kCoordinatorState, serializeState(coordinatorState));
@@ -559,6 +573,16 @@ void ReshardingMetrics::gotInserts(int n) noexcept {
     _cumulativeOp->gotInserts(n);
 }
 
+void ReshardingMetrics::onApplyOplogBatch(Milliseconds latency) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    invariant(_currentOp, kNoOperationInProgress);
+    invariant(checkState(*_currentOp->recipientState,
+                         {RecipientStateEnum::kApplying, RecipientStateEnum::kError}));
+
+    _currentOp->oplogBatchApplyLatencyMillis.increment(durationCount<Milliseconds>(latency));
+    _cumulativeOp->oplogBatchApplyLatencyMillis.increment(durationCount<Milliseconds>(latency));
+}
+
 void ReshardingMetrics::gotInsert() noexcept {
     _cumulativeOp->gotInsert();
 }
@@ -736,6 +760,13 @@ void ReshardingMetrics::serializeCumulativeOpMetrics(BSONObjBuilder* bob) const 
                 getRemainingOperationTime(ops.minRemainingOperationTime));
     bob->append(kMaxRemainingOperationTime,
                 getRemainingOperationTime(ops.maxRemainingOperationTime));
+
+    {
+        BSONObjBuilder histogramBuilder;
+        ops.oplogBatchApplyLatencyMillis.append(histogramBuilder, false);
+        BSONObj histogram = histogramBuilder.obj();
+        bob->appendElements(histogram);
+    }
 }
 
 Date_t ReshardingMetrics::_now() const {

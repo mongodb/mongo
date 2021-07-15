@@ -40,6 +40,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/integer_histogram.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -48,6 +49,7 @@ namespace {
 using namespace fmt::literals;
 
 constexpr auto kOpTimeRemaining = "remainingOperationTimeEstimatedSecs"_sd;
+constexpr auto kOplogBatchApplyLatencyMillis = "oplogBatchApplyLatencyMillis";
 
 class ReshardingMetricsTest : public ServiceContextTest {
 public:
@@ -126,6 +128,17 @@ public:
         ASSERT_EQ(report.getIntField(tag), expectedValue)
             << fmt::format("{}: {}", errMsg, report.toString());
     };
+
+    void appendExpectedHistogramResult(BSONObjBuilder& builder,
+                                       const std::vector<int64_t>& latencies) {
+        IntegerHistogram<kLatencyHistogramBucketsCount> hist(kOplogBatchApplyLatencyMillis,
+                                                             latencyHistogramBuckets);
+        for (size_t i = 0; i < latencies.size(); i++) {
+            hist.increment(latencies[i]);
+        }
+
+        hist.append(builder, false);
+    }
 
 private:
     ClockSourceMock* _clockSource;
@@ -540,7 +553,7 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForRecipient) {
         BSON("id" << 1),
         false);
 
-    const auto expected =
+    BSONObj expectedPrefix =
         fromjson(fmt::format("{{ type: \"op\","
                              "desc: \"ReshardingRecipientService {0}\","
                              "op: \"command\","
@@ -574,8 +587,66 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForRecipient) {
                              durationCount<Seconds>(kTimeSpentCloning),
                              RecipientState_serializer(kRecipientState)));
 
+    BSONObjBuilder expectedBuilder(std::move(expectedPrefix));
+
+    // Append histogram data for batch oplog applies.
+    appendExpectedHistogramResult(expectedBuilder, {});
+    BSONObj expected = expectedBuilder.obj();
+
     const auto report = getMetrics()->reportForCurrentOp(options);
     ASSERT_BSONOBJ_EQ(expected, report);
+}
+
+TEST_F(ReshardingMetricsTest, TestOplogBatchLatencyHistogramForRecipient) {
+    const std::vector<int64_t> latencies_1{3, 427, 0, 6004, 320, 10056, 12300, 105, 70};
+    const std::vector<int64_t> latencies_2{800, 20, 5, 1025, 10567};
+
+    std::vector<int64_t> allLatencies;
+    allLatencies.insert(allLatencies.end(), latencies_1.begin(), latencies_1.end());
+    allLatencies.insert(allLatencies.end(), latencies_2.begin(), latencies_2.end());
+
+    const ReshardingMetrics::ReporterOptions options(
+        ReshardingMetrics::Role::kRecipient,
+        UUID::parse("12345678-1234-1234-1234-123456789def").getValue(),
+        NamespaceString("db", "collection"),
+        BSON("id" << 1),
+        false);
+
+    // First test that histogram metrics appear in currentOp. Next, test that histogram metrics
+    // accumulate in cumulativeOp.
+    const size_t kNumTests = 2;
+    std::vector<int64_t> testLatencies[kNumTests] = {latencies_1, latencies_2};
+    std::vector<int64_t> expectedLatencies[kNumTests] = {latencies_1, allLatencies};
+    OpReportType testReportTypes[kNumTests] = {OpReportType::CurrentOpReportRecipientRole,
+                                               OpReportType::CumulativeReport};
+
+    auto testLatencyHistogram = [&](std::vector<int64_t> latencies,
+                                    OpReportType reportType,
+                                    std::vector<int64_t> expectedLatencies) {
+        startOperation(ReshardingMetrics::Role::kRecipient);
+
+        getMetrics()->setRecipientState(RecipientStateEnum::kApplying);
+        for (size_t i = 0; i < latencies.size(); i++) {
+            getMetrics()->onApplyOplogBatch(Milliseconds(latencies[i]));
+        }
+
+        const auto report = getReport(reportType);
+        const auto buckets = report[kOplogBatchApplyLatencyMillis];
+
+        BSONObjBuilder expectedBuilder;
+        appendExpectedHistogramResult(expectedBuilder, expectedLatencies);
+        const auto expectedHist = expectedBuilder.obj();
+        const auto expectedBuckets = expectedHist[kOplogBatchApplyLatencyMillis];
+
+        ASSERT_EQ(buckets.woCompare(expectedBuckets), 0);
+
+        completeOperation(ReshardingMetrics::Role::kRecipient,
+                          ReshardingOperationStatusEnum::kFailure);
+    };
+
+    for (size_t i = 0; i < kNumTests; i++) {
+        testLatencyHistogram(testLatencies[i], testReportTypes[i], expectedLatencies[i]);
+    }
 }
 
 TEST_F(ReshardingMetricsTest, CurrentOpReportForCoordinator) {
