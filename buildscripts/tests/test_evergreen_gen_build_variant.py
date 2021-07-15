@@ -300,6 +300,7 @@ class TestAdjustGenTasksPriority(unittest.TestCase):
         ]
         mock_orchestrator = build_mock_orchestrator(build_task_list=mock_task_list)
 
-        mock_orchestrator.adjust_gen_tasks_priority(gen_tasks)
+        n_tasks_adjusted = mock_orchestrator.adjust_gen_tasks_priority(gen_tasks)
 
+        self.assertEqual(len(gen_tasks), n_tasks_adjusted)
         self.assertEqual(len(gen_tasks), mock_orchestrator.evg_api.configure_task.call_count)
