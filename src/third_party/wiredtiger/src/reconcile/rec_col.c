@@ -722,6 +722,7 @@ record_loop:
                     twp = &clear_tw;
                     goto compare;
                 }
+                __cell_pack_kv_window_cleanup(session, page->dsk, vpack);
                 twp = &vpack->tw;
 
                 /*
