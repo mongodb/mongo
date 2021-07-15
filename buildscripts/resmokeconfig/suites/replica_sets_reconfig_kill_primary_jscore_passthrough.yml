@@ -35,7 +35,6 @@ selector:
   # These test run commands using legacy queries, which are not supported on sessions.
   - jstests/core/comment_field.js
   - jstests/core/exhaust.js
-  - jstests/core/validate_cmd_ns.js
 
   # Stepdown commands during fsync lock will fail.
   - jstests/core/currentop.js
@@ -63,7 +62,6 @@ selector:
   - jstests/core/list_collections_filter.js # Temporary collections are dropped on failover.
   - jstests/core/top.js # Tests read commands (including getMore) against the secondary
   - jstests/core/drop3.js # getMore is not causally consistent if collection is dropped
-  - jstests/core/validate_cmd_ns.js # Calls _exec() directly, not retryable.
   - jstests/core/list_collections_filter.js # Temporary collections are dropped on failover.
   - jstests/core/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
 

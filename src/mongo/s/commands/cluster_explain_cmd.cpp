@@ -40,15 +40,6 @@ namespace {
 
 /**
  * Implements the explain command on mongos.
- *
- * "Old-style" explains (i.e. queries which have the $explain flag set), do not run
- * through this path. Such explains will be supported for backwards compatibility,
- * and must succeed in multiversion clusters.
- *
- * "New-style" explains use the explain command. When the explain command is routed
- * through mongos, it is forwarded to all relevant shards. If *any* shard does not
- * support a new-style explain, then the entire explain will fail (i.e. new-style
- * explains cannot be used in multiversion clusters).
  */
 
 class ClusterExplainCmd final : public Command {

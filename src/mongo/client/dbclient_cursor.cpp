@@ -103,106 +103,72 @@ Message DBClientCursor::_assembleInit() {
     }
 
     // If we haven't gotten a cursorId yet, we need to issue a new query or command.
-    if (_isCommand) {
-        // HACK:
-        // Unfortunately, this code is used by the shell to run commands,
-        // so we need to allow the shell to send invalid options so that we can
-        // test that the server rejects them. Thus, to allow generating commands with
-        // invalid options, we validate them here, and fall back to generating an OP_QUERY
-        // through makeDeprecatedQueryMessage() if the options are invalid.
-        bool hasValidNToReturnForCommand = (nToReturn == 1 || nToReturn == -1);
-        bool hasValidFlagsForCommand = !(opts & mongo::QueryOption_Exhaust);
-        bool hasInvalidMaxTimeMs = query.hasField("$maxTimeMS");
+    // The caller supplies a 'query' object which may have $-prefixed directives in the format
+    // expected for a legacy OP_QUERY. Therefore, we use the legacy parsing code supplied by
+    // query_request_helper. When actually issuing the request to the remote node, we will
+    // assemble a find command.
+    auto findCommand =
+        query_request_helper::fromLegacyQuery(_nsOrUuid,
+                                              query,
+                                              fieldsToReturn ? *fieldsToReturn : BSONObj(),
+                                              nToSkip,
+                                              nextBatchSize(),
+                                              opts);
+    // If there was a problem building the query request, report that.
+    uassertStatusOK(findCommand.getStatus());
 
-        if (hasValidNToReturnForCommand && hasValidFlagsForCommand && !hasInvalidMaxTimeMs) {
-            return assembleCommandRequest(_client, ns.db(), opts, query);
-        }
-    } else if (_useFindCommand) {
-        // The caller supplies a 'query' object which may have $-prefixed directives in the format
-        // expected for a legacy OP_QUERY. Therefore, we use the legacy parsing code supplied by
-        // query_request_helper. When actually issuing the request to the remote node, we will
-        // assemble a find command.
-        bool explain = false;
-        auto findCommand =
-            query_request_helper::fromLegacyQuery(_nsOrUuid,
-                                                  query,
-                                                  fieldsToReturn ? *fieldsToReturn : BSONObj(),
-                                                  nToSkip,
-                                                  nextBatchSize(),
-                                                  opts,
-                                                  &explain);
-        if (findCommand.isOK() && !explain) {
-            if (query.getBoolField("$readOnce")) {
-                // Legacy queries don't handle readOnce.
-                findCommand.getValue()->setReadOnce(true);
-            }
-            if (query.getBoolField(FindCommandRequest::kRequestResumeTokenFieldName)) {
-                // Legacy queries don't handle requestResumeToken.
-                findCommand.getValue()->setRequestResumeToken(true);
-            }
-            if (query.hasField(FindCommandRequest::kResumeAfterFieldName)) {
-                // Legacy queries don't handle resumeAfter.
-                findCommand.getValue()->setResumeAfter(
-                    query.getObjectField(FindCommandRequest::kResumeAfterFieldName));
-            }
-            if (auto replTerm = query[FindCommandRequest::kTermFieldName]) {
-                // Legacy queries don't handle term.
-                findCommand.getValue()->setTerm(replTerm.numberLong());
-            }
-            // Legacy queries don't handle readConcern.
-            // We prioritize the readConcern parsed from the query object over '_readConcernObj'.
-            if (auto readConcern = query[repl::ReadConcernArgs::kReadConcernFieldName]) {
-                findCommand.getValue()->setReadConcern(readConcern.Obj());
-            } else if (_readConcernObj) {
-                findCommand.getValue()->setReadConcern(_readConcernObj);
-            }
-            BSONObj cmd = findCommand.getValue()->toBSON(BSONObj());
-
-            if (auto readPref = query["$readPreference"]) {
-                // FindCommandRequest doesn't handle $readPreference.
-                cmd = BSONObjBuilder(std::move(cmd)).append(readPref).obj();
-            }
-            return assembleCommandRequest(_client, ns.db(), opts, std::move(cmd));
-        }
-        // else use legacy OP_QUERY request.
-        // Legacy OP_QUERY request does not support UUIDs.
-        if (_nsOrUuid.uuid()) {
-            // If there was a problem building the query request, report that.
-            uassertStatusOK(findCommand.getStatus());
-            // Otherwise it must have been explain.
-            uasserted(50937, "Query by UUID is not supported for explain queries.");
-        }
+    if (query.getBoolField("$readOnce")) {
+        // Legacy queries don't handle readOnce.
+        findCommand.getValue()->setReadOnce(true);
+    }
+    if (query.getBoolField(FindCommandRequest::kRequestResumeTokenFieldName)) {
+        // Legacy queries don't handle requestResumeToken.
+        findCommand.getValue()->setRequestResumeToken(true);
+    }
+    if (query.hasField(FindCommandRequest::kResumeAfterFieldName)) {
+        // Legacy queries don't handle resumeAfter.
+        findCommand.getValue()->setResumeAfter(
+            query.getObjectField(FindCommandRequest::kResumeAfterFieldName));
+    }
+    if (auto replTerm = query[FindCommandRequest::kTermFieldName]) {
+        // Legacy queries don't handle term.
+        findCommand.getValue()->setTerm(replTerm.numberLong());
+    }
+    // Legacy queries don't handle readConcern.
+    // We prioritize the readConcern parsed from the query object over '_readConcernObj'.
+    if (auto readConcern = query[repl::ReadConcernArgs::kReadConcernFieldName]) {
+        findCommand.getValue()->setReadConcern(readConcern.Obj());
+    } else if (_readConcernObj) {
+        findCommand.getValue()->setReadConcern(_readConcernObj);
+    }
+    BSONObj cmd = findCommand.getValue()->toBSON(BSONObj());
+    if (auto readPref = query["$readPreference"]) {
+        // FindCommandRequest doesn't handle $readPreference.
+        cmd = BSONObjBuilder(std::move(cmd)).append(readPref).obj();
     }
 
-    _useFindCommand = false;  // Make sure we handle the reply correctly.
-    return makeDeprecatedQueryMessage(
-        ns.ns(), query, nextBatchSize(), nToSkip, fieldsToReturn, opts);
+    return assembleCommandRequest(_client, ns.db(), opts, std::move(cmd));
 }
 
 Message DBClientCursor::_assembleGetMore() {
     invariant(cursorId);
-    if (_useFindCommand) {
-        std::int64_t batchSize = nextBatchSize();
-        auto getMoreRequest = GetMoreCommandRequest(cursorId, ns.coll().toString());
-        getMoreRequest.setBatchSize(boost::make_optional(batchSize != 0, batchSize));
-        getMoreRequest.setMaxTimeMS(boost::make_optional(
-            tailableAwaitData(),
-            static_cast<std::int64_t>(durationCount<Milliseconds>(_awaitDataTimeout))));
-        if (_term) {
-            getMoreRequest.setTerm(static_cast<std::int64_t>(*_term));
-        }
-        getMoreRequest.setLastKnownCommittedOpTime(_lastKnownCommittedOpTime);
-        auto msg = assembleCommandRequest(_client, ns.db(), opts, getMoreRequest.toBSON({}));
-
-        // Set the exhaust flag if needed.
-        if (opts & QueryOption_Exhaust && msg.operation() == dbMsg) {
-            OpMsg::setFlag(&msg, OpMsg::kExhaustSupported);
-        }
-        return msg;
-    } else {
-        // Assemble a legacy getMore request.
-        return makeDeprecatedGetMoreMessage(ns.ns(), cursorId, nextBatchSize(), opts);
+    std::int64_t batchSize = nextBatchSize();
+    auto getMoreRequest = GetMoreCommandRequest(cursorId, ns.coll().toString());
+    getMoreRequest.setBatchSize(boost::make_optional(batchSize != 0, batchSize));
+    getMoreRequest.setMaxTimeMS(boost::make_optional(
+        tailableAwaitData(),
+        static_cast<std::int64_t>(durationCount<Milliseconds>(_awaitDataTimeout))));
+    if (_term) {
+        getMoreRequest.setTerm(static_cast<std::int64_t>(*_term));
     }
+    getMoreRequest.setLastKnownCommittedOpTime(_lastKnownCommittedOpTime);
+    auto msg = assembleCommandRequest(_client, ns.db(), opts, getMoreRequest.toBSON({}));
+
+    // Set the exhaust flag if needed.
+    if (opts & QueryOption_Exhaust && msg.operation() == dbMsg) {
+        OpMsg::setFlag(&msg, OpMsg::kExhaustSupported);
+    }
+    return msg;
 }
 
 bool DBClientCursor::init() {
@@ -339,87 +305,22 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
     batch.objs.clear();
     batch.pos = 0;
 
-    // If this is a reply to our initial command request.
-    if (_isCommand && cursorId == 0) {
-        batch.objs.push_back(commandDataReceived(reply));
-        return;
+    const auto replyObj = commandDataReceived(reply);
+    cursorId = 0;  // Don't try to kill cursor if we get back an error.
+    auto cr = uassertStatusOK(CursorResponse::parseFromBSON(replyObj));
+    cursorId = cr.getCursorId();
+    uassert(50935,
+            "Received a getMore response with a cursor id of 0 and the moreToCome flag set.",
+            !(_connectionHasPendingReplies && cursorId == 0));
+
+    ns = cr.getNSS();  // find command can change the ns to use for getMores.
+    // Store the resume token, if we got one.
+    _postBatchResumeToken = cr.getPostBatchResumeToken();
+    batch.objs = cr.releaseBatch();
+
+    if (replyObj.hasField(LogicalTime::kOperationTimeFieldName)) {
+        _operationTime = LogicalTime::fromOperationTime(replyObj).asTimestamp();
     }
-
-    if (_useFindCommand) {
-        const auto replyObj = commandDataReceived(reply);
-        cursorId = 0;  // Don't try to kill cursor if we get back an error.
-        auto cr = uassertStatusOK(CursorResponse::parseFromBSON(replyObj));
-        cursorId = cr.getCursorId();
-        uassert(50935,
-                "Received a getMore response with a cursor id of 0 and the moreToCome flag set.",
-                !(_connectionHasPendingReplies && cursorId == 0));
-
-        ns = cr.getNSS();  // Unlike OP_REPLY, find command can change the ns to use for getMores.
-        // Store the resume token, if we got one.
-        _postBatchResumeToken = cr.getPostBatchResumeToken();
-        batch.objs = cr.releaseBatch();
-
-        if (replyObj.hasField(LogicalTime::kOperationTimeFieldName)) {
-            _operationTime = LogicalTime::fromOperationTime(replyObj).asTimestamp();
-        }
-        return;
-    }
-
-    QueryResult::View qr = reply.singleData().view2ptr();
-    resultFlags = qr.getResultFlags();
-
-    if (resultFlags & ResultFlag_ErrSet) {
-        wasError = true;
-    }
-
-    if (resultFlags & ResultFlag_CursorNotFound) {
-        // cursor id no longer valid at the server.
-        invariant(qr.getCursorId() == 0);
-
-        // 0 indicates no longer valid (dead).
-        cursorId = 0;
-
-        uasserted(ErrorCodes::CursorNotFound,
-                  str::stream() << "cursor id " << cursorId << " didn't exist on server.");
-    }
-
-    if (cursorId == 0 || !(opts & QueryOption_CursorTailable)) {
-        // only set initially: we don't want to kill it on end of data
-        // if it's a tailable cursor
-        cursorId = qr.getCursorId();
-    }
-
-    if (opts & QueryOption_Exhaust) {
-        // With exhaust mode, each reply after the first claims to be a reply to the previous one
-        // rather than the initial request.
-        _connectionHasPendingReplies = (cursorId != 0);
-        _lastRequestId = reply.header().getId();
-    }
-
-    batch.objs.reserve(qr.getNReturned());
-
-    BufReader data(qr.data(), qr.dataLen());
-    while (static_cast<int>(batch.objs.size()) < qr.getNReturned()) {
-        if (serverGlobalParams.objcheck) {
-            batch.objs.push_back(data.read<Validated<BSONObj>>());
-        } else {
-            batch.objs.push_back(data.read<BSONObj>());
-        }
-        batch.objs.back().shareOwnershipWith(reply.sharedBuffer());
-    }
-    uassert(ErrorCodes::InvalidBSON,
-            "Got invalid reply from external server while reading from cursor",
-            data.atEof());
-
-    _client->checkResponse(batch.objs, false, &retry, &host);  // watches for "not primary"
-
-    tassert(5262101,
-            "Deprecated ShardConfigStale flag encountered in query result",
-            !(resultFlags & ResultFlag_ShardConfigStaleDeprecated));
-
-    /* this assert would fire the way we currently work:
-        verify( nReturned || cursorId == 0 );
-    */
 }
 
 /** If true, safe to call next().  Requests more from server if necessary. */
@@ -583,7 +484,6 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _originalHost(_client->getServerAddress()),
       _nsOrUuid(nsOrUuid),
       ns(nsOrUuid.nss() ? *nsOrUuid.nss() : NamespaceString(nsOrUuid.dbname())),
-      _isCommand(ns.isCommand()),
       query(query),
       nToReturn(nToReturn),
       haveLimit(nToReturn > 0 && !(queryOptions & QueryOption_CursorTailable)),
@@ -639,14 +539,7 @@ DBClientCursor::~DBClientCursor() {
 void DBClientCursor::kill() {
     DESTRUCTOR_GUARD({
         if (cursorId && _ownCursor && !globalInShutdownDeprecated()) {
-            auto killCursor = [&](auto&& conn) {
-                if (_useFindCommand) {
-                    conn->killCursor(ns, cursorId);
-                } else {
-                    auto toSend = makeDeprecatedKillCursorsMessage(cursorId);
-                    conn->say(toSend);
-                }
-            };
+            auto killCursor = [&](auto&& conn) { conn->killCursor(ns, cursorId); };
 
             // We only need to kill the cursor if there aren't pending replies. Pending replies
             // indicates that this is an exhaust cursor, so the connection must be closed and the

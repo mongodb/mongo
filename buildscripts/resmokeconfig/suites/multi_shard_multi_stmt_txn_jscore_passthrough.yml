@@ -136,7 +136,7 @@ selector:
   ## Some aggregation stages don't support snapshot readconcern.
   ##
 
-  # $explain (requires read concern local)
+  # explain (requires read concern local)
   - jstests/core/agg_hint.js
   - jstests/core/and.js
   - jstests/core/collation.js
@@ -200,7 +200,6 @@ selector:
 
   # SERVER-34868 Cannot run a legacy query on a session.
   - jstests/core/exhaust.js
-  - jstests/core/validate_cmd_ns.js
 
   # SERVER-34772 Tailable Cursors are not allowed with snapshot readconcern.
   - jstests/core/awaitdata_getmore_cmd.js
