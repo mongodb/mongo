@@ -36,7 +36,7 @@ import wttest
 # to do an update restore evict on a page, when the cache pressure requirements are not met.
 # This means setting eviction target low and cache size high.
 class test_debug_mode09(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=10MB,statistics=(all),eviction_target=10'
+    conn_config = 'cache_size=10MB,statistics=(all),eviction_target=10,debug_mode=(update_restore_evict=true)'
     uri = "table:test_debug_mode09"
 
     # Insert a bunch of data to trigger eviction
@@ -57,17 +57,3 @@ class test_debug_mode09(wttest.WiredTigerTestCase):
         pages_update_restored = stat_cursor[stat.conn.cache_write_restore][2]
         stat_cursor.close()
         self.assertGreater(pages_update_restored, 0)
-
-        # Restart the connection with update restore evict config and a clean table
-        self.close_conn()
-        self.conn_config += ",debug_mode=(update_restore_evict=true)"
-        self.reopen_conn(".", self.conn_config)
-        self.session.drop(self.uri)
-        self.session.create(self.uri, 'key_format=i,value_format=S')
-
-        self.trigger_eviction(self.uri)
-
-        stat_cursor = self.session.open_cursor('statistics:')
-        forced_pages_update_restore = stat_cursor[stat.conn.cache_write_restore][2]
-        stat_cursor.close()
-        self.assertGreater(forced_pages_update_restore, pages_update_restored)
