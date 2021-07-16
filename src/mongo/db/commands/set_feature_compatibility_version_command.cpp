@@ -60,6 +60,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
+#include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
@@ -399,10 +400,13 @@ public:
 
         boost::optional<Timestamp> changeTimestamp;
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            // TODO(SERVER-53283): Remove the call to requestPause()
+            // to allow the execution of balancer rounds during setFCV().
+            auto scopedBalancerPauseRequest = Balancer::get(opCtx)->requestPause();
+
             // The Config Server creates a new ID (i.e., timestamp) when it receives an upgrade or
             // downgrade request. Alternatively, the request refers to a previously aborted
             // operation for which the local FCV document must contain the ID to be reused.
-
             if (!serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
                 const auto now = VectorClock::get(opCtx)->getTime();
                 changeTimestamp = now.clusterTime().asTimestamp();
