@@ -388,7 +388,7 @@ const DeprecatedWireOpsTest = function() {
      */
     this.runDeprecatedWireOpPeriodTest = (setUp, tearDown, periodInSeconds) => {
         const [conn, testDB, connId, coll] = setUp(periodInSeconds);
-        const periodInMs = periodInSeconds * 1000 + 200;
+        const periodInMs = 5 * periodInSeconds * 1000 + 200;
         const assertLegacyOpWarningMsgCount = (expectedOpKind, expectedCount) =>
             assertLegacyOpWarningMsgCountOn(testDB, connId, expectedOpKind, expectedCount);
 
