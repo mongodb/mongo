@@ -64,3 +64,8 @@ feature_flags:
       description: "Feature flag for allowing usage of point-in-time pre- and post-images of documents in change streams"
       cpp_varname: gFeatureFlagChangeStreamsPreAndPostImages
       default: false
+
+    featureFlagSearchMeta:
+      description: "Feature flag for allowing use of search collectors alongside search results"
+      cpp_varname: gFeatureFlagSearchMeta
+      default: false
