@@ -2092,10 +2092,11 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
     }
 
     if (force) {
-        // Forcing the oldest timestamp backwards (e.g: eMRC=off rollback) to a value of T
-        // invalidates all snapshots > T. Components that register a pinned timestamp must
-        // synchronize with events that invalidate their snapshots, unpin themselves and either
-        // fail themselves, or reacquire a new snapshot after the rollback event.
+        // The oldest timestamp should only be forced backwards during replication recovery in order
+        // to do rollback via refetch. This refetching process invalidates any timestamped snapshots
+        // until after it completes. Components that register a pinned timestamp must synchronize
+        // with events that invalidate their snapshots, unpin themselves and either fail themselves,
+        // or reacquire a new snapshot after the rollback event.
         //
         // Forcing the oldest timestamp forward -- potentially past a pin request raises the
         // question of whether the pin should be honored. For now we will invariant there is no pin,

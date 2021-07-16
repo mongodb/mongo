@@ -51,6 +51,7 @@
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/session.h"
 #include "mongo/db/storage/control/journal_flusher.h"
+#include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
@@ -551,13 +552,19 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
         // When `recoverFromOplog` truncates the oplog, that also happens to set the "oldest
         // timestamp" to the truncation point[1]. `_applyToEndOfOplog` will then perform writes
         // before the truncation point. Doing so violates the constraint that all updates must be
-        // timestamped newer than the "oldest timestamp". This call will move the "oldest
+        // timestamped newer than the "oldest timestamp". So we will need to move the "oldest
         // timestamp" back to the `startPoint`.
+        //
+        // Before doing so, we will remove any pins. Forcing the oldest timestamp backwards will
+        // error if there are pins in place, as those pin requests will no longer be satisfied.
+        // Recovering from an unstable checkpoint has no history in the first place. Thus, clearing
+        // pins has no real effect on history being held.
         //
         // [1] This is arguably incorrect. On rollback for nodes that are not keeping history to
         // the "majority point", the "oldest timestamp" likely needs to go back in time. The
         // oplog's `cappedTruncateAfter` method was a convenient location for this logic, which,
         // unfortunately, conflicts with the usage above.
+        DurableHistoryRegistry::get(opCtx->getServiceContext())->clearPins(opCtx);
         opCtx->getServiceContext()->getStorageEngine()->setOldestTimestamp(
             appliedThrough.getTimestamp());
 

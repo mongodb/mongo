@@ -75,6 +75,11 @@ public:
      */
     void reconcilePins(OperationContext* opCtx);
 
+    /**
+     * Removes all registered pins.
+     */
+    void clearPins(OperationContext* opCtx);
+
 private:
     std::vector<std::unique_ptr<DurableHistoryPin>> _pins;
 };
