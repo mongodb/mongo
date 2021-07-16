@@ -4944,7 +4944,7 @@ tasks:
 
 - <<: *gen_task_template
   name: parallel_gen
-  tags: ["misc_js"]
+  tags: ["misc_js", "parallel"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -10780,7 +10780,8 @@ buildvariants:
   - name: .aggfuzzer .common !.timeseries
   - name: aggregation
   - name: .auth !.multiversion !.audit !.sharding
-  - name: .misc_js
+  # SERVER-56108: Re-enable parallel
+  - name: .misc_js !.parallel
   # SERVER-50296: Investigate concurrency test failures.
   # - name: concurrency
   # - name: concurrency_replication_gen
