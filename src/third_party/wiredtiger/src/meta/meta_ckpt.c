@@ -705,6 +705,9 @@ __wt_meta_ckptlist_get(
 
     *ckptbasep = NULL;
 
+    if (allocated != NULL)
+        *allocated = 0;
+
     btree = S2BT(session);
     config = NULL;
 
@@ -717,9 +720,11 @@ __wt_meta_ckptlist_get(
      */
     if (!WT_IS_METADATA(session->dhandle) && btree->ckpt != NULL) {
         *ckptbasep = btree->ckpt;
-        *allocated = btree->ckpt_bytes_allocated;
         if (update)
-            WT_ERR(__meta_ckptlist_allocate_new_ckpt(session, ckptbasep, allocated, NULL));
+            WT_ERR(__meta_ckptlist_allocate_new_ckpt(
+              session, ckptbasep, &btree->ckpt_bytes_allocated, NULL));
+        if (allocated != NULL)
+            *allocated = btree->ckpt_bytes_allocated;
 #ifdef HAVE_DIAGNOSTIC
         /*
          * Sanity check: Let's compare to a list generated from metadata. There should be no
