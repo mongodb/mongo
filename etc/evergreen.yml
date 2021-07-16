@@ -5525,7 +5525,8 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- name: sharding_last_lts_mongos_and_mixed_shards_gen
+- <<: *gen_task_template
+  name: sharding_last_lts_mongos_and_mixed_shards_gen
   tags: ["sharding", "common", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
