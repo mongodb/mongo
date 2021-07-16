@@ -5083,8 +5083,9 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 10
 
-- name: parallel_gen
-  tags: ["misc_js"]
+- <<: *task_template
+  name: parallel_gen
+  tags: ["misc_js", "parallel"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -5095,7 +5096,7 @@ tasks:
 
 - <<: *task_template
   name: parallel_compatibility
-  tags: ["misc_js"]
+  tags: ["misc_js", "parallel"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -10488,7 +10489,8 @@ buildvariants:
   - name: .aggfuzzer .common !.timeseries
   - name: aggregation
   - name: .auth !.multiversion !.audit !.sharding
-  - name: .misc_js
+  # SERVER-58597: Re-enable parallel
+  - name: .misc_js !.parallel
   # SERVER-50296: Investigate concurrency test failures.
   # - name: concurrency
   # - name: concurrency_replication_gen
