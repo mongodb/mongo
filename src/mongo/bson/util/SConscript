@@ -42,7 +42,7 @@ env.CppUnitTest(
         'bson_extract_test.cpp',
         'bitstream_builder_test.cpp',
         'builder_test.cpp',
-        'simple8b_test.cpp', 
+        #'simple8b_test.cpp', 
         'simple8b_type_util_test.cpp',
     ],
     LIBDEPS=[
