@@ -161,10 +161,19 @@ TimeseriesTest.run((insert) => {
                1,
                [{q: {[metaFieldName + ".b.a"]: "A"}, limit: 0}]);
 
-    // Query on a  field that is the prefix of the metaField.
+    // Query on a field that is the prefix of the metaField.
     testDelete([objA], [objA], 0, [{q: {[metaFieldName + "b"]: "A"}, limit: 0}], {
         expectedErrorCode: ErrorCodes.InvalidOptions
     });
+
+    const objACollation = {[timeFieldName]: ISODate(), [metaFieldName]: "Günter"};
+    const objBCollation = {[timeFieldName]: ISODate(), [metaFieldName]: "Gunter"};
+    // Query on the metaField using collation.
+    testDelete([objACollation, objBCollation], [objBCollation], 1, [{
+                   q: {[metaFieldName]: {"$lt": "Gunter"}},
+                   limit: 0,
+                   collation: {locale: "de@collation=phonebook"}
+               }]);
 
     /******************* Tests deleting from a collection without a metaField ********************/
     // Remove all documents.

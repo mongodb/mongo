@@ -1572,7 +1572,8 @@ public:
             for (auto& deleteEntry : request().getDeletes()) {
                 mutablebson::Document doc(deleteEntry.getQ());
                 replaceTimeseriesQueryMetaFieldName(doc.root(), metaField);
-                timeseriesDeletes.emplace_back(doc.getObject(), deleteEntry.getMulti());
+                timeseriesDeletes.push_back(deleteEntry);
+                timeseriesDeletes.back().setQ(doc.getObject());
             }
 
             write_ops::DeleteCommandRequest timeseriesDeleteReq(
