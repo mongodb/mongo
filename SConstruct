@@ -940,8 +940,9 @@ env_vars.Add('MONGO_DISTNAME',
     default='$MONGO_VERSION')
 
 def validate_mongo_version(key, val, env):
-    regex = r'^(\d+)\.(\d+)\.(\d+)-?((?:(rc)(\d+))?.*)?'
-    if not re.match(regex, val):
+    valid_version_re = re.compile(r'^(\d+)\.(\d+)\.(\d+)-?((?:(rc)(\d+))?.*)?$', re.MULTILINE)
+    invalid_version_re = re.compile(r'^0\.0\.0(?:-.*)?', re.MULTILINE)
+    if not valid_version_re.match(val) or invalid_version_re.match(val):
         print(("Invalid MONGO_VERSION '{}', or could not derive from version.json or git metadata. Please add a conforming MONGO_VERSION=x.y.z[-extra] as an argument to SCons".format(val)))
         Exit(1)
 
