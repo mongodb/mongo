@@ -51,7 +51,9 @@ Status crossVerifyUserNames(const UserName& oldUser, const UserName& newUser) no
 
         if (oldUser.getDB() != newUser.getDB()) {
             return {ErrorCodes::ProtocolError,
-                    "Attempt to switch database target during SASL authentication."};
+                    str::stream()
+                        << "Attempt to switch database target during SASL authentication from "
+                        << oldUser.toString() << " to " << newUser.toString()};
         }
     }
 
@@ -61,7 +63,9 @@ Status crossVerifyUserNames(const UserName& oldUser, const UserName& newUser) no
     }
 
     if (oldUser.getUser() != newUser.getUser()) {
-        return {ErrorCodes::ProtocolError, "Attempt to switch user during SASL authentication."};
+        return {ErrorCodes::ProtocolError,
+                str::stream() << "Attempt to switch user during SASL authentication from "
+                              << oldUser.toString() << " to " << newUser.toString()};
     }
 
     return Status::OK();
@@ -215,13 +219,22 @@ void AuthenticationSession::_verifyUserNameFromSaslSupportedMechanisms(const Use
 }
 
 void AuthenticationSession::setUserNameForSaslSupportedMechanisms(UserName userName) {
+    LOGV2_DEBUG(5859101,
+                kDiagnosticLogLevel,
+                "Set user name for session",
+                "userName"_attr = userName,
+                "oldName"_attr = _userName);
     _verifyUserNameFromSaslSupportedMechanisms(userName);
 
     _ssmUserName = userName;
 }
 
 void AuthenticationSession::updateUserName(UserName userName) {
-    LOGV2_DEBUG(5286203, kDiagnosticLogLevel, "Updating user name", "userName"_attr = userName);
+    LOGV2_DEBUG(5286203,
+                kDiagnosticLogLevel,
+                "Updating user name for session",
+                "userName"_attr = userName,
+                "oldName"_attr = _userName);
 
     _verifyUserNameFromSaslSupportedMechanisms(userName);
     uassertStatusOK(crossVerifyUserNames(_userName, userName));
