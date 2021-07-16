@@ -1,4 +1,10 @@
 // Tests the behavior of queries with a {$eq: null} or {$ne: null} predicate.
+//
+// @tags: [
+//   # This file includes tests for SERVER-21929, which is fixed in 5.0 but not earlier versions.
+//   # Therefore, for this test to run all nodes must be at least 5.0.
+//   requires_fcv_50,
+// ]
 (function() {
 "use strict";
 
