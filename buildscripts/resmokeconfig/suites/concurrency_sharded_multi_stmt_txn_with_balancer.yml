@@ -143,7 +143,6 @@ selector:
   - requires_profiling
   # mongos does not support inserts on timeseries collections
   - requires_timeseries
-  - requires_full_ddl_support
   - does_not_support_transactions
   - assumes_unsharded_collection
 
