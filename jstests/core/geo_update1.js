@@ -1,4 +1,5 @@
 // @tags: [
+//   requires_multi_updates,
 //   requires_non_retryable_writes,
 // ]
 
@@ -27,13 +28,15 @@ function p() {
 
 p();
 
-var res = t.update({loc: {$within: {$center: [[5, 5], 2]}}}, {$inc: {z: 1}}, false, true);
+var res = t.update(
+    {loc: {$within: {$center: [[5, 5], 2]}}}, {$inc: {z: 1}}, false /*upsert*/, true /*multi*/);
 assert.commandWorked(res);
 p();
 
-assert.commandWorked(t.update({}, {'$inc': {'z': 1}}, false, true));
+assert.commandWorked(t.update({}, {'$inc': {'z': 1}}, false /*upsert*/, true /*multi*/));
 p();
 
-res = t.update({loc: {$within: {$center: [[5, 5], 2]}}}, {$inc: {z: 1}}, false, true);
+res = t.update(
+    {loc: {$within: {$center: [[5, 5], 2]}}}, {$inc: {z: 1}}, false /*upsert*/, true /*multi*/);
 assert.commandWorked(res);
 p();
