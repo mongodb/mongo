@@ -500,7 +500,8 @@ void ParseAndRunCommand::_parseCommand() {
     _isHello.emplace(command->getName() == "hello"_sd || command->getName() == "isMaster"_sd);
 
     opCtx->setExhaust(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
-    const auto session = opCtx->getClient()->session();
+    Client* client = opCtx->getClient();
+    const auto session = client->session();
     if (session) {
         if (!opCtx->isExhaust() || !_isHello.get()) {
             InExhaustHello::get(session.get())->setInExhaust(false, _commandName);
@@ -529,10 +530,10 @@ void ParseAndRunCommand::_parseCommand() {
 
     // If the command includes a 'comment' field, set it on the current OpCtx.
     if (auto commentField = request.body["comment"]) {
+        stdx::lock_guard<Client> lk(*client);
         opCtx->setComment(commentField.wrap());
     }
 
-    Client* client = opCtx->getClient();
     auto const apiParamsFromClient = initializeAPIParameters(request.body, command);
 
     {

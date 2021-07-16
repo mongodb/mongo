@@ -232,7 +232,10 @@ TEST(CurOpTest, ShouldNotReportFailpointMsgIfNotSet) {
 
     // Test the reported state should _not_ contain 'failpointMsg'.
     BSONObjBuilder reportedStateWithoutFailpointMsg;
-    curop->reportState(opCtx.get(), &reportedStateWithoutFailpointMsg);
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        curop->reportState(opCtx.get(), &reportedStateWithoutFailpointMsg);
+    }
     auto bsonObj = reportedStateWithoutFailpointMsg.done();
 
     // bsonObj should _not_ contain 'failpointMsg' if a fail point is not set.

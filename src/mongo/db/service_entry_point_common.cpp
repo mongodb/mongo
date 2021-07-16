@@ -1337,6 +1337,7 @@ void ExecCommandDatabase::_initiateCommand() {
         } else if (fieldName == CommandHelpers::kHelpFieldName) {
             helpField = element;
         } else if (fieldName == "comment") {
+            stdx::lock_guard<Client> lk(*client);
             opCtx->setComment(element.wrap());
         } else if (fieldName == query_request_helper::queryOptionMaxTimeMS) {
             uasserted(ErrorCodes::InvalidOptions,

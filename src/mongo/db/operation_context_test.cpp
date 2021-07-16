@@ -1151,6 +1151,8 @@ TEST(OperationContextTest, CurrentOpExcludesKilledOperations) {
             // of an `opCtx`. This is because `CurOp::reportCurrentOpForClient()` accepts an `opCtx`
             // as input and requires it to be present throughout its execution.
             stdx::thread thread([&]() mutable {
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+
                 auto threadClient = serviceCtx->makeClient("ThreadClient");
 
                 // Generate report in absence of any opCtx

@@ -239,6 +239,7 @@ void setUpOperationContextStateForGetMore(OperationContext* opCtx,
     // that if the 'getMore' command itself has a 'comment' field, we give precedence to it.
     auto comment = cursor.getOriginatingCommandObj()["comment"];
     if (!opCtx->getComment() && comment) {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
         opCtx->setComment(comment.wrap());
     }
 }

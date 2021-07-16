@@ -180,6 +180,7 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
     // Extract 'comment' field from the 'explainedObj' only if there is no top-level comment.
     auto commentField = explainedObj["comment"];
     if (!opCtx->getComment() && commentField) {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
         opCtx->setComment(commentField.wrap());
     }
 

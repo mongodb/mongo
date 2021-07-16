@@ -518,10 +518,17 @@ public:
         _isStartingMultiDocumentTransaction = isStartingMultiDocumentTransaction;
     }
 
+    /**
+     * Sets '_comment'. The client lock must be acquired before calling this method.
+     */
     void setComment(const BSONObj& comment) {
         _comment = comment.getOwned();
     }
 
+    /**
+     * Gets '_comment'. The client lock must be acquired when calling from any thread that does
+     * not own the client associated with the operation.
+     */
     boost::optional<BSONElement> getComment() {
         // The '_comment' object, if present, will only ever have one field.
         return _comment ? boost::optional<BSONElement>(_comment->firstElement()) : boost::none;
