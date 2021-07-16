@@ -12,6 +12,9 @@
  *   # by which point it is too late to complain that "max" has been exceeded.
  *   does_not_support_transactions,
  *   does_not_support_causal_consistency,
+ *   # Reading from an pre-existing cursor after tenant migration returns stale data by design,
+ *   # so the cursor-invalidation test will not work in that scenario.
+ *   tenant_migration_incompatible,
  * ]
  */
 
