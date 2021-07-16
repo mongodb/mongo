@@ -28,9 +28,6 @@
  */
 
 #include "mongo/bson/util/simple8b_type_util.h"
-#include "mongo/bson/bsonelement.h"
-
-#include <cmath>
 
 namespace mongo {
 
@@ -40,59 +37,6 @@ uint64_t Simple8bTypeUtil::encodeInt64(int64_t val) {
 
 int64_t Simple8bTypeUtil::decodeInt64(uint64_t val) {
     return (val >> 1) ^ (~(val & 1) + 1);
-}
-
-boost::optional<uint8_t> Simple8bTypeUtil::calculateDecimalShiftMultiplier(double val) {
-    // Don't store isnan and isinf and end calculation early
-    if (std::isnan(val) || std::isinf(val)) {
-        return boost::none;
-    }
-    // Try multiplying by selected powers of 10 until we do not have any decimal digits. If we
-    // always have leftover digits, return none.
-    for (uint8_t i = 0; i < kScaleMultiplier.size(); ++i) {
-        double scaleMultiplier = kScaleMultiplier[i];
-        double valTimesMultiplier = val * scaleMultiplier;
-        // Checks for both overflows
-        // We use 2^53 because this is the max integer that we can guarentee can be
-        // exactly represented by a floating point decimal since there are 53 value bits
-        // in a IEEE754 Floating 64 representation
-        if (!(valTimesMultiplier >= BSONElement::kSmallestSafeLongLongAsDouble        // -2^53
-              && valTimesMultiplier <= BSONElement::kLargestSafeLongLongAsDouble)) {  // 2^53
-            return boost::none;
-        }
-        int64_t decimalToBeEncoded = std::llround(valTimesMultiplier);
-        if (decimalToBeEncoded / scaleMultiplier == val) {
-            return i;
-        }
-    }
-    return boost::none;
-}
-
-boost::optional<uint64_t> Simple8bTypeUtil::encodeDouble(double val, uint8_t scaleIndex) {
-    // Checks for both overflow and handles NaNs
-    // We use 2^53 because this is the max integer that we can guarentee can be
-    // exactly represented by a floating point decimal since there are 53 value bits
-    // in a IEEE754 Floating 64 representation
-    double scaleMultiplier = kScaleMultiplier[scaleIndex];
-    double valTimesMultiplier = val * scaleMultiplier;
-    if (!(valTimesMultiplier >= BSONElement::kSmallestSafeLongLongAsDouble     // -2^53
-          && valTimesMultiplier <= BSONElement::kLargestSafeLongLongAsDouble)  // 2^53
-    ) {
-        return boost::none;
-    }
-
-    // Check to make sure our exact encoded value can be exactly converted back into a decimal.
-    // We use encodeInt64 to handle negative floats by taking the signed bit and placing it at the
-    // lsb position
-    int64_t valueToBeEncoded = std::llround(valTimesMultiplier);
-    if (valueToBeEncoded / scaleMultiplier != val) {
-        return boost::none;
-    }
-    return encodeInt64(valueToBeEncoded);
-}
-
-double Simple8bTypeUtil::decodeDouble(uint64_t val, uint8_t scaleIndex) {
-    return double(decodeInt64(val)) / kScaleMultiplier[scaleIndex];
 }
 
 }  // namespace mongo
