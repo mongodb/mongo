@@ -130,9 +130,9 @@ assert.eq("6,9,2,1,1,1,1,2", s(), "E5");
 
 t.drop();
 
-t.save({x: 1});
-t.save({x: 2});
-t.save({x: 3});
+t.save({_id: 1, x: 1});
+t.save({_id: 2, x: 2});
+t.save({_id: 3, x: 3});
 
 t.createIndex({x: 1});
 
