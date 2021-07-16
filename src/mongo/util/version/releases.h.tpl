@@ -32,22 +32,30 @@
 ##
 #set $mvc_file = open($args[0], 'r')
 #set $mvc_doc = yaml.safe_load($mvc_file)
-#set $fcv_list = [v.replace('.', '_') for v in $mvc_doc['featureCompatibilityVersions']]
-#set $fcv_head = $fcv_list[0]
-#set $fcv_tail = $fcv_list[1:]
+#set $fcvs = $mvc_doc['featureCompatibilityVersions']
+#set $majors = $mvc_doc['majorReleases']
+ 
+## Change a dotted version to an underscore-delimited version.
+#def underscores($v): $v.replace('.', '_')
 
 namespace mongo::multiversion {
 
 enum class FeatureCompatibilityVersion {
     kInvalid,
 
-    kUnsetDefaultBehavior_$fcv_head,
-    kFullyDowngradedTo_$fcv_head,
+    kUnsetDefaultBehavior_$underscores($fcvs[0]),
+    kFullyDowngradedTo_$underscores($fcvs[0]),
 
-#for $fcv in $fcv_tail
-    kVersion_$fcv,
+#for $fcv in $fcvs[1:]
+    kVersion_$underscores($fcv),
 #end for
 };
+
+constexpr size_t kSince_$underscores('4.4') = ${len($fcvs) - 1};
+
+// Last major was "$majors[-1]".
+#set $last_major_fcv_idx = $fcvs.index($majors[-1])
+constexpr size_t kSinceLastMajor = ${len($fcvs) - $last_major_fcv_idx - 1};
 
 }  // namespace mongo::multiversion
 /* vim: set filetype=cpp: */
