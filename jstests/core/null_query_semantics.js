@@ -10,9 +10,6 @@
 
 load("jstests/aggregation/extras/utils.js");  // For 'resultsEq'.
 
-const coll = db.not_equals_null;
-coll.drop();
-
 function extractAValues(results) {
     return results.map(function(res) {
         if (!res.hasOwnProperty("a")) {
@@ -22,7 +19,7 @@ function extractAValues(results) {
     });
 }
 
-function testNullSemantics() {
+function testNullSemantics(coll) {
     // For the first portion of the test, only insert documents without arrays. This will avoid
     // making the indexes multi-key, which may allow an index to be used to answer the queries.
     assert.commandWorked(coll.insert([
@@ -651,6 +648,11 @@ function testNullSemantics() {
 }
 
 // Test without any indexes.
+jsTestLog('Without any indexes');
+const collNamePrefix = 'null_query_semantics_';
+let collCount = 0;
+let coll = db.getCollection(collNamePrefix + collCount++);
+coll.drop();
 testNullSemantics(coll);
 
 const keyPatterns = [
@@ -670,6 +672,7 @@ const keyPatterns = [
 
 // Test with a variety of other indexes.
 for (let indexSpec of keyPatterns) {
+    coll = db.getCollection(collNamePrefix + collCount++);
     coll.drop();
     jsTestLog(`Index spec: ${tojson(indexSpec)}`);
     assert.commandWorked(coll.createIndex(indexSpec.keyPattern, indexSpec.options));
@@ -677,9 +680,15 @@ for (let indexSpec of keyPatterns) {
 }
 
 // Test that you cannot use a $ne: null predicate in a partial filter expression.
+jsTestLog('Cannot use $ne: null predicate in a partial filter - 1');
+coll = db.getCollection(collNamePrefix + collCount++);
+coll.drop();
 assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: {a: {$ne: null}}}),
                              ErrorCodes.CannotCreateIndex);
 
+jsTestLog('Cannot use $ne: null predicate in a partial filter - 2');
+coll = db.getCollection(collNamePrefix + collCount++);
+coll.drop();
 assert.commandFailedWithCode(
     coll.createIndex({a: 1}, {partialFilterExpression: {a: {$elemMatch: {$ne: null}}}}),
     ErrorCodes.CannotCreateIndex);
