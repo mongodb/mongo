@@ -40,3 +40,8 @@ feature_flags:
       cpp_varname: gFeatureFlagDotsAndDollars
       default: true
       version: 5.0
+
+    featureFlagSearchMeta:
+      description: "Feature flag for allowing use of search collectors alongside search results"
+      cpp_varname: gFeatureFlagSearchMeta
+      default: false
