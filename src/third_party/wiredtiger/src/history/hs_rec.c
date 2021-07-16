@@ -714,6 +714,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi,
         }
 #endif
         __wt_update_vector_clear(&out_of_order_ts_updates);
+        __wt_update_vector_clear(&updates);
     }
 
     WT_ERR(__wt_block_manager_named_size(session, WT_HS_FILE, &hs_size));
