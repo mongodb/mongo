@@ -191,13 +191,14 @@ int64_t Simple8b::_encodeLargestPossibleWord() {
     uint64_t encodedWord = _encode(selector, integersCoded);
 
     _pendingValues.erase(_pendingValues.begin(), _pendingValues.begin() + integersCoded);
-    _currMaxBitLen =
-        _countBits((*std::max_element(_pendingValues.begin(),
-                                      _pendingValues.end(),
-                                      [](const PendingValue& lhs, const PendingValue& rhs) {
-                                          return _countBits(lhs.val) < _countBits(rhs.val);
-                                      }))
-                       .val);
+    _currMaxBitLen = _pendingValues.empty()
+        ? 0
+        : _countBits((*std::max_element(_pendingValues.begin(),
+                                        _pendingValues.end(),
+                                        [](const PendingValue& lhs, const PendingValue& rhs) {
+                                            return _countBits(lhs.val) < _countBits(rhs.val);
+                                        }))
+                         .val);
 
     return encodedWord;
 }
