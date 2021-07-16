@@ -187,6 +187,8 @@ const char* typeName(BinDataType type) {
             return "MD5";
         case Encrypt:
             return "encrypt";
+        case Column:
+            return "column";
         case bdtCustom:
             return "Custom";
         default:
@@ -203,6 +205,7 @@ bool isValidBinDataType(int type) {
         case newUUID:
         case MD5Type:
         case Encrypt:
+        case Column:
         case bdtCustom:
             return true;
         default:

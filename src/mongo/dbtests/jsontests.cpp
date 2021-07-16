@@ -834,6 +834,7 @@ TEST(FromJsonTest, BinDataTypes) {
         {0x04, newUUID},
         {0x05, MD5Type},
         {0x06, Encrypt},
+        {0x07, Column},
         {0x80, bdtCustom},
     };
     for (const auto& ts : specs) {
