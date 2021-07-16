@@ -15,8 +15,10 @@ env.Library(
 )
 
 env.Library(
-    target='type_compressor',
+    target='bson_column',
     source=[
+        'bsoncolumn.cpp',
+        'bsoncolumnbuilder.cpp',
         'simple8b.cpp',
         'simple8b_type_util.cpp',
     ],
@@ -30,13 +32,14 @@ env.CppUnitTest(
     source=[
         'bson_check_test.cpp',
         'bson_extract_test.cpp',
+        'bsoncolumn_test.cpp',
         'builder_test.cpp',
         'simple8b_test.cpp', 
         'simple8b_type_util_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        'bson_column', 
         'bson_extract',
-        'type_compressor', 
     ],
 )
