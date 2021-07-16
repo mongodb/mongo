@@ -83,11 +83,16 @@ assert.soon(() => {
     return oplogBuffer.find({"entry.o._id": "docToBeFetched"}).count() === 1;
 });
 
+recipientRst.awaitLastOpCommitted();
+
+// Set a failpoint to prevent the new recipient primary from completing the migration before the
+// donor renames the collection.
+const newRecipientPrimary = recipientRst.getSecondaries()[0];
+const fpPauseAtStartOfMigration =
+    configureFailPoint(newRecipientPrimary, "pauseAfterRunTenantMigrationRecipientInstance");
+
 // Step up a new node in the recipient set and trigger a failover. The new primary should resume
 // cloning starting from the third document.
-recipientRst.awaitLastOpCommitted();
-const newRecipientPrimary = recipientRst.getSecondaries()[0];
-const newRecipientDb = newRecipientPrimary.getDB(dbName);
 assert.commandWorked(newRecipientPrimary.adminCommand({replSetStepUp: 1}));
 hangDuringCollectionClone.off();
 recipientRst.getPrimary();
@@ -98,6 +103,7 @@ const collNameRenamed = collName + "_renamed";
 assert.commandWorked(donorColl.renameCollection(collNameRenamed));
 
 // The migration should go through after recipient failover.
+fpPauseAtStartOfMigration.off();
 TenantMigrationTest.assertCommitted(migrationThread.returnData());
 
 // Check that recipient has cloned all documents in the renamed collection.
