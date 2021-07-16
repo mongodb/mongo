@@ -73,7 +73,6 @@ functions:
         source venv/bin/activate
         pip3 install requirements_parser
         pip3 install -r etc/pip/compile-requirements.txt
-        sudo apt install -y ccache
         ./buildscripts/scons.py --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --link-model=dynamic --ninja generate-ninja ICECC=icecc CCACHE=ccache
         ninja -j$(nproc --all) install-mongod
   "configure wiredtiger": &configure_wiredtiger
@@ -2568,6 +2567,10 @@ tasks:
 
   - name: many-collection-test
     commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 86400
+          timeout_secs: 86400
       - func: "fetch mongo repo"
       - func: "get project"
       - func: "import wiredtiger into mongo"
@@ -2580,6 +2583,8 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
+            sudo su
+            ulimit -n 1000000
             export "PATH=/opt/mongodbtoolchain/v3/bin:$PATH"
             virtualenv -p python3 venv
             source venv/bin/activate
@@ -2789,6 +2794,7 @@ buildvariants:
   tasks:
     - name: many-dhandle-stress-test
     - name: many-collection-test
+      distros: ubuntu1804-wt-large
 
 - name: cppsuite-stress-tests
   display_name: "Cppsuite Stress Tests"
