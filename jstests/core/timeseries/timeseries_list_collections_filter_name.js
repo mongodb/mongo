@@ -12,17 +12,15 @@
 (function() {
 'use strict';
 
-const testDB = db.getSiblingDB(jsTestName());
-assert.commandWorked(testDB.dropDatabase());
-
 const timeFieldName = 'time';
-const coll = testDB.getCollection('t');
 
-assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+const coll = db.timeseries_list_collections_filter_name;
+coll.drop();
+
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
 const collections =
-    assert.commandWorked(testDB.runCommand({listCollections: 1, filter: {name: coll.getName()}}))
+    assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: coll.getName()}}))
         .cursor.firstBatch;
 assert.eq(collections, [{
               name: coll.getName(),
