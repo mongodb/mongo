@@ -60,6 +60,28 @@ class Balancer : public ReplicaSetAwareServiceConfigSvr<Balancer> {
 
 public:
     /**
+     * Scoped class to manage the pause/resumeBalancer requests cycle.
+     * See Balancer::requestPause() for more details.
+     */
+    class ScopedPauseBalancerRequest {
+    public:
+        ~ScopedPauseBalancerRequest() {
+            _balancer->_removePauseRequest();
+        }
+
+    private:
+        Balancer* _balancer;
+
+        ScopedPauseBalancerRequest(Balancer* balancer) : _balancer(balancer) {
+            _balancer->_addPauseRequest();
+        }
+
+        ScopedPauseBalancerRequest(const ScopedPauseBalancerRequest&) = delete;
+        ScopedPauseBalancerRequest& operator=(const ScopedPauseBalancerRequest&) = delete;
+
+        friend class Balancer;
+    };
+    /**
      * Provide access to the Balancer decoration on ServiceContext.
      */
     static Balancer* get(ServiceContext* serviceContext);
@@ -109,6 +131,14 @@ public:
      * context's deadline is exceeded, it will throw an ExceededTimeLimit exception.
      */
     void joinCurrentRound(OperationContext* opCtx);
+
+
+    /**
+     * Invoked by any client requiring a temporary suspension of the balancer thread
+     * (I.E. the setFCV process). The request is NOT persisted by the balancer in its config
+     * document and remains active as long as the returned ScopedPauseRequest doesn't get destroyed.
+     */
+    ScopedPauseBalancerRequest requestPause();
 
     /**
      * Blocking call, which requests the balancer to move a single chunk to a more appropriate
@@ -185,6 +215,21 @@ private:
     bool _stopRequested();
 
     /**
+     * Adds a request to pause the balancer main loop.
+     */
+    void _addPauseRequest();
+
+    /**
+     * Removes a previously added request to pause the balancer main loop.
+     */
+    void _removePauseRequest();
+
+    /**
+     * Assess whether the balancer has any active pause or stop request.
+     */
+    bool _stopOrPauseRequested();
+
+    /**
      * Signals the beginning and end of a balancing round.
      */
     void _beginRound(OperationContext* opCtx);
@@ -257,6 +302,9 @@ private:
 
     // Number of moved chunks in last round
     int _balancedLastTime;
+
+    // Number of active pause balancer requests
+    int _numPauseRequests{0};
 
     // Source of randomness when metadata needs to be randomized.
     BalancerRandomSource _random;

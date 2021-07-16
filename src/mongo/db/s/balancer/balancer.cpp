@@ -256,6 +256,10 @@ void Balancer::joinCurrentRound(OperationContext* opCtx) {
     });
 }
 
+Balancer::ScopedPauseBalancerRequest Balancer::requestPause() {
+    return ScopedPauseBalancerRequest(this);
+}
+
 Status Balancer::rebalanceSingleChunk(OperationContext* opCtx, const ChunkType& chunk) {
     auto migrateStatus = _chunkSelectionPolicy->selectSpecificChunkToMove(opCtx, chunk);
     if (!migrateStatus.isOK()) {
@@ -392,7 +396,7 @@ void Balancer::_mainThread() {
                 continue;
             }
 
-            if (!balancerConfig->shouldBalance()) {
+            if (!balancerConfig->shouldBalance() || _stopOrPauseRequested()) {
                 LOGV2_DEBUG(21859, 1, "Skipping balancing round because balancing is disabled");
                 _endRound(opCtx.get(), kBalanceRoundDefaultInterval);
                 continue;
@@ -495,9 +499,25 @@ void Balancer::_mainThread() {
     LOGV2(21867, "CSRS balancer is now stopped");
 }
 
+void Balancer::_addPauseRequest() {
+    stdx::unique_lock<Latch> scopedLock(_mutex);
+    ++_numPauseRequests;
+}
+
+void Balancer::_removePauseRequest() {
+    stdx::unique_lock<Latch> scopedLock(_mutex);
+    invariant(_numPauseRequests > 0);
+    --_numPauseRequests;
+}
+
 bool Balancer::_stopRequested() {
     stdx::lock_guard<Latch> scopedLock(_mutex);
     return (_state != kRunning);
+}
+
+bool Balancer::_stopOrPauseRequested() {
+    stdx::lock_guard<Latch> scopedLock(_mutex);
+    return (_state != kRunning || _numPauseRequests > 0);
 }
 
 void Balancer::_beginRound(OperationContext* opCtx) {
@@ -641,7 +661,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
     auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
 
     // If the balancer was disabled since we started this round, don't start new chunk moves
-    if (_stopRequested() || !balancerConfig->shouldBalance()) {
+    if (_stopOrPauseRequested() || !balancerConfig->shouldBalance()) {
         LOGV2_DEBUG(21870, 1, "Skipping balancing round because balancer was stopped");
         return 0;
     }
