@@ -246,7 +246,6 @@ struct __wt_cache {
 
 #define WT_WITH_PASS_LOCK(session, op)                                                   \
     do {                                                                                 \
-        WT_ASSERT(session, !FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_PASS));     \
         WT_WITH_LOCK_WAIT(session, &cache->evict_pass_lock, WT_SESSION_LOCKED_PASS, op); \
     } while (0)
 

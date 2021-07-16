@@ -667,7 +667,6 @@ __evict_pass(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
-    WT_DECL_RET;
     WT_TXN_GLOBAL *txn_global;
     uint64_t eviction_progress, oldest_id, prev_oldest_id;
     uint64_t time_now, time_prev;
@@ -728,23 +727,8 @@ __evict_pass(WT_SESSION_IMPL *session)
          */
         if (!WT_EVICT_HAS_WORKERS(session) &&
           (cache->evict_empty_score < WT_EVICT_SCORE_CUTOFF ||
-            !__evict_queue_empty(cache->evict_urgent_queue, false))) {
-            /*
-             * Release the evict pass lock as the thread is going to evict the pages from the queue.
-             * Otherwise, it can lead to a deadlock while evicting the page in the flow of clearing
-             * the eviction walk.
-             *
-             * As there is only one eviction thread that is active currently, there couldn't be any
-             * race conditions that other threads can enter into the flow of evict server when there
-             * is already another server is running.
-             */
-            FLD_CLR(session->lock_flags, WT_SESSION_LOCKED_PASS);
-            __wt_spin_unlock(session, &cache->evict_pass_lock);
-            ret = __evict_lru_pages(session, true);
-            __wt_spin_lock(session, &cache->evict_pass_lock);
-            FLD_SET(session->lock_flags, WT_SESSION_LOCKED_PASS);
-            WT_RET(ret);
-        }
+            !__evict_queue_empty(cache->evict_urgent_queue, false)))
+            WT_RET(__evict_lru_pages(session, true));
 
         if (cache->pass_intr != 0)
             break;
