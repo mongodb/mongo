@@ -33,7 +33,8 @@ feature_flags:
     featureFlagChangeStreamsOptimization:
       description: "Feature flag for enabling change streams optimization"
       cpp_varname: gFeatureFlagChangeStreamsOptimization
-      default: false
+      default: true
+      version: 5.1
 
     featureFlagChangeStreamsRewrite:
       description: "Feature flag for enabling change streams oplog rewrites"
