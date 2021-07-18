@@ -2846,3 +2846,10 @@ MacroAssembler::atomicEffectOpJS(Scalar::Type arrayType, const Synchronization& 
     atomicEffectOp(arrayType, sync, op, value, mem, valueTemp, offsetTemp, maskTemp);
 }
 
+void
+MacroAssembler::speculationBarrier()
+{
+    MOZ_CRASH();
+}
+
+

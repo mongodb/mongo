@@ -28,6 +28,9 @@ _xcode_setup() {
 }
 
 case "$_Path" in
+    "platform/mips64el/linux")
+        _CONFIG_OPTS="--host=mips64el-linux"
+	;;
     "platform/aarch64/linux")
         _CONFIG_OPTS="--host=aarch64-linux"
 	;;
