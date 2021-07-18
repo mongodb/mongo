@@ -41,6 +41,10 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#if defined(__FreeBSD__)
+#define MADV_DODUMP MADV_CORE
+#define MADV_DONTDUMP MADV_NOCORE
+#endif
 #endif
 
 #include "mongo/base/init.h"

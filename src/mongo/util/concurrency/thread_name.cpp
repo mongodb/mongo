@@ -33,7 +33,7 @@
 
 #include "mongo/util/concurrency/thread_name.h"
 
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__APPLE__) || defined(__linux__) || defined(__FreeBSD__)
 #include <pthread.h>
 #endif
 #if defined(__APPLE__)
@@ -47,6 +47,9 @@
 #if defined(__linux__)
 #include <sys/syscall.h>
 #include <sys/types.h>
+#endif
+#if defined(__FreeBSD__)
+#include <pthread_np.h>
 #endif
 
 #include <fmt/format.h>
@@ -171,6 +174,10 @@ void setOSThreadName(StringData threadName) {
                   "error"_attr = errnoWithDescription(error));
         }
     }
+#elif defined(__FreeBSD__)
+    // There is no hardcoded limit, name is allocated on the heap
+    // and does not return neither
+    pthread_set_name_np(pthread_self(), threadName.rawData());
 #endif
 }
 
