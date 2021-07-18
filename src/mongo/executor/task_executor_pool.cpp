@@ -44,10 +44,10 @@ namespace executor {
 
 // If less than or equal to 0, the suggested pool size will be determined by the number of cores. If
 // set to a particular positive value, this will be used as the pool size.
-MONGO_EXPORT_SERVER_PARAMETER(taskExecutorPoolSize, int, 1);
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(taskExecutorPoolSize, int, 1);
 
 size_t TaskExecutorPool::getSuggestedPoolSize() {
-    auto poolSize = taskExecutorPoolSize.load();
+    auto poolSize = taskExecutorPoolSize;
     if (poolSize > 0) {
         return poolSize;
     }
