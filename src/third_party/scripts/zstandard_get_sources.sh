@@ -13,13 +13,13 @@ if [ "$#" -ne 0 ]; then
 fi
 
 GIT_EXE=git
-if grep -q Microsoft /proc/version; then
+if grep -iq Microsoft /proc/version; then
     GIT_EXE=git.exe
 fi
 
 NAME=zstandard
 REVISION=1.4.4
-if grep -q Microsoft /proc/version; then
+if grep -iq Microsoft /proc/version; then
     SRC_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
     SRC_ROOT+="$(mktemp -u /zstandard.XXXXXX)"
     mkdir -p $SRC_ROOT
@@ -29,12 +29,12 @@ fi
 
 SRC=${SRC_ROOT}/${NAME}_${REVISION}
 CLONE_DEST=$SRC
-if grep -q Microsoft /proc/version; then
+if grep -iq Microsoft /proc/version; then
     CLONE_DEST=$(wslpath -m $SRC)
 fi
 DEST_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME-$REVISION
 PATCH_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME-$REVISION/patches
-if grep -q Microsoft /proc/version; then
+if grep -iq Microsoft /proc/version; then
     DEST_DIR=$(wslpath -u "$DEST_DIR")
     PATCH_DIR=$(wslpath -w $(wslpath -u "$PATCH_DIR"))
 fi
