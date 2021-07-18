@@ -66,7 +66,7 @@ Date.prototype.tojson = function() {
     // var ofsmin = this.getTimezoneOffset();
     // if (ofsmin != 0){
     //     ofs = ofsmin > 0 ? '-' : '+'; // This is correct
-    //     ofs += (ofsmin/60).zeroPad(2)
+    //     ofs += Math.abs(ofsmin/60).zeroPad(2)
     //     ofs += (ofsmin%60).zeroPad(2)
     // }
     return 'ISODate("' + year + '-' + month + '-' + date + 'T' + hour + ':' + minute + ':' + sec +
