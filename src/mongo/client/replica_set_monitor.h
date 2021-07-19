@@ -217,11 +217,6 @@ public:
      */
     static void shutdown();
 
-    /**
-     * Returns the refresh period that is given to all new SetStates.
-     */
-    static Seconds getDefaultRefreshPeriod();
-
     //
     // internal types (defined in replica_set_monitor_internal.h)
     //
@@ -262,6 +257,16 @@ public:
 private:
     Future<std::vector<HostAndPort>> _getHostsOrRefresh(const ReadPreferenceSetting& readPref,
                                                         Milliseconds maxWait);
+
+    /**
+     * Returns the refresh period that is given to all new SetStates.
+     */
+    static Seconds _getDefaultRefreshPeriod();
+
+    /**
+     * When fail injection is present, override refresh period.
+     */
+    static Seconds _overrideRefreshPeriod(Seconds original);
 
     /**
      * Schedules a refresh via the task executor. (Task is automatically canceled in the d-tor.)

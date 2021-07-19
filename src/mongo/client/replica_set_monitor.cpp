@@ -178,14 +178,18 @@ const Seconds ReplicaSetMonitor::kDefaultFindHostTimeout(15);
 // Defaults to random selection as required by the spec
 bool ReplicaSetMonitor::useDeterministicHostSelection = false;
 
-Seconds ReplicaSetMonitor::getDefaultRefreshPeriod() {
+Seconds ReplicaSetMonitor::_getDefaultRefreshPeriod() {
+    return kDefaultRefreshPeriod;
+}
+
+Seconds ReplicaSetMonitor::_overrideRefreshPeriod(Seconds original) {
+    static constexpr auto kPeriodField = "period"_sd;
     MONGO_FAIL_POINT_BLOCK_IF(modifyReplicaSetMonitorDefaultRefreshPeriod,
                               data,
-                              [&](const BSONObj& data) { return data.hasField("period"); }) {
-        return Seconds{data.getData().getIntField("period")};
+                              [&](const BSONObj& data) { return data.hasField(kPeriodField); }) {
+        return Seconds{data.getData().getIntField(kPeriodField)};
     }
-
-    return kDefaultRefreshPeriod;
+    return original;
 }
 
 ReplicaSetMonitor::ReplicaSetMonitor(const SetStatePtr& initialState) : _state(initialState) {}
@@ -251,7 +255,7 @@ void ReplicaSetMonitor::_doScheduledRefresh(const CallbackHandle& currentHandle)
 
     Refresher::ensureScanInProgress(_state, lk);
 
-    Milliseconds period = _state->refreshPeriod;
+    Milliseconds period = _overrideRefreshPeriod(_state->refreshPeriod);
     if (_state->isExpedited) {
         if (_state->waiters.empty()) {
             // No current waiters so we can stop the expedited scanning.
@@ -1020,7 +1024,7 @@ SetState::SetState(const MongoURI& uri,
       seedNodes(setUri.getServers().begin(), setUri.getServers().end()),
       latencyThresholdMicros(serverGlobalParams.defaultLocalThresholdMillis * int64_t(1000)),
       rand(std::random_device()()),
-      refreshPeriod(getDefaultRefreshPeriod()) {
+      refreshPeriod(_overrideRefreshPeriod(_getDefaultRefreshPeriod())) {
     uassert(13642, "Replica set seed list can't be empty", !seedNodes.empty());
 
     if (name.empty())
