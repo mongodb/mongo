@@ -207,7 +207,13 @@ let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
     requestFunc(testColl);
 
     // Get an expected error message.
-    assert.gte(rawMongoProgramOutput().search(errmsgRegExp), 0);
+    const rawLogs = rawMongoProgramOutput();
+    const matchedIndex = rawLogs.search(errmsgRegExp);
+    if (matchedIndex < 0) {
+        jsTestLog("String pattern not found in rawMongoProgramOutput(): " + rawLogs);
+    }
+
+    assert.gte(matchedIndex, 0);
     MongoRunner.stopMongod(mongod, 9, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
 };
 
