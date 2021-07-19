@@ -36,11 +36,13 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
 struct MultikeyPathInfo {
     NamespaceString nss;
+    UUID collectionUUID;
     std::string indexName;
     KeyStringSet multikeyMetadataKeys;
     MultikeyPaths multikeyPaths;
