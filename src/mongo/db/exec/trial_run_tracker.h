@@ -55,6 +55,13 @@ public:
         kLastElem
     };
 
+    /**
+     * Constructs a `TrialRunTracker' which indicates that the trial period is over when any
+     * 'TrialRunMetric' exceeds the maximum provided at construction.
+     *
+     * Callers can also pass a value of zero to indicate that the given metric should not be
+     * tracked.
+     */
     template <typename... MaxMetrics,
               std::enable_if_t<sizeof...(MaxMetrics) == TrialRunMetric::kLastElem, int> = 0>
     TrialRunTracker(MaxMetrics... maxMetrics) : _maxMetrics{maxMetrics...} {}
@@ -64,12 +71,20 @@ public:
      * 'metricIncrement' value and returns 'true' if the updated metric value has exceeded
      * its maximum.
      *
+     * This is a no-op, and will return false, if the given metric is not being tracked by this
+     * 'TrialRunTracker'.
+     *
      * If the metric has already exceeded its maximum value before this call, this method
      * returns 'true' immediately without incrementing the metric.
      */
     template <TrialRunMetric metric>
     bool trackProgress(size_t metricIncrement) {
         static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
+
+        if (_maxMetrics[metric] == 0) {
+            // This metric is not being tracked.
+            return false;
+        }
 
         if (_done) {
             return true;

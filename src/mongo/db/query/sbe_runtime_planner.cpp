@@ -146,6 +146,21 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
         }
     }
 
+    // If all the plans are blocking, then the trial period risks going on for too long. Because the
+    // plans are blocking, they may not provide 'maxNumResults' within the allotted budget of reads.
+    // We could end up in a situation where each plan's trial period runs for a long time,
+    // substantially slowing down the multi-planning process. For this reason, when all the plans
+    // are blocking, we pass 'maxNumResults' to the trial run tracker. This causes the sort stage to
+    // exit early as soon as it sees 'maxNumResults' _input_ values, which keeps the trial period
+    // shorter.
+    //
+    // On the other hand, if we have a mix of blocking and non-blocking plans, we don't want the
+    // sort stage to exit early based on the number of input rows it observes. This could cause the
+    // trial period for the blocking plans to run for a much shorter timeframe than the non-blocking
+    // plans. This leads to an apples-to-oranges comparison between the blocking and non-blocking
+    // plans which could artificially favor the blocking plans.
+    const size_t trackerResultsBudget = nonBlockingPlanIndexes.empty() ? maxNumResults : 0;
+
     auto runPlans = [&](const std::vector<size_t>& planIndexes, size_t& maxNumReads) -> void {
         for (auto planIndex : planIndexes) {
             // Prepare the plan.
@@ -153,7 +168,7 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
 
             // Attach a unique TrialRunTracker to the plan, which is configured to use at most
             // 'maxNumReads' reads.
-            auto tracker = std::make_unique<TrialRunTracker>(maxNumResults, maxNumReads);
+            auto tracker = std::make_unique<TrialRunTracker>(trackerResultsBudget, maxNumReads);
             root->attachToTrialRunTracker(tracker.get());
             trialRunTrackers.emplace_back(root.get(), std::move(tracker));
 
