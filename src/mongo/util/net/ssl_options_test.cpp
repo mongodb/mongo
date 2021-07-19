@@ -211,7 +211,6 @@ TEST(SetupOptions, tlsModeRequired) {
     argv.push_back("--tlsAllowInvalidHostnames");
     argv.push_back("--tlsAllowInvalidCertificates");
     argv.push_back("--tlsWeakCertificateValidation");
-    argv.push_back("--tlsFIPSMode");
     argv.push_back("--tlsCertificateKeyFilePassword");
     argv.push_back("pw1");
     argv.push_back("--tlsClusterPassword");
@@ -241,7 +240,6 @@ TEST(SetupOptions, tlsModeRequired) {
     ASSERT_EQ(::mongo::sslGlobalParams.sslAllowInvalidHostnames, true);
     ASSERT_EQ(::mongo::sslGlobalParams.sslAllowInvalidCertificates, true);
     ASSERT_EQ(::mongo::sslGlobalParams.sslWeakCertificateValidation, true);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslFIPSMode, true);
     ASSERT_EQ(::mongo::sslGlobalParams.sslPEMKeyPassword, "pw1");
     ASSERT_EQ(::mongo::sslGlobalParams.sslClusterPassword, "pw2");
     ASSERT_EQ(static_cast<int>(::mongo::sslGlobalParams.sslDisabledProtocols.back()),
@@ -277,7 +275,6 @@ TEST(SetupOptions, sslModeRequired) {
     argv.push_back("--sslAllowInvalidHostnames");
     argv.push_back("--sslAllowInvalidCertificates");
     argv.push_back("--sslWeakCertificateValidation");
-    argv.push_back("--sslFIPSMode");
     argv.push_back("--sslPEMKeyPassword");
     argv.push_back("pw1");
     argv.push_back("--sslClusterPassword");
@@ -307,7 +304,6 @@ TEST(SetupOptions, sslModeRequired) {
     ASSERT_EQ(::mongo::sslGlobalParams.sslAllowInvalidHostnames, true);
     ASSERT_EQ(::mongo::sslGlobalParams.sslAllowInvalidCertificates, true);
     ASSERT_EQ(::mongo::sslGlobalParams.sslWeakCertificateValidation, true);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslFIPSMode, true);
     ASSERT_EQ(::mongo::sslGlobalParams.sslPEMKeyPassword, "pw1");
     ASSERT_EQ(::mongo::sslGlobalParams.sslClusterPassword, "pw2");
     ASSERT_EQ(static_cast<int>(::mongo::sslGlobalParams.sslDisabledProtocols.back()),

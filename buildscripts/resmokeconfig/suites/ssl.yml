@@ -3,6 +3,7 @@ test_kind: js_test
 selector:
   roots:
   - jstests/ssl/*.js
+  - src/mongo/db/modules/*/jstests/fips/*.js
 
 # ssl tests start their own mongod's.
 executor:

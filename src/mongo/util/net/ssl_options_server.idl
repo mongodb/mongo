@@ -154,13 +154,6 @@ configs:
     deprecated_short_name: sslAllowInvalidCertificates
     arg_vartype: Switch
     cpp_varname: sslGlobalParams.sslAllowInvalidCertificates
-  "net.tls.FIPSMode":
-    description: "Activate FIPS 140-2 mode at startup"
-    short_name: tlsFIPSMode
-    deprecated_name: "net.ssl.FIPSMode"
-    deprecated_short_name: sslFIPSMode
-    arg_vartype: Switch
-    cpp_varname: sslGlobalParams.sslFIPSMode
 
   # Certificate Selectors are only available on OSX/Windows with --ssl-provider=native (or auto)
   "net.tls.certificateSelector":

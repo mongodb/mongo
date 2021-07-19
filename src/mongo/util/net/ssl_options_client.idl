@@ -98,15 +98,6 @@ configs:
     cpp_varname: "sslGlobalParams.sslAllowInvalidCertificates"
     requires: tls
 
-  "tls.FIPSMode":
-    description: "Activate FIPS 140-2 mode at startup"
-    short_name: tlsFIPSMode
-    deprecated_name: "ssl.FIPSMode"
-    deprecated_short_name: sslFIPSMode
-    arg_vartype: Switch
-    cpp_varname: "sslGlobalParams.sslFIPSMode"
-    requires: tls
-
   "tls.certificateSelector":
     description: "TLS Certificate in system store"
     short_name: tlsCertificateSelector
