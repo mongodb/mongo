@@ -107,6 +107,7 @@ public:
 
         // Expressions that are only created internally
         INTERNAL_2D_POINT_IN_ANNULUS,
+        INTERNAL_BUCKET_GEO_WITHIN,
 
         // Used to represent expression language comparisons in a match expression tree, since $eq,
         // $gt, $gte, $lt and $lte in the expression language has different semantics than their

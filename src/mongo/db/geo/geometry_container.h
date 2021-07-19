@@ -129,10 +129,14 @@ public:
     // TODO: Remove these hacks
     const CapWithCRS* getCapGeometryHack() const;
 
+    const BSONElement getGeoElement() const {
+        return _geoElm;
+    }
+
 private:
     class R2BoxRegion;
 
-    Status parseFromGeoJSON(const BSONObj& obj, bool skipValidation = false);
+    Status parseFromGeoJSON(bool skipValidation = false);
 
     // Does 'this' intersect with the provided type?
     bool intersects(const S2Cell& otherPoint) const;
@@ -166,6 +170,8 @@ private:
     // TODO: _s2Region is currently generated immediately - don't necessarily need to do this
     std::unique_ptr<S2RegionUnion> _s2Region;
     std::unique_ptr<R2Region> _r2Region;
+
+    BSONElement _geoElm;
 };
 
 }  // namespace mongo

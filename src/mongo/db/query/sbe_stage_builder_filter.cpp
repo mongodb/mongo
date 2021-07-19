@@ -1101,6 +1101,7 @@ public:
         unsupportedExpression(expr);
     }
     void visit(const InMatchExpression* expr) final {}
+    void visit(const InternalBucketGeoWithinMatchExpression* expr) final {}
     void visit(const InternalExprEqMatchExpression* expr) final {}
     void visit(const InternalExprGTMatchExpression* expr) final {}
     void visit(const InternalExprGTEMatchExpression* expr) final {}
@@ -1612,6 +1613,7 @@ public:
         generateAlwaysBoolean(_context, true);
     }
 
+    void visit(const InternalBucketGeoWithinMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {}
@@ -1844,6 +1846,7 @@ public:
     void visit(const GeoMatchExpression* expr) final {}
     void visit(const GeoNearMatchExpression* expr) final {}
     void visit(const InMatchExpression* expr) final {}
+    void visit(const InternalBucketGeoWithinMatchExpression* expr) final {}
     void visit(const InternalExprEqMatchExpression* expr) final {}
     void visit(const InternalExprGTMatchExpression* expr) final {}
     void visit(const InternalExprGTEMatchExpression* expr) final {}

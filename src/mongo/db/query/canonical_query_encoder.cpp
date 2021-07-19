@@ -190,6 +190,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::EXPRESSION:
             return "xp";
 
+        case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN:
+            return "internalBucketGeoWithin";
+
         case MatchExpression::INTERNAL_EXPR_EQ:
             return "eeq";
 

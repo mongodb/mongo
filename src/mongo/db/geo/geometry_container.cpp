@@ -892,7 +892,8 @@ bool GeometryContainer::intersects(const S2Polygon& otherPolygon) const {
     return false;
 }
 
-Status GeometryContainer::parseFromGeoJSON(const BSONObj& obj, bool skipValidation) {
+Status GeometryContainer::parseFromGeoJSON(bool skipValidation) {
+    auto obj = _geoElm.Obj();
     GeoParser::GeoJSONType type = GeoParser::parseGeoJSONType(obj);
 
     if (GeoParser::GEOJSON_UNKNOWN == type) {
@@ -999,7 +1000,8 @@ Status GeometryContainer::parseFromQuery(const BSONElement& elem) {
     }
 
     Status status = Status::OK();
-    BSONObj obj = elem.Obj();
+    _geoElm = elem;
+    auto obj = elem.Obj();
     if (GeoParser::BOX == specifier) {
         _box.reset(new BoxWithCRS());
         status = GeoParser::parseLegacyBox(obj, _box.get());
@@ -1020,7 +1022,7 @@ Status GeometryContainer::parseFromQuery(const BSONElement& elem) {
             status = GeoParser::parseQueryPoint(elem, _point.get());
         } else {
             // GeoJSON geometry
-            status = parseFromGeoJSON(obj);
+            status = parseFromGeoJSON();
         }
     }
     if (!status.isOK())
@@ -1048,9 +1050,9 @@ Status GeometryContainer::parseFromStorage(const BSONElement& elem, bool skipVal
                       str::stream() << "geo element must be an array or object: " << elem);
     }
 
-    BSONObj geoObj = elem.Obj();
+    _geoElm = elem;
     Status status = Status::OK();
-    if (Array == elem.type() || geoObj.firstElement().isNumber()) {
+    if (Array == elem.type() || elem.Obj().firstElement().isNumber()) {
         // Legacy point
         // { location: [1, 2] }
         // { location: [1, 2, 3] }
@@ -1062,7 +1064,7 @@ Status GeometryContainer::parseFromStorage(const BSONElement& elem, bool skipVal
     } else {
         // GeoJSON
         // { location: { type: "Point", coordinates: [...] } }
-        status = parseFromGeoJSON(elem.Obj(), skipValidation);
+        status = parseFromGeoJSON(skipValidation);
     }
     if (!status.isOK())
         return status;

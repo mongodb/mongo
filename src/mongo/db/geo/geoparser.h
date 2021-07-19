@@ -34,6 +34,28 @@
 
 namespace mongo {
 
+// This field must be present, and...
+static const string GEOJSON_TYPE = "type";
+// Have one of these values:
+static const string GEOJSON_TYPE_POINT = "Point";
+static const string GEOJSON_TYPE_LINESTRING = "LineString";
+static const string GEOJSON_TYPE_POLYGON = "Polygon";
+static const string GEOJSON_TYPE_MULTI_POINT = "MultiPoint";
+static const string GEOJSON_TYPE_MULTI_LINESTRING = "MultiLineString";
+static const string GEOJSON_TYPE_MULTI_POLYGON = "MultiPolygon";
+static const string GEOJSON_TYPE_GEOMETRY_COLLECTION = "GeometryCollection";
+// This field must also be present.  The value depends on the type.
+static const string GEOJSON_COORDINATES = "coordinates";
+static const string GEOJSON_GEOMETRIES = "geometries";
+
+// Coordinate System Reference
+// see http://portal.opengeospatial.org/files/?artifact_id=24045
+// and http://spatialreference.org/ref/epsg/4326/
+// and http://www.geojson.org/geojson-spec.html#named-crs
+static const string CRS_CRS84 = "urn:ogc:def:crs:OGC:1.3:CRS84";
+static const string CRS_EPSG_4326 = "EPSG:4326";
+static const string CRS_STRICT_WINDING = "urn:x-mongodb:crs:strictwinding:EPSG:4326";
+
 // This class parses geographic data.
 // It parses a subset of GeoJSON and creates S2 shapes from it.
 // See http://geojson.org/geojson-spec.html for the spec.

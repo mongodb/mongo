@@ -813,6 +813,7 @@ public:
         static constexpr auto kInvertedReason = "matching value found in array";
         generatePathError(*expr, kNormalReason, kInvertedReason);
     }
+    void visit(const InternalBucketGeoWithinMatchExpression* expr) final {}
     void visit(const InternalExprEqMatchExpression* expr) final {}
     void visit(const InternalExprGTMatchExpression* expr) final {}
     void visit(const InternalExprGTEMatchExpression* expr) final {}
@@ -1809,6 +1810,7 @@ public:
         MONGO_UNREACHABLE;
     }
     void visit(const InMatchExpression* expr) final {}
+    void visit(const InternalBucketGeoWithinMatchExpression* expr) final {}
     void visit(const InternalExprEqMatchExpression* expr) final {}
     void visit(const InternalExprGTMatchExpression* expr) final {}
     void visit(const InternalExprGTEMatchExpression* expr) final {}
@@ -2021,6 +2023,7 @@ public:
     void visit(const InMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
+    void visit(const InternalBucketGeoWithinMatchExpression* expr) final {}
     void visit(const InternalExprEqMatchExpression* expr) final {}
     void visit(const InternalExprGTMatchExpression* expr) final {}
     void visit(const InternalExprGTEMatchExpression* expr) final {}

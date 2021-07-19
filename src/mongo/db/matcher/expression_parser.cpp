@@ -44,6 +44,7 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -1057,6 +1058,45 @@ StatusWith<StringDataSet> parseProperties(BSONElement propertiesElem) {
     }
 
     return std::move(properties);
+}
+
+StatusWithMatchExpression parseInternalBucketGeoWithinMatchExpression(
+    StringData name,
+    BSONElement elem,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ExtensionsCallback* extensionsCallback,
+    MatchExpressionParser::AllowedFeatureSet allowedFeatures,
+    DocumentParseLevel currentLevel) {
+    if (elem.type() != BSONType::Object) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << InternalBucketGeoWithinMatchExpression::kName
+                              << " must be an object"};
+    }
+
+    auto subobj = elem.embeddedObject();
+
+    // Parse the region field, 'withinRegion', to a GeometryContainer.
+    std::shared_ptr<GeometryContainer> geoContainer = std::make_shared<GeometryContainer>();
+    tassert(5776200,
+            "$_internalBucketGeoWithin expression must contain 'withinRegion' field",
+            subobj.hasField("withinRegion"));
+    BSONObjIterator geoIt(subobj["withinRegion"].embeddedObject());
+    while (geoIt.more()) {
+        BSONElement elt = geoIt.next();
+        // The element must be a geo specifier. "$box", "$center", "$geometry", etc.
+        Status status = geoContainer->parseFromQuery(elt);
+        if (!status.isOK())
+            return status;
+    }
+
+    // Parse the field.
+    tassert(5776201,
+            "$_internalBucketGeoWithin expression must contain 'field' field with a string value",
+            subobj.hasField("field") && subobj["field"].type() == BSONType::String);
+    std::string field = subobj["field"].String();
+
+    expCtx->sbeCompatible = false;
+    return {std::make_unique<InternalBucketGeoWithinMatchExpression>(geoContainer, field)};
 }
 
 StatusWithMatchExpression parseInternalSchemaAllowedProperties(
@@ -2082,6 +2122,7 @@ MONGO_INITIALIZER(PathlessOperatorMap)(InitializerContext* context) {
                                                     const ExtensionsCallback*,
                                                     MatchExpressionParser::AllowedFeatureSet,
                                                     DocumentParseLevel)>>{
+            {"_internalBucketGeoWithin", &parseInternalBucketGeoWithinMatchExpression},
             {"_internalSchemaAllowedProperties", &parseInternalSchemaAllowedProperties},
             {"_internalSchemaCond",
              &parseInternalSchemaFixedArityArgument<InternalSchemaCondMatchExpression>},
