@@ -223,7 +223,7 @@ void ServerDescription::parseTypeFromHelloReply(const BSONObj helloReply) {
         LOGV2_ERROR(23931,
                     "Unknown server type from successful hello reply: {helloReply}",
                     "Unknown server type from successful hello reply",
-                    "helloReply"_attr = helloReply.toString());
+                    "helloReply"_attr = helloReply);
         t = ServerType::kUnknown;
     }
     _type = t;

@@ -400,7 +400,7 @@ void SingleServerDiscoveryMonitor::_onHelloSuccess(const BSONObj bson) {
                 "RSM received successful hello",
                 "host"_attr = _host,
                 "replicaSet"_attr = _setUri.getSetName(),
-                "helloReply"_attr = bson.toString());
+                "helloReply"_attr = bson);
 
     _eventListener->onServerHeartbeatSucceededEvent(_host, bson);
 }
@@ -413,7 +413,7 @@ void SingleServerDiscoveryMonitor::_onHelloFailure(const Status& status, const B
                 "host"_attr = _host,
                 "error"_attr = status.toString(),
                 "replicaSet"_attr = _setUri.getSetName(),
-                "response"_attr = bson.toString());
+                "response"_attr = bson);
 
     _eventListener->onServerHeartbeatFailureEvent(status, _host, bson);
 }

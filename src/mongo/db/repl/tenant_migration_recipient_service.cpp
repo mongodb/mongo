@@ -966,7 +966,7 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
                 "txnNumber"_attr = txnNumber,
                 "tenantId"_attr = getTenantId(),
                 "migrationId"_attr = getMigrationUUID(),
-                "entry"_attr = entry.toString());
+                "entry"_attr = entry);
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     uassert(5351300,

@@ -139,7 +139,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                             {logv2::UserAssertAfterLog(ErrorCodes::InternalError)},
                             "Unable to find shard key index for {keyPattern} in {namespace}",
                             "Unable to find shard key index",
-                            "keyPattern"_attr = keyPattern.toString(),
+                            "keyPattern"_attr = keyPattern,
                             "namespace"_attr = nss.ns());
     }
 

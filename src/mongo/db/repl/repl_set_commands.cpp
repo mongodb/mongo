@@ -107,7 +107,7 @@ public:
         LOGV2(21573,
               "replSetTest command received: {cmdObj}",
               "replSetTest command received",
-              "cmdObj"_attr = cmdObj.toString());
+              "cmdObj"_attr = cmdObj);
 
         auto replCoord = ReplicationCoordinator::get(getGlobalServiceContext());
 
@@ -371,7 +371,7 @@ public:
             LOGV2(21578,
                   "created this configuration for initiation : {config}",
                   "Created configuration for initiation",
-                  "config"_attr = configObj.toString());
+                  "config"_attr = configObj);
         }
 
         if (configObj.getField("version").eoo()) {

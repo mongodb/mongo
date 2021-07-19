@@ -71,7 +71,7 @@ ScopedMigrationRequest::~ScopedMigrationRequest() {
         LOGV2(21900,
               "Failed to remove config.migrations document for migration '{migration}': {error}",
               "Failed to remove config.migrations document for migration",
-              "migration"_attr = migrationDocumentIdentifier.toString(),
+              "migration"_attr = migrationDocumentIdentifier,
               "error"_attr = redact(result));
     }
 }

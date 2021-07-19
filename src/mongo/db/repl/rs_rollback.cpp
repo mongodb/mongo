@@ -1878,7 +1878,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                       "Exception in rollback ns:{namespace} {pattern} {error} ndeletes:{deletes}",
                       "Exception in rollback",
                       "namespace"_attr = nss->ns(),
-                      "pattern"_attr = pattern.toString(),
+                      "pattern"_attr = pattern,
                       "error"_attr = redact(e),
                       "deletes"_attr = deletes);
                 throw;

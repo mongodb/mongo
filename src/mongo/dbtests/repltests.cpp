@@ -194,8 +194,8 @@ protected:
         if (expected.woCompare(got)) {
             LOGV2(22500,
                   "expected: {expected}, got: {got}",
-                  "expected"_attr = expected.toString(),
-                  "got"_attr = got.toString());
+                  "expected"_attr = expected,
+                  "got"_attr = got);
         }
         ASSERT_BSONOBJ_EQ(expected, got);
     }
