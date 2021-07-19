@@ -152,10 +152,9 @@ class test_txn22(wttest.WiredTigerTestCase, suite_subprocess):
                     # Without salvage, they result in an error during the wiredtiger_open.
                     # But the nature of the messages produced during the error is variable
                     # by which case it is, and even variable from system to system.
-                    with self.expectedStdoutPattern('.'):
-                        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                            lambda: self.reopen_conn(salvagedir, self.base_config),
-                            '/.*/')
+                    self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                        lambda: self.reopen_conn(salvagedir, self.base_config),
+                        '/.*/')
 
                 self.reopen_conn(salvagedir, salvage_config)
                 if self.filename == 'test_txn22':
@@ -165,10 +164,9 @@ class test_txn22(wttest.WiredTigerTestCase, suite_subprocess):
                 # an error during the wiredtiger_open.  But the nature of the
                 # messages produced during the error is variable by which case
                 # it is, and even variable from system to system.
-                with self.expectedStdoutPattern('.'):
-                    self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                        lambda: self.reopen_conn(salvagedir, salvage_config),
-                        '/.*/')
+                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                    lambda: self.reopen_conn(salvagedir, salvage_config),
+                    '/.*/')
 
         # The test may output the following error message while opening a file that
         # does not exist. Ignore that.

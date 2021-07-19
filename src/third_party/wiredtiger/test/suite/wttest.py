@@ -366,13 +366,7 @@ class WiredTigerTestCase(unittest.TestCase):
         # avoid confusion.
         sys.stdout.flush()
         conn_param = 'create,error_prefix="%s",%s' % (self.shortid(), config)
-        try:
-            conn = self.wiredtiger_open(home, conn_param)
-        except wiredtiger.WiredTigerError as e:
-            print("Failed wiredtiger_open: dir '%s', config '%s'" % \
-                (home, conn_param))
-            raise e
-        return conn
+        return self.wiredtiger_open(home, conn_param)
 
     # Replacement for wiredtiger.wiredtiger_open that returns
     # a proxied connection that knows to close it itself at the
