@@ -100,6 +100,7 @@ public:
 
     Status setIndexIsMultikey(OperationContext* opCtx,
                               const NamespaceString& nss,
+                              const UUID& collectionUUID,
                               const std::string& indexName,
                               const KeyStringSet& multikeyMetadataKeys,
                               const MultikeyPaths& paths,

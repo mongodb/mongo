@@ -2611,8 +2611,9 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsNamespaceNotFoundForMi
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  storage.setIndexIsMultikey(opCtx, nss, "foo", {}, {}, Timestamp(3, 3)));
+    ASSERT_EQUALS(
+        ErrorCodes::NamespaceNotFound,
+        storage.setIndexIsMultikey(opCtx, nss, UUID::gen(), "foo", {}, {}, Timestamp(3, 3)));
 }
 
 TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsNamespaceNotFoundForMissingCollection) {
@@ -2621,33 +2622,39 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsNamespaceNotFoundForMi
     auto nss = makeNamespace(_agent);
     NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  storage.setIndexIsMultikey(opCtx, wrongColl, "foo", {}, {}, Timestamp(3, 3)));
+    ASSERT_EQUALS(
+        ErrorCodes::NamespaceNotFound,
+        storage.setIndexIsMultikey(opCtx, wrongColl, UUID::gen(), "foo", {}, {}, Timestamp(3, 3)));
 }
 
 TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsIndexNotFoundForMissingIndex) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
-    ASSERT_EQUALS(ErrorCodes::IndexNotFound,
-                  storage.setIndexIsMultikey(opCtx, nss, "foo", {}, {}, Timestamp(3, 3)));
+    auto options = generateOptionsWithUuid();
+    ASSERT_OK(storage.createCollection(opCtx, nss, options));
+    ASSERT_EQUALS(
+        ErrorCodes::IndexNotFound,
+        storage.setIndexIsMultikey(opCtx, nss, *options.uuid, "foo", {}, {}, Timestamp(3, 3)));
 }
 
 TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsInvalidOptionsForNullTimestamp) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
-    ASSERT_EQUALS(ErrorCodes::InvalidOptions,
-                  storage.setIndexIsMultikey(opCtx, nss, "foo", {}, {}, Timestamp()));
+    auto options = generateOptionsWithUuid();
+    ASSERT_OK(storage.createCollection(opCtx, nss, options));
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidOptions,
+        storage.setIndexIsMultikey(opCtx, nss, *options.uuid, "foo", {}, {}, Timestamp()));
 }
 
 TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeySucceeds) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto options = generateOptionsWithUuid();
+    ASSERT_OK(storage.createCollection(opCtx, nss, options));
 
     auto indexName = "a_b_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("a.b" << 1) << "v"
@@ -2655,7 +2662,8 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeySucceeds) {
     ASSERT_EQUALS(_createIndexOnEmptyCollection(opCtx, nss, indexSpec), 2);
 
     MultikeyPaths paths = {{1}};
-    ASSERT_OK(storage.setIndexIsMultikey(opCtx, nss, indexName, {}, paths, Timestamp(3, 3)));
+    ASSERT_OK(storage.setIndexIsMultikey(
+        opCtx, nss, *options.uuid, indexName, {}, paths, Timestamp(3, 3)));
     AutoGetCollectionForReadCommand autoColl(opCtx, nss);
     ASSERT_TRUE(autoColl.getCollection());
     auto indexCatalog = autoColl.getCollection()->getIndexCatalog();
