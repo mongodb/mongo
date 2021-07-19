@@ -2018,3 +2018,56 @@ __wt_bt_col_var_cursor_walk_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *
     cbt->cip_saved = cip;
     return (0);
 }
+
+/*
+ * __wt_btcur_skip_page --
+ *     Return if the cursor is pointing to a page with deleted records and can be skipped for cursor
+ *     traversal.
+ */
+static inline bool
+__wt_btcur_skip_page(WT_CURSOR_BTREE *cbt)
+{
+    WT_ADDR_COPY addr;
+    WT_PAGE *page;
+    WT_REF *ref;
+    WT_SESSION_IMPL *session;
+    uint8_t previous_state;
+    bool can_skip;
+
+    session = CUR2S(cbt);
+    ref = cbt->ref;
+    page = cbt->ref == NULL ? NULL : cbt->ref->page;
+
+    if (page == NULL)
+        return false;
+
+    previous_state = ref->state;
+    can_skip = false;
+
+    /*
+     * Determine if all records on the page have been deleted and all the tombstones are visible to
+     * our transaction. If so, we can avoid reading the records on the page and move to the next
+     * page. We base this decision on the aggregate stop point added to the page during the last
+     * reconciliation. We can skip this test if the page has been modified since it was reconciled
+     * or the underlying cursor is configured to ignore tombstones.
+     *
+     * We are making these decisions while holding a lock for the page as checkpoint or eviction can
+     * make changes to the data structures (i.e., aggregate timestamps) we are reading.
+     */
+    if (session->txn->isolation == WT_ISO_SNAPSHOT && !__wt_page_is_modified(page) &&
+      !F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) && previous_state == WT_REF_MEM) {
+
+        /* We only try to lock the page once. */
+        if (!WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
+            return false;
+
+        if (__wt_ref_addr_copy(session, ref, &addr) &&
+          __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts) &&
+          __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_durable_ts))
+            can_skip = true;
+
+        WT_REF_SET_STATE(ref, previous_state);
+    }
+
+    return (can_skip);
+}
