@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <array>
 #include <deque>
 #include <vector>
 
@@ -41,14 +42,13 @@ namespace mongo {
  */
 class Simple8b {
 public:
+    // Number of different type of selectors and their extensions available
+    static constexpr uint8_t kNumOfSelectorTypes = 4;
+
     struct Value {
         uint32_t index;
         uint64_t val;
     };
-
-    // TODO (SERVER-57808): Remove temporary error code.
-    static constexpr uint64_t errCode = 0x0000000000000000;
-
     /**
      * Retrieves all integers in the order it was appended.
      */
@@ -57,7 +57,7 @@ public:
     /**
      * Checks if we can append val to an existing RLE and handles the ending of a RLE.
      * The default RLE value at the beginning is 0.
-     * Otherwise, appends a value to the Simple8b chain of words.
+     * Otherwise, Appends a value to the Simple8b chain of words.
      * Return true if successfully appended and false otherwise.
      */
     bool append(uint64_t val);
@@ -69,9 +69,9 @@ public:
     void skip();
 
     /**
-     * Stores all values for RLE or in _pendingValues into _buffered even if the Simple8b word
-     * will not be optimal and use a larger selector than necessary because we don't have
-     * enough integers to use one with more slots.
+     * Stores all values for RLE or in _pendingValues into _buffered even if the Simple8b word will
+     * not be opimtal and use a larger selector than necessary because we don't have enough integers
+     * to use one wiht more slots.
      */
     void flush();
 
@@ -85,31 +85,44 @@ public:
      */
     size_t len();
 
+    /**
+     * This stores a value that has yet to be added to the buffer. It also stores the number of bits
+     * required to store the value for each selector extension type. Furthermore, it stores the
+     * number of trailing zeros that would be stored if this value was stored according to the
+     * respective selector type. The arrays are indexed using the same selector indexes as defined
+     * in the cpp file.
+     */
+    struct PendingValue {
+        PendingValue(uint64_t val,
+                     std::array<uint8_t, kNumOfSelectorTypes> bitCount,
+                     std::array<uint8_t, kNumOfSelectorTypes> trailingZerosCount,
+                     bool skip);
+        uint64_t val;
+        std::array<uint8_t, kNumOfSelectorTypes> bitCount = {0, 0, 0, 0};
+        // This is not the total number of trailing zeros, but the trailing zeros that will be
+        // stored given the selector chosen.
+        std::array<uint8_t, kNumOfSelectorTypes> trailingZerosCount = {0, 0, 0, 0};
+        bool skip;
+    };
+
 private:
     /**
-     * Tests if a value with numBits would fit inside the current simple8b word.
-     * Returns true if adding the value fits in the current simple8b word and false otherwise.
+     * Appends a value to the Simple8b chain of words.
+     * Return true if successfully appended and false otherwise.
      */
-    bool _doesIntegerFitInCurrentWord(uint8_t numBits) const;
+    bool _appendValue(uint64_t value, bool tryRle);
 
     /**
-     * Encodes the largest possible simple8b word from _pendingValues without unused buckets.
-     * Assumes is always called right after _doesIntegerFitInCurrentWord fails for the first time.
-     * It removes the integers used to form the simple8b word from _pendingValues permanently
-     * and updates _currMaxBitLen.
+     * Appends a skip to _pendingValues and forms a new Simple8b word if there i
+  s no space.
      */
-    int64_t _encodeLargestPossibleWord();
+    void _appendSkip();
 
     /**
-     * Decodes a simple8b word into a vector of integers and their indices. It appends directly
-     * into the passed in vector and the index values starts from the passed in index variable.
-     * When the selector is invalid, nothing will be appended.
-     */
-    void _decode(uint64_t simple8bWord, uint32_t* index, std::vector<Value>* decodedValues);
-
-    /**
-     * When an RLE ends because of inconsecutive values, check if there are enough
-     * consecutive values for a RLE value and/or any values to be appended to _pendingValues.
+     * When an RLE ends because of inconsecutive values, check if there are enou
+     gh
+     * consecutive values for a RLE value and/or any values to be appended to _p
+     endingValues.
      */
     void _handleRleTermination();
 
@@ -119,48 +132,110 @@ private:
      */
     void _appendRleEncoding();
 
-    /**
-     * Appends a value to the Simple8b chain of words.
-     * Return true if successfully appended and false otherwise.
+    /*
+     * Checks to see if RLE is possible and/or ongoing
      */
-    bool _appendValue(uint64_t value, bool tryRle);
+    bool _rlePossible() const;
 
     /**
-     * Appends a skip to _pendingValues and forms a new Simple8b word if there is no space.
+     * Tests if a value would fit inside the current simple8b word using any of the selectors
+     * selector. Returns true if adding the value fits in the current simple8b word and false
+     * otherwise.
      */
-    void _appendSkip();
+    bool _doesIntegerFitInCurrentWord(const PendingValue& value);
+
+    /*
+     * This is a helper method for testing if a given selector will allow an integer to fit in a
+     * simple8b word. Takes in a value to be stored and an extensionType representing the selector
+     * compression method to check. Returns true if the word fits and updates the global
+     * _lastValidExtensionType with the extensionType passed. If false, updates
+     * isSelectorPossible[extensionType] to false so we do not need to recheck that extension if we
+     * find a valid type and more values are added into the current word.
+     */
+    bool _doesIntegerFitInCurrentWordWithGivenSelectorType(const PendingValue& value,
+                                                           uint8_t extensionType);
 
     /**
-     * Takes a vector of integers to be compressed into a 64 bit word.
+     * Encodes the largest possible simple8b word from _pendingValues without unused buckets using
+     * the selector compression method passed in extensionType. Assumes is always called right after
+     * _doesIntegerFitInCurrentWord fails for the first time. It removes the integers used to form
+     * the simple8b word from _pendingValues permanently and updates our global state with any
+     * remaining integers in _pendingValues.
+     */
+    int64_t _encodeLargestPossibleWord(uint8_t extensionType);
+
+    /**
+     * Decodes a simple8b word into a vector of integers and their indices. It appends directly
+     * into the passed in vector and the index values starts from the passed in index variable.
+     * When the selector is invalid, nothing will be appended.
+     */
+    void _decode(const uint64_t simple8bWord,
+                 uint32_t* index,
+                 std::vector<Value>* decodedValues) const;
+
+    /*
+     * Parses a simple8b word with the selector compression method passed. This is a helper method
+     * to _decode above which determines the selector and then passes the correpsonding functor to
+     * this function for actual decoding of the simple8b word.
+     */
+    template <typename Func>
+    void _parseWord(Func func,
+                    uint8_t selector,
+                    uint8_t extensionType,
+                    const uint64_t simple8bWord,
+                    uint32_t* index,
+                    std::vector<Simple8b::Value>* decodedValues) const;
+
+    /*
+     * Decodes a RLE simple8b word. A helper method to _decode function.
+     */
+    void _rleDecode(const uint64_t simple8bWord,
+                    uint32_t* index,
+                    std::vector<Simple8b::Value>* decodedValues) const;
+
+    /**
+     * Takes a vector of integers to be compressed into a 64 bit word via the selector type given.
      * The values will be stored from right to left in little endian order.
-     * If there are wasted bits, they will be placed at the very left.
      * For now, we will assume that all ints in the vector are greater or equal to zero.
      * We will also assume that the selector and all values will fit into the 64 bit word.
      * Returns the encoded Simple8b word if the inputs are valid and errCode otherwise.
      */
-    uint64_t _encode(uint8_t selector, uint8_t endIdx);
+    template <typename Func>
+    uint64_t _encode(Func func, uint8_t selectorIdx, uint8_t extensionType);
 
-    /*
-     * Checks to see if RLE is possible and/or ongoing.
+    /**
+     * Updates the simple8b current state with the passed parameters. The maximum is always taken
+     * between the current state and the new value passed. This is used to keep track of the size of
+     * the simple8b word that we will need to encode.
      */
-    bool _rlePossible();
+    void _updateSimple8bCurrentState(const PendingValue& val);
 
-    struct PendingValue {
-        bool skip;
-        uint64_t val;
-    };
-
-    // The number of bits used by the largest integer in _pendingValues.
-    uint8_t _currMaxBitLen = 0;
-
-    // If RLE is ongoing, the number of consecutive repeats of lastValueInPrevWord.
+    // If RLE is ongoing, the number of consecutive repeats fo lastValueInPrevWord.
     uint32_t _rleCount = 0;
     // If RLE is ongoing, the last value in the previous Simple8b word.
-    PendingValue _lastValueInPrevWord = {false, 0};
+    PendingValue _lastValueInPrevWord = {0, {0, 0, 0, 0}, {0, 0, 0, 0}, false};
 
-    // The binary buffer storing all completed Simple8b words.
+    // This buffer holds the simple8b compressed words
     BufBuilder _buffer;
-    // A buffer of values that have not been added to _buffer yet.
+
+    // These variables hold the max amount of bits for each value in _pendingValues. They are
+    // updated whenever values are added or removed from _pendingValues to always reflect the max
+    // value in the deque.
+    std::array<uint8_t, kNumOfSelectorTypes> _currMaxBitLen = {0, 0, 0, 0};
+    std::array<uint8_t, kNumOfSelectorTypes> _currTrailingZerosCount = {0, 0, 0, 0};
+
+    // This holds the last valid selector compression method that succeded for
+    // doesIntegerFitInCurrentWord and is used to designate the compression type when we need to
+    // write a simple8b word to buffer.
+    uint8_t _lastValidExtensionType = 0;
+
+    // Holds whether the selector compression method is possible. This is updated in
+    // doesIntegerFitInCurrentWordWithSelector to avoid unnecessary calls when a selector is already
+    // invalid for the current set of words in _pendingValues.
+    std::array<bool, kNumOfSelectorTypes> isSelectorPossible = {true, true, true, true};
+
+    // This holds values that have not be encoded to the simple8b buffer, but are waiting for a full
+    // simple8b word to be filled before writing to buffer.
     std::deque<PendingValue> _pendingValues;
 };
 
