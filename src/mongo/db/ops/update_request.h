@@ -206,7 +206,8 @@ public:
     }
 
     bool isTimeseries() const {
-        return _source == OperationSource::kTimeseries;
+        return _source == OperationSource::kTimeseriesInsert ||
+            _source == OperationSource::kTimeseriesUpdate;
     }
 
     void setFromOplogApplication(bool value = true) {

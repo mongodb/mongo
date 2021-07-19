@@ -269,7 +269,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         if (request->isFromMigration()) {
             args.source = OperationSource::kFromMigrate;
         } else if (request->isTimeseries()) {
-            args.source = OperationSource::kTimeseries;
+            args.source = OperationSource::kTimeseriesInsert;
         }
 
         if (inPlace) {

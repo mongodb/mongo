@@ -42,7 +42,7 @@ bool queryOnlyDependsOnMetaField(OperationContext* opCtx,
                                  StringData metaField);
 
 /**
- * Returns true if the given update modification only modifies the time-series collection's
+ * Returns true if the given update modification only modifies the time-series collection's given
  * metaField, false otherwise. Returns false on any document replacement.
  */
 bool updateOnlyModifiesMetaField(OperationContext* opCtx,
@@ -58,15 +58,17 @@ bool updateOnlyModifiesMetaField(OperationContext* opCtx,
 BSONObj translateQuery(const BSONObj& query, StringData metaField);
 
 /**
- * Given a translated query and an update, creates and returns a translated update on the
- * time-series collection's underlying buckets collection where all occurrences of the given
- * metaField in updateMod are replaced with the literal "meta".
+ * Given a translated query and set of untranslated updates to apply, creates and returns a
+ * translated update on the time-series collection's underlying buckets collection. Specifically,
+ * returns an UpdateOpEntry whose query is translatedQuery and its update is updateMod where all
+ * occurrences of the given metaField in updateMod are replaced with the literal "meta". Requires
+ * that updateMod is is not a replacement document.
  */
 write_ops::UpdateOpEntry translateUpdate(const BSONObj& translatedQuery,
                                          const write_ops::UpdateModification& updateMod,
                                          StringData metaField);
 
-// TODO: SERVER-58394 Remove this method and combine its logic with
+// TODO: SERVER-58774 Remove this method and combine its logic with
 // timeseries::replaceTimeseriesQueryMetaFieldName().
 /**
  * Recurses through the mutablebson element query and replaces any occurrences of the

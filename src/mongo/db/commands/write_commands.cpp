@@ -122,7 +122,7 @@ bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
         .get();
 }
 
-// TODO: SERVER-58394 Remove this method since it is in an anonymous namespace in
+// TODO: SERVER-58774 Remove this method since it is in an anonymous namespace in
 // timeseries_update_delete_util.
 /**
  * Returns if the given metaField is the first element of the dotted path in the given field.
@@ -619,7 +619,7 @@ public:
             return _getTimeseriesSingleWriteResult(write_ops_exec::performInserts(
                 opCtx,
                 _makeTimeseriesInsertOp(batch, metadata, std::move(stmtIds)),
-                OperationSource::kTimeseries));
+                OperationSource::kTimeseriesInsert));
         }
 
         StatusWith<SingleWriteResult> _performTimeseriesUpdate(
@@ -634,7 +634,7 @@ public:
             return _getTimeseriesSingleWriteResult(write_ops_exec::performUpdates(
                 opCtx,
                 _makeTimeseriesUpdateOp(opCtx, batch, metadata, std::move(stmtIds)),
-                OperationSource::kTimeseries));
+                OperationSource::kTimeseriesInsert));
         }
 
         void _commitTimeseriesBucket(OperationContext* opCtx,
@@ -1264,76 +1264,11 @@ public:
                     << ns(),
                 !opCtx->inMultiDocumentTransaction());
 
-            auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
-                opCtx, ns().makeTimeseriesBucketsNamespace());
-            uassert(ErrorCodes::NamespaceNotFound,
-                    "Could not find time-series buckets collection for update",
-                    collection);
-
-            auto timeseriesOptions = collection->getTimeseriesOptions();
-            uassert(ErrorCodes::InvalidOptions,
-                    "Time-series buckets collection is missing time-series options",
-                    timeseriesOptions);
-
-            StringData metaField = timeseriesOptions->getMetaField().value_or("");
-
-            // Create the translated updates to apply, which are used to make a new
-            // UpdateCommandRequest.
-            std::vector<write_ops::UpdateOpEntry> translatedUpdates;
-            auto numUpdates = request().getUpdates().size();
-
-            // TODO: SERVER-58394 Allow multiple time-series metaField-only updates.
-            uassert(
-                ErrorCodes::IllegalOperation,
-                str::stream() << "Multiple updates are not supported for time-series collections: "
-                              << ns(),
-                numUpdates == 1);
-
-            translatedUpdates.reserve(numUpdates);
-
-            // Translate each query-update pair in the update.
-            for (auto& updateEntry : request().getUpdates()) {
-                uassert(ErrorCodes::InvalidOptions,
-                        str::stream()
-                            << "multi:false updates are not supported for time-series collections: "
-                            << ns(),
-                        updateEntry.getMulti());
-
-                // Get the original update query and check that it only depends on the metaField.
-                const auto& updateQuery = updateEntry.getQ();
-                uassert(
-                    ErrorCodes::InvalidOptions,
-                    str::stream() << "Cannot perform an update on a time-series collection "
-                                     "when querying on a field that is not the metaField: "
-                                  << ns(),
-                    timeseries::queryOnlyDependsOnMetaField(opCtx, ns(), updateQuery, metaField));
-
-                // Get the original set of modifications to apply and check that they only modify
-                // the metaField.
-                const auto& updateMod = updateEntry.getU();
-                uassert(ErrorCodes::InvalidOptions,
-                        str::stream() << "Update on a time-series collection must only "
-                                         "modify the metaField: "
-                                      << ns(),
-                        timeseries::updateOnlyModifiesMetaField(opCtx, ns(), updateMod, metaField));
-
-                translatedUpdates.push_back(timeseries::translateUpdate(
-                    metaField.empty() ? updateQuery
-                                      : timeseries::translateQuery(updateQuery, metaField),
-                    updateMod,
-                    metaField));
-            }
-
-            // Make a new UpdateCommandRequest from the translated updates.
-            write_ops::UpdateCommandRequest translatedRequest(ns().makeTimeseriesBucketsNamespace(),
-                                                              translatedUpdates);
-            translatedRequest.setWriteCommandRequestBase(request().getWriteCommandRequestBase());
-
             auto reply = write_ops_exec::performUpdates(
-                opCtx, translatedRequest, OperationSource::kTimeseries);
+                opCtx, request(), OperationSource::kTimeseriesUpdate);
             populateReply(opCtx,
-                          !translatedRequest.getWriteCommandRequestBase().getOrdered(),
-                          numUpdates,
+                          !request().getWriteCommandRequestBase().getOrdered(),
+                          request().getUpdates().size(),
                           std::move(reply),
                           updateReply);
 
@@ -1410,7 +1345,7 @@ public:
                                          "time-series collection: "
                                       << ns(),
                         !opCtx->inMultiDocumentTransaction());
-                source = OperationSource::kTimeseries;
+                source = OperationSource::kTimeseriesDelete;
             }
 
             auto reply = write_ops_exec::performDeletes(opCtx, request(), source);
