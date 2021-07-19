@@ -39,8 +39,9 @@ namespace mongo {
 enum OperationSource {
     kStandard,     // Default case, use this if none of the others applies.
     kFromMigrate,  // From a chunk migration.
-    kTimeseries    // From an internal operation on the BucketCatalog, not a direct operation on
-                   // the underlying bucket collection.
+    kTimeseriesInsert,
+    kTimeseriesUpdate,
+    kTimeseriesDelete,
 };
 
 }  // namespace mongo

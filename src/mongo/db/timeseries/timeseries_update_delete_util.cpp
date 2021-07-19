@@ -56,8 +56,8 @@ bool isMetaFieldFirstElementOfDottedPathField(StringData field, StringData metaF
  */
 std::string getRenamedMetaField(StringData field) {
     size_t dotIndex = field.find('.');
-    return dotIndex != std::string::npos ? "meta" + field.substr(dotIndex, field.size() - dotIndex)
-                                         : "meta";
+    return dotIndex >= field.size() ? "meta"
+                                    : "meta" + field.substr(dotIndex, field.size() - dotIndex);
 }
 
 /**
@@ -65,9 +65,8 @@ std::string getRenamedMetaField(StringData field) {
  * element with the literal "meta", accounting for uses of the metaField with dot notation.
  */
 void replaceQueryMetaFieldName(mutablebson::Element elem, StringData field, StringData metaField) {
-    if (isMetaFieldFirstElementOfDottedPathField(field, metaField)) {
+    if (isMetaFieldFirstElementOfDottedPathField(field, metaField))
         invariantStatusOK(elem.rename(getRenamedMetaField(field)));
-    }
 }
 
 /**
@@ -75,15 +74,30 @@ void replaceQueryMetaFieldName(mutablebson::Element elem, StringData field, Stri
  * metaField with "meta" accounting for queries that may be in dot notation. shouldReplaceFieldValue
  * is set for $expr queries when "$" + the metaField should be substituted for "$meta".
  */
-void replaceQueryMetaFieldName(mutablebson::Element elem, StringData metaField) {
-    replaceQueryMetaFieldName(elem, elem.getFieldName(), metaField);
+void replaceQueryMetaFieldName(mutablebson::Element elem,
+                               StringData metaField,
+                               bool shouldReplaceFieldValue = false) {
+    shouldReplaceFieldValue = (elem.getFieldName() != "$literal") &&
+        (shouldReplaceFieldValue || (elem.getFieldName() == "$expr"));
+    if (isMetaFieldFirstElementOfDottedPathField(elem.getFieldName(), metaField)) {
+        invariantStatusOK(elem.rename(getRenamedMetaField(elem.getFieldName())));
+    } else if (shouldReplaceFieldValue && elem.isType(BSONType::String) &&
+               isMetaFieldFirstElementOfDottedPathField(elem.getValueString(), "$" + metaField)) {
+        // Substitute element fieldValue with "$meta" if element is a subField of $expr, not a
+        // subField of $literal, and the element fieldValue is "$" + the metaField.
+        size_t dotIndex = elem.getValueString().find('.');
+        dotIndex >= elem.getValueString().size()
+            ? invariantStatusOK(elem.setValueString("$meta"))
+            : invariantStatusOK(elem.setValueString(
+                  "$meta" +
+                  elem.getValueString().substr(dotIndex, elem.getValueString().size() - dotIndex)));
+    }
     for (size_t i = 0; i < elem.countChildren(); ++i) {
-        replaceQueryMetaFieldName(elem.findNthChild(i), metaField);
+        replaceQueryMetaFieldName(elem.findNthChild(i), metaField, shouldReplaceFieldValue);
     }
 }
 }  // namespace
 
-// TODO: SERVER-58382 Handle time-series collections without a metaField.
 bool queryOnlyDependsOnMetaField(OperationContext* opCtx,
                                  const NamespaceString& ns,
                                  const BSONObj& query,
@@ -177,8 +191,7 @@ write_ops::UpdateOpEntry translateUpdate(const BSONObj& translatedQuery,
     switch (updateMod.type()) {
         case write_ops::UpdateModification::Type::kClassic: {
             const auto& document = updateMod.getUpdateClassic();
-            if (isDocReplacement(document))
-                break;
+            invariant(!isDocReplacement(document));
 
             // Make a mutable copy of the update document.
             auto updateDoc = mutablebson::Document(document);
