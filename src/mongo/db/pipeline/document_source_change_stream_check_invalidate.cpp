@@ -124,6 +124,11 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckInvalidate::doGetNe
     // indicating that the token is from an invalidate. This flag is necessary to disambiguate
     // the two tokens, and thus preserve a total ordering on the stream.
     if (isInvalidatingCommand(pExpCtx, operationType)) {
+        // Regardless of whether we generate an invalidation event or, in the case of startAfter,
+        // swallow it, we should clear the _startAfterInvalidate field once this block completes.
+        ON_BLOCK_EXIT([this] { _startAfterInvalidate.reset(); });
+
+        // Extract the resume token from the invalidating command and set the 'fromInvalidate' bit.
         auto resumeTokenData = ResumeToken::parse(doc[DSCS::kIdField].getDocument()).getData();
         resumeTokenData.fromInvalidate = ResumeTokenData::FromInvalidate::kFromInvalidate;
 
@@ -135,7 +140,6 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckInvalidate::doGetNe
         // token. We must re-generate this invalidate, since DSEnsureResumeTokenPresent needs to see
         // (and will take care of swallowing) the event which exactly matches the client's token.
         if (_startAfterInvalidate && resumeTokenData != _startAfterInvalidate) {
-            _startAfterInvalidate.reset();
             return nextInput;
         }
 

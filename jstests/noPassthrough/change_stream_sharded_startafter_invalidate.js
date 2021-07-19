@@ -17,31 +17,63 @@ const st = new ShardingTest(
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 
-// Start a change stream that matches on the invalidate event.
-const changeStream = mongosColl.watch([{'$match': {'operationType': 'invalidate'}}]);
+(function testStartAfterInvalidate() {
+    // Start a change stream that matches on the invalidate event.
+    const changeStream = mongosColl.watch([{'$match': {'operationType': 'invalidate'}}]);
 
-// Create the collection by inserting into it and then drop the collection, thereby generating
-// an invalidate event.
-assert.commandWorked(mongosColl.insert({_id: 1}));
+    // Create the collection by inserting into it and then drop the collection, thereby generating
+    // an invalidate event.
+    assert.commandWorked(mongosColl.insert({_id: 1}));
+    assert(mongosColl.drop());
+    assert.soon(() => changeStream.hasNext());
+    const invalidateEvent = changeStream.next();
+
+    // Resuming the change stream using the invalidate event allows us to see events after the drop.
+    const resumeStream = mongosColl.watch([], {startAfter: invalidateEvent["_id"]});
+
+    // The PBRT returned with the first (empty) batch should match the resume token we supplied.
+    assert.eq(bsonWoCompare(resumeStream.getResumeToken(), invalidateEvent["_id"]), 0);
+
+    // Initially, there should be no events visible after the drop.
+    assert(!resumeStream.hasNext());
+
+    // Add one last event and make sure the change stream sees it.
+    assert.commandWorked(mongosColl.insert({_id: 2}));
+    assert.soon(() => resumeStream.hasNext());
+    const afterDrop = resumeStream.next();
+    assert.eq(afterDrop.operationType, "insert");
+    assert.eq(afterDrop.fullDocument, {_id: 2});
+})();
+
+// Drop the collection before running the subsequent test.
 assert(mongosColl.drop());
-assert.soon(() => changeStream.hasNext());
-const invalidateEvent = changeStream.next();
 
-// Resuming the change stream using the invalidate event allows us to see events after the drop.
-const resumeStream = mongosColl.watch([], {startAfter: invalidateEvent["_id"]});
+(function testStartAfterInvalidateOnEmptyCollection() {
+    // Start a change stream on 'mongosColl', then create and drop the collection.
+    const changeStream = mongosColl.watch([]);
+    assert.commandWorked(mongosDB.createCollection(jsTestName()));
+    assert(mongosColl.drop());
 
-// The PBRT returned with the first (empty) batch should match the resume token we supplied.
-assert.eq(bsonWoCompare(resumeStream.getResumeToken(), invalidateEvent["_id"]), 0);
+    // Wait until we see the invalidation, and store the associated resume token.
+    assert.soon(() => {
+        return changeStream.hasNext() && changeStream.next().operationType === "invalidate";
+    });
 
-// Initially, there should be no events visible after the drop.
-assert(!resumeStream.hasNext());
+    const invalidateResumeToken = changeStream.getResumeToken();
 
-// Add one last event and make sure the change stream sees it.
-assert.commandWorked(mongosColl.insert({_id: 2}));
-assert.soon(() => resumeStream.hasNext());
-const afterDrop = resumeStream.next();
-assert.eq(afterDrop.operationType, "insert");
-assert.eq(afterDrop.fullDocument, {_id: 2});
+    // Recreate and then immediately drop the collection again to make sure that change stream when
+    // opened with the invalidate resume token sees this invalidate event.
+    assert.commandWorked(mongosDB.createCollection(jsTestName()));
+    assert(mongosColl.drop());
+
+    // Open the change stream using the invalidate resume token and verify that the change stream
+    // sees the invalidated event from the second collection drop.
+    const resumeStream = mongosColl.watch([], {startAfter: invalidateResumeToken});
+
+    assert.soon(() => {
+        return resumeStream.hasNext() && resumeStream.next().operationType === "invalidate";
+    });
+})();
 
 st.stop();
 })();
