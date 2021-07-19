@@ -52,10 +52,10 @@ public:
     // decimal digits. They work by multiplying the floating point value by a multiple of 10 and
     // rounding to the nearest integer. They return a option that will not be valid in the case of a
     // value being greater than 8 decimal digits. Additionally, they will return a boost::none in
-    // the case where lossless encoding is not feasible.
+    // the cae that compression is not feasible.
     static boost::optional<uint8_t> calculateDecimalShiftMultiplier(double val);
-    static boost::optional<uint64_t> encodeDouble(double val, uint8_t scaleIndex);
-    static double decodeDouble(uint64_t val, uint8_t scaleIndex);
+    static boost::optional<int64_t> encodeDouble(double val, uint8_t scaleIndex);
+    static double decodeDouble(int64_t val, uint8_t scaleIndex);
 
     // Array is a double as it will always be multiplied by a double and we don't want to do an
     // extra cast for
