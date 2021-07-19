@@ -338,6 +338,17 @@ assertReshardCollOk({
 },
                     1);
 
+jsTest.log("Succeed if zones are empty");
+assertReshardCollOk({
+    reshardCollection: ns,
+    key: {newKey: 1},
+    unique: false,
+    numInitialChunks: 1,
+    collation: {locale: 'simple'},
+    zones: []
+},
+                    1);
+
 jsTest.log("Succeed with hashed shard key that provides enough cardinality.");
 assert.commandWorked(
     mongos.adminCommand({shardCollection: ns, key: {a: "hashed"}, numInitialChunks: 5}));

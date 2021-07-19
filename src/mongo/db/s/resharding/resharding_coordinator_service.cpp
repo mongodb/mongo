@@ -864,7 +864,8 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
         const auto tempNs = coordinatorDoc.getTempReshardingNss();
 
         boost::optional<std::vector<mongo::TagsType>> parsedZones;
-        if (auto rawBSONZones = coordinatorDoc.getZones()) {
+        auto rawBSONZones = coordinatorDoc.getZones();
+        if (rawBSONZones && rawBSONZones->size() != 0) {
             parsedZones.emplace();
             parsedZones->reserve(rawBSONZones->size());
 
