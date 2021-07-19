@@ -1,5 +1,8 @@
 /**
  * Tests that secondaries participate in the shard versioning protocol.
+ * @tags: [
+ *   disabled_due_to_server_58295
+ * ]
  */
 (function() {
 "use strict";

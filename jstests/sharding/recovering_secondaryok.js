@@ -1,6 +1,9 @@
 /**
  * This tests that secondaryOk'd queries in sharded setups get correctly routed when a secondary
  * goes into RECOVERING state, and don't break
+ * @tags: [
+ *   disabled_due_to_server_58295
+ * ]
  */
 
 // Shard secondaries are restarted, which may cause that shard's primary to stepdown while it does

@@ -1,6 +1,9 @@
 /**
  * Tests that query options are not dropped by mongos when a query against a view is rewritten as an
  * aggregation against the underlying collection.
+ * @tags: [
+ *   disabled_due_to_server_58295
+ * ]
  */
 (function() {
 "use strict";

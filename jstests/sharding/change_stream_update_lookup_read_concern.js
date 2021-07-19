@@ -4,6 +4,7 @@
 // @tags: [
 //   requires_majority_read_concern,
 //   uses_change_streams,
+//   disabled_due_to_server_58295
 // ]
 (function() {
 "use strict";

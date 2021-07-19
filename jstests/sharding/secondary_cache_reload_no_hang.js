@@ -7,6 +7,9 @@
  *
  * This means that secondary should be replicating a newer refresh after that line
  * above and hit the condition described in the ticket to hit the bug.
+ * @tags: [
+ *   disabled_due_to_server_58295
+ * ]
  */
 (function() {
 let rsOptions = {nodes: 2};

@@ -7,7 +7,8 @@
 // This test involves using fsync to lock the secondaries, so cannot be run on
 // storage engines which do not support the command.
 // @tags: [
-//    requires_fsync
+//    requires_fsync,
+//    disabled_due_to_server_58295
 // ]
 
 (function() {

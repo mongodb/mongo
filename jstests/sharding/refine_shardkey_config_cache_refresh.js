@@ -4,7 +4,7 @@
  * config.cache collections by the ShardServerCatalogCacheLoader after a refine shard key and makes
  * sure that the shard will be able to eventually reach the valid state on config.cache.
  *
- * @tags: [requires_fcv_47]
+ * @tags: [requires_fcv_47, disabled_due_to_server_58295]
  */
 
 load("jstests/libs/uuid_util.js");

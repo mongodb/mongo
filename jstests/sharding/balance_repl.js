@@ -1,6 +1,10 @@
 /**
  * Testing migrations are successful and immediately visible on the secondaries, when
  * secondaryThrottle is used.
+ *
+ * @tags: [
+ *   disabled_due_to_server_58295
+ * ]
  */
 (function() {
 'use strict';

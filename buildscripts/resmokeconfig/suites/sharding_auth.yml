@@ -10,6 +10,8 @@ selector:
   - jstests/sharding/*.js
   - jstests/sharding/change_streams/*.js
   - jstests/sharding/query/*.js
+  exclude_with_any_tags:
+  - disabled_due_to_server_58295
   exclude_files:
   # Skip any tests that run with auth explicitly.
   - jstests/sharding/*[aA]uth*.js

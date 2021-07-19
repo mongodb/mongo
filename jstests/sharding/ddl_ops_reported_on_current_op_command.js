@@ -4,7 +4,8 @@
  *
  * @tags: [
  *   requires_fcv_50,
- *   featureFlagShardingFullDDLSupport
+ *   featureFlagShardingFullDDLSupport,
+ *   disabled_due_to_server_58295
  * ]
  */
 (function() {

@@ -1,7 +1,7 @@
 /**
  * Tests adding shard to sharded cluster will fail if the implicitDefaultWriteConcern is
  * w:1 and CWWC is not set.
- * @tags: [requires_fcv_50]
+ * @tags: [requires_fcv_50, disabled_due_to_server_58295]
  */
 
 (function() {

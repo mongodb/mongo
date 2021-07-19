@@ -25,7 +25,7 @@ TestData.skipCheckOrphans = true;
 //
 
 // Multiple users cannot be authenticated on one connection within a session.
-// @tags: [live_record_incompatible]
+// @tags: [live_record_incompatible, disabled_due_to_server_58295]
 TestData.disableImplicitSessions = true;
 
 var options = {rs: true, rsOptions: {nodes: 2}, keyFile: "jstests/libs/key1"};
