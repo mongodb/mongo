@@ -7,13 +7,13 @@
 (function() {
 "use strict";
 
-load("jstests/multiVersion/libs/multi_cluster.js");  // For 'upgradeCluster()'
+load("jstests/replsets/rslib.js");  // For reconfig and isConfigCommitted.
 
 function addNonArbiterNode(nodeId, rst) {
     const config = rst.getReplSetConfigFromNode();
     config.members.push({_id: nodeId, host: rst.add().host});
     config.version++;
-    assert.commandWorked(rst.getPrimary().adminCommand({replSetReconfig: config}));
+    reconfig(rst, config);
     assert.soon(() => isConfigCommitted(rst.getPrimary()));
     rst.waitForConfigReplication(rst.getPrimary());
     rst.awaitReplication();
