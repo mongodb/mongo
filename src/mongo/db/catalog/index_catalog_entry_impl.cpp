@@ -243,8 +243,12 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // it multikey, that write will be marked as "isTrackingMultikeyPathInfo" on the applier's
     // OperationContext and we can safely defer that write to the end of the batch.
     if (MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo()) {
-        MultikeyPathTracker::get(opCtx).addMultikeyPathInfo(
-            {ns(), _descriptor->indexName(), multikeyMetadataKeys, std::move(paths)});
+        auto collection = _descriptor->getCollection();
+        MultikeyPathTracker::get(opCtx).addMultikeyPathInfo({collection->ns(),
+                                                             collection->uuid(),
+                                                             _descriptor->indexName(),
+                                                             multikeyMetadataKeys,
+                                                             std::move(paths)});
         return;
     }
 
