@@ -87,7 +87,9 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     const auto routingInfo =
         uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss, true));
 
-    auto foundVersion = routingInfo.getVersion(shardId);
+    const auto foundVersion =
+        routingInfo.isSharded() ? routingInfo.getVersion() : ChunkVersion::UNSHARDED();
+
     uassert(StaleEpochInfo(nss),
             str::stream() << "could not act as router for " << nss.ns() << ", wanted "
                           << targetCollectionVersion.toString() << ", but found "
