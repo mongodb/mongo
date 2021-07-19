@@ -6066,7 +6066,6 @@ tasks:
 
 - name: powercycle_smoke
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6076,11 +6075,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6090,11 +6089,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_kill_mongod
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6104,11 +6103,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_fcv4.4
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6118,11 +6117,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_replication
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6132,11 +6131,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_replication_smalloplog
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6146,11 +6145,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_syncdelay
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6160,11 +6159,11 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_write_concern_majority
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: archive_dist_test_debug
   commands:
@@ -6174,6 +6173,7 @@ tasks:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: idl_tests
   depends_on:

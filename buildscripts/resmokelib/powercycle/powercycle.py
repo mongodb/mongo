@@ -574,9 +574,9 @@ class Processes(object):
     _PROC_LIST = []  # type: ignore
 
     @classmethod
-    def create(cls, cmds):
+    def create(cls, cmds, use_file=False):
         """Create a spawned process."""
-        proc = start_cmd(cmds, use_file=True)
+        proc = start_cmd(cmds, use_file=use_file)
         cls._PROC_LIST.append(proc)
 
     @classmethod
@@ -1281,7 +1281,7 @@ def resmoke_client(  # pylint: disable=too-many-arguments
             f" {log_output}")
     ret, output = None, None
     if no_wait:
-        Processes.create(cmds)
+        Processes.create(cmds, use_file=True)
     else:
         ret, output = execute_cmd(cmds, use_file=True)
     return ret, output
@@ -1296,10 +1296,8 @@ def setup_ssh_tunnel(  # pylint: disable=too-many-arguments
     ssh_tunnel_cmd = f"ssh -N {ssh_tunnel_opts} {ssh_connection_options} {ssh_options} {ssh_user_host}"
     LOGGER.info("Tunneling mongod connections through ssh to get around firewall")
     LOGGER.info(ssh_tunnel_cmd)
-    ssh_tunnel_proc = start_cmd(ssh_tunnel_cmd)
+    Processes.create(ssh_tunnel_cmd)
     LOGGER.info("The connection is not terminated because the host can be shut down at anytime")
-
-    return ssh_tunnel_proc
 
 
 def get_remote_python():
@@ -1540,8 +1538,8 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
         if ret:
             local_exit(ret)
 
-        ssh_tunnel_proc = setup_ssh_tunnel(mongod_host, secret_port, standard_port,
-                                           ssh_connection_options, ssh_options, ssh_user_host)
+        setup_ssh_tunnel(mongod_host, secret_port, standard_port, ssh_connection_options,
+                         ssh_options, ssh_user_host)
         verify_remote_access(local_ops)
 
         # Optionally validate canary document locally.
@@ -1666,7 +1664,6 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
         Processes.kill_all()
         for temp_file in temp_client_files:
             NamedTempFile.delete(temp_file)
-        kill_process(ssh_tunnel_proc)
 
         # Reestablish remote access after crash.
         local_ops = LocalToRemoteOperations(user_host=ssh_user_host,
