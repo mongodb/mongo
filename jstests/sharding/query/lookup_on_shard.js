@@ -30,6 +30,7 @@ const runTest = function() {
         // Run a pipeline which must be merged on a shard. This should force the $lookup (on
         // the sharded collection) to be run on a mongod.
         pipeline = [
+                {$_internalSplitPipeline: {mergeType: "anyShard"}},
                 {
                   $lookup: {
                       localField: "foreignId",
@@ -37,8 +38,7 @@ const runTest = function() {
                       from: "foreignColl",
                       as: "foreignDoc"
                   }
-                },
-                {$_internalSplitPipeline: {mergeType: "anyShard"}}
+                }
             ];
 
         const results = coll.aggregate(pipeline).toArray();
@@ -51,6 +51,7 @@ const runTest = function() {
     (function testMultipleLookupsFromShard() {
         // Run two lookups in a row (both on mongod).
         pipeline = [
+                {$_internalSplitPipeline: {mergeType: "anyShard"}},
                 {
                   $lookup: {
                       localField: "foreignId",
@@ -65,8 +66,7 @@ const runTest = function() {
                       as: "smallCollDocs",
                       pipeline: [],
                   }
-                },
-                {$_internalSplitPipeline: {mergeType: "anyShard"}}
+                }
             ];
 
         const results = coll.aggregate(pipeline).toArray();
@@ -80,6 +80,7 @@ const runTest = function() {
     (function testUnshardedLookupWithinShardedLookup() {
         // Pipeline with unsharded $lookup inside a sharded $lookup.
         pipeline = [
+                {$_internalSplitPipeline: {mergeType: "anyShard"}},
                 {
                   $lookup: {
                       from: "foreignColl",
@@ -88,8 +89,7 @@ const runTest = function() {
                           {$lookup: {from: "smallColl", as: "doc", pipeline: []}},
                       ],
                   }
-                },
-                {$_internalSplitPipeline: {mergeType: "anyShard"}}
+                }
             ];
 
         const results = coll.aggregate(pipeline).toArray();
@@ -101,19 +101,8 @@ const runTest = function() {
                 // Each document pulled from the foreign collection should have one document
                 // from "smallColl."
                 assert.eq(results[i].foreignDoc[j].collName, "foreignColl");
-
-                // TODO SERVER-39016: Once a mongod is able to target the primary shard when
-                // reading from a non-sharded collection this should always work. Until then,
-                // the results of the query depend on which shard is chosen as the merging
-                // shard. If the primary shard is chosen, we'll get the correct results (and
-                // correctly find a document in "smallColl"). Otherwise if the merging shard is
-                // not the primary shard, the merging shard will attempt to do a local read (on
-                // an empty/non-existent collection), which will return nothing.
-                if (results[i].foreignDoc[j].doc.length === 1) {
-                    assert.eq(results[i].foreignDoc[j].doc[0].collName, "smallColl");
-                } else {
-                    assert.eq(results[i].foreignDoc[j].doc.length, 0);
-                }
+                assert.eq(results[i].foreignDoc[j].doc.length, 1);
+                assert.eq(results[i].foreignDoc[j].doc[0].collName, "smallColl");
             }
         }
     })();
