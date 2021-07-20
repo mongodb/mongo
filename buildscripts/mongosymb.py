@@ -61,20 +61,16 @@ def parse_input(trace_doc, dbg_path_resolver):
 
 
 def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path, dsym_hint, input_format,
-                     **_kwargs):
+                     **kwargs):
     """Return a list of symbolized stack frames from a trace_doc in MongoDB stack dump format."""
+
+    # Keep frames in kwargs to avoid changing the function signature.
+    frames = kwargs.get("frames")
+    if frames is None:
+        frames = preprocess_frames(dbg_path_resolver, trace_doc, input_format)
 
     if not symbolizer_path:
         symbolizer_path = os.environ.get("MONGOSYMB_SYMBOLIZER_PATH", "llvm-symbolizer")
-
-    if input_format == "classic":
-        frames = parse_input(trace_doc, dbg_path_resolver)
-    elif input_format == "thin":
-        frames = trace_doc["backtrace"]
-        for frame in frames:
-            frame["path"] = dbg_path_resolver.get_dbg_file(frame)
-    else:
-        raise ValueError('Unknown input format "{}"'.format(input_format))
 
     symbolizer_args = [symbolizer_path]
     for dh in dsym_hint:
@@ -123,16 +119,33 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path, dsym_hint, i
     return frames
 
 
+def preprocess_frames(dbg_path_resolver, trace_doc, input_format):
+    """Process the paths in frame objects."""
+    if input_format == "classic":
+        frames = parse_input(trace_doc, dbg_path_resolver)
+    elif input_format == "thin":
+        frames = trace_doc["backtrace"]
+        for frame in frames:
+            frame["path"] = dbg_path_resolver.get_dbg_file(frame)
+    else:
+        raise ValueError('Unknown input format "{}"'.format(input_format))
+    return frames
+
+
 class PathDbgFileResolver(object):
     """PathDbgFileResolver class."""
 
     def __init__(self, bin_path_guess):
         """Initialize PathDbgFileResolver."""
         self._bin_path_guess = os.path.realpath(bin_path_guess)
+        self.mci_build_dir = None
 
     def get_dbg_file(self, soinfo):
         """Return dbg file name."""
         path = soinfo.get("path", "")
+        # TODO: make identifying mongo shared library directory more robust
+        if self.mci_build_dir is None and path.startswith("/data/mci/"):
+            self.mci_build_dir = path.split("/src/", maxsplit=1)[0]
         return path if path else self._bin_path_guess
 
 
@@ -143,6 +156,7 @@ class S3BuildidDbgFileResolver(object):
         """Initialize S3BuildidDbgFileResolver."""
         self._cache_dir = cache_dir
         self._s3_bucket = s3_bucket
+        self.mci_build_dir = None
 
     def get_dbg_file(self, soinfo):
         """Return dbg file name."""
@@ -182,32 +196,41 @@ def classic_output(frames, outfile, **kwargs):  # pylint: disable=unused-argumen
             outfile.write(" {path:s}!!!\n".format(**symbinfo))
 
 
-def make_argument_parser(**kwargs):
+def make_argument_parser(parser=None, **kwargs):
     """Make and return an argparse."""
-    parser = argparse.ArgumentParser(**kwargs)
+    if parser is None:
+        parser = argparse.ArgumentParser(**kwargs)
+
     parser.add_argument('--dsym-hint', default=[], action='append')
     parser.add_argument('--symbolizer-path', default='')
     parser.add_argument('--input-format', choices=['classic', 'thin'], default='classic')
     parser.add_argument('--output-format', choices=['classic', 'json'], default='classic',
                         help='"json" shows some extra information')
     parser.add_argument('--debug-file-resolver', choices=['path', 's3'], default='path')
+    parser.add_argument('--src-dir-to-move', action="store", type=str, default=None,
+                        help="Specify a src dir to move to /data/mci/{original_buildid}/src")
+
     s3_group = parser.add_argument_group(
         "s3 options", description='Options used with \'--debug-file-resolver s3\'')
     s3_group.add_argument('--s3-cache-dir')
     s3_group.add_argument('--s3-bucket')
-    parser.add_argument('path_to_executable')
+
+    # Look for symbols in the cwd by default.
+    parser.add_argument('path_to_executable', nargs="?")
     return parser
 
 
-def main():
+def main(options):
     """Execute Main program."""
-
-    options = make_argument_parser(description=__doc__).parse_args()
 
     # Skip over everything before the first '{' since it is likely to be log line prefixes.
     # Additionally, using raw_decode() to ignore extra data after the closing '}' to allow maximal
     # sloppiness in copy-pasting input.
     trace_doc = sys.stdin.read()
+
+    if not trace_doc or not trace_doc.strip():
+        print("Please provide the backtrace through stdin for symbolization;"
+              "e.g. `your/symbolization/command < /file/with/stacktrace`")
     trace_doc = trace_doc[trace_doc.find('{'):]
     trace_doc = json.JSONDecoder().raw_decode(trace_doc)[0]
 
@@ -242,10 +265,23 @@ def main():
     elif options.debug_file_resolver == 's3':
         resolver = S3BuildidDbgFileResolver(options.s3_cache_dir, options.s3_bucket)
 
-    frames = symbolize_frames(trace_doc, resolver, **vars(options))
+    frames = preprocess_frames(resolver, trace_doc, options.input_format)
+
+    if options.src_dir_to_move and resolver.mci_build_dir is not None:
+        try:
+            os.makedirs(resolver.mci_build_dir)
+            os.symlink(
+                os.path.join(os.getcwd(), options.src_dir_to_move),
+                os.path.join(resolver.mci_build_dir, 'src'))
+        except FileExistsError:
+            pass
+
+    frames = symbolize_frames(frames=frames, trace_doc=trace_doc, dbg_path_resolver=resolver,
+                              **vars(options))
     output_fn(frames, sys.stdout, indent=2)
 
 
 if __name__ == '__main__':
-    main()
+    symbolizer_options = make_argument_parser(description=__doc__).parse_args()
+    main(symbolizer_options)
     sys.exit(0)

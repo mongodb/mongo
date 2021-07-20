@@ -5,9 +5,9 @@ from argparse import Namespace
 
 from mock import patch
 
-from buildscripts.resmokelib.setup_multiversion import evergreen_conn
+from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.resmokelib.setup_multiversion.config import SetupMultiversionConfig
-from buildscripts.resmokelib.setup_multiversion.setup_multiversion import SetupMultiversion
+from buildscripts.resmokelib.setup_multiversion.setup_multiversion import SetupMultiversion, _DownloadOptions
 
 
 class TestSetupMultiversionBase(unittest.TestCase):
@@ -36,6 +36,9 @@ class TestSetupMultiversionBase(unittest.TestCase):
                 },
             ]
         }
+
+        download_options = _DownloadOptions(db=True, ds=False, da=False)
+
         options = Namespace(
             install_dir="install",
             link_dir="link",
@@ -44,17 +47,15 @@ class TestSetupMultiversionBase(unittest.TestCase):
             architecture=architecture,
             use_latest=False,
             versions=["4.2.1"],
-            download_symbols=False,
-            download_binaries=True,
-            download_artifacts=False,
             evergreen_config=None,
             github_oauth_token=None,
+            download_options=download_options,
             debug=False,
         )
         with patch("buildscripts.resmokelib.setup_multiversion.config.SetupMultiversionConfig"
                    ) as mock_config:
             mock_config.return_value = SetupMultiversionConfig(raw_yaml_config)
-            self.setup_multiversion = SetupMultiversion(options)
+            self.setup_multiversion = SetupMultiversion(**vars(options))
 
 
 class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
@@ -66,7 +67,7 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
 
     @patch("evergreen.version.Version")
     @patch("evergreen.api.EvergreenApi.versions_by_project")
-    @patch("buildscripts.resmokelib.setup_multiversion.evergreen_conn.get_compile_artifact_urls")
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_compile_artifact_urls")
     def test_no_compile_artifacts(self, mock_get_compile_artifact_urls, mock_versions_by_project,
                                   mock_version):
         mock_version.build_variants_map = {self.buildvariant_name: "build_id"}
@@ -78,7 +79,7 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
 
     @patch("evergreen.version.Version")
     @patch("evergreen.api.EvergreenApi.versions_by_project")
-    @patch("buildscripts.resmokelib.setup_multiversion.evergreen_conn.get_compile_artifact_urls")
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_compile_artifact_urls")
     def test_urls_found_on_last_version(self, mock_get_compile_artifact_urls,
                                         mock_versions_by_project, mock_version):
         expected_urls = {
@@ -96,7 +97,7 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
     @patch("evergreen.version.Version")
     @patch("evergreen.version.Version")
     @patch("evergreen.api.EvergreenApi.versions_by_project")
-    @patch("buildscripts.resmokelib.setup_multiversion.evergreen_conn.get_compile_artifact_urls")
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_compile_artifact_urls")
     def test_urls_found_on_not_last_version(self, mock_get_compile_artifact_urls,
                                             mock_versions_by_project, mock_version,
                                             mock_expected_version):
@@ -110,18 +111,21 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
         evg_versions = [mock_version for _ in range(3)]
         evg_versions.append(mock_expected_version)
         mock_versions_by_project.return_value = evg_versions
-        mock_get_compile_artifact_urls.side_effect = lambda evg_api, evg_version, buildvariant_name: {
-            (self.setup_multiversion.evg_api, mock_version, self.buildvariant_name): {},
-            (self.setup_multiversion.evg_api, mock_expected_version, self.buildvariant_name):
+        print(self.setup_multiversion.evg_api)
+        print(self.buildvariant_name)
+        print(mock_version)
+        mock_get_compile_artifact_urls.side_effect = lambda evg_api, evg_version, buildvariant_name, ignore_failed_push: {
+            (self.setup_multiversion.evg_api, mock_version, self.buildvariant_name, False): {},
+            (self.setup_multiversion.evg_api, mock_expected_version, self.buildvariant_name, False):
                 expected_urls,
-        }[evg_api, evg_version, buildvariant_name]
+        }[evg_api, evg_version, buildvariant_name, ignore_failed_push]
 
         urls = self.setup_multiversion.get_latest_urls("4.4")
         self.assertEqual(urls, expected_urls)
 
     @patch("evergreen.version.Version")
     @patch("evergreen.api.EvergreenApi.versions_by_project")
-    @patch("buildscripts.resmokelib.setup_multiversion.evergreen_conn.get_compile_artifact_urls")
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_compile_artifact_urls")
     def test_fallback_to_generic_buildvariant(self, mock_get_compile_artifact_urls,
                                               mock_versions_by_project, mock_version):
         expected_urls = {
@@ -139,11 +143,9 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
 
 class TestSetupMultiversionGetUrls(TestSetupMultiversionBase):
     @patch("evergreen.version.Version")
-    @patch(
-        "buildscripts.resmokelib.setup_multiversion.evergreen_conn.get_evergreen_project_and_version"
-    )
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_project_and_version")
     @patch("buildscripts.resmokelib.setup_multiversion.github_conn.get_git_tag_and_commit")
-    @patch("buildscripts.resmokelib.setup_multiversion.evergreen_conn.get_compile_artifact_urls")
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_compile_artifact_urls")
     def test_urls_found(self, mock_get_compile_artifact_urls, mock_get_git_tag_and_commit,
                         mock_get_evergreen_project_and_version, mock_version):
         expected_urls = {
@@ -160,11 +162,9 @@ class TestSetupMultiversionGetUrls(TestSetupMultiversionBase):
         self.assertEqual(urls, expected_urls)
 
     @patch("evergreen.version.Version")
-    @patch(
-        "buildscripts.resmokelib.setup_multiversion.evergreen_conn.get_evergreen_project_and_version"
-    )
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_project_and_version")
     @patch("buildscripts.resmokelib.setup_multiversion.github_conn.get_git_tag_and_commit")
-    @patch("buildscripts.resmokelib.setup_multiversion.evergreen_conn.get_compile_artifact_urls")
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_compile_artifact_urls")
     def test_urls_not_found(self, mock_get_compile_artifact_urls, mock_get_git_tag_and_commit,
                             mock_get_evergreen_project_and_version, mock_version):
         mock_get_git_tag_and_commit.return_value = ("git_tag", "commit_hash")
@@ -176,11 +176,9 @@ class TestSetupMultiversionGetUrls(TestSetupMultiversionBase):
         self.assertEqual(urls, {})
 
     @patch("evergreen.version.Version")
-    @patch(
-        "buildscripts.resmokelib.setup_multiversion.evergreen_conn.get_evergreen_project_and_version"
-    )
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_project_and_version")
     @patch("buildscripts.resmokelib.setup_multiversion.github_conn.get_git_tag_and_commit")
-    @patch("buildscripts.resmokelib.setup_multiversion.evergreen_conn.get_compile_artifact_urls")
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_compile_artifact_urls")
     def test_fallback_to_generic_buildvariant(self, mock_get_compile_artifact_urls,
                                               mock_get_git_tag_and_commit,
                                               mock_get_evergreen_project_and_version, mock_version):

@@ -26,7 +26,7 @@ def download_from_s3(url):
     """Download file from S3 bucket by a given URL."""
 
     if not url:
-        raise DownloadError("Download URL not found.")
+        raise DownloadError("Download URL not found")
 
     LOGGER.info("Downloading.", url=url)
     filename = os.path.join(tempfile.gettempdir(), url.split('/')[-1].split('?')[0])
@@ -91,11 +91,8 @@ def extract_archive(archive_file, install_dir):
 
     try:
         os.makedirs(install_dir)
-    except OSError as exc:
-        if exc.errno == errno.EEXIST and os.path.isdir(install_dir):
-            pass
-        else:
-            raise
+    except FileExistsError:
+        pass
 
     _rsync_move_dir(temp_dir, install_dir)
     shutil.rmtree(temp_dir)

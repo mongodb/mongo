@@ -1,4 +1,4 @@
-"""Unit tests for buildscripts/resmokelib/setup_multiversion/evergreen_conn.py."""
+"""Unit tests for buildscripts/resmokelib/utils/evergreen_conn.py."""
 # pylint: disable=missing-docstring,too-many-arguments
 import unittest
 
@@ -6,7 +6,7 @@ from mock import patch
 from requests import HTTPError
 from evergreen import RetryingEvergreenApi
 
-from buildscripts.resmokelib.setup_multiversion import evergreen_conn
+from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.resmokelib.setup_multiversion.config import SetupMultiversionConfig
 
 

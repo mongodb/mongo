@@ -15,7 +15,8 @@ import structlog
 import yaml
 
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
-from buildscripts.resmokelib.setup_multiversion import config, download, evergreen_conn, github_conn
+from buildscripts.resmokelib.setup_multiversion import config, download, github_conn
+from buildscripts.resmokelib.utils import evergreen_conn
 
 SUBCOMMAND = "setup-multiversion"
 
@@ -43,27 +44,30 @@ class SetupMultiversion(Subcommand):
     """Main class for the setup multiversion subcommand."""
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, options):
+    def __init__(self, download_options, install_dir="", link_dir="", platform=None, edition=None,
+                 architecture=None, use_latest=None, versions=None, evergreen_config=None,
+                 github_oauth_token=None, debug=None, ignore_failed_push=False):
         """Initialize."""
-        setup_logging(options.debug)
+        setup_logging(debug)
         cwd = os.getcwd()
-        self.install_dir = os.path.join(cwd, options.install_dir)
-        self.link_dir = os.path.join(cwd, options.link_dir)
+        self.install_dir = os.path.join(cwd, install_dir)
+        self.link_dir = os.path.join(cwd, link_dir)
 
-        self.edition = options.edition.lower() if options.edition else None
-        self.platform = options.platform.lower() if options.platform else None
-        self.architecture = options.architecture.lower() if options.architecture else None
-        self.use_latest = options.use_latest
-        self.versions = options.versions
+        self.edition = edition.lower() if edition else None
+        self.platform = platform.lower() if platform else None
+        self.architecture = architecture.lower() if architecture else None
+        self.use_latest = use_latest
+        self.versions = versions
+        self.ignore_failed_push = ignore_failed_push
 
-        self.download_binaries = options.download_binaries
-        self.download_symbols = options.download_symbols
-        self.download_artifacts = options.download_artifacts
+        self.download_binaries = download_options.download_binaries
+        self.download_symbols = download_options.download_symbols
+        self.download_artifacts = download_options.download_artifacts
 
-        self.evg_api = evergreen_conn.get_evergreen_api(options.evergreen_config)
+        self.evg_api = evergreen_conn.get_evergreen_api(evergreen_config)
         # In evergreen github oauth token is stored as `token ******`, so we remove the leading part
-        self.github_oauth_token = options.github_oauth_token.replace(
-            "token ", "") if options.github_oauth_token else None
+        self.github_oauth_token = github_oauth_token.replace("token ",
+                                                             "") if github_oauth_token else None
         with open(config.SETUP_MULTIVERSION_CONFIG) as file_handle:
             raw_yaml = yaml.safe_load(file_handle)
         self.config = config.SetupMultiversionConfig(raw_yaml)
@@ -99,21 +103,11 @@ class SetupMultiversion(Subcommand):
                                    "version.")
                     urls = self.get_urls(version)
 
-                artifacts_url = urls.get("Artifacts", "") if self.download_artifacts else None
-                binaries_url = urls.get("Binaries", "") if self.download_binaries else None
-                download_symbols_url = None
-
-                if self.download_symbols:
-                    download_symbols_url = urls.get(" mongo-debugsymbols.tgz", "")
-                    if not download_symbols_url:
-                        download_symbols_url = urls.get(" mongo-debugsymbols.zip", "")
-
                 bin_suffix = self._get_bin_suffix(version, urls["project_id"])
                 # Give each version a unique install dir
                 install_dir = os.path.join(self.install_dir, version)
 
-                self.setup_mongodb(artifacts_url, binaries_url, download_symbols_url, install_dir,
-                                   bin_suffix, self.link_dir)
+                self.download_and_extract_from_urls(urls, bin_suffix, install_dir)
 
             except (github_conn.GithubConnError, evergreen_conn.EvergreenConnError,
                     download.DownloadError) as ex:
@@ -123,6 +117,20 @@ class SetupMultiversion(Subcommand):
             else:
                 LOGGER.info("Setup version completed.", version=version)
                 LOGGER.info("-" * 50)
+
+    def download_and_extract_from_urls(self, urls, bin_suffix, install_dir):
+        """Download and extract values indicated in `urls`."""
+        artifacts_url = urls.get("Artifacts", "") if self.download_artifacts else None
+        binaries_url = urls.get("Binaries", "") if self.download_binaries else None
+        download_symbols_url = None
+
+        if self.download_symbols:
+            download_symbols_url = urls.get(" mongo-debugsymbols.tgz", None)
+            if not download_symbols_url:
+                download_symbols_url = urls.get(" mongo-debugsymbols.zip", None)
+
+        self.setup_mongodb(artifacts_url, binaries_url, download_symbols_url, install_dir,
+                           bin_suffix, self.link_dir)
 
     def get_latest_urls(self, version):
         """Return latest urls."""
@@ -149,34 +157,48 @@ class SetupMultiversion(Subcommand):
                 if buildvariant_name not in evg_version.build_variants_map:
                     buildvariant_name = self.fallback_to_generic_buildvariant(major_minor_version)
 
-                curr_urls = evergreen_conn.get_compile_artifact_urls(self.evg_api, evg_version,
-                                                                     buildvariant_name)
+                curr_urls = evergreen_conn.get_compile_artifact_urls(
+                    self.evg_api, evg_version, buildvariant_name,
+                    ignore_failed_push=self.ignore_failed_push)
                 if "Binaries" in curr_urls:
                     urls = curr_urls
                     break
 
         return urls
 
-    def get_urls(self, version):
-        """Return urls."""
-        git_tag, commit_hash = github_conn.get_git_tag_and_commit(self.github_oauth_token, version)
-        LOGGER.info("Found git attributes.", git_tag=git_tag, commit_hash=commit_hash)
+    def get_urls(self, binary_version=None, evergreen_version=None, buildvariant_name=None):
+        """Return multiversion urls for a given binary version or (Evergreen version + variant)."""
+        if (binary_version and evergreen_version) or not (binary_version or evergreen_version):
+            raise ValueError("Must specify exactly one of `version` and `evergreen_version`")
 
-        evg_project, evg_version = evergreen_conn.get_evergreen_project_and_version(
-            self.config, self.evg_api, commit_hash)
+        if binary_version:
+            git_tag, commit_hash = github_conn.get_git_tag_and_commit(self.github_oauth_token,
+                                                                      binary_version)
+            LOGGER.info("Found git attributes.", git_tag=git_tag, commit_hash=commit_hash)
+
+            evg_project, evg_version = evergreen_conn.get_evergreen_project_and_version(
+                self.config, self.evg_api, commit_hash)
+        else:
+            evg_project, evg_version = evergreen_conn.get_evergreen_project(
+                self.config, self.evg_api, evergreen_version)
+
         LOGGER.debug("Found evergreen project.", evergreen_project=evg_project)
+
         try:
             major_minor_version = re.findall(r"\d+\.\d+", evg_project)[-1]
         except IndexError:
             major_minor_version = "master"
 
-        buildvariant_name = self.get_buildvariant_name(major_minor_version)
+        if not buildvariant_name:
+            buildvariant_name = self.get_buildvariant_name(major_minor_version)
+
         LOGGER.debug("Found buildvariant.", buildvariant_name=buildvariant_name)
         if buildvariant_name not in evg_version.build_variants_map:
             buildvariant_name = self.fallback_to_generic_buildvariant(major_minor_version)
 
         urls = evergreen_conn.get_compile_artifact_urls(self.evg_api, evg_version,
-                                                        buildvariant_name)
+                                                        buildvariant_name,
+                                                        ignore_failed_push=self.ignore_failed_push)
 
         return urls
 
@@ -203,8 +225,6 @@ class SetupMultiversion(Subcommand):
                     try_download(url)
 
         if binaries_url is not None:
-            if not link_dir:
-                raise ValueError("link_dir must be specified if downloading binaries")
             download.symlink_version(bin_suffix, install_dir, link_dir)
 
     def get_buildvariant_name(self, major_minor_version):
@@ -227,21 +247,36 @@ class SetupMultiversion(Subcommand):
                                                             major_minor_version=major_minor_version)
 
 
+class _DownloadOptions(object):
+    def __init__(self, db, ds, da):
+        self.download_binaries = db
+        self.download_symbols = ds
+        self.download_artifacts = da
+
+
 class SetupMultiversionPlugin(PluginInterface):
     """Integration point for setup-multiversion-mongodb."""
 
     def parse(self, subcommand, parser, parsed_args, **kwargs):
         """Parse command-line options."""
+        if subcommand != SUBCOMMAND:
+            return None
 
-        if subcommand == SUBCOMMAND:
-            return SetupMultiversion(parsed_args)
+        # Shorthand for brevity.
+        args = parsed_args
 
-        return None
+        download_options = _DownloadOptions(db=args.download_binaries, ds=args.download_symbols,
+                                            da=args.download_artifacts)
 
-    def add_subcommand(self, subparsers):
-        """Create and add the parser for the subcommand."""
-        parser = subparsers.add_parser(SUBCOMMAND, help=__doc__)
+        return SetupMultiversion(install_dir=args.install_dir, link_dir=args.link_dir,
+                                 platform=args.platform, edition=args.edition,
+                                 architecture=args.architecture, use_latest=args.use_latest,
+                                 versions=args.versions, download_options=download_options,
+                                 evergreen_config=args.evergreen_config,
+                                 github_oauth_token=args.github_oauth_token, debug=args.debug)
 
+    @classmethod
+    def _add_args_to_parser(cls, parser):
         parser.add_argument("-i", "--installDir", dest="install_dir", required=True,
                             help="Directory to install the download archive. [REQUIRED]")
         parser.add_argument(
@@ -292,3 +327,8 @@ class SetupMultiversionPlugin(PluginInterface):
             "https://developer.github.com/v3/#rate-limiting")
         parser.add_argument("-d", "--debug", dest="debug", action="store_true", default=False,
                             help="Set DEBUG logging level.")
+
+    def add_subcommand(self, subparsers):
+        """Create and add the parser for the subcommand."""
+        parser = subparsers.add_parser(SUBCOMMAND, help=__doc__)
+        self._add_args_to_parser(parser)
