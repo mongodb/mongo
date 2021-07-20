@@ -42,6 +42,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/yieldable.h"
 
 namespace mongo {
 
@@ -292,17 +293,20 @@ public:
      * Call this when you are ready to finish your bulk work.
      * Pass in the BulkBuilder returned from initiateBulk.
      * @param bulk - Something created from initiateBulk
-     * @param mayInterrupt - Is this commit interruptible (will cancel)
      * @param dupsAllowed - If false and 'dupRecords' is not null, append with the RecordIds of
      *                      the uninserted duplicates.
+     * @param yieldIterations - The number of iterations run before each yielding. Will not yield if
+     * zero.
      * @param onDuplicateKeyInserted - Will be called for each duplicate key inserted into the
      * index.
      * @param onDuplicateRecord - If not nullptr, will be called for each RecordId of uninserted
      * duplicate keys.
      */
     virtual Status commitBulk(OperationContext* opCtx,
+                              const CollectionPtr& collection,
                               BulkBuilder* bulk,
                               bool dupsAllowed,
+                              int32_t yieldIterations,
                               const KeyHandlerFn& onDuplicateKeyInserted,
                               const RecordIdHandlerFn& onDuplicateRecord) = 0;
 
@@ -544,8 +548,10 @@ public:
                                               StringData dbName) final;
 
     Status commitBulk(OperationContext* opCtx,
+                      const CollectionPtr& collection,
                       BulkBuilder* bulk,
                       bool dupsAllowed,
+                      int32_t yieldIterations,
                       const KeyHandlerFn& onDuplicateKeyInserted,
                       const RecordIdHandlerFn& onDuplicateRecord) final;
 
@@ -615,6 +621,8 @@ private:
     Status _handleDuplicateKey(OperationContext* opCtx,
                                const KeyString::Value& dataKey,
                                const RecordIdHandlerFn& onDuplicateRecord);
+
+    void _yieldBulkLoad(OperationContext* opCtx, const Yieldable* yieldable) const;
 
     const std::unique_ptr<SortedDataInterface> _newInterface;
 };

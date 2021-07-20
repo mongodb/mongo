@@ -672,6 +672,10 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
               IndexBuildPhase_serializer(_phase).toString());
     _phase = IndexBuildPhaseEnum::kBulkLoad;
 
+    // Doesn't allow yielding when in a foreground index build.
+    const int32_t kYieldIterations =
+        isBackgroundBuilding() ? internalIndexBuildBulkLoadYieldIterations.load() : 0;
+
     for (size_t i = 0; i < _indexes.size(); i++) {
         // When onDuplicateRecord is passed, 'dupsAllowed' should be passed to reflect whether or
         // not the index is unique.
@@ -690,8 +694,10 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
         try {
             Status status = _indexes[i].real->commitBulk(
                 opCtx,
+                collection,
                 _indexes[i].bulk.get(),
                 dupsAllowed,
+                kYieldIterations,
                 [=](const KeyString::Value& duplicateKey) {
                     // Do not record duplicates when explicitly ignored. This may be the case on
                     // secondaries.
@@ -893,12 +899,6 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
     if (isResumable) {
         invariant(_buildUUID);
         invariant(_method == IndexBuildMethod::kHybrid);
-
-        // Index builds do not yield locks during the bulk load phase so it is not possible for
-        // rollback to interrupt an index build during this phase.
-        if (!ErrorCodes::isShutdownError(opCtx->checkForInterruptNoAssert())) {
-            invariant(IndexBuildPhaseEnum::kBulkLoad != _phase, str::stream() << *_buildUUID);
-        }
 
         _writeStateToDisk(opCtx, collection);
         action = TemporaryRecordStore::FinalizationAction::kKeep;

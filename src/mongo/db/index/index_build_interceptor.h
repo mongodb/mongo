@@ -75,7 +75,7 @@ public:
     /**
      * Finds the temporary table associated with storing writes during this index build. Only used
      * Only used when resuming an index build and the temporary table already exists on disk.
-     * Additionally will find the tmeporary table associated with storing duplicate key constraint
+     * Additionally will find the temporary table associated with storing duplicate key constraint
      * violations found during the build, if the index being built has uniqueness constraints.
      *
      * finalizeTemporaryTable() must be called before destruction.
