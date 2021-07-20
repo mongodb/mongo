@@ -19,6 +19,7 @@ selector:
   # These test run commands using legacy queries, which are not supported on sessions.
   - jstests/core/comment_field.js
   - jstests/core/exhaust.js
+  - jstests/core/validate_cmd_ns.js
 
   # Unacknowledged writes prohibited in an explicit session.
   - jstests/core/batch_write_command_w0.js

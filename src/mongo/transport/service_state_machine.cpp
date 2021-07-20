@@ -68,12 +68,61 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(doNotSetMoreToCome);
 MONGO_FAIL_POINT_DEFINE(beforeCompressingExhaustResponse);
 /**
+ * Creates and returns a legacy exhaust message, if exhaust is allowed. The returned message is to
+ * be used as the subsequent 'synthetic' exhaust request. Returns an empty message if exhaust is not
+ * allowed. Any messages that do not have an opcode of OP_MSG are considered legacy.
+ */
+Message makeLegacyExhaustMessage(Message* m, const DbResponse& dbresponse) {
+    // OP_QUERY responses are always of type OP_REPLY.
+    invariant(dbresponse.response.operation() == opReply);
+
+    if (!dbresponse.shouldRunAgainForExhaust) {
+        return Message();
+    }
+
+    // Legacy find operations via the OP_QUERY/OP_GET_MORE network protocol never provide the next
+    // invocation for exhaust.
+    invariant(!dbresponse.nextInvocation);
+
+    DbMessage dbmsg(*m);
+    invariant(dbmsg.messageShouldHaveNs());
+    const char* ns = dbmsg.getns();
+
+    MsgData::View header = dbresponse.response.header();
+    QueryResult::View qr = header.view2ptr();
+    long long cursorid = qr.getCursorId();
+
+    if (cursorid == 0) {
+        return Message();
+    }
+
+    // Generate a message that will act as the subsequent 'synthetic' exhaust request.
+    BufBuilder b(512);
+    b.appendNum(static_cast<int>(0));          // size set later in setLen()
+    b.appendNum(header.getId());               // message id
+    b.appendNum(header.getResponseToMsgId());  // in response to
+    b.appendNum(static_cast<int>(dbGetMore));  // opCode is OP_GET_MORE
+    b.appendNum(static_cast<int>(0));          // Must be ZERO (reserved)
+    b.appendStr(StringData(ns));               // Namespace
+    b.appendNum(static_cast<int>(0));          // ntoreturn
+    b.appendNum(cursorid);                     // cursor id from the OP_REPLY
+
+    MsgData::View(b.buf()).setLen(b.len());
+
+    return Message(b.release());
+}
+
+/**
  * Given a request and its already generated response, checks for exhaust flags. If exhaust is
  * allowed, produces the subsequent request message, and modifies the response message to indicate
  * it is part of an exhaust stream. Returns the subsequent request message, which is known as a
  * 'synthetic' exhaust request. Returns an empty message if exhaust is not allowed.
  */
 Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
+    if (requestMsg.operation() == dbQuery) {
+        return makeLegacyExhaustMessage(&requestMsg, *dbresponse);
+    }
+
     if (!OpMsgRequest::isFlagSet(requestMsg, OpMsg::kExhaustSupported)) {
         return Message();
     }

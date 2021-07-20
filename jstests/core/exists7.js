@@ -1,6 +1,6 @@
 // @tags: [requires_non_retryable_writes]
 
-// Test that non boolean value types are allowed with $exists spec. SERVER-2322
+// Test that non boolean value types are allowed with $explain spec. SERVER-2322
 
 t = db.jstests_exists7;
 t.drop();

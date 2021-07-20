@@ -92,7 +92,7 @@ void addMetaProjection(FindCommandRequest* findCommand) {
     }
 }
 
-Status initFullQuery(const BSONObj& top, FindCommandRequest* findCommand) {
+Status initFullQuery(const BSONObj& top, FindCommandRequest* findCommand, bool* explain) {
     BSONObjIterator i(top);
 
     while (i.more()) {
@@ -140,8 +140,8 @@ Status initFullQuery(const BSONObj& top, FindCommandRequest* findCommand) {
         } else if (name.startsWith("$")) {
             name = name.substr(1);  // chop first char
             if (name == "explain") {
-                return Status(ErrorCodes::Error(5856600),
-                              "the $explain OP_QUERY flag is no longer supported");
+                // Won't throw.
+                *explain = e.trueValue();
             } else if (name == "min") {
                 if (!e.isABSONObj()) {
                     return Status(ErrorCodes::BadValue, "$min must be a BSONObj");
@@ -191,7 +191,8 @@ Status initFindCommandRequest(int ntoskip,
                               const BSONObj& queryObj,
                               const BSONObj& proj,
                               bool fromQueryMessage,
-                              FindCommandRequest* findCommand) {
+                              FindCommandRequest* findCommand,
+                              bool* explain) {
     if (!proj.isEmpty()) {
         findCommand->setProjection(proj.getOwned());
     }
@@ -227,7 +228,7 @@ Status initFindCommandRequest(int ntoskip,
         }
         if (queryField.isABSONObj()) {
             findCommand->setFilter(queryField.embeddedObject().getOwned());
-            Status status = initFullQuery(queryObj, findCommand);
+            Status status = initFullQuery(queryObj, findCommand, explain);
             if (!status.isOK()) {
                 return status;
             }
@@ -417,16 +418,36 @@ void validateCursorResponse(const BSONObj& outputAsBson) {
 // Old QueryRequest parsing code: SOON TO BE DEPRECATED.
 //
 
+StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQueryMessage(const QueryMessage& qm,
+                                                                       bool* explain) {
+    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString(qm.ns));
+
+    Status status = initFindCommandRequest(qm.ntoskip,
+                                           qm.ntoreturn,
+                                           qm.queryOptions,
+                                           qm.query,
+                                           qm.fields,
+                                           true,
+                                           findCommand.get(),
+                                           explain);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return std::move(findCommand);
+}
+
 StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQuery(NamespaceStringOrUUID nssOrUuid,
                                                                 const BSONObj& queryObj,
                                                                 const BSONObj& proj,
                                                                 int ntoskip,
                                                                 int ntoreturn,
-                                                                int queryOptions) {
+                                                                int queryOptions,
+                                                                bool* explain) {
     auto findCommand = std::make_unique<FindCommandRequest>(std::move(nssOrUuid));
 
     Status status = initFindCommandRequest(
-        ntoskip, ntoreturn, queryOptions, queryObj, proj, true, findCommand.get());
+        ntoskip, ntoreturn, queryOptions, queryObj, proj, true, findCommand.get(), explain);
     if (!status.isOK()) {
         return status;
     }

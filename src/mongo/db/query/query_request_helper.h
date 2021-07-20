@@ -148,6 +148,13 @@ void validateCursorResponse(const BSONObj& outputAsBson);
 //
 
 /**
+ * Parse the provided QueryMessage and return a heap constructed FindCommandRequest, which
+ * represents it or an error.
+ */
+StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQueryMessage(const QueryMessage& qm,
+                                                                       bool* explain);
+
+/**
  * Parse the provided legacy query object and parameters to construct a FindCommandRequest.
  */
 StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQuery(NamespaceStringOrUUID nsOrUuid,
@@ -155,7 +162,8 @@ StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQuery(NamespaceStringO
                                                                 const BSONObj& proj,
                                                                 int ntoskip,
                                                                 int ntoreturn,
-                                                                int queryOptions);
+                                                                int queryOptions,
+                                                                bool* explain);
 
 }  // namespace query_request_helper
 }  // namespace mongo

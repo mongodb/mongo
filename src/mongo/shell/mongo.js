@@ -418,6 +418,11 @@ connect = function(url, user, pass, apiParameters) {
     return db;
 };
 
+Mongo.prototype.hasExplainCommand = function() {
+    var hasExplain = (this.getMinWireVersion() <= 3 && 3 <= this.getMaxWireVersion());
+    return hasExplain;
+};
+
 //
 // Write Concern can be set at the connection level, and is used for all write operations unless
 // overridden at the collection level.

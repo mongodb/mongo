@@ -299,6 +299,7 @@ private:
     // After a successful 'find' command, 'ns' is updated to contain the namespace returned by that
     // command.
     NamespaceString ns;
+    const bool _isCommand;
     BSONObj query;
     int nToReturn;
     bool haveLimit;
@@ -313,6 +314,7 @@ private:
     std::string _scopedHost;
     std::string _lazyHost;
     bool wasError;
+    bool _useFindCommand = true;
     bool _connectionHasPendingReplies = false;
     int _lastRequestId = 0;
     Milliseconds _awaitDataTimeout = Milliseconds{0};
