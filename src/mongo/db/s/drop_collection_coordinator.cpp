@@ -68,7 +68,6 @@ boost::optional<BSONObj> DropCollectionCoordinator::reportForCurrentOp(
     bob.append("active", true);
     return bob.obj();
 }
-
 void DropCollectionCoordinator::_insertStateDocument(StateDoc&& doc) {
     auto coorMetadata = doc.getShardingDDLCoordinatorMetadata();
     coorMetadata.setRecoveredFromDisk(true);
@@ -89,6 +88,30 @@ void DropCollectionCoordinator::_updateStateDocument(StateDoc&& newDoc) {
                  WriteConcerns::kMajorityWriteConcern);
 
     _doc = std::move(newDoc);
+}
+
+DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
+                                                           const NamespaceString& nss) {
+    DropReply result;
+    uassertStatusOK(dropCollection(
+        opCtx, nss, &result, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+
+    {
+        // Clear the CollectionShardingRuntime entry
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+        auto* csr = CollectionShardingRuntime::get(opCtx, nss);
+        csr->clearFilteringMetadata(opCtx);
+    }
+
+    // Force the refresh of the catalog cache to purge outdated information
+    const auto catalog = Grid::get(opCtx)->catalogCache();
+    uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, nss));
+    CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
+    repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
+    return result;
 }
 
 void DropCollectionCoordinator::_enterPhase(Phase newPhase) {

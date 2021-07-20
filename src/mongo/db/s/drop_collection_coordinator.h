@@ -51,27 +51,10 @@ public:
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
     /**
-     * Locally drops a collection and cleans its CollectionShardingRuntime metadata
+     * Locally drops a collection, cleans its CollectionShardingRuntime metadata and refreshes the
+     * catalog cache.
      */
-    static DropReply dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) {
-        DropReply result;
-        uassertStatusOK(
-            dropCollection(opCtx,
-                           nss,
-                           &result,
-                           DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
-
-        {
-            // Clear CollectionShardingRuntime entry
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-            Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
-            Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-            auto* csr = CollectionShardingRuntime::get(opCtx, nss);
-            csr->clearFilteringMetadata(opCtx);
-        }
-
-        return result;
-    }
+    static DropReply dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss);
 
 private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
