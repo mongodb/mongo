@@ -63,6 +63,7 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/view_catalog.h"
@@ -127,48 +128,6 @@ bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
  */
 bool isMetaFieldFirstElementOfDottedPathField(StringData metaField, StringData field) {
     return field.substr(0, field.find('.')) == metaField;
-}
-
-// TODO: SERVER-58394 Remove this method and combine its logic with
-// timeseries::replaceTimeseriesQueryMetaFieldName().
-/**
- * Recurses through the mutablebson element query and replaces any occurrences of the
- * metaField with "meta" accounting for queries that may be in dot notation. shouldReplaceFieldValue
- * is set for $expr queries when "$" + the metaField should be subsitutited for "$meta".
- */
-void replaceTimeseriesQueryMetaFieldName(mutablebson::Element elem,
-                                         const StringData& metaField,
-                                         bool shouldReplaceFieldValue = false) {
-    if (metaField.empty()) {
-        return;
-    }
-    shouldReplaceFieldValue = (elem.getFieldName() != "$literal") &&
-        (shouldReplaceFieldValue || (elem.getFieldName() == "$expr"));
-    if (isMetaFieldFirstElementOfDottedPathField(metaField, elem.getFieldName())) {
-        size_t dotIndex = elem.getFieldName().find('.');
-        dotIndex >= elem.getFieldName().size()
-            ? invariantStatusOK(elem.rename("meta"))
-            : invariantStatusOK(elem.rename(
-                  "meta" +
-                  elem.getFieldName().substr(dotIndex, elem.getFieldName().size() - dotIndex)));
-    }
-    // Substitute element fieldValue with "$meta" if element is a subField of $expr, not a subField
-    // of $literal, and the element fieldValue is "$" + the metaField.
-    else if (shouldReplaceFieldValue && elem.isType(BSONType::String) &&
-             isMetaFieldFirstElementOfDottedPathField("$" + metaField, elem.getValueString())) {
-        size_t dotIndex = elem.getValueString().find('.');
-        dotIndex >= elem.getValueString().size()
-            ? invariantStatusOK(elem.setValueString("$meta"))
-            : invariantStatusOK(elem.setValueString(
-                  "$meta" +
-                  elem.getValueString().substr(dotIndex, elem.getValueString().size() - dotIndex)));
-    }
-    if (elem.hasChildren()) {
-        for (size_t i = 0; i < elem.countChildren(); ++i) {
-            replaceTimeseriesQueryMetaFieldName(
-                elem.findNthChild(i), metaField, shouldReplaceFieldValue);
-        }
-    }
 }
 
 // Default for control.version in time-series bucket collection.
@@ -1541,10 +1500,18 @@ public:
             timeseriesDeletes.reserve(request().getDeletes().size());
             for (auto& deleteEntry : request().getDeletes()) {
                 // TODO: SERVER-58394 Call timeseries::translateQuery() here instead.
-                mutablebson::Document doc(deleteEntry.getQ());
-                replaceTimeseriesQueryMetaFieldName(doc.root(), metaField);
+                mutablebson::Document queryDoc(deleteEntry.getQ());
+                timeseries::replaceTimeseriesQueryMetaFieldName(queryDoc.root(), metaField);
                 timeseriesDeletes.push_back(deleteEntry);
-                timeseriesDeletes.back().setQ(doc.getObject());
+                timeseriesDeletes.back().setQ(queryDoc.getObject());
+
+                // Only translate the hint if it is specified by index spec.
+                if (deleteEntry.getHint().firstElement().fieldNameStringData() != "$hint"_sd ||
+                    deleteEntry.getHint().firstElement().type() != BSONType::String) {
+                    timeseriesDeletes.back().setHint(
+                        uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
+                            *timeseriesOptions, deleteEntry.getHint())));
+                }
             }
 
             write_ops::DeleteCommandRequest timeseriesDeleteReq(
