@@ -95,11 +95,16 @@ boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldFor
 }
 
 void CollectionMetadata::throwIfReshardingInProgress(NamespaceString const& nss) const {
-    if (isSharded() && getReshardingFields()) {
-        LOGV2(5277122, "reshardCollection in progress", "namespace"_attr = nss.toString());
+    if (isSharded()) {
+        const auto& reshardingFields = getReshardingFields();
+        if (reshardingFields &&
+            !(reshardingFields->getState() == CoordinatorStateEnum::kCommitting ||
+              reshardingFields->getState() == CoordinatorStateEnum::kAborting)) {
+            LOGV2(5277122, "reshardCollection in progress", "namespace"_attr = nss.toString());
 
-        uasserted(ErrorCodes::ReshardCollectionInProgress,
-                  "reshardCollection is in progress for namespace " + nss.toString());
+            uasserted(ErrorCodes::ReshardCollectionInProgress,
+                      "reshardCollection is in progress for namespace " + nss.toString());
+        }
     }
 }
 

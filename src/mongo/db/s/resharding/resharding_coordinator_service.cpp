@@ -74,6 +74,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorAfterPreparingToDonate);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCloning);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeBlockingWrites);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeRemovingStateDoc);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCompletion);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeStartingErrorFlow);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforePersistingStateTransition);
@@ -1693,6 +1694,9 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllParticipantShardsD
         .then([this, executor](const auto& coordinatorDocsChangedOnDisk) {
             auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
             auto& coordinatorDoc = coordinatorDocsChangedOnDisk[1];
+
+            reshardingPauseCoordinatorBeforeRemovingStateDoc.pauseWhileSetAndNotCanceled(
+                opCtx.get(), _ctHolder->getStepdownToken());
 
             boost::optional<Status> abortReason;
             if (coordinatorDoc.getAbortReason()) {
