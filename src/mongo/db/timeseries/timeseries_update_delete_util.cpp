@@ -63,9 +63,7 @@ std::string getRenamedMetaField(StringData field) {
  * Replaces the first occurrence of the metaField in the given field of the given mutablebson
  * element with the literal "meta", accounting for uses of the metaField with dot notation.
  */
-void replaceTimeseriesQueryMetaFieldName(mutablebson::Element elem,
-                                         StringData field,
-                                         StringData metaField) {
+void replaceQueryMetaFieldName(mutablebson::Element elem, StringData field, StringData metaField) {
     if (isMetaFieldFirstElementOfDottedPathField(field, metaField)) {
         invariantStatusOK(elem.rename(getRenamedMetaField(field)));
     }
@@ -74,12 +72,12 @@ void replaceTimeseriesQueryMetaFieldName(mutablebson::Element elem,
 /**
  * Recurses through the mutablebson element query and replaces any occurrences of the
  * metaField with "meta" accounting for queries that may be in dot notation. shouldReplaceFieldValue
- * is set for $expr queries when "$" + the metaField should be subsitutited for "$meta".
+ * is set for $expr queries when "$" + the metaField should be substituted for "$meta".
  */
-void replaceTimeseriesQueryMetaFieldName(mutablebson::Element elem, StringData metaField) {
-    replaceTimeseriesQueryMetaFieldName(elem, elem.getFieldName(), metaField);
+void replaceQueryMetaFieldName(mutablebson::Element elem, StringData metaField) {
+    replaceQueryMetaFieldName(elem, elem.getFieldName(), metaField);
     for (size_t i = 0; i < elem.countChildren(); ++i) {
-        replaceTimeseriesQueryMetaFieldName(elem.findNthChild(i), metaField);
+        replaceQueryMetaFieldName(elem.findNthChild(i), metaField);
     }
 }
 }  // namespace
@@ -166,7 +164,7 @@ bool updateOnlyModifiesMetaField(OperationContext* opCtx,
 BSONObj translateQuery(const BSONObj& query, StringData metaField) {
     invariant(!metaField.empty());
     mutablebson::Document queryDoc(query);
-    timeseries::replaceTimeseriesQueryMetaFieldName(queryDoc.root(), metaField);
+    timeseries::replaceQueryMetaFieldName(queryDoc.root(), metaField);
     return queryDoc.getObject();
 }
 
@@ -197,7 +195,7 @@ write_ops::UpdateOpEntry translateUpdate(const BSONObj& translatedQuery,
                 // and replace it if it is the metaField.
                 for (size_t j = 0; j < updatePair.countChildren(); j++) {
                     auto fieldValuePair = updatePair.findNthChild(j);
-                    timeseries::replaceTimeseriesQueryMetaFieldName(
+                    timeseries::replaceQueryMetaFieldName(
                         fieldValuePair, fieldValuePair.getFieldName(), metaField);
                 }
             }
@@ -223,14 +221,14 @@ write_ops::UpdateOpEntry translateUpdate(const BSONObj& translatedQuery,
                         // updatePair = $set: {<newField> : <newExpression>, ...}
                         for (size_t j = 0; j < updatePair.countChildren(); j++) {
                             auto fieldValuePair = updatePair.findNthChild(j);
-                            timeseries::replaceTimeseriesQueryMetaFieldName(
+                            timeseries::replaceQueryMetaFieldName(
                                 fieldValuePair, fieldValuePair.getFieldName(), metaField);
                         }
                     } else if (aggOp == "$unset" || aggOp == "$project") {
                         if (updatePair.getType() == BSONType::Array) {
                             // updatePair = $unset: ["field1", "field2", ...]
                             for (size_t j = 0; j < updatePair.countChildren(); j++) {
-                                timeseries::replaceTimeseriesQueryMetaFieldName(
+                                timeseries::replaceQueryMetaFieldName(
                                     updatePair,
                                     updatePair.findNthChild(j).getValueString(),
                                     metaField);

@@ -1315,14 +1315,7 @@ public:
                     "Time-series buckets collection is missing time-series options",
                     timeseriesOptions);
 
-            // TODO: SERVER-58617 Allow updates on time-series collections with no metaField.
-            uassert(
-                ErrorCodes::IllegalOperation,
-                str::stream()
-                    << "Updates on a time-series collection without a metaField are not supported: "
-                    << ns(),
-                timeseriesOptions->getMetaField() != boost::none);
-            StringData metaField = *timeseriesOptions->getMetaField();
+            StringData metaField = timeseriesOptions->getMetaField().value_or("");
 
             // Create the translated updates to apply, which are used to make a new
             // UpdateCommandRequest.
@@ -1537,8 +1530,7 @@ public:
             uassert(ErrorCodes::InvalidOptions,
                     "Time-series buckets collection is missing time-series options",
                     timeseriesOptions);
-            StringData metaField =
-                timeseriesOptions->getMetaField() ? *timeseriesOptions->getMetaField() : "";
+            StringData metaField = timeseriesOptions->getMetaField().value_or("");
 
             std::vector<mongo::write_ops::DeleteOpEntry> timeseriesDeletes;
             timeseriesDeletes.reserve(request().getDeletes().size());
