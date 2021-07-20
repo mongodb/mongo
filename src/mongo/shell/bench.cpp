@@ -369,7 +369,6 @@ void BenchRunConfig::initializeToDefaults() {
 
     parallel = 1;
     seconds = 1.0;
-    hideResults = true;
     handleErrors = false;
     hideErrors = false;
 
@@ -536,8 +535,6 @@ BenchRunOp opFromBson(const BSONObj& op) {
                         (opType == "find" || (opType == "update") || (opType == "delete") ||
                          (opType == "remove")));
             myOp.query = arg.Obj();
-        } else if (name == "safe") {
-            myOp.safe = arg.trueValue();
         } else if (name == "skip") {
             uassert(ErrorCodes::BadValue,
                     str::stream() << "Field 'skip' should be a number, instead it's type: "
@@ -560,8 +557,6 @@ BenchRunOp opFromBson(const BSONObj& op) {
             myOp.sort = arg.Obj();
         } else if (name == "showError") {
             myOp.showError = arg.trueValue();
-        } else if (name == "showResult") {
-            myOp.showResult = arg.trueValue();
         } else if (name == "target") {
             uassert(ErrorCodes::BadValue,
                     str::stream() << "Field 'target' should be a string. It's type: "
@@ -744,8 +739,6 @@ void BenchRunConfig::initializeFromBson(const BSONObj& args) {
                                   << typeName(arg.type()),
                     arg.isNumber());
             delayMillisOnFailedOperation = Milliseconds(arg.numberInt());
-        } else if (name == "hideResults") {
-            hideResults = arg.trueValue();
         } else if (name == "handleErrors") {
             handleErrors = arg.trueValue();
         } else if (name == "hideErrors") {
@@ -1054,9 +1047,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                                      Milliseconds(0),
                                      readPrefObj,
                                      &result);
-
-            if (!config.hideResults || this->showResult)
-                LOGV2_INFO(22796, "Result from benchRun thread [findOne]", "result"_attr = result);
+            LOGV2_DEBUG(22796, 5, "Result from benchRun thread [findOne]", "result"_attr = result);
         } break;
         case OpType::COMMAND: {
             bool ok;
@@ -1167,9 +1158,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                            "got"_attr = count);
                 verify(false);
             }
-
-            if (!config.hideResults || this->showResult)
-                LOGV2_INFO(22798, "Result from benchRun thread [query]", "count"_attr = count);
+            LOGV2_DEBUG(22798, 5, "Result from benchRun thread [query]", "count"_attr = count);
         } break;
         case OpType::UPDATE: {
             BSONObj result;
@@ -1225,17 +1214,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                                       txnNumberForOp,
                                       &result);
             }
-
-            if (this->safe) {
-                if (!config.hideResults || this->showResult)
-                    LOGV2_INFO(
-                        22799, "Result from benchRun thread [safe update]", "result"_attr = result);
-
-                if (!result["err"].eoo() && result["err"].type() == String &&
-                    (config.throwGLE || this->throwGLE))
-                    uasserted(result["code"].eoo() ? 0 : result["code"].Int(),
-                              (std::string) "From benchRun GLE" + causedBy(result["err"].String()));
-            }
+            LOGV2_DEBUG(
+                22799, 5, "Result from benchRun thread [safe update]", "result"_attr = result);
         } break;
         case OpType::INSERT: {
             BSONObj result;
@@ -1271,17 +1251,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                                       txnNumberForOp,
                                       &result);
             }
-
-            if (this->safe) {
-                if (!config.hideResults || this->showResult)
-                    LOGV2_INFO(
-                        22800, "Result from benchRun thread [safe insert]", "result"_attr = result);
-
-                if (!result["err"].eoo() && result["err"].type() == String &&
-                    (config.throwGLE || this->throwGLE))
-                    uasserted(result["code"].eoo() ? 0 : result["code"].Int(),
-                              (std::string) "From benchRun GLE" + causedBy(result["err"].String()));
-            }
+            LOGV2_DEBUG(
+                22800, 5, "Result from benchRun thread [safe insert]", "result"_attr = result);
         } break;
         case OpType::REMOVE: {
             BSONObj result;
@@ -1309,18 +1280,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                                       txnNumberForOp,
                                       &result);
             }
-
-            if (this->safe) {
-                if (!config.hideResults || this->showResult)
-                    LOGV2_INFO(
-                        22801, "Result from benchRun thread [safe remove]", "result"_attr = result);
-
-                if (!result["err"].eoo() && result["err"].type() == String &&
-                    (config.throwGLE || this->throwGLE))
-                    uasserted(result["code"].eoo() ? 0 : result["code"].Int(),
-                              (std::string) "From benchRun GLE " +
-                                  causedBy(result["err"].String()));
-            }
+            LOGV2_DEBUG(
+                22801, 5, "Result from benchRun thread [safe remove]", "result"_attr = result);
         } break;
         case OpType::CREATEINDEX:
             conn->createIndex(this->ns, this->key);

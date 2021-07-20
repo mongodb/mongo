@@ -118,11 +118,9 @@ struct BenchRunOp {
     int options = 0;
     BSONObj projection;
     BSONObj query;
-    bool safe = false;
     int skip = 0;
     BSONObj sort;
     bool showError = false;
-    bool showResult = false;
     std::string target;
     bool throwGLE = false;
     write_ops::UpdateModification update;
@@ -237,7 +235,6 @@ public:
     /// Base random seed for threads
     int64_t randomSeed;
 
-    bool hideResults;
     bool handleErrors;
     bool hideErrors;
 
