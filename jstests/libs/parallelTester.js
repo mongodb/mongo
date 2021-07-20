@@ -227,6 +227,10 @@ if (typeof _threadInject != "undefined") {
 
             // Assumes that other tests are not creating API version 1 incompatible data.
             "validate_db_metadata_command.js",
+
+            // This test causes delete commands to hang, which may affect other tests running
+            // concurrently.
+            "timeseries/timeseries_delete_hint.js"
         ]);
 
         // Get files, including files in subdirectories.
