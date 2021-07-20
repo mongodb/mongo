@@ -2627,6 +2627,18 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsNamespaceNotFoundForMi
         storage.setIndexIsMultikey(opCtx, wrongColl, UUID::gen(), "foo", {}, {}, Timestamp(3, 3)));
 }
 
+TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyLooksUpCollectionByUUID) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto options = generateOptionsWithUuid();
+    ASSERT_OK(storage.createCollection(opCtx, nss, options));
+    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  storage.setIndexIsMultikey(
+                      opCtx, wrongColl, *options.uuid, "foo", {}, {}, Timestamp(3, 3)));
+}
+
 TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsIndexNotFoundForMissingIndex) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
