@@ -606,30 +606,29 @@ assert.commandWorked(mongosDB.adminCommand({
 
 runTests(withDefaultCollationColl, withoutDefaultCollationColl, caseInsensitive);
 
-// TODO: Enable the following tests once SERVER-32536 is fixed.
 //
-// Sharded collection with default collation and sharded collection without a default
-// collation.
+// Sharded collection with default collation and sharded collection without a default collation.
 //
 
 // Shard the collection without a default collation.
-// assert.commandWorked(mongosDB.adminCommand({
-//     shardCollection: withoutDefaultCollationColl.getFullName(),
-//     key: {_id: 1},
-// }));
+assert.commandWorked(mongosDB.adminCommand({
+    shardCollection: withoutDefaultCollationColl.getFullName(),
+    key: {_id: 1},
+}));
 
-// // Split the collection into 2 chunks.
-// assert.commandWorked(mongosDB.adminCommand(
-//     {split: withoutDefaultCollationColl.getFullName(), middle: {_id: "unmatched"}}));
+// Split the collection into 2 chunks.
+assert.commandWorked(mongosDB.adminCommand(
+    {split: withoutDefaultCollationColl.getFullName(), middle: {_id: "unmatched"}}));
 
-// // Move the chunk containing {_id: "lowercase"} to shard0001.
-// assert.commandWorked(mongosDB.adminCommand({
-//     moveChunk: withoutDefaultCollationColl.getFullName(),
-//     find: {_id: "lowercase"},
-//     to: st.shard1.shardName
-// }));
+// Move the chunk containing {_id: "lowercase"} to shard0001.
+assert.commandWorked(mongosDB.adminCommand({
+    moveChunk: withoutDefaultCollationColl.getFullName(),
+    find: {_id: "lowercase"},
+    to: st.shard1.shardName,
+    _waitForDelete: true
+}));
 
-// runTests(withDefaultCollationColl, withoutDefaultCollationColl, caseInsensitive);
+runTests(withDefaultCollationColl, withoutDefaultCollationColl, caseInsensitive);
 
 st.stop();
 })();
