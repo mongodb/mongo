@@ -394,9 +394,9 @@ void BenchRunConfig::initializeToDefaults() {
 }
 
 BenchRunConfig* BenchRunConfig::createFromBson(const BSONObj& args) {
-    BenchRunConfig* config = new BenchRunConfig();
+    auto config = std::make_unique<BenchRunConfig>();
     config->initializeFromBson(args);
-    return config;
+    return config.release();
 }
 
 BenchRunOp opFromBson(const BSONObj& op) {
