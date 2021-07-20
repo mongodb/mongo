@@ -131,7 +131,6 @@ public:
     BSONObj getFilter() const;
     BSONObj getSort() const;
     BSONObj getHint() const;
-    bool isExplain() const;
 
     /**
      * @return true if the query object contains a read preference specification object.

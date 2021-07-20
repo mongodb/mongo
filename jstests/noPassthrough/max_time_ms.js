@@ -320,20 +320,9 @@ function executeTest(db, isMongos) {
                                      ErrorCodes.BadValue);
         assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: {}}), ErrorCodes.BadValue);
 
-        // Verify that the maxTimeMS command argument can be sent with $query-wrapped commands.
-        cursor = t.getDB().$cmd.find({ping: 1, maxTimeMS: 0}).limit(-1);
-        cursor._ensureSpecial();
-        assert.eq(1, cursor.next().ok);
-
         // Verify that the server rejects invalid command argument $maxTimeMS.
-        cursor = t.getDB().$cmd.find({ping: 1, $maxTimeMS: 0}).limit(-1);
-        cursor._ensureSpecial();
-        assert.commandFailed(cursor.next());
-
-        // Verify that the $maxTimeMS query option can't be sent with $query-wrapped commands.
-        cursor = t.getDB().$cmd.find({ping: 1}).limit(-1).maxTimeMS(0);
-        cursor._ensureSpecial();
-        assert.commandFailed(cursor.next());
+        assert.commandFailed(t.getDB().runCommand({ping: 1, $maxTimeMS: 0}),
+                             [ErrorCodes.InvalidOptions, 40415]);
     })();
 
     //

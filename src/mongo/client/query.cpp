@@ -146,9 +146,6 @@ BSONObj Query::getHint() const {
         return BSONObj();
     return obj.getObjectField("$hint");
 }
-bool Query::isExplain() const {
-    return isComplex() && obj.getBoolField("$explain");
-}
 
 string Query::toString() const {
     return obj.toString();
