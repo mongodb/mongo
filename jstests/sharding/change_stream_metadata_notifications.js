@@ -4,7 +4,7 @@
 // ]
 (function() {
 "use strict";
-load("jstests/libs/change_stream_util.js");        // For isChangeStreamOptimizationEnabled.
+load("jstests/libs/change_stream_util.js");        // For isChangeStreamsOptimizationEnabled.
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
 load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
 
@@ -18,7 +18,7 @@ const st = new ShardingTest({
 
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
-const isChangeStreamOptimized = isChangeStreamOptimizationEnabled(mongosDB);
+const isChangeStreamOptimized = isChangeStreamsOptimizationEnabled(mongosDB);
 
 assert.commandWorked(mongosDB.dropDatabase());
 

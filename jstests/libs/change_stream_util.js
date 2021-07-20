@@ -17,10 +17,19 @@ const ChangeStreamWatchMode = Object.freeze({
 /**
  * Returns true if feature flag 'featureFlagChangeStreamsOptimization' is enabled, false otherwise.
  */
-function isChangeStreamOptimizationEnabled(db) {
+function isChangeStreamsOptimizationEnabled(db) {
     const getParam = db.adminCommand({getParameter: 1, featureFlagChangeStreamsOptimization: 1});
     return getParam.hasOwnProperty("featureFlagChangeStreamsOptimization") &&
         getParam.featureFlagChangeStreamsOptimization.value;
+}
+
+/**
+ * Returns true if feature flag 'featureFlagChangeStreamsRewrite' is enabled, false otherwise.
+ */
+function isChangeStreamsRewriteEnabled(db) {
+    const getParam = db.adminCommand({getParameter: 1, featureFlagChangeStreamsRewrite: 1});
+    return getParam.hasOwnProperty("featureFlagChangeStreamsRewrite") &&
+        getParam.featureFlagChangeStreamsRewrite.value;
 }
 
 /**

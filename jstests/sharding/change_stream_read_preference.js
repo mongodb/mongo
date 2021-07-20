@@ -8,7 +8,7 @@
 (function() {
 "use strict";
 
-load('jstests/libs/change_stream_util.js');  // For isChangeStreamOptimizationEnabled().
+load('jstests/libs/change_stream_util.js');  // For isChangeStreamsOptimizationEnabled().
 load('jstests/libs/profiler.js');            // For various profiler helpers.
 
 const st = new ShardingTest({
@@ -63,7 +63,7 @@ assert.eq(primaryStream.next().fullDocument, {_id: -1, updated: true});
 assert.soon(() => primaryStream.hasNext());
 assert.eq(primaryStream.next().fullDocument, {_id: 1, updated: true});
 
-const isChangeStreamOptimized = isChangeStreamOptimizationEnabled(mongosDB);
+const isChangeStreamOptimized = isChangeStreamsOptimizationEnabled(mongosDB);
 
 for (let rs of [st.rs0, st.rs1]) {
     const primaryDB = rs.getPrimary().getDB(dbName);

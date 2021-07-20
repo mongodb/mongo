@@ -7,7 +7,7 @@
 (function() {
 'use strict';
 
-load('jstests/libs/change_stream_util.js');  // For isChangeStreamOptimizationEnabled().
+load('jstests/libs/change_stream_util.js');  // For isChangeStreamsOptimizationEnabled().
 load('jstests/libs/profiler.js');            // For various profiler helpers.
 
 const st = new ShardingTest({
@@ -26,7 +26,7 @@ const shard0 = st.shard0;
 const shard1 = st.shard1;
 const shard2 = st.shard2;
 
-const isChangeStreamOptimized = isChangeStreamOptimizationEnabled(mongos.getDB(dbName));
+const isChangeStreamOptimized = isChangeStreamsOptimizationEnabled(mongos.getDB(dbName));
 
 // Enable sharding to inform mongos of the database, and make sure all chunks start on shard 0.
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));

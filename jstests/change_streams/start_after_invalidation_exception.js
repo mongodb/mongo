@@ -6,9 +6,9 @@
 "use strict";
 
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load("jstests/libs/change_stream_util.js");        // For isChangeStreamOptimizationEnabled.
+load("jstests/libs/change_stream_util.js");        // For isChangeStreamsOptimizationEnabled.
 
-if (!isChangeStreamOptimizationEnabled(db)) {
+if (!isChangeStreamsOptimizationEnabled(db)) {
     jsTestLog(
         'Skipping test because featureFlagChangeStreamsOptimization feature flag is not enabled');
     return;

@@ -35,6 +35,11 @@ feature_flags:
       cpp_varname: gFeatureFlagChangeStreamsOptimization
       default: false
 
+    featureFlagChangeStreamsRewrite:
+      description: "Feature flag for enabling change streams oplog rewrites"
+      cpp_varname: gFeatureFlagChangeStreamsRewrite
+      default: false
+
     featureFlagDensify:
       description: "Feature flag for allowing a $densify stage in an aggregation pipeline"
       cpp_varname: gFeatureFlagDensify

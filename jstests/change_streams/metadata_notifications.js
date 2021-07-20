@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/change_stream_util.js");        // For isChangeStreamOptimizationEnabled.
+load("jstests/libs/change_stream_util.js");        // For isChangeStreamsOptimizationEnabled.
 load('jstests/replsets/libs/two_phase_drops.js');  // For 'TwoPhaseDropCollectionTest'.
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For isSharded.
@@ -126,7 +126,7 @@ assert.commandFailedWithCode(db.runCommand({
 
 // Test that if change stream optimization is enabled, then even after the 'invalidate' event has
 // been filtered out, the cursor should hold the resume token of the 'invalidate' event.
-if (isChangeStreamOptimizationEnabled(db)) {
+if (isChangeStreamsOptimizationEnabled(db)) {
     const resumeStream =
         coll.watch([{$match: {operationType: "DummyOperationType"}}], {resumeAfter: resumeToken});
     assert.soon(() => {

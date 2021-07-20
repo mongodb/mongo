@@ -9,7 +9,7 @@
 (function() {
 "use strict";
 
-load('jstests/libs/change_stream_util.js');  // For isChangeStreamOptimizationEnabled().
+load('jstests/libs/change_stream_util.js');  // For isChangeStreamsOptimizationEnabled().
 load("jstests/libs/profiler.js");            // For profilerHas*OrThrow() helpers.
 load("jstests/replsets/rslib.js");           // For reconfig().
 
@@ -62,7 +62,7 @@ assert.commandWorked(st.s.adminCommand(
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 
-const isChangeStreamOptimized = isChangeStreamOptimizationEnabled(mongosDB);
+const isChangeStreamOptimized = isChangeStreamsOptimizationEnabled(mongosDB);
 
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
 assert.commandWorked(
