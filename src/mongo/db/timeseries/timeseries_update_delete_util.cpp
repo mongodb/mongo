@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo::timeseries {
 namespace {
@@ -258,5 +259,40 @@ write_ops::UpdateOpEntry translateUpdate(const BSONObj& translatedQuery,
             MONGO_UNREACHABLE;
     }
     MONGO_UNREACHABLE;
+}
+
+void replaceTimeseriesQueryMetaFieldName(mutablebson::Element elem,
+                                         const StringData& metaField,
+                                         bool shouldReplaceFieldValue) {
+    if (metaField.empty()) {
+        return;
+    }
+    shouldReplaceFieldValue = (elem.getFieldName() != "$literal") &&
+        (shouldReplaceFieldValue || (elem.getFieldName() == "$expr"));
+    if (isMetaFieldFirstElementOfDottedPathField(elem.getFieldName(), metaField)) {
+        size_t dotIndex = elem.getFieldName().find('.');
+        dotIndex >= elem.getFieldName().size()
+            ? invariantStatusOK(elem.rename("meta"))
+            : invariantStatusOK(elem.rename(
+                  "meta" +
+                  elem.getFieldName().substr(dotIndex, elem.getFieldName().size() - dotIndex)));
+    }
+    // Substitute element fieldValue with "$meta" if element is a subField of $expr, not a subField
+    // of $literal, and the element fieldValue is "$" + the metaField.
+    else if (shouldReplaceFieldValue && elem.isType(BSONType::String) &&
+             isMetaFieldFirstElementOfDottedPathField(elem.getValueString(), "$" + metaField)) {
+        size_t dotIndex = elem.getValueString().find('.');
+        dotIndex >= elem.getValueString().size()
+            ? invariantStatusOK(elem.setValueString("$meta"))
+            : invariantStatusOK(elem.setValueString(
+                  "$meta" +
+                  elem.getValueString().substr(dotIndex, elem.getValueString().size() - dotIndex)));
+    }
+    if (elem.hasChildren()) {
+        for (size_t i = 0; i < elem.countChildren(); ++i) {
+            replaceTimeseriesQueryMetaFieldName(
+                elem.findNthChild(i), metaField, shouldReplaceFieldValue);
+        }
+    }
 }
 }  // namespace mongo::timeseries
