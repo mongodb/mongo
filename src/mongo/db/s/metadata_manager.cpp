@@ -306,7 +306,10 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
 
     // Collection is becoming sharded
     if (_metadata.empty()) {
-        LOG(0) << "Marking collection " << _nss.ns() << " as " << remoteMetadata.toStringBasic();
+        if (remoteMetadata.isSharded()) {
+            LOG(0) << "Marking collection " << _nss.ns() << " as "
+                   << remoteMetadata.toStringBasic();
+        }
 
         invariant(_receivingChunks.empty());
         invariant(_rangesToClean.isEmpty());
