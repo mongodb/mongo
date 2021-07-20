@@ -1249,7 +1249,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_commitAndFinishReshardOper
                    })
                    .then([this] { _updateChunkImbalanceMetrics(_coordinatorDoc.getSourceNss()); })
                    .then([this, executor] { return _awaitAllParticipantShardsDone(executor); })
-                   .then([this, self = shared_from_this(), executor] {
+                   .then([this, executor] {
                        // Best-effort attempt to trigger a refresh on the participant shards so
                        // they see the collection metadata without reshardingFields and no longer
                        // throw ReshardCollectionInProgress. There is no guarantee this logic ever
@@ -1295,13 +1295,6 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             return _commitAndFinishReshardOperation(executor, updatedCoordinatorDoc);
         })
         .onCompletion([this, executor](Status status) {
-            if (!_ctHolder->isSteppingOrShuttingDown() &&
-                _coordinatorDoc.getState() != CoordinatorStateEnum::kUnused) {
-                // Notify `ReshardingMetrics` as the operation is now complete for external
-                // observers.
-                markCompleted(status);
-            }
-
             auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
             reshardingPauseCoordinatorBeforeCompletion.pauseWhileSetAndNotCanceled(
                 opCtx.get(), _ctHolder->getStepdownToken());
@@ -1358,12 +1351,15 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
 ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::_onAbortCoordinatorOnly(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const Status& status) {
     if (_coordinatorDoc.getState() == CoordinatorStateEnum::kUnused) {
-        // No work to be done.
         return ExecutorFuture<void>(**executor, status);
     }
 
     return resharding::WithAutomaticRetry([this, executor, status] {
                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+
+               // Notify `ReshardingMetrics` as the operation is now complete for external
+               // observers.
+               markCompleted(status);
 
                // The temporary collection and its corresponding entries were never created. Only
                // the coordinator document and reshardingFields require cleanup.
@@ -1712,6 +1708,9 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllParticipantShardsD
             if (coordinatorDoc.getAbortReason()) {
                 abortReason = getStatusFromAbortReason(coordinatorDoc);
             }
+
+            // Notify `ReshardingMetrics` as the operation is now complete for external observers.
+            markCompleted(abortReason ? *abortReason : Status::OK());
 
             resharding::removeCoordinatorDocAndReshardingFields(
                 opCtx.get(), coordinatorDoc, abortReason);

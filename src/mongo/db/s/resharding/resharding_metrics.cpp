@@ -522,15 +522,17 @@ void ReshardingMetrics::setLastReshardChunkImbalanceCount(int64_t newCount) noex
 }
 
 void ReshardingMetrics::setMinRemainingOperationTime(Milliseconds minTime) noexcept {
-    invariant(_currentOp, kNoOperationInProgress);
-
-    _cumulativeOp->minRemainingOperationTime = minTime;
+    stdx::lock_guard<Latch> lk(_mutex);
+    if (_currentOp) {
+        _cumulativeOp->minRemainingOperationTime = minTime;
+    }
 }
 
 void ReshardingMetrics::setMaxRemainingOperationTime(Milliseconds maxTime) noexcept {
-    invariant(_currentOp, kNoOperationInProgress);
-
-    _cumulativeOp->maxRemainingOperationTime = maxTime;
+    stdx::lock_guard<Latch> lk(_mutex);
+    if (_currentOp) {
+        _cumulativeOp->maxRemainingOperationTime = maxTime;
+    }
 }
 
 void ReshardingMetrics::onDocumentsCopied(int64_t documents, int64_t bytes) noexcept {

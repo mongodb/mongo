@@ -42,6 +42,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_op_observer.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
@@ -662,6 +663,16 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
                   ErrorCodes::InterruptedDueToReplStateChange);
 
         coordinator.reset();
+
+        // Metrics should be cleared after step down.
+        {
+            auto metrics = ReshardingMetrics::get(opCtx->getServiceContext());
+            BSONObjBuilder metricsBuilder;
+            metrics->serializeCurrentOpMetrics(&metricsBuilder,
+                                               ReshardingMetrics::Role::kCoordinator);
+            ASSERT_BSONOBJ_EQ(BSONObj(), metricsBuilder.done());
+        }
+
         stepUp(opCtx);
 
         stateTransitionsGuard.unset(state);
@@ -675,12 +686,27 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
         if (state != CoordinatorStateEnum::kDone) {
             // 'done' state is never written to storage so don't wait for it.
             waitUntilCommittedCoordinatorDocReach(opCtx, state);
+
+            // Metrics should not be empty after step up.
+            auto metrics = ReshardingMetrics::get(opCtx->getServiceContext());
+            BSONObjBuilder metricsBuilder;
+            metrics->serializeCurrentOpMetrics(&metricsBuilder,
+                                               ReshardingMetrics::Role::kCoordinator);
+            ASSERT_BSONOBJ_NE(BSONObj(), metricsBuilder.done());
         }
     }
 
     // Join the coordinator if it has not yet been cleaned up.
     if (auto coordinator = getCoordinatorIfExists(opCtx, instanceId)) {
         coordinator->getCompletionFuture().get(opCtx);
+    }
+
+    // Metrics should be cleared after commit.
+    {
+        auto metrics = ReshardingMetrics::get(opCtx->getServiceContext());
+        BSONObjBuilder metricsBuilder;
+        metrics->serializeCurrentOpMetrics(&metricsBuilder, ReshardingMetrics::Role::kCoordinator);
+        ASSERT_BSONOBJ_EQ(BSONObj(), metricsBuilder.done());
     }
 }
 
