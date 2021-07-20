@@ -1402,11 +1402,11 @@ public:
                 *frame.data().inputSlot == *_context->inputSlot);
 
         auto currentStage = stageOrLimitCoScan(frame.extractStage(), _context->planNodeId);
-        auto&& [_, expr, stage] = generateExpression(_context->state,
-                                                     matchExpr->getExpression().get(),
-                                                     std::move(currentStage),
-                                                     *frame.data().inputSlot,
-                                                     _context->planNodeId);
+        auto&& [expr, stage] = generateExpression(_context->state,
+                                                  matchExpr->getExpression().get(),
+                                                  std::move(currentStage),
+                                                  *frame.data().inputSlot,
+                                                  _context->planNodeId);
         auto frameId = _context->state.frameId();
 
         // We will need to convert the result of $expr to a boolean value, so we'll wrap it into an
@@ -1414,7 +1414,7 @@ public:
         auto logicExpr = generateCoerceToBoolExpression(sbe::EVariable{frameId, 0});
 
         auto localBindExpr = sbe::makeE<sbe::ELocalBind>(
-            frameId, sbe::makeEs(std::move(expr)), std::move(logicExpr));
+            frameId, sbe::makeEs(expr.extractExpr()), std::move(logicExpr));
 
         frame.pushExpr(_context->stateHelper.makeState(std::move(localBindExpr)));
         frame.setStage(std::move(stage));

@@ -93,18 +93,21 @@ struct ExpressionVisitorContext {
         return evalStack.topFrame().popExpr().extractExpr();
     }
 
-    void pushExpr(std::unique_ptr<sbe::EExpression> expr) {
+    EvalExpr popEvalExpr() {
+        return evalStack.topFrame().popExpr();
+    }
+
+    void pushExpr(EvalExpr expr) {
         evalStack.topFrame().pushExpr(std::move(expr));
     }
 
-    void pushExpr(std::unique_ptr<sbe::EExpression> expr, EvalStage stage) {
+    void pushExpr(EvalExpr expr, EvalStage stage) {
         pushExpr(std::move(expr));
         evalStack.topFrame().setStage(std::move(stage));
     }
 
-    std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> popFrame() {
-        auto [expr, stage] = evalStack.popFrame();
-        return {expr.extractExpr(), std::move(stage)};
+    EvalExprStagePair popFrame() {
+        return evalStack.popFrame();
     }
 
     sbe::value::SlotVector getLexicalEnvironment() {
@@ -115,10 +118,10 @@ struct ExpressionVisitorContext {
         return lexicalEnvironment;
     }
 
-    std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, EvalStage> done() {
+    EvalExprStagePair done() {
         invariant(evalStack.framesCount() == 1);
         auto [expr, stage] = popFrame();
-        return {state.slotId(), std::move(expr), stageOrLimitCoScan(std::move(stage), planNodeId)};
+        return {std::move(expr), stageOrLimitCoScan(std::move(stage), planNodeId)};
     }
 
     StageBuilderState& state;
@@ -543,13 +546,13 @@ public:
         auto varToBind = currentFrame.variablesToBind.front();
         currentFrame.variablesToBind.pop_front();
 
-        // We create two bindings. First, the initializer result is bound to a slot when this
-        // ProjectStage executes.
-        auto slotToBind = _context->state.slotId();
-        _context->setCurrentStage(makeProject(_context->extractCurrentEvalStage(),
-                                              _context->planNodeId,
-                                              slotToBind,
-                                              _context->popExpr()));
+        // We create two bindings. First, the initializer result is bound to a slot (if it's not
+        // already in a slot).
+        auto [slotToBind, projectStage] = projectEvalExpr(_context->popEvalExpr(),
+                                                          _context->extractCurrentEvalStage(),
+                                                          _context->planNodeId,
+                                                          _context->state.slotIdGenerator);
+        _context->setCurrentStage(std::move(projectStage));
         currentFrame.slotsForLetVariables.insert(slotToBind);
 
         // Second, we bind this variables AST-level name (with type Variable::Id) to the SlotId that
@@ -1188,7 +1191,7 @@ public:
                                           _context->planNodeId,
                                           _context->getLexicalEnvironment());
 
-        _context->pushExpr(sbe::makeE<sbe::EVariable>(branchSlot), std::move(finalNljStage));
+        _context->pushExpr(branchSlot, std::move(finalNljStage));
     }
     void visit(const ExpressionCond* expr) final {
         visitConditionalExpression(expr);
@@ -1804,7 +1807,7 @@ public:
         if (expr->getFieldPath().getPathLength() == 1) {
             // A solo variable reference (e.g.: "$$ROOT" or "$$myvar") that doesn't need any
             // traversal.
-            _context->pushExpr(sbe::makeE<sbe::EVariable>(slotId));
+            _context->pushExpr(slotId);
             return;
         }
 
@@ -1817,7 +1820,7 @@ public:
                                                     _context->planNodeId,
                                                     _context->state.slotIdGenerator);
 
-        _context->pushExpr(sbe::makeE<sbe::EVariable>(outputSlot), std::move(stage));
+        _context->pushExpr(outputSlot, std::move(stage));
     }
     void visit(const ExpressionFilter* expr) final {
         // Extract filter predicate expression and sub-tree.
@@ -1891,7 +1894,7 @@ public:
         frameId = _context->state.frameId();
         auto boolFilterPredicate =
             sbe::makeE<sbe::ELocalBind>(frameId,
-                                        sbe::makeEs(std::move(filterPredicate)),
+                                        sbe::makeEs(filterPredicate.extractExpr()),
                                         generateCoerceToBoolExpression(sbe::EVariable{frameId, 0}));
         auto filterWithPredicate = makeFilter<false>(
             std::move(filterStage), std::move(boolFilterPredicate), _context->planNodeId);
@@ -1962,15 +1965,15 @@ public:
                            EvalStage stage,
                            PlanNodeId planNodeId,
                            sbe::value::SlotIdGenerator* slotIdGenerator) {
-            auto slot = slotIdGenerator->generate();
-            stage = makeProject(std::move(stage), planNodeId, slot, evalExpr.extractExpr());
+            auto [slot, projectStage] =
+                projectEvalExpr(std::move(evalExpr), std::move(stage), planNodeId, slotIdGenerator);
 
             // Create a FilterStage for each branch (except the last one). If a branch's filter
             // condition is true, it will "short-circuit" the evaluation process. For ifNull,
             // short-circuiting should happen if the current variable is not null or missing.
             auto filterExpr = makeNot(generateNullOrMissing(slot));
             auto filterStage =
-                makeFilter<false>(std::move(stage), std::move(filterExpr), planNodeId);
+                makeFilter<false>(std::move(projectStage), std::move(filterExpr), planNodeId);
 
             // Set the current expression as the output to be returned if short-circuiting occurs.
             return std::make_pair(slot, std::move(filterStage));
@@ -1984,7 +1987,7 @@ public:
                                           _context->planNodeId,
                                           _context->getLexicalEnvironment());
 
-        _context->pushExpr(resultExpr.extractExpr(), std::move(loopJoinStage));
+        _context->pushExpr(std::move(resultExpr), std::move(loopJoinStage));
     }
     void visit(const ExpressionIn* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -2811,7 +2814,7 @@ private:
             auto frameId = _context->state.frameId();
             auto coercedExpr = sbe::makeE<sbe::ELocalBind>(
                 frameId,
-                sbe::makeEs(std::move(expr)),
+                sbe::makeEs(expr.extractExpr()),
                 generateCoerceToBoolExpression(sbe::EVariable{frameId, 0}));
 
             branches.emplace_back(std::move(coercedExpr), std::move(stage));
@@ -2830,7 +2833,7 @@ private:
                                           _context->planNodeId,
                                           _context->getLexicalEnvironment());
 
-        _context->pushExpr(resultExpr.extractExpr(), std::move(loopJoinStage));
+        _context->pushExpr(std::move(resultExpr), std::move(loopJoinStage));
     }
 
     /**
@@ -2860,9 +2863,10 @@ private:
                 continue;
             }
 
-            auto thenSlot = _context->state.slotId();
-            auto thenStage =
-                makeProject(std::move(stage), _context->planNodeId, thenSlot, std::move(expr));
+            auto [thenSlot, thenStage] = projectEvalExpr(std::move(expr),
+                                                         std::move(stage),
+                                                         _context->planNodeId,
+                                                         _context->state.slotIdGenerator);
 
             // Construct a FilterStage tree that will EOF if "case" expression returns false. In
             // this case inner branch of loop join with "then" expression will never be executed.
@@ -2870,7 +2874,7 @@ private:
             auto frameId = _context->state.frameId();
             auto coercedExpr = sbe::makeE<sbe::ELocalBind>(
                 frameId,
-                sbe::makeEs(std::move(expr)),
+                sbe::makeEs(expr.extractExpr()),
                 generateCoerceToBoolExpression(sbe::EVariable{frameId, 0}));
             auto conditionStage =
                 makeFilter<false>(std::move(stage), std::move(coercedExpr), _context->planNodeId);
@@ -2896,7 +2900,7 @@ private:
                                           _context->planNodeId,
                                           _context->getLexicalEnvironment());
 
-        _context->pushExpr(resultExpr.extractExpr(), std::move(loopJoinStage));
+        _context->pushExpr(std::move(resultExpr), std::move(loopJoinStage));
     }
 
     void generateDayOfExpression(StringData exprName, const Expression* expr) {
@@ -3676,12 +3680,11 @@ std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(sbe::EVariable 
             makeBinaryOp(sbe::EPrimBinary::logicAnd, makeNeqFalseCheck(), makeNeqZeroCheck())));
 }
 
-std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, EvalStage> generateExpression(
-    StageBuilderState& state,
-    Expression* expr,
-    EvalStage stage,
-    sbe::value::SlotId rootSlot,
-    PlanNodeId planNodeId) {
+EvalExprStagePair generateExpression(StageBuilderState& state,
+                                     Expression* expr,
+                                     EvalStage stage,
+                                     sbe::value::SlotId rootSlot,
+                                     PlanNodeId planNodeId) {
     ExpressionVisitorContext context(state, std::move(stage), rootSlot, planNodeId);
 
     ExpressionPreVisitor preVisitor{&context};
@@ -3690,7 +3693,6 @@ std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, EvalStage> gen
     ExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
     expression_walker::walk<const Expression>(expr, &walker);
 
-    auto [slotId, resultExpr, resultStage] = context.done();
-    return {slotId, std::move(resultExpr), std::move(resultStage)};
+    return context.done();
 }
 }  // namespace mongo::stage_builder

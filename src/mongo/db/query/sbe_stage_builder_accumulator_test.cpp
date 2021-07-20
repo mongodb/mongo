@@ -348,15 +348,15 @@ TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorOneGroupByTranslation) {
     // Translate the the group-by field path and bind it to a slot in a project stage.
     auto vps = expCtx.variablesParseState;
     auto groupByExpression = ExpressionFieldPath::parse(&expCtx, "$a", vps);
-    auto [groupBySlot, groupByExpr, groupByStage] =
+    auto [groupByExpr, groupByStage] =
         stage_builder::generateExpression(state,
                                           groupByExpression.get(),
                                           std::move(evalStage),
                                           resultSlots.front() /* See comment for buildPlanStage */,
                                           kEmptyPlanNodeId);
 
-    auto projectGroupByStage =
-        makeProject(std::move(groupByStage), kEmptyPlanNodeId, groupBySlot, std::move(groupByExpr));
+    auto [groupBySlot, projectGroupByStage] = projectEvalExpr(
+        std::move(groupByExpr), std::move(groupByStage), kEmptyPlanNodeId, state.slotIdGenerator);
 
     auto [argExpr, argStage] =
         stage_builder::buildArgument(state,

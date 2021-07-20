@@ -42,12 +42,11 @@ namespace mongo::stage_builder {
  * Translates an input Expression into an SBE EExpression. The 'stage' parameter provides the input
  * subtree to build on top of.
  */
-std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, EvalStage> generateExpression(
-    StageBuilderState& state,
-    Expression* expr,
-    EvalStage stage,
-    sbe::value::SlotId inputVar,
-    PlanNodeId planNodeId);
+EvalExprStagePair generateExpression(StageBuilderState& state,
+                                     Expression* expr,
+                                     EvalStage stage,
+                                     sbe::value::SlotId inputVar,
+                                     PlanNodeId planNodeId);
 
 /**
  * Generate an EExpression that converts a value (contained in a variable bound to 'branchRef') that

@@ -107,9 +107,9 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildArgument(
     EvalStage stage,
     sbe::value::SlotId inputVar,
     PlanNodeId planNodeId) {
-    auto [_, argExpr, outStage] =
+    auto [argExpr, outStage] =
         generateExpression(state, acc.expr.argument.get(), std::move(stage), inputVar, planNodeId);
-    return {std::move(argExpr), std::move(outStage)};
+    return {argExpr.extractExpr(), std::move(outStage)};
 }
 
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulator(
