@@ -264,9 +264,7 @@ write_ops::UpdateOpEntry translateUpdate(const BSONObj& translatedQuery,
 void replaceTimeseriesQueryMetaFieldName(mutablebson::Element elem,
                                          const StringData& metaField,
                                          bool shouldReplaceFieldValue) {
-    if (metaField.empty()) {
-        return;
-    }
+    invariant(!metaField.empty());
     shouldReplaceFieldValue = (elem.getFieldName() != "$literal") &&
         (shouldReplaceFieldValue || (elem.getFieldName() == "$expr"));
     if (isMetaFieldFirstElementOfDottedPathField(elem.getFieldName(), metaField)) {

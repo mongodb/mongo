@@ -194,13 +194,12 @@ validateDeleteIndex([objA, objB, objC],
                     "IXSCAN { control.min.time: 1, control.max.time: 1 }",
                     {expectedErrorCode: ErrorCodes.BadValue});
 
-// TODO: SERVER-58519 Uncomment this test.
-// // Query on a collection with multiple indexes using an invalid index spec.
-// validateDeleteIndex([objA, objB, objC],
-//                     [objA, objB, objC],
-//                     0,
-//                     [{q: {[metaFieldName]: {c: "C"}}, limit: 0, hint: {"test_hint": 1}}],
-//                     [{[metaFieldName]: -1}, {[timeFieldName]: 1}],
-//                     "IXSCAN { control.min.time: 1, control.max.time: 1 }",
-//                     {expectedErrorCode: ErrorCodes.BadValue});
+// Query on a collection with multiple indexes using an invalid index spec.
+validateDeleteIndex([objA, objB, objC],
+                    [objA, objB, objC],
+                    0,
+                    [{q: {[metaFieldName]: {c: "C"}}, limit: 0, hint: {"test_hint": 1}}],
+                    [{[metaFieldName]: -1}, {[timeFieldName]: 1}],
+                    "IXSCAN { control.min.time: 1, control.max.time: 1 }",
+                    {expectedErrorCode: ErrorCodes.BadValue});
 })();

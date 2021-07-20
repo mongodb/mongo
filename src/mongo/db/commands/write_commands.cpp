@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
+#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
@@ -1397,13 +1398,22 @@ public:
         write_ops::DeleteCommandReply typedRun(OperationContext* opCtx) final try {
             transactionChecks(opCtx, ns());
             write_ops::DeleteCommandReply deleteReply;
+            OperationSource source = OperationSource::kStandard;
 
             if (isTimeseries(opCtx, ns())) {
-                _performTimeseriesDeletes(opCtx, &deleteReply);
-                return deleteReply;
+                uassert(ErrorCodes::InvalidOptions,
+                        "Time-series deletes are not enabled",
+                        feature_flags::gTimeseriesUpdatesAndDeletes.isEnabled(
+                            serverGlobalParams.featureCompatibility));
+                uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                        str::stream() << "Cannot perform a multi-document transaction on a "
+                                         "time-series collection: "
+                                      << ns(),
+                        !opCtx->inMultiDocumentTransaction());
+                source = OperationSource::kTimeseries;
             }
 
-            auto reply = write_ops_exec::performDeletes(opCtx, request());
+            auto reply = write_ops_exec::performDeletes(opCtx, request(), source);
             populateReply(opCtx,
                           !request().getWriteCommandRequestBase().getOrdered(),
                           request().getDeletes().size(),
@@ -1464,66 +1474,6 @@ public:
                                    BSONObj(),
                                    _commandObj,
                                    &bodyBuilder);
-        }
-
-        write_ops::DeleteCommandReply* _performTimeseriesDeletes(
-            OperationContext* opCtx, write_ops::DeleteCommandReply* deleteReply) {
-
-            uassert(ErrorCodes::InvalidOptions,
-                    "Time-series deletes are not enabled",
-                    feature_flags::gTimeseriesUpdatesAndDeletes.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-            uassert(
-                ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream()
-                    << "Cannot perform a multi-document transaction on a time-series collection: "
-                    << ns(),
-                !opCtx->inMultiDocumentTransaction());
-
-            auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
-                opCtx, ns().makeTimeseriesBucketsNamespace());
-            uassert(ErrorCodes::NamespaceNotFound,
-                    "Could not find time-series buckets collection for write",
-                    collection);
-            auto timeseriesOptions = collection->getTimeseriesOptions();
-            uassert(ErrorCodes::InvalidOptions,
-                    "Time-series buckets collection is missing time-series options",
-                    timeseriesOptions);
-            StringData metaField = timeseriesOptions->getMetaField().value_or("");
-
-            std::vector<mongo::write_ops::DeleteOpEntry> timeseriesDeletes;
-            timeseriesDeletes.reserve(request().getDeletes().size());
-            for (auto& deleteEntry : request().getDeletes()) {
-                // TODO: SERVER-58394 Call timeseries::translateQuery() here instead.
-                mutablebson::Document queryDoc(deleteEntry.getQ());
-                timeseries::replaceTimeseriesQueryMetaFieldName(queryDoc.root(), metaField);
-                timeseriesDeletes.push_back(deleteEntry);
-                timeseriesDeletes.back().setQ(queryDoc.getObject());
-
-                // Only translate the hint if it is specified by index spec.
-                if (deleteEntry.getHint().firstElement().fieldNameStringData() != "$hint"_sd ||
-                    deleteEntry.getHint().firstElement().type() != BSONType::String) {
-                    timeseriesDeletes.back().setHint(
-                        uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
-                            *timeseriesOptions, deleteEntry.getHint())));
-                }
-            }
-
-            write_ops::DeleteCommandRequest timeseriesDeleteReq(
-                ns().makeTimeseriesBucketsNamespace(), timeseriesDeletes);
-            timeseriesDeleteReq.setWriteCommandRequestBase(request().getWriteCommandRequestBase());
-            timeseriesDeleteReq.setLet(request().getLet());
-            timeseriesDeleteReq.setLegacyRuntimeConstants(request().getLegacyRuntimeConstants());
-
-            auto reply = write_ops_exec::performDeletes(
-                opCtx, timeseriesDeleteReq, OperationSource::kTimeseries);
-            populateReply(opCtx,
-                          !timeseriesDeleteReq.getWriteCommandRequestBase().getOrdered(),
-                          timeseriesDeleteReq.getDeletes().size(),
-                          std::move(reply),
-                          deleteReply);
-
-            return deleteReply;
         }
 
         const BSONObj& _commandObj;
