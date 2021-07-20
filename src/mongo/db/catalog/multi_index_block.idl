@@ -52,3 +52,14 @@ server_parameters:
     default: 200
     validator:
       gte: 50
+
+  internalIndexBuildBulkLoadYieldIterations:
+    description: "The number of keys bulk-loaded before yielding."
+    set_at:
+      - runtime
+      - startup
+    cpp_varname: internalIndexBuildBulkLoadYieldIterations
+    cpp_vartype: AtomicWord<int>
+    default: 1000
+    validator:
+      gte: 1
