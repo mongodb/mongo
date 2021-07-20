@@ -29,6 +29,10 @@
 #ifndef CONN_API_H
 #define CONN_API_H
 
+/* Following definitions are required in order to use printing format specifiers in C++. */
+#define __STDC_LIMIT_MACROS
+#define __STDC_FORMAT_MACROS
+
 #include <mutex>
 
 extern "C" {
@@ -36,8 +40,7 @@ extern "C" {
 #include "wiredtiger.h"
 }
 
-#include "util/api_const.h"
-#include "util/debug_utils.h"
+#include "util/scoped_types.h"
 
 namespace test_harness {
 /*
@@ -46,72 +49,26 @@ namespace test_harness {
  */
 class connection_manager {
     public:
+    static connection_manager &instance();
+
+    public:
     /* No copies of the singleton allowed. */
     connection_manager(connection_manager const &) = delete;
     connection_manager &operator=(connection_manager const &) = delete;
 
-    static connection_manager &
-    instance()
-    {
-        static connection_manager _instance;
-        return (_instance);
-    }
-
-    void
-    close()
-    {
-        if (_conn != nullptr) {
-            testutil_check(_conn->close(_conn, NULL));
-            _conn = nullptr;
-        }
-    }
-
-    void
-    create(const std::string &config, const std::string &home = DEFAULT_DIR)
-    {
-        if (_conn != nullptr) {
-            debug_print("Connection is not NULL, cannot be re-opened.", DEBUG_ERROR);
-            testutil_die(EINVAL, "Connection is not NULL");
-        }
-
-        /* Create the working dir. */
-        testutil_make_work_dir(home.c_str());
-
-        /* Open conn. */
-        testutil_check(wiredtiger_open(home.c_str(), NULL, config.c_str(), &_conn));
-    }
-
-    WT_SESSION *
-    create_session()
-    {
-        WT_SESSION *session;
-
-        if (_conn == nullptr) {
-            debug_print("Connection is NULL, did you forget to call connection_manager::create ?",
-              DEBUG_ERROR);
-            testutil_die(EINVAL, "Connection is NULL");
-        }
-
-        _conn_mutex.lock();
-        testutil_check(_conn->open_session(_conn, NULL, NULL, &session));
-        _conn_mutex.unlock();
-
-        return (session);
-    }
+    void close();
+    void create(const std::string &config, const std::string &home = DEFAULT_DIR);
+    scoped_session create_session();
 
     /*
      * set_timestamp calls into the connection API in a thread safe manner to set global timestamps.
      */
-    void
-    set_timestamp(const std::string &config)
-    {
-        _conn_mutex.lock();
-        testutil_check(_conn->set_timestamp(_conn, config.c_str()));
-        _conn_mutex.unlock();
-    }
+    void set_timestamp(const std::string &config);
 
     private:
-    connection_manager() {}
+    connection_manager();
+
+    private:
     WT_CONNECTION *_conn = nullptr;
     std::mutex _conn_mutex;
 };

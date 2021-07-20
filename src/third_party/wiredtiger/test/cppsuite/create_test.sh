@@ -23,7 +23,7 @@ if test -f "$FILE"; then
 fi
 
 # Check if default configuration associated to the test already exists.
-CONFIG=configs/config_$1_default.txt
+CONFIG=configs/$1_default.txt
 if test -f "$CONFIG"; then
     echo "$CONFIG cannot be created as it already exists."
     exit 1
@@ -32,7 +32,7 @@ fi
 # Copy the default template.
 cp tests/example_test.cxx $FILE
 echo "Created $FILE."
-cp configs/config_example_test_default.txt $CONFIG
+cp configs/example_test_default.txt $CONFIG
 echo "Created $CONFIG."
 
 # Replace example_test with the new test name.

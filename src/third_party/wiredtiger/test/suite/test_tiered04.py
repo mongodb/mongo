@@ -133,12 +133,7 @@ class test_tiered04(wttest.WiredTigerTestCase):
         self.check(c, 3)
 
         self.pr("flush tier again, holding open cursor")
-        # FIXME-WT-7591 Remove the extra cursor close and open surrounding the flush_tier call.
-        # Having a cursor open during a flush_tier does not yet work, so the test closes it,
-        # and reopens after the flush_tier.
-        c.close()
         self.session.flush_tier(None)
-        c = self.session.open_cursor(self.uri)
 
         c["3"] = "3"
         self.check(c, 4)

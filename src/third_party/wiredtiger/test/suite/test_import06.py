@@ -48,6 +48,16 @@ class test_import06(test_import_base):
     create_config = 'allocation_size={},key_format=u,log=(enabled=true),value_format=u,' \
         'block_compressor={},encryption=(name={})'
 
+    # To test the sodium encryptor, we use secretkey= rather than
+    # setting a keyid, because for a "real" (vs. test-only) encryptor,
+    # keyids require some kind of key server, and (a) setting one up
+    # for testing would be a nuisance and (b) currently the sodium
+    # encryptor doesn't support any anyway.
+    #
+    # It expects secretkey= to provide a hex-encoded 256-bit chacha20 key.
+    # This key will serve for testing purposes.
+    sodium_testkey = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+
     allocsizes = [
         ('512', dict(allocsize='512')),
         ('1024', dict(allocsize='1024')),
@@ -63,9 +73,10 @@ class test_import06(test_import_base):
         ('zstd', dict(compressor='zstd')),
     ]
     encryptors = [
-        ('none', dict(encryptor='none')),
-        ('nop', dict(encryptor='none')),
-        ('rotn', dict(encryptor='rotn')),
+        ('none', dict(encryptor='none', encryptor_args='')),
+        ('nop', dict(encryptor='none', encryptor_args='')),
+        ('rotn', dict(encryptor='rotn', encryptor_args='')),
+        ('sodium', dict(encryptor='sodium', encryptor_args=',secretkey=' + sodium_testkey)),
     ]
     scenarios = make_scenarios(allocsizes, compressors, encryptors)
 
@@ -77,7 +88,7 @@ class test_import06(test_import_base):
 
     def conn_config(self):
         return 'cache_size=50MB,log=(enabled),statistics=(all),encryption=(name={})'.format(
-            self.encryptor)
+            self.encryptor + self.encryptor_args)
 
     def test_import_repair(self):
         self.session.create(self.uri,

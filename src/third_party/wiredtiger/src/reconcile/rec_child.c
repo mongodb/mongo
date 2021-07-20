@@ -17,7 +17,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_C
 {
     WT_PAGE_DELETED *page_del;
 
-    page_del = ref->page_del;
+    page_del = ref->ft_info.del;
 
     /*
      * Internal pages with child leaf pages in the WT_REF_DELETED state are a special case during
@@ -61,18 +61,10 @@ __rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_C
      * function instantiates an entirely new page.)
      */
     if (ref->addr != NULL && !__wt_page_del_active(session, ref, true)) {
-        /*
-         * Minor memory cleanup: if a truncate call deleted this page and we were ever forced to
-         * instantiate the page in memory, we would have built a list of updates in the page
-         * reference in order to be able to commit/rollback the truncate. We just passed a
-         * visibility test, discard the update list.
-         */
-        if (page_del != NULL) {
-            __wt_free(session, ref->page_del->update_list);
-            __wt_free(session, ref->page_del);
-        }
-
         WT_RET(__wt_ref_block_free(session, ref));
+
+        /* Any fast-truncate information can be freed as soon as the delete is stable. */
+        __wt_overwrite_and_free(session, ref->ft_info.del);
     }
 
     /*

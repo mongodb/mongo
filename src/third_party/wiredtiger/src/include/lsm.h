@@ -66,7 +66,7 @@ struct __wt_cursor_lsm {
 
     u_int update_count; /* Updates performed. */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CLSM_ACTIVE 0x001u        /* Incremented the session count */
 #define WT_CLSM_BULK 0x002u          /* Open for snapshot isolation */
 #define WT_CLSM_ITERATE_NEXT 0x004u  /* Forward iteration */
@@ -76,7 +76,7 @@ struct __wt_cursor_lsm {
 #define WT_CLSM_MULTIPLE 0x040u      /* Multiple cursors have values */
 #define WT_CLSM_OPEN_READ 0x080u     /* Open for reads */
 #define WT_CLSM_OPEN_SNAPSHOT 0x100u /* Open for snapshot isolation */
-                                     /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
@@ -114,13 +114,13 @@ struct __wt_lsm_chunk {
     int8_t evicted;   /* 1/0: in-memory chunk was evicted */
     uint8_t flushing; /* 1/0: chunk flush in progress */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LSM_CHUNK_BLOOM 0x01u
 #define WT_LSM_CHUNK_HAS_TIMESTAMP 0x02u
 #define WT_LSM_CHUNK_MERGING 0x04u
 #define WT_LSM_CHUNK_ONDISK 0x08u
 #define WT_LSM_CHUNK_STABLE 0x10u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
@@ -128,14 +128,14 @@ struct __wt_lsm_chunk {
  * Different types of work units. Used by LSM worker threads to choose which type of work they will
  * execute, and by work units to define which action is required.
  */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LSM_WORK_BLOOM 0x01u        /* Create a bloom filter */
 #define WT_LSM_WORK_DROP 0x02u         /* Drop unused chunks */
 #define WT_LSM_WORK_ENABLE_EVICT 0x04u /* Allow eviction of pinned chunk */
 #define WT_LSM_WORK_FLUSH 0x08u        /* Flush a chunk to disk */
 #define WT_LSM_WORK_MERGE 0x10u        /* Look for a tree merge */
 #define WT_LSM_WORK_SWITCH 0x20u       /* Switch the in-memory chunk */
-/* AUTOMATIC FLAG VALUE GENERATION STOP */
+/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /* Work units that are serviced by general worker threads. */
 #define WT_LSM_WORK_GENERAL_OPS                                                            \
@@ -149,9 +149,9 @@ struct __wt_lsm_chunk {
 struct __wt_lsm_work_unit {
     TAILQ_ENTRY(__wt_lsm_work_unit) q; /* Worker unit queue */
     uint32_t type;                     /* Type of operation */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LSM_WORK_FORCE 0x1u /* Force operation */
-                               /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                               /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;            /* Flags for operation */
     WT_LSM_TREE *lsm_tree;
 };
@@ -185,9 +185,9 @@ struct __wt_lsm_manager {
 #define WT_LSM_MIN_WORKERS 3
     WT_LSM_WORKER_ARGS lsm_worker_cookies[WT_LSM_MAX_WORKERS];
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LSM_MANAGER_SHUTDOWN 0x1u /* Manager has shut down */
-                                     /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
@@ -252,11 +252,11 @@ struct __wt_lsm_tree {
     uint64_t chunk_max; /* Maximum chunk a merge creates */
     u_int merge_min, merge_max;
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LSM_BLOOM_MERGED 0x1u
 #define WT_LSM_BLOOM_OFF 0x2u
 #define WT_LSM_BLOOM_OLDEST 0x4u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t bloom; /* Bloom creation policy */
 
     WT_LSM_CHUNK **chunk; /* Array of active LSM chunks */
@@ -303,12 +303,12 @@ struct __wt_lsm_tree {
  * flags here are not protected for concurrent access, don't put anything here that is susceptible
  * to races.
  */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LSM_TREE_COMPACTING 0x1u /* Tree being compacted */
 #define WT_LSM_TREE_MERGES 0x2u     /* Tree should run merges */
 #define WT_LSM_TREE_OPEN 0x4u       /* The tree is open */
 #define WT_LSM_TREE_THROTTLE 0x8u   /* Throttle updates */
-                                    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 

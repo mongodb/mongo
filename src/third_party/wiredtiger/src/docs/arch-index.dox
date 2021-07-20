@@ -6,7 +6,7 @@ Here is an overview of the software components in WiredTiger and how they are or
 An arrow indicates the "from" component uses "to" component.
 
 <div class="arch_diagram">
-@plantuml_start{wt_diagram.png}
+@plantuml_start{wt_diagram.png }
 @startuml{wt_diagram.png}
 
 ' We add spacing to the diagram in places to influence the layout.

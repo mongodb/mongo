@@ -648,7 +648,7 @@ fail_fs_simulate_fail(
 {
     FAIL_FILE_SYSTEM *fail_fs;
     WT_EXTENSION_API *wtext;
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
     size_t btret, i;
 #else
     int btret, i;
@@ -662,7 +662,7 @@ fail_fs_simulate_fail(
         (void)wtext->msg_printf(wtext, session,
           "fail_fs: %s: simulated failure after %" PRId64 " %s operations", fail_fh->iface.name,
           nops, opkind);
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
         btret = backtrace(bt, sizeof(bt) / sizeof(bt[0]));
 #else
         btret = backtrace(bt, (int)(sizeof(bt) / sizeof(bt[0])));

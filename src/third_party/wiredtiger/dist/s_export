@@ -33,26 +33,39 @@ check()
 
 	test -s $t && {
 		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-		echo 'unexpected external symbols in the WiredTiger library'
+		echo 'unexpected external symbols in the WiredTiger library '"$f"
 		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 		cat $t
 		exit 1
 	}
-
-	exit 0
 }
 
 # This check would normally be done after the library is built, but this way
 # we don't forget about a symbol during development. We usually build in the
 # top-level or build_posix directories, check the previously built library,
 # if it exists. And, allow this script to be run from the top-level directory
-# as well as locally.
-for d in .. ../build_posix; do
-	for ext in a so dylib; do
-		f="$d/.libs/libwiredtiger.$ext"
-		test -f $f && check $f
-	done
+# as well as locally. (??? this last wasn't true before my changes and still
+# isn't)
+#
+# Check all library images that appear; typically they will be one of
+#    ../build_posix/.libs/libwiredtiger.$ext    (autotools build)
+#    ../.libs/libwiredtiger.$ext                (autotools build at top level)
+#    ../build/libwiredtiger.$ext                (cmake build)
+#    ../build_cmake/libwiredtiger.$ext          (cmake build)
+
+found=0
+for f in $(find .. -name "libwiredtiger.*" -print); do
+	case "$f" in
+	    *.a|*.so|*.dylib)
+		check "$f"
+		found=1
+	        ;;
+	    *)
+		;;
+	esac
 done
 
-echo "$0 skipped: libwiredtiger.[a|so|dylib] not found"
+if [ $found = 0 ]; then
+    echo "$0 skipped: libwiredtiger.[a|so|dylib] not found"
+fi
 exit 0

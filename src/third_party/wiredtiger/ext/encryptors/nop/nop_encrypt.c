@@ -130,6 +130,90 @@ nop_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session, size_t *expansion_const
 }
 /*! [WT_ENCRYPTOR sizing] */
 
+/*! [WT_ENCRYPTOR customize] */
+/*
+ * nop_customize --
+ *     The customize function creates a customized encryptor.
+ */
+static int
+nop_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session, WT_CONFIG_ARG *encrypt_config,
+  WT_ENCRYPTOR **customp)
+{
+    /*
+     * This is how keys are set: the extension is first loaded, and then for every distinct key used
+     * a copy is made by calling the customize method. The original uncustomized WT_ENCRYPTOR is
+     * ordinarily never used to encrypt or decrypt anything.
+     *
+     * The copy, with the key installed into it, should be returned to the caller via the customp
+     * argument. If the customize method succeeds but sets *customp to NULL, the original encryptor
+     * is used for that key.
+     *
+     * The customize method need not be provided, but in that case key configuration is not
+     * performed, the original encryptor is used for all encryption, and it must have some other
+     * means to get the key or keys it should use.
+     */
+
+    const NOP_ENCRYPTOR *orig;
+    NOP_ENCRYPTOR *new;
+    WT_CONFIG_ITEM keyid, secretkey;
+    WT_EXTENSION_API *wt_api;
+    int ret;
+
+    orig = (const NOP_ENCRYPTOR *)encryptor;
+    wt_api = orig->wt_api;
+
+    /* Allocate and initialize the new encryptor. */
+    if ((new = calloc(1, sizeof(*new))) == NULL)
+        return (errno);
+    *new = *orig;
+
+    /* Get the keyid, if any. */
+    ret = wt_api->config_get(wt_api, session, encrypt_config, "keyid", &keyid);
+    if (ret != 0)
+        keyid.len = 0;
+
+    /* Get the explicit secret key, if any. */
+    ret = wt_api->config_get(wt_api, session, encrypt_config, "secretkey", &secretkey);
+    if (ret != 0)
+        secretkey.len = 0;
+
+    /* Providing both a keyid and a secretkey is an error. */
+    if (keyid.len != 0 && secretkey.len != 0) {
+        ret = nop_error(
+          new, NULL, EINVAL, "nop_customize: keys specified with both keyid= and secretkey=");
+        goto err;
+    }
+
+    /*
+     * Providing neither is also normally an error. Allow it here for the benefit of the test suite.
+     */
+    if (keyid.len == 0 && secretkey.len == 0)
+        (void)keyid; /* do nothing */
+
+    if (keyid.len != 0)
+        /*
+         * Here one would contact a key manager to get the key, then install it.
+         */
+        (void)keyid.str; /* do nothing; add code here */
+
+    if (secretkey.len != 0)
+        /*
+         * Here one would install the explicit secret key, probably after base64- or hex-decoding
+         * it. If it's a passphrase rather than a key, one might hash it first. Other
+         * transformations might be needed or wanted as well.
+         */
+        (void)secretkey.str; /* do nothing; add code here */
+
+    /* Return the new encryptor. */
+    *customp = (WT_ENCRYPTOR *)new;
+    return (0);
+
+err:
+    free(new);
+    return (ret);
+}
+/*! [WT_ENCRYPTOR customize] */
+
 /*! [WT_ENCRYPTOR terminate] */
 /*
  * nop_terminate --
@@ -176,6 +260,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
     nop_encryptor->encryptor.encrypt = nop_encrypt;
     nop_encryptor->encryptor.decrypt = nop_decrypt;
     nop_encryptor->encryptor.sizing = nop_sizing;
+    nop_encryptor->encryptor.customize = nop_customize;
     nop_encryptor->encryptor.terminate = nop_terminate;
 
     nop_encryptor->wt_api = connection->get_extension_api(connection);

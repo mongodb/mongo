@@ -298,15 +298,15 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint3
     blk->disk_size = WT_STORE_SIZE(align_size);
 
     /*
-     * Update the block's checksum: if our caller specifies, checksum the complete data, otherwise
-     * checksum the leading WT_BLOCK_COMPRESS_SKIP bytes. The assumption is applications with good
-     * compression support turn off checksums and assume corrupted blocks won't decompress
-     * correctly. However, if compression failed to shrink the block, the block wasn't compressed,
-     * in which case our caller will tell us to checksum the data to detect corruption. If
-     * compression succeeded, we still need to checksum the first WT_BLOCK_COMPRESS_SKIP bytes
-     * because they're not compressed, both to give salvage a quick test of whether a block is
-     * useful and to give us a test so we don't lose the first WT_BLOCK_COMPRESS_SKIP bytes without
-     * noticing.
+     * Update the block's checksum: checksum the complete data if our caller specifies, otherwise
+     * checksum the leading WT_BLOCK_COMPRESS_SKIP bytes. Applications with a compression or
+     * encryption engine that includes checksums won't need a separate checksum. However, if the
+     * block was too small for compression, or compression failed to shrink the block, the block
+     * wasn't compressed, in which case our caller will tell us to checksum the data. If skipping
+     * checksums because of compression or encryption, we still need to checksum the first
+     * WT_BLOCK_COMPRESS_SKIP bytes because they're not compressed or encrypted, both to give
+     * salvage a quick test of whether a block is useful and to give us a test so we don't lose the
+     * first WT_BLOCK_COMPRESS_SKIP bytes without noticing.
      *
      * Checksum a little-endian version of the header, and write everything in little-endian format.
      * The checksum is (potentially) returned in a big-endian format, swap it into place in a

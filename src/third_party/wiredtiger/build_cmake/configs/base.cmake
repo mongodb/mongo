@@ -63,7 +63,7 @@ config_bool(
 config_bool(
     ENABLE_STRICT
     "Compile with strict compiler warnings enabled"
-    DEFAULT ON
+    DEFAULT OFF
 )
 
 config_bool(
@@ -139,6 +139,16 @@ config_bool(
     # Specifically throw a fatal error if a user tries to enable the zstd compressor without
     # actually having the library available (as opposed to silently defaulting to OFF).
     DEPENDS_ERROR ON "Failed to find zstd library"
+)
+
+config_bool(
+    ENABLE_SODIUM
+    "Build the libsodium encryption extension"
+    DEFAULT OFF
+    DEPENDS "HAVE_LIBSODIUM"
+    # Specifically throw a fatal error if a user tries to enable the libsodium encryptor without
+    # actually having the library available (as opposed to silently defaulting to OFF).
+    DEPENDS_ERROR ON "Failed to find sodium library"
 )
 
 config_bool(

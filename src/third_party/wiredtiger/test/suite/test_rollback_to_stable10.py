@@ -29,40 +29,13 @@
 import fnmatch, os, shutil, threading, time
 from helper import copy_wiredtiger_home, simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
-from wiredtiger import stat, wiredtiger_strerror, WiredTigerError, WT_ROLLBACK
+from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wtthread import checkpoint_thread, op_thread
-from time import sleep
 
 def timestamp_str(t):
     return '%x' % t
-
-def retry_rollback(self, name, txn_session, code):
-    retry_limit = 100
-    retries = 0
-    completed = False
-    saved_exception = None
-    while not completed and retries < retry_limit:
-        if retries != 0:
-            self.pr("Retrying operation for " + name)
-            if txn_session:
-                txn_session.rollback_transaction()
-            sleep(0.1)
-            if txn_session:
-                txn_session.begin_transaction('isolation=snapshot')
-                self.pr("Began new transaction for " + name)
-        try:
-            code()
-            completed = True
-        except WiredTigerError as e:
-            rollback_str = wiredtiger_strerror(WT_ROLLBACK)
-            if rollback_str not in str(e):
-                raise(e)
-            retries += 1
-            saved_exception = e
-    if not completed and saved_exception:
-        raise(saved_exception)
 
 # test_rollback_to_stable10.py
 # Test the rollback to stable operation performs sweeping history store.
@@ -155,13 +128,13 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             # Perform several updates in parallel with checkpoint.
             # Rollbacks may occur when checkpoint is running, so retry as needed.
             self.pr("updates")
-            retry_rollback(self, 'update ds1, e', None,
+            self.retry_rollback('update ds1, e', None,
                            lambda: self.large_updates(uri_1, value_e, ds_1, nrows, self.prepare, 70))
-            retry_rollback(self, 'update ds2, e', None,
+            self.retry_rollback('update ds2, e', None,
                            lambda: self.large_updates(uri_2, value_e, ds_2, nrows, self.prepare, 70))
-            retry_rollback(self, 'update ds1, f', None,
+            self.retry_rollback('update ds1, f', None,
                            lambda: self.large_updates(uri_1, value_f, ds_1, nrows, self.prepare, 80))
-            retry_rollback(self, 'update ds2, f', None,
+            self.retry_rollback('update ds2, f', None,
                            lambda: self.large_updates(uri_2, value_f, ds_2, nrows, self.prepare, 80))
         finally:
             done.set()
@@ -289,7 +262,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             session_p1 = self.conn.open_session()
             cursor_p1 = session_p1.open_cursor(uri_1)
             session_p1.begin_transaction('isolation=snapshot')
-            retry_rollback(self, 'update ds1', session_p1,
+            self.retry_rollback('update ds1', session_p1,
                            lambda: prepare_range_updates(
                                session_p1, cursor_p1, ds_1, value_e, nrows,
                                'prepare_timestamp=' + timestamp_str(69)))
@@ -298,7 +271,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             session_p2 = self.conn.open_session()
             cursor_p2 = session_p2.open_cursor(uri_2)
             session_p2.begin_transaction('isolation=snapshot')
-            retry_rollback(self, 'update ds2', session_p2,
+            self.retry_rollback('update ds2', session_p2,
                            lambda: prepare_range_updates(
                                session_p2, cursor_p2, ds_2, value_e, nrows,
                                'prepare_timestamp=' + timestamp_str(69)))

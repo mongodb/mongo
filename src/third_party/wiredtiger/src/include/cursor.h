@@ -60,7 +60,7 @@ struct __wt_cursor_backup {
     uint64_t bit_offset;  /* Current offset */
     uint64_t granularity; /* Length, transfer size */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CURBACKUP_CKPT_FAKE 0x001u   /* Object has fake checkpoint */
 #define WT_CURBACKUP_CONSOLIDATE 0x002u /* Consolidate returned info on this object */
 #define WT_CURBACKUP_DUP 0x004u         /* Duplicated backup cursor */
@@ -72,7 +72,7 @@ struct __wt_cursor_backup {
 #define WT_CURBACKUP_LOCKER 0x100u      /* Hot-backup started */
 #define WT_CURBACKUP_QUERYID 0x200u     /* Backup cursor for incremental ids */
 #define WT_CURBACKUP_RENAME 0x400u      /* Object had a rename */
-                                        /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                        /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
@@ -212,7 +212,7 @@ struct __wt_cursor_btree {
     uint64_t lastrecno;
 #endif
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CBT_ACTIVE 0x001u             /* Active in the tree */
 #define WT_CBT_ITERATE_APPEND 0x002u     /* Col-store: iterating append list */
 #define WT_CBT_ITERATE_NEXT 0x004u       /* Next iteration configuration */
@@ -224,7 +224,7 @@ struct __wt_cursor_btree {
 #define WT_CBT_READ_ONCE 0x100u          /* Page in with WT_READ_WONT_NEED */
 #define WT_CBT_SEARCH_SMALLEST 0x200u    /* Row-store: small-key insert list */
 #define WT_CBT_VAR_ONPAGE_MATCH 0x400u   /* Var-store: on-page recno match */
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 #define WT_CBT_POSITION_MASK /* Flags associated with position */                      \
     (WT_CBT_ITERATE_APPEND | WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV |               \
@@ -292,12 +292,12 @@ struct __wt_cursor_hs {
 
     bool insert_success;
 
-    /* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_HS_CUR_BTREE_ID_SET 0x1u
 #define WT_HS_CUR_COUNTER_SET 0x2u
 #define WT_HS_CUR_KEY_SET 0x4u
 #define WT_HS_CUR_TS_SET 0x8u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 };
 
@@ -357,12 +357,12 @@ struct __wt_cursor_join_endpoint {
     uint8_t recno_buf[10]; /* holds packed recno */
     WT_CURSOR *cursor;
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CURJOIN_END_EQ 0x1u         /* include values == cursor */
 #define WT_CURJOIN_END_GT 0x2u         /* include values >  cursor */
 #define WT_CURJOIN_END_LT 0x4u         /* include values <  cursor */
 #define WT_CURJOIN_END_OWN_CURSOR 0x8u /* must close cursor */
-/* AUTOMATIC FLAG VALUE GENERATION STOP */
+/* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
 #define WT_CURJOIN_END_GE (WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ)
 #define WT_CURJOIN_END_LE (WT_CURJOIN_END_LT | WT_CURJOIN_END_EQ)
     uint8_t flags; /* range for this endpoint */
@@ -386,12 +386,12 @@ struct __wt_cursor_join_entry {
     uint32_t bloom_hash_count; /* hash functions in bloom */
     uint64_t count;            /* approx number of matches */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CURJOIN_ENTRY_BLOOM 0x1u           /* use a bloom filter */
 #define WT_CURJOIN_ENTRY_DISJUNCTION 0x2u     /* endpoints are or-ed */
 #define WT_CURJOIN_ENTRY_FALSE_POSITIVES 0x4u /* don't filter false pos */
 #define WT_CURJOIN_ENTRY_OWN_BLOOM 0x8u       /* this entry owns the bloom */
-                                              /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                              /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 
     WT_CURSOR_JOIN_ENDPOINT *ends; /* reference endpoints */
@@ -414,11 +414,11 @@ struct __wt_cursor_join {
     u_int entries_next;
     uint8_t recno_buf[10]; /* holds packed recno */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CURJOIN_DISJUNCTION 0x1u /* Entries are or-ed */
 #define WT_CURJOIN_ERROR 0x2u       /* Error in initialization */
 #define WT_CURJOIN_INITIALIZED 0x4u /* Successful initialization */
-                                    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                    /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 };
 
@@ -443,9 +443,9 @@ struct __wt_cursor_log {
     uint32_t rectype;                 /* Record type */
     uint64_t txnid;                   /* Record txnid */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CURLOG_ARCHIVE_LOCK 0x1u /* Archive lock held */
-                                    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                    /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 };
 
@@ -455,11 +455,11 @@ struct __wt_cursor_metadata {
     WT_CURSOR *file_cursor;   /* Queries of regular metadata */
     WT_CURSOR *create_cursor; /* Extra cursor for create option */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_MDC_CREATEONLY 0x1u
 #define WT_MDC_ONMETADATA 0x2u
 #define WT_MDC_POSITIONED 0x4u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 };
 

@@ -16,15 +16,21 @@ static int
 __block_switch_writeable(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t object_id)
 {
     WT_DECL_RET;
-
-    WT_ERR(__wt_close(session, &block->fh));
+    WT_FH *new_fh, *old_fh;
 
     /*
      * FIXME-WT-7470: write lock while opening a new write handle.
+     *
+     * The block manager must always have valid file handle since other threads may have concurrent
+     * requests in flight.
      */
+    old_fh = block->fh;
     WT_ERR(block->opener->open(
-      block->opener, session, object_id, WT_FS_OPEN_FILE_TYPE_DATA, block->file_flags, &block->fh));
+      block->opener, session, object_id, WT_FS_OPEN_FILE_TYPE_DATA, block->file_flags, &new_fh));
+    block->fh = new_fh;
     block->objectid = object_id;
+
+    WT_ERR(__wt_close(session, &old_fh));
 
 err:
     return (ret);

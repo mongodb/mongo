@@ -87,6 +87,15 @@ def wiredtiger_open_tiered(ignored_self, args):
 
     return args
 
+# Called to replace Connection.close
+# Insert a call to flush_tier before closing connection.
+def connection_close_replace(orig_connection_close, connection_self, config):
+    s = connection_self.open_session(None)
+    s.flush_tier(None)
+    s.close()
+    ret = orig_connection_close(connection_self, config)
+    return ret
+
 # Called to replace Session.alter
 def session_alter_replace(orig_session_alter, session_self, uri, config):
     # Alter isn't implemented for tiered tables.  Only call it if this can't be the uri
@@ -207,13 +216,13 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
         return new_tests
 
     def setup_hooks(self):
+        orig_connection_close = self.Connection['close']
+        self.Connection['close'] = (wthooks.HOOK_REPLACE, lambda s, config:
+          connection_close_replace(orig_connection_close, s, config))
+
         orig_session_alter = self.Session['alter']
         self.Session['alter'] =  (wthooks.HOOK_REPLACE, lambda s, uri, config:
           session_alter_replace(orig_session_alter, s, uri, config))
-
-        orig_session_close = self.Session['close']
-        self.Session['close'] = (wthooks.HOOK_REPLACE, lambda s, config=None:
-          session_close_replace(orig_session_close, s, config))
 
         orig_session_compact = self.Session['compact']
         self.Session['compact'] =  (wthooks.HOOK_REPLACE, lambda s, uri, config:

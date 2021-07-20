@@ -1174,6 +1174,19 @@ err:
 }
 
 /*
+ * __session_salvage_worker --
+ *     Wrapper function for salvage processing.
+ */
+static int
+__session_salvage_worker(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
+{
+    WT_RET(__wt_schema_worker(
+      session, uri, __wt_salvage, NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE));
+    WT_RET(__wt_schema_worker(session, uri, NULL, __wt_rollback_to_stable_one, cfg, 0));
+    return (0);
+}
+
+/*
  * __session_salvage --
  *     WT_SESSION->salvage method.
  */
@@ -1189,11 +1202,17 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 
     WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 
-    /* Block out checkpoints to avoid spurious EBUSY errors. */
-    WT_WITH_CHECKPOINT_LOCK(session,
-      WT_WITH_SCHEMA_LOCK(session,
-        ret = __wt_schema_worker(
-          session, uri, __wt_salvage, NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE)));
+    /*
+     * Run salvage and then rollback-to-stable (to bring the object into compliance with database
+     * timestamps).
+     *
+     * Block out checkpoints to avoid spurious EBUSY errors.
+     *
+     * Hold the schema lock across both salvage and rollback-to-stable to avoid races where another
+     * thread opens the handle before rollback-to-stable completes.
+     */
+    WT_WITH_CHECKPOINT_LOCK(
+      session, WT_WITH_SCHEMA_LOCK(session, ret = __session_salvage_worker(session, uri, cfg)));
 
 err:
     if (ret != 0)

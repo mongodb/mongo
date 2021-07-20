@@ -640,11 +640,11 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 }
 
 /*
- * __recovery_free --
- *     Free the recovery state.
+ * __recovery_close_cursors --
+ *     Close the logging recovery cursors.
  */
 static int
-__recovery_free(WT_RECOVERY *r)
+__recovery_close_cursors(WT_RECOVERY *r)
 {
     WT_CURSOR *c;
     WT_DECL_RET;
@@ -658,6 +658,7 @@ __recovery_free(WT_RECOVERY *r)
             WT_TRET(c->close(c));
     }
 
+    r->nfiles = 0;
     __wt_free(session, r->files);
     return (ret);
 }
@@ -986,6 +987,9 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR(ret);
 
 done:
+    /* Close cached cursors, rollback-to-stable asserts exclusive access. */
+    WT_ERR(__recovery_close_cursors(&r));
+
     WT_ERR(__recovery_set_checkpoint_timestamp(&r));
     WT_ERR(__recovery_set_oldest_timestamp(&r));
     WT_ERR(__recovery_set_checkpoint_snapshot(session));
@@ -1073,7 +1077,7 @@ done:
     FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE);
 
 err:
-    WT_TRET(__recovery_free(&r));
+    WT_TRET(__recovery_close_cursors(&r));
     __wt_free(session, config);
     FLD_CLR(conn->log_flags, WT_CONN_LOG_RECOVER_DIRTY);
 

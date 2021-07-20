@@ -121,7 +121,7 @@ __wt_tiered_bucket_config(
       storage, &session->iface, new->bucket, new->auth_token, NULL, &new->file_system));
     new->storage_source = storage;
 
-    /* If we're creating a new bucket storage, parse the other settings into it.  */
+    /* If we're creating a new bucket storage, parse the other settings into it. */
     TAILQ_INSERT_HEAD(&nstorage->bucketqh, new, q);
     TAILQ_INSERT_HEAD(&nstorage->buckethashqh[hash_bucket], new, hashq);
     F_SET(new, WT_BUCKET_FREE);

@@ -29,115 +29,65 @@
 #ifndef WORKLOAD_TRACKING_H
 #define WORKLOAD_TRACKING_H
 
+#include "../core/component.h"
+#include "../timestamp_manager.h"
+#include "../util/scoped_types.h"
+
 /*
- * Default schema for tracking operations on collections (key_format: Collection name / Key /
+ * Default schema for tracking operations on collections (key_format: Collection id / Key /
  * Timestamp, value_format: Operation type / Value)
  */
-#define OPERATION_TRACKING_KEY_FORMAT WT_UNCHECKED_STRING(SSQ)
+#define OPERATION_TRACKING_KEY_FORMAT WT_UNCHECKED_STRING(QSQ)
 #define OPERATION_TRACKING_VALUE_FORMAT WT_UNCHECKED_STRING(iS)
 #define OPERATION_TRACKING_TABLE_CONFIG \
     "key_format=" OPERATION_TRACKING_KEY_FORMAT ",value_format=" OPERATION_TRACKING_VALUE_FORMAT
 
 /*
- * Default schema for tracking schema operations on collections (key_format: Collection name /
+ * Default schema for tracking schema operations on collections (key_format: Collection id /
  * Timestamp, value_format: Operation type)
  */
-#define SCHEMA_TRACKING_KEY_FORMAT WT_UNCHECKED_STRING(SQ)
+#define SCHEMA_TRACKING_KEY_FORMAT WT_UNCHECKED_STRING(QQ)
 #define SCHEMA_TRACKING_VALUE_FORMAT WT_UNCHECKED_STRING(i)
 #define SCHEMA_TRACKING_TABLE_CONFIG \
     "key_format=" SCHEMA_TRACKING_KEY_FORMAT ",value_format=" SCHEMA_TRACKING_VALUE_FORMAT
 
 namespace test_harness {
 /* Tracking operations. */
-enum class tracking_operation { CREATE_COLLECTION, DELETE_COLLECTION, DELETE_KEY, INSERT, UPDATE };
+enum class tracking_operation { CREATE_COLLECTION, DELETE_COLLECTION, DELETE_KEY, INSERT };
+
 /* Class used to track operations performed on collections */
 class workload_tracking : public component {
-
     public:
     workload_tracking(configuration *_config, const std::string &operation_table_config,
       const std::string &operation_table_name, const std::string &schema_table_config,
-      const std::string &schema_table_name)
-        : component("workload_tracking", _config), _operation_table_config(operation_table_config),
-          _operation_table_name(operation_table_name), _schema_table_config(schema_table_config),
-          _schema_table_name(schema_table_name)
-    {
-    }
+      const std::string &schema_table_name, const bool use_compression, timestamp_manager &tsm);
 
-    const std::string &
-    get_schema_table_name() const
-    {
-        return _schema_table_name;
-    }
+    const std::string &get_schema_table_name() const;
+    const std::string &get_operation_table_name() const;
+    void load() override final;
 
-    const std::string &
-    get_operation_table_name() const
-    {
-        return _operation_table_name;
-    }
+    /*
+     * As every operation is tracked in the tracking table we need to clear out obsolete operations
+     * otherwise the file size grow continuously, as such we cleanup operations that are no longer
+     * relevant, i.e. older than the oldest timestamp.
+     */
+    void do_work() override final;
 
-    void
-    load() override final
-    {
-        WT_SESSION *session;
-
-        component::load();
-
-        if (!_enabled)
-            return;
-
-        /* Initiate schema tracking. */
-        session = connection_manager::instance().create_session();
-        testutil_check(
-          session->create(session, _schema_table_name.c_str(), _schema_table_config.c_str()));
-        testutil_check(
-          session->open_cursor(session, _schema_table_name.c_str(), NULL, NULL, &_cursor_schema));
-        debug_print("Schema tracking initiated", DEBUG_TRACE);
-
-        /* Initiate operations tracking. */
-        testutil_check(
-          session->create(session, _operation_table_name.c_str(), _operation_table_config.c_str()));
-        testutil_check(session->open_cursor(
-          session, _operation_table_name.c_str(), NULL, NULL, &_cursor_operations));
-        debug_print("Operations tracking created", DEBUG_TRACE);
-    }
-
-    void
-    run() override final
-    {
-        /* Does not do anything. */
-    }
-
-    void
-    save_schema_operation(
-      const tracking_operation &operation, const std::string &collection_name, wt_timestamp_t ts)
-    {
-        std::string error_message;
-
-        if (!_enabled)
-            return;
-
-        if (operation == tracking_operation::CREATE_COLLECTION ||
-          operation == tracking_operation::DELETE_COLLECTION) {
-            _cursor_schema->set_key(_cursor_schema, collection_name.c_str(), ts);
-            _cursor_schema->set_value(_cursor_schema, static_cast<int>(operation));
-            testutil_check(_cursor_schema->insert(_cursor_schema));
-        } else {
-            error_message = "save_schema_operation: invalid operation " +
-              std::to_string(static_cast<int>(operation));
-            testutil_die(EINVAL, error_message.c_str());
-        }
-        debug_print("save_schema_operation: workload tracking saved operation.", DEBUG_TRACE);
-    }
+    void save_schema_operation(
+      const tracking_operation &operation, const uint64_t &collection_id, wt_timestamp_t ts);
 
     template <typename K, typename V>
-    void
-    save_operation(const tracking_operation &operation, const std::string &collection_name,
-      const K &key, const V &value, wt_timestamp_t ts)
+    int
+    save_operation(const tracking_operation &operation, const uint64_t &collection_id, const K &key,
+      const V &value, wt_timestamp_t ts, scoped_cursor &op_track_cursor)
     {
+        WT_DECL_RET;
         std::string error_message;
 
         if (!_enabled)
-            return;
+            return (0);
+
+        testutil_assert(op_track_cursor.get() != nullptr);
 
         if (operation == tracking_operation::CREATE_COLLECTION ||
           operation == tracking_operation::DELETE_COLLECTION) {
@@ -145,20 +95,23 @@ class workload_tracking : public component {
               "save_operation: invalid operation " + std::to_string(static_cast<int>(operation));
             testutil_die(EINVAL, error_message.c_str());
         } else {
-            _cursor_operations->set_key(_cursor_operations, collection_name.c_str(), key, ts);
-            _cursor_operations->set_value(_cursor_operations, static_cast<int>(operation), value);
-            testutil_check(_cursor_operations->insert(_cursor_operations));
+            op_track_cursor->set_key(op_track_cursor.get(), collection_id, key, ts);
+            op_track_cursor->set_value(op_track_cursor.get(), static_cast<int>(operation), value);
+            ret = op_track_cursor->insert(op_track_cursor.get());
         }
-        debug_print("save_operation: workload tracking saved operation.", DEBUG_TRACE);
+        return (ret);
     }
 
     private:
-    WT_CURSOR *_cursor_operations = nullptr;
-    WT_CURSOR *_cursor_schema = nullptr;
+    scoped_session _session;
+    scoped_cursor _schema_track_cursor;
+    scoped_cursor _sweep_cursor;
     const std::string _operation_table_config;
     const std::string _operation_table_name;
     const std::string _schema_table_config;
     const std::string _schema_table_name;
+    const bool _use_compression;
+    timestamp_manager &_tsm;
 };
 } // namespace test_harness
 

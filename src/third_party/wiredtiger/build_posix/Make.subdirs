@@ -15,6 +15,7 @@ ext/compressors/zlib ZLIB
 ext/compressors/zstd ZSTD
 ext/encryptors/nop
 ext/encryptors/rotn
+ext/encryptors/sodium SODIUM
 ext/extractors/csv
 ext/storage_sources/local_store POSIX_HOST
 ext/test/fail_fs

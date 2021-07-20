@@ -28,7 +28,7 @@ __wt_tiered_work_free(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry)
         WT_STAT_CONN_INCR(session, flush_state_races);
         __wt_yield();
     }
-    /* If all work is done signal any waiting thread waiting for sync.  */
+    /* If all work is done signal any waiting thread waiting for sync. */
     if (WT_FLUSH_STATE_DONE(conn->flush_state))
         __wt_cond_signal(session, conn->flush_cond);
     __wt_free(session, entry);

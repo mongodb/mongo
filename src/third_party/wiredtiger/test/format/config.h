@@ -149,8 +149,8 @@ static CONFIG c[] = {
   {"checkpoint.wait", "seconds to wait if wiredtiger checkpoints configured", 0x0, 5, 100, 3600,
     &g.c_checkpoint_wait, NULL},
 
-  {"disk.checksum", "checksum type (on | off | uncompressed)", C_IGNORE | C_STRING, 0, 0, 0, NULL,
-    &g.c_checksum},
+  {"disk.checksum", "checksum type (on | off | uncompressed | unencrypted)", C_IGNORE | C_STRING, 0,
+    0, 0, NULL, &g.c_checksum},
 
   /* 5% */
   {"disk.data_extend", "configure data file extension", C_BOOL, 5, 0, 0, &g.c_data_extend, NULL},

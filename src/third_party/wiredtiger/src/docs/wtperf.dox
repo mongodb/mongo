@@ -190,6 +190,10 @@ if non zero choose a value from within this range as the key for insert operatio
 generate random content for the value
 @par range_partition (boolean, default=false)
 partition data by range (vs hash)
+@par read_range (unsigned int, default=0)
+read a sequential range of keys upon each read operation. This value tells us how many keys  to read each time, or an upper bound on the number of keys read if read_range_random is set.
+@par read_range_random (boolean, default=false)
+if doing range reads, select the number of keys to read  in a range uniformly at random.
 @par readonly (boolean, default=false)
 reopen the connection between populate and workload phases in readonly mode.  Requires  reopen_connection turned on (default).  Requires that read be the only workload specified
 @par reopen_connection (boolean, default=true)
@@ -212,6 +216,8 @@ scan tables every interval seconds during the workload phase, 0 to disable
 percentage of entire data set scanned, if scan_interval is enabled
 @par scan_table_count (unsigned int, default=0)
 number of separate tables to be used for scanning. Zero indicates that tables are shared with  other operations
+@par select_latest (boolean, default=false)
+in workloads that involve inserts and another type of operation, select the recently inserted records with higher probability
 @par sess_config (string, default="")
 session configuration string
 @par session_count_idle (unsigned int, default=0)

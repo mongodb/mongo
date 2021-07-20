@@ -26,6 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+# [TEST_TAGS]
+# reconciliation:overflow_keys
+# [END_TAGS]
+#
 # test_bug004.py
 #       Regression tests.
 

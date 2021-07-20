@@ -7,7 +7,7 @@ Schema operations cause an update to the metadata and are performed under a
 schema lock to avoid concurrent operations on the same object. The following
 sequence of steps define a generic schema operation:
 
-@plantuml_start{schema_generic.png}
+@plantuml_start{schema_generic.png }
 @startuml{schema_generic.png}
 :A schema operation;
 partition with-schema-lock {
@@ -26,7 +26,7 @@ object on the filesystem with the right parameters and then creating an entry
 for this new object into the metadata. The sequence of operations involved in a
 create for various schema types are as follows:
 
-@plantuml_start{schema_create.png}
+@plantuml_start{schema_create.png }
 @startuml{schema_create.png}
 :WT_SESSION->create(.,name,.)
 (__session_create());
@@ -128,7 +128,7 @@ The rename schema operation is responsible for renaming the underlying data
 object on the filesystem and updating the metadata accordingly. The sequence of
 operations involved in a rename for various schema types are as follows:
 
-@plantuml_start{schema_rename.png}
+@plantuml_start{schema_rename.png }
 @startuml{schema_rename.png}
 :WT_SESSION->rename(old-uri, new-uri, .)
 (__session_rename());

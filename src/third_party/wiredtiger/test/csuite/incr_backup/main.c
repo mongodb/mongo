@@ -156,6 +156,20 @@ die(void)
 }
 
 /*
+ * Get operation type based on the number of changes
+ */
+static OPERATION_TYPE
+get_operation_type(uint64_t change_count)
+{
+    int32_t op_type;
+
+    op_type = ((change_count % CHANGES_PER_CYCLE) / KEYS_PER_TABLE);
+    testutil_assert(op_type <= _OPERATION_TYPE_COUNT);
+
+    return (OPERATION_TYPE)op_type;
+}
+
+/*
  * key_value --
  *     Return the key, value and operation type for a given change to a table. See "Cycle of changes
  *     to a table" above.
@@ -175,7 +189,7 @@ key_value(uint64_t change_count, char *key, size_t key_size, WT_ITEM *item, OPER
     char ch;
 
     key_num = change_count % KEYS_PER_TABLE;
-    *typep = op_type = (OPERATION_TYPE)((change_count % CHANGES_PER_CYCLE) / KEYS_PER_TABLE);
+    *typep = op_type = get_operation_type(change_count);
 
     testutil_check(
       __wt_snprintf(key, key_size, KEY_FORMAT, (int)(key_num % 100), (int)(key_num / 100)));
@@ -375,11 +389,8 @@ table_changes(WT_SESSION *session, TABLE *table)
 
             /*
              * To satisfy code analysis checks, we must handle all elements of the enum in the
-             * switch statement. For that reason we use the "less or equal" operator in the assert
-             * condition below to test the upper boundary. We check the lower boundary against 0
-             * since this is the default value of the first element in any enum.
+             * switch statement.
              */
-            testutil_assert(op_type >= 0 && op_type <= _OPERATION_TYPE_COUNT);
             switch (op_type) {
             case INSERT:
                 cur->set_value(cur, &item);
@@ -691,18 +702,15 @@ check_table(WT_SESSION *session, TABLE *table)
     expect_records = 0;
     total_changes = table->change_count;
     boundary = total_changes % KEYS_PER_TABLE;
-    op_type = (OPERATION_TYPE)((total_changes % CHANGES_PER_CYCLE) / KEYS_PER_TABLE);
+    op_type = get_operation_type(total_changes);
     value = dcalloc(1, table->max_value_size);
 
     VERBOSE(3, "Checking: %s\n", table->name);
 
     /*
      * To satisfy code analysis checks, we must handle all elements of the enum in the switch
-     * statement. For that reason we use the "less or equal" operator in the assert condition below
-     * to test the upper boundary. We check the lower boundary against 0 since this is the default
-     * value of the first element in any enum.
+     * statement.
      */
-    testutil_assert(op_type >= 0 && op_type <= _OPERATION_TYPE_COUNT);
     switch (op_type) {
     case INSERT:
         expect_records = total_changes % KEYS_PER_TABLE;

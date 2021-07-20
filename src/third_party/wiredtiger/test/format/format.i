@@ -232,6 +232,38 @@ lock_writeunlock(WT_SESSION *session, RWLOCK *lock)
     }
 }
 
+/*
+ * lock_readlock --
+ *     Wait to get read lock.
+ */
+static inline void
+lock_readlock(WT_SESSION *session, RWLOCK *lock)
+{
+    testutil_assert(LOCK_INITIALIZED(lock));
+
+    if (lock->lock_type == LOCK_WT) {
+        __wt_readlock((WT_SESSION_IMPL *)session, &lock->l.wt);
+    } else {
+        testutil_check(pthread_rwlock_rdlock(&lock->l.pthread));
+    }
+}
+
+/*
+ * lock_writeunlock --
+ *     Release an exclusive lock.
+ */
+static inline void
+lock_readunlock(WT_SESSION *session, RWLOCK *lock)
+{
+    testutil_assert(LOCK_INITIALIZED(lock));
+
+    if (lock->lock_type == LOCK_WT) {
+        __wt_readunlock((WT_SESSION_IMPL *)session, &lock->l.wt);
+    } else {
+        testutil_check(pthread_rwlock_unlock(&lock->l.pthread));
+    }
+}
+
 #define trace_msg(fmt, ...)                                                                        \
     do {                                                                                           \
         if (g.trace) {                                                                             \

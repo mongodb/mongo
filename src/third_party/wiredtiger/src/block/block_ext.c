@@ -583,8 +583,6 @@ __wt_block_free(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, 
         __wt_spin_lock(session, &block->live_lock);
         ret = __wt_block_off_free(session, block, objectid, offset, (wt_off_t)size);
         __wt_spin_unlock(session, &block->live_lock);
-    } else {
-        /* TODO: update stats about older files to drive garbage collection. */
     }
 
     return (ret);
@@ -603,7 +601,7 @@ __wt_block_off_free(
     /* If a sync is running, no other sessions can free blocks. */
     WT_ASSERT(session, WT_SESSION_BTREE_SYNC_SAFE(session, S2BT(session)));
 
-    /* TODO: track stats for old files to drive garbage collection. */
+    /* We can't reuse free space in an object. */
     if (objectid != block->objectid)
         return (0);
 

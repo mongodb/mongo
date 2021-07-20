@@ -41,7 +41,7 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
     WT_DATA_HANDLE *dhandle;
     WT_DECL_RET;
     char *metaconf, *tmp;
-    const char *base, *cfg[4];
+    const char *base, *cfg[4], *strip;
 
     dhandle = session->dhandle;
     base = NULL;
@@ -99,8 +99,11 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
          */
         cfg[0] = tmp;
         cfg[1] = NULL;
-        WT_ERR(__wt_config_merge(
-          session, cfg, "checkpoint=,checkpoint_backup_info=,checkpoint_lsn=", &base));
+        if (dhandle->type == WT_DHANDLE_TYPE_TIERED)
+            strip = "checkpoint=,checkpoint_backup_info=,checkpoint_lsn=,last=,tiers=()";
+        else
+            strip = "checkpoint=,checkpoint_backup_info=,checkpoint_lsn=";
+        WT_ERR(__wt_config_merge(session, cfg, strip, &base));
         __wt_free(session, tmp);
         break;
     case WT_DHANDLE_TYPE_TABLE:
@@ -609,8 +612,6 @@ err:
         /*
          * We want to close the Btree for an object that lives in the local directory. It will
          * actually be part of the corresponding tiered Btree.
-         *
-         * TODO: tiered: need a flag in the dhandle to indicate it's a file and an object.
          */
         if (dhandle->type == WT_DHANDLE_TYPE_BTREE && WT_SUFFIX_MATCH(dhandle->name, ".wtobj"))
             WT_TRET(__wt_btree_close(session));

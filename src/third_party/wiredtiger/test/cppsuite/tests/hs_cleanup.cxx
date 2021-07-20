@@ -28,31 +28,61 @@
 
 #include "test_harness/test.h"
 
+#include "test_harness/connection_manager.h"
+
+using namespace test_harness;
+
 /*
- * Class that defines operations that do nothing as an example.
- * This shows how database operations can be overriden and customized.
+ * Here we want to age out entire pages, i.e. the stop time pair on a page should be globally
+ * visible. To do so we'll update ranges of keys with increasing timestamps which will age out the
+ * pre-existing data. It may not trigger a cleanup on the data file but should result in data
+ * getting cleaned up from the history store.
+ *
+ * This is then tracked using the associated statistic which can be found in the runtime_monitor.
  */
-class hs_cleanup : public test_harness::test {
+class hs_cleanup : public test {
     public:
-    hs_cleanup(const std::string &config, const std::string &name) : test(config, name) {}
+    hs_cleanup(const test_args &args) : test(args) {}
 
     void
-    populate(test_harness::database &database, test_harness::timestamp_manager *_timestamp_manager,
-      test_harness::configuration *_config, test_harness::workload_tracking *tracking)
-       override final
+    update_operation(thread_context *tc) override final
     {
-        std::cout << "populate: nothing done." << std::endl;
-    }
+        logger::log_msg(
+          LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
 
-    void
-    read_operation(test_harness::thread_context *context) override final
-    {
-        std::cout << "read_operation: nothing done." << std::endl;
-    }
+        const char *key_tmp;
 
-    void
-    update_operation(test_harness::thread_context *context) override final
-    {
-        std::cout << "update_operation: nothing done." << std::endl;
+        collection &coll = tc->db.get_collection(tc->id);
+
+        /* In this test each thread gets a single collection. */
+        testutil_assert(tc->db.get_collection_count() == tc->thread_count);
+        scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name.c_str());
+
+        /* We don't know the keyrange we're operating over here so we can't be much smarter here. */
+        while (tc->running()) {
+            tc->sleep();
+
+            if (tc->next(cursor) != 0)
+                continue;
+
+            testutil_check(cursor->get_key(cursor.get(), &key_tmp));
+
+            /* Start a transaction if possible. */
+            tc->transaction.try_begin();
+
+            /*
+             * The retrieved key needs to be passed inside the update function. However, the update
+             * API doesn't guarantee our buffer will still be valid once it is called, as such we
+             * copy the buffer and then pass it into the API.
+             */
+            if (!tc->update(cursor, coll.id, key_value_t(key_tmp)))
+                continue;
+
+            /* Commit our transaction. */
+            tc->transaction.try_commit();
+        }
+        /* Ensure our last transaction is resolved. */
+        if (tc->transaction.active())
+            tc->transaction.commit();
     }
 };

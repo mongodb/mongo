@@ -44,7 +44,37 @@ functions:
     command: shell.exec
     params:
       script: |
+        set -o errexit
+        set -o verbose
         git clone https://github.com/wiredtiger/mongo-tests
+  "fetch mongo repo" :
+    command: shell.exec
+    params:
+      script: |
+        set -o errexit
+        set -o verbose
+        git clone https://github.com/mongodb/mongo
+  "import wiredtiger into mongo" :
+    command: shell.exec
+    params:
+      script: |
+        set -o errexit
+        set -o verbose
+        cp -a wiredtiger mongo/src/third_party/
+  "compile mongodb" :
+    command: shell.exec
+    params:
+      shell: bash
+      working_dir: "mongo"
+      script: |
+        set -o errexit
+        set -o verbose
+        virtualenv -p python3 venv
+        source venv/bin/activate
+        pip3 install requirements_parser
+        pip3 install -r etc/pip/compile-requirements.txt
+        ./buildscripts/scons.py --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --link-model=dynamic --ninja generate-ninja ICECC=icecc CCACHE=ccache
+        ninja -j$(nproc --all) install-mongod
   "configure wiredtiger": &configure_wiredtiger
     command: shell.exec
     params:
@@ -67,7 +97,7 @@ functions:
             mkdir -p cmake_build
             cd cmake_build
             $CMAKE \
-            ${posix_configure_flags|-DCMAKE_TOOLCHAIN_FILE=../build_cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_PYTHON=1 -DENABLE_ZLIB=1 -DENABLE_STATIC=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL} -G "${cmake_generator|Ninja}" ./..
+            ${posix_configure_flags|-DCMAKE_TOOLCHAIN_FILE=../build_cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_PYTHON=1 -DENABLE_ZLIB=1 -DENABLE_STATIC=1 -DENABLE_STRICT=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL} -G "${cmake_generator|Ninja}" ./..
           fi
         elif [ "$OS" != "Windows_NT" ]; then
           # Compiling with Autoconf/Libtool.
@@ -594,27 +624,6 @@ tasks:
       - func: "upload artifact"
       - func: "cleanup"
 
-  - name: compile-msan
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          # We don't compile C++ for memory sanitized testing as it creates false positives
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=skip PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=memory -ggdb"
-          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
-      - func: "upload artifact"
-      - func: "cleanup"
-
-  - name: compile-ubsan
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=undefined -ggdb" CXXFLAGS="-fsanitize=undefined -ggdb"
-          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic
-      - func: "upload artifact"
-      - func: "cleanup"
-
   # production build with --disable-shared
   - name: compile-production-disable-shared
     tags: ["pull_request"]
@@ -711,23 +720,6 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check all"
-
-  - name: make-check-msan-test
-    depends_on:
-      - name: compile-msan
-    commands:
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: compile-msan
-      - func: "compile wiredtiger"
-        vars:
-          # We don't compile C++ for memory sanitized testing as it creates false positives
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/clang CXX=skip PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=memory -ggdb"
-          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
-      - func: "make check all"
-        vars:
-          smp_command: -j 1
-          test_env_vars: MSAN_OPTIONS=abort_on_error=1:disable_coredump=0 MSAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer TESTUTIL_SLOW_MACHINE=1
 
   - name: make-check-linux-no-ftruncate-test
     depends_on:
@@ -929,28 +921,11 @@ tasks:
 
   # End of normal make check test tasks
 
-  - name: ubsan-test
-    depends_on:
-      - name: compile-ubsan
-    commands:
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: compile-ubsan
-      - func: "compile wiredtiger"
-        vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-fsanitize=undefined -ggdb" CXXFLAGS="-fsanitize=undefined -ggdb"
-          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix/examples/c"
-          script: |
-            set -o errexit
-            set -o verbose
-            UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:abort_on_error=1:disable_coredump=0 ./ex_access
-
   # Start of cppsuite test tasks.
+  # All cppsuite pull request tasks must supply the relative path to the config file as we are in
+  # the build_posix working directory and the LD_LIBRARY_PATH is .libs.
 
-  - name: poc-test-cpp
+  - name: cppsuite-base-test-default
     tags: ["pull_request"]
     depends_on:
       - name: compile
@@ -963,7 +938,50 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test/cppsuite/run -t poc_test -f test/cppsuite/configs/config_poc_test_default.txt -l 1
+            ${test_env_vars|} $(pwd)/test/cppsuite/run -t base_test -C 'debug_mode=(cursor_copy=true)' -f test/cppsuite/configs/base_test_default.txt -l 2
+
+  - name: cppsuite-hs-cleanup-default
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test/cppsuite/run -t hs_cleanup -C 'debug_mode=(cursor_copy=true)' -f test/cppsuite/configs/hs_cleanup_default.txt -l 2
+
+  - name: cppsuite-base-test-stress
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/test/cppsuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/run -t base_test -f configs/base_test_stress.txt -l 2
+
+  - name: cppsuite-hs-cleanup-stress
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/test/cppsuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/run -t hs_cleanup -f configs/hs_cleanup_stress.txt -l 2
 
   # End of cppsuite test tasks.
   # Start of csuite test tasks
@@ -1775,21 +1793,6 @@ tasks:
               ${test_env_vars|} test/fops/t
             fi
 
-  - name: million-collection-test
-    commands:
-      - func: "get project"
-      - func: "fetch mongo-tests repo"
-      - command: shell.exec
-        params:
-          working_dir: mongo-tests
-          script: |
-            sudo su
-            set -o errexit
-            set -o verbose
-            ulimit -n 1000000
-            ulimit -c unlimited
-            largescale/run-million-collection-test.sh .
-
   - name: compatibility-test-for-newer-releases
     commands:
       - func: "get project"
@@ -2545,6 +2548,49 @@ tasks:
     name: recovery-stress-test-3
     tags: ["stress-test-3", "stress-test-zseries-3"]
 
+  - name: many-dhandle-stress-test
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars:
+            CXX=/opt/mongodbtoolchain/v3/bin/g++
+            PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-ggdb -fPIC"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/bench/workgen/runner"
+          script: |
+            set -o errexit
+            set -o verbose
+            export "PATH=/opt/mongodbtoolchain/v3/bin:$PATH"
+            ./workgen_perf_check.sh many-dhandle-stress.py output.log 50 500 500
+
+  - name: many-collection-test
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 86400
+          timeout_secs: 86400
+      - func: "fetch mongo repo"
+      - func: "get project"
+      - func: "import wiredtiger into mongo"
+      - func: "compile mongodb"
+      - func: "fetch mongo-tests repo"
+      - command: shell.exec
+        params:
+          working_dir: mongo-tests/largescale
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            sudo su
+            ulimit -n 1000000
+            export "PATH=/opt/mongodbtoolchain/v3/bin:$PATH"
+            virtualenv -p python3 venv
+            source venv/bin/activate
+            pip3 install lorem pymongo
+            ./run_many_coll.sh ../../mongo/build/install/bin/mongod mongodb.log config/many-collection-testing many-collection clean-and-populate
+
   - name: cyclomatic-complexity
     commands:
       - func: "get project"
@@ -2580,10 +2626,6 @@ buildvariants:
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
     - name: ".pull_request !.windows_only !.pull_request_compilers"
-    - name: compile-msan
-    - name: make-check-msan-test
-    - name: compile-ubsan
-    - name: ubsan-test
     - name: linux-directio
       distros: ubuntu1804-build
     - name: syscall-linux
@@ -2640,7 +2682,70 @@ buildvariants:
       LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
     - name: ".pull_request !.windows_only !.pull_request_compilers !.python"
-    - examples-c-test
+    - name: examples-c-test
+
+- name: ubuntu1804-msan
+  display_name: "! Ubuntu 18.04 MSAN"
+  run_on:
+  - ubuntu1804-test
+  expansions:
+    configure_env_vars:
+      # We don't compile C++ for memory sanitized testing as it creates false positives.
+      CC=/opt/mongodbtoolchain/v3/bin/clang
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+      CFLAGS="-fsanitize=memory -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -ggdb"
+    posix_configure_flags:
+      --enable-silent-rules --enable-strict --enable-diagnostic
+      --disable-static --prefix=$(pwd)/LOCAL_INSTALL
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+    test_env_vars:
+      MSAN_OPTIONS="abort_on_error=1:disable_coredump=0:print_stacktrace=1"
+      MSAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so LD_LIBRARY_PATH=$(pwd)/.libs
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+      TESTUTIL_SLOW_MACHINE=1
+  tasks:
+    - name: clang-analyzer
+    - name: compile
+    - name: compile-production-disable-shared
+    - name: compile-production-disable-static
+    - name: examples-c-production-disable-shared-test
+    - name: examples-c-production-disable-static-test
+    - name: format-stress-pull-request-test
+    - name: make-check-test
+
+- name: ubuntu1804-ubsan
+  display_name: "! Ubuntu 18.04 UBSAN"
+  run_on:
+  - ubuntu1804-test
+  expansions:
+    configure_env_vars:
+      CC=/opt/mongodbtoolchain/v3/bin/clang
+      CXX=/opt/mongodbtoolchain/v3/bin/clang++
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+      CFLAGS="-fsanitize=undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -ggdb"
+      CXXFLAGS="-fsanitize=undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -ggdb"
+    posix_configure_flags:
+      --enable-silent-rules --enable-strict --enable-diagnostic
+      --disable-static --prefix=$(pwd)/LOCAL_INSTALL
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+    test_env_vars:
+      UBSAN_OPTIONS="detect_leaks=1:disable_coredump=0:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer:halt_on_error=1:print_stacktrace=1"
+      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so LD_LIBRARY_PATH=$(pwd)/.libs
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+  tasks:
+    - name: clang-analyzer
+    - name: compile
+    - name: compile-production-disable-shared
+    - name: compile-production-disable-static
+    - name: examples-c-production-disable-shared-test
+    - name: examples-c-production-disable-static-test
+    - name: format-stress-pull-request-test
+    - name: make-check-test
+    - name: cppsuite-base-test-default
+    - name: cppsuite-hs-cleanup-default
 
 - name: ubuntu1804-compilers
   display_name: "! Ubuntu 18.04 Compilers"
@@ -2673,6 +2778,41 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
+
+- name: large-scale-tests
+  display_name: "Large scale tests"
+  batchtime: 480 # 3 times a day
+  run_on:
+  - ubuntu1804-test
+  expansions:
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+    posix_configure_flags:
+      --enable-silent-rules --enable-python --enable-zlib --enable-snappy
+      --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+    test_env_vars:
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+  tasks:
+    - name: many-dhandle-stress-test
+    - name: many-collection-test
+      distros: ubuntu1804-wt-large
+
+- name: cppsuite-stress-tests
+  display_name: "Cppsuite Stress Tests"
+  batchtime: 480 # 3 times a day
+  run_on:
+  - ubuntu1804-test
+  expansions:
+    test_env_vars: LD_LIBRARY_PATH=$(pwd)/../../.libs
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+    posix_configure_flags:
+      --enable-silent-rules --enable-python --enable-zlib --enable-snappy
+      --enable-strict --enable-static
+    test_env_vars:
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+  tasks:
+    - name: compile
+    - name: cppsuite-hs-cleanup-stress
+    - name: cppsuite-base-test-stress
 
 - name: package
   display_name: "~ Package"
@@ -2723,10 +2863,6 @@ buildvariants:
     - name: unit-test
     - name: fops
     - name: time-shift-sensitivity-test
-    - name: compile-msan
-    - name: make-check-msan-test
-    - name: compile-ubsan
-    - name: ubsan-test
     - name: linux-directio
       distros: rhel80-build
     - name: syscall-linux
@@ -2741,14 +2877,6 @@ buildvariants:
     - name: ftruncate-test
     - name: long-test
     - name: configure-combinations
-
-- name: large-scale-tests
-  display_name: "~ Large scale tests"
-  batchtime: 1440 # 1 day
-  run_on:
-  - rhel80-build
-  tasks:
-    - name: million-collection-test
 
 - name: code-statistics
   display_name: "Code statistics"
@@ -2817,8 +2945,6 @@ buildvariants:
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH DYLD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
     - name: compile
-      # macos-1012 is a more stable distro that we want to use for our PR testing task
-      distros: macos-1012
     - name: make-check-test
     - name: unit-test-with-compile
     - name: fops

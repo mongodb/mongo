@@ -198,7 +198,7 @@ __curbackup_incr_next(WT_CURSOR *cursor)
         found = false;
         /* The bit offset can be less than or equal to but never greater than the number of bits. */
         WT_ASSERT(session, cb->bit_offset <= cb->nbits);
-        /* Look for the next chunk that had modifications.  */
+        /* Look for the next chunk that had modifications. */
         while (cb->bit_offset < cb->nbits)
             if (__bit_test(cb->bitstring.mem, cb->bit_offset)) {
                 found = true;

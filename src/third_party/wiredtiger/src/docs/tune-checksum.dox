@@ -1,22 +1,27 @@
 /*! @page tune_checksum Checksums
 
-WiredTiger optionally checksums file reads and writes to detect storage
-failures.  In read-only applications, or when file compression provides
-any necessary checksum functionality, or when using backing storage
-systems where blocks require no validation, performance can be increased
-by turning off checksum support when calling the WT_SESSION::create
+WiredTiger optionally checksums file reads and writes to detect storage failures. In read-only
+applications, or when configured compression or encryption provides sufficient checksum
+functionality, or when using backing storage systems where blocks require no validation,
+performance can be increased by turning off checksum support when calling the WT_SESSION::create
 method.
 
-Checksums can be configured to be "off" or "on", as well as "uncompressed".
-The "uncompressed" configuration checksums blocks not otherwise protected
-by compression.   For example, in a system where the compression algorithms
-provide sufficient protection against corruption, and when writing a block
-which is too small to be usefully compressed, setting the checksum
-configuration value to "uncompressed" causes WiredTiger to checksum the
-blocks which are not compressed:
+Checksums can be configured to be "off", "on", "uncompressed" or "unencrypted". The default is
+"on", in which case all block writes include a checksum subsequently verified when the block is
+read. The "off" setting does no checksums, intended for read-only applications or applications
+with storage systems that detect block corruption. The "uncompressed" setting only checksums
+blocks that are not compressed; the "unencrypted" setting only checksums blocks that are not
+encrypted. The "uncompressed" and "unencrypted" settings are intended for applications with
+compression or encryption engines that detect block corruption. Corruption detection is often
+the case for encryption engines (including the sodium engine included in WiredTiger). Corruption
+detection is often not the case for compression engines, specifically, applications configuring
+the lz4, snappy, zlib and zstd compression engines included in WiredTiger are encouraged to
+consider enabling separate checksum support for increased reliability. Of course, the failure
+profile of the underlying storage layer and the cost of an undetected file corruption are
+tradeoffs against the performance improvement of turning off checksums.
+
+The default WiredTiger checksum configuration is "on".
 
 @snippet ex_all.c Configure checksums to uncompressed
-
-The default WiredTiger configuration is \c uncompressed.
 
  */

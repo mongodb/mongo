@@ -25,6 +25,11 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+#
+# [TEST_TAGS]
+# rollback_to_stable:prepare
+# rollback_to_stable:out_of_order_timestamps
+# [END_TAGS]
 
 from wiredtiger import stat, WT_NOTFOUND
 from wtscenario import make_scenarios

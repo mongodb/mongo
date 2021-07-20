@@ -27,7 +27,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # [TEST_TAGS]
-# backup:correctness:full_backup
+# wt_util
+# backup:cursors
 # [END_TAGS]
 #
 

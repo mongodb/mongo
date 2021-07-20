@@ -5,12 +5,9 @@ ASAN
 ActiveState
 Adler's
 Atomicity
-autoconf
 BLOBs
 BLRrVv
-ccache
 CFLAGS
-cmake
 CMake
 COV
 CPPFLAGS
@@ -29,19 +26,19 @@ Coverity's
 Cyclomatic
 DB's
 DBTs
+DCC
+DCMAKE
+DENABLE
 DHANDLE
+DHAVE
 DONTNEED
+DSPINLOCK
+DWT
 Datastore
 DbCursor
 DbEnv
 DbMultiple
-DCC
-DCMAKE
-DENABLE
-DHAVE
-DSPINLOCK
 Durations
-DWT
 EAGAIN
 EB
 EBUSY
@@ -118,6 +115,7 @@ Roelofs
 RrVv
 Rrx
 SCons
+SYSV
 Sanitizer
 Seward's
 SiH
@@ -126,6 +124,7 @@ TXT
 UBSAN
 UNC
 URIs
+VV
 Valgrind
 WILLNEED
 WiredTiger
@@ -141,6 +140,7 @@ WiredTigerRollbackException
 WiredTigerStat
 WiredTigerTestCase
 WiredTigerTmplog
+XChaCha
 XRay
 Yann
 Za
@@ -187,6 +187,7 @@ cacheable
 cachesize
 calc
 callbk
+ccache
 cd
 cdb
 cds
@@ -197,6 +198,7 @@ checksums
 ckp
 ckpt
 clickable
+cmake
 colgroup
 colgroups
 combinatorial
@@ -217,7 +219,10 @@ cppsuite
 cpu
 crashless
 crc
+cryptographic
+cryptographically
 csuite
+ctest
 curfile
 cursortype
 curtable
@@ -269,6 +274,7 @@ dups
 encrypt
 encryptor
 encryptors
+encryptor's
 endcode
 endcond
 endian
@@ -380,6 +386,7 @@ libdir
 libfuzzer
 libhe
 libkvs
+libsodium
 libtool
 libwiredtiger
 lifecycle
@@ -456,6 +463,7 @@ nosync
 notgranted
 notyet
 nowait
+nproc
 ns
 nul
 num
@@ -578,7 +586,6 @@ superset
 svg
 sys
 syscalls
-SYSV
 sz
 tRuE
 tablename
@@ -599,6 +606,7 @@ touchpad
 tpc
 tpcb
 trackpad
+tradeoffs
 transactional
 transactionally
 tt

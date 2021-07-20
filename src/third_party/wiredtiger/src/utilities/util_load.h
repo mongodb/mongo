@@ -22,9 +22,9 @@ int config_reorder(WT_SESSION *, char **);
 int config_update(WT_SESSION *, char **);
 
 /* Flags for util_load_json */
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define LOAD_JSON_APPEND 0x1u       /* append (ignore record number keys) */
 #define LOAD_JSON_NO_OVERWRITE 0x2u /* don't overwrite existing data */
-/* AUTOMATIC FLAG VALUE GENERATION STOP */
+/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 int util_load_json(WT_SESSION *, const char *, uint32_t);

@@ -44,12 +44,11 @@ class test_debug_mode05(wttest.WiredTigerTestCase):
     def test_table_logging_rollback_to_stable(self):
         self.session.create(self.uri, 'key_format=i,value_format=u,log=(enabled=false)')
 
-        cursor = self.session.open_cursor(self.uri, None)
-
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(100))
         self.session.checkpoint()
 
         # Try doing a normal prepared txn and then rollback to stable.
+        cursor = self.session.open_cursor(self.uri, None)
         self.session.begin_transaction()
         for i in range(1, 50):
             cursor[i] = b'a' * 100
@@ -60,6 +59,7 @@ class test_debug_mode05(wttest.WiredTigerTestCase):
         self.session.timestamp_transaction(
             'durable_timestamp=' + timestamp_str(250))
         self.session.commit_transaction()
+        cursor.close()
 
         self.conn.rollback_to_stable()
 
@@ -84,10 +84,12 @@ class test_debug_mode05(wttest.WiredTigerTestCase):
         self.conn.rollback_to_stable()
 
         self.session.begin_transaction()
+        cursor = self.session.open_cursor(self.uri, None)
         for i in range(1, 50):
             cursor[i] = b'b' * 100
         self.session.commit_transaction(
             'commit_timestamp=' + timestamp_str(450))
+        cursor.close()
 
         self.conn.rollback_to_stable()
 

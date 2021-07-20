@@ -644,12 +644,13 @@ __wt_btcur_next_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
     WT_DECL_RET;
     WT_PAGE *page;
     WT_SESSION_IMPL *session;
-    size_t total_skipped, skipped;
+    size_t pages_skipped_count, total_skipped, skipped;
     uint32_t flags;
     bool newpage, restart;
 
     cursor = &cbt->iface;
     session = CUR2S(cbt);
+    pages_skipped_count = 0;
     total_skipped = 0;
 
     WT_STAT_CONN_DATA_INCR(session, cursor_next);
@@ -676,6 +677,16 @@ __wt_btcur_next_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
     F_CLR(cbt, WT_CBT_ITERATE_RETRY_NEXT);
     for (newpage = false;; newpage = true, restart = false) {
         page = cbt->ref == NULL ? NULL : cbt->ref->page;
+
+        /*
+         * Determine if all records on the page have been deleted and all the tombstones are visible
+         * to our transaction. If so, we can avoid reading the records on the page and move to the
+         * next page.
+         */
+        if (__wt_btcur_skip_page(cbt)) {
+            pages_skipped_count++;
+            goto skip_page;
+        }
 
         if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
             /* The page cannot be NULL if the above flag is set. */
@@ -730,7 +741,6 @@ __wt_btcur_next_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
                 continue;
             }
         }
-
         /*
          * If we saw a lot of deleted records on this page, or we went all the way through a page
          * and only saw deleted records, try to evict the page when we release it. Otherwise
@@ -749,7 +759,7 @@ __wt_btcur_next_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
             WT_STAT_CONN_INCR(session, cache_eviction_force_delete);
         }
         cbt->page_deleted_count = 0;
-
+skip_page:
         if (F_ISSET(cbt, WT_CBT_READ_ONCE))
             LF_SET(WT_READ_WONT_NEED);
         WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
@@ -757,6 +767,8 @@ __wt_btcur_next_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
     }
 
 err:
+    WT_STAT_CONN_DATA_INCRV(session, cursor_next_skip_page_count, pages_skipped_count);
+
     if (total_skipped < 100)
         WT_STAT_CONN_DATA_INCR(session, cursor_next_skip_lt_100);
     else

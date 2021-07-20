@@ -41,9 +41,9 @@ struct __wt_index {
     const char *idxkey_format; /* Index key format (hides primary) */
     const char *exkey_format;  /* Key format for custom extractors */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_INDEX_IMMUTABLE 0x1u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags; /* Index configuration flags */
 };
 

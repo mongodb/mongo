@@ -716,6 +716,7 @@ __conn_get_storage_source(
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_NAMED_STORAGE_SOURCE *nstorage_source;
+    WT_STORAGE_SOURCE *storage_source;
 
     conn = (WT_CONNECTION_IMPL *)wt_conn;
     *storage_sourcep = NULL;
@@ -723,7 +724,9 @@ __conn_get_storage_source(
     ret = EINVAL;
     TAILQ_FOREACH (nstorage_source, &conn->storagesrcqh, q)
         if (WT_STREQ(nstorage_source->name, name)) {
-            *storage_sourcep = nstorage_source->storage_source;
+            storage_source = nstorage_source->storage_source;
+            WT_RET(storage_source->ss_add_reference(storage_source));
+            *storage_sourcep = storage_source;
             ret = 0;
             break;
         }
@@ -2862,7 +2865,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__wt_config_gets(session, cfg, "verify_metadata", &cval));
     verify_meta = cval.val;
 
-    /* Only verify the metadata file first. We will verify the history store table later.  */
+    /* Only verify the metadata file first. We will verify the history store table later. */
     if (verify_meta) {
         wt_session = &session->iface;
         ret = wt_session->verify(wt_session, WT_METAFILE_URI, NULL);
