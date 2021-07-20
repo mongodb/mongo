@@ -32,6 +32,11 @@ const doc2 = {
     [metaFieldName]: {c: "C", d: 2},
     f: [{"k": "K", "v": "V"}],
 };
+const doc3 = {
+    _id: 3,
+    [timeFieldName]: dateTime,
+    f: "F",
+};
 
 TimeseriesTest.run((insert) => {
     const testDB = db.getSiblingDB(jsTestName());
@@ -46,11 +51,14 @@ TimeseriesTest.run((insert) => {
         resultDocList,
         nModified = 0,
         failCode = null,
+        hasMetaField = true,
         ordered = true
     }) {
         const coll = testDB.getCollection('t');
-        assert.commandWorked(testDB.createCollection(
-            coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+        assert.commandWorked(testDB.createCollection(coll.getName(), {
+            timeseries: hasMetaField ? {timeField: timeFieldName, metaField: metaFieldName}
+                                     : {timeField: timeFieldName},
+        }));
         assert.commandWorked(insert(coll, initialDocList));
 
         const updateCommand = {update: coll.getName(), updates: updateList};
@@ -390,6 +398,46 @@ TimeseriesTest.run((insert) => {
         }],
         resultDocList: [doc2],
         failCode: ErrorCodes.InvalidOptions,
+    });
+
+    /*********************** Tests updating a collection with no metaField. **********************/
+    // Query on a field which is not the (nonexistent) metaField.
+    testUpdate({
+        initialDocList: [doc3],
+        updateList: [{
+            q: {f: "F"},
+            u: {},
+            multi: true,
+        }],
+        resultDocList: [doc3],
+        failCode: ErrorCodes.InvalidOptions,
+        hasMetaField: false,
+    });
+
+    // Query on all documents and update them to be empty documents.
+    testUpdate({
+        initialDocList: [doc3],
+        updateList: [{
+            q: {},
+            u: {},
+            multi: true,
+        }],
+        resultDocList: [doc3],
+        failCode: ErrorCodes.InvalidOptions,
+        hasMetaField: false,
+    });
+
+    // Query on all documents and update them to be nonempty documents.
+    testUpdate({
+        initialDocList: [doc3],
+        updateList: [{
+            q: {},
+            u: {f: "FF"},
+            multi: true,
+        }],
+        resultDocList: [doc3],
+        failCode: ErrorCodes.InvalidOptions,
+        hasMetaField: false,
     });
 });
 }());
