@@ -2634,7 +2634,7 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyLooksUpCollectionByUUID) {
     auto options = generateOptionsWithUuid();
     ASSERT_OK(storage.createCollection(opCtx, nss, options));
     NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+    ASSERT_EQUALS(ErrorCodes::IndexNotFound,
                   storage.setIndexIsMultikey(
                       opCtx, wrongColl, *options.uuid, "foo", {}, {}, Timestamp(3, 3)));
 }
