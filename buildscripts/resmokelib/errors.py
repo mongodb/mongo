@@ -11,6 +11,11 @@ class SuiteNotFound(ResmokeError):  # noqa: D204
     pass
 
 
+class DuplicateSuiteDefinition(ResmokeError):  # noqa: D204
+    """A suite name with multiple definitions."""
+    pass
+
+
 class StopExecution(ResmokeError):  # noqa: D204
     """Exception raised when resmoke.py should stop executing tests if failing fast is enabled."""
     pass

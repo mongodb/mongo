@@ -3,7 +3,8 @@
   value:
     executor:
       fixture:
-        num_nodes: 2
+        num_nodes: 3
+
 - name: sharded_fixture
   value:
     executor:

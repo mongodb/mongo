@@ -17,6 +17,7 @@ from buildscripts.idl.lib import ALL_FEATURE_FLAG_FILE
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib import mongod_fuzzer_configs
+from buildscripts.resmokelib.suitesconfig import SuiteFinder
 
 
 def validate_and_update_config(parser, args):
@@ -371,9 +372,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 
     _config.UNDO_RECORDER_PATH = config.pop("undo_recorder_path")
 
-    # Populate the named suites by scanning config_dir/suites
-    named_suites = {}
-
     def configure_tests(test_files, replay_file):
         # `_validate_options` has asserted that at most one of `test_files` and `replay_file` contains input.
 
@@ -393,16 +391,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 
     configure_tests(config.pop("test_files"), config.pop("replay_file"))
 
-    suites_dir = os.path.join(_config.CONFIG_DIR, "suites")
-    root = os.path.abspath(suites_dir)
-    files = os.listdir(root)
-    for filename in files:
-        (short_name, ext) = os.path.splitext(filename)
-        if ext in (".yml", ".yaml"):
-            pathname = os.path.join(root, filename)
-            named_suites[short_name] = pathname
-
-    _config.NAMED_SUITES = named_suites
+    _config.NAMED_SUITES = SuiteFinder.get_named_suites(_config.CONFIG_DIR)
 
     _config.LOGGER_DIR = os.path.join(_config.CONFIG_DIR, "loggers")
 

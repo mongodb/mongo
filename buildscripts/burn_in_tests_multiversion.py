@@ -84,23 +84,6 @@ class MultiversionBurnInOrchestrator:
         self.multiversion_util = multiversion_util
         self.burn_in_config = burn_in_config
 
-    def validate_multiversion_tasks_and_suites(self) -> None:
-        """
-        Validate that the multiversion suites and tasks match up.
-
-        We expect the number of suites with MULTIVERSION_PASSTHROUGH_TAG to be the same as in
-        multiversion_suites. Multiversion passthrough suites must include
-        MULTIVERSION_CONFIG_KEY as a root level key and must be set to true.
-
-        Throws an exception if there are inconsistencies.
-        """
-        multiversion_tasks = self.evg_config.get_task_names_by_tag(MULTIVERSION_PASSTHROUGH_TAG)
-        LOGGER.debug("Multiversion tasks by tag", tasks=multiversion_tasks,
-                     tag=MULTIVERSION_PASSTHROUGH_TAG)
-
-        multiversion_suites = get_named_suites_with_root_level_key(MULTIVERSION_CONFIG_KEY)
-        assert len(multiversion_tasks) == len(multiversion_suites)
-
     def generate_tests(self, repos: List[Repo], generate_config: GenerateConfig,
                        target_file: str) -> None:
         """
@@ -289,7 +272,6 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
     inject.configure(dependencies)
 
     burn_in_orchestrator = MultiversionBurnInOrchestrator()  # pylint: disable=no-value-for-parameter
-    burn_in_orchestrator.validate_multiversion_tasks_and_suites()
     burn_in_orchestrator.generate_tests(repos, generate_config, generate_tasks_file)
 
 

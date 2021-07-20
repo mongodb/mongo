@@ -765,7 +765,7 @@ class RunPlugin(PluginInterface):
         parser.add_argument(
             "--multiversionBinVersion", type=str, dest="multiversion_bin_version",
             choices=config.MultiversionOptions.all_options(),
-            help="Chose the multiverion binary version as last-lts or last-continous.")
+            help="Chose the multiverion binary version as last-lts or last-continuous.")
 
         parser.add_argument(
             "--linearChain", action="store", dest="linear_chain", choices=("on", "off"),
