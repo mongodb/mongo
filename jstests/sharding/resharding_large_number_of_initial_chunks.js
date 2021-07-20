@@ -5,6 +5,7 @@
  * @tags: [
  *   requires_fcv_49,
  *   uses_atclustertime,
+ *   resource_intensive
  * ]
  */
 (function() {
@@ -12,7 +13,12 @@
 
 load("jstests/sharding/libs/find_chunks_util.js");
 
-const st = new ShardingTest({mongos: 1, shards: 2});
+// The total size of the zones and chunks documents that the config server writes in a single
+// replica set transaction totals to around 60 MB. WWhen combined with the other operations and
+// transactions occurring in the config server, this large transaction causes WiredTiger to run out
+// of dirty cache space. Hence, we need to increase the wiredTigerCacheSizeGB to 5 GB.
+const st = new ShardingTest(
+    {mongos: 1, shards: 2, config: 1, other: {configOptions: {wiredTigerCacheSizeGB: 5}}});
 
 const kDbName = 'db';
 const collName = 'foo';
@@ -22,8 +28,9 @@ const mongos = st.s;
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
-// TODO SERVER-SERVER-57095 increase the number of zones
-let nZones = 10000;
+// In debug builds, the resharding operation takes significantly longer when there's a large number
+// of chunks and zones. We reduce nZones so the test completes in a reasonable amount of time.
+let nZones = buildInfo().debug ? 10000 : 175000;
 let zones = [];
 let shard0Zones = [];
 let shard1Zones = [];
@@ -38,11 +45,14 @@ for (let i = 0; i < nZones; i++) {
     }
 }
 
+jsTestLog("Updating First Zone");
 assert.commandWorked(
     mongos.getDB("config").shards.update({_id: st.shard0.shardName}, {$set: {tags: shard0Zones}}));
+jsTestLog("Updating First Zone");
 assert.commandWorked(
     mongos.getDB("config").shards.update({_id: st.shard1.shardName}, {$set: {tags: shard1Zones}}));
 
+jsTestLog("Resharding Collection");
 assert.commandWorked(mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, zones: zones}));
 
 // Assert that the correct number of zones and chunks documents exist after resharding 'db.foo'.

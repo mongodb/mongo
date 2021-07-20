@@ -232,13 +232,18 @@ BatchedCommandRequest BatchedCommandRequest::cloneInsertWithIds(
 
 BatchedCommandRequest BatchedCommandRequest::buildDeleteOp(const NamespaceString& nss,
                                                            const BSONObj& query,
-                                                           bool multiDelete) {
+                                                           bool multiDelete,
+                                                           const boost::optional<BSONObj>& hint) {
     return BatchedCommandRequest([&] {
         write_ops::DeleteCommandRequest deleteOp(nss);
         deleteOp.setDeletes({[&] {
             write_ops::DeleteOpEntry entry;
             entry.setQ(query);
             entry.setMulti(multiDelete);
+
+            if (hint) {
+                entry.setHint(hint.get());
+            }
             return entry;
         }()});
         return deleteOp;
@@ -258,7 +263,8 @@ BatchedCommandRequest BatchedCommandRequest::buildUpdateOp(const NamespaceString
                                                            const BSONObj& query,
                                                            const BSONObj& update,
                                                            bool upsert,
-                                                           bool multi) {
+                                                           bool multi,
+                                                           const boost::optional<BSONObj>& hint) {
     return BatchedCommandRequest([&] {
         write_ops::UpdateCommandRequest updateOp(nss);
         updateOp.setUpdates({[&] {
@@ -267,6 +273,9 @@ BatchedCommandRequest BatchedCommandRequest::buildUpdateOp(const NamespaceString
             entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
             entry.setUpsert(upsert);
             entry.setMulti(multi);
+            if (hint) {
+                entry.setHint(hint.get());
+            }
             return entry;
         }()});
         return updateOp;

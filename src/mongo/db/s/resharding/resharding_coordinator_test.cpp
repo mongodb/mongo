@@ -74,7 +74,7 @@ protected:
         client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
         client.createCollection(NamespaceString::kConfigReshardingOperationsNamespace.ns());
         client.createCollection(CollectionType::ConfigNS.ns());
-
+        client.createIndex(TagsType::ConfigNS.ns(), BSON("ns" << 1 << "min" << 1));
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())
             ->onShardingInitialization(operationContext(), true);
@@ -822,7 +822,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWithFetchTimestampSu
     ASSERT_TRUE(initialTempCollectionVersion.isOlderThan(finalTempCollectionVersion));
 }
 
-TEST_F(ReshardingCoordinatorPersistenceTest, StateTranstionToDecisionPersistedSucceeds) {
+TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToDecisionPersistedSucceeds) {
     Timestamp fetchTimestamp = Timestamp(1, 1);
     auto coordinatorDoc = insertStateAndCatalogEntries(
         CoordinatorStateEnum::kBlockingWrites, _originalEpoch, fetchTimestamp);
@@ -847,6 +847,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTranstionToDecisionPersistedSu
 
     auto initialCollectionVersion =
         assertGet(getCollectionVersion(operationContext(), _originalNss));
+
 
     writeDecisionPersistedStateExpectSuccess(
         operationContext(), expectedCoordinatorDoc, fetchTimestamp, updatedChunks, updatedZones);

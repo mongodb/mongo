@@ -160,7 +160,8 @@ public:
      */
     static BatchedCommandRequest buildDeleteOp(const NamespaceString& nss,
                                                const BSONObj& query,
-                                               bool multiDelete);
+                                               bool multiDelete,
+                                               const boost::optional<BSONObj>& hint = boost::none);
 
     /**
      * Returns batch of insert operations to be attached to a transaction
@@ -175,7 +176,8 @@ public:
                                                const BSONObj& query,
                                                const BSONObj& update,
                                                bool upsert,
-                                               bool multi);
+                                               bool multi,
+                                               const boost::optional<BSONObj>& hint = boost::none);
 
     /**
      *  Returns batch of pipeline update operations to be attached to a transaction

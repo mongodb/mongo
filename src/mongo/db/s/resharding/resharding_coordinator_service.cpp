@@ -467,7 +467,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
 }
 
 void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
-                                     std::vector<ChunkType> initialChunks,
+                                     const std::vector<ChunkType>& initialChunks,
                                      std::vector<BSONObj> newZones,
                                      TxnNumber txnNumber) {
     // Insert new initial chunk documents for temp nss
@@ -509,12 +509,14 @@ void removeChunkAndTagsDocs(OperationContext* opCtx,
 
     // Remove all tag documents for the original nss. We do not know how many tag docs currently
     // exist, so cannot pass a value for expectedNumModified
+    auto hint = BSON("ns" << 1 << "min" << 1);
     ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx,
         TagsType::ConfigNS,
         BatchedCommandRequest::buildDeleteOp(TagsType::ConfigNS,
                                              BSON(ChunkType::ns(ns.ns())),  // query
-                                             true                           // multi
+                                             true,                          // multi
+                                             hint                           // hint
                                              ),
         txnNumber);
 }
@@ -564,12 +566,14 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
             opCtx, ChunkType::ConfigNS, chunksRequest, txnNumber);
     }
 
+    auto hint = BSON("ns" << 1 << "min" << 1);
     auto tagsRequest = BatchedCommandRequest::buildUpdateOp(
         TagsType::ConfigNS,
         BSON(TagsType::ns(coordinatorDoc.getTempReshardingNss().ns())),    // query
         BSON("$set" << BSON("ns" << coordinatorDoc.getSourceNss().ns())),  // update
         false,                                                             // upsert
-        true                                                               // multi
+        true,                                                              // multi
+        hint                                                               // hint
     );
 
     // Update the 'ns' field to be the original collection namespace for all tags documents that
@@ -696,6 +700,7 @@ void writeParticipantShardsAndTempCollInfo(
 
             // Insert the config.collections entry for the temporary resharding collection. The
             // chunks all have the same epoch, so picking the last chunk here is arbitrary.
+            invariant(initialChunks.size() != 0);
             auto chunkVersion = initialChunks.back().getVersion();
             writeToConfigCollectionsForTempNss(
                 opCtx, updatedCoordinatorDoc, chunkVersion, CollationSpec::kSimpleSpec, txnNumber);
