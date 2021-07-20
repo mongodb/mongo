@@ -86,10 +86,11 @@ static constexpr uint8_t kEightSelectorLarge = 3;
 // Variables to handle RLE
 static constexpr uint8_t kRleSelector = 15;
 static constexpr uint8_t kMaxRleCount = 16;
-static constexpr uint8_t kRleMinSize = 120;
+static constexpr uint8_t kRleMultiplier = 120;
 
-// Mask to obtain the base selector.
+// Mask to obtain the base and extended selectors.
 static constexpr uint64_t kBaseSelectorMask = 0x000000000000000F;
+static constexpr uint64_t kExtendedSelectorMask = 0x00000000000000F0;
 
 // Selectors are always of size 4
 static constexpr uint8_t kSelectorBits = 4;
@@ -115,8 +116,13 @@ constexpr std::array<uint8_t, 4> kTrailingZerosMaxCount = {0, 15, 60, 124};
 // Obtain a mask for the trailing zeros for the seven and eight selectors. We shift 4 and 5 bits to
 // create the mask The trailingZeroBitSize variable is used as an index, but must be shifted - 4 to
 // correspond to indexes 0 and 1.
-constexpr std::array<uint64_t, 4> kTrailingZerosMask = {
+constexpr std::array<uint8_t, 4> kTrailingZerosMask = {
     0, (1ull << 4) - 1, (1ull << 4) - 1, (1ull << 5) - 1};
+
+// The amount of zeros each value in the trailing zero count represents
+constexpr std::array<uint8_t, 4> kTrailingZerosMultiplier = {
+    0, 1, kNibbleShiftSize, kNibbleShiftSize};
+
 
 // Transfer from a selector to a specific extension type
 // This is for selector 7 and 8 extensions where the selector value is passed along with
@@ -221,7 +227,7 @@ constexpr std::array<std::array<uint8_t, 16>, 4> kIntsStoreForSelector = {
 // return val. Contains unsed vars in order to seamlessly integrate with seven and eight selector
 // extensions.
 struct BaseSelectorEncodeFunctor {
-    uint64_t operator()(const Simple8b::PendingValue& value) {
+    uint64_t operator()(const Simple8bBuilder::PendingValue& value) {
         return value.val;
     };
 };
@@ -230,7 +236,7 @@ struct BaseSelectorEncodeFunctor {
 // word according to the specifications of the sevenSelector extension. This value is then appended
 // to the full simple8b word in _encode.
 struct SevenSelectorEncodeFunctor {
-    uint64_t operator()(const Simple8b::PendingValue& value) {
+    uint64_t operator()(const Simple8bBuilder::PendingValue& value) {
         uint8_t trailingZeros = value.trailingZerosCount[kSevenSelector];
         uint64_t currWord = trailingZeros;
         // We do two shifts here to account for the case where trailingZeros is > kTrailingZero bit
@@ -245,7 +251,7 @@ struct SevenSelectorEncodeFunctor {
 // designated by the inheritance in the EightSelectorSmall and EightSelectorLarge functors.
 template <uint8_t ExtensionType>
 struct EightSelectorEncodeFunctor {
-    uint64_t operator()(const Simple8b::PendingValue& value) {
+    uint64_t operator()(const Simple8bBuilder::PendingValue& value) {
         // integer division. We have a nibble shift of size 4
         uint8_t trailingZeros = value.trailingZerosCount[ExtensionType] / kNibbleShiftSize;
         uint64_t currWord = trailingZeros;
@@ -266,56 +272,6 @@ struct EightSelectorSmallEncodeFunctor : public EightSelectorEncodeFunctor<kEigh
 // word according to the specifications of the eightSelectorLarge extension. This value is then
 // appended to the full simple8b word in _encode.
 struct EightSelectorLargeEncodeFunctor : public EightSelectorEncodeFunctor<kEightSelectorLarge> {};
-
-// This is called in _decode while iterating through a simple8b word. In the case of the
-// baseSelector, we only check for a skip. If the value is a skip, return boost::none.
-struct BaseSelectorDecodeFunctor {
-    boost::optional<uint64_t> operator()(uint64_t value, uint64_t unshiftedMask) {
-        if (unshiftedMask != value)
-            return value;
-        return boost::none;
-    }
-};
-
-// This is called in _decode while iterating through a simple8b word. It takes a value and parses
-// the correct uint64_t result assuming a selector seven extension was used to encode the word. If
-// the value is a skip, return boost::none.
-struct SevenSelectorDecodeFunctor {
-    boost::optional<uint64_t> operator()(uint64_t value, uint64_t unshiftedMask) {
-        uint8_t trailingZeros = value & kTrailingZerosMask[kSevenSelector];
-        if (value != unshiftedMask) {
-            uint64_t valueBits = value >> kTrailingZeroBitSize[kSevenSelector];
-            return valueBits << trailingZeros;
-        }
-        return boost::none;
-    }
-};
-
-// This is a helper method that is called by the eightSelectorSmall and eightSelectorLarge decode
-// functors. It provides the logic for decoding with the eight selector where the extension type is
-// designated by the inheritance in the eightSelectorSmall and eightSelectorLarge functors.
-template <uint8_t ExtensionType>
-struct EightSelectorDecodeFunctor {
-    boost::optional<uint64_t> operator()(uint64_t value, uint64_t unshiftedMask) {
-        // Subtract 4 in kTrailingZerosMask as it is an array with indexs 0 and 1
-        uint8_t trailingZeros = value & kTrailingZerosMask[ExtensionType];
-        if (value != unshiftedMask) {
-            uint64_t valueBits = value >> kTrailingZeroBitSize[ExtensionType];
-            return valueBits << (kNibbleShiftSize * trailingZeros);
-        }
-        return boost::none;
-    }
-};
-
-// This is called in _decode while iterating through a simple8b word. It takes a value and parses
-// the correct uint64_t result assuming a selector eight small extension was used to encode the
-// word. If the value is a skip, return boost::none.
-struct EightSelectorSmallDecodeFunctor : public EightSelectorDecodeFunctor<kEightSelectorSmall> {};
-
-// This is called in _decode while iterating through a simple8b word. It takes a value and parses
-// the correct uint64_t result assuming a selector eight large extension was used to encode the
-// word. If the value is a skip, return boost::none.
-struct EightSelectorLargeDecodeFunctor : public EightSelectorDecodeFunctor<kEightSelectorLarge> {};
 
 uint8_t _countBitsWithoutLeadingZeros(uint64_t value) {
     // All 1s is reserved for skip encoding so we add 1 to value to account for that case.
@@ -358,57 +314,13 @@ void _createRleEncoding(uint8_t count, BufBuilder& buffer) {
 }  // namespace
 
 // Base Constructor for PendingValue
-Simple8b::PendingValue::PendingValue(uint64_t val,
-                                     std::array<uint8_t, 4> bitCount,
-                                     std::array<uint8_t, 4> trailingZerosCount,
-                                     bool skip)
+Simple8bBuilder::PendingValue::PendingValue(uint64_t val,
+                                            std::array<uint8_t, 4> bitCount,
+                                            std::array<uint8_t, 4> trailingZerosCount,
+                                            bool skip)
     : val(val), bitCount(bitCount), trailingZerosCount(trailingZerosCount), skip(skip){};
 
-std::vector<Simple8b::Value> Simple8b::getAllInts() {
-    std::vector<Simple8b::Value> values;
-
-    // Add integers in the BufBuilder first.
-    uint64_t* buf = reinterpret_cast<uint64_t*>(_buffer.buf());
-
-    size_t numBufWords = _buffer.len() / 8;  // 8 chars in a Simple8b word.
-    uint32_t index = 0;
-    for (size_t i = 0; i < numBufWords; i++) {
-        uint64_t simple8bWord = LittleEndian<uint64_t>::load(*buf);
-        _decode(simple8bWord, &index, &values);
-        buf++;
-    }
-
-    // Store added value for RLE.
-    bool isLastAddedANum = true;
-
-    // Then add buffered integers that has not yet been written to the buffer.
-    for (size_t pendingValuesIdx = 0; pendingValuesIdx < _pendingValues.size();
-         ++pendingValuesIdx) {
-        if (_pendingValues[pendingValuesIdx].skip) {
-            ++index;
-            isLastAddedANum = false;
-            continue;
-        }
-        values.push_back({index, _pendingValues[pendingValuesIdx].val});
-        ++index;
-        isLastAddedANum = true;
-    }
-
-    // Handle RLE
-    if (_rleCount > 0 && isLastAddedANum) {
-        // If RLE started on the first Simple8b word, use default value 0, otherwise use that word.
-        uint64_t value = !values.empty() ? values.back().val : 0;
-
-        for (uint32_t i = 0; i < _rleCount; ++i) {
-            // Add all rle values
-            values.push_back({index, value});
-            ++index;
-        }
-    }
-    return values;
-}
-
-bool Simple8b::append(uint64_t value) {
+bool Simple8bBuilder::append(uint64_t value) {
     // TODO (SERVER-58520): Remove invariants before release.
     // There should be no values in _pendingValues if RLE is happening and vice versa.
     invariant(_rleCount == 0 || _pendingValues.empty());
@@ -423,7 +335,7 @@ bool Simple8b::append(uint64_t value) {
     return _appendValue(value, true);
 }
 
-void Simple8b::skip() {
+void Simple8bBuilder::skip() {
     // TODO (SERVER-58520): Remove invariants before release.
     // There should be no values in _pendingValues if RLE is happening and vice versa.
     invariant(_rleCount == 0 || _pendingValues.empty());
@@ -436,7 +348,7 @@ void Simple8b::skip() {
     _appendSkip();
 }
 
-void Simple8b::flush() {
+void Simple8bBuilder::flush() {
     // TODO (SERVER-58520): Remove invariants before release.
     // There should be no values in _pendingValues if RLE is happening and vice versa.
     invariant(_rleCount == 0 || _pendingValues.empty());
@@ -460,15 +372,15 @@ void Simple8b::flush() {
     }
 }
 
-char* Simple8b::data() {
+char* Simple8bBuilder::data() {
     return _buffer.buf();
 }
 
-size_t Simple8b::len() {
+size_t Simple8bBuilder::len() {
     return _buffer.len();
 }
 
-bool Simple8b::_appendValue(uint64_t value, bool tryRle) {
+bool Simple8bBuilder::_appendValue(uint64_t value, bool tryRle) {
     uint8_t trailingZerosCount = _countTrailingZerosWithZero(value);
     // bitCountWithoutLeadingZeros is also the meaningfulValueBitsStoredWithBase.
     uint8_t bitCountWithoutLeadingZeros = _countBitsWithoutLeadingZeros(value);
@@ -565,7 +477,7 @@ bool Simple8b::_appendValue(uint64_t value, bool tryRle) {
     return true;
 }
 
-void Simple8b::_appendSkip() {
+void Simple8bBuilder::_appendSkip() {
     if (!_pendingValues.empty()) {
         bool isLastValueSkip = _pendingValues.back().skip;
 
@@ -584,6 +496,7 @@ void Simple8b::_appendSkip() {
             uint64_t simple8bWord = _encodeLargestPossibleWord(_lastValidExtensionType);
             _buffer.appendNum(tagLittleEndian(simple8bWord));
             isSelectorPossible = {true, true, true, true};
+            _lastValidExtensionType = kBaseSelector;
         }
 
         if (_pendingValues.empty() && isLastValueSkip) {
@@ -598,7 +511,7 @@ void Simple8b::_appendSkip() {
     _pendingValues.push_back({0, {0, 0, 0, 0}, {0, 0, 0, 0}, true});
 }
 
-void Simple8b::_handleRleTermination() {
+void Simple8bBuilder::_handleRleTermination() {
     if (_rleCount == 0)
         return;
 
@@ -615,8 +528,8 @@ void Simple8b::_handleRleTermination() {
     }
 }
 
-void Simple8b::_appendRleEncoding() {
-    uint8_t count = _rleCount / kRleMinSize;
+void Simple8bBuilder::_appendRleEncoding() {
+    uint8_t count = _rleCount / kRleMultiplier;
     // Check to make sure count is big enough for RLE encoding
     if (count >= 1) {
         while (count > kMaxRleCount) {
@@ -625,44 +538,15 @@ void Simple8b::_appendRleEncoding() {
             count -= kMaxRleCount;
         }
         _createRleEncoding(count, _buffer);
-        _rleCount %= kRleMinSize;
+        _rleCount %= kRleMultiplier;
     }
 }
 
-bool Simple8b::_rlePossible() const {
+bool Simple8bBuilder::_rlePossible() const {
     return _pendingValues.empty() || _rleCount != 0;
 }
 
-void Simple8b::_rleDecode(const uint64_t simple8bWord,
-                          uint32_t* index,
-                          std::vector<Simple8b::Value>* decodedValues) const {
-    uint64_t mask = kBaseSelectorMask << kSelectorBits;
-    uint8_t count = (simple8bWord & mask) >> kSelectorBits;
-
-    if (*index == 0) {
-        // We stored (count - 1) during encoding, so we use (count + 1) during decoding.
-        for (uint8_t i = 0; i < (count + 1) * kRleMinSize; ++i) {
-            // If there is a RLE as the first value, store 0s
-            decodedValues->push_back({*index, 0});
-            ++(*index);
-        }
-    }
-
-    if (*index > decodedValues->back().index + 1) {
-        // The previous value was a skip
-        (*index) += (count + 1) * kRleMinSize;
-        return;
-    }
-
-    uint64_t previousValue = decodedValues->back().val;
-    // We stored (count-1) during encoding so we use (count + 1) during decoding.
-    for (uint8_t i = 0; i < (count + 1) * kRleMinSize; ++i) {
-        decodedValues->push_back({*index, previousValue});
-        ++(*index);
-    }
-}
-
-bool Simple8b::_doesIntegerFitInCurrentWord(const PendingValue& value) {
+bool Simple8bBuilder::_doesIntegerFitInCurrentWord(const PendingValue& value) {
     bool fitsInCurrentWord = false;
     for (uint8_t i = 0; i < kNumOfSelectorTypes; ++i) {
         if (isSelectorPossible[i]) {
@@ -676,8 +560,8 @@ bool Simple8b::_doesIntegerFitInCurrentWord(const PendingValue& value) {
     return false;
 }
 
-bool Simple8b::_doesIntegerFitInCurrentWordWithGivenSelectorType(const PendingValue& value,
-                                                                 uint8_t extensionType) {
+bool Simple8bBuilder::_doesIntegerFitInCurrentWordWithGivenSelectorType(const PendingValue& value,
+                                                                        uint8_t extensionType) {
     uint64_t numBitsWithValue =
         (std::max(_currMaxBitLen[extensionType], value.bitCount[extensionType]) +
          kTrailingZeroBitSize[extensionType]) *
@@ -694,7 +578,7 @@ bool Simple8b::_doesIntegerFitInCurrentWordWithGivenSelectorType(const PendingVa
     return true;
 }
 
-int64_t Simple8b::_encodeLargestPossibleWord(uint8_t extensionType) {
+int64_t Simple8bBuilder::_encodeLargestPossibleWord(uint8_t extensionType) {
     // Since this is always called right after _doesIntegerFitInCurrentWord fails for the first
     // time, we know all values in _pendingValues fits in the slots for the selector that can store
     // this many values. Find the smallest selector that doesn't leave any unused slots.
@@ -723,85 +607,8 @@ int64_t Simple8b::_encodeLargestPossibleWord(uint8_t extensionType) {
     return encodedWord;
 }
 
-void Simple8b::_decode(const uint64_t simple8bWord,
-                       uint32_t* index,
-                       std::vector<Simple8b::Value>* decodedValues) const {
-    uint8_t selector = simple8bWord & kBaseSelectorMask;
-    invariant(selector >= kMinSelector[kBaseSelector]);
-    uint8_t extensionType = kBaseSelector;
-    uint8_t selectorExtension = ((simple8bWord >> 60) & kBaseSelectorMask);
-
-    if (selector == 7 || selector == 8) {
-        // Selector-7 due to array LUT indexing of 0 or 1.
-        extensionType = kSelectorToExtension[selector - 7][selectorExtension];
-        selector = extensionType > 0 ? selectorExtension : selector;
-    }
-
-    switch (extensionType) {
-        case kEightSelectorSmall:
-            _parseWord(EightSelectorSmallDecodeFunctor(),
-                       selector,
-                       extensionType,
-                       simple8bWord,
-                       index,
-                       decodedValues);
-            break;
-        case kEightSelectorLarge:
-            _parseWord(EightSelectorLargeDecodeFunctor(),
-                       selector,
-                       extensionType,
-                       simple8bWord,
-                       index,
-                       decodedValues);
-            break;
-        case kSevenSelector:
-            _parseWord(SevenSelectorDecodeFunctor(),
-                       selector,
-                       extensionType,
-                       simple8bWord,
-                       index,
-                       decodedValues);
-            break;
-        default:
-            if (selector == kRleSelector) {
-                _rleDecode(simple8bWord, index, decodedValues);
-            } else {
-                _parseWord(BaseSelectorDecodeFunctor(),
-                           selector,
-                           extensionType,
-                           simple8bWord,
-                           index,
-                           decodedValues);
-            }
-    }
-}
-
 template <typename Func>
-void Simple8b::_parseWord(Func func,
-                          uint8_t selector,
-                          uint8_t extensionType,
-                          const uint64_t simple8bWord,
-                          uint32_t* index,
-                          std::vector<Simple8b::Value>* decodedValues) const {
-    uint8_t bitsPerInteger = kBitsPerIntForSelector[extensionType][selector];
-    uint8_t integersCoded = kIntsStoreForSelector[extensionType][selector];
-    uint64_t unshiftedMask = kDecodeMask[extensionType][selector];
-    uint8_t bitsForTrailingZeros = kTrailingZeroBitSize[extensionType];
-
-    for (uint8_t integerIdx = 0; integerIdx < integersCoded; ++integerIdx) {
-        uint8_t startIdx = (bitsPerInteger + bitsForTrailingZeros) * integerIdx + kSelectorBits;
-        uint64_t mask = unshiftedMask << startIdx;
-        uint64_t value = (simple8bWord & mask) >> startIdx;
-
-        boost::optional<uint64_t> result = func(value, unshiftedMask);
-        if (result)
-            decodedValues->push_back({*index, result.value()});
-        ++(*index);
-    }
-}
-
-template <typename Func>
-uint64_t Simple8b::_encode(Func func, uint8_t selectorIdx, uint8_t extensionType) {
+uint64_t Simple8bBuilder::_encode(Func func, uint8_t selectorIdx, uint8_t extensionType) {
     // TODO (SERVER-58520) : Remove invariants before release.
     invariant(
         !(selectorIdx > kMaxSelector[extensionType] || selectorIdx < kMinSelector[extensionType]));
@@ -827,10 +634,135 @@ uint64_t Simple8b::_encode(Func func, uint8_t selectorIdx, uint8_t extensionType
     return encodedWord;
 }
 
-void Simple8b::_updateSimple8bCurrentState(const PendingValue& val) {
+void Simple8bBuilder::_updateSimple8bCurrentState(const PendingValue& val) {
     for (uint8_t i = 0; i < kNumOfSelectorTypes; ++i) {
         _currMaxBitLen[i] = std::max(_currMaxBitLen[i], val.bitCount[i]);
     }
+}
+
+Simple8b::Iterator::Iterator(const uint64_t* pos, const uint64_t* end)
+    : _pos(pos), _end(end), _value(0), _rleRemaining(0), _shift(0) {
+    if (pos != end) {
+        _loadBlock();
+    }
+}
+
+void Simple8b::Iterator::_loadBlock() {
+    _current = LittleEndian<uint64_t>::load(*_pos);
+
+    uint8_t selector = _current & kBaseSelectorMask;
+
+    // If RLE selector, just load remaining count. Keep value from previous.
+    if (selector == kRleSelector) {
+        // Set shift to something larger than 64bit to force a new block to be loaded when
+        // we've extinguished RLE count.
+        _shift = (sizeof(_current) * 8) + 1;
+        _rleRemaining = _rleCountInCurrent() - 1;
+        return;
+    }
+
+    uint8_t extensionType = kBaseSelector;
+
+    // If Selectors 7 or 8 check if we are using extended selectors
+    if (selector == 7 || selector == 8) {
+        uint8_t selectorExtension = ((_current >> 60) & kBaseSelectorMask);
+        extensionType = kSelectorToExtension[selector - 7][selectorExtension];
+        // Use the extended selector if extension is != 0
+        if (extensionType != kBaseSelector) {
+            selector = selectorExtension;
+        }
+    }
+
+    // Initialize all variables needed to advance the iterator for this block
+    _mask = kDecodeMask[extensionType][selector];
+    _countMask = kTrailingZerosMask[extensionType];
+    _countBits = kTrailingZeroBitSize[extensionType];
+    _countMultiplyer = kTrailingZerosMultiplier[extensionType];
+    _bitsPerValue = kBitsPerIntForSelector[extensionType][selector] + _countBits;
+    _shift = kSelectorBits;
+    _rleRemaining = 0;
+
+    // Finally load the first value in the block.
+    _loadValue();
+}
+
+void Simple8b::Iterator::_loadValue() {
+    // Mask out the value of current slot
+    auto shiftedMask = _mask << _shift;
+    uint64_t value = (_current & shiftedMask) >> _shift;
+
+    // Check if this a skip
+    if (value == _mask) {
+        _value = boost::none;
+        return;
+    }
+
+    // Shift in any trailing zeros that are stored in the count for extended selectors 7 and 8.
+    auto trailingZeros = (value & _countMask);
+    _value = (value >> _countBits) << (trailingZeros * _countMultiplyer);
+}
+
+uint16_t Simple8b::Iterator::_rleCountInCurrent() const {
+    return (((_current & kExtendedSelectorMask) >> kSelectorBits) + 1) * kRleMultiplier;
+}
+
+size_t Simple8b::Iterator::blockSize() const {
+    uint8_t selector = _current & kBaseSelectorMask;
+    uint8_t extensionType = kBaseSelector;
+    if (selector == 7 || selector == 8) {
+        uint8_t selectorExtension = ((_current >> 60) & kBaseSelectorMask);
+        extensionType = kSelectorToExtension[selector - 7][selectorExtension];
+        if (extensionType != kBaseSelector) {
+            selector = selectorExtension;
+        }
+    }
+    return kIntsStoreForSelector[extensionType][selector];
+}
+
+Simple8b::Iterator& Simple8b::Iterator::operator++() {
+    if (_rleRemaining > 0) {
+        --_rleRemaining;
+        return *this;
+    }
+
+    _shift += _bitsPerValue;
+    if (_shift + _bitsPerValue > sizeof(_current) * 8) {
+        return advanceBlock();
+    }
+
+    _loadValue();
+    return *this;
+}
+
+Simple8b::Iterator& Simple8b::Iterator::advanceBlock() {
+    ++_pos;
+    if (_pos == _end) {
+        _rleRemaining = 0;
+        _shift = 0;
+        return *this;
+    }
+
+    _loadBlock();
+    return *this;
+}
+
+bool Simple8b::Iterator::operator==(const Simple8b::Iterator& rhs) const {
+    return _pos == rhs._pos && _rleRemaining == rhs._rleRemaining && _shift == rhs._shift;
+}
+bool Simple8b::Iterator::operator!=(const Simple8b::Iterator& rhs) const {
+    return !operator==(rhs);
+}
+
+Simple8b::Simple8b(const char* buffer, int size) : _buffer(buffer), _size(size) {}
+
+Simple8b::Iterator Simple8b::begin() const {
+    return {reinterpret_cast<const uint64_t*>(_buffer),
+            reinterpret_cast<const uint64_t*>(_buffer + _size)};
+}
+
+Simple8b::Iterator Simple8b::end() const {
+    return {reinterpret_cast<const uint64_t*>(_buffer + _size),
+            reinterpret_cast<const uint64_t*>(_buffer + _size)};
 }
 
 }  // namespace mongo

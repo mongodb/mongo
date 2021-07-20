@@ -38,21 +38,12 @@
 namespace mongo {
 
 /**
- * Simple8b compresses a series of integers into chains of 64 bit Simple8b word.
+ * Simple8bBuilder compresses a series of integers into chains of 64 bit Simple8b word.
  */
-class Simple8b {
+class Simple8bBuilder {
 public:
     // Number of different type of selectors and their extensions available
     static constexpr uint8_t kNumOfSelectorTypes = 4;
-
-    struct Value {
-        uint32_t index;
-        uint64_t val;
-    };
-    /**
-     * Retrieves all integers in the order it was appended.
-     */
-    std::vector<Value> getAllInts();
 
     /**
      * Checks if we can append val to an existing RLE and handles the ending of a RLE.
@@ -113,16 +104,13 @@ private:
     bool _appendValue(uint64_t value, bool tryRle);
 
     /**
-     * Appends a skip to _pendingValues and forms a new Simple8b word if there i
-  s no space.
+     * Appends a skip to _pendingValues and forms a new Simple8b word if there is no space.
      */
     void _appendSkip();
 
     /**
-     * When an RLE ends because of inconsecutive values, check if there are enou
-     gh
-     * consecutive values for a RLE value and/or any values to be appended to _p
-     endingValues.
+     * When an RLE ends because of inconsecutive values, check if there are enough
+     * consecutive values for a RLE value and/or any values to be appended to _pendingValues.
      */
     void _handleRleTermination();
 
@@ -163,35 +151,6 @@ private:
      * remaining integers in _pendingValues.
      */
     int64_t _encodeLargestPossibleWord(uint8_t extensionType);
-
-    /**
-     * Decodes a simple8b word into a vector of integers and their indices. It appends directly
-     * into the passed in vector and the index values starts from the passed in index variable.
-     * When the selector is invalid, nothing will be appended.
-     */
-    void _decode(const uint64_t simple8bWord,
-                 uint32_t* index,
-                 std::vector<Value>* decodedValues) const;
-
-    /*
-     * Parses a simple8b word with the selector compression method passed. This is a helper method
-     * to _decode above which determines the selector and then passes the correpsonding functor to
-     * this function for actual decoding of the simple8b word.
-     */
-    template <typename Func>
-    void _parseWord(Func func,
-                    uint8_t selector,
-                    uint8_t extensionType,
-                    const uint64_t simple8bWord,
-                    uint32_t* index,
-                    std::vector<Simple8b::Value>* decodedValues) const;
-
-    /*
-     * Decodes a RLE simple8b word. A helper method to _decode function.
-     */
-    void _rleDecode(const uint64_t simple8bWord,
-                    uint32_t* index,
-                    std::vector<Simple8b::Value>* decodedValues) const;
 
     /**
      * Takes a vector of integers to be compressed into a 64 bit word via the selector type given.
@@ -237,6 +196,114 @@ private:
     // This holds values that have not be encoded to the simple8b buffer, but are waiting for a full
     // simple8b word to be filled before writing to buffer.
     std::deque<PendingValue> _pendingValues;
+};
+
+/**
+ * Simple8b provides an interface to read Simple8b encoded data built by Simple8bBuilder above
+ */
+class Simple8b {
+public:
+    class Iterator {
+    public:
+        friend class Simple8b;
+
+        // typedefs expected in iterators
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = ptrdiff_t;
+        using value_type = boost::optional<uint64_t>;
+        // pointer and reference is not used but some traits look for them
+        using pointer = const boost::optional<uint64_t>*;
+        using reference = const boost::optional<uint64_t>&;
+
+        /**
+         * Returns the number of values in the current Simple8b block that the iterator is
+         * positioned on.
+         */
+        size_t blockSize() const;
+
+        /**
+         * Returns the value at the current iterator position.
+         */
+        pointer operator->() const {
+            return &_value;
+        }
+        reference operator*() const {
+            return _value;
+        }
+
+        /**
+         * Advance the iterator one step.
+         */
+        Iterator& operator++();
+
+        /**
+         * Advance the iterator to the next Simple8b block.
+         */
+        Iterator& advanceBlock();
+
+        bool operator==(const Iterator& rhs) const;
+        bool operator!=(const Iterator& rhs) const;
+
+    private:
+        Iterator(const uint64_t* pos, const uint64_t* end);
+
+        /**
+         * Loads the current Simple8b block into the iterator
+         */
+        void _loadBlock();
+        void _loadValue();
+
+        /**
+         * RLE count, may only be called if iterator is positioned on an RLE block
+         */
+        uint16_t _rleCountInCurrent() const;
+
+        const uint64_t* _pos;
+        const uint64_t* _end;
+
+        // Current Simple8b block in native endian
+        uint64_t _current;
+
+        boost::optional<uint64_t> _value;
+
+        // Mask for getting a single Simple-8b slot
+        uint64_t _mask;
+
+        // Remaining RLE count for repeating previous value
+        uint16_t _rleRemaining;
+
+        // Number of positions to shift the mask to get slot for current iterator position
+        uint8_t _shift;
+
+        // Number of bits in single Simple-8b slot, used to increment _shift when updating iterator
+        // position
+        uint8_t _bitsPerValue;
+
+        // Variables for the extended Selectors 7 and 8 with embedded count in Simple-8b slot
+        // Mask to extract count
+        uint8_t _countMask;
+
+        // Number of bits for the count
+        uint8_t _countBits;
+
+        // Multiplyer of the value in count to get number of zeros
+        uint8_t _countMultiplyer;
+    };
+
+    /**
+     * Does not take ownership of buffer, must remain valid during the lifetime of this class.
+     */
+    Simple8b(const char* buffer, int size);
+
+    /**
+     * Forward iterators to read decompressed values
+     */
+    Iterator begin() const;
+    Iterator end() const;
+
+private:
+    const char* _buffer;
+    int _size;
 };
 
 }  // namespace mongo
