@@ -8,6 +8,7 @@
 
 # List all the main algorithms for each language, in UTF-8.
 
+czech           UTF_8                   czech,cz,czk
 danish          UTF_8                   danish,da,dan
 dutch           UTF_8                   dutch,nl,dut,nld
 english         UTF_8                   english,en,eng
@@ -20,6 +21,7 @@ norwegian       UTF_8                   norwegian,no,nor
 portuguese      UTF_8                   portuguese,pt,por
 romanian        UTF_8                   romanian,ro,rum,ron
 russian         UTF_8                   russian,ru,rus
+slovak          UTF_8                   slovak,sk,svk
 spanish         UTF_8                   spanish,es,esl,spa
 swedish         UTF_8                   swedish,sv,swe
 turkish         UTF_8                   turkish,tr,tur

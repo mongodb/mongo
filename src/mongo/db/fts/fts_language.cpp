@@ -77,6 +77,7 @@ struct {
     StringData alias;  // - language alias (if nonempty)
 } static constexpr kLanguagesV2V3[] = {
     {"none"_sd, {}},
+    {"czech"_sd, "cz"_sd},
     {"danish"_sd, "da"_sd},
     {"dutch"_sd, "nl"_sd},
     {"english"_sd, "en"_sd},
@@ -89,6 +90,7 @@ struct {
     {"portuguese"_sd, "pt"_sd},
     {"romanian"_sd, "ro"_sd},
     {"russian"_sd, "ru"_sd},
+    {"slovak"_sd, "sk"_sd},
     {"spanish"_sd, "es"_sd},
     {"swedish"_sd, "sv"_sd},
     {"turkish"_sd, "tr"_sd},
@@ -103,17 +105,18 @@ struct {
 struct {
     StringData name;
 } static constexpr kLanguagesV1[] = {
-    {"none"_sd},       {"da"_sd},      {"dan"_sd},       {"danish"_sd},   {"de"_sd},
-    {"deu"_sd},        {"dut"_sd},     {"dutch"_sd},     {"en"_sd},       {"eng"_sd},
-    {"english"_sd},    {"es"_sd},      {"esl"_sd},       {"fi"_sd},       {"fin"_sd},
-    {"finnish"_sd},    {"fr"_sd},      {"fra"_sd},       {"fre"_sd},      {"french"_sd},
-    {"ger"_sd},        {"german"_sd},  {"hu"_sd},        {"hun"_sd},      {"hungarian"_sd},
-    {"it"_sd},         {"ita"_sd},     {"italian"_sd},   {"nl"_sd},       {"nld"_sd},
-    {"no"_sd},         {"nor"_sd},     {"norwegian"_sd}, {"por"_sd},      {"porter"_sd},
-    {"portuguese"_sd}, {"pt"_sd},      {"ro"_sd},        {"romanian"_sd}, {"ron"_sd},
-    {"ru"_sd},         {"rum"_sd},     {"rus"_sd},       {"russian"_sd},  {"spa"_sd},
-    {"spanish"_sd},    {"sv"_sd},      {"swe"_sd},       {"swedish"_sd},  {"tr"_sd},
-    {"tur"_sd},        {"turkish"_sd},
+    {"none"_sd},       {"cz"_sd},       {"czk"_sd},       {"czech"_sd},      {"da"_sd},
+    {"dan"_sd},        {"danish"_sd},   {"de"_sd},        {"deu"_sd},        {"dut"_sd},
+    {"dutch"_sd},      {"en"_sd},       {"eng"_sd},       {"english"_sd},    {"es"_sd},
+    {"esl"_sd},        {"fi"_sd},       {"fin"_sd},       {"finnish"_sd},    {"fr"_sd},
+    {"fra"_sd},        {"fre"_sd},      {"french"_sd},    {"ger"_sd},        {"german"_sd},
+    {"hu"_sd},         {"hun"_sd},      {"hungarian"_sd}, {"it"_sd},         {"ita"_sd},
+    {"italian"_sd},    {"nl"_sd},       {"nld"_sd},       {"no"_sd},         {"nor"_sd},
+    {"norwegian"_sd},  {"por"_sd},      {"porter"_sd},    {"portuguese"_sd}, {"pt"_sd},
+    {"ro"_sd},         {"romanian"_sd}, {"ron"_sd},       {"ru"_sd},         {"rum"_sd},
+    {"rus"_sd},        {"russian"_sd},  {"sk"_sd},        {"svk"_sd},        {"slovak"_sd},
+    {"spa"_sd},        {"spanish"_sd},  {"sv"_sd},        {"swe"_sd},        {"swedish"_sd},
+    {"tr"_sd},         {"tur"_sd},      {"turkish"_sd},
 };
 
 template <TextIndexVersion ver>

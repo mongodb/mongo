@@ -14,6 +14,7 @@ env.SConscript(
 )
 
 stop_word_languages = [
+    'czech',
     'danish',
     'dutch',
     'english',
@@ -26,6 +27,7 @@ stop_word_languages = [
     'portuguese',
     'romanian',
     'russian',
+    'slovak',
     'spanish',
     'swedish',
     'turkish',
