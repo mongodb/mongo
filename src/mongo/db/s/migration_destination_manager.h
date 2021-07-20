@@ -115,10 +115,10 @@ public:
     /**
      * Clones documents from a donor shard.
      */
-    static repl::OpTime cloneDocumentsFromDonor(
+    static repl::OpTime fetchAndApplyBatch(
         OperationContext* opCtx,
-        std::function<void(OperationContext*, BSONObj)> insertBatchFn,
-        std::function<BSONObj(OperationContext*)> fetchBatchFn);
+        std::function<bool(OperationContext*, BSONObj)> applyBatchFn,
+        std::function<bool(OperationContext*, BSONObj*)> fetchBatchFn);
 
     /**
      * Idempotent method, which causes the current ongoing migration to abort only if it has the
@@ -189,7 +189,7 @@ private:
 
     void _migrateDriver(OperationContext* opCtx);
 
-    bool _applyMigrateOp(OperationContext* opCtx, const BSONObj& xfer, repl::OpTime* lastOpApplied);
+    bool _applyMigrateOp(OperationContext* opCtx, const BSONObj& xfer);
 
     bool _flushPendingWrites(OperationContext* opCtx, const repl::OpTime& lastOpApplied);
 

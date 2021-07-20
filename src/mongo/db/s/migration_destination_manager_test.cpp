@@ -70,7 +70,7 @@ protected:
 TEST_F(MigrationDestinationManagerTest, CloneDocumentsFromDonorWorksCorrectly) {
     bool ranOnce = false;
 
-    auto fetchBatchFn = [&](OperationContext* opCtx) {
+    auto fetchBatchFn = [&](OperationContext* opCtx, BSONObj* nextBatch) {
         BSONObjBuilder fetchBatchResultBuilder;
 
         if (ranOnce) {
@@ -80,18 +80,23 @@ TEST_F(MigrationDestinationManagerTest, CloneDocumentsFromDonorWorksCorrectly) {
             fetchBatchResultBuilder.append("objects", createDocumentsToCloneArray());
         }
 
-        return fetchBatchResultBuilder.obj();
+        *nextBatch = fetchBatchResultBuilder.obj();
+        return nextBatch->getField("objects").Obj().isEmpty();
     };
 
     std::vector<BSONObj> resultDocs;
 
     auto insertBatchFn = [&](OperationContext* opCtx, BSONObj docs) {
-        for (auto&& docToClone : docs) {
+        auto arr = docs["objects"].Obj();
+        if (arr.isEmpty())
+            return false;
+        for (auto&& docToClone : arr) {
             resultDocs.push_back(docToClone.Obj().getOwned());
         }
+        return true;
     };
 
-    MigrationDestinationManager::cloneDocumentsFromDonor(
+    MigrationDestinationManager::fetchAndApplyBatch(
         operationContext(), insertBatchFn, fetchBatchFn);
 
     std::vector<BSONObj> originalDocs = createDocumentsToClone();
@@ -110,7 +115,7 @@ TEST_F(MigrationDestinationManagerTest, CloneDocumentsFromDonorWorksCorrectly) {
 TEST_F(MigrationDestinationManagerTest, CloneDocumentsThrowsFetchErrors) {
     bool ranOnce = false;
 
-    auto fetchBatchFn = [&](OperationContext* opCtx) {
+    auto fetchBatchFn = [&](OperationContext* opCtx, BSONObj* nextBatch) {
         BSONObjBuilder fetchBatchResultBuilder;
 
         if (ranOnce) {
@@ -120,12 +125,13 @@ TEST_F(MigrationDestinationManagerTest, CloneDocumentsThrowsFetchErrors) {
         ranOnce = true;
         fetchBatchResultBuilder.append("objects", createDocumentsToCloneArray());
 
-        return fetchBatchResultBuilder.obj();
+        *nextBatch = fetchBatchResultBuilder.obj();
+        return nextBatch->getField("objects").Obj().isEmpty();
     };
 
-    auto insertBatchFn = [&](OperationContext* opCtx, BSONObj docs) {};
+    auto insertBatchFn = [&](OperationContext* opCtx, BSONObj docs) { return true; };
 
-    ASSERT_THROWS_CODE_AND_WHAT(MigrationDestinationManager::cloneDocumentsFromDonor(
+    ASSERT_THROWS_CODE_AND_WHAT(MigrationDestinationManager::fetchAndApplyBatch(
                                     operationContext(), insertBatchFn, fetchBatchFn),
                                 DBException,
                                 ErrorCodes::NetworkTimeout,
@@ -135,20 +141,22 @@ TEST_F(MigrationDestinationManagerTest, CloneDocumentsThrowsFetchErrors) {
 // Tests that an exception in the insertion logic will successfully throw an exception on the
 // main thread.
 TEST_F(MigrationDestinationManagerTest, CloneDocumentsCatchesInsertErrors) {
-    auto fetchBatchFn = [&](OperationContext* opCtx) {
+    auto fetchBatchFn = [&](OperationContext* opCtx, BSONObj* nextBatch) {
         BSONObjBuilder fetchBatchResultBuilder;
         fetchBatchResultBuilder.append("objects", createDocumentsToCloneArray());
-        return fetchBatchResultBuilder.obj();
+        *nextBatch = fetchBatchResultBuilder.obj();
+        return nextBatch->getField("objects").Obj().isEmpty();
     };
 
     auto insertBatchFn = [&](OperationContext* opCtx, BSONObj docs) {
         uasserted(ErrorCodes::FailedToParse, "insertion error");
+        return false;
     };
 
     // Since the error is thrown on another thread, the message becomes "operation was interrupted"
     // on the main thread.
 
-    ASSERT_THROWS_CODE_AND_WHAT(MigrationDestinationManager::cloneDocumentsFromDonor(
+    ASSERT_THROWS_CODE_AND_WHAT(MigrationDestinationManager::fetchAndApplyBatch(
                                     operationContext(), insertBatchFn, fetchBatchFn),
                                 DBException,
                                 51008,

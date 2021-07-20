@@ -447,10 +447,10 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     return Status::OK();
 }
 
-repl::OpTime MigrationDestinationManager::cloneDocumentsFromDonor(
+repl::OpTime MigrationDestinationManager::fetchAndApplyBatch(
     OperationContext* opCtx,
-    std::function<void(OperationContext*, BSONObj)> insertBatchFn,
-    std::function<BSONObj(OperationContext*)> fetchBatchFn) {
+    std::function<bool(OperationContext*, BSONObj)> applyBatchFn,
+    std::function<bool(OperationContext*, BSONObj*)> fetchBatchFn) {
 
     SingleProducerSingleConsumerQueue<BSONObj>::Options options;
     options.maxQueueDepth = 1;
@@ -458,8 +458,8 @@ repl::OpTime MigrationDestinationManager::cloneDocumentsFromDonor(
     SingleProducerSingleConsumerQueue<BSONObj> batches(options);
     repl::OpTime lastOpApplied;
 
-    stdx::thread inserterThread{[&] {
-        Client::initThread("chunkInserter", opCtx->getServiceContext(), nullptr);
+    stdx::thread applicationThread{[&] {
+        Client::initThread("batchApplier", opCtx->getServiceContext(), nullptr);
         auto client = Client::getCurrent();
         {
             stdx::lock_guard lk(*client);
@@ -467,46 +467,45 @@ repl::OpTime MigrationDestinationManager::cloneDocumentsFromDonor(
         }
         auto executor =
             Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
-        auto inserterOpCtx = CancelableOperationContext(
+        auto applicationOpCtx = CancelableOperationContext(
             cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
 
         auto consumerGuard = makeGuard([&] {
             batches.closeConsumerEnd();
-            lastOpApplied = repl::ReplClientInfo::forClient(inserterOpCtx->getClient()).getLastOp();
+            lastOpApplied =
+                repl::ReplClientInfo::forClient(applicationOpCtx->getClient()).getLastOp();
         });
 
         try {
             while (true) {
-                auto nextBatch = batches.pop(inserterOpCtx.get());
-                auto arr = nextBatch["objects"].Obj();
-                if (arr.isEmpty()) {
+                auto nextBatch = batches.pop(applicationOpCtx.get());
+                if (!applyBatchFn(applicationOpCtx.get(), nextBatch)) {
                     return;
                 }
-                insertBatchFn(inserterOpCtx.get(), arr);
             }
         } catch (...) {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             opCtx->getServiceContext()->killOperation(lk, opCtx, ErrorCodes::Error(51008));
             LOGV2(21999,
-                  "Batch insertion failed: {error}",
-                  "Batch insertion failed",
+                  "Batch application failed: {error}",
+                  "Batch application failed",
                   "error"_attr = redact(exceptionToStatus()));
         }
     }};
 
 
     {
-        auto inserterThreadJoinGuard = makeGuard([&] {
+        auto applicationThreadJoinGuard = makeGuard([&] {
             batches.closeProducerEnd();
-            inserterThread.join();
+            applicationThread.join();
         });
 
         while (true) {
-            auto res = fetchBatchFn(opCtx);
+            BSONObj nextBatch;
+            bool emptyBatch = fetchBatchFn(opCtx, &nextBatch);
             try {
-                batches.push(res.getOwned(), opCtx);
-                auto arr = res["objects"].Obj();
-                if (arr.isEmpty()) {
+                batches.push(nextBatch.getOwned(), opCtx);
+                if (emptyBatch) {
                     break;
                 }
             } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueEndClosed>&) {
@@ -1091,7 +1090,11 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
             uassert(50748, "Migration aborted while copying documents", getState() != ABORT);
         };
 
-        auto insertBatchFn = [&](OperationContext* opCtx, BSONObj arr) {
+        auto insertBatchFn = [&](OperationContext* opCtx, BSONObj nextBatch) {
+            auto arr = nextBatch["objects"].Obj();
+            if (arr.isEmpty()) {
+                return false;
+            }
             auto it = arr.begin();
             while (it != arr.end()) {
                 int batchNumCloned = 0;
@@ -1152,10 +1155,11 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
                 sleepmillis(migrateCloneInsertionBatchDelayMS.load());
             }
+            return true;
         };
 
-        auto fetchBatchFn = [&](OperationContext* opCtx) {
-            auto res = uassertStatusOKWithContext(
+        auto fetchBatchFn = [&](OperationContext* opCtx, BSONObj* nextBatch) {
+            auto commandResponse = uassertStatusOKWithContext(
                 fromShard->runCommand(opCtx,
                                       ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                       "admin",
@@ -1163,15 +1167,16 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                                       Shard::RetryPolicy::kNoRetry),
                 "_migrateClone failed: ");
 
-            uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(res),
+            uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(commandResponse),
                                        "_migrateClone failed: ");
 
-            return res.response;
+            *nextBatch = commandResponse.response;
+            return nextBatch->getField("objects").Obj().isEmpty();
         };
 
         // If running on a replicated system, we'll need to flush the docs we cloned to the
         // secondaries
-        lastOpApplied = cloneDocumentsFromDonor(opCtx, insertBatchFn, fetchBatchFn);
+        lastOpApplied = fetchAndApplyBatch(opCtx, insertBatchFn, fetchBatchFn);
 
         timing.done(4);
         migrateThreadHangAtStep4.pauseWhileSet();
@@ -1189,8 +1194,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         // 5. Do bulk of mods
         _setState(CATCHUP);
 
-        while (true) {
-            auto res = uassertStatusOKWithContext(
+        auto fetchBatchFn = [&](OperationContext* opCtx, BSONObj* nextBatch) {
+            auto commandResponse = uassertStatusOKWithContext(
                 fromShard->runCommand(opCtx,
                                       ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                       "admin",
@@ -1198,18 +1203,21 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                                       Shard::RetryPolicy::kNoRetry),
                 "_transferMods failed: ");
 
-            uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(res),
+            uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(commandResponse),
                                        "_transferMods failed: ");
 
-            const auto& mods = res.response;
+            *nextBatch = commandResponse.response;
+            return nextBatch->getField("size").number() == 0;
+        };
 
-            if (mods["size"].number() == 0) {
+        auto applyModsFn = [&](OperationContext* opCtx, BSONObj nextBatch) {
+            if (nextBatch["size"].number() == 0) {
                 // There are no more pending modifications to be applied. End the catchup phase
-                break;
+                return false;
             }
 
-            if (!_applyMigrateOp(opCtx, mods, &lastOpApplied)) {
-                continue;
+            if (!_applyMigrateOp(opCtx, nextBatch)) {
+                return true;
             }
 
             const int maxIterations = 3600 * 50;
@@ -1219,17 +1227,16 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                 opCtx->checkForInterrupt();
                 outerOpCtx->checkForInterrupt();
 
-                if (getState() == ABORT) {
-                    LOGV2(22002,
-                          "Migration aborted while waiting for replication at catch up stage",
-                          "migrationId"_attr = _migrationId->toBSON());
-                    return;
-                }
+                uassert(ErrorCodes::CommandFailed,
+                        str::stream()
+                            << "Migration aborted while waiting for replication at catch up stage, "
+                            << _migrationId->toBSON(),
+                        getState() != ABORT);
 
                 if (runWithoutSession(outerOpCtx, [&] {
                         return opReplicatedEnough(opCtx, lastOpApplied, _writeConcern);
                     })) {
-                    break;
+                    return true;
                 }
 
                 if (i > 100) {
@@ -1241,11 +1248,15 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                 sleepmillis(20);
             }
 
-            if (i == maxIterations) {
-                _setStateFail("secondary can't keep up with migrate");
-                return;
-            }
-        }
+            uassert(ErrorCodes::CommandFailed,
+                    "Secondary can't keep up with migrate",
+                    i != maxIterations);
+
+            return true;
+        };
+
+        auto updatedTime = fetchAndApplyBatch(opCtx, applyModsFn, fetchBatchFn);
+        lastOpApplied = (updatedTime == repl::OpTime()) ? lastOpApplied : updatedTime;
 
         timing.done(5);
         migrateThreadHangAtStep5.pauseWhileSet();
@@ -1312,7 +1323,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
             auto mods = res.response;
 
-            if (mods["size"].number() > 0 && _applyMigrateOp(opCtx, mods, &lastOpApplied)) {
+            if (mods["size"].number() > 0 && _applyMigrateOp(opCtx, mods)) {
+                lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
                 continue;
             }
 
@@ -1359,11 +1371,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     migrateThreadHangAtStep7.pauseWhileSet();
 }
 
-bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
-                                                  const BSONObj& xfer,
-                                                  repl::OpTime* lastOpApplied) {
-    invariant(lastOpApplied);
-
+bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const BSONObj& xfer) {
     bool didAnything = false;
 
     // Deleted documents
@@ -1408,7 +1416,6 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
                               true /* fromMigrate */);
             });
 
-            *lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             didAnything = true;
         }
     }
@@ -1460,7 +1467,6 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
                 Helpers::upsert(opCtx, _nss.ns(), updatedDoc, true);
             });
 
-            *lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             didAnything = true;
         }
     }
