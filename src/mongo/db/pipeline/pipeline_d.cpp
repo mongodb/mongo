@@ -191,8 +191,12 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
                                             minWorkAdvancedRatio);
     }
 
-    return PlanExecutor::make(
-        opCtx, std::move(ws), std::move(root), coll, PlanExecutor::YIELD_AUTO);
+    return PlanExecutor::make(opCtx,
+                              std::move(ws),
+                              std::move(root),
+                              coll,
+                              opCtx->inMultiDocumentTransaction() ? PlanExecutor::INTERRUPT_ONLY
+                                                                  : PlanExecutor::YIELD_AUTO);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
