@@ -26,36 +26,64 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#import bisect
+#import re
 #import yaml
+#from packaging.version import Version
 ##
 ## `args[0]` : the path to a `releases.yml` file.
+## `args[1]` : the mongo version
 ##
-#set $mvc_file = open($args[0], 'r')
+#set $releases_yml_path = $args[0]
+#set $mongo_version = $args[1]
+##
+#set $mvc_file = open($releases_yml_path, 'r')
 #set $mvc_doc = yaml.safe_load($mvc_file)
 #set $fcvs = $mvc_doc['featureCompatibilityVersions']
 #set $majors = $mvc_doc['majorReleases']
- 
-## Change a dotted version to an underscore-delimited version.
-#def underscores($v): $v.replace('.', '_')
+##
+## Transform strings to versions.
+#set $fcvs = list(map(Version, $fcvs))
+#set $majors = list(map(Version, $majors))
+##
+#set $latest = Version(re.sub(r'-.*', '', $mongo_version))
+## Highest release less than latest.
+#set $last_rapid = $fcvs[bisect.bisect_left($fcvs, $latest) - 1]
+## Highest major release less than latest.
+#set global $last_major = $majors[bisect.bisect_left($majors, $latest) - 1]
+##
+## Format a Version as `{major}_{minor}`.
+#def $underscores(v): ${'{}_{}'.format(v.major, v.minor)}
+#def $fcv_prefix(v):${'kFullyDowngradedTo_' if v == $last_major else 'kVersion_'}
+#def $fcv_cpp_name(v):${'{}{}'.format($fcv_prefix(v), $underscores(v))}
 
 namespace mongo::multiversion {
 
 enum class FeatureCompatibilityVersion {
     kInvalid,
-
-    kUnsetDefaultBehavior_$underscores($fcvs[0]),
-    kFullyDowngradedTo_$underscores($fcvs[0]),
-
-#for $fcv in $fcvs[1:]
-    kVersion_$underscores($fcv),
+    kUnsetDefaultBehavior_$underscores($last_major),
+## Generate FCV constants for all versions from last_major to latest, inclusive.
+#for $fcv in $fcvs[bisect.bisect_left($fcvs, $last_major):bisect.bisect_right($fcvs, $latest)]:
+    $fcv_cpp_name($fcv),
 #end for
 };
 
-constexpr size_t kSince_$underscores('4.4') = ${len($fcvs) - 1};
+## Calculate number of versions since v4.4.
+constexpr size_t kSince_$underscores(Version('4.4')) = ${len($fcvs) - 1};
 
-// Last major was "$majors[-1]".
-#set $last_major_fcv_idx = $fcvs.index($majors[-1])
-constexpr size_t kSinceLastMajor = ${len($fcvs) - $last_major_fcv_idx - 1};
+// Last major was "$last_major".
+constexpr size_t kSinceLastMajor = ${len($fcvs) - bisect.bisect_left($fcvs, $last_major) - 1};
+
+class GenericFCV {
+#def define_fcv_alias($id, v):
+static constexpr auto $id = FeatureCompatibilityVersion::$fcv_cpp_name(v);#slurp
+#end def
+public:
+    $define_fcv_alias('kLatest', $latest)
+    $define_fcv_alias('kLastRapid', $last_rapid)
+    $define_fcv_alias('kLastMajor', $last_major)
+};
 
 }  // namespace mongo::multiversion
+
 /* vim: set filetype=cpp: */
