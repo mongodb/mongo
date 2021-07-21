@@ -8,7 +8,8 @@
  *
  * @tags: [
  *   requires_fcv_50,
- *   featureFlagShardedLookup
+ *   featureFlagShardedLookup,
+ *   disabled_due_to_server_58295
  * ]
  */
 (function() {

@@ -3,7 +3,7 @@
  *
  * requires_persistence - This test restarts shards and expects them to remember their data.
  * requires_fcv_47 - This test changed the behavior of disableResumableRangeDeleter from 4.4.
- * @tags: [requires_persistence, requires_fcv_47]
+ * @tags: [requires_persistence, requires_fcv_47, disabled_due_to_server_58295]
  */
 (function() {
 

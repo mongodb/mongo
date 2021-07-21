@@ -71,7 +71,8 @@ buildvariants:
     - rhel80-large
   - name: lint_pylinters
   - name: burn_in_tests_gen
-  - name: aggregation_multiversion_fuzzer_gen
+  # TODO SERVER-58718: Re-enable this suite.
+  # - name: aggregation_multiversion_fuzzer_gen
   - name: aggregation
   - name: burn_in_tags_gen
 - name: buildvariant-without-burn-in-tag-buildvariants
@@ -91,7 +92,8 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel80-large
-  - name: aggregation_multiversion_fuzzer_gen
+  # TODO SERVER-58718: Re-enable this suite.
+  # - name: aggregation_multiversion_fuzzer_gen
   - name: aggregation
 - name: enterprise-rhel-80-64-bit-inmem
   display_name: Enterprise RHEL 8.0 (inMemory)
@@ -134,5 +136,6 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel80-large
-  - name: aggregation_multiversion_fuzzer_gen
+  # TODO SERVER-58718: Re-enable this suite.
+  # - name: aggregation_multiversion_fuzzer_gen
   - name: aggregation

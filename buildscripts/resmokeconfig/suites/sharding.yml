@@ -5,6 +5,9 @@ selector:
   - jstests/sharding/*.js
   - jstests/sharding/change_streams/*.js
   - jstests/sharding/query/*.js
+  exclude_files:
+  # TODO SERVER-58696: Re-enable the below test.
+  - jstests/sharding/implicit_default_write_concern_add_shard.js
 
 executor:
   archive:
