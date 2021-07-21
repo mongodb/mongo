@@ -185,10 +185,15 @@ class test_tiered04(wttest.WiredTigerTestCase):
         retain = self.get_stat(stat.conn.tiered_retention, None)
         self.assertEqual(retain, new)
         self.pr("reconfigure flush_tier")
-        self.session.flush_tier(None)
+        # Call flush_tier with its various configuration arguments. It is difficult
+        # to force a timeout or lock contention with a unit test. So just test the
+        # call for now.
+        self.session.flush_tier('timeout=10')
+        self.session.flush_tier('lock_wait=false')
+        self.session.flush_tier('sync=off')
         self.pr("reconfigure get stat")
         calls = self.get_stat(stat.conn.flush_tier, None)
-        self.assertEqual(calls, 5)
+        self.assertEqual(calls, 7)
 
 if __name__ == '__main__':
     wttest.run()

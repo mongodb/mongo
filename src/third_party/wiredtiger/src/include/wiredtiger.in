@@ -815,6 +815,9 @@ struct __wt_session {
 	 * internal thread.  The \c on setting causes the caller to wait until all work queued for
 	 * this call to be completely processed before returning., a string\, chosen from the
 	 * following options: \c "off"\, \c "on"; default \c on.}
+	 * @config{timeout, maximum amount of time to allow for waiting for previous flushing of
+	 * objects\, in seconds.  The actual amount of time spent waiting may exceed the configured
+	 * value.  A value of zero disables the timeout., an integer; default \c 0.}
 	 * @configend
 	 * @errors
 	 */
