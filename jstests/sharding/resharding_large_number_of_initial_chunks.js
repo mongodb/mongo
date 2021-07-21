@@ -5,7 +5,8 @@
  * @tags: [
  *   requires_fcv_49,
  *   uses_atclustertime,
- *   resource_intensive
+ *   resource_intensive,
+ *   exclude_from_large_txns
  * ]
  */
 (function() {
