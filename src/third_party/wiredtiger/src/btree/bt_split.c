@@ -770,8 +770,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
      * Get a generation for this split, mark the page. This must be after the new index is swapped
      * into place in order to know that no readers with the new generation will look at the old
      * index.
-     *
-     * Getting a new split generation implies a full barrier, no additional barrier is needed.
      */
     WT_FULL_BARRIER();
     split_gen = __wt_gen(session, WT_GEN_SPLIT);
@@ -1042,8 +1040,6 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
      * Get a generation for this split, mark the parent page. This must be after the new index is
      * swapped into place in order to know that no readers with the new generation will look at the
      * old index.
-     *
-     * Getting a new split generation implies a full barrier, no additional barrier is needed.
      */
     WT_FULL_BARRIER();
     split_gen = __wt_gen(session, WT_GEN_SPLIT);

@@ -5,7 +5,8 @@ key_sz=100
 value_sz=1024
 icount=120000000
 run_time=3600
-threads=((count=10,reads=1),(count=10,modifies=1))
+sess_config="isolation=snapshot"
+threads=((count=10,reads=1),(count=10,modify=1,ops_per_txn=1))
 warmup=120
 sample_interval=5
 populate_threads=8
