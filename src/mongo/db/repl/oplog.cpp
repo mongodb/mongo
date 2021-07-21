@@ -1309,11 +1309,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 bool needToDoUpsert = haveWrappingWriteUnitOfWork && !inTxn;
 
                 Timestamp timestamp;
-                long long term = OpTime::kUninitializedTerm;
                 if (assignOperationTimestamp) {
                     timestamp = op.getTimestamp();
-                    invariant(op.getTerm());
-                    term = op.getTerm().get();
                 }
 
                 if (!needToDoUpsert) {
@@ -1321,17 +1318,24 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                     // Do not use supplied timestamps if running through applyOps, as that would
                     // allow a user to dictate what timestamps appear in the oplog.
+                    InsertStatement insertStmt(o);
                     if (assignOperationTimestamp) {
-                        timestamp = op.getTimestamp();
                         invariant(op.getTerm());
-                        term = op.getTerm().get();
+                        insertStmt.oplogSlot = OpTime(op.getTimestamp(), op.getTerm().get());
+                    } else if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(
+                                   opCtx, collection->ns())) {
+                        // Primaries processing inserts always pre-allocate timestamps. For parity,
+                        // we also pre-allocate timestamps for an `applyOps` of insert oplog
+                        // entries. This parity is meaningful for capped collections where the
+                        // insert may result in a delete that becomes replicated.
+                        auto oplogInfo = LocalOplogInfo::get(opCtx);
+                        auto oplogSlots = oplogInfo->getNextOpTimes(opCtx, /*batchSize=*/1);
+                        insertStmt.oplogSlot = oplogSlots.front();
                     }
 
                     OpDebug* const nullOpDebug = nullptr;
-                    Status status = collection->insertDocument(opCtx,
-                                                               InsertStatement(o, timestamp, term),
-                                                               nullOpDebug,
-                                                               false /* fromMigrate */);
+                    Status status = collection->insertDocument(
+                        opCtx, insertStmt, nullOpDebug, false /* fromMigrate */);
 
                     if (status.isOK()) {
                         wuow.commit();
