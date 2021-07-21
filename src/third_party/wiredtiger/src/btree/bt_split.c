@@ -520,8 +520,6 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
      *
      * Note: as the root page cannot currently be evicted, the root split generation isn't ever
      * used. That said, it future proofs eviction and isn't expensive enough to special-case.
-     *
-     * Getting a new split generation implies a full barrier, no additional barrier is needed.
      */
     WT_FULL_BARRIER();
     split_gen = __wt_gen(session, WT_GEN_SPLIT);
