@@ -2985,7 +2985,7 @@ Status _validatePeerRoles(const stdx::unordered_set<RoleName>& embeddedRoles, SS
     }
 
     auto root = sk_X509_value(stack.get(), sk_X509_num(stack.get()) - 1);
-    SHA256Block::HashType digest;
+    auto digest = SHA256Block::HashType();
     if (!X509_digest(root, EVP_sha256(), digest.data(), nullptr)) {
         return {ErrorCodes::BadValue, "Unable to digest root certificate"};
     }
