@@ -133,7 +133,7 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
         c[1] = 1
         c[2] = 1
         c[3] = 1
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(301))
+        self.session.commit_transaction('commit_timestamp=' + timestamp_str(302))
 
         # Trigger a checkpoint, which could trigger reconciliation
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(350))

@@ -162,7 +162,9 @@ snap_track(TINFO *tinfo, thread_op op)
             snap->kdata = drealloc(snap->kdata, ip->size);
             snap->kmemsize = ip->size;
         }
-        memcpy(snap->kdata, ip->data, snap->ksize = ip->size);
+        snap->ksize = ip->size;
+        if (ip->size > 0)
+            memcpy(snap->kdata, ip->data, ip->size);
     }
 
     if (op != REMOVE && op != TRUNCATE) {
@@ -171,7 +173,9 @@ snap_track(TINFO *tinfo, thread_op op)
             snap->vdata = drealloc(snap->vdata, ip->size);
             snap->vmemsize = ip->size;
         }
-        memcpy(snap->vdata, ip->data, snap->vsize = ip->size);
+        snap->vsize = ip->size;
+        if (ip->size > 0)
+            memcpy(snap->vdata, ip->data, ip->size);
     }
 
     /* Move to the next slot, wrap at the end of the circular buffer. */
@@ -262,9 +266,12 @@ snap_verify(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap)
     }
 
     /* Check for simple matches. */
-    if (ret == 0 && snap->op != REMOVE && value->size == snap->vsize &&
-      memcmp(value->data, snap->vdata, value->size) == 0)
-        return (0);
+    if (ret == 0 && snap->op != REMOVE && value->size == snap->vsize) {
+        if (value->size == 0)
+            return (0);
+        if ((value->size > 0) && (memcmp(value->data, snap->vdata, value->size) == 0))
+            return (0);
+    }
     if (ret == WT_NOTFOUND && snap->op == REMOVE)
         return (0);
 

@@ -1195,6 +1195,18 @@ main(int argc, char *argv[])
     /*! [Configure zstd extension with compression level] */
     error_check(conn->close(conn, NULL));
 
+    /* this is outside the example snippet on purpose; don't encourage compiling in keys */
+    const char *secretkey = "abcdef";
+    /*! [Configure sodium extension] */
+    char conf[1024];
+    snprintf(conf, sizeof(conf),
+      "create,extensions=[/usr/local/lib/libwiredtiger_sodium.so],"
+      "encryption=(name=sodium,secretkey=%s)",
+      secretkey);
+    error_check(wiredtiger_open(home, NULL, conf, &conn));
+    /*! [Configure sodium extension] */
+    error_check(conn->close(conn, NULL));
+
     /*
      * This example code gets run, and direct I/O might not be available, causing the open to fail.
      * The documentation requires code snippets, use #ifdef's to avoid running it.

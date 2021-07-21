@@ -394,7 +394,11 @@ __cursor_row_search(WT_CURSOR_BTREE *cbt, bool insert, WT_REF *leaf, bool *leaf_
 static inline int
 __cursor_col_modify(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
 {
+#ifdef HAVE_DIAGNOSTIC
+    return (__wt_col_modify(cbt, cbt->iface.recno, value, NULL, modify_type, false, false));
+#else
     return (__wt_col_modify(cbt, cbt->iface.recno, value, NULL, modify_type, false));
+#endif
 }
 
 /*
@@ -404,7 +408,11 @@ __cursor_col_modify(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
 static inline int
 __cursor_row_modify(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
 {
+#ifdef HAVE_DIAGNOSTIC
+    return (__wt_row_modify(cbt, &cbt->iface.key, value, NULL, modify_type, false, false));
+#else
     return (__wt_row_modify(cbt, &cbt->iface.key, value, NULL, modify_type, false));
+#endif
 }
 
 /*
@@ -1372,17 +1380,19 @@ __cursor_chain_exceeded(WT_CURSOR_BTREE *cbt)
      * of 1, the total size in memory of a set of modify updates is limited to double the size of
      * the modifies.
      *
-     * Otherwise, limit the length of the update chain to a fixed size to bound the cost of
-     * rebuilding the value during reads. When history has to be maintained, creating extra copies
-     * of large documents multiplies cache pressure because the old ones cannot be freed, so allow
-     * the modify chain to grow.
+     * Otherwise, limit the length of the update chain to bound the cost of rebuilding the value
+     * during reads. When history has to be maintained, creating extra copies of large documents
+     * multiplies cache pressure because the old ones cannot be freed, so allow the modify chain to
+     * grow.
      */
     for (i = 0, upd_size = 0; upd != NULL && upd->type == WT_UPDATE_MODIFY; ++i, upd = upd->next) {
+        if (i >= WT_MODIFY_UPDATE_MAX)
+            return (true);
         upd_size += WT_UPDATE_MEMSIZE(upd);
-        if (i >= WT_MAX_MODIFY_UPDATE && upd_size * WT_MODIFY_MEM_FRACTION >= cursor->value.size)
+        if (i >= WT_MODIFY_UPDATE_MIN && upd_size * WT_MODIFY_MEM_FRACTION >= cursor->value.size)
             return (true);
     }
-    if (i >= WT_MAX_MODIFY_UPDATE && upd != NULL && upd->type == WT_UPDATE_STANDARD &&
+    if (i >= WT_MODIFY_UPDATE_MIN && upd != NULL && upd->type == WT_UPDATE_STANDARD &&
       __wt_txn_upd_visible_all(session, upd))
         return (true);
     return (false);

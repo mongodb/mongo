@@ -46,7 +46,7 @@ Format  Python  Notes
   s     str     fixed-length string
   S     str     NUL-terminated string
   t     int     fixed-length bit field
-  u     str     raw byte array
+  u     bytes   raw byte array
 """
 
 from wiredtiger.packutil import _chr, _is_string, _ord, _string_result, \

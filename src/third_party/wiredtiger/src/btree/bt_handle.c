@@ -416,8 +416,10 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
         btree->checksum = CKSUM_ON;
     else if (WT_STRING_MATCH("off", cval.str, cval.len))
         btree->checksum = CKSUM_OFF;
-    else
+    else if (WT_STRING_MATCH("uncompressed", cval.str, cval.len))
         btree->checksum = CKSUM_UNCOMPRESSED;
+    else
+        btree->checksum = CKSUM_UNENCRYPTED;
 
     /* Huffman encoding */
     WT_RET(__wt_btree_huffman_open(session));

@@ -29,80 +29,67 @@
 #ifndef THREAD_CONTEXT_H
 #define THREAD_CONTEXT_H
 
+#include <string>
+
+extern "C" {
+#include "test_util.h"
+}
+
 #include "../core/throttle.h"
-#include "../timestamp_manager.h"
-#include "database_model.h"
-#include "random_generator.h"
-#include "workload_tracking.h"
+#include "../workload/database_model.h"
+
+/* Forward declarations for classes to reduce compilation time and modules coupling. */
+class configuration;
+class timestamp_manager;
+class workload_tracking;
 
 namespace test_harness {
+enum thread_type { READ, INSERT, UPDATE };
+
+static std::string
+type_string(thread_type type)
+{
+    switch (type) {
+    case thread_type::INSERT:
+        return ("insert");
+    case thread_type::READ:
+        return ("read");
+    case thread_type::UPDATE:
+        return ("update");
+    default:
+        testutil_die(EINVAL, "unexpected thread_type: %d", static_cast<int>(type));
+    }
+}
+
 class transaction_context {
     public:
-    explicit transaction_context(configuration *config)
-    {
-        configuration *transaction_config = config->get_subconfig(OPS_PER_TRANSACTION);
-        _min_op_count = transaction_config->get_int(MIN);
-        _max_op_count = transaction_config->get_int(MAX);
-        delete transaction_config;
-    }
+    explicit transaction_context(
+      configuration *config, timestamp_manager *timestamp_manager, WT_SESSION *session);
 
-    bool
-    active() const
-    {
-        return (_in_txn);
-    }
+    bool active() const;
+    void add_op();
+    void begin(const std::string &config = "");
+    /* Begin a transaction if we are not currently in one. */
+    void try_begin(const std::string &config = "");
+    void commit(const std::string &config = "");
+    /* Attempt to commit the transaction given the requirements are met. */
+    void try_commit(const std::string &config = "");
+    void rollback(const std::string &config = "");
+    /* Attempt to rollback the transaction given the requirements are met. */
+    void try_rollback(const std::string &config = "");
+    /* Set a commit timestamp. */
+    void set_commit_timestamp(wt_timestamp_t ts);
 
-    /*
-     * The current transaction can be committed if: A transaction has started and the number of
-     * operations executed in the current transaction has exceeded the threshold.
-     */
-    bool
-    can_commit() const
-    {
-        return (_in_txn && op_count >= _target_op_count);
-    }
+    private:
+    bool can_commit_rollback();
 
-    void
-    commit(WT_SESSION *session, const std::string &config)
-    {
-        /* A transaction cannot be committed if not started. */
-        testutil_assert(_in_txn);
-        testutil_check(
-          session->commit_transaction(session, config.empty() ? nullptr : config.c_str()));
-        _in_txn = false;
-    }
-
-    void
-    begin(WT_SESSION *session, const std::string &config)
-    {
-        if (!_in_txn) {
-            testutil_check(
-              session->begin_transaction(session, config.empty() ? nullptr : config.c_str()));
-            /* This randomizes the number of operations to be executed in one transaction. */
-            _target_op_count =
-              random_generator::instance().generate_integer(_min_op_count, _max_op_count);
-            op_count = 0;
-            _in_txn = true;
-        }
-    }
-
-    /*
-     * Set a commit timestamp.
-     */
-    void
-    set_commit_timestamp(WT_SESSION *session, const std::string &ts)
-    {
-        std::string config = std::string(COMMIT_TS) + "=" + ts;
-        testutil_check(session->timestamp_transaction(session, config.c_str()));
-    }
-
+    private:
     /*
      * op_count is the current number of operations that have been executed in the current
      * transaction.
      */
-    int64_t op_count = 0;
+    int64_t _op_count = 0;
 
-    private:
     /*
      * _min_op_count and _max_op_count are the minimum and maximum number of operations within one
      * transaction. is the current maximum number of operations that can be executed in the current
@@ -112,51 +99,67 @@ class transaction_context {
     int64_t _max_op_count = INT64_MAX;
     int64_t _target_op_count = 0;
     bool _in_txn = false;
+
+    WT_SESSION *_session = nullptr;
+    timestamp_manager *_timestamp_manager = nullptr;
 };
 
 /* Container class for a thread and any data types it may need to interact with the database. */
 class thread_context {
     public:
-    thread_context(configuration *config, timestamp_manager *timestamp_manager,
-      workload_tracking *tracking, database &db)
-        : database(db), timestamp_manager(timestamp_manager), tracking(tracking),
-          transaction(transaction_context(config))
-    {
-        session = connection_manager::instance().create_session();
-        _throttle = throttle(config);
+    thread_context(uint64_t id, thread_type type, configuration *config,
+      scoped_session &&created_session, timestamp_manager *timestamp_manager,
+      workload_tracking *tracking, database &dbase);
 
-        /* These won't exist for read threads which is why we use optional here. */
-        key_size = config->get_optional_int(KEY_SIZE, 1);
-        value_size = config->get_optional_int(VALUE_SIZE, 1);
+    virtual ~thread_context() = default;
 
-        testutil_assert(key_size > 0 && value_size > 0);
-    }
+    void finish();
 
-    void
-    finish()
-    {
-        _running = false;
-    }
+    /*
+     * Convert a key_id to a string. If the resulting string is less than the given length, padding
+     * of '0' is added.
+     */
+    std::string key_to_string(uint64_t key_id);
 
-    void
-    sleep()
-    {
-        _throttle.sleep();
-    }
+    /*
+     * Generic update function, takes a collection_id and key, will generate the value.
+     *
+     * Returns true if it successfully updates the key, false if it receives rollback from the API.
+     */
+    bool update(scoped_cursor &cursor, uint64_t collection_id, const std::string &key);
 
-    bool
-    running() const
-    {
-        return (_running);
-    }
+    /*
+     * Generic insert function, takes a collection_id and key_id, will generate the value.
+     *
+     * Returns true if it successfully inserts the key, false if it receives rollback from the API.
+     */
+    bool insert(scoped_cursor &cursor, uint64_t collection_id, uint64_t key_id);
 
-    WT_SESSION *session;
+    /*
+     * Generic next function.
+     *
+     * Handles rollback and not found internally, but will return the error code to the caller so
+     * the caller can distinguish between them.
+     */
+    int next(scoped_cursor &cursor);
+
+    void sleep();
+    bool running() const;
+
+    public:
+    scoped_session session;
+    scoped_cursor op_track_cursor;
     transaction_context transaction;
-    test_harness::timestamp_manager *timestamp_manager;
-    test_harness::workload_tracking *tracking;
-    test_harness::database &database;
-    int64_t key_size = 0;
-    int64_t value_size = 0;
+    timestamp_manager *tsm;
+    workload_tracking *tracking;
+    database &db;
+    const int64_t collection_count;
+    const int64_t key_count;
+    const int64_t key_size;
+    const int64_t value_size;
+    const int64_t thread_count;
+    const uint64_t id;
+    const thread_type type;
 
     private:
     throttle _throttle;

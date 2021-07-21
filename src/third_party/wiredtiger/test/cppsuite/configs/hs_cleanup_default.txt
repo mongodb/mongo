@@ -1,0 +1,59 @@
+# Configuration for hs_cleanup.
+# need to be defined.
+duration_seconds=60,
+cache_size_mb=200,
+statistics_config=
+(
+    type=all,
+    enable_logging=true
+),
+checkpoint_manager=
+(
+    enabled=true,
+    op_rate=20s
+),
+runtime_monitor=
+(
+    stat_cache_size=
+    (
+        enabled=true,
+        limit=1000
+    ),
+    stat_db_size=
+    (
+        enabled=true,
+        #10GB
+        limit=10000000000
+    ),
+    postrun_statistics=[cache_hs_insert:0:100000000, cc_pages_removed:0:10000000],
+),
+timestamp_manager=
+(
+    enabled=true,
+    oldest_lag=5,
+    op_rate=1s,
+    stable_lag=5
+),
+workload_generator=
+(
+    populate_config=
+    (
+        collection_count=10,
+        key_count_per_collection=500,
+        key_size=100,
+        thread_count=10,
+        value_size=10000
+    ),
+    update_config=
+    (
+        op_rate=10ms,
+        ops_per_transaction=(max=100,min=20),
+        thread_count=10,
+        value_size=10000
+    )
+),
+workload_tracking=
+(
+    enabled=true,
+    op_rate=30s
+)

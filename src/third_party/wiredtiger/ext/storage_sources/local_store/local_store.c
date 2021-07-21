@@ -68,6 +68,11 @@ typedef struct {
     pthread_rwlock_t file_handle_lock;
 
     /*
+     * Keep the number of references to this storage source.
+     */
+    uint32_t reference_count;
+
+    /*
      * Configuration values are set at startup.
      */
     uint32_t delay_ms;    /* Average length of delay when simulated */
@@ -129,7 +134,7 @@ static int local_writeable(LOCAL_STORAGE *, const char *name, bool *writeable);
 /*
  * Forward function declarations for storage source API implementation
  */
-static int local_exist(WT_FILE_SYSTEM *, WT_SESSION *, const char *, bool *);
+static int local_add_reference(WT_STORAGE_SOURCE *);
 static int local_customize_file_system(
   WT_STORAGE_SOURCE *, WT_SESSION *, const char *, const char *, const char *, WT_FILE_SYSTEM **);
 static int local_flush(
@@ -149,6 +154,7 @@ static int local_directory_list_internal(
 static int local_directory_list_single(
   WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, char ***, uint32_t *);
 static int local_directory_list_free(WT_FILE_SYSTEM *, WT_SESSION *, char **, uint32_t);
+static int local_exist(WT_FILE_SYSTEM *, WT_SESSION *, const char *, bool *);
 static int local_fs_terminate(WT_FILE_SYSTEM *, WT_SESSION *);
 static int local_open(WT_FILE_SYSTEM *, WT_SESSION *, const char *, WT_FS_OPEN_FILE_TYPE file_type,
   uint32_t, WT_FILE_HANDLE **);
@@ -171,14 +177,14 @@ static int local_file_write(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t, size_t, co
  * Report an error for a file operation. Note that local_err returns its third argument, and this
  * macro will too.
  */
-#define FS2LOCAL(fs) (((LOCAL_FILE_SYSTEM *)(fs))->local_storage)
+#define WT_FS2LOCAL(fs) (((LOCAL_FILE_SYSTEM *)(fs))->local_storage)
 
-#define VERBOSE(local, ...)               \
+#define WT_VERBOSE_LS(local, ...)         \
     do {                                  \
         if ((local)->verbose > 0)         \
             fprintf(stderr, __VA_ARGS__); \
     } while (0);
-#define SHOW_STRING(s) (((s) == NULL) ? "<null>" : (s))
+#define WT_SHOW_STRING(s) (((s) == NULL) ? "<null>" : (s))
 
 /*
  * local_configure
@@ -238,15 +244,21 @@ local_delay(LOCAL_STORAGE *local)
 
     ret = 0;
     if (local->force_delay != 0 && local->object_flushes % local->force_delay == 0) {
-        VERBOSE(local,
+        WT_VERBOSE_LS(local,
           "Artificial delay %" PRIu32 " milliseconds after %" PRIu64 " object flushes\n",
           local->delay_ms, local->object_flushes);
+        /*
+         * tv_usec has type suseconds_t, which is signed (hence the s), but ->delay_ms is unsigned.
+         * In both gcc8 and gcc10 with -Wsign-conversion enabled (as we do) this causes a spurious
+         * warning about the implicit conversion possibly changing the value. Hence the explicit
+         * cast. (both struct timeval and suseconds_t are POSIX)
+         */
         tv.tv_sec = local->delay_ms / 1000;
-        tv.tv_usec = (local->delay_ms % 1000) * 1000;
+        tv.tv_usec = (suseconds_t)(local->delay_ms % 1000) * 1000;
         (void)select(0, NULL, NULL, NULL, &tv);
     }
     if (local->force_error != 0 && local->object_flushes % local->force_error == 0) {
-        VERBOSE(local, "Artificial error returned after %" PRIu64 " object flushes\n",
+        WT_VERBOSE_LS(local, "Artificial error returned after %" PRIu64 " object flushes\n",
           local->object_flushes);
         ret = ENETUNREACH;
     }
@@ -369,10 +381,31 @@ local_path(WT_FILE_SYSTEM *file_system, const char *dir, const char *name, char 
     }
     len = strlen(dir) + strlen(name) + 2;
     if ((p = malloc(len)) == NULL)
-        return (local_err(FS2LOCAL(file_system), NULL, ENOMEM, "local_path"));
+        return (local_err(WT_FS2LOCAL(file_system), NULL, ENOMEM, "local_path"));
     snprintf(p, len, "%s/%s", dir, name);
     *pathp = p;
     return (ret);
+}
+
+/*
+ * local_add_reference --
+ *     Add a reference to the storage source so we can reference count to know when to really
+ *     terminate.
+ */
+static int
+local_add_reference(WT_STORAGE_SOURCE *storage_source)
+{
+    LOCAL_STORAGE *local;
+
+    local = (LOCAL_STORAGE *)storage_source;
+
+    /*
+     * Missing reference or overflow?
+     */
+    if (local->reference_count == 0 || local->reference_count + 1 == 0)
+        return (EINVAL);
+    ++local->reference_count;
+    return (0);
 }
 
 /*
@@ -486,7 +519,7 @@ local_exist(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, 
     int ret;
     char *path;
 
-    local = FS2LOCAL(file_system);
+    local = WT_FS2LOCAL(file_system);
     path = NULL;
 
     /* If the file exists directly in the file system, it's not yet flushed, and we're done. */
@@ -655,7 +688,7 @@ static int
 local_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *directory,
   const char *prefix, char ***dirlistp, uint32_t *countp)
 {
-    FS2LOCAL(file_system)->op_count++;
+    WT_FS2LOCAL(file_system)->op_count++;
     return (
       local_directory_list_internal(file_system, session, directory, prefix, 0, dirlistp, countp));
 }
@@ -668,7 +701,7 @@ static int
 local_directory_list_single(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *directory,
   const char *prefix, char ***dirlistp, uint32_t *countp)
 {
-    FS2LOCAL(file_system)->op_count++;
+    WT_FS2LOCAL(file_system)->op_count++;
     return (
       local_directory_list_internal(file_system, session, directory, prefix, 1, dirlistp, countp));
 }
@@ -683,7 +716,7 @@ local_directory_list_free(
 {
     (void)session;
 
-    FS2LOCAL(file_system)->op_count++;
+    WT_FS2LOCAL(file_system)->op_count++;
     if (dirlist != NULL) {
         while (count > 0)
             free(dirlist[--count]);
@@ -811,7 +844,7 @@ local_fs_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *session)
     (void)session; /* unused */
 
     local_fs = (LOCAL_FILE_SYSTEM *)file_system;
-    FS2LOCAL(file_system)->op_count++;
+    WT_FS2LOCAL(file_system)->op_count++;
     free(local_fs->auth_token);
     free(local_fs->bucket_dir);
     free(local_fs->cache_dir);
@@ -948,8 +981,8 @@ local_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
 
     *file_handlep = file_handle;
 
-    VERBOSE(
-      local, "File opened: %s final path=%s\n", SHOW_STRING(name), SHOW_STRING(local_fh->fh->name));
+    WT_VERBOSE_LS(local, "File opened: %s final path=%s\n", WT_SHOW_STRING(name),
+      WT_SHOW_STRING(local_fh->fh->name));
 
 err:
     free(alloced_path);
@@ -977,7 +1010,7 @@ local_rename(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *from,
     int ret;
     bool writeable;
 
-    local = FS2LOCAL(file_system);
+    local = WT_FS2LOCAL(file_system);
     local_fs = (LOCAL_FILE_SYSTEM *)file_system;
     wt_fs = local_fs->wt_fs;
 
@@ -1013,7 +1046,7 @@ local_remove(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
 
     (void)flags; /* Unused */
 
-    local = FS2LOCAL(file_system);
+    local = WT_FS2LOCAL(file_system);
 
     local->op_count++;
     if ((ret = local_writeable(local, name, &writeable)) != 0)
@@ -1045,7 +1078,7 @@ local_size(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, w
     int ret;
     char *path;
 
-    local = FS2LOCAL(file_system);
+    local = WT_FS2LOCAL(file_system);
     path = NULL;
 
     local->op_count++;
@@ -1084,6 +1117,9 @@ local_terminate(WT_STORAGE_SOURCE *storage, WT_SESSION *session)
 
     ret = 0;
     local = (LOCAL_STORAGE *)storage;
+
+    if (--local->reference_count != 0)
+        return (0);
 
     local->op_count++;
 
@@ -1264,10 +1300,16 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
      * Allocate a local storage structure, with a WT_STORAGE structure as the first field, allowing
      * us to treat references to either type of structure as a reference to the other type.
      */
+    local->storage_source.ss_add_reference = local_add_reference;
     local->storage_source.ss_customize_file_system = local_customize_file_system;
     local->storage_source.ss_flush = local_flush;
     local->storage_source.ss_flush_finish = local_flush_finish;
     local->storage_source.terminate = local_terminate;
+
+    /*
+     * The first reference is implied by the call to add_storage_source.
+     */
+    local->reference_count = 1;
 
     if ((ret = local_configure(local, config)) != 0) {
         free(local);

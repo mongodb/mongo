@@ -575,15 +575,14 @@ __wt_block_free(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, 
       (intmax_t)offset, (intmax_t)size);
 
 #ifdef HAVE_DIAGNOSTIC
-    WT_RET(__wt_block_misplaced(session, block, "free", offset, size, true, __func__, __LINE__));
+    WT_RET(__wt_block_misplaced(
+      session, block, "free", offset, size, true, __PRETTY_FUNCTION__, __LINE__));
 #endif
     if (objectid == block->objectid) {
         WT_RET(__wt_block_ext_prealloc(session, 5));
         __wt_spin_lock(session, &block->live_lock);
         ret = __wt_block_off_free(session, block, objectid, offset, (wt_off_t)size);
         __wt_spin_unlock(session, &block->live_lock);
-    } else {
-        /* TODO: update stats about older files to drive garbage collection. */
     }
 
     return (ret);
@@ -602,7 +601,7 @@ __wt_block_off_free(
     /* If a sync is running, no other sessions can free blocks. */
     WT_ASSERT(session, WT_SESSION_BTREE_SYNC_SAFE(session, S2BT(session)));
 
-    /* TODO: track stats for old files to drive garbage collection. */
+    /* We can't reuse free space in an object. */
     if (objectid != block->objectid)
         return (0);
 
@@ -1164,7 +1163,7 @@ __wt_block_extlist_write(
     WT_EXT *ext;
     WT_PAGE_HEADER *dsk;
     size_t size;
-    uint32_t objectid, entries;
+    uint32_t entries;
     uint8_t *p;
 
     WT_RET(__block_extlist_dump(session, block, el, "write"));
@@ -1222,8 +1221,7 @@ __wt_block_extlist_write(
 
     /* Write the extent list to disk. */
     WT_ERR(__wt_block_write_off(
-      session, block, tmp, &objectid, &el->offset, &el->size, &el->checksum, true, true, true));
-    WT_UNUSED(objectid); /* TODO: tiered: check */
+      session, block, tmp, &el->objectid, &el->offset, &el->size, &el->checksum, true, true, true));
 
     /*
      * Remove the allocated blocks from the system's allocation list, extent blocks never appear on

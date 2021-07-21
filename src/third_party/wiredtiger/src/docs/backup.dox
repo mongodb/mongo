@@ -133,7 +133,7 @@ this cursor will return the filename as the key.  There is no associated
 value.  The information returned will be based on blocks tracked since the time of
 the previous backup designated with "ID1".  New block tracking will be started as
 "ID2" as well.  WiredTiger will maintain modifications from two IDs, the current
-and the most recent completed one. Note that all backup identifiers are subject to
+and the most recently completed one. Note that all backup identifiers are subject to
 the same naming restrictions as other configuration naming. See @ref config_intro
 for details.
 

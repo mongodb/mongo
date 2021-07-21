@@ -25,6 +25,17 @@ static const char *mongodb_config = "log=(enabled=true,path=journal,compressor=s
 #define REC_RECOVER "log=(recover=on)"
 #define SALVAGE "salvage=true"
 
+/*
+ * wt_explicit_zero: clear a buffer, with precautions against being optimized away.
+ */
+static void
+wt_explicit_zero(void *ptr, size_t len)
+{
+    /* Call through a volatile pointer to avoid removal even when it's a dead store. */
+    static void *(*volatile memsetptr)(void *ptr, int ch, size_t len) = memset;
+    (void)memsetptr(ptr, '\0', len);
+}
+
 static void
 usage(void)
 {
@@ -100,13 +111,15 @@ main(int argc, char *argv[])
         case 'C': /* wiredtiger_open config */
             cmd_config = __wt_optarg;
             break;
-        case 'E':            /* secret key */
+        case 'E': /* secret key */
+            if (secretkey != NULL)
+                wt_explicit_zero(secretkey, strlen(secretkey));
             free(secretkey); /* lint: set more than once */
             if ((secretkey = strdup(__wt_optarg)) == NULL) {
                 (void)util_err(NULL, errno, NULL);
                 goto err;
             }
-            memset(__wt_optarg, 0, strlen(__wt_optarg));
+            wt_explicit_zero(__wt_optarg, strlen(__wt_optarg));
             break;
         case 'h': /* home directory */
             home = __wt_optarg;
@@ -286,6 +299,15 @@ open:
         goto err;
     }
 
+    if (secretkey != NULL) {
+        /* p contains a copy of secretkey, so zero both before freeing */
+        wt_explicit_zero(p, strlen(p));
+        wt_explicit_zero(secretkey, strlen(secretkey));
+    }
+    free(p);
+    free(secretkey);
+    config = secretkey = p = NULL;
+
     /* If we only want to verify the metadata, that is done in wiredtiger_open. We're done. */
     if (func == NULL && meta_verify)
         goto done;
@@ -304,6 +326,17 @@ err:
     }
 done:
 
+    /* may get here via either err or done before the free above happens */
+    if (p != NULL) {
+        /* p may contain a copy of secretkey, so zero before freeing */
+        wt_explicit_zero(p, strlen(p));
+        free(p);
+    }
+    if (secretkey != NULL) {
+        wt_explicit_zero(secretkey, strlen(secretkey));
+        free(secretkey);
+    }
+
     if (conn != NULL) {
         /* Maintain backward compatibility. */
         if (backward_compatible &&
@@ -314,9 +347,6 @@ done:
         if ((tret = conn->close(conn, NULL)) != 0 && ret == 0)
             ret = tret;
     }
-
-    free(p);
-    free(secretkey);
 
     return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

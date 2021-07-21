@@ -26,32 +26,34 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef DEBUG_UTILS_H
-#define DEBUG_UTILS_H
+#include "test_harness/util/logger.h"
+#include "thread_manager.h"
 
-#include <iostream>
-
-/* Define helpful functions related to debugging. */
 namespace test_harness {
-
-#define DEBUG_ERROR 0
-#define DEBUG_INFO 1
-#define DEBUG_TRACE 2
-
-static int64_t _trace_level = 0;
-
-/* Used to print out traces for debugging purpose. */
-static void
-debug_print(const std::string &str, int64_t trace_type)
+thread_manager::~thread_manager()
 {
-    if (_trace_level >= trace_type) {
-        if (trace_type >= DEBUG_ERROR)
-            std::cerr << str << std::endl;
-        else
-            std::cout << str << std::endl;
+    for (auto &it : _workers) {
+        if (it != nullptr && it->joinable()) {
+            logger::log_msg(LOG_ERROR, "You should've called join on the thread manager");
+            it->join();
+        }
+        delete it;
+        it = nullptr;
     }
+    _workers.clear();
 }
 
+void
+thread_manager::join()
+{
+    for (const auto &it : _workers) {
+        while (!it->joinable()) {
+            /* Helpful for diagnosing hangs. */
+            logger::log_msg(LOG_TRACE, "Thread manager: Waiting to join.");
+            /* Check every so often to avoid spamming the log. */
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        it->join();
+    }
+}
 } // namespace test_harness
-
-#endif

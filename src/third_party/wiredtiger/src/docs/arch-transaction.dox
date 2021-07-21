@@ -17,7 +17,7 @@ run at a time per session, and that transaction must complete before another tra
 started. Since every session is singly-threaded, all the operations in the transaction are executed
 on the same thread.
 
-@plantuml_start{transaction_lifecycle.png}
+@plantuml_start{transaction_lifecycle.png }
 @startuml{transaction_lifecycle.png}
 :Transaction Lifecycle;
 

@@ -60,8 +60,11 @@ class test_prepare08(wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + timestamp_str(ts))
         cursor.close()
 
-    def check(self, ds, uri, nrows, value, ts):
-        cursor = self.session.open_cursor(uri)
+    def check(self, ds, uri, nrows, value, ts, release_evict):
+        if release_evict:
+            cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
+        else:
+            cursor = self.session.open_cursor(uri)
         self.session.begin_transaction('ignore_prepare=true,read_timestamp=' + timestamp_str(ts))
         for i in range(1, nrows):
             cursor.set_key(ds.key(i))
@@ -70,6 +73,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
             else:
                 self.assertEquals(cursor.search(), 0)
                 self.assertEquals(cursor.get_value(),value)
+            cursor.reset()
         self.session.commit_transaction()
         cursor.close()
 
@@ -104,11 +108,11 @@ class test_prepare08(wttest.WiredTigerTestCase):
         self.updates(ds_2, uri_2, nrows, value_b, 30)
 
         # Verify the updates
-        self.check(ds_1, uri_1, nrows, value_a, 20)
-        self.check(ds_1, uri_1, nrows, value_b, 30)
+        self.check(ds_1, uri_1, nrows, value_a, 20, False)
+        self.check(ds_1, uri_1, nrows, value_b, 30, False)
 
-        self.check(ds_2, uri_2, nrows, value_a, 20)
-        self.check(ds_2, uri_2, nrows, value_b, 30)
+        self.check(ds_2, uri_2, nrows, value_a, 20, False)
+        self.check(ds_2, uri_2, nrows, value_b, 30, False)
 
         # Checkpoint
         self.session.checkpoint()
@@ -127,14 +131,14 @@ class test_prepare08(wttest.WiredTigerTestCase):
         self.updates(ds_2, uri_2, nrows, value_d, 50)
         self.updates(ds_2, uri_2, nrows, value_e, 60)
 
-        self.check(ds_1, uri_1, nrows, value_a, 20)
-        self.check(ds_1, uri_1, nrows, value_b, 50)
+        self.check(ds_1, uri_1, nrows, value_a, 20, True)
+        self.check(ds_1, uri_1, nrows, value_b, 50, True)
 
         #rollback the prepared session
         session_p.rollback_transaction()
 
-        self.check(ds_1, uri_1, nrows, value_a, 20)
-        self.check(ds_1, uri_1, nrows, value_b, 50)
+        self.check(ds_1, uri_1, nrows, value_a, 20, False)
+        self.check(ds_1, uri_1, nrows, value_b, 50, False)
 
         # close sessions.
         cursor_p.close()
@@ -173,11 +177,11 @@ class test_prepare08(wttest.WiredTigerTestCase):
         self.updates(ds_2, uri_2, nrows, value_b, 30)
 
         # Verify the updates
-        self.check(ds_1, uri_1, nrows, value_a, 20)
-        self.check(ds_1, uri_1, nrows, value_b, 30)
+        self.check(ds_1, uri_1, nrows, value_a, 20, False)
+        self.check(ds_1, uri_1, nrows, value_b, 30, False)
 
-        self.check(ds_2, uri_2, nrows, value_a, 20)
-        self.check(ds_2, uri_2, nrows, value_b, 30)
+        self.check(ds_2, uri_2, nrows, value_a, 20, False)
+        self.check(ds_2, uri_2, nrows, value_b, 30, False)
 
         # Checkpoint
         self.session.checkpoint()
@@ -199,16 +203,16 @@ class test_prepare08(wttest.WiredTigerTestCase):
         self.updates(ds_2, uri_2, nrows, value_d, 50)
         self.updates(ds_2, uri_2, nrows, value_e, 60)
 
-        self.check(ds_1, uri_1, nrows, value_a, 20)
-        self.check(ds_1, uri_1, nrows, value_b, 30)
-        self.check(ds_1, uri_1, nrows, value_b, 50)
+        self.check(ds_1, uri_1, nrows, value_a, 20, True)
+        self.check(ds_1, uri_1, nrows, value_b, 30, True)
+        self.check(ds_1, uri_1, nrows, value_b, 50, True)
 
         # Commit the prepared session
         session_p.commit_transaction('commit_timestamp=' + timestamp_str(50) + ',durable_timestamp=' + timestamp_str(60))
 
-        self.check(ds_1, uri_1, nrows, value_a, 20)
-        self.check(ds_1, uri_1, nrows, value_b, 30)
-        self.check(ds_1, uri_1, 0, None, 50)
+        self.check(ds_1, uri_1, nrows, value_a, 20, False)
+        self.check(ds_1, uri_1, nrows, value_b, 30, False)
+        self.check(ds_1, uri_1, 0, None, 50, False)
 
         # close sessions.
         cursor_p.close()
@@ -269,16 +273,16 @@ class test_prepare08(wttest.WiredTigerTestCase):
         self.updates(ds_2, uri_2, nrows, value_d, 50)
         self.updates(ds_2, uri_2, nrows, value_e, 60)
 
-        self.check(ds_1, uri_1, nrows, value_a, 20)
-        self.check(ds_1, uri_1, 0, None, 30)
-        self.check(ds_1, uri_1, 0, None, 50)
+        self.check(ds_1, uri_1, nrows, value_a, 20, True)
+        self.check(ds_1, uri_1, 0, None, 30, True)
+        self.check(ds_1, uri_1, 0, None, 50, True)
 
         # Commit the prepared session
         session_p.commit_transaction('commit_timestamp=' + timestamp_str(50) + ',durable_timestamp=' + timestamp_str(60))
 
-        self.check(ds_1, uri_1, nrows, value_a, 20)
-        self.check(ds_1, uri_1, 0, None, 30)
-        self.check(ds_1, uri_1, 0, None, 50)
+        self.check(ds_1, uri_1, nrows, value_a, 20, False)
+        self.check(ds_1, uri_1, 0, None, 30, False)
+        self.check(ds_1, uri_1, 0, None, 50, False)
 
         # close sessions.
         cursor_p.close()

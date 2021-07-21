@@ -68,10 +68,10 @@ run_format()
         flags="-1q $(bflag $1)"
 
         args=""
-        args+="runs.type=row "                  # Temporarily disable column store tests
         args+="btree.prefix=0 "                 # Prefix testing isn't portable between releases
         args+="cache=80 "                       # Medium cache so there's eviction
         args+="checkpoints=1 "                  # Force periodic writes
+        args+="checksum=on "                    # Force checksums.
         args+="compression=snappy "             # We only built with snappy, force the choice
         args+="data_source=table "
         args+="huffman_key=0 "                  # Not supoprted by newer releases
@@ -80,6 +80,7 @@ run_format()
         args+="logging=1 "                      # Test log compatibility
         args+="logging_compression=snappy "     # We only built with snappy, force the choice
         args+="rows=1000000 "
+        args+="runs.type=row "                  # Temporarily disable column store tests
         args+="salvage=0 "                      # Faster runs
         args+="timer=4 "
         args+="transaction.isolation=snapshot " # Older releases can't do lower isolation levels

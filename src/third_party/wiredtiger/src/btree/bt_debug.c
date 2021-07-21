@@ -849,10 +849,10 @@ __wt_debug_tree_shape(WT_SESSION_IMPL *session, WT_REF *ref, const char *ofile)
     return (ret);
 }
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_DEBUG_TREE_LEAF 0x1u /* Debug leaf pages */
 #define WT_DEBUG_TREE_WALK 0x2u /* Descend the tree */
-                                /* AUTOMATIC FLAG VALUE GENERATION STOP */
+/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /*
  * __wt_debug_tree_all --

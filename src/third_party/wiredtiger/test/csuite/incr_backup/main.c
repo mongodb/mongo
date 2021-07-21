@@ -110,7 +110,9 @@ extern int __wt_optind;
 extern char *__wt_optarg;
 
 /*
- * The choices of operations we do to each table.
+ * The choices of operations we do to each table. Please do not initialize enum elements with custom
+ * values as there's an assumption that the first element has the default value of 0 and the last
+ * element is always reserved to check count on elements.
  */
 typedef enum { INSERT, MODIFY, REMOVE, UPDATE, _OPERATION_TYPE_COUNT } OPERATION_TYPE;
 
@@ -154,6 +156,20 @@ die(void)
 }
 
 /*
+ * Get operation type based on the number of changes
+ */
+static OPERATION_TYPE
+get_operation_type(uint64_t change_count)
+{
+    int32_t op_type;
+
+    op_type = ((change_count % CHANGES_PER_CYCLE) / KEYS_PER_TABLE);
+    testutil_assert(op_type <= _OPERATION_TYPE_COUNT);
+
+    return (OPERATION_TYPE)op_type;
+}
+
+/*
  * key_value --
  *     Return the key, value and operation type for a given change to a table. See "Cycle of changes
  *     to a table" above.
@@ -173,7 +189,7 @@ key_value(uint64_t change_count, char *key, size_t key_size, WT_ITEM *item, OPER
     char ch;
 
     key_num = change_count % KEYS_PER_TABLE;
-    *typep = op_type = (OPERATION_TYPE)((change_count % CHANGES_PER_CYCLE) / KEYS_PER_TABLE);
+    *typep = op_type = get_operation_type(change_count);
 
     testutil_check(
       __wt_snprintf(key, key_size, KEY_FORMAT, (int)(key_num % 100), (int)(key_num / 100)));
@@ -370,7 +386,11 @@ table_changes(WT_SESSION *session, TABLE *table)
             item.size = table->max_value_size;
             key_value(change_count, key, sizeof(key), &item, &op_type);
             cur->set_key(cur, key);
-            testutil_assert(op_type < _OPERATION_TYPE_COUNT);
+
+            /*
+             * To satisfy code analysis checks, we must handle all elements of the enum in the
+             * switch statement.
+             */
             switch (op_type) {
             case INSERT:
                 cur->set_value(cur, &item);
@@ -393,7 +413,7 @@ table_changes(WT_SESSION *session, TABLE *table)
                 testutil_check(cur->update(cur));
                 break;
             case _OPERATION_TYPE_COUNT:
-                break;
+                testutil_die(0, "Unexpected OPERATION_TYPE: _OPERATION_TYPE_COUNT");
             }
         }
         free(value);
@@ -682,11 +702,15 @@ check_table(WT_SESSION *session, TABLE *table)
     expect_records = 0;
     total_changes = table->change_count;
     boundary = total_changes % KEYS_PER_TABLE;
-    op_type = (OPERATION_TYPE)((total_changes % CHANGES_PER_CYCLE) / KEYS_PER_TABLE);
+    op_type = get_operation_type(total_changes);
     value = dcalloc(1, table->max_value_size);
 
     VERBOSE(3, "Checking: %s\n", table->name);
-    testutil_assert(op_type < _OPERATION_TYPE_COUNT);
+
+    /*
+     * To satisfy code analysis checks, we must handle all elements of the enum in the switch
+     * statement.
+     */
     switch (op_type) {
     case INSERT:
         expect_records = total_changes % KEYS_PER_TABLE;
@@ -699,7 +723,7 @@ check_table(WT_SESSION *session, TABLE *table)
         expect_records = KEYS_PER_TABLE - (total_changes % KEYS_PER_TABLE);
         break;
     case _OPERATION_TYPE_COUNT:
-        break;
+        testutil_die(0, "Unexpected OPERATION_TYPE: _OPERATION_TYPE_COUNT");
     }
 
     testutil_check(session->open_cursor(session, table->name, NULL, NULL, &cursor));

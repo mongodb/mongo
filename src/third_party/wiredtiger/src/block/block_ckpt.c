@@ -97,8 +97,6 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint
             WT_ERR(__wt_block_addr_to_buffer(
               block, &endp, ci->root_objectid, ci->root_offset, ci->root_size, ci->root_checksum));
             *root_addr_sizep = WT_PTRDIFF(endp, root_addr);
-
-            WT_ERR(__wt_block_tiered_load(session, block, ci));
         }
 
         /*

@@ -757,6 +757,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_ISOLATION saved_isolation;
+    wt_off_t hs_size;
     wt_timestamp_t ckpt_tmp_ts;
     uint64_t fsync_duration_usecs, generation, hs_ckpt_duration_usecs;
     uint64_t time_start_fsync, time_stop_fsync, time_start_hs, time_stop_hs;
@@ -766,6 +767,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
     conn = S2C(session);
     cache = conn->cache;
+    hs_size = 0;
     hs_dhandle = NULL;
     txn = session->txn;
     txn_global = &conn->txn_global;
@@ -955,6 +957,12 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     WT_STAT_CONN_SET(session, txn_checkpoint_fsync_post_duration, fsync_duration_usecs);
 
     __checkpoint_verbose_track(session, "sync completed");
+
+    /* If the history store file exists on disk, update its statistic. */
+    if (F_ISSET(hs_dhandle, WT_DHANDLE_OPEN)) {
+        WT_ERR(__wt_block_manager_named_size(session, WT_HS_FILE, &hs_size));
+        WT_STAT_CONN_SET(session, cache_hs_ondisk, hs_size);
+    }
 
     /*
      * Commit the transaction now that we are sure that all files in the checkpoint have been
@@ -1310,8 +1318,18 @@ __checkpoint_lock_dirty_tree_int(WT_SESSION_IMPL *session, bool is_checkpoint, b
      * checkpoint.
      */
     WT_RET(__checkpoint_mark_skip(session, ckptbase, force));
-    if (F_ISSET(btree, WT_BTREE_SKIP_CKPT))
+    if (F_ISSET(btree, WT_BTREE_SKIP_CKPT)) {
+        /*
+         * If we decide to skip checkpointing, clear the delete flag on the checkpoints. The list of
+         * checkpoints will be cached for a future access. Which checkpoints need to be deleted can
+         * change in the meanwhile.
+         */
+        WT_CKPT_FOREACH (ckptbase, ckpt)
+            if (F_ISSET(ckpt, WT_CKPT_DELETE))
+                F_CLR(ckpt, WT_CKPT_DELETE);
         return (0);
+    }
+
     /*
      * Lock the checkpoints that will be deleted.
      *
@@ -1374,9 +1392,10 @@ __checkpoint_lock_dirty_tree(
 
     btree = S2BT(session);
     ckpt = ckptbase = NULL;
-    dhandle = session->dhandle;
     ckpt_bytes_allocated = 0;
+    dhandle = session->dhandle;
     name_alloc = NULL;
+    seen_ckpt_add = false;
 
     /*
      * Only referenced in diagnostic builds and gcc 5.1 isn't satisfied with wrapping the entire
@@ -1453,17 +1472,7 @@ __checkpoint_lock_dirty_tree(
     WT_BTREE_CLEAN_CKPT(session, btree, 0);
     F_CLR(btree, WT_BTREE_OBSOLETE_PAGES);
 
-    /*
-     * Get the list of checkpoints for this file: We try to cache the ckptlist between the
-     * checkpoints. But there might not be one, as there are operations that can invalidate a
-     * ckptlist. So, use a cached ckptlist if there is one. Otherwise go through slow path of
-     * re-generating the ckptlist by reading the metadata. Also, we avoid using a cached checkpoint
-     * list for metadata.
-     */
-    if (WT_IS_METADATA(dhandle) ||
-      __wt_meta_saved_ckptlist_get(session, dhandle->name, &ckptbase) != 0)
-        WT_ERR(
-          __wt_meta_ckptlist_get(session, dhandle->name, true, &ckptbase, &ckpt_bytes_allocated));
+    WT_ERR(__wt_meta_ckptlist_get(session, dhandle->name, true, &ckptbase, &ckpt_bytes_allocated));
 
     /* We may be dropping specific checkpoints, check the configuration. */
     if (cfg != NULL) {
@@ -1512,7 +1521,6 @@ __checkpoint_lock_dirty_tree(
      * If we decided to skip checkpointing, we need to remove the new checkpoint entry we might have
      * appended to the list.
      */
-    seen_ckpt_add = false;
     if (F_ISSET(btree, WT_BTREE_SKIP_CKPT)) {
         WT_CKPT_FOREACH_NAME_OR_ORDER (ckptbase, ckpt) {
             /* Checkpoint(s) to be added are always at the end of the list. */
@@ -1531,7 +1539,8 @@ __checkpoint_lock_dirty_tree(
         /* It is possible that we do not have any checkpoint in the list. */
 err:
         __wt_meta_ckptlist_free(session, &ckptbase);
-        __wt_meta_saved_ckptlist_free(session);
+        btree->ckpt = NULL;
+        btree->ckpt_bytes_allocated = 0;
     }
 skip:
     __wt_free(session, name_alloc);
@@ -1846,7 +1855,7 @@ fake:
     if (WT_IS_METADATA(dhandle) || !F_ISSET(session->txn, WT_TXN_RUNNING))
         WT_ERR(__wt_checkpoint_sync(session, NULL));
 
-    WT_ERR(__wt_meta_ckptlist_set(session, dhandle->name, btree->ckpt, &ckptlsn));
+    WT_ERR(__wt_meta_ckptlist_set(session, dhandle, btree->ckpt, &ckptlsn));
 
     /*
      * If we wrote a checkpoint (rather than faking one), we have to resolve it. Normally, tracking

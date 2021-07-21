@@ -16,7 +16,12 @@ static int __col_insert_alloc(WT_SESSION_IMPL *, uint64_t, u_int, WT_INSERT **, 
  */
 int
 __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_UPDATE *upd_arg,
-  u_int modify_type, bool exclusive)
+  u_int modify_type, bool exclusive
+#ifdef HAVE_DIAGNOSTIC
+  ,
+  bool restore
+#endif
+)
 {
     static const WT_ITEM col_fix_remove = {"", 1, NULL, 0, 0};
     WT_BTREE *btree;
@@ -143,6 +148,12 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
 
         /* Avoid a data copy in WT_CURSOR.update. */
         __wt_upd_value_assign(cbt->modify_update, upd);
+
+        /*
+         * If we restore an update chain in update restore eviction, there should be no update on
+         * the existing update chain.
+         */
+        WT_ASSERT(session, !restore || old_upd == NULL);
 
         /*
          * Point the new WT_UPDATE item to the next element in the list. If we get it right, the

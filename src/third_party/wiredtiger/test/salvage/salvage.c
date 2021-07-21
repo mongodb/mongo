@@ -699,7 +699,7 @@ empty(int cnt)
 
     if (page_type == WT_PAGE_COL_FIX)
         for (i = 0; i < cnt; ++i)
-            testutil_assert(fputs("\\00\n", res_fp));
+            testutil_assert(fputs("\\00\n", res_fp) != EOF);
 }
 
 /*

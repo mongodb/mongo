@@ -35,16 +35,12 @@ __wt_bt_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t
      * into the caller's buffer. Else, read directly into the caller's buffer.
      */
     if (btree->compressor == NULL && btree->kencryptor == NULL) {
-        WT_WITH_BUCKET_STORAGE(
-          btree->bstorage, session, { ret = bm->read(bm, session, buf, addr, addr_size); });
-        WT_RET(ret);
+        WT_RET(bm->read(bm, session, buf, addr, addr_size));
         dsk = buf->data;
         ip = NULL;
     } else {
         WT_RET(__wt_scr_alloc(session, 0, &tmp));
-        WT_WITH_BUCKET_STORAGE(
-          btree->bstorage, session, { ret = bm->read(bm, session, tmp, addr, addr_size); });
-        WT_ERR(ret);
+        WT_ERR(bm->read(bm, session, tmp, addr, addr_size));
         dsk = tmp->data;
         ip = tmp;
     }
@@ -60,6 +56,10 @@ __wt_bt_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t
             goto corrupt;
         }
 
+        /*
+         * If checksums were turned off because we're depending on decryption to fail on any
+         * corrupted data, we'll end up here on corrupted data.
+         */
         WT_ERR(__wt_scr_alloc(session, 0, &etmp));
         if ((ret = __wt_decrypt(session, encryptor, WT_BLOCK_ENCRYPT_SKIP, ip, etmp)) != 0) {
             fail_msg = "block decryption failed";
@@ -98,9 +98,8 @@ __wt_bt_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t
           &result_len);
 
         /*
-         * If checksums were turned off because we're depending on the decompression to fail on any
-         * corrupted data, we'll end up here after corruption happens. If we're salvaging the file,
-         * it's OK, otherwise it's really, really bad.
+         * If checksums were turned off because we're depending on decompression to fail on any
+         * corrupted data, we'll end up here on corrupted data.
          */
         if (ret != 0 || result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP) {
             fail_msg = "block decompression failed";
@@ -314,9 +313,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_t *add
      */
     WT_ASSERT(session, dsk->write_gen != 0);
 
-    /*
-     * Checksum the data if the buffer isn't compressed or checksums are configured.
-     */
+    /* Determine if the data requires a checksum. */
     WT_NOT_READ(data_checksum, true);
     switch (btree->checksum) {
     case CKSUM_ON:
@@ -328,18 +325,17 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_t *add
     case CKSUM_UNCOMPRESSED:
         data_checksum = !compressed;
         break;
+    case CKSUM_UNENCRYPTED:
+        data_checksum = !encrypted;
+        break;
     }
     timer = !F_ISSET(session, WT_SESSION_INTERNAL);
     if (timer)
         time_start = __wt_clock(session);
 
-    WT_WITH_BUCKET_STORAGE(btree->bstorage, session, {
-        /* Call the block manager to write the block. */
-        ret =
-          (checkpoint ? bm->checkpoint(bm, session, ip, btree->ckpt, data_checksum) :
+    /* Call the block manager to write the block. */
+    WT_ERR(checkpoint ? bm->checkpoint(bm, session, ip, btree->ckpt, data_checksum) :
                         bm->write(bm, session, ip, addr, addr_sizep, data_checksum, checkpoint_io));
-    });
-    WT_ERR(ret);
 
     /* Update some statistics now that the write is done */
     if (timer) {

@@ -62,6 +62,7 @@ CHECKKEY
 CKPT
 CLOEXEC
 CMP
+CMake
 CONCAT
 CONFIG
 COVERITY
@@ -147,6 +148,7 @@ FOREACH
 FS
 FTRUNCATE
 FULLFSYNC
+FUNCSIG
 Facebook
 FindClose
 FindFirstFile
@@ -323,6 +325,7 @@ Phong
 PlatformSDK
 Posix
 PostgreSQL
+Postrun
 PowerPC
 Pre
 Preload
@@ -394,6 +397,7 @@ Syscall
 TAILQ
 TCMalloc
 TESTUTIL
+TID
 TIMESTAMP
 TIMESTAMPS
 TMP
@@ -423,6 +427,7 @@ URIs
 UTF
 UltraSparc
 Unbuffered
+Unencrypted
 UnixLib
 UnlockFile
 Unmap
@@ -472,11 +477,13 @@ WiredTigerTxn
 WithSeeds
 Wpedantic
 WriteFile
+Wsign
 Wuninitialized
 Wunused
 XP
 Xcode
 Xcode/
+YCSB
 Yann
 ZSTD
 Zlib
@@ -582,6 +589,7 @@ celsius
 centric
 cfg
 cfko
+chacha
 change's
 changelog
 chdir
@@ -599,6 +607,7 @@ chk
 chmod
 chongo
 cip
+ciphertext
 cjoin
 ckpt
 ckptfrag
@@ -640,6 +649,8 @@ create's
 createCStream
 crypto
 cryptobad
+cryptographic
+cryptographically
 cstring
 csuite
 csv
@@ -704,6 +715,7 @@ designator
 dest
 destSize
 destructor
+destructors
 dev
 dh
 dhandle
@@ -854,6 +866,7 @@ gobare
 goesc
 gostring
 gostruct
+goto
 goutf
 gt
 handleops
@@ -952,6 +965,7 @@ kb
 kbits
 keycmp
 keyid
+keyids
 keylen
 keyv
 kmsid
@@ -976,6 +990,7 @@ lf
 lfence
 libdatasource
 libs
+libsodium
 libtool
 libwiredtiger
 linkers
@@ -1095,6 +1110,7 @@ nocase
 noclear
 nocrypto
 nolock
+nonces
 nonliteral
 noop
 nop
@@ -1161,6 +1177,7 @@ portably
 pos
 posint
 posix
+postrun
 postsize
 powerpc
 pragmas
@@ -1183,6 +1200,7 @@ printlog
 priv
 prog
 progname
+programmatically
 ps
 psp
 pthread
@@ -1202,6 +1220,7 @@ qsort
 quartile
 queueable
 quiesce
+quiesced
 qup
 rN
 rS
@@ -1258,6 +1277,7 @@ sT
 sanitizer
 sanitizers
 scalability
+scalable
 sched
 scr
 sd
@@ -1330,6 +1350,7 @@ subtree
 sunique
 supd
 superset
+suseconds
 sw
 sx
 sy
@@ -1354,6 +1375,7 @@ timedwait
 timestamp
 timestamped
 timestamps
+timeval
 tinfo
 tlb
 tmp
@@ -1364,6 +1386,7 @@ tokname
 tokstart
 toktype
 tolower
+toolchain
 toplevel
 totalsec
 toupper
@@ -1376,6 +1399,7 @@ trunc
 trylock
 tsc
 tupdate
+tv
 tvalue
 tw
 txn
@@ -1392,14 +1416,16 @@ uint
 uintmax
 unbare
 unbuffered
+uncompressed
 uncompressing
-uncompresssed
+uncustomized
 undef
 underflowed
 unencrypted
 unesc
 unescape
 unescaped
+unhandled
 unicode
 uninstantiated
 unistd

@@ -499,14 +499,20 @@ config_checksum(void)
     /* Choose a checksum mode if nothing was specified. */
     if (!config_is_perm("disk.checksum"))
         switch (mmrand(NULL, 1, 10)) {
-        case 1: /* 10% */
+        case 1:
+        case 2:
+        case 3:
+        case 4: /* 40% */
             config_single("disk.checksum=on", false);
             break;
-        case 2: /* 10% */
+        case 5: /* 10% */
             config_single("disk.checksum=off", false);
             break;
-        default: /* 80% */
+        case 6: /* 10% */
             config_single("disk.checksum=uncompressed", false);
+            break;
+        default: /* 40% */
+            config_single("disk.checksum=unencrypted", false);
             break;
         }
 }
@@ -1082,7 +1088,7 @@ config_file(const char *name)
                 break;
             }
             if (t == buf && *p == ']') { /* Closing brace, configuration starts after it. */
-                while (isblank(*++p))
+                while (isblank((unsigned char)*++p))
                     ;
                 t = p--;
             }
@@ -1368,9 +1374,11 @@ config_map_checksum(const char *s, u_int *vp)
     if (strcmp(s, "on") == 0)
         *vp = CHECKSUM_ON;
     else if (strcmp(s, "off") == 0)
-        *vp = CHECKSUM_ON;
+        *vp = CHECKSUM_OFF;
     else if (strcmp(s, "uncompressed") == 0)
         *vp = CHECKSUM_UNCOMPRESSED;
+    else if (strcmp(s, "unencrypted") == 0)
+        *vp = CHECKSUM_UNENCRYPTED;
     else
         testutil_die(EINVAL, "illegal checksum configuration: %s", s);
 }
@@ -1411,6 +1419,8 @@ config_map_encryption(const char *s, u_int *vp)
         *vp = ENCRYPT_NONE;
     else if (strcmp(s, "rotn-7") == 0)
         *vp = ENCRYPT_ROTN_7;
+    else if (strcmp(s, "sodium") == 0)
+        *vp = ENCRYPT_SODIUM;
     else
         testutil_die(EINVAL, "illegal encryption configuration: %s", s);
 }

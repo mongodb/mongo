@@ -66,8 +66,10 @@ record_config = [
 populate_config = record_config + [
     Config('collection_count', 1, r'''
         The number of collections the workload generator operates over''', min=0, max=200000),
-    Config('key_count', 0, r'''
+    Config('key_count_per_collection', 0, r'''
         The number of keys to be operated on per collection''', min=0, max=1000000),
+    Config('thread_count', 1, r'''
+        The number of worker threads to use while populating the database.''')
 ]
 
 #
@@ -110,8 +112,8 @@ transaction_config = [
 ]
 
 thread_count = [
-    Config('thread_count', 1, r'''
-        Specifies the number of threads that will be used to perform a certain function.''')
+    Config('thread_count', 0, r'''
+        Specifies the number of threads that will be used to perform a certain function.''', min=0)
 ]
 
 read_thread_config = thread_count + throttle_config + transaction_config
@@ -132,7 +134,11 @@ runtime_monitor = enabled_config_true + component_config + [
         type='category', subconfig=limit_stat),
     Config('stat_db_size', '', '''
         The maximum on-disk database size in bytes that can be hit while running.''',
-        type='category', subconfig=limit_stat)
+        type='category', subconfig=limit_stat),
+    Config('postrun_statistics', '[]', '''
+        A list of statistics to be checked after the workload has completed. Each element of the
+        list should be formatted as "stat_name:min_limit:max_limit".''',
+        type='list')
 ]
 
 #
@@ -153,7 +159,10 @@ workload_tracking = enabled_config_true + component_config
 #
 # Configuration that applies to the workload_generator component.
 #
-workload_generator = enabled_config_true + component_config + populate_config + [
+workload_generator = enabled_config_true + component_config + [
+    Config('populate_config', '', r'''
+        Config that specifies how the database will be populated initially.''',
+        type='category', subconfig=populate_config),
     Config('read_config', '', r'''
         Config that specifies the number of read threads and their behaviour.''',
         type='category', subconfig=read_thread_config),
@@ -186,13 +195,26 @@ test_config = [
 # Non component top level configuration.
     Config('cache_size_mb', 0, r'''
         The cache size that wiredtiger will be configured to run with''', min=0, max=100000000000),
+    Config('compression_enabled', 'false', r'''
+        Whether the database files will use snappy compression or not.''', type='boolean'),
     Config('duration_seconds', 0, r'''
         The duration that the test run will last''', min=0, max=1000000),
     Config('enable_logging', 'false', r'''
         Enables write ahead logs''', type='boolean'),
+    Config('statistics_config', '', r'''
+        Statistic configuration that is passed into wiredtiger on open.''',
+        type='category', subconfig=[
+            Config('type', 'all', r'''
+            The configuration that will get passed to wiredtiger to determine the style of
+            statistics gathering'''),
+            Config('enable_logging', 'true', r'''
+            Configuration enabling or disabling statistics logging in the form of json logging.''',
+            type='boolean')
+        ]),
 ]
 
 methods = {
     'example_test' : Method(test_config),
-    'poc_test' : Method(test_config),
+    'hs_cleanup' : Method(test_config),
+    'base_test' : Method(test_config),
 }

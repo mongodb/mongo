@@ -6,21 +6,21 @@
  * See the file LICENSE for redistribution information.
  */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LOGSCAN_FIRST 0x01u
 #define WT_LOGSCAN_FROM_CKP 0x02u
 #define WT_LOGSCAN_ONE 0x04u
 #define WT_LOGSCAN_RECOVER 0x08u
 #define WT_LOGSCAN_RECOVER_METADATA 0x10u
-/* AUTOMATIC FLAG VALUE GENERATION STOP */
+/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LOG_BACKGROUND 0x01u
 #define WT_LOG_DSYNC 0x02u
 #define WT_LOG_FLUSH 0x04u
 #define WT_LOG_FSYNC 0x08u
 #define WT_LOG_SYNC_ENABLED 0x10u
-/* AUTOMATIC FLAG VALUE GENERATION STOP */
+/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 #define WT_LOGOP_IGNORE 0x80000000
 #define WT_LOGOP_IS_IGNORED(val) ((val)&WT_LOGOP_IGNORE)
@@ -199,13 +199,13 @@ struct __wt_logslot {
     WT_FH *slot_fh;              /* File handle for this group */
     WT_ITEM slot_buf;            /* Buffer for grouped writes */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_SLOT_CLOSEFH 0x01u    /* Close old fh on release */
 #define WT_SLOT_FLUSH 0x02u      /* Wait for write */
 #define WT_SLOT_SYNC 0x04u       /* Needs sync on release */
 #define WT_SLOT_SYNC_DIR 0x08u   /* Directory sync on release */
 #define WT_SLOT_SYNC_DIRTY 0x10u /* Sync system buffers on release */
-                                 /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
     WT_CACHE_LINE_PAD_END
 };
@@ -225,11 +225,11 @@ struct __wt_myslot {
     wt_off_t end_offset; /* My end offset in buffer */
     wt_off_t offset;     /* Slot buffer offset */
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_MYSLOT_CLOSE 0x1u         /* This thread is closing the slot */
 #define WT_MYSLOT_NEEDS_RELEASE 0x2u /* This thread is releasing the slot */
 #define WT_MYSLOT_UNBUFFERED 0x4u    /* Write directly */
-                                     /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
@@ -299,11 +299,11 @@ struct __wt_log {
     uint64_t write_calls; /* Calls to log_write */
 #endif
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LOG_FORCE_NEWFILE 0x1u   /* Force switch to new log file */
 #define WT_LOG_OPENED 0x2u          /* Log subsystem successfully open */
 #define WT_LOG_TRUNCATE_NOTSUP 0x4u /* File system truncate not supported */
-                                    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
@@ -399,11 +399,11 @@ __wt_log_desc_byteswap(WT_LOG_DESC *desc)
 struct __wt_txn_printlog_args {
     WT_FSTREAM *fs;
 
-/* AUTOMATIC FLAG VALUE GENERATION START */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TXN_PRINTLOG_HEX 0x1u      /* Add hex output */
 #define WT_TXN_PRINTLOG_MSG 0x2u      /* Messages only */
 #define WT_TXN_PRINTLOG_UNREDACT 0x4u /* Don't redact user data from output */
-                                      /* AUTOMATIC FLAG VALUE GENERATION STOP */
+                                      /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 

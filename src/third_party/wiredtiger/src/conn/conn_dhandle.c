@@ -41,7 +41,7 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
     WT_DATA_HANDLE *dhandle;
     WT_DECL_RET;
     char *metaconf, *tmp;
-    const char *base, *cfg[4];
+    const char *base, *cfg[4], *strip;
 
     dhandle = session->dhandle;
     base = NULL;
@@ -99,8 +99,11 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
          */
         cfg[0] = tmp;
         cfg[1] = NULL;
-        WT_ERR(__wt_config_merge(
-          session, cfg, "checkpoint=,checkpoint_backup_info=,checkpoint_lsn=", &base));
+        if (dhandle->type == WT_DHANDLE_TYPE_TIERED)
+            strip = "checkpoint=,checkpoint_backup_info=,checkpoint_lsn=,last=,tiers=()";
+        else
+            strip = "checkpoint=,checkpoint_backup_info=,checkpoint_lsn=";
+        WT_ERR(__wt_config_merge(session, cfg, strip, &base));
         __wt_free(session, tmp);
         break;
     case WT_DHANDLE_TYPE_TABLE:
@@ -146,8 +149,7 @@ __conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
         ret = __wt_schema_close_table(session, (WT_TABLE *)dhandle);
         break;
     case WT_DHANDLE_TYPE_TIERED:
-        WT_WITH_DHANDLE(session, dhandle, ret = __wt_btree_discard(session));
-        ret = __wt_tiered_close(session, (WT_TIERED *)dhandle);
+        WT_WITH_DHANDLE(session, dhandle, ret = __wt_tiered_discard(session, (WT_TIERED *)dhandle));
         break;
     case WT_DHANDLE_TYPE_TIERED_TREE:
         ret = __wt_tiered_tree_close(session, (WT_TIERED_TREE *)dhandle);
@@ -400,9 +402,8 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead)
         WT_TRET(__wt_schema_close_table(session, (WT_TABLE *)dhandle));
         break;
     case WT_DHANDLE_TYPE_TIERED:
-        WT_TRET(__wt_btree_close(session));
+        WT_TRET(__wt_tiered_close(session));
         F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
-        WT_TRET(__wt_tiered_close(session, (WT_TIERED *)dhandle));
         break;
     case WT_DHANDLE_TYPE_TIERED_TREE:
         WT_TRET(__wt_tiered_tree_close(session, (WT_TIERED_TREE *)dhandle));
@@ -605,8 +606,16 @@ err:
             F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
     }
 
-    if (WT_DHANDLE_BTREE(dhandle))
+    if (WT_DHANDLE_BTREE(dhandle) && session->dhandle != NULL) {
         __wt_evict_file_exclusive_off(session);
+
+        /*
+         * We want to close the Btree for an object that lives in the local directory. It will
+         * actually be part of the corresponding tiered Btree.
+         */
+        if (dhandle->type == WT_DHANDLE_TYPE_BTREE && WT_SUFFIX_MATCH(dhandle->name, ".wtobj"))
+            WT_TRET(__wt_btree_close(session));
+    }
 
     if (ret == ENOENT && F_ISSET(dhandle, WT_DHANDLE_IS_METADATA)) {
         F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);

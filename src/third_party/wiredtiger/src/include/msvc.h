@@ -13,9 +13,9 @@
 
 #define inline __inline
 
-/* MSVC Doesn't provide __func__, it has __FUNCTION__ */
+/* MSVC Doesn't provide __PRETTY_FUNCTION__, it has __FUNCSIG__ */
 #ifdef _MSC_VER
-#define __func__ __FUNCTION__
+#define __PRETTY_FUNCTION__ __FUNCSIG__
 #endif
 
 #define WT_PTRDIFFT_FMT "Id" /* ptrdiff_t format string */

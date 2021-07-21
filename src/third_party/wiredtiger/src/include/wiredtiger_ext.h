@@ -57,6 +57,15 @@ struct __wt_txn_notify {
     int (*notify)(WT_TXN_NOTIFY *notify, WT_SESSION *session, uint64_t txnid, int committed);
 };
 
+typedef struct __wt_extension_spinlock WT_EXTENSION_SPINLOCK;
+/*!
+ * A placeholder data structure that allows for using the WiredTiger
+ * spinlock implementation from within extensions.
+ */
+struct __wt_extension_spinlock {
+    void *spinlock; /* Represents actual WiredTiger spinlock. */
+};
+
 /*!
  * Table of WiredTiger extension methods.
  *
@@ -536,6 +545,49 @@ struct __wt_extension_api {
      * @copydoc wiredtiger_version
      */
     const char *(*version)(int *majorp, int *minorp, int *patchp);
+
+    /*!
+     * Initialize a spinlock
+     *
+     * @param wt_api the extension handle
+     * @param session the session handle
+     * @param spinlock the extension spinlock
+     * @param name the name for the spinlock
+     *
+     */
+    int (*spin_init)(WT_EXTENSION_API *wt_api, WT_EXTENSION_SPINLOCK *spinlock, const char *name);
+
+    /*!
+     * Destroy a spinlock
+     *
+     * @param wt_api the extension handle
+     * @param session the session handle
+     * @param spinlock the extension spinlock
+     *
+     */
+    void (*spin_destroy)(WT_EXTENSION_API *wt_api, WT_EXTENSION_SPINLOCK *spinlock);
+
+    /*!
+     * Spin until the lock is acquired.
+     *
+     * @param wt_api the extension handle
+     * @param session the session handle
+     * @param spinlock the extension spinlock
+     *
+     */
+    void (*spin_lock)(
+      WT_EXTENSION_API *wt_api, WT_SESSION *session, WT_EXTENSION_SPINLOCK *spinlock);
+
+    /*!
+     * Release the spinlock.
+     *
+     * @param wt_api the extension handle
+     * @param session the session handle
+     * @param spinlock the extension spinlock
+     *
+     */
+    void (*spin_unlock)(
+      WT_EXTENSION_API *wt_api, WT_SESSION *session, WT_EXTENSION_SPINLOCK *spinlock);
 };
 
 /*!

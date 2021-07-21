@@ -1,0 +1,14 @@
+conn_config="cache_size=40G,log=(enabled=true)"
+pareto=20
+table_config="type=file"
+key_sz=100
+value_sz=1024
+icount=90000000
+run_time=3600
+threads=((count=20,reads=95,inserts=5))
+read_range=100
+read_range_random=true
+warmup=120
+sample_interval=5
+populate_threads=8
+report_interval=5

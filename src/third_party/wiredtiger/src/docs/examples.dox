@@ -61,4 +61,7 @@ Shows the basic framework for building an encryptor as a plug in library.
 @example rotn_encrypt.c
 Shows a simple encryptor as a plug in library.
 
+@example sodium_encrypt.c
+An encryptor using the <a href=https://libsodium.org>libsodium</a> cryptography library.
+
  */

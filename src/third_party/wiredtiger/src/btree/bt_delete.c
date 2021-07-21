@@ -20,16 +20,16 @@
  * state to WT_REF_DELETED. Pages ineligible for this fast path include pages already in the cache,
  * having overflow items, or requiring history store records. Ineligible pages are read and have
  * their rows updated/deleted individually. The transaction for the delete operation is stored in
- * memory referenced by the WT_REF.page_del field.
+ * memory referenced by the WT_REF.ft_info.del field.
  *
  * Future cursor walks of the tree will skip the deleted page based on the transaction stored for
  * the delete, but it gets more complicated if a read is done using a random key, or a cursor walk
  * is done with a transaction where the delete is not visible. In those cases, we read the original
  * contents of the page. The page-read code notices a deleted page is being read, and as part of the
- * read instantiates the contents of the page, creating a WT_UPDATE with a deleted operation, in the
- * same transaction as deleted the page. In other words, the read process makes it appear as if the
- * page was read and each individual row deleted, exactly as would have happened if the page had
- * been in the cache all along.
+ * read instantiates the contents of the page, creating a WT_UPDATE with a tombstone, in the same
+ * transaction as deleted the page. In other words, the read process makes it appear as if the page
+ * was read and each individual row deleted, exactly as would have happened if the page had been in
+ * the cache all along.
  *
  * There's an additional complication to support rollback of the page delete. When the page was
  * marked deleted, a pointer to the WT_REF was saved in the deleting session's transaction list and
@@ -39,14 +39,14 @@
  * saved/restored during reconciliation and appear on multiple pages, and the WT_REF stored in the
  * deleting session's transaction list is no longer useful. For this reason, when the page is
  * instantiated by a read, a list of the WT_UPDATE structures on the page is stored in the
- * WT_REF.page_del field, with the transaction ID, that way the session committing/unrolling the
- * delete can find all WT_UPDATE structures that require update.
+ * WT_REF.ft_info.update field, that way the session resolving the delete can find all WT_UPDATE
+ * structures that require update.
  *
  * One final note: pages can also be marked deleted if emptied and evicted. In that case, the WT_REF
- * state will be set to WT_REF_DELETED but there will not be any associated WT_REF.page_del field.
- * These pages are always skipped during cursor traversal (the page could not have been evicted if
- * there were updates that weren't globally visible), and if read is forced to instantiate such a
- * page, it simply creates an empty page from scratch.
+ * state will be set to WT_REF_DELETED but there will not be any associated WT_REF.ft_info.del
+ * field. These pages are always skipped during cursor traversal (the page could not have been
+ * evicted if there were updates that weren't globally visible), and if read is forced to
+ * instantiate such a page, it simply creates an empty page from scratch.
  */
 
 /*
@@ -93,16 +93,12 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
         return (0);
 
     /*
-     * If this WT_REF was previously part of a truncate operation, there may be existing page-delete
-     * information. The structure is only read while the state is locked, free the previous version.
-     *
-     * Note: changes have been made, we must publish any state change from this point on.
+     * There should be no previous page-delete information: if the previous fast-truncate didn't
+     * instantiate the page, then we'd never get here to do another delete; if the previous fast-
+     * truncate did instantiate the page, then any fast-truncate information was removed at that
+     * point and/or when the fast-truncate transaction was resolved.
      */
-    if (ref->page_del != NULL) {
-        WT_ASSERT(session, ref->page_del->txnid == WT_TXN_ABORTED);
-        __wt_free(session, ref->page_del->update_list);
-        __wt_free(session, ref->page_del);
-    }
+    WT_ASSERT(session, ref->ft_info.del == NULL);
 
     /*
      * We cannot truncate pages that have overflow key/value items as the overflow blocks have to be
@@ -128,8 +124,8 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     WT_ERR(__wt_page_parent_modify_set(session, ref, false));
 
     /* Allocate and initialize the page-deleted structure. */
-    WT_ERR(__wt_calloc_one(session, &ref->page_del));
-    ref->page_del->previous_state = previous_state;
+    WT_ERR(__wt_calloc_one(session, &ref->ft_info.del));
+    ref->ft_info.del->previous_state = previous_state;
 
     WT_ERR(__wt_txn_modify_page_delete(session, ref));
 
@@ -141,7 +137,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     return (0);
 
 err:
-    __wt_free(session, ref->page_del);
+    __wt_free(session, ref->ft_info.del);
 
     /* Publish the page to its previous state, ensuring visibility. */
     WT_REF_SET_STATE(ref, previous_state);
@@ -150,7 +146,7 @@ err:
 
 /*
  * __wt_delete_page_rollback --
- *     Abort pages that were deleted without being instantiated.
+ *     Abort fast-truncate operations.
  */
 int
 __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
@@ -160,7 +156,7 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
     uint8_t current_state;
     bool locked;
 
-    /* Lock the reference. We cannot access ref->page_del except when locked. */
+    /* Lock the reference. We cannot access ref->ft_info.del except when locked. */
     for (locked = false, sleep_usecs = yield_count = 0;;) {
         switch (current_state = ref->state) {
         case WT_REF_LOCKED:
@@ -188,23 +184,25 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
     }
 
     /*
-     * If the page is still "deleted", it's as we left it, all we have to do is reset the state.
-     *
-     * We can't use the normal read path to get a copy of the page because the session may have
-     * closed the cursor, we no longer have the reference to the tree required for a hazard pointer.
-     * We're safe because with unresolved transactions, the page isn't going anywhere.
-     *
-     * The page is in an in-memory state, which means it was instantiated at some point. Walk any
-     * list of update structures and abort them.
+     * If the page is still "deleted", it's as we left it, simply reset the state. Otherwise, the
+     * page is in an in-memory state, which means it was instantiated at some point. Walk any list
+     * of update structures and abort them. We can't use the normal read path to get the pages with
+     * updates (the original page may have split, so there many be more than one page), because the
+     * session may have closed the cursor, we no longer have the reference to the tree required for
+     * a hazard pointer. We're safe since pages with unresolved transactions aren't going anywhere.
      */
     if (current_state == WT_REF_DELETED)
-        current_state = ref->page_del->previous_state;
-    else if ((updp = ref->page_del->update_list) != NULL)
+        current_state = ref->ft_info.del->previous_state;
+    else if ((updp = ref->ft_info.update) != NULL)
         for (; *updp != NULL; ++updp)
             (*updp)->txnid = WT_TXN_ABORTED;
 
-    /* Finally mark the truncate aborted */
-    ref->page_del->txnid = WT_TXN_ABORTED;
+    /*
+     * We didn't set the WT_PAGE_DELETED transaction ID to aborted or discard any WT_UPDATE list,
+     * instead, we discard both structures entirely, it has the same effect. It's a single call,
+     * they're a union of two pointers.
+     */
+    __wt_free(session, ref->ft_info.del);
 
     WT_REF_SET_STATE(ref, current_state);
     return (0);
@@ -240,16 +238,14 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
     skip = !__wt_page_del_active(session, ref, visible_all);
 
     /*
-     * The page_del structure can be freed as soon as the delete is stable: it is only read when the
-     * ref state is locked. It is worth checking every time we come through because once this is
-     * freed, we no longer need synchronization to check the ref.
+     * The fast-truncate structure can be freed as soon as the delete is stable: it is only read
+     * when the ref state is locked. It is worth checking every time we come through because once
+     * this is freed, we no longer need synchronization to check the ref.
      */
-    if (skip && ref->page_del != NULL &&
+    if (skip && ref->ft_info.del != NULL &&
       (visible_all ||
-        __wt_txn_visible_all(session, ref->page_del->txnid, ref->page_del->timestamp))) {
-        __wt_free(session, ref->page_del->update_list);
-        __wt_free(session, ref->page_del);
-    }
+        __wt_txn_visible_all(session, ref->ft_info.del->txnid, ref->ft_info.del->timestamp)))
+        __wt_overwrite_and_free(session, ref->ft_info.del);
 
     WT_REF_SET_STATE(ref, WT_REF_DELETED);
     return (skip);
@@ -296,12 +292,14 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_PAGE_DELETED *page_del;
     WT_ROW *rip;
     WT_TIME_WINDOW tw;
-    WT_UPDATE **upd_array, *upd;
+    WT_UPDATE **upd_array, **update_list, *upd;
     size_t size, total_size;
     uint32_t count, i;
 
     btree = S2BT(session);
     page = ref->page;
+    page_del = NULL;
+    update_list = NULL;
 
     WT_STAT_CONN_DATA_INCR(session, cache_read_deleted);
 
@@ -315,7 +313,15 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
     if (!F_ISSET(btree, WT_BTREE_READONLY))
         __wt_page_modify_set(session, page);
 
-    if (ref->page_del != NULL && ref->page_del->prepare_state != WT_PREPARE_INIT)
+    /*
+     * Allocate the per-page update array if one doesn't already exist. (It might already exist
+     * because deletes are instantiated after the history store table updates.)
+     */
+    if (page->entries != 0 && page->modify->mod_row_update == NULL)
+        WT_PAGE_ALLOC_AND_SWAP(
+          session, page, page->modify->mod_row_update, upd_array, page->entries);
+
+    if (ref->ft_info.del != NULL && ref->ft_info.del->prepare_state != WT_PREPARE_INIT)
         WT_STAT_CONN_DATA_INCR(session, cache_read_deleted_prepared);
 
     /*
@@ -332,26 +338,16 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
      * in the system forced us to keep the old version of the page around, then we crashed and
      * recovered or we're running inside a checkpoint, and now we're being forced to read that page.
      *
-     * Expect a page-deleted structure if there's a running transaction that needs to be resolved,
-     * otherwise, there may not be one (and, if the transaction has resolved, we can ignore the
-     * page-deleted structure).
+     * If there's a page-deleted structure that's not yet globally visible, get a reference and
+     * migrate transaction ID and timestamp information to the updates (globally visible means the
+     * updates don't require that information).
+     *
+     * If the truncate operation is not yet resolved, link updates in the page-deleted structure so
+     * they can be found when the transaction is aborted or committed, even if they have moved to
+     * other pages.
      */
-    page_del = __wt_page_del_active(session, ref, true) ? ref->page_del : NULL;
-
-    /*
-     * Allocate the per-page update array if one doesn't already exist. (It might already exist
-     * because deletes are instantiated after the history store table updates.)
-     */
-    if (page->entries != 0 && page->modify->mod_row_update == NULL)
-        WT_PAGE_ALLOC_AND_SWAP(
-          session, page, page->modify->mod_row_update, upd_array, page->entries);
-
-    /*
-     * Allocate the per-reference update array; in the case of instantiating a page deleted in a
-     * running transaction, we need a list of the update structures for the eventual commit or
-     * abort.
-     */
-    if (page_del != NULL) {
+    page_del = __wt_page_del_active(session, ref, true) ? ref->ft_info.del : NULL;
+    if (page_del != NULL && page_del->committed == 0) {
         count = 0;
         if ((insert = WT_ROW_INSERT_SMALLEST(page)) != NULL)
             WT_SKIP_FOREACH (ins, insert)
@@ -362,12 +358,11 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
                 WT_SKIP_FOREACH (ins, insert)
                     ++count;
         }
-        WT_RET(__wt_calloc_def(session, count + 1, &page_del->update_list));
-        __wt_cache_page_inmem_incr(session, page, (count + 1) * sizeof(page_del->update_list));
+        WT_RET(__wt_calloc_def(session, count + 1, &update_list));
     }
 
     /* Walk the page entries, giving each one a tombstone. */
-    size = total_size = 0;
+    total_size = size = 0;
     count = 0;
     upd_array = page->modify->mod_row_update;
     if ((insert = WT_ROW_INSERT_SMALLEST(page)) != NULL)
@@ -377,8 +372,8 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
             upd->next = ins->upd;
             ins->upd = upd;
 
-            if (page_del != NULL)
-                page_del->update_list[count++] = upd;
+            if (update_list != NULL)
+                update_list[count++] = upd;
         }
     WT_ROW_FOREACH (page, rip, i) {
         /*
@@ -392,8 +387,8 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
             upd->next = upd_array[WT_ROW_SLOT(page, rip)];
             upd_array[WT_ROW_SLOT(page, rip)] = upd;
 
-            if (page_del != NULL)
-                page_del->update_list[count++] = upd;
+            if (update_list != NULL)
+                update_list[count++] = upd;
 
             if ((insert = WT_ROW_INSERT(page, rip)) != NULL)
                 WT_SKIP_FOREACH (ins, insert) {
@@ -402,23 +397,24 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
                     upd->next = ins->upd;
                     ins->upd = upd;
 
-                    if (page_del != NULL)
-                        page_del->update_list[count++] = upd;
+                    if (update_list != NULL)
+                        update_list[count++] = upd;
                 }
         }
     }
-
     __wt_cache_page_inmem_incr(session, page, total_size);
+
+    /*
+     * We no longer need the WT_PAGE_DELETED structure, all of its information should have been
+     * transferred to the list of WT_UPDATE structures (if any).
+     */
+    __wt_overwrite_and_free(session, ref->ft_info.del);
+    if (update_list != NULL)
+        ref->ft_info.update = update_list;
 
     return (0);
 
 err:
-    /*
-     * The page-delete update structure may have existed before we were called, and presumably might
-     * be in use by a running transaction. The list of update structures cannot have been created
-     * before we were called, and should not exist if we exit with an error.
-     */
-    if (page_del != NULL)
-        __wt_free(session, page_del->update_list);
+    __wt_free(session, update_list);
     return (ret);
 }

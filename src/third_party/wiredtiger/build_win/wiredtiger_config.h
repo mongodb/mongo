@@ -19,6 +19,9 @@
 /* ZSTD support automatically loaded. */
 /* #undef HAVE_BUILTIN_EXTENSION_ZSTD */
 
+/* libsodium support automatically loaded. */
+/* #undef HAVE_BUILTIN_EXTENSION_SODIUM */
+
 /* Define to 1 if you have the `clock_gettime' function. */
 /* #undef HAVE_CLOCK_GETTIME */
 
@@ -66,6 +69,9 @@
 
 /* Define to 1 if you have the `zstd' library (-lzstd). */
 /* #undef HAVE_LIBZSTD */
+
+/* Define to 1 if you have the `sodium' library (-lsodium). */
+/* #undef HAVE_LIBSODIUM */
 
 /* Define to 1 if you have the <memory.h> header file. */
 /* #undef HAVE_MEMORY_H */

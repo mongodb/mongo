@@ -44,10 +44,18 @@ compare_int(int32_t a, int32_t b)
 }
 
 static int32_t
-item_to_int(WT_ITEM *item)
+item_to_int(const WT_ITEM *item)
 {
+    int32_t ret;
+
     testutil_assert(item->size == sizeof(int32_t));
-    return (*(int32_t *)item->data);
+
+    /*
+     * Using memcpy instead of direct type cast to avoid undefined behavior sanitizer complaining
+     * about misaligned address.
+     */
+    memcpy(&ret, item->data, sizeof(int32_t));
+    return ret;
 }
 
 static int
@@ -61,10 +69,9 @@ compare_int_items(WT_ITEM *itema, WT_ITEM *itemb)
 static void
 print_int_item(const char *str, const WT_ITEM *item)
 {
-    if (item->size > 0) {
-        testutil_assert(item->size == sizeof(int32_t));
-        printf("%s%" PRId32, str, *(int32_t *)item->data);
-    } else
+    if (item->size > 0)
+        printf("%s%" PRId32, str, item_to_int(item));
+    else
         printf("%s<empty>", str);
 }
 

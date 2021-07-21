@@ -284,6 +284,27 @@ class WiredTigerTestCase(unittest.TestCase):
         self.skipped = True
         super(WiredTigerTestCase, self).skipTest(reason)
 
+    # Construct the expected filename for an extension library and return
+    # the name if the file exists.
+    @staticmethod
+    def findExtension(dirname, libname):
+        pat = ''
+        # When scanning for the extension library, we need to account for
+        # the binary paths produced by libtool and CMake. Libtool will export
+        # the library under '.libs'.
+        if os.path.exists(os.path.join(WiredTigerTestCase._builddir, 'ext',
+            dirname, libname, '.libs')):
+            pat = os.path.join(WiredTigerTestCase._builddir, 'ext',
+                dirname, libname, '.libs', 'libwiredtiger_*.so')
+        else:
+            pat = os.path.join(WiredTigerTestCase._builddir, 'ext',
+                dirname, libname, 'libwiredtiger_*.so')
+        filenames = glob.glob(pat)
+        if len(filenames) > 1:
+            raise Exception(self.shortid() + ": " + ext +
+                ": multiple extensions libraries found matching: " + pat)
+        return filenames
+
     # Return the wiredtiger_open extension argument for
     # any needed shared library.
     def extensionsConfig(self):
@@ -312,9 +333,7 @@ class WiredTigerTestCase(unittest.TestCase):
                     ": extension is not named <dir>/<name>")
             libname = splits[1]
             dirname = splits[0]
-            pat = os.path.join(WiredTigerTestCase._builddir, 'ext',
-                dirname, libname, '.libs', 'libwiredtiger_*.so')
-            filenames = glob.glob(pat)
+            filenames = self.findExtension(dirname, libname)
             if len(filenames) == 0:
                 if skipIfMissing:
                     self.skipTest('extension "' + ext + '" not built')
@@ -323,10 +342,6 @@ class WiredTigerTestCase(unittest.TestCase):
                     raise Exception(self.shortid() +
                         ": " + ext +
                         ": no extensions library found matching: " + pat)
-            elif len(filenames) > 1:
-                raise Exception(self.shortid() +
-                    ": " + ext +
-                    ": multiple extensions libraries found matching: " + pat)
             complete = '"' + filenames[0] + '"' + extconf
             if ext in extfiles:
                 if extfiles[ext] != complete:
@@ -351,13 +366,7 @@ class WiredTigerTestCase(unittest.TestCase):
         # avoid confusion.
         sys.stdout.flush()
         conn_param = 'create,error_prefix="%s",%s' % (self.shortid(), config)
-        try:
-            conn = self.wiredtiger_open(home, conn_param)
-        except wiredtiger.WiredTigerError as e:
-            print("Failed wiredtiger_open: dir '%s', config '%s'" % \
-                (home, conn_param))
-            raise e
-        return conn
+        return self.wiredtiger_open(home, conn_param)
 
     # Replacement for wiredtiger.wiredtiger_open that returns
     # a proxied connection that knows to close it itself at the

@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # [TEST_TAGS]
-# caching_eviction:correctness:written_data
+# history_store:eviction_checkpoint_interaction
 # [END_TAGS]
 #
 

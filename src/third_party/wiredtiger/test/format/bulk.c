@@ -60,7 +60,7 @@ bulk_commit_transaction(WT_SESSION *session)
     testutil_check(session->commit_transaction(session, buf));
 
     /* Update the oldest timestamp, otherwise updates are pinned in memory. */
-    timestamp_once(false, false);
+    timestamp_once(session, false, false);
 }
 
 /*

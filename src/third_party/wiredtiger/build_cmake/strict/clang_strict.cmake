@@ -53,5 +53,13 @@ if(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
     list(APPEND clang_base_c_flags "-Wno-implicit-int-float-conversion")
 endif()
 
+if(WT_DARWIN AND NOT CMAKE_CROSSCOMPILING)
+    # If we are not cross-compiling, we can safely disable this diagnostic.
+    # Its incompatible with strict diagnostics when including external
+    # libraries that are not in the default linker path
+    # e.g. linking zlib/snappy/... from /usr/local/.
+    list(APPEND clang_base_c_flags "-Wno-poison-system-directories")
+endif()
+
 # Set our base clang flags to ensure it propogates to the rest of our build.
 set(COMPILER_DIAGNOSTIC_FLAGS "${COMPILER_DIAGNOSTIC_FLAGS};${clang_base_c_flags}" CACHE  INTERNAL "" FORCE)

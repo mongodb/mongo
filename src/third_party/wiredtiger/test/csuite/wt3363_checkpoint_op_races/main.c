@@ -28,7 +28,7 @@
 
 /*
  * [TEST_TAGS]
- * checkpoints:liveness:liveness
+ * checkpoint
  * [END_TAGS]
  */
 

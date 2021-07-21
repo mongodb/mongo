@@ -939,8 +939,7 @@ __curhs_insert(WT_CURSOR *cursor)
 
     /* Insert doesn't maintain a position across calls, clear resources. */
 err:
-    __wt_free(session, hs_tombstone);
-    __wt_free(session, hs_upd);
+    __wt_free_update_list(session, &hs_upd);
     WT_TRET(cursor->reset(cursor));
     API_END_RET(session, ret);
 }
@@ -969,7 +968,7 @@ __curhs_remove(WT_CURSOR *cursor)
     cbt = (WT_CURSOR_BTREE *)file_cursor;
     hs_tombstone = NULL;
 
-    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, insert, CUR2BT(file_cursor));
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, remove, CUR2BT(file_cursor));
 
     /* Remove must be called with cursor positioned. */
     WT_ASSERT(session, F_ISSET(cursor, WT_CURSTD_KEY_INT));

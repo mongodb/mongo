@@ -1464,7 +1464,9 @@ __wt_page_del_active(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
     WT_PAGE_DELETED *page_del;
     uint8_t prepare_state;
 
-    if ((page_del = ref->page_del) == NULL)
+    WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+
+    if ((page_del = ref->ft_info.del) == NULL)
         return (false);
     if (page_del->txnid == WT_TXN_ABORTED)
         return (false);
@@ -1651,13 +1653,18 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     page = ref->page;
     mod = page->modify;
 
-    /* A truncated page can't be evicted until the truncate completes. */
-    if (__wt_page_del_active(session, ref, true))
-        return (false);
-
-    /* Otherwise, never modified pages can always be evicted. */
+    /* Never modified pages can always be evicted. */
     if (mod == NULL)
         return (true);
+
+    /*
+     * If a fast-truncate page is subsequently instantiated, it can become an eviction candidate. If
+     * the fast-truncate itself has not resolved when the page is instantiated, a list of updates is
+     * created, which will be discarded as part of transaction resolution. Don't attempt to evict a
+     * fast-truncate page until any update list has been removed.
+     */
+    if (ref->ft_info.update != NULL)
+        return (false);
 
     /*
      * We can't split or evict multiblock row-store pages where the parent's key for the page is an
@@ -1693,15 +1700,18 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     }
 
     /*
+     * Check we are not evicting an accessible internal page with an active split generation.
+     *
      * If a split created new internal pages, those newly created internal pages cannot be evicted
      * until all threads are known to have exited the original parent page's index, because evicting
      * an internal page discards its WT_REF array, and a thread traversing the original parent page
      * index might see a freed WT_REF.
      *
-     * One special case where we know this is safe is if the handle is locked exclusive (e.g., when
-     * the whole tree is being evicted). In that case, no readers can be looking at an old index.
+     * One special case where we know this is safe is if the handle is dead or locked exclusively,
+     * that is, no readers can be looking at an old index.
      */
-    if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) && !F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE) &&
+    if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) &&
+      !F_ISSET(session->dhandle, WT_DHANDLE_DEAD | WT_DHANDLE_EXCLUSIVE) &&
       __wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen))
         return (false);
 
@@ -2007,4 +2017,57 @@ __wt_bt_col_var_cursor_walk_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *
     cbt->tmp->size = cbt->iface.value.size;
     cbt->cip_saved = cip;
     return (0);
+}
+
+/*
+ * __wt_btcur_skip_page --
+ *     Return if the cursor is pointing to a page with deleted records and can be skipped for cursor
+ *     traversal.
+ */
+static inline bool
+__wt_btcur_skip_page(WT_CURSOR_BTREE *cbt)
+{
+    WT_ADDR_COPY addr;
+    WT_PAGE *page;
+    WT_REF *ref;
+    WT_SESSION_IMPL *session;
+    uint8_t previous_state;
+    bool can_skip;
+
+    session = CUR2S(cbt);
+    ref = cbt->ref;
+    page = cbt->ref == NULL ? NULL : cbt->ref->page;
+
+    if (page == NULL)
+        return false;
+
+    previous_state = ref->state;
+    can_skip = false;
+
+    /*
+     * Determine if all records on the page have been deleted and all the tombstones are visible to
+     * our transaction. If so, we can avoid reading the records on the page and move to the next
+     * page. We base this decision on the aggregate stop point added to the page during the last
+     * reconciliation. We can skip this test if the page has been modified since it was reconciled
+     * or the underlying cursor is configured to ignore tombstones.
+     *
+     * We are making these decisions while holding a lock for the page as checkpoint or eviction can
+     * make changes to the data structures (i.e., aggregate timestamps) we are reading.
+     */
+    if (session->txn->isolation == WT_ISO_SNAPSHOT && !__wt_page_is_modified(page) &&
+      !F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) && previous_state == WT_REF_MEM) {
+
+        /* We only try to lock the page once. */
+        if (!WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
+            return false;
+
+        if (__wt_ref_addr_copy(session, ref, &addr) &&
+          __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts) &&
+          __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_durable_ts))
+            can_skip = true;
+
+        WT_REF_SET_STATE(ref, previous_state);
+    }
+
+    return (can_skip);
 }

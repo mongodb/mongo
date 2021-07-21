@@ -890,6 +890,15 @@ __txn_commit_timestamps_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_
           __wt_timestamp_to_string(op_ts, ts_string[0]),
           __wt_timestamp_to_string(prev_op_durable_ts, ts_string[1])));
 
+    if (FLD_ISSET(ts_flags, WT_DHANDLE_TS_ORDERED) && prev_op_durable_ts != WT_TS_NONE &&
+      !txn_has_ts)
+        WT_RET(
+          __wt_msg(session,
+            WT_COMMIT_TS_VERB_PREFIX "committing a transaction that updates a value without "
+                                     "a timestamp while the previous update (%s) is timestamped "
+                                     "on a table configured for strict ordering",
+            __wt_timestamp_to_string(prev_op_durable_ts, ts_string[1])));
+
     if (FLD_ISSET(ts_flags, WT_DHANDLE_TS_MIXED_MODE) && F_ISSET(txn, WT_TXN_HAS_TS_COMMIT) &&
       op_ts != WT_TS_NONE && prev_op_durable_ts > op_ts)
         WT_RET(__wt_msg(session,
@@ -965,9 +974,8 @@ __txn_fixup_prepared_update(
         hs_cursor->set_value(hs_cursor, &tw, tw.durable_stop_ts, tw.durable_start_ts,
           (uint64_t)WT_UPDATE_STANDARD, &hs_value);
         WT_ERR(hs_cursor->update(hs_cursor));
-    } else {
+    } else
         WT_ERR(hs_cursor->remove(hs_cursor));
-    }
 
 err:
     F_SET(txn, txn_flags);
@@ -1129,9 +1137,15 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
              * and instead write nothing.
              */
             WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, &not_used));
+#ifdef HAVE_DIAGNOSTIC
+            WT_WITH_BTREE(session, op->btree,
+              ret = __wt_row_modify(
+                cbt, &cbt->iface.key, NULL, tombstone, WT_UPDATE_INVALID, false, false));
+#else
             WT_WITH_BTREE(session, op->btree,
               ret =
                 __wt_row_modify(cbt, &cbt->iface.key, NULL, tombstone, WT_UPDATE_INVALID, false));
+#endif
             WT_ERR(ret);
             tombstone = NULL;
         } else if (ret == 0)
@@ -1263,9 +1277,12 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
 
     used_ts = F_ISSET(txn, WT_TXN_HAS_TS_COMMIT) || F_ISSET(txn, WT_TXN_HAS_TS_DURABLE);
     /*
-     * Debugging checks on timestamps, if user requested them.
+     * Debugging checks on timestamps, if user requested them. We additionally don't expect recovery
+     * to be using timestamps when applying commits. If recovery is running, skip this assert to
+     * avoid failing the recovery process.
      */
-    if (F_ISSET(txn, WT_TXN_TS_WRITE_ALWAYS) && !used_ts && txn->mod_count != 0)
+    if (F_ISSET(txn, WT_TXN_TS_WRITE_ALWAYS) && !used_ts && txn->mod_count != 0 &&
+      !F_ISSET(S2C(session), WT_CONN_RECOVERING))
         WT_RET_MSG(session, EINVAL, "commit_timestamp required and none set on this transaction");
     if (F_ISSET(txn, WT_TXN_TS_WRITE_NEVER) && used_ts && txn->mod_count != 0)
         WT_RET_MSG(
@@ -1431,15 +1448,16 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     WT_UPDATE *upd;
     wt_timestamp_t candidate_durable_timestamp, prev_durable_timestamp;
     uint32_t fileid;
-    u_int i;
+    uint8_t previous_state;
+    u_int i, ft_resolution;
 #ifdef HAVE_DIAGNOSTIC
     u_int prepare_count;
 #endif
     bool locked, prepare, readonly, update_durable_ts;
 
-    txn = session->txn;
     conn = S2C(session);
     cursor = NULL;
+    txn = session->txn;
     txn_global = &conn->txn_global;
 #ifdef HAVE_DIAGNOSTIC
     prepare_count = 0;
@@ -1564,6 +1582,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     /* Note: we're going to commit: nothing can fail after this point. */
 
     /* Process and free updates. */
+    ft_resolution = 0;
     for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
         fileid = op->btree->id;
         switch (op->type) {
@@ -1607,8 +1626,12 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
             }
             break;
         case WT_TXN_OP_REF_DELETE:
-            __wt_txn_op_set_timestamp(session, op);
-            break;
+            /*
+             * Fast-truncate operations are resolved in a second pass after failure is no longer
+             * possible.
+             */
+            ++ft_resolution;
+            continue;
         case WT_TXN_OP_TRUNCATE_COL:
         case WT_TXN_OP_TRUNCATE_ROW:
             /* Other operations don't need timestamps. */
@@ -1620,16 +1643,41 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
         if (cursor != NULL)
             WT_CLEAR(cursor->key);
     }
-    txn->mod_count = 0;
-#ifdef HAVE_DIAGNOSTIC
-    WT_ASSERT(session, txn->prepare_count == prepare_count);
-    txn->prepare_count = 0;
-#endif
 
     if (cursor != NULL) {
         WT_ERR(cursor->close(cursor));
         cursor = NULL;
     }
+
+    /*
+     * Resolve any fast-truncate transactions and allow eviction to proceed on instantiated pages.
+     * This isn't done as part of the initial processing because until now the commit could still
+     * switch to an abort. The action allowing eviction to proceed is clearing the WT_UPDATE list,
+     * (if any), associated with the commit. We're the only consumer of that list and we no longer
+     * need it, and eviction knows it means abort or commit has completed on instantiated pages.
+     */
+    for (i = 0, op = txn->mod; ft_resolution > 0 && i < txn->mod_count; i++, op++)
+        if (op->type == WT_TXN_OP_REF_DELETE) {
+            __wt_txn_op_set_timestamp(session, op);
+
+            WT_REF_LOCK(session, op->u.ref, &previous_state);
+            if (previous_state == WT_REF_DELETED)
+                op->u.ref->ft_info.del->committed = 1;
+            else
+                __wt_free(session, op->u.ref->ft_info.update);
+            WT_REF_UNLOCK(op->u.ref, previous_state);
+
+            __wt_txn_op_free(session, op);
+
+            --ft_resolution;
+        }
+    WT_ASSERT(session, ft_resolution == 0);
+
+    txn->mod_count = 0;
+#ifdef HAVE_DIAGNOSTIC
+    WT_ASSERT(session, txn->prepare_count == prepare_count);
+    txn->prepare_count = 0;
+#endif
 
     /*
      * If durable is set, we'll try to update the global durable timestamp with that value. If
@@ -1680,6 +1728,20 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
      */
     if (!readonly)
         WT_IGNORE_RET(__wt_cache_eviction_check(session, false, false, NULL));
+
+    /*
+     * Stable timestamp cannot be concurrently increased greater than or equal to the prepared
+     * transaction's durable timestamp. Otherwise, checkpoint may only write partial updates of the
+     * transaction.
+     */
+    if (prepare && txn->durable_timestamp <= txn_global->stable_timestamp) {
+        WT_ERR(__wt_verbose_dump_sessions(session, true));
+        WT_ERR_PANIC(session, WT_PANIC,
+          "Stable timestamp is increased greater than or equal to the committing prepared "
+          "transaction's "
+          "durable timestamp");
+    }
+
     return (0);
 
 err:
@@ -1733,7 +1795,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
           "A transaction should not have been assigned a log record if WT_CONN_LOG_DEBUG mode is "
           "not enabled");
 
-    /* Set the prepare timestamp.  */
+    /* Set the prepare timestamp. */
     WT_RET(__wt_txn_set_timestamp(session, cfg));
 
     if (!F_ISSET(txn, WT_TXN_HAS_TS_PREPARE))

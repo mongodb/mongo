@@ -259,23 +259,11 @@ err:
 static int
 __rename_tiered(WT_SESSION_IMPL *session, const char *olduri, const char *newuri, const char *cfg[])
 {
-    WT_DECL_RET;
-    WT_TIERED *tiered;
-
-    /* Get the tiered data handle. */
-    WT_RET(__wt_session_get_dhandle(session, olduri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
-    tiered = (WT_TIERED *)session->dhandle;
-
-    /* TODO */
     WT_UNUSED(olduri);
     WT_UNUSED(newuri);
     WT_UNUSED(cfg);
-    WT_UNUSED(tiered);
-
-    F_SET(session->dhandle, WT_DHANDLE_DISCARD);
-    WT_TRET(__wt_session_release_dhandle(session));
-
-    return (ret);
+    /* We do not allow renaming a tiered table. */
+    WT_RET_MSG(session, EINVAL, "rename of tiered table is not supported");
 }
 
 /*
