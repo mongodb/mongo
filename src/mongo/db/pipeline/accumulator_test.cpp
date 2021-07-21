@@ -39,9 +39,11 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_for_window_functions.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 
 namespace AccumulatorTests {
@@ -59,12 +61,21 @@ template <typename AccName>
 static void assertExpectedResults(
     ExpressionContext* const expCtx,
     std::initializer_list<std::pair<std::vector<Value>, Value>> operations,
-    bool skipMerging = false) {
+    bool skipMerging = false,
+    boost::optional<Value> newGroupValue = boost::none) {
+    auto initializeAccumulator = [&]() -> intrusive_ptr<AccumulatorState> {
+        auto accum = AccName::create(expCtx);
+        if (newGroupValue) {
+            accum->startNewGroup(*newGroupValue);
+        }
+        return accum;
+    };
+
     for (auto&& op : operations) {
         try {
             // Asserts that result equals expected result when not sharded.
             {
-                auto accum = AccName::create(expCtx);
+                auto accum = initializeAccumulator();
                 for (auto&& val : op.first) {
                     accum->process(val, false);
                 }
@@ -75,12 +86,13 @@ static void assertExpectedResults(
 
             // Asserts that result equals expected result when all input is on one shard.
             if (!skipMerging) {
-                auto accum = AccName::create(expCtx);
-                auto shard = AccName::create(expCtx);
+                auto accum = initializeAccumulator();
+                auto shard = initializeAccumulator();
                 for (auto&& val : op.first) {
                     shard->process(val, false);
                 }
-                accum->process(shard->getValue(true), true);
+                auto val = shard->getValue(true);
+                accum->process(val, true);
                 Value result = accum->getValue(false);
                 ASSERT_VALUE_EQ(op.second, result);
                 ASSERT_EQUALS(op.second.getType(), result.getType());
@@ -88,9 +100,9 @@ static void assertExpectedResults(
 
             // Asserts that result equals expected result when each input is on a separate shard.
             if (!skipMerging) {
-                auto accum = AccName::create(expCtx);
+                auto accum = initializeAccumulator();
                 for (auto&& val : op.first) {
-                    auto shard = AccName::create(expCtx);
+                    auto shard = initializeAccumulator();
                     shard->process(val, false);
                     accum->process(shard->getValue(true), true);
                 }
@@ -221,6 +233,104 @@ TEST(Accumulators, MinRespectsCollation) {
     expCtx.setCollator(std::move(collator));
     assertExpectedResults<AccumulatorMin>(&expCtx,
                                           {{{Value("abc"_sd), Value("cba"_sd)}, Value("cba"_sd)}});
+}
+
+TEST(Accumulators, MinN) {
+    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
+    auto expCtx = ExpressionContextForTest{};
+    const auto n = Value(3);
+    assertExpectedResults<AccumulatorMinN>(
+        &expCtx,
+        {
+            // Basic tests.
+            {{Value(3), Value(4), Value(5), Value(100)},
+             {Value(std::vector<Value>{Value(3), Value(4), Value(5)})}},
+            {{Value(10), Value(8), Value(9), Value(7), Value(1)},
+             {Value(std::vector<Value>{Value(1), Value(7), Value(8)})}},
+            {{Value(11.32), Value(91.0), Value(2), Value(701), Value(101)},
+             {Value(std::vector<Value>{Value(2), Value(11.32), Value(91.0)})}},
+
+            // 3 or fewer values results in those values being returned.
+            {{Value(10), Value(8), Value(9)},
+             {Value(std::vector<Value>{Value(8), Value(9), Value(10)})}},
+            {{Value(10)}, {Value(std::vector<Value>{Value(10)})}},
+
+            // Ties are broken arbitrarily.
+            {{Value(10), Value(10), Value(1), Value(10), Value(1), Value(10)},
+             {Value(std::vector<Value>{Value(1), Value(1), Value(10)})}},
+
+            // Null/missing cases (missing and null both get ignored).
+            {{Value(100), Value(BSONNULL), Value(), Value(4), Value(3)},
+             {Value(std::vector<Value>{Value(3), Value(4), Value(100)})}},
+            {{Value(100), Value(), Value(BSONNULL), Value(), Value(3)},
+             {Value(std::vector<Value>{Value(3), Value(100)})}},
+        },
+        false /*skipMerging*/,
+        n);
+}
+
+TEST(Accumulators, MinNRespectsCollation) {
+    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
+    auto expCtx = ExpressionContextForTest{};
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
+    expCtx.setCollator(std::move(collator));
+    const auto n = Value(2);
+    assertExpectedResults<AccumulatorMinN>(
+        &expCtx,
+        {{{Value("abc"_sd), Value("cba"_sd), Value("cca"_sd)},
+          Value(std::vector<Value>{Value("cba"_sd), Value("cca"_sd)})}},
+        false /* skipMerging */,
+        n);
+}
+
+TEST(Accumulators, MaxN) {
+    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
+    auto expCtx = ExpressionContextForTest{};
+    const auto n = Value(3);
+    assertExpectedResults<AccumulatorMaxN>(
+        &expCtx,
+        {
+            // Basic tests.
+            {{Value(3), Value(4), Value(5), Value(100)},
+             {Value(std::vector<Value>{Value(100), Value(5), Value(4)})}},
+            {{Value(10), Value(8), Value(9), Value(7), Value(1)},
+             {Value(std::vector<Value>{Value(10), Value(9), Value(8)})}},
+            {{Value(11.32), Value(91.0), Value(2), Value(701), Value(101)},
+             {Value(std::vector<Value>{Value(701), Value(101), Value(91.0)})}},
+
+            // 3 or fewer values results in those values being returned.
+            {{Value(10), Value(8), Value(9)},
+             {Value(std::vector<Value>{Value(10), Value(9), Value(8)})}},
+            {{Value(10)}, {Value(std::vector<Value>{Value(10)})}},
+
+            // Ties are broken arbitrarily.
+            {{Value(1), Value(1), Value(1), Value(10), Value(1), Value(10)},
+             {Value(std::vector<Value>{Value(10), Value(10), Value(1)})}},
+
+            // Null/missing cases (missing and null both get ignored).
+            {{Value(100), Value(BSONNULL), Value(), Value(4), Value(3)},
+             {Value(std::vector<Value>{Value(100), Value(4), Value(3)})}},
+            {{Value(100), Value(), Value(BSONNULL), Value(), Value(3)},
+             {Value(std::vector<Value>{Value(100), Value(3)})}},
+        },
+        false /*skipMerging*/,
+        n);
+}
+
+TEST(Accumulators, MaxNRespectsCollation) {
+    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
+    auto expCtx = ExpressionContextForTest{};
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
+    expCtx.setCollator(std::move(collator));
+    const auto n = Value(2);
+    assertExpectedResults<AccumulatorMaxN>(
+        &expCtx,
+        {{{Value("abc"_sd), Value("cba"_sd), Value("cca"_sd)},
+          Value(std::vector<Value>{Value("abc"_sd), Value("cca"_sd)})}},
+        false /* skipMerging */,
+        n);
 }
 
 TEST(Accumulators, Max) {

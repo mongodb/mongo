@@ -76,7 +76,7 @@ namespace mongo {
  * contains intermediate values being accumulated.
  *
  * Like most accumulators, $sum does not require or accept an initializer Expression. At time of
- * writing, only user-defined accumulators accept an initializer.
+ * writing, only user-defined accumulators and the 'N' family of accumulators accept an initializer.
  *
  * For example, in:
  *     {$group: {
