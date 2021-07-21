@@ -45,6 +45,7 @@
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog/uncommitted_multikey.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -66,6 +67,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_recovery.h"
@@ -73,6 +75,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/update/update_driver.h"
 
@@ -214,6 +217,34 @@ Status validatePreImageRecording(OperationContext* opCtx, const NamespaceString&
 
     return Status::OK();
 }
+
+bool isRetryableWrite(OperationContext* opCtx) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    const bool inMultiDocumentTransaction = txnParticipant && txnParticipant.transactionIsOpen();
+    return !inMultiDocumentTransaction && opCtx->writesAreReplicated() && opCtx->getTxnNumber();
+}
+
+boost::optional<OplogSlot> reserveOplogSlotsForRetryableFindAndModify(OperationContext* opCtx) {
+    if (isRetryableWrite(opCtx)) {
+        // Check if we're in a retryable write that should save the image to
+        // `config.image_collection`. This is the only time
+        // `storeFindAndModifyImagesInSideCollection` may be queried for this transaction.
+        const bool storeImageInSideCollection =
+            repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCV() &&
+            repl::gStoreFindAndModifyImagesInSideCollection.load();
+        if (storeImageInSideCollection) {
+            // We reserve two oplog slots here, expecting the greater of the two (say TS) to be used
+            // as the oplog timestamp. Tenant migrations and resharding will forge no-op image oplog
+            // entries and set the timestamp for these synthetic entries to be TS - 1.
+            auto oplogInfo = LocalOplogInfo::get(opCtx);
+            auto slots = oplogInfo->getNextOpTimes(opCtx, 2);
+            uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(slots[1].getTimestamp()));
+            return slots[1];
+        }
+    }
+    return boost::none;
+}
+
 
 class CappedDeleteSideTxn {
 public:
@@ -1082,6 +1113,10 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
         uasserted(10089, "cannot remove from a capped collection");
     }
 
+    const auto oplogSlot = reserveOplogSlotsForRetryableFindAndModify(opCtx);
+    OpObserver::OplogDeleteEntryArgs deleteArgs{
+        nullptr, fromMigrate, getRecordPreImages(), oplogSlot, oplogSlot != boost::none};
+
     getGlobalServiceContext()->getOpObserver()->aboutToDelete(opCtx, ns(), doc.value());
 
     boost::optional<BSONObj> deletedDoc;
@@ -1089,7 +1124,6 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
         getRecordPreImages()) {
         deletedDoc.emplace(doc.value().getOwned());
     }
-
     int64_t keysDeleted;
     _indexCatalog->unindexRecord(opCtx,
                                  CollectionPtr(this, CollectionPtr::NoYieldTag{}),
@@ -1098,8 +1132,6 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                  noWarn,
                                  &keysDeleted);
     _shared->_recordStore->deleteRecord(opCtx, loc);
-
-    OpObserver::OplogDeleteEntryArgs deleteArgs{nullptr, fromMigrate, getRecordPreImages()};
     if (deletedDoc) {
         deleteArgs.deletedDoc = &(deletedDoc.get());
     }
@@ -1176,6 +1208,18 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
         args->preImageDoc = oldDoc.value().getOwned();
     }
     args->preImageRecordingEnabledForCollection = getRecordPreImages();
+    const bool storePrePostImage =
+        args->storeDocOption != CollectionUpdateArgs::StoreDocOption::None;
+    if (!args->oplogSlot && storePrePostImage) {
+        const auto oplogSlot = reserveOplogSlotsForRetryableFindAndModify(opCtx);
+        args->oplogSlot = oplogSlot;
+        args->storeImageInSideCollection = oplogSlot != boost::none;
+    } else {
+        // Retryable findAndModify commands should not reserve oplog slots before entering this
+        // function since tenant migrations and resharding rely on always being able to set
+        // timestamps of forged pre- and post- image entries to timestamp of findAndModify - 1.
+        invariant(!(isRetryableWrite(opCtx) && storePrePostImage));
+    }
 
     uassertStatusOK(_shared->_recordStore->updateRecord(
         opCtx, oldLocation, newDoc.objdata(), newDoc.objsize()));
@@ -1229,6 +1273,18 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
     // a retryable findAndModify or a possible update to the shard key.
     if (!args->preImageDoc && getRecordPreImages()) {
         args->preImageDoc = oldRec.value().toBson().getOwned();
+    }
+    const bool storePrePostImage =
+        args->storeDocOption != CollectionUpdateArgs::StoreDocOption::None;
+    if (!args->oplogSlot && storePrePostImage) {
+        const auto oplogSlot = reserveOplogSlotsForRetryableFindAndModify(opCtx);
+        args->oplogSlot = oplogSlot;
+        args->storeImageInSideCollection = oplogSlot != boost::none;
+    } else {
+        // Retryable findAndModify commands should not reserve oplog slots before entering this
+        // function since tenant migrations and resharding rely on always being able to set
+        // timestamps of forged pre- and post- image entries to timestamp of findAndModify - 1.
+        invariant(!(isRetryableWrite(opCtx) && storePrePostImage));
     }
 
     auto newRecStatus =

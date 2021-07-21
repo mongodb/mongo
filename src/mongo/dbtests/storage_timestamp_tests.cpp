@@ -34,6 +34,7 @@
 #include <cstdint>
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
@@ -87,6 +88,7 @@
 #include "mongo/db/transaction_participant_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/future.h"
@@ -3409,6 +3411,226 @@ public:
     }
 };
 
+class RetryableFindAndModifyTest : public StorageTimestampTest {
+public:
+    const StringData dbName = "unittest"_sd;
+    const BSONObj oldObj = BSON("_id" << 0 << "a" << 1);
+
+    RetryableFindAndModifyTest(const std::string& collName) : nss(dbName, collName) {
+        auto service = _opCtx->getServiceContext();
+        auto sessionCatalog = SessionCatalog::get(service);
+        sessionCatalog->reset_forTest();
+        MongoDSessionCatalog::onStepUp(_opCtx);
+
+        reset(nss);
+        UUID ui = UUID::gen();
+
+        {
+            AutoGetCollection coll(_opCtx, nss, LockMode::MODE_IX);
+            ASSERT(coll);
+            ui = coll->uuid();
+        }
+
+        const auto currentTime = _clock->getTime();
+        currentTs = currentTime.clusterTime().asTimestamp();
+        insertTs = currentTime.clusterTime().asTimestamp() + 1;
+        beforeOplogTs = insertTs + 1;
+        oplogTs = insertTs + 2;
+        // This test does not run a real ReplicationCoordinator, so must advance the snapshot
+        // manager manually.
+        auto storageEngine = cc().getServiceContext()->getStorageEngine();
+        storageEngine->getSnapshotManager()->setLastApplied(insertTs);
+
+        const auto sessionId = makeLogicalSessionIdForTest();
+        _opCtx->setLogicalSessionId(sessionId);
+        const auto txnNumber = 10;
+        _opCtx->setTxnNumber(txnNumber);
+
+        ocs.emplace(_opCtx);
+
+        {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+            WriteUnitOfWork wunit(_opCtx);
+            insertDocument(autoColl.getCollection(), InsertStatement(oldObj));
+            wunit.commit();
+        }
+        assertOplogDocumentExistsAtTimestamp(BSON("ts" << insertTs << "op"
+                                                       << "i"),
+                                             insertTs,
+                                             true);
+
+        storageEngine->getSnapshotManager()->setLastApplied(insertTs);
+
+        auto txnParticipant = TransactionParticipant::get(_opCtx);
+        ASSERT(txnParticipant);
+        // Start a retryable write.
+        txnParticipant.beginOrContinue(
+            _opCtx, txnNumber, boost::none /* autocommit */, boost::none /* startTransaction */);
+    }
+
+protected:
+    NamespaceString nss;
+    Timestamp currentTs;
+    Timestamp insertTs;
+    Timestamp beforeOplogTs;
+    Timestamp oplogTs;
+
+    boost::optional<MongoDOperationContextSession> ocs;
+};
+
+class RetryableFindAndModifyUpdate : RetryableFindAndModifyTest {
+public:
+    RetryableFindAndModifyUpdate() : RetryableFindAndModifyTest("RetryableFindAndModifyUpdate") {}
+
+    void run() {
+        RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
+        RAIIServerParameterControllerForTest storeImageInSideCollection(
+            "storeFindAndModifyImagesInSideCollection", true);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+        CollectionWriter collection(autoColl);
+        const auto newObj = BSON("_id" << 0 << "a" << 1 << "b" << 1);
+        CollectionUpdateArgs args;
+        args.stmtIds = {1};
+        args.preImageDoc = oldObj;
+        args.updatedDoc = newObj;
+        args.storeDocOption = CollectionUpdateArgs::StoreDocOption::PreImage;
+        args.update = BSON("$set" << BSON("b" << 1));
+        args.criteria = BSON("_id" << 0);
+
+        {
+            auto cursor = collection->getCursor(_opCtx);
+            auto record = cursor->next();
+            invariant(record);
+            WriteUnitOfWork wuow(_opCtx);
+            collection->updateDocument(
+                _opCtx,
+                record->id,
+                Snapshotted<BSONObj>(_opCtx->recoveryUnit()->getSnapshotId(), oldObj),
+                newObj,
+                false,
+                nullptr,
+                &args);
+            wuow.commit();
+        }
+
+        // There should be no oplog entry at 'beforeOplogTs'.
+        const auto beforeOplogTsFilter = BSON("ts" << beforeOplogTs);
+        assertOplogDocumentExistsAtTimestamp(beforeOplogTsFilter, currentTs, false);
+        assertOplogDocumentExistsAtTimestamp(beforeOplogTsFilter, beforeOplogTs, false);
+        assertOplogDocumentExistsAtTimestamp(beforeOplogTsFilter, oplogTs, false);
+
+        const auto oplogTsFilter = BSON("ts" << oplogTs << "op"
+                                             << "u");
+        assertOplogDocumentExistsAtTimestamp(oplogTsFilter, currentTs, false);
+        assertOplogDocumentExistsAtTimestamp(oplogTsFilter, beforeOplogTs, false);
+        assertOplogDocumentExistsAtTimestamp(oplogTsFilter, oplogTs, true);
+    }
+};
+
+class RetryableFindAndModifyUpdateWithDamages : RetryableFindAndModifyTest {
+public:
+    RetryableFindAndModifyUpdateWithDamages()
+        : RetryableFindAndModifyTest("RetryableFindAndModifyUpdateWithDamages") {}
+
+    void run() {
+        namespace mmb = mongo::mutablebson;
+        RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
+        RAIIServerParameterControllerForTest storeImageInSideCollection(
+            "storeFindAndModifyImagesInSideCollection", true);
+        const auto bsonObj = BSON("_id" << 0 << "a" << 1);
+        // Create a new document representing BSONObj with the above contents.
+        mmb::Document doc(bsonObj, mmb::Document::kInPlaceEnabled);
+
+        mmb::DamageVector damages;
+        const char* source = nullptr;
+        size_t size = 0;
+        ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source, &size));
+
+        // Enable in-place mutation for this document
+        ASSERT_EQUALS(mmb::Document::kInPlaceEnabled, doc.getCurrentInPlaceMode());
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+        CollectionWriter collection(autoColl);
+        const auto newObj = BSON("_id" << 0 << "a" << 0);
+        CollectionUpdateArgs args;
+        args.stmtIds = {1};
+        args.preImageDoc = oldObj;
+        args.updatedDoc = newObj;
+        args.storeDocOption = CollectionUpdateArgs::StoreDocOption::PreImage;
+        args.update = BSON("$set" << BSON("a" << 0));
+        args.criteria = BSON("_id" << 0);
+
+        {
+            Snapshotted<BSONObj> objSnapshot(_opCtx->recoveryUnit()->getSnapshotId(), oldObj);
+            const RecordData oldRec(objSnapshot.value().objdata(), objSnapshot.value().objsize());
+            Snapshotted<RecordData> recordSnapshot(objSnapshot.snapshotId(), oldRec);
+            auto cursor = collection->getCursor(_opCtx);
+            auto record = cursor->next();
+            invariant(record);
+            WriteUnitOfWork wuow(_opCtx);
+            const auto statusWith = collection->updateDocumentWithDamages(
+                _opCtx, record->id, std::move(recordSnapshot), source, damages, &args);
+            wuow.commit();
+            ASSERT_OK(statusWith.getStatus());
+        }
+
+        // There should be no oplog entry at 'beforeOplogTs'.
+        const auto beforeOplogTsFilter = BSON("ts" << beforeOplogTs);
+        assertOplogDocumentExistsAtTimestamp(beforeOplogTsFilter, currentTs, false);
+        assertOplogDocumentExistsAtTimestamp(beforeOplogTsFilter, beforeOplogTs, false);
+        assertOplogDocumentExistsAtTimestamp(beforeOplogTsFilter, oplogTs, false);
+
+        const auto tsFilter = BSON("ts" << oplogTs << "op"
+                                        << "u");
+        assertOplogDocumentExistsAtTimestamp(tsFilter, currentTs, false);
+        assertOplogDocumentExistsAtTimestamp(tsFilter, beforeOplogTs, false);
+        assertOplogDocumentExistsAtTimestamp(tsFilter, oplogTs, true);
+    }
+};
+
+class RetryableFindAndModifyDelete : RetryableFindAndModifyTest {
+public:
+    RetryableFindAndModifyDelete() : RetryableFindAndModifyTest("RetryableFindAndModifyDelete") {}
+
+    void run() {
+        namespace mmb = mongo::mutablebson;
+        RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
+        RAIIServerParameterControllerForTest storeImageInSideCollection(
+            "storeFindAndModifyImagesInSideCollection", true);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+        CollectionWriter collection(autoColl);
+        const auto bsonObj = BSON("_id" << 0 << "a" << 1);
+
+        {
+            Snapshotted<BSONObj> objSnapshot(_opCtx->recoveryUnit()->getSnapshotId(), oldObj);
+            auto cursor = collection->getCursor(_opCtx);
+            auto record = cursor->next();
+            invariant(record);
+            WriteUnitOfWork wuow(_opCtx);
+            collection->deleteDocument(_opCtx,
+                                       objSnapshot,
+                                       1,
+                                       record->id,
+                                       nullptr,
+                                       false,
+                                       false,
+                                       Collection::StoreDeletedDoc::On);
+            wuow.commit();
+        }
+
+        // There should be no oplog entry at 'beforeOplogTs'.
+        const auto beforeOplogTsFilter = BSON("ts" << beforeOplogTs);
+        assertOplogDocumentExistsAtTimestamp(beforeOplogTsFilter, currentTs, false);
+        assertOplogDocumentExistsAtTimestamp(beforeOplogTsFilter, beforeOplogTs, false);
+        assertOplogDocumentExistsAtTimestamp(beforeOplogTsFilter, oplogTs, false);
+
+        const auto tsFilter = BSON("ts" << oplogTs << "op"
+                                        << "d");
+        assertOplogDocumentExistsAtTimestamp(tsFilter, currentTs, false);
+        assertOplogDocumentExistsAtTimestamp(tsFilter, beforeOplogTs, false);
+        assertOplogDocumentExistsAtTimestamp(tsFilter, oplogTs, true);
+    }
+};
+
 class MultiDocumentTransactionTest : public StorageTimestampTest {
 public:
     const StringData dbName = "unittest"_sd;
@@ -4235,6 +4457,9 @@ public:
         addIf<PreparedMultiDocumentTransaction>();
         addIf<AbortedPreparedMultiDocumentTransaction>();
         addIf<IndexBuildsResolveErrorsDuringStateChangeToPrimary>();
+        addIf<RetryableFindAndModifyUpdate>();
+        addIf<RetryableFindAndModifyUpdateWithDamages>();
+        addIf<RetryableFindAndModifyDelete>();
     }
 };
 

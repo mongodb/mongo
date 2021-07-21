@@ -619,11 +619,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                                 css,
                                 collDesc);
 
-        // Check if we're in a retryable write that should save the image to
-        // `config.image_collection`. This is the only time
-        // `storeFindAndModifyImagesInSideCollection` may be queried for this update.
-        if (opCtx->getTxnNumber() && repl::gStoreFindAndModifyImagesInSideCollection.load() &&
-            repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCV()) {
+        if (opCtx->getTxnNumber() && args.updateArgs.storeImageInSideCollection) {
             // If we've stored a preImage:
             if (args.updateArgs.storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage &&
                 // And we're not writing to a noop entry anyways for
@@ -738,15 +734,16 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         MutableOplogEntry oplogEntry;
-        if (args.deletedDoc &&
-            repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCV() &&
-            repl::gStoreFindAndModifyImagesInSideCollection.load() &&
+        if (args.deletedDoc && args.storeImageInSideCollection &&
             !args.preImageRecordingEnabledForCollection) {
             // If we have a deleted document and the image should be saved to
             // `config.image_collection`...
             invariant(opCtx->getTxnNumber());
 
             oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPreImage});
+            if (args.oplogSlot) {
+                oplogEntry.setOpTime(*args.oplogSlot);
+            }
         }
 
         boost::optional<BSONObj> deletedDocForOplog = boost::none;

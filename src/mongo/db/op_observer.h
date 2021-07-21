@@ -140,6 +140,12 @@ public:
         const BSONObj* deletedDoc = nullptr;
         bool fromMigrate = false;
         bool preImageRecordingEnabledForCollection = false;
+
+        // Set if an OpTime was reserved for the delete ahead of time.
+        boost::optional<OplogSlot> oplogSlot = boost::none;
+        // When true, store the pre- or post- image for findAndModify commands in the side
+        // collection. When false, store the image in the oplog.
+        bool storeImageInSideCollection = false;
     };
 
     /**

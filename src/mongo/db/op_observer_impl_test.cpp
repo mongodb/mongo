@@ -1475,7 +1475,6 @@ public:
 
 TEST_F(OpObserverRetryableFindAndModifyTest,
        RetryableFindAndModifyUpdateRequestingPostImageHasNeedsRetryImage) {
-    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
     NamespaceString nss = {"test", "coll"};
     const auto uuid = CollectionUUID::gen();
 
@@ -1487,6 +1486,7 @@ TEST_F(OpObserverRetryableFindAndModifyTest,
                                             << "x"));
     updateArgs.criteria = BSON("_id" << 0);
     updateArgs.storeDocOption = CollectionUpdateArgs::StoreDocOption::PostImage;
+    updateArgs.storeImageInSideCollection = true;
     OplogUpdateEntryArgs update(std::move(updateArgs), nss, uuid);
 
     WriteUnitOfWork wunit(opCtx());
@@ -1504,7 +1504,6 @@ TEST_F(OpObserverRetryableFindAndModifyTest,
 
 TEST_F(OpObserverRetryableFindAndModifyTest,
        RetryableFindAndModifyUpdateRequestingPreImageHasNeedsRetryImage) {
-    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
     NamespaceString nss = {"test", "coll"};
     const auto uuid = CollectionUUID::gen();
 
@@ -1516,6 +1515,7 @@ TEST_F(OpObserverRetryableFindAndModifyTest,
                                             << "x"));
     updateArgs.criteria = BSON("_id" << 0);
     updateArgs.storeDocOption = CollectionUpdateArgs::StoreDocOption::PreImage;
+    updateArgs.storeImageInSideCollection = true;
     OplogUpdateEntryArgs update(std::move(updateArgs), nss, uuid);
 
     WriteUnitOfWork wunit(opCtx());
@@ -1532,7 +1532,6 @@ TEST_F(OpObserverRetryableFindAndModifyTest,
 }
 
 TEST_F(OpObserverRetryableFindAndModifyTest, RetryableFindAndModifyDeleteHasNeedsRetryImage) {
-    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
     NamespaceString nss = {"test", "coll"};
     const auto uuid = CollectionUUID::gen();
 
@@ -1542,6 +1541,7 @@ TEST_F(OpObserverRetryableFindAndModifyTest, RetryableFindAndModifyDeleteHasNeed
                                        << "x");
     opObserver().aboutToDelete(opCtx(), nss, deletedDoc);
     OpObserver::OplogDeleteEntryArgs args;
+    args.storeImageInSideCollection = true;
     args.deletedDoc = &deletedDoc;
     opObserver().onDelete(opCtx(), nss, uuid, 0, args);
     // Asserts that only a single oplog entry was created. In essence, we did not create any
@@ -1609,12 +1609,8 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
     OpObserverRegistry opObserver;
     opObserver.addObserver(std::make_unique<OpObserverImpl>());
 
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
     NamespaceString nss("test", "coll");
     CollectionUUID uuid = CollectionUUID::gen();
-
-    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
 
     const bool kRecordPreImages = true;
     const bool kDoNotRecordPreImages = false;
@@ -1649,6 +1645,8 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
               "RetryableOptions"_attr = testCase.getRetryableOptionsStr(),
               "ExpectedOplogEntries"_attr = testCase.numOutputOplogs);
 
+        auto opCtxRaii = cc().makeOperationContext();
+        OperationContext* opCtx = opCtxRaii.get();
         // Phase 1: Clearing any state and setting up fixtures/the update call.
         resetOplogAndTransactions(opCtx);
 
@@ -1660,11 +1658,11 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
                 updateArgs.stmtIds = {kUninitializedStmtId};
                 break;
             case RetryableOptions::WithOplog:
-                repl::gStoreFindAndModifyImagesInSideCollection.store(false);
+                updateArgs.storeImageInSideCollection = false;
                 updateArgs.stmtIds = {1};
                 break;
             case RetryableOptions::WithSideCollection:
-                repl::gStoreFindAndModifyImagesInSideCollection.store(true);
+                updateArgs.storeImageInSideCollection = true;
                 updateArgs.stmtIds = {1};
                 break;
         }
@@ -1762,8 +1760,6 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
     OpObserverRegistry opObserver;
     opObserver.addObserver(std::make_unique<OpObserverImpl>());
 
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
     NamespaceString nss("test", "coll");
     CollectionUUID uuid = CollectionUUID::gen();
 
@@ -1784,6 +1780,8 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
               "Retryable"_attr = testCase.isRetryableWrite,
               "NumDocsToInsert"_attr = testCase.numDocsToInsert);
 
+        auto opCtxRaii = cc().makeOperationContext();
+        OperationContext* opCtx = opCtxRaii.get();
         // Phase 1: Clearing any state and setting up fixtures/the update call.
         resetOplogAndTransactions(opCtx);
 
@@ -1865,12 +1863,8 @@ TEST_F(OpObserverTest, TestFundamentalOnDeleteOutputs) {
     OpObserverRegistry opObserver;
     opObserver.addObserver(std::make_unique<OpObserverImpl>());
 
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
     NamespaceString nss("test", "coll");
     CollectionUUID uuid = CollectionUUID::gen();
-
-    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
 
     const bool kRecordPreImages = true;
     const bool kDoNotRecordPreImages = false;
@@ -1898,6 +1892,8 @@ TEST_F(OpObserverTest, TestFundamentalOnDeleteOutputs) {
               "RetryableOptions"_attr = testCase.getRetryableOptionsStr(),
               "ExpectedOplogEntries"_attr = testCase.numOutputOplogs);
 
+        auto opCtxRaii = cc().makeOperationContext();
+        OperationContext* opCtx = opCtxRaii.get();
         // Phase 1: Clearing any state and setting up fixtures/the update call.
         resetOplogAndTransactions(opCtx);
 
@@ -1910,21 +1906,20 @@ TEST_F(OpObserverTest, TestFundamentalOnDeleteOutputs) {
             txnParticipant.emplace(TransactionParticipant::get(opCtx));
             txnParticipant->beginOrContinue(opCtx, TxnNumber(testIdx), boost::none, boost::none);
         }
-
+        OpObserver::OplogDeleteEntryArgs deleteArgs;
         switch (testCase.retryableOptions) {
             case RetryableOptions::NotRetryable:
                 break;
             case RetryableOptions::WithOplog:
-                repl::gStoreFindAndModifyImagesInSideCollection.store(false);
+                deleteArgs.storeImageInSideCollection = false;
                 break;
             case RetryableOptions::WithSideCollection:
-                repl::gStoreFindAndModifyImagesInSideCollection.store(true);
+                deleteArgs.storeImageInSideCollection = true;
                 break;
         }
 
         const BSONObj deletedDoc = BSON("_id" << 0 << "valuePriorToDelete"
                                               << "marvelous");
-        OpObserver::OplogDeleteEntryArgs deleteArgs;
         if (testCase.retryableOptions != RetryableOptions::NotRetryable ||
             testCase.alwaysRecordPreImages) {
             deleteArgs.deletedDoc = &deletedDoc;
