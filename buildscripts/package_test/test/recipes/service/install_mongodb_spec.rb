@@ -1,7 +1,5 @@
 ############################################################
-# This section verifies start, stop, and restart after
-# installation within a new EC2 instance spun up by Kitchen.
-#
+# This section verifies start, stop, and restart.
 # - stop mongod so that we begin testing from a stopped state
 # - verify start, stop, and restart
 ############################################################
