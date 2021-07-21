@@ -8,6 +8,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/libs/discover_topology.js");
 
 (function() {
 'use strict';
@@ -19,6 +20,12 @@ const ns = kDbName + '.' + collName;
 const mongos = st.s0;
 const mongosConfig = mongos.getDB('config');
 const kNumInitialDocs = 500;
+
+const criticalSectionTimeoutMS = 24 * 60 * 60 * 1000; /* 1 day */
+const topology = DiscoverTopology.findConnectedNodes(mongos);
+const coordinator = new Mongo(topology.configsvr.nodes[0]);
+assert.commandWorked(coordinator.getDB("admin").adminCommand(
+    {setParameter: 1, reshardingCriticalSectionTimeoutMillis: criticalSectionTimeoutMS}));
 
 let shardToRSMap = {};
 shardToRSMap[st.shard0.shardName] = st.rs0;
