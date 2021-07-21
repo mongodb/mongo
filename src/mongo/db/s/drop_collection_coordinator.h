@@ -57,6 +57,10 @@ public:
     static DropReply dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss);
 
 private:
+    ShardingDDLCoordinatorMetadata const& metadata() const override {
+        return _doc.getShardingDDLCoordinatorMetadata();
+    }
+
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
@@ -77,8 +81,6 @@ private:
         };
     }
 
-    void _insertStateDocument(StateDoc&& doc);
-    void _updateStateDocument(StateDoc&& newStateDoc);
     void _enterPhase(Phase newPhase);
 
     DropCollectionCoordinatorDocument _doc;

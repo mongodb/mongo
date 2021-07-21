@@ -111,28 +111,6 @@ boost::optional<BSONObj> RenameCollectionCoordinator::reportForCurrentOp(
     return bob.obj();
 }
 
-void RenameCollectionCoordinator::_insertStateDocument(StateDoc&& doc) {
-    auto coorMetadata = doc.getShardingDDLCoordinatorMetadata();
-    coorMetadata.setRecoveredFromDisk(true);
-    doc.setShardingDDLCoordinatorMetadata(coorMetadata);
-
-    auto opCtx = cc().makeOperationContext();
-    PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
-    store.add(opCtx.get(), doc, WriteConcerns::kMajorityWriteConcern);
-    _doc = std::move(doc);
-}
-
-void RenameCollectionCoordinator::_updateStateDocument(StateDoc&& newDoc) {
-    auto opCtx = cc().makeOperationContext();
-    PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
-    store.update(opCtx.get(),
-                 BSON(StateDoc::kIdFieldName << _doc.getId().toBSON()),
-                 newDoc.toBSON(),
-                 WriteConcerns::kMajorityWriteConcern);
-
-    _doc = std::move(newDoc);
-}
-
 void RenameCollectionCoordinator::_enterPhase(Phase newPhase) {
     StateDoc newDoc(_doc);
     newDoc.setPhase(newPhase);
@@ -146,10 +124,10 @@ void RenameCollectionCoordinator::_enterPhase(Phase newPhase) {
                 "oldPhase"_attr = RenameCollectionCoordinatorPhase_serializer(_doc.getPhase()));
 
     if (_doc.getPhase() == Phase::kUnset) {
-        _insertStateDocument(std::move(newDoc));
+        _doc = _insertStateDocument(std::move(newDoc));
         return;
     }
-    _updateStateDocument(std::move(newDoc));
+    _doc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
 }
 
 ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(

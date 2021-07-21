@@ -799,29 +799,7 @@ void CreateCollectionCoordinator::_logEndCreateCollection(OperationContext* opCt
         opCtx, "shardCollection.end", nss().ns(), collectionDetail.obj());
 }
 
-// Phase change and document handling API.
-void CreateCollectionCoordinator::_insertCoordinatorDocument(CoordDoc&& doc) {
-    auto docBSON = _doc.toBSON();
-    auto coorMetadata = doc.getShardingDDLCoordinatorMetadata();
-    coorMetadata.setRecoveredFromDisk(true);
-    doc.setShardingDDLCoordinatorMetadata(coorMetadata);
-
-    auto opCtx = cc().makeOperationContext();
-    PersistentTaskStore<CoordDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
-    store.add(opCtx.get(), doc, WriteConcerns::kMajorityWriteConcern);
-    _doc = std::move(doc);
-}
-
-void CreateCollectionCoordinator::_updateCoordinatorDocument(CoordDoc&& newDoc) {
-    auto opCtx = cc().makeOperationContext();
-    PersistentTaskStore<CoordDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
-    store.update(opCtx.get(),
-                 BSON(CoordDoc::kIdFieldName << _doc.getId().toBSON()),
-                 newDoc.toBSON(),
-                 WriteConcerns::kMajorityWriteConcern);
-
-    _doc = std::move(newDoc);
-}
+// Phase change API.
 
 void CreateCollectionCoordinator::_enterPhase(Phase newPhase) {
     CoordDoc newDoc(_doc);
@@ -835,10 +813,10 @@ void CreateCollectionCoordinator::_enterPhase(Phase newPhase) {
                 "oldPhase"_attr = CreateCollectionCoordinatorPhase_serializer(_doc.getPhase()));
 
     if (_doc.getPhase() == Phase::kUnset) {
-        _insertCoordinatorDocument(std::move(newDoc));
+        _doc = _insertStateDocument(std::move(newDoc));
         return;
     }
-    _updateCoordinatorDocument(std::move(newDoc));
+    _doc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
 }
 
 }  // namespace mongo

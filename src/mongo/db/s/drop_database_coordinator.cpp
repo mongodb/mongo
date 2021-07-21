@@ -117,26 +117,6 @@ boost::optional<BSONObj> DropDatabaseCoordinator::reportForCurrentOp(
     return bob.obj();
 }
 
-void DropDatabaseCoordinator::_insertStateDocument(OperationContext* opCtx, StateDoc&& doc) {
-    auto coorMetadata = doc.getShardingDDLCoordinatorMetadata();
-    coorMetadata.setRecoveredFromDisk(true);
-    doc.setShardingDDLCoordinatorMetadata(coorMetadata);
-
-    PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
-    store.add(opCtx, doc, WriteConcerns::kMajorityWriteConcern);
-    _doc = std::move(doc);
-}
-
-void DropDatabaseCoordinator::_updateStateDocument(OperationContext* opCtx, StateDoc&& newDoc) {
-    PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
-    store.update(opCtx,
-                 BSON(StateDoc::kIdFieldName << _doc.getId().toBSON()),
-                 newDoc.toBSON(),
-                 WriteConcerns::kMajorityWriteConcern);
-
-    _doc = std::move(newDoc);
-}
-
 void DropDatabaseCoordinator::_enterPhase(Phase newPhase) {
     StateDoc newDoc(_doc);
     newDoc.setPhase(newPhase);
@@ -148,12 +128,11 @@ void DropDatabaseCoordinator::_enterPhase(Phase newPhase) {
                 "newPhase"_attr = DropDatabaseCoordinatorPhase_serializer(newDoc.getPhase()),
                 "oldPhase"_attr = DropDatabaseCoordinatorPhase_serializer(_doc.getPhase()));
 
-    auto opCtx = cc().makeOperationContext();
     if (_doc.getPhase() == Phase::kUnset) {
-        _insertStateDocument(opCtx.get(), std::move(newDoc));
+        _doc = _insertStateDocument(std::move(newDoc));
         return;
     }
-    _updateStateDocument(opCtx.get(), std::move(newDoc));
+    _doc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
 }
 
 ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
@@ -191,7 +170,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
 
                     auto newStateDoc = _doc;
                     newStateDoc.setCollInfo(coll);
-                    _updateStateDocument(opCtx, std::move(newStateDoc));
+                    _doc = _updateStateDocument(opCtx, std::move(newStateDoc));
 
                     dropShardedCollection(opCtx, coll, executor);
                 }
