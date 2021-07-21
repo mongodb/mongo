@@ -232,24 +232,24 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
 
     return std::make_unique<ReshardingDataReplication>(std::move(collectionCloner),
                                                        std::move(txnCloners),
-                                                       std::move(oplogAppliers),
                                                        std::move(oplogFetchers),
                                                        std::move(oplogFetcherExecutor),
+                                                       std::move(oplogAppliers),
                                                        TrustedInitTag{});
 }
 
 ReshardingDataReplication::ReshardingDataReplication(
     std::unique_ptr<ReshardingCollectionCloner> collectionCloner,
     std::vector<std::unique_ptr<ReshardingTxnCloner>> txnCloners,
-    std::vector<std::unique_ptr<ReshardingOplogApplier>> oplogAppliers,
     std::vector<std::unique_ptr<ReshardingOplogFetcher>> oplogFetchers,
     std::shared_ptr<executor::TaskExecutor> oplogFetcherExecutor,
+    std::vector<std::unique_ptr<ReshardingOplogApplier>> oplogAppliers,
     TrustedInitTag)
     : _collectionCloner{std::move(collectionCloner)},
       _txnCloners{std::move(txnCloners)},
-      _oplogAppliers{std::move(oplogAppliers)},
       _oplogFetchers{std::move(oplogFetchers)},
-      _oplogFetcherExecutor{std::move(oplogFetcherExecutor)} {}
+      _oplogFetcherExecutor{std::move(oplogFetcherExecutor)},
+      _oplogAppliers{std::move(oplogAppliers)} {}
 
 void ReshardingDataReplication::startOplogApplication() {
     ensureFulfilledPromise(_startOplogApplication);
