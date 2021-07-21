@@ -104,19 +104,6 @@ bool shouldSaveCursorGetMore(PlanExecutor* exec, bool isTailable) {
     return isTailable || !exec->isEOF();
 }
 
-void beginQueryOp(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  const BSONObj& queryObj,
-                  long long ntoreturn,
-                  long long ntoskip) {
-    auto curOp = CurOp::get(opCtx);
-    curOp->debug().ntoreturn = ntoreturn;
-    curOp->debug().ntoskip = ntoskip;
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
-    curOp->setOpDescription_inlock(queryObj);
-    curOp->setNS_inlock(nss.ns());
-}
-
 void endQueryOp(OperationContext* opCtx,
                 const CollectionPtr& collection,
                 const PlanExecutor& exec,

@@ -74,34 +74,29 @@ struct QueryPlannerParams {
         // could be eligible for the COUNT_SCAN.
         IS_COUNT = 1 << 4,
 
-        // Set this if you want to handle batchSize properly with sort(). If limits on SORT
-        // stages are always actually limits, then this should be left off. If they are
-        // sometimes to be interpreted as batchSize, then this should be turned on.
-        SPLIT_LIMITED_SORT = 1 << 5,
-
         // Set this to generate covered whole IXSCAN plans.
-        GENERATE_COVERED_IXSCANS = 1 << 6,
+        GENERATE_COVERED_IXSCANS = 1 << 5,
 
         // Set this to track the most recent timestamp seen by this cursor while scanning the oplog.
-        TRACK_LATEST_OPLOG_TS = 1 << 7,
+        TRACK_LATEST_OPLOG_TS = 1 << 6,
 
         // Set this so that collection scans on the oplog wait for visibility before reading.
-        OPLOG_SCAN_WAIT_FOR_VISIBLE = 1 << 8,
+        OPLOG_SCAN_WAIT_FOR_VISIBLE = 1 << 7,
 
         // Set this so that getExecutorDistinct() will only use a plan that _guarantees_ it will
         // return exactly one document per value of the distinct field. See the comments above the
         // declaration of getExecutorDistinct() for more detail.
-        STRICT_DISTINCT_ONLY = 1 << 9,
+        STRICT_DISTINCT_ONLY = 1 << 8,
 
         // Instruct the planner that the caller is expecting to consume the record ids associated
         // with documents returned by the plan. Any generated query solution must not discard record
         // ids. In some cases, record ids can be discarded as an optimization when they will not be
         // consumed downstream.
-        PRESERVE_RECORD_ID = 1 << 10,
+        PRESERVE_RECORD_ID = 1 << 9,
 
         // Set this on an oplog scan to uassert that the oplog has not already rolled over the
         // minimum 'ts' timestamp specified in the query.
-        ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG = 1 << 11,
+        ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG = 1 << 10,
 
         // Instruct the plan enumerator to enumerate contained $ors in a special order. $or
         // enumeration can generate an exponential number of plans, and is therefore limited at some
@@ -118,11 +113,11 @@ struct QueryPlannerParams {
         // order, we would get assignments [a_b, a_b], [a_c, a_c], [a_c, a_b], then [a_b, a_c]. This
         // is thought to be helpful in general, but particularly in cases where all children of the
         // $or use the same fields and have the same indexes available, as in this example.
-        ENUMERATE_OR_CHILDREN_LOCKSTEP = 1 << 12,
+        ENUMERATE_OR_CHILDREN_LOCKSTEP = 1 << 11,
 
         // Ensure that any plan generated returns data that is "owned." That is, all BSONObjs are
         // in an "owned" state and are not pointing to data that belongs to the storage engine.
-        RETURN_OWNED_DATA = 1 << 13,
+        RETURN_OWNED_DATA = 1 << 12,
     };
 
     // See Options enum above.

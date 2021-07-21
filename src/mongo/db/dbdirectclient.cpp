@@ -158,7 +158,7 @@ void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {
 
 unique_ptr<DBClientCursor> DBDirectClient::query(const NamespaceStringOrUUID& nsOrUuid,
                                                  Query query,
-                                                 int nToReturn,
+                                                 int limit,
                                                  int nToSkip,
                                                  const BSONObj* fieldsToReturn,
                                                  int queryOptions,
@@ -166,7 +166,7 @@ unique_ptr<DBClientCursor> DBDirectClient::query(const NamespaceStringOrUUID& ns
                                                  boost::optional<BSONObj> readConcernObj) {
     invariant(!readConcernObj, "passing readConcern to DBDirectClient functions is not supported");
     return DBClientBase::query(
-        nsOrUuid, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
+        nsOrUuid, query, limit, nToSkip, fieldsToReturn, queryOptions, batchSize);
 }
 
 write_ops::FindAndModifyCommandReply DBDirectClient::findAndModify(

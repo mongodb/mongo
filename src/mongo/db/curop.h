@@ -224,8 +224,6 @@ public:
 
     // detailed options
     long long cursorid{-1};
-    long long ntoreturn{-1};
-    long long ntoskip{-1};
     bool exhaust{false};
 
     // For search using mongot.

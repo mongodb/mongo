@@ -146,7 +146,7 @@ public:
     DBClientCursor(DBClientBase* client,
                    const NamespaceStringOrUUID& nsOrUuid,
                    const BSONObj& query,
-                   int nToReturn,
+                   int limit,
                    int nToSkip,
                    const BSONObj* fieldsToReturn,
                    int queryOptions,
@@ -156,7 +156,7 @@ public:
     DBClientCursor(DBClientBase* client,
                    const NamespaceStringOrUUID& nsOrUuid,
                    long long cursorId,
-                   int nToReturn,
+                   int limit,
                    int options,
                    std::vector<BSONObj> initialBatch = {},
                    boost::optional<Timestamp> operationTime = boost::none);
@@ -281,7 +281,7 @@ private:
                    const NamespaceStringOrUUID& nsOrUuid,
                    const BSONObj& query,
                    long long cursorId,
-                   int nToReturn,
+                   int limit,
                    int nToSkip,
                    const BSONObj* fieldsToReturn,
                    int queryOptions,
@@ -289,8 +289,6 @@ private:
                    std::vector<BSONObj> initialBatch,
                    boost::optional<BSONObj> readConcernObj,
                    boost::optional<Timestamp> operationTime);
-
-    int nextBatchSize();
 
     DBClientBase* _client;
     std::string _originalHost;
@@ -300,8 +298,7 @@ private:
     // command.
     NamespaceString ns;
     BSONObj query;
-    int nToReturn;
-    bool haveLimit;
+    int limit;
     int nToSkip;
     const BSONObj* fieldsToReturn;
     int opts;

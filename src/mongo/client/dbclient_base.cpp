@@ -590,7 +590,7 @@ list<BSONObj> DBClientBase::getCollectionInfos(const string& db, const BSONObj& 
 
         if (id != 0) {
             const std::string ns = cursorObj["ns"].String();
-            unique_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
+            unique_ptr<DBClientCursor> cursor = getMore(ns, id);
             while (cursor->more()) {
                 infos.push_back(cursor->nextSafe().getOwned());
             }
@@ -660,16 +660,16 @@ bool DBClientBase::exists(const string& ns) {
 void DBClientBase::findN(vector<BSONObj>& out,
                          const string& ns,
                          Query query,
-                         int nToReturn,
+                         int limit,
                          int nToSkip,
                          const BSONObj* fieldsToReturn,
                          int queryOptions,
                          boost::optional<BSONObj> readConcernObj) {
-    out.reserve(nToReturn);
+    out.reserve(limit);
 
     unique_ptr<DBClientCursor> c = this->query(NamespaceString(ns),
                                                query,
-                                               nToReturn,
+                                               limit,
                                                nToSkip,
                                                fieldsToReturn,
                                                queryOptions,
@@ -686,9 +686,7 @@ void DBClientBase::findN(vector<BSONObj>& out,
             "Deprecated ShardConfigStale flag encountered in query result",
             !c->hasResultFlag(ResultFlag_ShardConfigStaleDeprecated));
 
-    for (int i = 0; i < nToReturn; i++) {
-        if (!c->more())
-            break;
+    while (c->more()) {
         out.push_back(c->nextSafe());
     }
 }
@@ -747,7 +745,7 @@ const uint64_t DBClientBase::INVALID_SOCK_CREATION_TIME = std::numeric_limits<ui
 
 unique_ptr<DBClientCursor> DBClientBase::query(const NamespaceStringOrUUID& nsOrUuid,
                                                Query query,
-                                               int nToReturn,
+                                               int limit,
                                                int nToSkip,
                                                const BSONObj* fieldsToReturn,
                                                int queryOptions,
@@ -756,7 +754,7 @@ unique_ptr<DBClientCursor> DBClientBase::query(const NamespaceStringOrUUID& nsOr
     unique_ptr<DBClientCursor> c(new DBClientCursor(this,
                                                     nsOrUuid,
                                                     query.obj,
-                                                    nToReturn,
+                                                    limit,
                                                     nToSkip,
                                                     fieldsToReturn,
                                                     queryOptions,
@@ -769,10 +767,9 @@ unique_ptr<DBClientCursor> DBClientBase::query(const NamespaceStringOrUUID& nsOr
 
 unique_ptr<DBClientCursor> DBClientBase::getMore(const string& ns,
                                                  long long cursorId,
-                                                 int nToReturn,
                                                  int options) {
     unique_ptr<DBClientCursor> c(
-        new DBClientCursor(this, NamespaceString(ns), cursorId, nToReturn, options));
+        new DBClientCursor(this, NamespaceString(ns), cursorId, 0 /* limit */, options));
     if (c->init())
         return c;
     return nullptr;
@@ -1018,7 +1015,7 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
             if (nsOrUuid.nss()) {
                 invariant((*nsOrUuid.nss()).toString() == cursorNs);
             }
-            unique_ptr<DBClientCursor> cursor = getMore(cursorNs, id, 0, 0);
+            unique_ptr<DBClientCursor> cursor = getMore(cursorNs, id);
             while (cursor->more()) {
                 specs.push_back(cursor->nextSafe().getOwned());
             }

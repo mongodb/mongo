@@ -267,37 +267,35 @@ void QueryPlannerTest::addIndex(const IndexEntry& ie) {
 }
 
 void QueryPlannerTest::runQuery(BSONObj query) {
-    runQuerySortProjSkipNToReturn(query, BSONObj(), BSONObj(), 0, 0);
+    runQuerySortProjSkipLimit(query, BSONObj(), BSONObj(), 0, 0);
 }
 
 void QueryPlannerTest::runQuerySortProj(const BSONObj& query,
                                         const BSONObj& sort,
                                         const BSONObj& proj) {
-    runQuerySortProjSkipNToReturn(query, sort, proj, 0, 0);
+    runQuerySortProjSkipLimit(query, sort, proj, 0, 0);
 }
 
-void QueryPlannerTest::runQuerySkipNToReturn(const BSONObj& query,
-                                             long long skip,
-                                             long long ntoreturn) {
-    runQuerySortProjSkipNToReturn(query, BSONObj(), BSONObj(), skip, ntoreturn);
+void QueryPlannerTest::runQuerySkipLimit(const BSONObj& query, long long skip, long long limit) {
+    runQuerySortProjSkipLimit(query, BSONObj(), BSONObj(), skip, limit);
 }
 
 void QueryPlannerTest::runQueryHint(const BSONObj& query, const BSONObj& hint) {
-    runQuerySortProjSkipNToReturnHint(query, BSONObj(), BSONObj(), 0, 0, hint);
+    runQuerySortProjSkipLimitHint(query, BSONObj(), BSONObj(), 0, 0, hint);
 }
 
-void QueryPlannerTest::runQuerySortProjSkipNToReturn(const BSONObj& query,
-                                                     const BSONObj& sort,
-                                                     const BSONObj& proj,
-                                                     long long skip,
-                                                     long long ntoreturn) {
-    runQuerySortProjSkipNToReturnHint(query, sort, proj, skip, ntoreturn, BSONObj());
+void QueryPlannerTest::runQuerySortProjSkipLimit(const BSONObj& query,
+                                                 const BSONObj& sort,
+                                                 const BSONObj& proj,
+                                                 long long skip,
+                                                 long long limit) {
+    runQuerySortProjSkipLimitHint(query, sort, proj, skip, limit, BSONObj());
 }
 
 void QueryPlannerTest::runQuerySortHint(const BSONObj& query,
                                         const BSONObj& sort,
                                         const BSONObj& hint) {
-    runQuerySortProjSkipNToReturnHint(query, sort, BSONObj(), 0, 0, hint);
+    runQuerySortProjSkipLimitHint(query, sort, BSONObj(), 0, 0, hint);
 }
 
 void QueryPlannerTest::runQueryHintMinMax(const BSONObj& query,
@@ -307,20 +305,20 @@ void QueryPlannerTest::runQueryHintMinMax(const BSONObj& query,
     runQueryFull(query, BSONObj(), BSONObj(), 0, 0, hint, minObj, maxObj);
 }
 
-void QueryPlannerTest::runQuerySortProjSkipNToReturnHint(const BSONObj& query,
-                                                         const BSONObj& sort,
-                                                         const BSONObj& proj,
-                                                         long long skip,
-                                                         long long ntoreturn,
-                                                         const BSONObj& hint) {
-    runQueryFull(query, sort, proj, skip, ntoreturn, hint, BSONObj(), BSONObj());
+void QueryPlannerTest::runQuerySortProjSkipLimitHint(const BSONObj& query,
+                                                     const BSONObj& sort,
+                                                     const BSONObj& proj,
+                                                     long long skip,
+                                                     long long limit,
+                                                     const BSONObj& hint) {
+    runQueryFull(query, sort, proj, skip, limit, hint, BSONObj(), BSONObj());
 }
 
 void QueryPlannerTest::runQueryFull(const BSONObj& query,
                                     const BSONObj& sort,
                                     const BSONObj& proj,
                                     long long skip,
-                                    long long ntoreturn,
+                                    long long limit,
                                     const BSONObj& hint,
                                     const BSONObj& minObj,
                                     const BSONObj& maxObj) {
@@ -333,13 +331,8 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
     if (skip) {
         findCommand->setSkip(skip);
     }
-    if (ntoreturn) {
-        if (ntoreturn < 0) {
-            ASSERT_NE(ntoreturn, std::numeric_limits<long long>::min());
-            ntoreturn = -ntoreturn;
-            findCommand->setSingleBatch(true);
-        }
-        findCommand->setNtoreturn(ntoreturn);
+    if (limit) {
+        findCommand->setLimit(limit);
     }
     findCommand->setHint(hint);
     findCommand->setMin(minObj);
@@ -360,25 +353,25 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
 }
 
 void QueryPlannerTest::runInvalidQuery(const BSONObj& query) {
-    runInvalidQuerySortProjSkipNToReturn(query, BSONObj(), BSONObj(), 0, 0);
+    runInvalidQuerySortProjSkipLimit(query, BSONObj(), BSONObj(), 0, 0);
 }
 
 void QueryPlannerTest::runInvalidQuerySortProj(const BSONObj& query,
                                                const BSONObj& sort,
                                                const BSONObj& proj) {
-    runInvalidQuerySortProjSkipNToReturn(query, sort, proj, 0, 0);
+    runInvalidQuerySortProjSkipLimit(query, sort, proj, 0, 0);
 }
 
-void QueryPlannerTest::runInvalidQuerySortProjSkipNToReturn(const BSONObj& query,
-                                                            const BSONObj& sort,
-                                                            const BSONObj& proj,
-                                                            long long skip,
-                                                            long long ntoreturn) {
-    runInvalidQuerySortProjSkipNToReturnHint(query, sort, proj, skip, ntoreturn, BSONObj());
+void QueryPlannerTest::runInvalidQuerySortProjSkipLimit(const BSONObj& query,
+                                                        const BSONObj& sort,
+                                                        const BSONObj& proj,
+                                                        long long skip,
+                                                        long long limit) {
+    runInvalidQuerySortProjSkipLimitHint(query, sort, proj, skip, limit, BSONObj());
 }
 
 void QueryPlannerTest::runInvalidQueryHint(const BSONObj& query, const BSONObj& hint) {
-    runInvalidQuerySortProjSkipNToReturnHint(query, BSONObj(), BSONObj(), 0, 0, hint);
+    runInvalidQuerySortProjSkipLimitHint(query, BSONObj(), BSONObj(), 0, 0, hint);
 }
 
 void QueryPlannerTest::runInvalidQueryHintMinMax(const BSONObj& query,
@@ -388,20 +381,20 @@ void QueryPlannerTest::runInvalidQueryHintMinMax(const BSONObj& query,
     runInvalidQueryFull(query, BSONObj(), BSONObj(), 0, 0, hint, minObj, maxObj);
 }
 
-void QueryPlannerTest::runInvalidQuerySortProjSkipNToReturnHint(const BSONObj& query,
-                                                                const BSONObj& sort,
-                                                                const BSONObj& proj,
-                                                                long long skip,
-                                                                long long ntoreturn,
-                                                                const BSONObj& hint) {
-    runInvalidQueryFull(query, sort, proj, skip, ntoreturn, hint, BSONObj(), BSONObj());
+void QueryPlannerTest::runInvalidQuerySortProjSkipLimitHint(const BSONObj& query,
+                                                            const BSONObj& sort,
+                                                            const BSONObj& proj,
+                                                            long long skip,
+                                                            long long limit,
+                                                            const BSONObj& hint) {
+    runInvalidQueryFull(query, sort, proj, skip, limit, hint, BSONObj(), BSONObj());
 }
 
 void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                            const BSONObj& sort,
                                            const BSONObj& proj,
                                            long long skip,
-                                           long long ntoreturn,
+                                           long long limit,
                                            const BSONObj& hint,
                                            const BSONObj& minObj,
                                            const BSONObj& maxObj) {
@@ -414,13 +407,8 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     if (skip) {
         findCommand->setSkip(skip);
     }
-    if (ntoreturn) {
-        if (ntoreturn < 0) {
-            ASSERT_NE(ntoreturn, std::numeric_limits<long long>::min());
-            ntoreturn = -ntoreturn;
-            findCommand->setSingleBatch(true);
-        }
-        findCommand->setNtoreturn(ntoreturn);
+    if (limit) {
+        findCommand->setLimit(limit);
     }
     findCommand->setHint(hint);
     findCommand->setMin(minObj);

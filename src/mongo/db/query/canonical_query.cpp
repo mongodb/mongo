@@ -68,6 +68,10 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     const ProjectionPolicies& projectionPolicies,
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline) {
+    tassert(5746107,
+            "ntoreturn should not be set on the findCommand",
+            findCommand->getNtoreturn() == boost::none);
+
     auto status = query_request_helper::validateFindCommandRequest(*findCommand);
     if (!status.isOK()) {
         return status;
@@ -498,10 +502,6 @@ std::string CanonicalQuery::toString() const {
         ss << " skip=" << *_findCommand->getSkip();
     }
 
-    if (_findCommand->getNtoreturn()) {
-        ss << " ntoreturn=" << *_findCommand->getNtoreturn() << '\n';
-    }
-
     // The expression tree puts an endl on for us.
     ss << "Tree: " << _root->debugString();
     ss << "Sort: " << _findCommand->getSort().toString() << '\n';
@@ -533,10 +533,6 @@ std::string CanonicalQuery::toStringShort() const {
 
     if (_findCommand->getSkip()) {
         ss << " skip: " << *_findCommand->getSkip();
-    }
-
-    if (_findCommand->getNtoreturn()) {
-        ss << " ntoreturn=" << *_findCommand->getNtoreturn();
     }
 
     return ss;

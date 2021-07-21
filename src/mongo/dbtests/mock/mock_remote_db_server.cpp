@@ -198,7 +198,7 @@ BSONObj MockRemoteDBServer::project(projection_executor::ProjectionExecutor* pro
 mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
                                            const NamespaceStringOrUUID& nsOrUuid,
                                            mongo::Query query,
-                                           int nToReturn,
+                                           int limit,
                                            int nToSkip,
                                            const BSONObj* fieldsToReturn,
                                            int queryOptions,

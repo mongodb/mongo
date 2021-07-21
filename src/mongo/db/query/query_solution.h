@@ -1172,38 +1172,6 @@ struct CountScanNode : public QuerySolutionNodeWithSortSet {
     bool endKeyInclusive;
 };
 
-/**
- * This stage drops results that are out of sorted order.
- */
-struct EnsureSortedNode : public QuerySolutionNode {
-    EnsureSortedNode() {}
-    virtual ~EnsureSortedNode() {}
-
-    virtual StageType getType() const {
-        return STAGE_ENSURE_SORTED;
-    }
-
-    virtual void appendToString(str::stream* ss, int indent) const;
-
-    bool fetched() const {
-        return children[0]->fetched();
-    }
-    FieldAvailability getFieldAvailability(const std::string& field) const {
-        return children[0]->getFieldAvailability(field);
-    }
-    bool sortedByDiskLoc() const {
-        return children[0]->sortedByDiskLoc();
-    }
-    const ProvidedSortSet& providedSorts() const {
-        return children[0]->providedSorts();
-    }
-
-    QuerySolutionNode* clone() const;
-
-    // The pattern that the results should be sorted by.
-    BSONObj pattern;
-};
-
 struct EofNode : public QuerySolutionNodeWithSortSet {
     EofNode() {}
 

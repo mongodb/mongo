@@ -167,7 +167,7 @@ public:
     mongo::BSONArray query(InstanceID id,
                            const NamespaceStringOrUUID& nsOrUuid,
                            mongo::Query query = mongo::Query(),
-                           int nToReturn = 0,
+                           int limit = 0,
                            int nToSkip = 0,
                            const mongo::BSONObj* fieldsToReturn = nullptr,
                            int queryOptions = 0,

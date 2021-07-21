@@ -155,9 +155,6 @@ string optionString(size_t options) {
             case QueryPlannerParams::IS_COUNT:
                 ss << "IS_COUNT ";
                 break;
-            case QueryPlannerParams::SPLIT_LIMITED_SORT:
-                ss << "SPLIT_LIMITED_SORT ";
-                break;
             case QueryPlannerParams::GENERATE_COVERED_IXSCANS:
                 ss << "GENERATE_COVERED_IXSCANS ";
                 break;

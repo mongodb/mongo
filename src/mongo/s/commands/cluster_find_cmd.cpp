@@ -78,6 +78,9 @@ std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(Operation
     uassert(51202,
             "Cannot specify runtime constants option to a mongos",
             !findCommand->getLegacyRuntimeConstants());
+    uassert(5746101,
+            "Cannot specify ntoreturn in a find command against mongos",
+            findCommand->getNtoreturn() == boost::none);
     return findCommand;
 }
 

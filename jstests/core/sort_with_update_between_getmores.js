@@ -6,11 +6,11 @@
 //   requires_getmore,
 // ]
 
-// SERVER-17011 Tests whether queries which specify sort and batch size can generate results out of
-// order due to the ntoreturn hack. The EnsureSortedStage should solve this problem.
+// This test checks that a sort query with an update between getMores() doesn't produce out-of-order
+// results when the update touches a field on which the query is sorting.
 (function() {
 'use strict';
-const collName = "ensure_sorted";
+const collName = jsTestName();
 const coll = db[collName];
 const kDocList =
     [{_id: 0, a: 1, b: 4}, {_id: 1, a: 2, b: 3}, {_id: 2, a: 3, b: 2}, {_id: 3, a: 4, b: 1}];

@@ -87,16 +87,6 @@ Message assembleCommandRequest(DBClientBase* cli,
 
 }  // namespace
 
-int DBClientCursor::nextBatchSize() {
-    if (nToReturn == 0)
-        return batchSize;
-
-    if (batchSize == 0)
-        return nToReturn;
-
-    return batchSize < nToReturn ? batchSize : nToReturn;
-}
-
 Message DBClientCursor::_assembleInit() {
     if (cursorId) {
         return _assembleGetMore();
@@ -107,16 +97,21 @@ Message DBClientCursor::_assembleInit() {
     // expected for a legacy OP_QUERY. Therefore, we use the legacy parsing code supplied by
     // query_request_helper. When actually issuing the request to the remote node, we will
     // assemble a find command.
-    auto findCommand =
-        query_request_helper::fromLegacyQuery(_nsOrUuid,
-                                              query,
-                                              fieldsToReturn ? *fieldsToReturn : BSONObj(),
-                                              nToSkip,
-                                              nextBatchSize(),
-                                              opts);
+    auto findCommand = query_request_helper::fromLegacyQuery(
+        _nsOrUuid, query, fieldsToReturn ? *fieldsToReturn : BSONObj(), nToSkip, opts);
     // If there was a problem building the query request, report that.
     uassertStatusOK(findCommand.getStatus());
 
+    // Despite the request being generated using the legacy OP_QUERY format above, we will never set
+    // the 'ntoreturn' parameter on the find command request, since this is an OP_QUERY-specific
+    // concept. Instead, we always use 'batchSize' and 'limit', which are provided separately to us
+    // by the client.
+    if (limit) {
+        findCommand.getValue()->setLimit(limit);
+    }
+    if (batchSize) {
+        findCommand.getValue()->setBatchSize(batchSize);
+    }
     if (query.getBoolField("$readOnce")) {
         // Legacy queries don't handle readOnce.
         findCommand.getValue()->setReadOnce(true);
@@ -152,9 +147,9 @@ Message DBClientCursor::_assembleInit() {
 
 Message DBClientCursor::_assembleGetMore() {
     invariant(cursorId);
-    std::int64_t batchSize = nextBatchSize();
     auto getMoreRequest = GetMoreCommandRequest(cursorId, ns.coll().toString());
-    getMoreRequest.setBatchSize(boost::make_optional(batchSize != 0, batchSize));
+    getMoreRequest.setBatchSize(
+        boost::make_optional(batchSize != 0, static_cast<int64_t>(batchSize)));
     getMoreRequest.setMaxTimeMS(boost::make_optional(
         tailableAwaitData(),
         static_cast<std::int64_t>(durationCount<Milliseconds>(_awaitDataTimeout))));
@@ -240,11 +235,6 @@ void DBClientCursor::requestMore() {
     invariant(!_connectionHasPendingReplies);
     verify(cursorId && batch.pos == batch.objs.size());
 
-    if (haveLimit) {
-        nToReturn -= batch.objs.size();
-        verify(nToReturn > 0);
-    }
-
     auto doRequestMore = [&] {
         Message toSend = _assembleGetMore();
         Message response;
@@ -269,7 +259,7 @@ void DBClientCursor::requestMore() {
 void DBClientCursor::exhaustReceiveMore() {
     verify(cursorId);
     verify(batch.pos == batch.objs.size());
-    uassert(40675, "Cannot have limit for exhaust query", !haveLimit);
+    uassert(40675, "Cannot have limit for exhaust query", limit == 0);
     Message response;
     verify(_client);
     uassertStatusOK(
@@ -327,9 +317,6 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
 bool DBClientCursor::more() {
     if (!_putBack.empty())
         return true;
-
-    if (haveLimit && static_cast<int>(batch.pos) >= nToReturn)
-        return false;
 
     if (batch.pos < batch.objs.size())
         return true;
@@ -428,7 +415,7 @@ void DBClientCursor::attach(AScopedConnection* conn) {
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                const NamespaceStringOrUUID& nsOrUuid,
                                const BSONObj& query,
-                               int nToReturn,
+                               int limit,
                                int nToSkip,
                                const BSONObj* fieldsToReturn,
                                int queryOptions,
@@ -438,7 +425,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                      nsOrUuid,
                      query,
                      0,  // cursorId
-                     nToReturn,
+                     limit,
                      nToSkip,
                      fieldsToReturn,
                      queryOptions,
@@ -450,7 +437,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                const NamespaceStringOrUUID& nsOrUuid,
                                long long cursorId,
-                               int nToReturn,
+                               int limit,
                                int queryOptions,
                                std::vector<BSONObj> initialBatch,
                                boost::optional<Timestamp> operationTime)
@@ -458,7 +445,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                      nsOrUuid,
                      BSONObj(),  // query
                      cursorId,
-                     nToReturn,
+                     limit,
                      0,        // nToSkip
                      nullptr,  // fieldsToReturn
                      queryOptions,
@@ -471,7 +458,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                                const NamespaceStringOrUUID& nsOrUuid,
                                const BSONObj& query,
                                long long cursorId,
-                               int nToReturn,
+                               int limit,
                                int nToSkip,
                                const BSONObj* fieldsToReturn,
                                int queryOptions,
@@ -485,8 +472,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _nsOrUuid(nsOrUuid),
       ns(nsOrUuid.nss() ? *nsOrUuid.nss() : NamespaceString(nsOrUuid.dbname())),
       query(query),
-      nToReturn(nToReturn),
-      haveLimit(nToReturn > 0 && !(queryOptions & QueryOption_CursorTailable)),
+      limit(limit),
       nToSkip(nToSkip),
       fieldsToReturn(fieldsToReturn),
       opts(queryOptions),
@@ -496,7 +482,9 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _ownCursor(true),
       wasError(false),
       _readConcernObj(readConcernObj),
-      _operationTime(operationTime) {}
+      _operationTime(operationTime) {
+    tassert(5746103, "DBClientCursor limit must be non-negative", limit >= 0);
+}
 
 /* static */
 StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationRequest(

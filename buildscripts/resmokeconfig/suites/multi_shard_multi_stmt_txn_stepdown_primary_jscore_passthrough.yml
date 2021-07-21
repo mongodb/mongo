@@ -220,13 +220,13 @@ selector:
   # txn interrupted by command outside of txn before getMore runs.
   - jstests/core/commands_namespace_parsing.js
   - jstests/core/drop3.js
-  - jstests/core/ensure_sorted.js
   - jstests/core/geo_s2cursorlimitskip.js
   - jstests/core/getmore_invalidated_cursors.js
   - jstests/core/getmore_invalidated_documents.js
   - jstests/core/kill_cursors.js
   - jstests/core/list_indexes.js
   - jstests/core/oro.js
+  - jstests/core/sort_with_update_between_getmores.js
 
   # Parallel Shell - we do not signal the override to end a txn when a parallel shell closes.
   - jstests/core/awaitdata_getmore_cmd.js

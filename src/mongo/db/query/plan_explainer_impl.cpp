@@ -332,12 +332,6 @@ void statsToBSON(const PlanStageStats& stats,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
         }
-    } else if (STAGE_ENSURE_SORTED == stats.stageType) {
-        EnsureSortedStats* spec = static_cast<EnsureSortedStats*>(stats.specific.get());
-
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("nDropped", spec->nDropped);
-        }
     } else if (STAGE_FETCH == stats.stageType) {
         FetchStats* spec = static_cast<FetchStats*>(stats.specific.get());
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {

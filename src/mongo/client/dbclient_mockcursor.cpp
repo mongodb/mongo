@@ -53,7 +53,13 @@ DBClientMockCursor::DBClientMockCursor(mongo::DBClientBase* client,
 }
 
 bool DBClientMockCursor::more() {
+    if (_batchSize && batch.pos == _batchSize) {
+        _fillNextBatch();
+    }
+    return batch.pos < batch.objs.size();
+}
 
+void DBClientMockCursor::_fillNextBatch() {
     // Throw if requested via failpoint.
     mockCursorThrowErrorOnGetMore.execute([&](const BSONObj& data) {
         auto errorString = data["errorType"].valueStringDataSafe();
@@ -64,13 +70,6 @@ bool DBClientMockCursor::more() {
         uasserted(errorCode, message);
     });
 
-    if (_batchSize && batch.pos == _batchSize) {
-        _fillNextBatch();
-    }
-    return batch.pos < batch.objs.size();
-}
-
-void DBClientMockCursor::_fillNextBatch() {
     int leftInBatch = _batchSize;
     batch.objs.clear();
     while (_iter.more() && (!_batchSize || leftInBatch--)) {

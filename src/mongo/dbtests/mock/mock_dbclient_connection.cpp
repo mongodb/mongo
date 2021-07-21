@@ -101,7 +101,7 @@ std::pair<rpc::UniqueReply, DBClientBase*> MockDBClientConnection::runCommandWit
 std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
     const NamespaceStringOrUUID& nsOrUuid,
     mongo::Query query,
-    int nToReturn,
+    int limit,
     int nToSkip,
     const BSONObj* fieldsToReturn,
     int queryOptions,
@@ -113,7 +113,7 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
         mongo::BSONArray result(_remoteServer->query(_remoteServerInstanceID,
                                                      nsOrUuid,
                                                      query,
-                                                     nToReturn,
+                                                     limit,
                                                      nToSkip,
                                                      fieldsToReturn,
                                                      queryOptions,

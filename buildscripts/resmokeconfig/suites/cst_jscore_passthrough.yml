@@ -123,7 +123,6 @@ selector:
   - jstests/core/elemmatch_or_pushdown.js
   - jstests/core/elemmatch_projection.js
   - jstests/core/positional_projection.js
-  - jstests/core/ensure_sorted.js
   - jstests/core/exists.js
   - jstests/core/existsa.js
   - jstests/core/explain1.js
@@ -390,6 +389,7 @@ selector:
   - jstests/core/sorth.js
   - jstests/core/sortj.js
   - jstests/core/sortk.js
+  - jstests/core/sort_with_update_between_getmores.js
   - jstests/core/sparse_index_supports_ne_null.js
   - jstests/core/stages_and_hash.js
   - jstests/core/stages_collection_scan.js

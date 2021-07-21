@@ -44,7 +44,6 @@
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/count_scan.h"
 #include "mongo/db/exec/distinct_scan.h"
-#include "mongo/db/exec/ensure_sorted.h"
 #include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/geo_near.h"
@@ -369,12 +368,6 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             params.endKey = csn->endKey;
             params.endKeyInclusive = csn->endKeyInclusive;
             return std::make_unique<CountScan>(expCtx, _collection, std::move(params), _ws);
-        }
-        case STAGE_ENSURE_SORTED: {
-            const EnsureSortedNode* esn = static_cast<const EnsureSortedNode*>(root);
-            auto childStage = build(esn->children[0]);
-            return std::make_unique<EnsureSortedStage>(
-                expCtx, esn->pattern, _ws, std::move(childStage));
         }
         case STAGE_EOF: {
             return std::make_unique<EOFStage>(expCtx);

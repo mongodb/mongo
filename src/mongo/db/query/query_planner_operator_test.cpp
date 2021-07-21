@@ -562,7 +562,7 @@ TEST_F(QueryPlannerTest, ExistsBoundsCompound) {
 TEST_F(QueryPlannerTest, BasicSkipNoIndex) {
     addIndex(BSON("a" << 1));
 
-    runQuerySkipNToReturn(BSON("x" << 5), 3, 0);
+    runQuerySkipLimit(BSON("x" << 5), 3, 0);
 
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists("{skip: {n: 3, node: {cscan: {dir: 1, filter: {x: 5}}}}}");
@@ -571,7 +571,7 @@ TEST_F(QueryPlannerTest, BasicSkipNoIndex) {
 TEST_F(QueryPlannerTest, BasicSkipWithIndex) {
     addIndex(BSON("a" << 1 << "b" << 1));
 
-    runQuerySkipNToReturn(BSON("a" << 5), 8, 0);
+    runQuerySkipLimit(BSON("a" << 5), 8, 0);
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists("{skip: {n: 8, node: {cscan: {dir: 1, filter: {a: 5}}}}}");
@@ -583,7 +583,7 @@ TEST_F(QueryPlannerTest, BasicSkipWithIndex) {
 TEST_F(QueryPlannerTest, CoveredSkipWithIndex) {
     addIndex(fromjson("{a: 1, b: 1}"));
 
-    runQuerySortProjSkipNToReturn(
+    runQuerySortProjSkipLimit(
         fromjson("{a: 5}"), BSONObj(), fromjson("{_id: 0, a: 1, b: 1}"), 8, 0);
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
@@ -598,7 +598,7 @@ TEST_F(QueryPlannerTest, CoveredSkipWithIndex) {
 TEST_F(QueryPlannerTest, SkipEvaluatesAfterFetchWithPredicate) {
     addIndex(fromjson("{a: 1}"));
 
-    runQuerySkipNToReturn(fromjson("{a: 5, b: 7}"), 8, 0);
+    runQuerySkipLimit(fromjson("{a: 5, b: 7}"), 8, 0);
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists("{skip: {n: 8, node: {cscan: {dir: 1, filter: {a: 5, b: 7}}}}}");
@@ -616,7 +616,7 @@ TEST_F(QueryPlannerTest, SkipEvaluatesAfterFetchWithPredicate) {
 TEST_F(QueryPlannerTest, SkipEvaluatesBeforeFetchForIndexedOr) {
     addIndex(fromjson("{a: 1}"));
 
-    runQuerySkipNToReturn(fromjson("{$or: [{a: 5}, {a: 7}]}"), 8, 0);
+    runQuerySkipLimit(fromjson("{$or: [{a: 5}, {a: 7}]}"), 8, 0);
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists(
@@ -630,25 +630,16 @@ TEST_F(QueryPlannerTest, SkipEvaluatesBeforeFetchForIndexedOr) {
 TEST_F(QueryPlannerTest, BasicLimitNoIndex) {
     addIndex(BSON("a" << 1));
 
-    runQuerySkipNToReturn(BSON("x" << 5), 0, -3);
+    runQuerySkipLimit(BSON("x" << 5), 0, 3);
 
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists("{limit: {n: 3, node: {cscan: {dir: 1, filter: {x: 5}}}}}");
 }
 
-TEST_F(QueryPlannerTest, BasicSoftLimitNoIndex) {
-    addIndex(BSON("a" << 1));
-
-    runQuerySkipNToReturn(BSON("x" << 5), 0, 3);
-
-    ASSERT_EQUALS(getNumSolutions(), 1U);
-    assertSolutionExists("{cscan: {dir: 1, filter: {x: 5}}}");
-}
-
 TEST_F(QueryPlannerTest, BasicLimitWithIndex) {
     addIndex(BSON("a" << 1 << "b" << 1));
 
-    runQuerySkipNToReturn(BSON("a" << 5), 0, -5);
+    runQuerySkipLimit(BSON("a" << 5), 0, 5);
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists("{limit: {n: 5, node: {cscan: {dir: 1, filter: {a: 5}}}}}");
@@ -657,22 +648,10 @@ TEST_F(QueryPlannerTest, BasicLimitWithIndex) {
         "{ixscan: {filter: null, pattern: {a: 1, b: 1}}}}}}}");
 }
 
-TEST_F(QueryPlannerTest, BasicSoftLimitWithIndex) {
-    addIndex(BSON("a" << 1 << "b" << 1));
-
-    runQuerySkipNToReturn(BSON("a" << 5), 0, 5);
-
-    ASSERT_EQUALS(getNumSolutions(), 2U);
-    assertSolutionExists("{cscan: {dir: 1, filter: {a: 5}}}}");
-    assertSolutionExists(
-        "{fetch: {filter: null, node: "
-        "{ixscan: {filter: null, pattern: {a: 1, b: 1}}}}}");
-}
-
 TEST_F(QueryPlannerTest, SkipAndLimit) {
     addIndex(BSON("x" << 1));
 
-    runQuerySkipNToReturn(BSON("x" << BSON("$lte" << 4)), 7, -2);
+    runQuerySkipLimit(BSON("x" << BSON("$lte" << 4)), 7, 2);
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists(
@@ -682,21 +661,6 @@ TEST_F(QueryPlannerTest, SkipAndLimit) {
         "{limit: {n: 2, node: {fetch: {filter: null, node: "
         "{skip: {n: 7, node: {ixscan: {filter: null, pattern: {x: 1}}}}}}}}}");
 }
-
-TEST_F(QueryPlannerTest, SkipAndSoftLimit) {
-    addIndex(BSON("x" << 1));
-
-    runQuerySkipNToReturn(BSON("x" << BSON("$lte" << 4)), 7, 2);
-
-    ASSERT_EQUALS(getNumSolutions(), 2U);
-    assertSolutionExists(
-        "{skip: {n: 7, node: "
-        "{cscan: {dir: 1, filter: {x: {$lte: 4}}}}}}");
-    assertSolutionExists(
-        "{fetch: {filter: null, node: {skip: {n: 7, node: "
-        "{ixscan: {filter: null, pattern: {x: 1}}}}}}}");
-}
-
 
 //
 // Basic sort
@@ -803,7 +767,7 @@ TEST_F(QueryPlannerTest, CompoundIndexWithEqualityPredicatesProvidesSort) {
 
 TEST_F(QueryPlannerTest, SortLimit) {
     // Negative limit indicates hard limit - see query_request_helper.cpp
-    runQuerySortProjSkipNToReturn(BSONObj(), fromjson("{a: 1}"), BSONObj(), 0, -3);
+    runQuerySortProjSkipLimit(BSONObj(), fromjson("{a: 1}"), BSONObj(), 0, 3);
     assertNumSolutions(1U);
     assertSolutionExists(
         "{sort: {pattern: {a: 1}, limit: 3, type: 'simple', node:"
@@ -811,7 +775,7 @@ TEST_F(QueryPlannerTest, SortLimit) {
 }
 
 TEST_F(QueryPlannerTest, SortSkip) {
-    runQuerySortProjSkipNToReturn(BSONObj(), fromjson("{a: 1}"), BSONObj(), 2, 0);
+    runQuerySortProjSkipLimit(BSONObj(), fromjson("{a: 1}"), BSONObj(), 2, 0);
     assertNumSolutions(1U);
     // If only skip is provided, do not limit sort.
     assertSolutionExists(
@@ -821,26 +785,9 @@ TEST_F(QueryPlannerTest, SortSkip) {
 }
 
 TEST_F(QueryPlannerTest, SortSkipLimit) {
-    runQuerySortProjSkipNToReturn(BSONObj(), fromjson("{a: 1}"), BSONObj(), 2, -3);
+    runQuerySortProjSkipLimit(BSONObj(), fromjson("{a: 1}"), BSONObj(), 2, 3);
     assertNumSolutions(1U);
     // Limit in sort node should be adjusted by skip count
-    assertSolutionExists(
-        "{skip: {n: 2, node: "
-        "{sort: {pattern: {a: 1}, limit: 5, type: 'simple', node: "
-        "{cscan: {dir: 1}}}}}}}}");
-}
-
-TEST_F(QueryPlannerTest, SortSoftLimit) {
-    runQuerySortProjSkipNToReturn(BSONObj(), fromjson("{a: 1}"), BSONObj(), 0, 3);
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{sort: {pattern: {a: 1}, limit: 3, type: 'simple', node:"
-        "{cscan: {dir: 1}}}}");
-}
-
-TEST_F(QueryPlannerTest, SortSkipSoftLimit) {
-    runQuerySortProjSkipNToReturn(BSONObj(), fromjson("{a: 1}"), BSONObj(), 2, 3);
-    assertNumSolutions(1U);
     assertSolutionExists(
         "{skip: {n: 2, node: "
         "{sort: {pattern: {a: 1}, limit: 5, type: 'simple', node: "

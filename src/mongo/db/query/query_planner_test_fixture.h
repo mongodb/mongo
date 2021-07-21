@@ -91,15 +91,15 @@ protected:
 
     void runQuerySortProj(const BSONObj& query, const BSONObj& sort, const BSONObj& proj);
 
-    void runQuerySkipNToReturn(const BSONObj& query, long long skip, long long ntoreturn);
+    void runQuerySkipLimit(const BSONObj& query, long long skip, long long limit);
 
     void runQueryHint(const BSONObj& query, const BSONObj& hint);
 
-    void runQuerySortProjSkipNToReturn(const BSONObj& query,
-                                       const BSONObj& sort,
-                                       const BSONObj& proj,
-                                       long long skip,
-                                       long long ntoreturn);
+    void runQuerySortProjSkipLimit(const BSONObj& query,
+                                   const BSONObj& sort,
+                                   const BSONObj& proj,
+                                   long long skip,
+                                   long long limit);
 
     void runQuerySortHint(const BSONObj& query, const BSONObj& sort, const BSONObj& hint);
 
@@ -108,18 +108,18 @@ protected:
                             const BSONObj& minObj,
                             const BSONObj& maxObj);
 
-    void runQuerySortProjSkipNToReturnHint(const BSONObj& query,
-                                           const BSONObj& sort,
-                                           const BSONObj& proj,
-                                           long long skip,
-                                           long long ntoreturn,
-                                           const BSONObj& hint);
+    void runQuerySortProjSkipLimitHint(const BSONObj& query,
+                                       const BSONObj& sort,
+                                       const BSONObj& proj,
+                                       long long skip,
+                                       long long limit,
+                                       const BSONObj& hint);
 
     void runQueryFull(const BSONObj& query,
                       const BSONObj& sort,
                       const BSONObj& proj,
                       long long skip,
-                      long long ntoreturn,
+                      long long limit,
                       const BSONObj& hint,
                       const BSONObj& minObj,
                       const BSONObj& maxObj);
@@ -132,11 +132,11 @@ protected:
 
     void runInvalidQuerySortProj(const BSONObj& query, const BSONObj& sort, const BSONObj& proj);
 
-    void runInvalidQuerySortProjSkipNToReturn(const BSONObj& query,
-                                              const BSONObj& sort,
-                                              const BSONObj& proj,
-                                              long long skip,
-                                              long long ntoreturn);
+    void runInvalidQuerySortProjSkipLimit(const BSONObj& query,
+                                          const BSONObj& sort,
+                                          const BSONObj& proj,
+                                          long long skip,
+                                          long long limit);
 
     void runInvalidQueryHint(const BSONObj& query, const BSONObj& hint);
 
@@ -145,18 +145,18 @@ protected:
                                    const BSONObj& minObj,
                                    const BSONObj& maxObj);
 
-    void runInvalidQuerySortProjSkipNToReturnHint(const BSONObj& query,
-                                                  const BSONObj& sort,
-                                                  const BSONObj& proj,
-                                                  long long skip,
-                                                  long long ntoreturn,
-                                                  const BSONObj& hint);
+    void runInvalidQuerySortProjSkipLimitHint(const BSONObj& query,
+                                              const BSONObj& sort,
+                                              const BSONObj& proj,
+                                              long long skip,
+                                              long long limit,
+                                              const BSONObj& hint);
 
     void runInvalidQueryFull(const BSONObj& query,
                              const BSONObj& sort,
                              const BSONObj& proj,
                              long long skip,
-                             long long ntoreturn,
+                             long long limit,
                              const BSONObj& hint,
                              const BSONObj& minObj,
                              const BSONObj& maxObj);

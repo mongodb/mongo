@@ -828,8 +828,6 @@ void OpDebug::report(OperationContext* opCtx,
     if (mongotCursorId) {
         pAttrs->add("mongot", makeMongotDebugStatsObject());
     }
-    OPDEBUG_TOATTR_HELP(ntoreturn);
-    OPDEBUG_TOATTR_HELP(ntoskip);
     OPDEBUG_TOATTR_HELP_BOOL(exhaust);
 
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysExamined", additiveMetrics.keysExamined);

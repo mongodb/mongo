@@ -746,43 +746,41 @@ TEST_F(QueryPlannerTest, InCompoundIndexLastOrEquivalent) {
 }
 */
 
-// SERVER-1205
 TEST_F(QueryPlannerTest, InWithSort) {
     addIndex(BSON("a" << 1 << "b" << 1));
-    runQuerySortProjSkipNToReturn(fromjson("{a: {$in: [1, 2]}}"), BSON("b" << 1), BSONObj(), 0, 1);
+    runQuerySortProjSkipLimit(fromjson("{a: {$in: [1, 2]}}"), BSON("b" << 1), BSONObj(), 0, 1);
 
     assertSolutionExists(
         "{sort: {pattern: {b: 1}, limit: 1, type: 'simple', node: "
         "{cscan: {dir: 1}}}}");
     assertSolutionExists(
-        "{fetch: {node: {mergeSort: {nodes: "
-        "[{ixscan: {pattern: {a: 1, b: 1}}}, {ixscan: {pattern: {a: 1, b: 1}}}]}}}}");
+        "{limit: {n: 1, node: {fetch: {node: {mergeSort: {nodes: "
+        "[{ixscan: {pattern: {a: 1, b: 1}}}, {ixscan: {pattern: {a: 1, b: 1}}}]}}}}}}");
 }
 
-// SERVER-1205
 TEST_F(QueryPlannerTest, InWithoutSort) {
     addIndex(BSON("a" << 1 << "b" << 1));
     // No sort means we don't bother to blow up the bounds.
-    runQuerySortProjSkipNToReturn(fromjson("{a: {$in: [1, 2]}}"), BSONObj(), BSONObj(), 0, 1);
+    runQuerySortProjSkipLimit(fromjson("{a: {$in: [1, 2]}}"), BSONObj(), BSONObj(), 0, 1);
 
-    assertSolutionExists("{cscan: {dir: 1}}");
-    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}}}}}");
+    assertSolutionExists("{limit: {n: 1, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{limit: {n: 1, node: {fetch: {node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}");
 }
 
-// SERVER-1205
 TEST_F(QueryPlannerTest, ManyInWithSort) {
     addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1));
-    runQuerySortProjSkipNToReturn(fromjson("{a: {$in: [1, 2]}, b:{$in:[1,2]}, c:{$in:[1,2]}}"),
-                                  BSON("d" << 1),
-                                  BSONObj(),
-                                  0,
-                                  1);
+    runQuerySortProjSkipLimit(fromjson("{a: {$in: [1, 2]}, b:{$in:[1,2]}, c:{$in:[1,2]}}"),
+                              BSON("d" << 1),
+                              BSONObj(),
+                              0,
+                              1);
 
     assertSolutionExists(
         "{sort: {pattern: {d: 1}, limit: 1, type: 'simple', node: "
         "{cscan: {dir: 1}}}}");
     assertSolutionExists(
-        "{fetch: {node: {mergeSort: {nodes: "
+        "{limit: {n: 1, node: {fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a: 1, b: 1, c:1, d:1}}},"
         "{ixscan: {pattern: {a: 1, b: 1, c:1, d:1}}},"
         "{ixscan: {pattern: {a: 1, b: 1, c:1, d:1}}},"
@@ -790,19 +788,18 @@ TEST_F(QueryPlannerTest, ManyInWithSort) {
         "{ixscan: {pattern: {a: 1, b: 1, c:1, d:1}}},"
         "{ixscan: {pattern: {a: 1, b: 1, c:1, d:1}}},"
         "{ixscan: {pattern: {a: 1, b: 1, c:1, d:1}}},"
-        "{ixscan: {pattern: {a: 1, b: 1, c:1, d:1}}}]}}}}");
+        "{ixscan: {pattern: {a: 1, b: 1, c:1, d:1}}}]}}}}}}");
 }
 
-// SERVER-1205
 TEST_F(QueryPlannerTest, TooManyToExplode) {
     addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1));
-    runQuerySortProjSkipNToReturn(fromjson("{a: {$in: [1,2,3,4,5,6]},"
-                                           "b:{$in:[1,2,3,4,5,6,7,8]},"
-                                           "c:{$in:[1,2,3,4,5,6,7,8]}}"),
-                                  BSON("d" << 1),
-                                  BSONObj(),
-                                  0,
-                                  1);
+    runQuerySortProjSkipLimit(fromjson("{a: {$in: [1,2,3,4,5,6]},"
+                                       "b:{$in:[1,2,3,4,5,6,7,8]},"
+                                       "c:{$in:[1,2,3,4,5,6,7,8]}}"),
+                              BSON("d" << 1),
+                              BSONObj(),
+                              0,
+                              1);
 
     // We cap the # of ixscans we're willing to create.
     assertNumSolutions(2);
@@ -1066,11 +1063,11 @@ TEST_F(QueryPlannerTest, ExplodeForSortIxscanFetchOrAndIxscanOr) {
 
 TEST_F(QueryPlannerTest, InWithSortAndLimitTrailingField) {
     addIndex(BSON("a" << 1 << "b" << -1 << "c" << 1));
-    runQuerySortProjSkipNToReturn(fromjson("{a: {$in: [1, 2]}, b: {$gte: 0}}"),
-                                  fromjson("{b: -1}"),
-                                  BSONObj(),  // no projection
-                                  0,          // no skip
-                                  -1);        // .limit(1)
+    runQuerySortProjSkipLimit(fromjson("{a: {$in: [1, 2]}, b: {$gte: 0}}"),
+                              fromjson("{b: -1}"),
+                              BSONObj(),  // no projection
+                              0,          // no skip
+                              1);         // .limit(1)
 
     assertNumSolutions(2U);
     assertSolutionExists(
@@ -1215,7 +1212,6 @@ TEST_F(QueryPlannerTest, NonIndexEqualitiesNotProvided) {
 // Sort orders
 //
 
-// SERVER-1205.
 TEST_F(QueryPlannerTest, MergeSort) {
     addIndex(BSON("a" << 1 << "c" << 1));
     addIndex(BSON("b" << 1 << "c" << 1));
@@ -1230,7 +1226,6 @@ TEST_F(QueryPlannerTest, MergeSort) {
         "[{ixscan: {pattern: {a: 1, c: 1}}}, {ixscan: {pattern: {b: 1, c: 1}}}]}}}}");
 }
 
-// SERVER-1205 as well.
 TEST_F(QueryPlannerTest, NoMergeSortIfNoSortWanted) {
     addIndex(BSON("a" << 1 << "c" << 1));
     addIndex(BSON("b" << 1 << "c" << 1));

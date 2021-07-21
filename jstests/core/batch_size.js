@@ -96,11 +96,6 @@ if (FixtureHelpers.isMongos(db)) {
 } else {
     assert.eq(6, explain.executionStats.nReturned);
 }
-
-// -------
-
-// During plan ranking, we treat ntoreturn as a limit. This prevents us from buffering too much
-// data in a blocking sort stage during plan ranking.
 t.drop();
 
 // Generate big string to use in the object - 1MB+ String

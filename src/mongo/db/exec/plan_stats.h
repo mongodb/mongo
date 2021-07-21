@@ -397,21 +397,6 @@ struct DistinctScanStats : public SpecificStats {
     BSONObj indexBounds;
 };
 
-struct EnsureSortedStats : public SpecificStats {
-    EnsureSortedStats() : nDropped(0) {}
-
-    std::unique_ptr<SpecificStats> clone() const final {
-        return std::make_unique<EnsureSortedStats>(*this);
-    }
-
-    uint64_t estimateObjectSizeInBytes() const {
-        return sizeof(*this);
-    }
-
-    // The number of out-of-order results that were dropped.
-    long long nDropped;
-};
-
 struct FetchStats : public SpecificStats {
     FetchStats() = default;
 

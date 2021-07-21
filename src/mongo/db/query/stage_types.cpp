@@ -43,7 +43,6 @@ StringData stageTypeToString(StageType stageType) {
         {STAGE_COUNT_SCAN, "COUNT_SCAN"_sd},
         {STAGE_DELETE, "DELETE"_sd},
         {STAGE_DISTINCT_SCAN, "DISTINCT_SCAN"_sd},
-        {STAGE_ENSURE_SORTED, "SORTED"_sd},
         {STAGE_EOF, "EOF"_sd},
         {STAGE_FETCH, "FETCH"_sd},
         {STAGE_GEO_NEAR_2D, "GEO_NEAR_2D"_sd},

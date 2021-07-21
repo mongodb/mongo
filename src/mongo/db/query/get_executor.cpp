@@ -351,8 +351,6 @@ void fillOutPlannerParams(OperationContext* opCtx,
         plannerParams->options |= QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     }
 
-    plannerParams->options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
-
     if (shouldWaitForOplogVisibility(
             opCtx, collection, canonicalQuery->getFindCommandRequest().getTailable())) {
         plannerParams->options |= QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
@@ -1182,15 +1180,12 @@ inline bool isQuerySbeCompatible(OperationContext* opCtx,
             return part.fieldPath &&
                 !FieldRef(part.fieldPath->fullPath()).hasNumericPathComponents();
         });
-    // A find command with 'ntoreturn' is not supported in SBE due to the possibility of an
-    // ENSURE_SORTED stage.
-    const bool doesNotNeedEnsureSorted = !cq->getFindCommandRequest().getNtoreturn();
 
     // Queries against a time-series collection are not currently supported by SBE.
     const bool isQueryNotAgainstTimeseriesCollection = !(cq->nss().isTimeseriesBucketsCollection());
     return allExpressionsSupported && isNotCount && doesNotContainMetadataRequirements &&
-        doesNotNeedEnsureSorted && isQueryNotAgainstTimeseriesCollection &&
-        doesNotSortOnMetaOrPathWithNumericComponents && isNotOplog;
+        isQueryNotAgainstTimeseriesCollection && doesNotSortOnMetaOrPathWithNumericComponents &&
+        isNotOplog;
 }
 }  // namespace
 

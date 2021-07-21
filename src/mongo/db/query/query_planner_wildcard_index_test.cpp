@@ -576,7 +576,7 @@ TEST_F(QueryPlannerWildcardTest, OrWithOneRegularAndOneWildcardIndexPathUsesTwoI
 
 TEST_F(QueryPlannerWildcardTest, BasicSkip) {
     addWildcardIndex(BSON("$**" << 1));
-    runQuerySkipNToReturn(BSON("a" << 5), 8, 0);
+    runQuerySkipLimit(BSON("a" << 5), 8, 0);
 
     assertNumSolutions(1U);
     assertSolutionExists(
@@ -587,7 +587,7 @@ TEST_F(QueryPlannerWildcardTest, BasicSkip) {
 
 TEST_F(QueryPlannerWildcardTest, CoveredSkip) {
     addWildcardIndex(BSON("$**" << 1));
-    runQuerySortProjSkipNToReturn(fromjson("{a: 5}"), BSONObj(), fromjson("{_id: 0, a: 1}"), 8, 0);
+    runQuerySortProjSkipLimit(fromjson("{a: 5}"), BSONObj(), fromjson("{_id: 0, a: 1}"), 8, 0);
 
     assertNumSolutions(1U);
     assertSolutionExists(
@@ -598,7 +598,7 @@ TEST_F(QueryPlannerWildcardTest, CoveredSkip) {
 
 TEST_F(QueryPlannerWildcardTest, BasicLimit) {
     addWildcardIndex(BSON("$**" << 1));
-    runQuerySkipNToReturn(BSON("a" << 5), 0, -5);
+    runQuerySkipLimit(BSON("a" << 5), 0, 5);
 
     assertNumSolutions(1U);
     assertSolutionExists(

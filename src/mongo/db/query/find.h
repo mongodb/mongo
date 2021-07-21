@@ -64,15 +64,6 @@ bool shouldSaveCursor(OperationContext* opCtx,
 bool shouldSaveCursorGetMore(PlanExecutor* exec, bool isTailable);
 
 /**
- * Fills out the CurOp for "opCtx" with information about this query.
- */
-void beginQueryOp(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  const BSONObj& queryObj,
-                  long long ntoreturn,
-                  long long ntoskip);
-
-/**
  * 1) Fills out CurOp for "opCtx" with information regarding this query's execution.
  * 2) Reports index usage to the CollectionQueryInfo.
  *

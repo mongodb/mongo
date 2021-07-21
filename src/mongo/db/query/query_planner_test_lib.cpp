@@ -1088,41 +1088,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
 
         return solutionMatches(child.Obj(), fn->children[0], relaxBoundsCheck)
             .withContext("mismatch below shard filter stage");
-    } else if (STAGE_ENSURE_SORTED == trueSoln->getType()) {
-        const EnsureSortedNode* esn = static_cast<const EnsureSortedNode*>(trueSoln);
-
-        BSONElement el = testSoln["ensureSorted"];
-        if (el.eoo() || !el.isABSONObj()) {
-            return {ErrorCodes::Error{5619208},
-                    "found a ensureSorted stage in the solution but no "
-                    "corresponding 'ensureSorted' object in the provided JSON"};
-        }
-        BSONObj esObj = el.Obj();
-        invariant(bsonObjFieldsAreInSet(esObj, {"node", "pattern"}));
-
-        BSONElement patternEl = esObj["pattern"];
-        if (patternEl.eoo() || !patternEl.isABSONObj()) {
-            return {ErrorCodes::Error{5676407},
-                    "found an ensureSorted stage in the solution but no 'pattern' object in the "
-                    "provided JSON"};
-        }
-        BSONElement child = esObj["node"];
-        if (child.eoo() || !child.isABSONObj()) {
-            return {ErrorCodes::Error{5676406},
-                    "found an ensureSorted stage in the solution but no 'node' sub-object in "
-                    "the provided JSON"};
-        }
-
-        if (!SimpleBSONObjComparator::kInstance.evaluate(patternEl.Obj() == esn->pattern)) {
-            return {ErrorCodes::Error{5698302},
-                    str::stream() << "found an ensureSorted stage in the solution with "
-                                     "mismatching 'pattern'. Expected: "
-                                  << patternEl << " Found: " << esn->pattern};
-        }
-        return solutionMatches(child.Obj(), esn->children[0], relaxBoundsCheck)
-            .withContext("mismatch below ensureSorted stage");
     }
-
     return {ErrorCodes::Error{5698301},
             str::stream() << "Unknown query solution node found: " << trueSoln->toString()};
 }  // namespace mongo

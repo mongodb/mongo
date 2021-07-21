@@ -65,6 +65,44 @@ namespace {
 
 const auto kTermField = "term"_sd;
 
+// Older client code before FCV 5.1 could still send 'ntoreturn' to mean a 'limit' or 'batchSize'.
+// This helper translates an 'ntoreturn' to an appropriate combination of 'limit', 'singleBatch',
+// and 'batchSize'. The translation rules are as follows: when 'ntoreturn' < 0 we have 'singleBatch'
+// semantics so we set 'limit= -ntoreturn' and 'singleBatch=true' flag to 'true'. When 'ntoreturn'
+// == 1 this is a limit-1 case so we set the 'limit' accordingly. Lastly when 'ntoreturn' > 1, it's
+// interpreted as a 'batchSize'. When the cluster is fully upgraded to v5.1 'ntoreturn' should no
+// longer be used on incoming requests.
+//
+// This helper can be removed when we no longer have to interoperate with 5.0 or older nodes.
+// longer have to interoperate with 5.0 or older nodes.
+std::unique_ptr<FindCommandRequest> translateNtoReturnToLimitOrBatchSize(
+    std::unique_ptr<FindCommandRequest> findCmd) {
+    const auto& fcvState = serverGlobalParams.featureCompatibility;
+    uassert(5746102,
+            "the ntoreturn find command parameter is not supported when FCV >= 5.1",
+            !(fcvState.isVersionInitialized() &&
+              fcvState.isGreaterThanOrEqualTo(
+                  ServerGlobalParams::FeatureCompatibility::Version::kVersion51) &&
+              findCmd->getNtoreturn()));
+
+    const auto ntoreturn = findCmd->getNtoreturn().get_value_or(0);
+    if (ntoreturn) {
+        if (ntoreturn < 0) {
+            uassert(5746100,
+                    "bad ntoreturn value in query",
+                    ntoreturn != std::numeric_limits<int>::min());
+            findCmd->setLimit(-ntoreturn);
+            findCmd->setSingleBatch(true);
+        } else if (ntoreturn == 1) {
+            findCmd->setLimit(1);
+        } else {
+            findCmd->setBatchSize(ntoreturn);
+        }
+    }
+    findCmd->setNtoreturn(boost::none);
+    return findCmd;
+}
+
 // Parses the command object to a FindCommandRequest. If the client request did not specify any
 // runtime constants, make them available to the query here.
 std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(OperationContext* opCtx,
@@ -74,7 +112,8 @@ std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(Operation
         std::move(cmdObj),
         std::move(nss),
         APIParameters::get(opCtx).getAPIStrict().value_or(false));
-    return findCommand;
+
+    return translateNtoReturnToLimitOrBatchSize(std::move(findCommand));
 }
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
@@ -120,6 +159,16 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     );
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     return expCtx;
+}
+
+/**
+ * Fills out the CurOp for "opCtx" with information about this query.
+ */
+void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& queryObj) {
+    auto curOp = CurOp::get(opCtx);
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    curOp->setOpDescription_inlock(queryObj);
+    curOp->setNS_inlock(nss.ns());
 }
 
 /**
@@ -369,7 +418,6 @@ public:
                 opCtx->lockState()->skipAcquireTicket();
             }
 
-
             // Acquire locks. If the query is on a view, we release our locks and convert the query
             // request into an aggregation command.
             boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
@@ -393,13 +441,7 @@ public:
                 opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
             // Fill out curop information.
-            //
-            // We pass negative values for 'ntoreturn' and 'ntoskip' to indicate that these values
-            // should be omitted from the log line. Limit and skip information is already present in
-            // the find command parameters, so these fields are redundant.
-            const int ntoreturn = -1;
-            const int ntoskip = -1;
-            beginQueryOp(opCtx, nss, _request.body, ntoreturn, ntoskip);
+            beginQueryOp(opCtx, nss, _request.body);
 
             // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);

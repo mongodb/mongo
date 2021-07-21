@@ -78,7 +78,7 @@ class DBClientQueryInterface {
     virtual std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
         Query query,
-        int nToReturn = 0,
+        int limit = 0,
         int nToSkip = 0,
         const BSONObj* fieldsToReturn = nullptr,
         int queryOptions = 0,
@@ -138,7 +138,7 @@ public:
     void findN(std::vector<BSONObj>& out,
                const std::string& ns,
                Query query,
-               int nToReturn,
+               int limit,
                int nToSkip = 0,
                const BSONObj* fieldsToReturn = nullptr,
                int queryOptions = 0,
@@ -592,7 +592,7 @@ public:
      You may format as
        { query: { ... }, orderby: { ... } }
      to specify a sort order.
-     @param nToReturn n to return (i.e., limit).  0 = unlimited
+     @param limit - the maximum number of documents that the cursor should return. 0 = unlimited.
      @param nToSkip start with the nth item
      @param fieldsToReturn optional template of which fields to select. if unspecified,
             returns all fields
@@ -604,7 +604,7 @@ public:
     std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
         Query query,
-        int nToReturn = 0,
+        int limit = 0,
         int nToSkip = 0,
         const BSONObj* fieldsToReturn = nullptr,
         int queryOptions = 0,
@@ -650,7 +650,6 @@ public:
      */
     virtual std::unique_ptr<DBClientCursor> getMore(const std::string& ns,
                                                     long long cursorId,
-                                                    int nToReturn = 0,
                                                     int options = 0);
 
     /**

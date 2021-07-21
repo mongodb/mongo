@@ -154,7 +154,6 @@ StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQuery(NamespaceStringO
                                                                 const BSONObj& queryObj,
                                                                 const BSONObj& proj,
                                                                 int ntoskip,
-                                                                int ntoreturn,
                                                                 int queryOptions);
 
 }  // namespace query_request_helper

@@ -145,9 +145,11 @@ public:
             : BSON("$gte" << _oplogApplicationStartPoint);
         _cursor = _client->query(NamespaceString::kRsOplogNamespace,
                                  QUERY("ts" << predicate),
-                                 /*batchSize*/ 0,
+                                 /*limit*/ 0,
                                  /*skip*/ 0,
-                                 /*projection*/ nullptr);
+                                 /*projection*/ nullptr,
+                                 /*options*/ 0,
+                                 /*batchSize*/ 0);
 
         // Check that the first document matches our appliedThrough point then skip it since it's
         // already been applied.

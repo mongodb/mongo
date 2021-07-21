@@ -1375,12 +1375,6 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowPartialResultsFails) {
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
-TEST(QueryRequestTest, ConvertToAggregationWithNToReturnFails) {
-    FindCommandRequest findCommand(testns);
-    findCommand.setNtoreturn(7);
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
-}
-
 TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenFails) {
     FindCommandRequest findCommand(testns);
     findCommand.setRequestResumeToken(true);
@@ -1556,7 +1550,6 @@ TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseFalseSucceeds) {
 
 TEST(QueryRequestTest, ParseFromLegacyQuery) {
     const auto kSkip = 1;
-    const auto kNToReturn = 2;
     const NamespaceString nss("test.testns");
     BSONObj queryObj = fromjson(R"({
             query: {query: 1},
@@ -1567,7 +1560,7 @@ TEST(QueryRequestTest, ParseFromLegacyQuery) {
          })");
 
     unique_ptr<FindCommandRequest> findCommand(assertGet(query_request_helper::fromLegacyQuery(
-        nss, queryObj, BSON("proj" << 1), kSkip, kNToReturn, QueryOption_Exhaust)));
+        nss, queryObj, BSON("proj" << 1), kSkip, QueryOption_Exhaust)));
 
     ASSERT_EQ(*findCommand->getNamespaceOrUUID().nss(), nss);
     ASSERT_BSONOBJ_EQ(findCommand->getFilter(), fromjson("{query: 1}"));
@@ -1577,7 +1570,7 @@ TEST(QueryRequestTest, ParseFromLegacyQuery) {
     ASSERT_BSONOBJ_EQ(findCommand->getMin(), fromjson("{x: 'min'}"));
     ASSERT_BSONOBJ_EQ(findCommand->getMax(), fromjson("{x: 'max'}"));
     ASSERT_EQ(findCommand->getSkip(), boost::optional<int64_t>(kSkip));
-    ASSERT_EQ(findCommand->getNtoreturn(), boost::optional<int64_t>(kNToReturn));
+    ASSERT_FALSE(findCommand->getNtoreturn());
     ASSERT_EQ(findCommand->getSingleBatch(), false);
     ASSERT_EQ(findCommand->getNoCursorTimeout(), false);
     ASSERT_EQ(findCommand->getTailable(), false);
@@ -1589,13 +1582,12 @@ TEST(QueryRequestTest, ParseFromLegacyQueryOplogReplayFlagAllowed) {
     auto queryObj = fromjson("{query: {query: 1}, orderby: {sort: 1}}");
     const BSONObj projectionObj{};
     const auto nToSkip = 0;
-    const auto nToReturn = 0;
 
     // Test that parsing succeeds even if the oplog replay bit is set in the OP_QUERY message. This
     // flag may be set by old clients.
     auto options = QueryOption_OplogReplay_DEPRECATED;
-    unique_ptr<FindCommandRequest> findCommand(assertGet(query_request_helper::fromLegacyQuery(
-        nss, queryObj, projectionObj, nToSkip, nToReturn, options)));
+    unique_ptr<FindCommandRequest> findCommand(assertGet(
+        query_request_helper::fromLegacyQuery(nss, queryObj, projectionObj, nToSkip, options)));
 
     // Verify that if we reserialize the find command, the 'oplogReplay' field
     // does not appear.
@@ -1615,8 +1607,8 @@ TEST(QueryRequestTest, ParseFromLegacyQueryUnwrapped) {
             foo: 1
          })");
     const NamespaceString nss("test.testns");
-    unique_ptr<FindCommandRequest> findCommand(assertGet(query_request_helper::fromLegacyQuery(
-        nss, queryObj, BSONObj(), 0, 0, QueryOption_Exhaust)));
+    unique_ptr<FindCommandRequest> findCommand(assertGet(
+        query_request_helper::fromLegacyQuery(nss, queryObj, BSONObj(), 0, QueryOption_Exhaust)));
 
     ASSERT_EQ(*findCommand->getNamespaceOrUUID().nss(), nss);
     ASSERT_BSONOBJ_EQ(findCommand->getFilter(), fromjson("{foo: 1}"));
@@ -1636,18 +1628,6 @@ TEST(QueryRequestHelperTest, ValidateResponseWrongDataType) {
                        ErrorCodes::TypeMismatch);
 }
 
-TEST(QueryRequestTest, ParseFromLegacyQueryTooNegativeNToReturn) {
-    BSONObj queryObj = fromjson(R"({
-            foo: 1
-         })");
-
-    const NamespaceString nss("test.testns");
-    ASSERT_NOT_OK(
-        query_request_helper::fromLegacyQuery(
-            nss, queryObj, BSONObj(), 0, std::numeric_limits<int>::min(), QueryOption_Exhaust)
-            .getStatus());
-}
-
 TEST(QueryRequestTest, ParseFromLegacyQueryExplainError) {
     BSONObj queryObj = fromjson(R"({
             query: {query: 1},
@@ -1656,7 +1636,7 @@ TEST(QueryRequestTest, ParseFromLegacyQueryExplainError) {
 
     const NamespaceString nss("test.testns");
     ASSERT_EQUALS(
-        query_request_helper::fromLegacyQuery(nss, queryObj, BSONObj(), 0, -1, QueryOption_Exhaust)
+        query_request_helper::fromLegacyQuery(nss, queryObj, BSONObj(), 0, QueryOption_Exhaust)
             .getStatus()
             .code(),
         static_cast<ErrorCodes::Error>(5856600));

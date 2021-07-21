@@ -59,14 +59,16 @@ const OperationContext::Decoration<AwaitDataState> awaitDataState =
     OperationContext::declareDecoration<AwaitDataState>();
 
 bool FindCommon::enoughForFirstBatch(const FindCommandRequest& findCommand, long long numDocs) {
-    auto effectiveBatchSize =
-        findCommand.getBatchSize() ? findCommand.getBatchSize() : findCommand.getNtoreturn();
-    if (!effectiveBatchSize) {
+    auto batchSize = findCommand.getBatchSize();
+    tassert(5746104,
+            "ntoreturn on the find command should not be set",
+            findCommand.getNtoreturn() == boost::none);
+    if (!batchSize) {
         // We enforce a default batch size for the initial find if no batch size is specified.
         return numDocs >= query_request_helper::kDefaultBatchSize;
     }
 
-    return numDocs >= effectiveBatchSize.value();
+    return numDocs >= batchSize.value();
 }
 
 bool FindCommon::haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, int bytesBuffered) {

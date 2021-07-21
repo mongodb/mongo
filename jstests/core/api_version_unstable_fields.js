@@ -25,7 +25,6 @@ const unstableFieldsForAggregate = {
 };
 
 const unstableFieldsForFind = {
-    ntoreturn: 10,
     min: {"a": 1},
     max: {"a": 1},
     returnKey: false,

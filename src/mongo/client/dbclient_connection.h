@@ -149,7 +149,7 @@ public:
     std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
         Query query = Query(),
-        int nToReturn = 0,
+        int limit = 0,
         int nToSkip = 0,
         const BSONObj* fieldsToReturn = nullptr,
         int queryOptions = 0,
@@ -158,7 +158,7 @@ public:
         checkConnection();
         return DBClientBase::query(nsOrUuid,
                                    query,
-                                   nToReturn,
+                                   limit,
                                    nToSkip,
                                    fieldsToReturn,
                                    queryOptions,

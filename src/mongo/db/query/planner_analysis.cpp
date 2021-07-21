@@ -539,10 +539,6 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
 bool canUseSimpleSort(const QuerySolutionNode& solnRoot,
                       const CanonicalQuery& cq,
                       const QueryPlannerParams& plannerParams) {
-    const bool splitLimitedSortEligible = cq.getFindCommandRequest().getNtoreturn() &&
-        !cq.getFindCommandRequest().getSingleBatch() &&
-        plannerParams.options & QueryPlannerParams::SPLIT_LIMITED_SORT;
-
     // The simple sort stage discards any metadata other than sort key metadata. It can only be used
     // if there are no metadata dependencies, or the only metadata dependency is a 'kSortKey'
     // dependency.
@@ -554,11 +550,7 @@ bool canUseSimpleSort(const QuerySolutionNode& solnRoot,
         // record ids along through the sorting process is wasted work when these ids will never be
         // consumed later in the execution of the query. If the record ids are needed, however, then
         // we can't use the simple sort stage.
-        !(plannerParams.options & QueryPlannerParams::PRESERVE_RECORD_ID)
-        // Disable for queries which have an ntoreturn value and are eligible for the "split limited
-        // sort" hack. Such plans require record ids to be present for deduping, but the simple sort
-        // stage discards record ids.
-        && !splitLimitedSortEligible;
+        !(plannerParams.options & QueryPlannerParams::PRESERVE_RECORD_ID);
 }
 
 }  // namespace
@@ -765,6 +757,10 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
     *blockingSortOut = false;
 
     const FindCommandRequest& findCommand = query.getFindCommandRequest();
+    tassert(5746105,
+            "ntoreturn on the find command should not be set",
+            findCommand.getNtoreturn() == boost::none);
+
     const BSONObj& sortObj = findCommand.getSort();
 
     if (sortObj.isEmpty()) {
@@ -839,67 +835,9 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
     // the limit N and skip count M. The sort should return an ordered list
     // N + M items so that the skip stage can discard the first M results.
     if (findCommand.getLimit()) {
-        // We have a true limit. The limit can be combined with the SORT stage.
+        // The limit can be combined with the SORT stage.
         sortNodeRaw->limit = static_cast<size_t>(*findCommand.getLimit()) +
             static_cast<size_t>(findCommand.getSkip().value_or(0));
-    } else if (findCommand.getNtoreturn()) {
-        // We have an ntoreturn specified by an OP_QUERY style find. This is used
-        // by clients to mean both batchSize and limit.
-        //
-        // Overflow here would be bad and could cause a nonsense limit. Cast
-        // skip and limit values to unsigned ints to make sure that the
-        // sum is never stored as signed. (See SERVER-13537).
-        sortNodeRaw->limit = static_cast<size_t>(*findCommand.getNtoreturn()) +
-            static_cast<size_t>(findCommand.getSkip().value_or(0));
-
-        // This is a SORT with a limit. The wire protocol has a single quantity called "numToReturn"
-        // which could mean either limit or batchSize.  We have no idea what the client intended.
-        // One way to handle the ambiguity of a limited OR stage is to use the SPLIT_LIMITED_SORT
-        // hack.
-        //
-        // If singleBatch is true (meaning that 'ntoreturn' was initially passed to the server as a
-        // negative value), then we treat numToReturn as a limit.  Since there is no limit-batchSize
-        // ambiguity in this case, we do not use the SPLIT_LIMITED_SORT hack.
-        //
-        // If numToReturn is really a limit, then we want to add a limit to this SORT stage, and
-        // hence perform a topK.
-        //
-        // If numToReturn is really a batchSize, then we want to perform a regular blocking sort.
-        //
-        // Since we don't know which to use, just join the two options with an OR, with the topK
-        // first. If the client wants a limit, they'll get the efficiency of topK. If they want a
-        // batchSize, the other OR branch will deliver the missing results. The OR stage handles
-        // deduping.
-        //
-        // We must also add an ENSURE_SORTED node above the OR to ensure that the final results are
-        // in correct sorted order, which may not be true if the data is concurrently modified.
-        //
-        // Not allowed for geo or text, because we assume elsewhere that those stages appear just
-        // once.
-        if (!findCommand.getSingleBatch() &&
-            params.options & QueryPlannerParams::SPLIT_LIMITED_SORT &&
-            !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT) &&
-            !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO) &&
-            !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
-            // If we're here then the SPLIT_LIMITED_SORT hack is turned on, and the query is of a
-            // type that allows the hack.
-            //
-            // The EnsureSortedStage consumes sort key metadata, so we must instruct the sort to
-            // attach it.
-            sortNodeRaw->addSortKeyMetadata = true;
-
-            auto orNode = std::make_unique<OrNode>();
-            orNode->children.push_back(solnRoot);
-            auto sortClone = static_cast<SortNode*>(sortNodeRaw->clone());
-            sortClone->limit = 0;
-            orNode->children.push_back(sortClone);
-
-            // Add ENSURE_SORTED above the OR.
-            auto ensureSortedNode = std::make_unique<EnsureSortedNode>();
-            ensureSortedNode->pattern = sortNodeRaw->pattern;
-            ensureSortedNode->children.push_back(orNode.release());
-            solnRoot = ensureSortedNode.release();
-        }
     } else {
         sortNodeRaw->limit = 0;
     }
@@ -1006,26 +944,14 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
         }
     }
 
-    // When there is both a blocking sort and a limit, the limit will
-    // be enforced by the blocking sort.
-    // Otherwise, we need to limit the results in the case of a hard limit
-    // (ie. limit in raw query is negative)
-    if (!hasSortStage) {
-        // We don't have a sort stage. This means that, if there is a limit, we will have
-        // to enforce it ourselves since it's not handled inside SORT.
-        if (findCommand.getLimit()) {
-            LimitNode* limit = new LimitNode();
-            limit->limit = *findCommand.getLimit();
-            limit->children.push_back(solnRoot.release());
-            solnRoot.reset(limit);
-        } else if (findCommand.getNtoreturn() && findCommand.getSingleBatch()) {
-            // We have a "legacy limit", i.e. a negative ntoreturn value from an OP_QUERY style
-            // find.
-            LimitNode* limit = new LimitNode();
-            limit->limit = *findCommand.getNtoreturn();
-            limit->children.push_back(solnRoot.release());
-            solnRoot.reset(limit);
-        }
+    // When there is both a blocking sort and a limit, the limit will be enforced by the blocking
+    // sort. Otherwise, we will have to enforce the limit ourselves since it's not handled inside
+    // SORT.
+    if (!hasSortStage && findCommand.getLimit()) {
+        LimitNode* limit = new LimitNode();
+        limit->limit = *findCommand.getLimit();
+        limit->children.push_back(solnRoot.release());
+        solnRoot.reset(limit);
     }
 
     solnRoot = tryPushdownProjectBeneathSort(std::move(solnRoot));

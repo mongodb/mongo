@@ -110,40 +110,6 @@ StatusWith<std::unique_ptr<FindCommandRequest>> transformQueryForShards(
         newLimit = newLimitValue;
     }
 
-    // Similarly, if nToReturn is set, we forward the sum of nToReturn and the skip.
-    boost::optional<int64_t> newNToReturn;
-    if (findCommand.getNtoreturn()) {
-        // 'singleBatch' and ntoreturn mean the same as 'singleBatch' and limit, so perform the
-        // conversion.
-        if (findCommand.getSingleBatch()) {
-            int64_t newLimitValue;
-            if (overflow::add(*findCommand.getNtoreturn(),
-                              findCommand.getSkip().value_or(0),
-                              &newLimitValue)) {
-                return Status(ErrorCodes::Overflow,
-                              str::stream()
-                                  << "sum of ntoreturn and skip cannot be represented as a 64-bit "
-                                     "integer, ntoreturn: "
-                                  << *findCommand.getNtoreturn()
-                                  << ", skip: " << findCommand.getSkip().value_or(0));
-            }
-            newLimit = newLimitValue;
-        } else {
-            int64_t newNToReturnValue;
-            if (overflow::add(*findCommand.getNtoreturn(),
-                              findCommand.getSkip().value_or(0),
-                              &newNToReturnValue)) {
-                return Status(ErrorCodes::Overflow,
-                              str::stream()
-                                  << "sum of ntoreturn and skip cannot be represented as a 64-bit "
-                                     "integer, ntoreturn: "
-                                  << *findCommand.getNtoreturn()
-                                  << ", skip: " << findCommand.getSkip().value_or(0));
-            }
-            newNToReturn = newNToReturnValue;
-        }
-    }
-
     // If there is a sort other than $natural, we send a sortKey meta-projection to the remote node.
     BSONObj newProjection = findCommand.getProjection();
     if (!findCommand.getSort().isEmpty() &&
@@ -166,7 +132,6 @@ StatusWith<std::unique_ptr<FindCommandRequest>> transformQueryForShards(
     newQR->setProjection(newProjection);
     newQR->setSkip(boost::none);
     newQR->setLimit(newLimit);
-    newQR->setNtoreturn(newNToReturn);
 
     // Even if the client sends us singleBatch=true, we may need to retrieve
     // multiple batches from a shard in order to return the single requested batch to the client.
@@ -264,8 +229,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     ClusterClientCursorParams params(
         query.nss(), APIParameters::get(opCtx), readPref, ReadConcernArgs::get(opCtx));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
-    params.batchSize =
-        findCommand.getBatchSize() ? findCommand.getBatchSize() : findCommand.getNtoreturn();
+    params.batchSize = findCommand.getBatchSize();
     params.tailableMode = query_request_helper::getTailableMode(findCommand);
     params.isAllowPartialResults = findCommand.getAllowPartialResults();
     params.lsid = opCtx->getLogicalSessionId();

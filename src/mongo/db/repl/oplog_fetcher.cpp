@@ -539,7 +539,7 @@ void OplogFetcher::_createNewCursor(bool initialFind) {
         std::make_unique<DBClientCursor>(_conn.get(),
                                          _nss,
                                          _makeFindQuery(findTimeout),
-                                         0 /* nToReturn */,
+                                         0 /* limit */,
                                          0 /* nToSkip */,
                                          nullptr /* fieldsToReturn */,
                                          QueryOption_CursorTailable | QueryOption_AwaitData |

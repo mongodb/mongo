@@ -71,8 +71,6 @@ enum StageType {
     // scan stage is an ixscan with some key-skipping behvaior that only distinct uses.
     STAGE_DISTINCT_SCAN,
 
-    STAGE_ENSURE_SORTED,
-
     STAGE_EOF,
 
     STAGE_FETCH,

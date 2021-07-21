@@ -363,14 +363,14 @@ void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     if (haveFields)
         fields = ValueWriter(cx, args.get(2)).toBSON();
 
-    int nToReturn = ValueWriter(cx, args.get(3)).toInt32();
+    int limit = ValueWriter(cx, args.get(3)).toInt32();
     int nToSkip = ValueWriter(cx, args.get(4)).toInt32();
     int batchSize = ValueWriter(cx, args.get(5)).toInt32();
     int options = ValueWriter(cx, args.get(6)).toInt32();
 
     std::unique_ptr<DBClientCursor> cursor(conn->query(NamespaceString(ns),
                                                        q,
-                                                       nToReturn,
+                                                       limit,
                                                        nToSkip,
                                                        haveFields ? &fields : nullptr,
                                                        options,

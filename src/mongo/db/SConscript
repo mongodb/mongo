@@ -1173,7 +1173,6 @@ env.Library(
         'exec/count_scan.cpp',
         'exec/delete.cpp',
         'exec/distinct_scan.cpp',
-        'exec/ensure_sorted.cpp',
         'exec/eof.cpp',
         'exec/fetch.cpp',
         'exec/geo_near.cpp',
