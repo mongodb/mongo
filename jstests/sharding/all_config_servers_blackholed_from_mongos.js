@@ -28,7 +28,7 @@ assert.commandWorked(
 assert.commandWorked(testDB.ShardedColl.insert({a: 1}));
 
 jsTest.log('Making all the config servers appear as a blackhole to mongos');
-st._configServers.forEach(function(configSvr) {
+st.forEachConfigServer((configSvr) => {
     configSvr.discardMessagesFrom(st.s, 1.0);
 });
 

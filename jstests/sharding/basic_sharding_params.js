@@ -30,7 +30,7 @@ function shardingTestUsingObjects() {
     assert.eq(s1, st._mongos[1]);
 
     var c0 = st.c0;
-    assert.eq(c0, st._configServers[0]);
+    assert.eq(c0, st.configRS.nodes[0]);
 
     var rs0 = st.rs0;
     assert.eq(rs0, st._rsObjects[0]);
@@ -67,7 +67,7 @@ function shardingTestUsingArrays() {
     assert.eq(s1, st._mongos[1]);
 
     var c0 = st.c0;
-    assert.eq(c0, st._configServers[0]);
+    assert.eq(c0, st.configRS.nodes[0]);
 
     var rs0 = st.rs0;
     assert.eq(rs0, st._rsObjects[0]);

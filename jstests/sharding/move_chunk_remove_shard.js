@@ -18,7 +18,7 @@ assert.commandWorked(st.s.adminCommand({split: 'test.user', middle: {x: 0}}));
 
 pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
-st._configServers.forEach((conn) => {
+st.forEachConfigServer((conn) => {
     conn.adminCommand({
         configureFailPoint: 'overrideBalanceRoundInterval',
         mode: 'alwaysOn',

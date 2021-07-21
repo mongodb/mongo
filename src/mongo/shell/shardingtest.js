@@ -93,11 +93,10 @@
  * s {Mongo} - connection to the first mongos
  * s0, s1, ... {Mongo} - connection to different mongos
  * rs0, rs1, ... {ReplSetTest} - test objects to replica sets
- * shard0, shard1, ... {Mongo} - connection to shards (not available for replica sets)
- * d0, d1, ... {Mongo} - same as shard0, shard1, ...
+ * shard0, shard1, ... {Mongo} - connection to shards
  * config0, config1, ... {Mongo} - connection to config servers
  * c0, c1, ... {Mongo} - same as config0, config1, ...
- * configRS - If the config servers are a replset, this will contain the config ReplSetTest object
+ * configRS - the config ReplSetTest object
  */
 var ShardingTest = function(params) {
     if (!(this instanceof ShardingTest)) {
@@ -388,14 +387,7 @@ var ShardingTest = function(params) {
     };
 
     this.stopAllConfigServers = function(opts) {
-        if (this.configRS) {
-            this.configRS.stopSet(undefined, undefined, opts);
-        } else {
-            // Old style config triplet
-            for (var i = 0; i < this._configServers.length; i++) {
-                this.stopConfigServer(i, opts);
-            }
-        }
+        this.configRS.stopSet(undefined, undefined, opts);
     };
 
     this.stopAllShards = function(opts) {
@@ -459,7 +451,7 @@ var ShardingTest = function(params) {
     };
 
     this.forEachConfigServer = function(fn) {
-        this._configServers.forEach(function(conn) {
+        this.configRS.nodes.forEach(function(conn) {
             fn(conn);
         });
     };
@@ -818,12 +810,7 @@ var ShardingTest = function(params) {
      * Kills the config server mongod with index n.
      */
     this.stopConfigServer = function(n, opts) {
-        if (otherParams.useBridge) {
-            MongoRunner.stopMongod(unbridgedConfigServers[n], undefined, opts);
-            this._configServers[n].stop();
-        } else {
-            MongoRunner.stopMongod(this._configServers[n], undefined, opts);
-        }
+        this.configRS.stop(n, undefined, opts);
     };
 
     /**
@@ -925,46 +912,10 @@ var ShardingTest = function(params) {
      *
      * Warning: Overwrites the old cn/confign member variables.
      */
-    this.restartConfigServer = function(n) {
-        var mongod;
-
-        if (otherParams.useBridge) {
-            mongod = unbridgedConfigServers[n];
-        } else {
-            mongod = this["c" + n];
-        }
-
-        this.stopConfigServer(n);
-
-        if (otherParams.useBridge) {
-            var bridgeOptions =
-                Object.merge(otherParams.bridgeOptions, mongod.fullOptions.bridgeOptions || {});
-            bridgeOptions = Object.merge(bridgeOptions, {
-                hostName: otherParams.useHostname ? hostName : "localhost",
-                port: this._configServers[n].port,
-                // The mongod processes identify themselves to mongobridge as host:port, where the
-                // host is the actual hostname of the machine and not localhost.
-                dest: hostName + ":" + mongod.port,
-            });
-
-            this._configServers[n] = new MongoBridge(bridgeOptions);
-        }
-
-        mongod.restart = true;
-        var newConn = MongoRunner.runMongod(mongod);
-        if (!newConn) {
-            throw new Error("Failed to restart config server " + n);
-        }
-
-        if (otherParams.useBridge) {
-            this._configServers[n].connectToBridge();
-            unbridgedConfigServers[n] = newConn;
-        } else {
-            this._configServers[n] = newConn;
-        }
-
-        this["config" + n] = this._configServers[n];
-        this["c" + n] = this._configServers[n];
+    this.restartConfigServer = function(n, options, signal, wait) {
+        this.configRS.restart(n, options, signal, wait);
+        this["config" + n] = this.configRS.nodes[n];
+        this["c" + n] = this.configRS.nodes[n];
     };
 
     /**
@@ -1191,7 +1142,6 @@ var ShardingTest = function(params) {
     this._rs = [];
     this._rsObjects = [];
 
-    let unbridgedConfigServers;
     let unbridgedMongos;
     let _makeAllocatePortFn;
     let _allocatePortForMongos;
@@ -1200,7 +1150,6 @@ var ShardingTest = function(params) {
     let _allocatePortForBridgeForShard;
 
     if (otherParams.useBridge) {
-        unbridgedConfigServers = [];
         unbridgedMongos = [];
 
         _makeAllocatePortFn = (preallocatedPorts, errorMessage) => {
@@ -1342,9 +1291,7 @@ var ShardingTest = function(params) {
     //
     // Start up the config server replica set.
     //
-    this._configServers = [];
 
-    // Using replica set for config servers
     var rstOptions = {
         useHostName: otherParams.useHostname,
         host: hostName,
@@ -1357,7 +1304,7 @@ var ShardingTest = function(params) {
         isConfigServer: true,
     };
 
-    // when using CSRS, always use wiredTiger as the storage engine
+    // always use wiredTiger as the storage engine for CSRS
     var startOptions = {
         pathOpts: pathOpts,
         // Ensure that journaling is always enabled for config servers.
@@ -1619,16 +1566,13 @@ var ShardingTest = function(params) {
     }
 
     this._configDB = this.configRS.getURL();
-    this._configServers = this.configRS.nodes;
     for (var i = 0; i < numConfigs; ++i) {
-        var conn = this._configServers[i];
+        var conn = this.configRS.nodes[i];
         this["config" + i] = conn;
         this["c" + i] = conn;
     }
 
     printjson('Config servers: ' + this._configDB);
-
-    var configConnection = _connectWithRetry(this._configDB);
 
     print("ShardingTest " + this._testName + " :\n" +
           tojson({config: this._configDB, shards: this._connections}));
@@ -1727,8 +1671,6 @@ var ShardingTest = function(params) {
     this.configRS.awaitLastOpCommitted();
 
     if (jsTestOptions().keyFile) {
-        jsTest.authenticate(configConnection);
-        jsTest.authenticateNodes(this._configServers);
         jsTest.authenticateNodes(this._mongos);
     }
 

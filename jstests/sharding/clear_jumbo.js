@@ -97,7 +97,7 @@ let chunk = findChunksUtil.findOneChunkByNs(sessionConfigDB, 'test.range', {min:
 assert(chunk.jumbo, tojson(chunk));
 assert.eq(st.shard0.shardName, chunk.shard);
 
-st._configServers.forEach((conn) => {
+st.forEachConfigServer((conn) => {
     conn.adminCommand({
         configureFailPoint: 'overrideBalanceRoundInterval',
         mode: 'alwaysOn',

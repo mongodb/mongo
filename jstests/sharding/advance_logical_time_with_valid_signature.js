@@ -10,7 +10,7 @@ let st = new ShardingTest({shards: 1, mongos: 2, useBridge: true});
 
 // Sever outgoing communications from the second mongos.
 st.s0.disconnect(st.s1);
-st._configServers.forEach(function(configSvr) {
+st.forEachConfigServer(function(configSvr) {
     configSvr.disconnect(st.s1);
 });
 

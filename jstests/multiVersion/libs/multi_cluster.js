@@ -32,47 +32,26 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
     if (options.waitUntilStable == undefined)
         options.waitUntilStable = false;
 
-    var upgradedSingleShards = [];
-
     if (options.upgradeConfigs) {
-        // Upgrade config servers if they aren't already upgraded shards
-        var numConfigs = this._configServers.length;
+        // Upgrade config servers
+        const numConfigs = this.configRS.nodes.length;
 
         for (var i = 0; i < numConfigs; i++) {
-            var configSvr = this._configServers[i];
+            var configSvr = this.configRS.nodes[i];
 
-            if (configSvr.host in upgradedSingleShards) {
-                configSvr = upgradedSingleShards[configSvr.host];
-            } else {
-                MongoRunner.stopMongod(configSvr);
-                configSvr = MongoRunner.runMongod(
-                    {restart: configSvr, binVersion: binVersion, appendOptions: true});
-            }
+            MongoRunner.stopMongod(configSvr);
+            configSvr = MongoRunner.runMongod(
+                {restart: configSvr, binVersion: binVersion, appendOptions: true});
 
-            this["config" + i] = this["c" + i] = this._configServers[i] = configSvr;
+            this["config" + i] = this["c" + i] = this.configRS.nodes[i] = configSvr;
         }
     }
 
     if (options.upgradeShards) {
-        var numShards = this._connections.length;
-
         // Upgrade shards
-        for (var i = 0; i < numShards; i++) {
-            if (this._rs && this._rs[i]) {
-                // Upgrade replica set
-                var rst = this._rs[i].test;
-                rst.upgradeSet({binVersion: binVersion});
-            } else {
-                // Upgrade shard
-                var shard = this._connections[i];
-                MongoRunner.stopMongod(shard);
-                shard = MongoRunner.runMongod(
-                    {restart: shard, binVersion: binVersion, appendOptions: true});
-
-                upgradedSingleShards[shard.host] = shard;
-                this["shard" + i] = this["d" + i] = this._connections[i] = shard;
-            }
-        }
+        this._rs.forEach((rs) => {
+            rs.test.upgradeSet({binVersion: binVersion});
+        });
     }
 
     if (options.upgradeMongos) {

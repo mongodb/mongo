@@ -13,7 +13,7 @@ var st = new ShardingTest({shards: 4, chunkSize: 1});
 
 // Double the balancer interval to produce fewer migrations per unit time so that the test does not
 // run out of stale shard version retries.
-st._configServers.forEach((conn) => {
+st.forEachConfigServer((conn) => {
     conn.adminCommand({
         configureFailPoint: 'overrideBalanceRoundInterval',
         mode: 'alwaysOn',

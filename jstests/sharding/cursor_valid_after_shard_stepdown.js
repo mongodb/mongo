@@ -12,7 +12,7 @@ var st = new ShardingTest({shards: 1, rs: {nodes: 2}});
 // This test expects the shard version after step down to be UNKNOWN. Disable checking for index
 // consistency to ensure that the config server doesn't trigger a StaleShardVersion exception on
 // shard0 and cause it to refresh its sharding metadata.
-st._configServers.forEach(
+st.forEachConfigServer(
     config => config.adminCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}));
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: 'TestDB'}));

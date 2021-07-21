@@ -33,9 +33,9 @@ assert.commandWorked(
 assert.eq(100, st.s.getDB('test').foo.find().itcount());
 
 jsTestLog("Shutting down all config servers");
-for (var i = 0; i < st._configServers.length; i++) {
-    st.stopConfigServer(i);
-}
+st.configRS.nodes.forEach((config) => {
+    st.stopConfigServer(config);
+});
 
 jsTestLog("Starting a new mongos when there are no config servers up");
 var newMongosInfo = MongoRunner.runMongos({configdb: st._configDB, waitForConnect: false});
@@ -59,9 +59,9 @@ assert(ErrorCodes.ReplicaSetNotFound == error.code || ErrorCodes.ExceededTimeLim
        ErrorCodes.FailedToSatisfyReadPreference == error.code);
 
 jsTestLog("Restarting the config servers");
-for (var i = 0; i < st._configServers.length; i++) {
-    st.restartConfigServer(i);
-}
+st.configRS.nodes.forEach((config) => {
+    st.restartConfigServer(config);
+});
 
 print("Sleeping for 60 seconds to let the other shards restart their ReplicaSetMonitors");
 sleep(60000);
