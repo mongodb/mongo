@@ -220,6 +220,14 @@ if (typeof _threadInject != "undefined") {
 
             // Assumes that other tests are not creating API version 1 incompatible data.
             "validate_db_metadata_command.js",
+
+            // The tests in 'bench_test*.js' files use 'benchRun()'. The main purpose of
+            // 'benchRun()' is for performance testing and the 'benchRun()' implementation itself
+            // launches multiple threads internally, it's not necessary to keep 'bench_test*.js'
+            // within the parallel test job.
+            "bench_test1.js",
+            "bench_test2.js",
+            "bench_test3.js",
         ]);
 
         // Get files, including files in subdirectories.
