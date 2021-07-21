@@ -154,6 +154,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
             opCtx, ws.get(), idxIterator.release(), nullptr, collection);
     }
 
+    auto yieldPolicy =
+        opCtx->getWriteUnitOfWork() ? PlanExecutor::INTERRUPT_ONLY : PlanExecutor::YIELD_AUTO;
     // If we're in a sharded environment, we need to filter out documents we don't own.
     if (OperationShardingState::isOperationVersioned(opCtx)) {
         auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
@@ -161,15 +163,11 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
             CollectionShardingState::get(opCtx, collection->ns())->getOrphansFilter(opCtx),
             ws.get(),
             stage.release());
-        return PlanExecutor::make(opCtx,
-                                  std::move(ws),
-                                  std::move(shardFilterStage),
-                                  collection,
-                                  PlanExecutor::YIELD_AUTO);
+        return PlanExecutor::make(
+            opCtx, std::move(ws), std::move(shardFilterStage), collection, yieldPolicy);
     }
 
-    return PlanExecutor::make(
-        opCtx, std::move(ws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
+    return PlanExecutor::make(opCtx, std::move(ws), std::move(stage), collection, yieldPolicy);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
