@@ -632,9 +632,9 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggMin(value::TypeTags
         return {true, tag, val};
     }
 
-    auto [tag, val] = genericCompare<std::less<>>(accTag, accValue, fieldTag, fieldValue);
+    auto [tag, val] = compare3way(accTag, accValue, fieldTag, fieldValue);
 
-    if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
+    if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int>(val) < 0) {
         auto [tag, val] = value::copyValue(accTag, accValue);
         return {true, tag, val};
     } else {
@@ -691,9 +691,9 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggMax(value::TypeTags
         return {true, tag, val};
     }
 
-    auto [tag, val] = genericCompare<std::greater<>>(accTag, accValue, fieldTag, fieldValue);
+    auto [tag, val] = compare3way(accTag, accValue, fieldTag, fieldValue);
 
-    if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
+    if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int>(val) > 0) {
         auto [tag, val] = value::copyValue(accTag, accValue);
         return {true, tag, val};
     } else {

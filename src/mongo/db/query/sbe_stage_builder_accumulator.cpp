@@ -45,11 +45,8 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     std::unique_ptr<sbe::EExpression> arg,
     EvalStage inputStage,
     PlanNodeId planNodeId) {
-    // Now that we have a slot to get the result of the argument expression we can build the
-    // accumulator expressions for the group-by stage. In the case of min, we only have a single
-    // accumulator expression.
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
-    aggs.push_back(makeFunction("min", std::move(arg)));
+    aggs.push_back(buildAccumulatorMinMax("min", std::move(arg)));
     return {std::move(aggs), std::move(inputStage)};
 }
 
@@ -66,7 +63,80 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeMin(
             str::stream() << "Expected one input slot for finalization of min, got: "
                           << minSlots.size(),
             minSlots.size() == 1);
-    return {makeVariable(minSlots[0]), std::move(inputStage)};
+    return {makeFillEmptyNull(makeVariable(minSlots[0])), std::move(inputStage)};
+}
+
+std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorMax(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    std::unique_ptr<sbe::EExpression> arg,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(buildAccumulatorMinMax("max", std::move(arg)));
+    return {std::move(aggs), std::move(inputStage)};
+}
+
+std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeMax(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& maxSlots,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    tassert(5755100,
+            str::stream() << "Expected one input slot for finalization of max, got: "
+                          << maxSlots.size(),
+            maxSlots.size() == 1);
+    return {makeFillEmptyNull(makeVariable(maxSlots[0])), std::move(inputStage)};
+}
+
+
+std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorFirst(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    std::unique_ptr<sbe::EExpression> arg,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("first", makeFillEmptyNull(std::move(arg))));
+    return {std::move(aggs), std::move(inputStage)};
+}
+
+std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeFirst(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& firstSlots,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    tassert(5755101,
+            str::stream() << "Expected one input slot for finalization of first, got: "
+                          << firstSlots.size(),
+            firstSlots.size() == 1);
+    return {makeVariable(firstSlots[0]), std::move(inputStage)};
+}
+
+std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorLast(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    std::unique_ptr<sbe::EExpression> arg,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("last", makeFillEmptyNull(std::move(arg))));
+    return {std::move(aggs), std::move(inputStage)};
+}
+
+std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeLast(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& lastSlots,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    tassert(5755102,
+            str::stream() << "Expected one input slot for finalization of last, got: "
+                          << lastSlots.size(),
+            lastSlots.size() == 1);
+    return {makeVariable(lastSlots[0]), std::move(inputStage)};
 }
 
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorAvg(
@@ -128,6 +198,9 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
 
     static const StringDataMap<BuildAccumulatorFn> kAccumulatorBuilders = {
         {AccumulatorMin::kName, &buildAccumulatorMin},
+        {AccumulatorMax::kName, &buildAccumulatorMax},
+        {AccumulatorFirst::kName, &buildAccumulatorFirst},
+        {AccumulatorLast::kName, &buildAccumulatorLast},
         {AccumulatorAvg::kName, &buildAccumulatorAvg}};
 
     auto accExprName = acc.expr.name;
@@ -157,7 +230,12 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalize(
         PlanNodeId)>;
 
     static const StringDataMap<BuildFinalizeFn> kAccumulatorBuilders = {
-        {AccumulatorMin::kName, &buildFinalizeMin}, {AccumulatorAvg::kName, &buildFinalizeAvg}};
+        {AccumulatorMin::kName, &buildFinalizeMin},
+        {AccumulatorMax::kName, &buildFinalizeMax},
+        {AccumulatorFirst::kName, &buildFinalizeFirst},
+        {AccumulatorLast::kName, &buildFinalizeLast},
+        {AccumulatorAvg::kName, &buildFinalizeAvg},
+    };
 
     auto accExprName = acc.expr.name;
     uassert(5754700,

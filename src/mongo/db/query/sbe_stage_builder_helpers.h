@@ -77,6 +77,8 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::EVariable& va
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(sbe::FrameId frameId,
                                                         sbe::value::SlotId slotId);
 
+std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EExpression> arg);
+
 /**
  * Generates an EExpression that checks if the input expression is a non-numeric type _assuming
  * that_ it has already been verified to be neither null nor missing.
@@ -230,6 +232,13 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyUndefined(std::unique_ptr<sbe::EE
  */
 std::unique_ptr<sbe::EExpression> makeNothingArrayCheck(
     std::unique_ptr<sbe::EExpression> isArrayInput, std::unique_ptr<sbe::EExpression> otherwise);
+
+/**
+ * Check if arg is null or missing and return a min/max expression with arg as Nothing if so.
+ * Otherwise, return a min/max expression with arg.
+ */
+std::unique_ptr<sbe::EExpression> buildAccumulatorMinMax(mongo::StringData name,
+                                                         std::unique_ptr<sbe::EExpression> arg);
 
 /**
  * Creates an expression to extract a shard key part from inputExpr. The generated expression is a

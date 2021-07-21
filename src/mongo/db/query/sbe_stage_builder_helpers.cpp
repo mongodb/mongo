@@ -118,6 +118,14 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frame
     return generateNullOrMissing(var);
 }
 
+std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EExpression> arg) {
+    return makeBinaryOp(sbe::EPrimBinary::logicOr,
+                        makeNot(makeFunction("exists", arg->clone())),
+                        sbe::makeE<sbe::ETypeMatch>(arg->clone(),
+                                                    getBSONTypeMask(BSONType::jstNULL) |
+                                                        getBSONTypeMask(BSONType::Undefined)));
+}
+
 std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& var) {
     return makeNot(makeFunction("isNumber", var.clone()));
 }
@@ -240,6 +248,17 @@ std::unique_ptr<sbe::EExpression> makeNothingArrayCheck(
     return sbe::makeE<sbe::EIf>(makeFunction("isArray"_sd, std::move(isArrayInput)),
                                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0),
                                 std::move(otherwise));
+}
+
+std::unique_ptr<sbe::EExpression> buildAccumulatorMinMax(mongo::StringData name,
+                                                         std::unique_ptr<sbe::EExpression> arg) {
+    tassert(5755103,
+            str::stream() << "Expected 'min' or 'max' for name but got: " << name,
+            name == "min" || name == "max");
+    return makeFunction(name,
+                        sbe::makeE<sbe::EIf>(generateNullOrMissing(arg->clone()),
+                                             makeConstant(sbe::value::TypeTags::Nothing, 0),
+                                             arg->clone()));
 }
 
 std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
