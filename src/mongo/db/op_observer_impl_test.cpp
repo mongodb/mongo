@@ -1406,7 +1406,6 @@ public:
 
 TEST_F(OpObserverRetryableFindAndModifyTest,
        RetryableFindAndModifyUpdateRequestingPostImageHasNeedsRetryImage) {
-    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
     NamespaceString nss = {"test", "coll"};
     const auto uuid = CollectionUUID::gen();
 
@@ -1418,6 +1417,7 @@ TEST_F(OpObserverRetryableFindAndModifyTest,
                                             << "x"));
     updateArgs.criteria = BSON("_id" << 0);
     updateArgs.storeDocOption = CollectionUpdateArgs::StoreDocOption::PostImage;
+    updateArgs.storeImageInSideCollection = true;
     OplogUpdateEntryArgs update(std::move(updateArgs), nss, uuid);
 
     WriteUnitOfWork wunit(opCtx());
@@ -1435,7 +1435,6 @@ TEST_F(OpObserverRetryableFindAndModifyTest,
 
 TEST_F(OpObserverRetryableFindAndModifyTest,
        RetryableFindAndModifyUpdateRequestingPreImageHasNeedsRetryImage) {
-    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
     NamespaceString nss = {"test", "coll"};
     const auto uuid = CollectionUUID::gen();
 
@@ -1447,6 +1446,7 @@ TEST_F(OpObserverRetryableFindAndModifyTest,
                                             << "x"));
     updateArgs.criteria = BSON("_id" << 0);
     updateArgs.storeDocOption = CollectionUpdateArgs::StoreDocOption::PreImage;
+    updateArgs.storeImageInSideCollection = true;
     OplogUpdateEntryArgs update(std::move(updateArgs), nss, uuid);
 
     WriteUnitOfWork wunit(opCtx());
@@ -1463,7 +1463,6 @@ TEST_F(OpObserverRetryableFindAndModifyTest,
 }
 
 TEST_F(OpObserverRetryableFindAndModifyTest, RetryableFindAndModifyDeleteHasNeedsRetryImage) {
-    RAIIServerParameterControllerForTest ffRaii("featureFlagRetryableFindAndModify", true);
     NamespaceString nss = {"test", "coll"};
     const auto uuid = CollectionUUID::gen();
 
@@ -1473,6 +1472,7 @@ TEST_F(OpObserverRetryableFindAndModifyTest, RetryableFindAndModifyDeleteHasNeed
                                        << "x");
     opObserver().aboutToDelete(opCtx(), nss, deletedDoc);
     OpObserver::OplogDeleteEntryArgs args;
+    args.storeImageInSideCollection = true;
     args.deletedDoc = &deletedDoc;
     opObserver().onDelete(opCtx(), nss, uuid, 0, args);
     // Asserts that only a single oplog entry was created. In essence, we did not create any
