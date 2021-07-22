@@ -444,7 +444,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipelineFr
 
     // Update the expression context with any new namespaces the resolved pipeline has introduced.
     LiteParsedPipeline liteParsedPipeline(resolvedNamespace.ns, resolvedNamespace.pipeline);
-    _fromExpCtx = _fromExpCtx->copyForSubPipeline(resolvedNamespace.ns);
+    _fromExpCtx = _fromExpCtx->copyWith(resolvedNamespace.ns);
     _fromExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
 
     return pipeline;

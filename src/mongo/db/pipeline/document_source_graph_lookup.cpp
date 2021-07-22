@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
 
@@ -43,8 +44,11 @@
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/views/resolved_view.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 
@@ -264,7 +268,45 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
                 ? ShardTargetingPolicy::kAllowed
                 : ShardTargetingPolicy::kNotAllowed;
             _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
-            auto pipeline = Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);
+
+            std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+            try {
+                pipeline = Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);
+            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
+                // This exception returns the information we need to resolve a sharded view. Update
+                // the pipeline with the resolved view definition, but don't optimize or attach the
+                // cursor source yet.
+                MakePipelineOptions opts;
+                opts.optimize = false;
+                opts.attachCursorSource = false;
+                pipeline = Pipeline::makePipelineFromViewDefinition(
+                    _fromExpCtx,
+                    ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()},
+                    _fromPipeline,
+                    opts);
+
+                // Update '_fromPipeline' with the resolved view definition to avoid triggering this
+                // exception next time.
+                _fromPipeline = pipeline->serializeToBson();
+
+                // Update the expression context with any new namespaces the resolved pipeline has
+                // introduced.
+                LiteParsedPipeline liteParsedPipeline(e->getNamespace(), e->getPipeline());
+                _fromExpCtx = _fromExpCtx->copyWith(e->getNamespace());
+                _fromExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
+
+                LOGV2_DEBUG(5865400,
+                            3,
+                            "$graphLookup found view definition. ns: {ns}, pipeline: {pipeline}. "
+                            "New $graphLookup sub-pipeline: {new_pipe}",
+                            "ns"_attr = e->getNamespace(),
+                            "pipeline"_attr = Value(e->getPipeline()),
+                            "new_pipe"_attr = _fromPipeline);
+
+                // We can now safely optimize and reattempt attaching the cursor source.
+                pipeline = Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);
+            }
+
             while (auto next = pipeline->getNext()) {
                 uassert(40271,
                         str::stream()
