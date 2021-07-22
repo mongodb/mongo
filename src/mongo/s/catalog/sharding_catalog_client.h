@@ -336,6 +336,19 @@ public:
                                                   const WriteConcernOptions& writeConcern) = 0;
 
     /**
+     * Overload version of updateConfigDocument with the extra parameter 'maxTimeMs' for setting a
+     * custom timeout duration. Setting 'maxTimeMs' to Milliseconds::max() will entirely remove
+     * maxTimeMs from the command object sent over the wire.
+     */
+    virtual StatusWith<bool> updateConfigDocument(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const BSONObj& query,
+                                                  const BSONObj& update,
+                                                  bool upsert,
+                                                  const WriteConcernOptions& writeConcern,
+                                                  Milliseconds maxTimeMs) = 0;
+
+    /**
      * Removes documents matching a particular query predicate from the specified namespace on the
      * config server. Must only be used for deletions from the 'config' database.
      *

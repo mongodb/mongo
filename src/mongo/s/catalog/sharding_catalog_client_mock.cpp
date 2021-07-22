@@ -37,6 +37,7 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/client/shard.h"
 
 namespace mongo {
 
@@ -155,6 +156,18 @@ StatusWith<bool> ShardingCatalogClientMock::updateConfigDocument(
     const BSONObj& update,
     bool upsert,
     const WriteConcernOptions& writeConcern) {
+    return {updateConfigDocument(
+        opCtx, nss, query, update, upsert, writeConcern, Shard::kDefaultConfigCommandTimeout)};
+}
+
+StatusWith<bool> ShardingCatalogClientMock::updateConfigDocument(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& query,
+    const BSONObj& update,
+    bool upsert,
+    const WriteConcernOptions& writeConcern,
+    Milliseconds maxTimeMs) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

@@ -245,6 +245,32 @@ public:
     }
 };
 
+TEST_F(RecipientServiceExternalStateTest, ReshardingConfigServerUpdatesHaveNoTimeout) {
+    // TODO (SERVER-57194): enable lock-free reads.
+    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
+    storageGlobalParams.disableLockFreeReads = true;
+    ON_BLOCK_EXIT(
+        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
+
+    RecipientStateMachineExternalStateImpl externalState;
+
+    auto future = launchAsync([&] {
+        externalState.updateCoordinatorDocument(operationContext(),
+                                                BSON("query"
+                                                     << "test"),
+                                                BSON("update"
+                                                     << "test"));
+    });
+
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_FALSE(request.cmdObj.hasField("maxTimeMS"));
+        ASSERT_EQUALS(request.timeout, executor::RemoteCommandRequest::kNoTimeout);
+        return BSON("ok" << 1);
+    });
+
+    future.default_timed_get();
+}
+
 TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) {
     // TODO (SERVER-57194): enable lock-free reads.
     bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;

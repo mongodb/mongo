@@ -316,7 +316,8 @@ Status ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
                                         BSON(CollectionType::kNssFieldName << nss.ns()),
                                         coll.toBSON(),
                                         upsert,
-                                        ShardingCatalogClient::kMajorityWriteConcern);
+                                        ShardingCatalogClient::kMajorityWriteConcern,
+                                        Shard::kDefaultConfigCommandTimeout);
     return status.getStatus().withContext(str::stream() << "Collection metadata write failed");
 }
 
@@ -1078,7 +1079,19 @@ StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(
     const BSONObj& update,
     bool upsert,
     const WriteConcernOptions& writeConcern) {
-    return _updateConfigDocument(opCtx, nss, query, update, upsert, writeConcern);
+    return _updateConfigDocument(
+        opCtx, nss, query, update, upsert, writeConcern, Shard::kDefaultConfigCommandTimeout);
+}
+
+StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& query,
+    const BSONObj& update,
+    bool upsert,
+    const WriteConcernOptions& writeConcern,
+    Milliseconds maxTimeMs) {
+    return _updateConfigDocument(opCtx, nss, query, update, upsert, writeConcern, maxTimeMs);
 }
 
 StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
@@ -1087,7 +1100,8 @@ StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
     const BSONObj& query,
     const BSONObj& update,
     bool upsert,
-    const WriteConcernOptions& writeConcern) {
+    const WriteConcernOptions& writeConcern,
+    Milliseconds maxTimeMs) {
     invariant(nss.db() == NamespaceString::kConfigDb);
 
     BatchedCommandRequest request([&] {
@@ -1106,7 +1120,7 @@ StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto response = configShard->runBatchWriteCommand(
-        opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kIdempotent);
+        opCtx, maxTimeMs, request, Shard::RetryPolicy::kIdempotent);
 
     Status status = response.toStatus();
     if (!status.isOK()) {
