@@ -2851,7 +2851,7 @@ def doConfigure(myenv):
 
     conf.Finish()
 
-    # We require macOS 10.12 or newer
+    # We require macOS 10.14 or newer
     if env.TargetOSIs('darwin'):
 
         # TODO: Better error messages, mention the various -mX-version-min-flags in the error, and
@@ -2862,7 +2862,7 @@ def doConfigure(myenv):
             #include <AvailabilityMacros.h>
             #include <TargetConditionals.h>
 
-            #if TARGET_OS_OSX && (__MAC_OS_X_VERSION_MIN_REQUIRED < __MAC_10_12)
+            #if TARGET_OS_OSX && (__MAC_OS_X_VERSION_MIN_REQUIRED < __MAC_10_14)
             #error 1
             #endif
             """
@@ -2877,7 +2877,7 @@ def doConfigure(myenv):
         })
 
         if not conf.CheckDarwinMinima():
-            conf.env.ConfError("Required target minimum of macOS 10.12 not found")
+            conf.env.ConfError("Required target minimum of macOS 10.14 not found")
 
         conf.Finish()
 
