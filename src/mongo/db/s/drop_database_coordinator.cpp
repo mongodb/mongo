@@ -119,11 +119,19 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     OperationContext* opCtx,
     const CollectionType& coll,
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    const auto& nss = coll.getNss();
+
+    // Acquire the collection distributed lock in order to synchronize with an eventual ongoing
+    // moveChunk and to prevent new ones from happening.
+    const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
+    auto collDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
+        opCtx, nss.ns(), coorName, DistLockManager::kDefaultLockTimeout));
+
     sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
         opCtx, coll, ShardingCatalogClient::kMajorityWriteConcern);
 
     _doc = _updateSession(opCtx, _doc);
-    sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, coll.getNss(), getCurrentSession(_doc));
+    sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss, getCurrentSession(_doc));
 
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
     _doc = _updateSession(opCtx, _doc);
@@ -131,7 +139,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     // The collection needs to be dropped first on the db primary shard
     // because otherwise changestreams won't receive the drop event.
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, coll.getNss(), {primaryShardId}, **executor, getCurrentSession(_doc));
+        opCtx, nss, {primaryShardId}, **executor, getCurrentSession(_doc));
 
     // We need to send the drop to all the shards because both movePrimary and
     // moveChunk leave garbage behind for sharded collections.
@@ -140,7 +148,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
                        participants.end());
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, coll.getNss(), participants, **executor, getCurrentSession(_doc));
+        opCtx, nss, participants, **executor, getCurrentSession(_doc));
 }
 
 DropDatabaseCoordinator::DropDatabaseCoordinator(ShardingDDLCoordinatorService* service,
