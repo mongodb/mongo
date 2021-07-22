@@ -272,6 +272,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/shardsvr_process_interface',
         '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
+        '$BUILD_DIR/mongo/db/repl/hello_command',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
