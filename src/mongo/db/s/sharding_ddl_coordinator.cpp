@@ -117,9 +117,9 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
                auto distLockManager = DistLockManager::get(opCtx);
 
                const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
-               auto dbDistLock = uassertStatusOK(distLockManager->lock(
+               auto distLock = uassertStatusOK(distLockManager->lock(
                    opCtx, resource, coorName, DistLockManager::kDefaultLockTimeout));
-               _scopedLocks.emplace(dbDistLock.moveToAnotherThread());
+               _scopedLocks.emplace(distLock.moveToAnotherThread());
            })
         .until([this](Status status) { return (!_recoveredFromDisk) || status.isOK(); })
         .withBackoffBetweenIterations(kExponentialBackoff)
@@ -215,7 +215,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                          status.isA<ErrorCategory::RetriableError>() ||
                          status.isA<ErrorCategory::CancellationError>() ||
                          status.isA<ErrorCategory::ExceededTimeLimitError>() ||
-                         status == ErrorCodes::Interrupted ||
+                         status == ErrorCodes::Interrupted || status == ErrorCodes::LockBusy ||
                          status == ErrorCodes::CommandNotFound) &&
                         !token.isCanceled()) {
                         LOGV2_DEBUG(5656000,
