@@ -1672,7 +1672,13 @@ __rollback_to_stable(WT_SESSION_IMPL *session, bool no_ckpt)
     if (retries == WT_RTS_EVICT_MAX_RETRIES) {
         WT_ERR(__wt_msg(
           session, "timed out waiting for eviction to quiesce, running rollback to stable"));
-        WT_ASSERT(session, false && "Timed out waiting for eviction to quiesce prior to rts");
+        /*
+         * FIXME: WT-7877 RTS fails when there are active transactions running in parallel to it.
+         * Waiting in a loop for eviction to quiesce is not efficient in some scenarios where the
+         * cache is not cleared in 2 minutes. Enable the following assert and
+         * test_rollback_to_stable22.py when the cache issue is addressed.
+         */
+        /* WT_ASSERT(session, false && "Timed out waiting for eviction to quiesce prior to rts"); */
     }
 
     /*
