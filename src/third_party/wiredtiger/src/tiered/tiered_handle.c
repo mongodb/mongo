@@ -577,7 +577,6 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
     if (0) {
 err:
         __wt_free(session, tiered->obj_config);
-        __wt_free(session, tiered->tiers);
         __wt_free(session, metaconf);
     }
     __wt_verbose(session, WT_VERB_TIERED, "TIERED_OPEN: Done ret %d", ret);
