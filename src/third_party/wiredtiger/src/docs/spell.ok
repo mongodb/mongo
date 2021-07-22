@@ -179,6 +179,7 @@ br
 btmem
 btree
 btrees
+btree's
 bufs
 builtin
 builtins
@@ -193,6 +194,7 @@ cdb
 cds
 changelog
 checkpointed
+checkpointing
 checksum
 checksums
 ckp
