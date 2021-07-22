@@ -9,6 +9,8 @@
  *
  * This behavior can be overridden by adding the bool `allowRewriteStateChange`
  * to the failpoint's configuration object.
+ *
+ * @tags: [disabled_due_to_server_58295]
  */
 
 (function() {

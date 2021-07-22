@@ -2,7 +2,10 @@
  * Test that we can restart a node that has an oplog hole open at the stable optime
  * when we kill it.
  *
- * @tags: [requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   disabled_due_to_server_58295
+ * ]
  */
 (function() {
 "use strict";

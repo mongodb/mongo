@@ -8,6 +8,8 @@
  *	4. We verify that upgrade procedures have been performed
  *	5. We set FCV to old bin version + downgrade the binaries of the sharded cluster to that version
  *	6. We verify that downgrade procedures have been performed
+ *
+ * @tags: [disabled_due_to_server_58295]
  */
 (function() {
 "use strict";

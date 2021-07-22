@@ -1,6 +1,8 @@
 /**
  * Test that it is not possible to move a chunk from an upgrade featureCompatibilityVersion node to
  * a downgrade binary version node.
+ *
+ * @tags: [disabled_due_to_server_58295]
  */
 
 (function() {

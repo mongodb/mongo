@@ -1,5 +1,6 @@
 test_kind: fsm_workload_test
-use_in_multiversion: concurrency_sharded_replication_multiversion_passthrough
+# TODO SERVER-58706 re-enable this multiversion suite.
+#use_in_multiversion: concurrency_sharded_replication_multiversion_passthrough
 
 selector:
   roots:

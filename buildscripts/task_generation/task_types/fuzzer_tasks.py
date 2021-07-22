@@ -135,7 +135,12 @@ class FuzzerGenTaskService:
             "gen_task_config_location": params.config_location,
         }  # yapf: disable
 
-        commands = [
+        commands = []
+
+        if params.require_multiversion:
+            commands += [FunctionCall("git get project no modules")]
+
+        commands += [
             FunctionCall("do setup"),
             FunctionCall("configure evergreen api credentials")
             if params.require_multiversion else None,

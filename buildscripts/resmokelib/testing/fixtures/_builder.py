@@ -18,8 +18,6 @@ FIXTURE_DIR = "buildscripts/resmokelib/testing/fixtures"
 RETRIEVE_DIR = "build/multiversionfixtures"
 RETRIEVE_LOCK = threading.Lock()
 
-USE_LEGACY_MULTIVERSION = True
-
 _BUILDERS = {}  # type: ignore
 
 
@@ -63,12 +61,7 @@ class ReplSetBuilder(FixtureBuilder):
         """Build a replica set."""
         # We hijack the mixed_bin_versions passed to the fixture.
         mixed_bin_versions = kwargs.pop("mixed_bin_versions", config.MIXED_BIN_VERSIONS)
-        multiversion_bin_version = kwargs.pop("multiversion_bin_version",
-                                              config.MULTIVERSION_BIN_VERSION)
-        if USE_LEGACY_MULTIVERSION:
-            # We mark the use of the legacy multiversion system by allowing
-            # access to mixed_bin_versions.
-            kwargs["mixed_bin_versions"] = mixed_bin_versions
+        old_bin_version = kwargs.pop("old_bin_version", config.MULTIVERSION_BIN_VERSION)
 
         # We also hijack the num_nodes because we need it here.
         num_nodes = kwargs.pop("num_nodes", 2)
@@ -88,20 +81,20 @@ class ReplSetBuilder(FixtureBuilder):
         classes = []
         fcv = None
 
-        multiversion_class_suffix = "_" + multiversion_bin_version
+        multiversion_class_suffix = "_" + old_bin_version
         shell_version = {
             config.MultiversionOptions.LAST_LTS:
                 multiversionconstants.LAST_LTS_MONGO_BINARY,
-            config.MultiversionOptions.LAST_CONTINOUS:
+            config.MultiversionOptions.LAST_CONTINUOUS:
                 multiversionconstants.LAST_CONTINUOUS_MONGO_BINARY
-        }[multiversion_bin_version]
+        }[old_bin_version]
 
         mongod_version = {
             config.MultiversionOptions.LAST_LTS:
                 multiversionconstants.LAST_LTS_MONGOD_BINARY,
-            config.MultiversionOptions.LAST_CONTINOUS:
+            config.MultiversionOptions.LAST_CONTINUOUS:
                 multiversionconstants.LAST_CONTINUOUS_MONGOD_BINARY
-        }[multiversion_bin_version]
+        }[old_bin_version]
 
         if mixed_bin_versions is None:
             executables = [latest_mongod for x in range(num_nodes)]
@@ -110,26 +103,16 @@ class ReplSetBuilder(FixtureBuilder):
 
             is_config_svr = "configsvr" in replset_config_options and replset_config_options[
                 "configsvr"]
-            if USE_LEGACY_MULTIVERSION:
+            load_version(version_path_suffix=multiversion_class_suffix, shell_path=shell_version)
+
+            if not is_config_svr:
                 executables = [
-                    latest_mongod if (x == "new") else multiversionconstants.LAST_LTS_MONGOD_BINARY
+                    latest_mongod if (x == "new") else mongod_version for x in mixed_bin_versions
+                ]
+                classes = [
+                    latest_class if (x == "new") else f"{latest_class}{multiversion_class_suffix}"
                     for x in mixed_bin_versions
                 ]
-                classes = [latest_class for x in range(num_nodes)]
-            else:
-                load_version(version_path_suffix=multiversion_class_suffix,
-                             shell_path=shell_version)
-
-                if not is_config_svr:
-                    executables = [
-                        latest_mongod if (x == "new") else mongod_version
-                        for x in mixed_bin_versions
-                    ]
-                    classes = [
-                        latest_class if
-                        (x == "new") else f"{latest_class}{multiversion_class_suffix}"
-                        for x in mixed_bin_versions
-                    ]
             if is_config_svr:
                 # Our documented recommended path for upgrading shards lets us assume that config
                 # server nodes will always be fully upgraded before shard nodes.
@@ -138,9 +121,10 @@ class ReplSetBuilder(FixtureBuilder):
 
             num_versions = len(mixed_bin_versions)
             fcv = {
-                config.MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_FCV,
-                config.MultiversionOptions.LAST_CONTINOUS: multiversionconstants.LAST_CONTINUOUS_FCV
-            }[multiversion_bin_version]
+                config.MultiversionOptions.LAST_LTS:
+                    multiversionconstants.LAST_LTS_FCV, config.MultiversionOptions.LAST_CONTINUOUS:
+                        multiversionconstants.LAST_CONTINUOUS_FCV
+            }[old_bin_version]
 
             if num_versions != num_nodes and not is_config_svr:
                 msg = (("The number of binary versions specified: {} do not match the number of"\
@@ -175,7 +159,7 @@ class ReplSetBuilder(FixtureBuilder):
 
 
 def load_version(version_path_suffix=None, shell_path=None):
-    """Load the last_lts/last_continous fixtures."""
+    """Load the last_lts/last_continuous fixtures."""
     with RETRIEVE_LOCK, registry.suffix(version_path_suffix):
         # Only one thread needs to retrieve the fixtures.
         retrieve_dir = os.path.relpath(os.path.join(RETRIEVE_DIR, version_path_suffix))

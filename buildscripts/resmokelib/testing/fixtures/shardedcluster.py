@@ -366,7 +366,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
         # The last-lts binary is currently expected to live in '/data/multiversion', which is
         # part of the PATH.
-        mongos_executable = self.mongos_executable if self.mixed_bin_versions is None else self.config.LAST_LTS_MONGOS_BINARY
+        mongos_executable = self.mongos_executable if self.mixed_bin_versions is None else self.config.LAST_CONTINUOUS_MONGOS_BINARY
 
         return _MongoSFixture(mongos_logger, self.job_num, self.fixturelib,
                               dbpath_prefix=self._dbpath_prefix,

@@ -1,6 +1,8 @@
 /**
  * Specifies for each command whether it is expected to send a databaseVersion, and verifies that
  * the commands match the specification.
+ *
+ * @tags: [disabled_due_to_server_58295]
  */
 (function() {
 'use strict';

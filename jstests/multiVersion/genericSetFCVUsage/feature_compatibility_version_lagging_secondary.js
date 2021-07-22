@@ -1,5 +1,7 @@
 // Tests that a primary with upgrade featureCompatibilityVersion cannot connect with a secondary
 // with a lower binary version.
+//
+// @tags: [disabled_due_to_server_58295]
 (function() {
 "use strict";
 

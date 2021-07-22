@@ -102,7 +102,7 @@ DEFAULTS = {
     "transport_layer": None,
     "user_friendly_output": None,
     "mixed_bin_versions": None,
-    "multiversion_bin_version": "last_lts",
+    "old_bin_version": "last_continuous",
     "linear_chain": None,
     "num_replset_nodes": None,
     "num_shards": None,
@@ -244,13 +244,13 @@ class MultiversionOptions(object):
     """Represent the multiversion version choices."""
 
     LAST_LTS = "last_lts"
-    LAST_CONTINOUS = "last_continuous"
+    LAST_CONTINUOUS = "last_continuous"
 
     @classmethod
     def all_options(cls):
         """Return available version options for multiversion."""
 
-        return [cls.LAST_LTS, cls.LAST_CONTINOUS]
+        return [cls.LAST_LTS, cls.LAST_CONTINUOUS]
 
 
 ##
@@ -565,3 +565,9 @@ LOGGER_DIR = None
 # Generated logging config for the current invocation.
 LOGGING_CONFIG: dict = {}
 SHORTEN_LOGGER_NAME_CONFIG: dict = {}
+
+# Whether legacy multiversion code is used. This value is not used on the master version of
+# resmoke.py but is needed to ensure the v5.0 version of fixture classes (e.g. standalone.py)
+# that get loaded for multiversion tests can behave correctly on master and on v5.0; the latter
+# case runs 5.0 and 4.4 binaries and has this value set to True. Can be removed after 6.0.
+USE_LEGACY_MULTIVERSION = True

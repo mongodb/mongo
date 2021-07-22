@@ -468,6 +468,14 @@ functions:
         enterprise: ${enterprise_rev}
         wtdevelop: ${wtdevelop_rev}
 
+  # Get get the mongo repo, no modules. Useful for inspecting the commit history with the
+  # `git` Python tool.
+  "git get project no modules":
+    - *f_expansions_write
+    - command: git.get_project
+      params:
+        directory: ${git_project_directory|src}
+
   "add git tag": &add_git_tag
     command: subprocess.exec
     params:

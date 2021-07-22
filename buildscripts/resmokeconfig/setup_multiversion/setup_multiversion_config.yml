@@ -8,9 +8,6 @@
 evergreen_projects:
   - mongodb-mongo-master
   - mongodb-mongo-v5.0
-  - mongodb-mongo-v4.9
-  - mongodb-mongo-v4.8
-  - mongodb-mongo-v4.7
   - mongodb-mongo-v4.4
   - mongodb-mongo-v4.2
   - mongodb-mongo-v4.0

@@ -1,6 +1,8 @@
 /**
  * Multiversion rollback test. Checks that rollback succeeds between a
  * 'latest' version rollback node and a downgraded version sync source.
+ *
+ * @tags: [disabled_due_to_server_58295]
  */
 
 (function() {

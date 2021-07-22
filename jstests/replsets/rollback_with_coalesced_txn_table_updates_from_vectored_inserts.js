@@ -4,7 +4,7 @@
  * to the 'config.transactions' table were coalesced into a single operation when performing
  * vectored inserts on the primary.
  *
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, disabled_due_to_server_58295]
  */
 
 (function() {

@@ -58,7 +58,7 @@ def get_backports_required_hash_for_shell_version(mongo_shell_path=None):
     raise ValueError("Could not find a valid commit hash from the last-lts mongo binary.")
 
 
-def get_last_lts_yaml(commit_hash):
+def get_old_yaml(commit_hash):
     """Download BACKPORTS_REQUIRED_FILE from the last LTS commit and return the yaml."""
     LOGGER.info(f"Downloading file from commit hash of last-lts branch {commit_hash}")
     response = requests.get(
@@ -105,29 +105,36 @@ def generate_exclude_yaml(output: str) -> None:
     # Get the state of the backports_required_for_multiversion_tests.yml file for the last-lts
     # binary we are running tests against. We do this by using the commit hash from the last-lts
     # mongo shell executable.
-    last_lts_commit_hash = get_backports_required_hash_for_shell_version(
-        mongo_shell_path=LAST_LTS_MONGO_BINARY)
+    # TODO: SERVER-55857 Support LAST_LTS after backporting to 5.0.
+    old_version_commit_hash = get_backports_required_hash_for_shell_version(
+        mongo_shell_path=LAST_CONTINUOUS_MONGO_BINARY)
 
     # Get the yaml contents from the last-lts commit.
-    backports_required_last_lts = get_last_lts_yaml(last_lts_commit_hash)
+    backports_required_old = get_old_yaml(old_version_commit_hash)
 
     def diff(list1, list2):
         return [elem for elem in (list1 or []) if elem not in (list2 or [])]
 
-    suites_latest = backports_required_latest["last-lts"]["suites"] or {}
-    # Check if the changed syntax for etc/backports_required_for_multiversion_tests.yml has been
-    # backported.
-    # This variable and all branches where it's not set can be deleted after backporting the change.
-    change_backported = "last-lts" in backports_required_last_lts.keys()
-    if change_backported:
-        always_exclude = diff(backports_required_latest["last-lts"]["all"],
-                              backports_required_last_lts["last-lts"]["all"])
-        suites_last_lts: defaultdict = defaultdict(
-            list, backports_required_last_lts["last-lts"]["suites"])
-    else:
-        always_exclude = diff(backports_required_latest["last-lts"]["all"],
-                              backports_required_last_lts["all"])
-        suites_last_lts: defaultdict = defaultdict(list, backports_required_last_lts["suites"])
+    def get_suite_exclusions(version_key):
+
+        _suites_latest = backports_required_latest[version_key]["suites"] or {}
+        # Check if the changed syntax for etc/backports_required_for_multiversion_tests.yml has been
+        # backported.
+        # This variable and all branches where it's not set can be deleted after backporting the change.
+        change_backported = version_key in backports_required_old.keys()
+        if change_backported:
+            _always_exclude = diff(backports_required_latest[version_key]["all"],
+                                   backports_required_old[version_key]["all"])
+            _suites_old: defaultdict = defaultdict(list,
+                                                   backports_required_old[version_key]["suites"])
+        else:
+            _always_exclude = diff(backports_required_latest[version_key]["all"],
+                                   backports_required_old["all"])
+            _suites_old: defaultdict = defaultdict(list, backports_required_old["suites"])
+
+        return _suites_latest, _suites_old, _always_exclude
+
+    suites_latest, suites_old, always_exclude = get_suite_exclusions('last-continuous')
 
     tags = _tags.TagsConfig()
 
@@ -138,7 +145,7 @@ def generate_exclude_yaml(output: str) -> None:
     # Tag tests that are excluded on a suite-by-suite basis.
     for suite in suites_latest.keys():
         test_set = set()
-        for elem in diff(suites_latest[suite], suites_last_lts[suite]):
+        for elem in diff(suites_latest[suite], suites_old[suite]):
             test_set.add(elem["test_file"])
         for test in test_set:
             tags.add_tag("js_test", test, f"{suite}_{BACKPORT_REQUIRED_TAG}")

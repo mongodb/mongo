@@ -191,8 +191,8 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
 
     # If the 'logComponentVerbosity' setParameter for mongod was not already specified, we set its
     # value to a default.
-    mongod_set_parameters.setdefault("logComponentVerbosity",
-                                     mongod_launcher.default_mongod_log_component_verbosity())
+    mongod_set_parameters.setdefault(
+        "logComponentVerbosity", mongod_launcher.get_default_log_component_verbosity_for_mongod())
 
     # If the 'enableFlowControl' setParameter for mongod was not already specified, we set its value
     # to a default.

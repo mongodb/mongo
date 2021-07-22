@@ -187,20 +187,11 @@ DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY = {
     "tenantMigration": 4
 }
 
-DEFAULT_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY = {"replication": {"rollback": 2}, "transaction": 4}
-
 # The default verbosity setting for any mongod processes running in Evergreen i.e. started with an
 # Evergreen task id.
 DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY = {
     "replication": {"election": 4, "heartbeats": 2, "initialSync": 2, "rollback": 2},
     "sharding": {"migration": 2}, "storage": {"recovery": 2}, "transaction": 4, "tenantMigration": 4
-}
-
-# The default verbosity setting for any last-lts mongod processes running in Evergreen i.e. started
-# with an Evergreen task id.
-DEFAULT_EVERGREEN_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY = {
-    "replication": {"election": 4, "heartbeats": 2, "initialSync": 2, "rollback": 2},
-    "storage": {"recovery": 2}, "transaction": 4
 }
 
 
@@ -237,8 +228,7 @@ class MongodLauncher(object):
         # Set default log verbosity levels if none were specified.
         if "logComponentVerbosity" not in suite_set_parameters:
             suite_set_parameters[
-                "logComponentVerbosity"] = self.get_default_log_component_verbosity_for_mongod(
-                    executable)
+                "logComponentVerbosity"] = self.get_default_log_component_verbosity_for_mongod()
 
         # minNumChunksForSessionsCollection controls the minimum number of chunks the balancer will
         # enforce for the sessions collection. If the actual number of chunks is less, the balancer will
@@ -263,24 +253,11 @@ class MongodLauncher(object):
 
         # Set coordinateCommitReturnImmediatelyAfterPersistingDecision to false so that tests do
         # not need to rely on causal consistency or explicitly wait for the transaction to finish
-        # committing. If we are running LAST_LTS mongoD and the test suite has explicitly set the
-        # coordinateCommitReturnImmediatelyAfterPersistingDecision parameter, we remove it from
-        # the setParameter list, since coordinateCommitReturnImmediatelyAfterPersistingDecision
-        # does not exist prior to 4.7.
-        # TODO(SERVER-51682): remove the 'elif' clause on master when 5.0 becomes LAST_LTS.
-        if executable != self.config.LAST_LTS_MONGOD_BINARY and \
-            "coordinateCommitReturnImmediatelyAfterPersistingDecision" not in suite_set_parameters:
+        # committing.
+        if "coordinateCommitReturnImmediatelyAfterPersistingDecision" not in suite_set_parameters:
             suite_set_parameters["coordinateCommitReturnImmediatelyAfterPersistingDecision"] = False
-        elif executable == self.config.LAST_LTS_MONGOD_BINARY and \
-            "coordinateCommitReturnImmediatelyAfterPersistingDecision" in suite_set_parameters:
-            del suite_set_parameters["coordinateCommitReturnImmediatelyAfterPersistingDecision"]
 
-        # TODO SERVER-54593 to remove the special-case handling when 5.0 becomes LAST_LTS.
-        if "reshardingMinimumOperationDurationMillis" in suite_set_parameters:
-            if executable == self.config.LAST_LTS_MONGOD_BINARY:
-                del suite_set_parameters["reshardingMinimumOperationDurationMillis"]
-        elif executable != self.config.LAST_LTS_MONGOD_BINARY:
-            suite_set_parameters["reshardingMinimumOperationDurationMillis"] = 5000
+        suite_set_parameters["reshardingMinimumOperationDurationMillis"] = 5000
 
         # There's a periodic background thread that checks for and aborts expired transactions.
         # "transactionLifetimeLimitSeconds" specifies for how long a transaction can run before expiring
@@ -308,8 +285,7 @@ class MongodLauncher(object):
         # this to 100ms for faster shutdown. On branches 4.4 and earlier, there is no quiesce mode, but
         # the default time for stepdown is 10 seconds.
         if ("replSet" in mongod_options
-                and "shutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters
-                and executable != self.config.LAST_LTS_MONGOD_BINARY):
+                and "shutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters):
             suite_set_parameters["shutdownTimeoutMillisForSignaledShutdown"] = 100
 
         if "enableFlowControl" not in suite_set_parameters and self.config.FLOW_CONTROL is not None:
@@ -374,23 +350,11 @@ class MongodLauncher(object):
         return self.fixturelib.mongod_program(logger, job_num, executable, process_kwargs,
                                               mongod_options)
 
-    def get_default_log_component_verbosity_for_mongod(self, executable):
-        """Return the correct default 'logComponentVerbosity' value for the executable version."""
-        if executable == self.config.LAST_LTS_MONGOD_BINARY:
-            return self.default_last_lts_mongod_log_component_verbosity()
-        return self.default_mongod_log_component_verbosity()
-
-    def default_mongod_log_component_verbosity(self):
+    def get_default_log_component_verbosity_for_mongod(self):
         """Return the default 'logComponentVerbosity' value to use for mongod processes."""
         if self.config.EVERGREEN_TASK_ID:
             return DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY
         return DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY
-
-    def default_last_lts_mongod_log_component_verbosity(self):
-        """Return the default 'logComponentVerbosity' value to use for last-lts mongod processes."""
-        if self.config.EVERGREEN_TASK_ID:
-            return DEFAULT_EVERGREEN_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY
-        return DEFAULT_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY
 
 
 def _add_testing_set_parameters(suite_set_parameters):

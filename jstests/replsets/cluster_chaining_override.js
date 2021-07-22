@@ -1,6 +1,8 @@
 /**
  * Tests that if chaining is disabled, enabling the server parameter
  * 'enableOverrideClusterChainingSetting' will allow the node to chain anyway.
+ *
+ * @tags: [disabled_due_to_server_58295]
  */
 
 (function() {

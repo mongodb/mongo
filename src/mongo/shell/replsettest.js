@@ -2849,7 +2849,7 @@ var ReplSetTest = function(opts) {
                 const rand = Random.rand();
                 // TODO SERVER-50389: Support last-continuous binary version with
                 // useRandomBinVersionsWithinReplicaSet.
-                options.binVersion = rand < 0.5 ? "latest" : "last-lts";
+                options.binVersion = rand < 0.5 ? "latest" : "last-continuous";
             }
             print("Randomly assigned binary version: " + options.binVersion + " to node: " + n);
         }

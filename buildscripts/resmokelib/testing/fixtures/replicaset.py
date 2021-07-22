@@ -61,31 +61,6 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                                                               linear_chain)
         self.linear_chain = linear_chain_option if linear_chain_option else linear_chain
 
-        # Legacy multiversion line
-        if self.mixed_bin_versions is not None:
-            mongod_executable = self.fixturelib.default_if_none(
-                self.mongod_executable, self.config.MONGOD_EXECUTABLE,
-                self.config.DEFAULT_MONGOD_EXECUTABLE)
-            latest_mongod = mongod_executable
-            # The last-lts binary is currently expected to live in '/data/multiversion', which is
-            # part of the PATH.
-            is_config_svr = "configsvr" in self.replset_config_options and self.replset_config_options[
-                "configsvr"]
-            if not is_config_svr:
-                self.mixed_bin_versions = [
-                    latest_mongod if (x == "new") else self.config.LAST_LTS_MONGOD_BINARY
-                    for x in self.mixed_bin_versions
-                ]
-            else:
-                # Our documented recommended path for upgrading shards lets us assume that config
-                # server nodes will always be fully upgraded before shard nodes.
-                self.mixed_bin_versions = [latest_mongod, latest_mongod]
-            num_versions = len(self.mixed_bin_versions)
-            if num_versions != self.num_nodes and not is_config_svr:
-                msg = (("The number of binary versions specified: {} do not match the number of"\
-                        " nodes in the replica set: {}.")).format(num_versions, self.num_nodes)
-                raise self.fixturelib.ServerFailure(msg)
-
         # By default, we only use a replica set connection string if all nodes are capable of being
         # elected primary.
         if self.use_replica_set_connection_string is None:

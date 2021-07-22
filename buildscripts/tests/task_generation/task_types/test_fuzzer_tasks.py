@@ -108,4 +108,4 @@ class TestBuildFuzzerSubTask(unittest.TestCase):
         sub_task = fuzzer_service.build_fuzzer_sub_task(3, mock_params, "")
 
         self.assertEqual(sub_task.name, f"{mock_params.task_name}_3_{mock_params.variant}")
-        self.assertEqual(len(sub_task.commands), 6)
+        self.assertEqual(len(sub_task.commands), 7)

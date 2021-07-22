@@ -3,6 +3,7 @@
  * when there are no transfer mod writes (SERVER-42783).
  * @tags: [
  *   requires_majority_read_concern,
+ *   disabled_due_to_server_58295,
  * ]
  */
 

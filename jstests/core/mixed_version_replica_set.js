@@ -8,7 +8,9 @@
 "use strict";
 
 const latestBinVersion = MongoRunner.getBinVersionFor("latest");
-const lastLTSBinVersion = MongoRunner.getBinVersionFor("last-lts");
+
+// TODO: SERVER-50389 Support both lastLTS and lastContinuous.
+const lastContiuousBinVersion = MongoRunner.getBinVersionFor("last-continuous");
 
 if (testingReplication && TestData && TestData.mixedBinVersions) {
     const replSetStatus = db.adminCommand({"replSetGetStatus": 1});
@@ -20,7 +22,7 @@ if (testingReplication && TestData && TestData.mixedBinVersions) {
         const serverStatus = admin.serverStatus();
         const actualVersion = serverStatus["version"];
         const expectedVersion =
-            TestData.mixedBinVersions[i] === "new" ? latestBinVersion : lastLTSBinVersion;
+            TestData.mixedBinVersions[i] === "new" ? latestBinVersion : lastContiuousBinVersion;
         assert(MongoRunner.areBinVersionsTheSame(actualVersion, expectedVersion));
     }
 } else {

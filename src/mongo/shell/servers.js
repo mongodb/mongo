@@ -211,10 +211,8 @@ var extractMajorVersionFromVersionString = function(versionString) {
 // versions being checked in 'verify_versions_test.js' to verify it is susbstituted correctly.
 MongoRunner.binVersionSubs = [
     new MongoRunner.VersionSub("latest", shellVersion()),
-    new MongoRunner.VersionSub(extractMajorVersionFromVersionString(shellVersion()),
-                               shellVersion()),
     // To-be-updated when we branch for the next release.
-    new MongoRunner.VersionSub("last-continuous", "4.9"),
+    new MongoRunner.VersionSub("last-continuous", "5.0"),
     // To be updated when we branch for the next LTS release.
     new MongoRunner.VersionSub("last-lts", "4.4")
 ];
@@ -252,7 +250,6 @@ MongoRunner.areBinVersionsTheSame = function(versionA, versionB) {
     // Check for invalid version strings first.
     convertVersionStringToArray(MongoRunner.getBinVersionFor(versionA));
     convertVersionStringToArray(MongoRunner.getBinVersionFor(versionB));
-
     try {
         return (0 === MongoRunner.compareBinVersions(versionA, versionB));
     } catch (err) {
@@ -295,7 +292,8 @@ MongoRunner.compareBinVersions = function(versionA, versionB) {
         var numA = parseInt(elementA);
         var numB = parseInt(elementB);
 
-        assert(!isNaN(numA) && !isNaN(numB), "Cannot compare non-equal non-numeric versions.");
+        assert(!isNaN(numA) && !isNaN(numB),
+               `Cannot compare non-equal non-numeric versions. ${elementA}, ${elementB}`);
 
         if (numA > numB) {
             return 1;

@@ -2,6 +2,8 @@
 /**
  * Test shard targeting for queries on a collection with a non-simple collation and a hashed shard
  * key.
+ *
+ * @tags: [disabled_due_to_server_58295]
  */
 (function() {
 const st = new ShardingTest({mongos: 1, config: 1, shards: 2, rs: {nodes: 1}});
