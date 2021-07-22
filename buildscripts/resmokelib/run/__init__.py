@@ -37,6 +37,7 @@ from buildscripts.resmokelib.core import process
 from buildscripts.resmokelib.core import jasper_process
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.run import runtime_recorder
+from buildscripts.resmokelib.run import list_tags
 from buildscripts.resmokelib.run.runtime_recorder import compare_start_time
 
 _INTERNAL_OPTIONS_TITLE = "Internal Options"
@@ -121,6 +122,8 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
                 self.list_suites()
             elif self.__command == "find-suites":
                 self.find_suites()
+            elif self.__command == "list-tags":
+                self.list_tags()
             elif config.DRY_RUN == "tests":
                 self.dry_run()
             else:
@@ -145,6 +148,34 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
             suite_names = suites_by_test[test]
             self._resmoke_logger.info("%s will be run by the following suite(s): %s", test,
                                       suite_names)
+
+    def list_tags(self):
+        """List the tags and its documentation available in the suites."""
+        tag_docs = {}
+        out_tag_names = []
+        for suite_name in suitesconfig.get_named_suites():
+            suite_file = config.NAMED_SUITES.get(suite_name, "")
+            tags_blocks = list_tags.get_tags_blocks(suite_file)
+
+            for tags_block in tags_blocks:
+                splitted_tags_block = list_tags.split_into_tags(tags_block)
+
+                for single_tag_block in splitted_tags_block:
+                    tag_name, doc = list_tags.get_tag_doc(single_tag_block)
+
+                    if tag_name and (tag_name not in tag_docs
+                                     or len(doc) > len(tag_docs[tag_name])):
+                        tag_docs[tag_name] = doc
+
+                    if suite_name in config.SUITE_FILES:  # pylint: disable=unsupported-membership-test
+                        out_tag_names.append(tag_name)
+
+        if config.SUITE_FILES == [config.DEFAULTS["suite_files"]]:
+            out_tag_docs = tag_docs
+        else:
+            out_tag_docs = {tag: doc for tag, doc in tag_docs.items() if tag in out_tag_names}
+
+        self._resmoke_logger.info("Found tags in suites:%s", list_tags.make_output(out_tag_docs))
 
     @staticmethod
     def _find_suites_by_test(suites):
@@ -562,6 +593,7 @@ class RunPlugin(PluginInterface):
         RunPlugin._add_run(subparsers)
         RunPlugin._add_list_suites(subparsers)
         RunPlugin._add_find_suites(subparsers)
+        RunPlugin._add_list_tags(subparsers)
 
     def parse(self, subcommand, parser, parsed_args, **kwargs):
         """
@@ -573,7 +605,7 @@ class RunPlugin(PluginInterface):
         :param kwargs: additional args
         :return: None or a Subcommand
         """
-        if subcommand in ('find-suites', 'list-suites', 'run'):
+        if subcommand in ('find-suites', 'list-suites', 'list-tags', 'run'):
             configure_resmoke.validate_and_update_config(parser, parsed_args)
             if config.EVERGREEN_TASK_ID is not None:
                 return TestRunnerEvg(subcommand, **kwargs)
@@ -1100,6 +1132,17 @@ class RunPlugin(PluginInterface):
 
         parser.add_argument("test_files", metavar="TEST_FILES", nargs="*",
                             help="Explicit test files to run")
+
+    @classmethod
+    def _add_list_tags(cls, subparsers):
+        """Create and add the parser for the list-tags subcommand."""
+        parser = subparsers.add_parser(
+            "list-tags", help="Lists the tags and their documentation available in the suites.")
+        parser.set_defaults(logger_file="console")
+        parser.add_argument(
+            "--suites", dest="suite_files", metavar="SUITE1,SUITE2",
+            help=("Comma separated list of suite names to get tags from."
+                  " All suites are used if unspecified."))
 
 
 def to_local_args(input_args=None):  # pylint: disable=too-many-branches,too-many-locals
