@@ -13,7 +13,9 @@ load("jstests/libs/analyze_plan.js");         // For getPlanStages.
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
-const coll = db.wildcard_multikey_index;
+const collNamePrefix = 'wildcard_index_multikey_';
+let collCount = 0;
+let coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 
 // Template document which defines the 'schema' of the documents in the test collection.
@@ -66,7 +68,10 @@ const operationList = [
 // been indexed based on the spec; this function will confirm that only the appropriate paths
 // are present in the $** index.
 function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
-    assert.commandWorked(coll.dropIndexes());
+    coll = db.getCollection(collNamePrefix + collCount++);
+    coll.drop();
+    jsTestLog('runWildcardIndexTest: args=' + tojson([keyPattern, pathProjection, expectedPaths]) +
+              '; coll=' + coll.getFullName());
     assert.commandWorked(
         coll.createIndex(keyPattern, pathProjection ? {wildcardProjection: pathProjection} : {}));
     assert(expectedPaths);
@@ -128,6 +133,7 @@ runWildcardIndexTest({'$**': 1}, {a: 0, 'b.c': 0}, ['b.d.e']);
 
 // Sanity check that a few queries which need to be planned specially in the multikey case
 // return the correct results.
+coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 assert.commandWorked(coll.createIndex({"$**": 1}));
 assert.commandWorked(coll.insert({a: [-5, 15]}));
@@ -144,7 +150,8 @@ assert.eq(
     0, coll.find({"b.c.d": {$elemMatch: {"e.f": {$gt: 0, $lt: 9}}}}).hint({$natural: 1}).itcount());
 
 // Fieldname-or-array-index query tests.
-assert(coll.drop());
+coll = db.getCollection(collNamePrefix + collCount++);
+coll.drop();
 assert.commandWorked(coll.createIndex({"$**": 1}));
 
 // Insert some documents that exhibit a mix of numeric fieldnames and array indices.
@@ -209,7 +216,8 @@ assertWildcardQuery({'a.0.1.d': 1}, null);
 
 // Test that fieldname-or-array-index queries do not inappropriately trim predicates; that is,
 // all predicates on the field are added to a FETCH filter above the IXSCAN.
-assert(coll.drop());
+coll = db.getCollection(collNamePrefix + collCount++);
+coll.drop();
 assert.commandWorked(coll.createIndex({"$**": 1}));
 
 assert.commandWorked(coll.insert({_id: 1, a: [0, 1, 2]}));
@@ -244,7 +252,8 @@ for (let ixScan of trimTestIxScans) {
 assertArrayEq(coll.find(trimTestQuery).toArray(),
               coll.find(trimTestQuery).hint({$natural: 1}).toArray());
 
-assert(coll.drop());
+coll = db.getCollection(collNamePrefix + collCount++);
+coll.drop();
 assert.commandWorked(coll.createIndex({"$**": 1}));
 assert.commandWorked(coll.insert({a: {0: {1: "exists"}}}));
 assert.commandWorked(coll.insert({a: {0: [2, "exists"]}}));
