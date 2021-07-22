@@ -10790,7 +10790,7 @@ buildvariants:
   - name: .aggfuzzer .common !.timeseries
   - name: aggregation
   - name: .auth !.multiversion !.audit !.sharding
-  # SERVER-56108: Re-enable parallel
+  # SERVER-58597: Re-enable parallel
   - name: .misc_js !.parallel
   # SERVER-50296: Investigate concurrency test failures.
   # - name: concurrency
