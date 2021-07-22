@@ -311,7 +311,8 @@ class MongodLauncher(object):
         if ("replSet" in mongod_options
                 and "waitForStepDownOnNonCommandShutdown" not in suite_set_parameters
                 and "shutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters):
-            if executable == self.config.LAST_LTS_MONGOD_BINARY:
+            if executable == self.config.LAST_LTS_MONGOD_BINARY and \
+                    self.config.LAST_LTS_MONGOD_BINARY != "mongod-5.0":
                 suite_set_parameters["waitForStepDownOnNonCommandShutdown"] = False
             else:
                 suite_set_parameters["shutdownTimeoutMillisForSignaledShutdown"] = 100
