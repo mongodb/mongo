@@ -159,7 +159,8 @@ public:
             query,
             update,
             false, /* upsert */
-            ShardingCatalogClient::kMajorityWriteConcern));
+            ShardingCatalogClient::kMajorityWriteConcern,
+            Milliseconds::max()));
 
         if (!docWasModified) {
             LOGV2_DEBUG(
