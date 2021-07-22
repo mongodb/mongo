@@ -177,6 +177,9 @@ protected:
     const ShardingDDLCoordinatorId _coordId;
 
     const bool _recoveredFromDisk;
+    bool _firstExecution{
+        true};  // True only when executing the coordinator for the first time (meaning it's not a
+                // retry after a retryable error nor a recovered instance from a previous primary)
     bool _completeOnError{false};
 
 private:

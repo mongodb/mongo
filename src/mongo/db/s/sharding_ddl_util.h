@@ -153,5 +153,20 @@ void performNoopRetryableWriteOnShards(OperationContext* opCtx,
                                        const OperationSessionInfo& osi,
                                        const std::shared_ptr<executor::TaskExecutor>& executor);
 
+
+/*
+ * Performs a noop write locally with majority write concern.
+ */
+void performNoopMajorityWriteLocally(OperationContext* opCtx);
+
+/**
+ * Sends the _shardsvrDropCollectionParticipant command to the specified shards.
+ */
+void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const std::vector<ShardId>& shardIds,
+                                                  std::shared_ptr<executor::TaskExecutor> executor,
+                                                  const OperationSessionInfo& osi);
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo

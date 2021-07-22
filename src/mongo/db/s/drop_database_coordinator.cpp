@@ -39,39 +39,17 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/flush_database_cache_updates_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace {
 
-void dropShardedCollection(OperationContext* opCtx,
-                           const CollectionType& coll,
-                           std::shared_ptr<executor::ScopedTaskExecutor> executor) {
-    sharding_ddl_util::removeCollAndChunksMetadataFromConfig(opCtx, coll);
-    sharding_ddl_util::removeTagsMetadataFromConfig_notIdempotent(opCtx, coll.getNss());
-
-    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-    const ShardsvrDropCollectionParticipant dropCollectionParticipant(coll.getNss());
-    const auto cmdObj =
-        CommandHelpers::appendMajorityWriteConcern(dropCollectionParticipant.toBSON({}));
-
-    // The collection needs to be dropped first on the db primary shard
-    // because otherwise changestreams won't receive the drop event.
-    sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, coll.getNss().db(), cmdObj, {primaryShardId}, **executor);
-
-    // We need to send the drop to all the shards because both movePrimary and
-    // moveChunk leave garbage behind for sharded collections.
-    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    // Remove prumary shard from participants
-    participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
-                       participants.end());
-    sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, coll.getNss().db(), cmdObj, participants, **executor);
-}
-
-void removeDatabaseMetadataFromConfig(OperationContext* opCtx, StringData dbName) {
+void removeDatabaseMetadataFromConfig(OperationContext* opCtx,
+                                      StringData dbName,
+                                      const DatabaseVersion& dbVersion) {
     IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
@@ -79,12 +57,14 @@ void removeDatabaseMetadataFromConfig(OperationContext* opCtx, StringData dbName
         Grid::get(opCtx)->catalogCache()->purgeDatabase(dbName);
     });
 
-    // Remove the database entry from the metadata.
-    const Status status =
-        catalogClient->removeConfigDocuments(opCtx,
-                                             DatabaseType::ConfigNS,
-                                             BSON(DatabaseType::name(dbName.toString())),
-                                             ShardingCatalogClient::kMajorityWriteConcern);
+    // Remove the database entry from the metadata. Making the dbVersion uuid part of the query
+    // ensures idempotency.
+    const Status status = catalogClient->removeConfigDocuments(
+        opCtx,
+        DatabaseType::ConfigNS,
+        BSON(DatabaseType::name(dbName.toString()) << DatabaseType::version() + "." +
+                 DatabaseVersion::kUuidFieldName << dbVersion.getUuid()),
+        ShardingCatalogClient::kMajorityWriteConcern);
     uassertStatusOKWithContext(status,
                                str::stream()
                                    << "Could not remove database metadata from config server for '"
@@ -92,6 +72,47 @@ void removeDatabaseMetadataFromConfig(OperationContext* opCtx, StringData dbName
 }
 
 }  // namespace
+
+void DropDatabaseCoordinator::_performNoopRetryableWriteOnParticipants(
+    OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor) {
+    auto shardsAndConfigsvr = [&] {
+        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+        auto participants = shardRegistry->getAllShardIds(opCtx);
+        participants.emplace_back(shardRegistry->getConfigShard()->getId());
+        return participants;
+    }();
+
+    _doc = _updateSession(opCtx, _doc);
+    sharding_ddl_util::performNoopRetryableWriteOnShards(
+        opCtx, shardsAndConfigsvr, getCurrentSession(_doc), executor);
+}
+
+void DropDatabaseCoordinator::_dropShardedCollection(
+    OperationContext* opCtx,
+    const CollectionType& coll,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    sharding_ddl_util::removeCollAndChunksMetadataFromConfig(opCtx, coll);
+
+    _doc = _updateSession(opCtx, _doc);
+    sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, coll.getNss(), getCurrentSession(_doc));
+
+    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+    _doc = _updateSession(opCtx, _doc);
+
+    // The collection needs to be dropped first on the db primary shard
+    // because otherwise changestreams won't receive the drop event.
+    sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+        opCtx, coll.getNss(), {primaryShardId}, **executor, getCurrentSession(_doc));
+
+    // We need to send the drop to all the shards because both movePrimary and
+    // moveChunk leave garbage behind for sharded collections.
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    // Remove primary shard from participants
+    participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
+                       participants.end());
+    sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+        opCtx, coll.getNss(), participants, **executor, getCurrentSession(_doc));
+}
 
 DropDatabaseCoordinator::DropDatabaseCoordinator(ShardingDDLCoordinatorService* service,
                                                  const BSONObj& initialState)
@@ -147,13 +168,20 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
+                if (!_firstExecution) {
+                    // Perform a noop write on the participants in order to advance the txnNumber
+                    // for this coordinator's lsid so that requests with older txnNumbers can no
+                    // longer execute.
+                    _performNoopRetryableWriteOnParticipants(opCtx, **executor);
+                }
+
                 if (_doc.getCollInfo()) {
                     const auto& coll = _doc.getCollInfo().get();
                     LOGV2_DEBUG(5494504,
                                 2,
                                 "Completing collection drop from previous primary",
                                 "namespace"_attr = coll.getNss());
-                    dropShardedCollection(opCtx, coll, executor);
+                    _dropShardedCollection(opCtx, coll, executor);
                 }
 
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase.start", _dbName);
@@ -163,20 +191,23 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 const auto allCollectionsForDb = catalogClient->getCollections(
                     opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
 
+                // Make sure we were primary when we read the collections metadata so it is safe
+                // to proceed using the collection uuids to perform destructive operations
+                sharding_ddl_util::performNoopMajorityWriteLocally(opCtx);
+
                 for (const auto& coll : allCollectionsForDb) {
                     const auto& nss = coll.getNss();
                     LOGV2_DEBUG(5494505, 2, "Dropping collection", "namespace"_attr = nss);
 
-                    sharding_ddl_util::stopMigrations(opCtx, nss, boost::none);
+                    sharding_ddl_util::stopMigrations(opCtx, nss, coll.getUuid());
 
                     auto newStateDoc = _doc;
                     newStateDoc.setCollInfo(coll);
                     _doc = _updateStateDocument(opCtx, std::move(newStateDoc));
 
-                    dropShardedCollection(opCtx, coll, executor);
+                    _dropShardedCollection(opCtx, coll, executor);
                 }
 
-                const auto primaryShardId = ShardingState::get(opCtx)->shardId();
                 auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
                 dropDatabaseParticipantCmd.setDbName(_dbName);
                 const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
@@ -184,28 +215,58 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
 
                 // The database needs to be dropped first on the db primary shard
                 // because otherwise changestreams won't receive the drop event.
-                sharding_ddl_util::sendAuthenticatedCommandToShards(
-                    opCtx, _dbName, cmdObj, {primaryShardId}, **executor);
+                {
+                    DBDirectClient dbDirectClient(opCtx);
+                    const auto commandResponse =
+                        dbDirectClient.runCommand(OpMsgRequest::fromDBAndBody(_dbName, cmdObj));
+                    uassertStatusOK(getStatusFromCommandResult(commandResponse->getCommandReply()));
+
+                    WriteConcernResult ignoreResult;
+                    const auto latestOpTime =
+                        repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+                    uassertStatusOK(
+                        waitForWriteConcern(opCtx,
+                                            latestOpTime,
+                                            ShardingCatalogClient::kMajorityWriteConcern,
+                                            &ignoreResult));
+                }
 
                 const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-                // Remove prumary shard from participants
+                // Remove primary shard from participants
+                const auto primaryShardId = ShardingState::get(opCtx)->shardId();
                 auto participants = allShardIds;
                 participants.erase(
                     std::remove(participants.begin(), participants.end(), primaryShardId),
                     participants.end());
-                // Drop DB on all other shards
-                sharding_ddl_util::sendAuthenticatedCommandToShards(
-                    opCtx, _dbName, cmdObj, participants, **executor);
+                // Drop DB on all other shards, attaching the dbVersion to the request to ensure
+                // idempotency.
+                try {
+                    sharding_ddl_util::sendAuthenticatedCommandToShards(
+                        opCtx,
+                        _dbName,
+                        appendDbVersionIfPresent(cmdObj, *metadata().getDatabaseVersion()),
+                        participants,
+                        **executor);
+                } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
+                    // The DB metadata could have been removed by a network-partitioned former
+                    // primary
+                }
 
-                removeDatabaseMetadataFromConfig(opCtx, _dbName);
+                removeDatabaseMetadataFromConfig(opCtx, _dbName, *metadata().getDatabaseVersion());
 
                 {
                     // Send _flushDatabaseCacheUpdates to all shards
+                    auto flushDbCacheUpdatesCmd =
+                        _flushDatabaseCacheUpdatesWithWriteConcern(_dbName.toString());
+                    flushDbCacheUpdatesCmd.setSyncFromConfig(true);
+                    flushDbCacheUpdatesCmd.setDbName(_dbName);
+
                     IgnoreAPIParametersBlock ignoreApiParametersBlock{opCtx};
                     sharding_ddl_util::sendAuthenticatedCommandToShards(
                         opCtx,
                         "admin",
-                        BSON("_flushDatabaseCacheUpdates" << _dbName),
+                        CommandHelpers::appendMajorityWriteConcern(
+                            flushDbCacheUpdatesCmd.toBSON({})),
                         allShardIds,
                         **executor);
                 }

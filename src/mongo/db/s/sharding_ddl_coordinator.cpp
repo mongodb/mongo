@@ -64,7 +64,8 @@ ShardingDDLCoordinator::ShardingDDLCoordinator(ShardingDDLCoordinatorService* se
                                                const BSONObj& coorDoc)
     : _service(service),
       _coordId(extractShardingDDLCoordinatorMetadata(coorDoc).getId()),
-      _recoveredFromDisk(extractShardingDDLCoordinatorMetadata(coorDoc).getRecoveredFromDisk()) {}
+      _recoveredFromDisk(extractShardingDDLCoordinatorMetadata(coorDoc).getRecoveredFromDisk()),
+      _firstExecution(!_recoveredFromDisk) {}
 
 ShardingDDLCoordinator::~ShardingDDLCoordinator() {
     invariant(_constructionCompletionPromise.getFuture().isReady());
@@ -222,6 +223,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                                     "Re-executing sharding DDL coordinator",
                                     "coordinatorId"_attr = _coordId,
                                     "reason"_attr = redact(status));
+                        _firstExecution = false;
                         return false;
                     }
                     return true;
