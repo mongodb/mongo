@@ -4,10 +4,19 @@
 (function() {
 "use strict";
 
-var coll = db.geo_s2sparse;
-var point = {type: "Point", coordinates: [5, 5]};
-var indexSpec = {geo: "2dsphere", nonGeo: 1};
-var indexName = 'geo_2dsphere_nonGeo_1';
+const collNamePrefix = 'geo_s2sparse_';
+let collCount = 0;
+let coll = db.getCollection(collNamePrefix + collCount++);
+
+const point = {
+    type: "Point",
+    coordinates: [5, 5],
+};
+const indexSpec = {
+    geo: "2dsphere",
+    nonGeo: 1,
+};
+const indexName = 'geo_2dsphere_nonGeo_1';
 
 //
 // V2 indices are "geo sparse" always.
@@ -17,7 +26,7 @@ var indexName = 'geo_2dsphere_nonGeo_1';
 coll.drop();
 coll.createIndex(indexSpec);
 
-var bulkInsertDocs = function(coll, numDocs, makeDocFn) {
+const bulkInsertDocs = function(coll, numDocs, makeDocFn) {
     print("Bulk inserting " + numDocs + " documents");
 
     var bulk = coll.initializeUnorderedBulkOp();
@@ -31,7 +40,7 @@ var bulkInsertDocs = function(coll, numDocs, makeDocFn) {
 };
 
 // Insert N documents with the geo field.
-var N = 1000;
+const N = 1000;
 bulkInsertDocs(coll, N, function(i) {
     return {geo: point, nonGeo: "point_" + i};
 });
@@ -76,6 +85,7 @@ assert.eq(N + N, coll.validate().keysPerIndex[indexName]);
 // V1 indices are never sparse
 //
 
+coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 coll.createIndex(indexSpec, {"2dsphereIndexVersion": 1});
 
@@ -100,10 +110,11 @@ assert.eq(N + N, coll.validate().keysPerIndex[indexName]);
 //
 
 // Clean up.
+coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 coll.createIndex({geo: "2dsphere", otherGeo: "2dsphere"});
 
-indexName = 'geo_2dsphere_otherGeo_2dsphere';
+const indexNameOther = 'geo_2dsphere_otherGeo_2dsphere';
 
 // Insert N documents with the first geo field.
 bulkInsertDocs(coll, N, function(i) {
@@ -111,7 +122,7 @@ bulkInsertDocs(coll, N, function(i) {
 });
 
 // Expect N keys.
-assert.eq(N, coll.validate().keysPerIndex[indexName]);
+assert.eq(N, coll.validate().keysPerIndex[indexNameOther]);
 
 // Insert N documents with the second geo field.
 bulkInsertDocs(coll, N, function(i) {
@@ -119,7 +130,7 @@ bulkInsertDocs(coll, N, function(i) {
 });
 
 // They get inserted too.
-assert.eq(N + N, coll.validate().keysPerIndex[indexName]);
+assert.eq(N + N, coll.validate().keysPerIndex[indexNameOther]);
 
 // Insert N documents with neither geo field.
 bulkInsertDocs(coll, N, function(i) {
@@ -127,5 +138,5 @@ bulkInsertDocs(coll, N, function(i) {
 });
 
 // Still expect 2N keys as the neither geo docs were omitted from the index.
-assert.eq(N + N, coll.validate().keysPerIndex[indexName]);
+assert.eq(N + N, coll.validate().keysPerIndex[indexNameOther]);
 })();
