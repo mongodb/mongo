@@ -150,9 +150,7 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk(
 }
 
 bool ReadWriteConcernDefaults::isCWWCSet(OperationContext* opCtx) {
-    auto cached = _getDefaultCWRWCFromDisk(opCtx).value_or(RWConcernDefaultAndTime());
-    return cached.getDefaultWriteConcern() &&
-        !cached.getDefaultWriteConcern().get().usedDefaultConstructedWC;
+    return getCWWC(opCtx) ? true : false;
 }
 
 void ReadWriteConcernDefaults::observeDirectWriteToConfigSettings(OperationContext* opCtx,
@@ -299,6 +297,17 @@ boost::optional<ReadWriteConcernDefaults::WriteConcern>
 ReadWriteConcernDefaults::getDefaultWriteConcern(OperationContext* opCtx) {
     auto current = getDefault(opCtx);
     return current.getDefaultWriteConcern();
+}
+
+boost::optional<ReadWriteConcernDefaults::WriteConcern> ReadWriteConcernDefaults::getCWWC(
+    OperationContext* opCtx) {
+    auto cached = _getDefaultCWRWCFromDisk(opCtx);
+    if (cached && cached.get().getDefaultWriteConcern() &&
+        !cached.get().getDefaultWriteConcern().get().usedDefaultConstructedWC) {
+        return cached.get().getDefaultWriteConcern().get();
+    }
+
+    return boost::none;
 }
 
 ReadWriteConcernDefaults& ReadWriteConcernDefaults::get(ServiceContext* service) {

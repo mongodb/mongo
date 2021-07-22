@@ -38,6 +38,7 @@
 #include <set>
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
@@ -53,6 +54,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
@@ -393,8 +395,8 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                               << " as a shard since it is a config server"};
     }
 
-    if (resIsMaster.hasField("isImplicitDefaultMajorityWC") &&
-        !resIsMaster.getBoolField("isImplicitDefaultMajorityWC") &&
+    if (resIsMaster.hasField(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName) &&
+        !resIsMaster.getBoolField(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName) &&
         !ReadWriteConcernDefaults::get(opCtx).isCWWCSet(opCtx)) {
         return {
             ErrorCodes::OperationFailed,
@@ -405,6 +407,37 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                    "number of writable voting members not to be strictly more than the voting "
                    "majority. Change the shard configuration or set the cluster-wide write concern "
                    "using the setDefaultRWConcern command and try again."};
+    }
+
+    if (resIsMaster.hasField(HelloCommandReply::kCwwcFieldName)) {
+        auto cwwcOnShard = WriteConcernOptions::parse(
+                               resIsMaster.getObjectField(HelloCommandReply::kCwwcFieldName))
+                               .getValue()
+                               .toBSON();
+
+        auto cachedCWWC = ReadWriteConcernDefaults::get(opCtx).getCWWC(opCtx);
+        if (!cachedCWWC) {
+            return {ErrorCodes::OperationFailed,
+                    str::stream() << "Cannot add " << connectionString.toString()
+                                  << " as a shard since the cluster-wide write concern is set on "
+                                     "the shard and not set on the cluster. Set the CWWC on the "
+                                     "cluster to the same CWWC as the shard and try again."
+                                  << " The CWWC on the shard is (" << cwwcOnShard << ")."};
+        }
+
+        auto cwwcOnConfig = cachedCWWC.get().toBSON();
+        BSONObjComparator comparator(
+            BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, nullptr);
+        if (comparator.compare(cwwcOnShard, cwwcOnConfig) != 0) {
+            return {
+                ErrorCodes::OperationFailed,
+                str::stream()
+                    << "Cannot add " << connectionString.toString()
+                    << " as a shard since the cluster-wide write concern set on the shard doesn't "
+                       "match the one set on the cluster. Make sure they match and try again."
+                    << " The CWWC on the shard is (" << cwwcOnShard
+                    << "), and the CWWC on the cluster is (" << cwwcOnConfig << ")."};
+        }
     }
 
     // If the shard is part of a replica set, make sure all the hosts mentioned in the connection

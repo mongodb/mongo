@@ -172,6 +172,11 @@ public:
      */
     boost::optional<bool> getImplicitDefaultWriteConcernMajority_forTest();
 
+    /**
+     * Gets the cluster-wide write concern (CWWC) persisted on disk.
+     */
+    boost::optional<WriteConcern> getCWWC(OperationContext* opCtx);
+
 private:
     enum class Type { kReadWriteConcernEntry };
 
