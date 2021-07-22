@@ -345,6 +345,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         }
     }
 
+    // TODO SERVER-58750: investigate if it is really needed to sort the vector
     // Make sure splitKeys is in ascending order
     std::sort(
         splitKeys.begin(), splitKeys.end(), SimpleBSONObjComparator::kInstance.makeLessThan());
