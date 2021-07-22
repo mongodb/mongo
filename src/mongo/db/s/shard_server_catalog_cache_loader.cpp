@@ -464,6 +464,7 @@ void ShardServerCatalogCacheLoader::onStepDown() {
 void ShardServerCatalogCacheLoader::onStepUp() {
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(_role != ReplicaSetRole::None);
+    _contexts.interrupt(ErrorCodes::InterruptedDueToReplStateChange);
     ++_term;
     _role = ReplicaSetRole::Primary;
 }
