@@ -140,7 +140,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
                                  << chunk.getMin() << ChunkType::max() << chunk.getMax()));
                 query.readPref(ReadPreference::Nearest, BSONArray());
 
-                NamespaceString chunkMetadataNss{ChunkType::ShardNSPrefix + uuid.toString()};
+                NamespaceString chunkMetadataNss{ChunkType::ShardNSPrefix + kNss.ns()};
                 std::unique_ptr<DBClientCursor> cursor = client.query(chunkMetadataNss, query, 1);
                 ASSERT(cursor);
 

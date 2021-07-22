@@ -32,8 +32,7 @@ assert.commandWorked(
     priConn.adminCommand({_flushRoutingTableCacheUpdates: 'test.user', syncFromConfig: true}));
 
 let collEntry = st.config.collections.findOne({_id: 'test.user'});
-let chunksCollName = "cache.chunks." +
-    (collEntry.hasOwnProperty("timestamp") ? extractUUIDFromObject(collEntry.uuid) : 'test.user');
+let chunksCollName = "cache.chunks.test.user";
 let chunkCache = priConn.getDB('config').getCollection(chunksCollName);
 let preRefineChunks = chunkCache.find().toArray();
 assert.eq(3, preRefineChunks.length);

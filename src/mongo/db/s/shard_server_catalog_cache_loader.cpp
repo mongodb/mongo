@@ -827,7 +827,7 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
                           << "'."};
     }
 
-    if (maxLoaderVersion.isSet() &&
+    if (false && maxLoaderVersion.isSet() &&
         maxLoaderVersion.getTimestamp().is_initialized() !=
             collAndChunks.creationTime.is_initialized() &&
         maxLoaderVersion.epoch() == collAndChunks.epoch) {

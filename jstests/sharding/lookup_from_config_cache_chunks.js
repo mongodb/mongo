@@ -49,8 +49,7 @@ const setUp = () => {
 
     const collNs = dbName + "." + collName;
     const collEntry = st.config.collections.findOne({_id: collNs});
-    chunksCollName = "cache.chunks." +
-        (collEntry.hasOwnProperty("timestamp") ? extractUUIDFromObject(collEntry.uuid) : collNs);
+    chunksCollName = "cache.chunks." + collNs;
     flushRoutersAndRefreshShardMetadata(st, {collNs});
 };
 

@@ -282,9 +282,7 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    boost::optional<long long> limit,
                                                    const OID& epoch,
                                                    const boost::optional<Timestamp>& timestamp) {
-    const NamespaceString chunksNss{
-        ChunkType::ShardNSPrefix +
-        (!nss.isTemporaryReshardingCollection() && uuid ? uuid->toString() : nss.ns())};
+    const NamespaceString chunksNss{ChunkType::ShardNSPrefix + nss.ns()};
 
     try {
         DBDirectClient client(opCtx);
@@ -324,9 +322,7 @@ Status updateShardChunks(OperationContext* opCtx,
                          const OID& currEpoch) {
     invariant(!chunks.empty());
 
-    const NamespaceString chunksNss{
-        ChunkType::ShardNSPrefix +
-        (!nss.isTemporaryReshardingCollection() && uuid ? uuid->toString() : nss.ns())};
+    const NamespaceString chunksNss{ChunkType::ShardNSPrefix + nss.ns()};
 
     try {
         DBDirectClient client(opCtx);
@@ -457,12 +453,11 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
 void dropChunks(OperationContext* opCtx,
                 const NamespaceString& nss,
                 const boost::optional<UUID>& uuid) {
-    const auto chunksNs = ChunkType::ShardNSPrefix +
-        (!nss.isTemporaryReshardingCollection() && uuid ? uuid->toString() : nss.ns());
+    const NamespaceString chunksNss{ChunkType::ShardNSPrefix + nss.ns()};
 
     DBDirectClient client(opCtx);
     BSONObj result;
-    if (!client.dropCollection(chunksNs, kLocalWriteConcern, &result)) {
+    if (!client.dropCollection(chunksNss.ns(), kLocalWriteConcern, &result)) {
         auto status = getStatusFromCommandResult(result);
         if (status != ErrorCodes::NamespaceNotFound) {
             uassertStatusOK(status);
@@ -472,7 +467,7 @@ void dropChunks(OperationContext* opCtx,
     LOGV2_DEBUG(3463201,
                 1,
                 "Dropped chunks cache",
-                "chunksNamespace"_attr = chunksNs,
+                "chunksNamespace"_attr = chunksNss,
                 "collectionNamespace"_attr = nss,
                 "error"_attr = getStatusFromCommandResult(result));
 }

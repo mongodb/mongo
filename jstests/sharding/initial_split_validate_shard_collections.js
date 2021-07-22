@@ -65,8 +65,7 @@ assert.commandWorked(
 const chunksOnConfigCount = findChunksUtil.countChunksForNs(st.config, 'test.user');
 assert.eq(2, chunksOnConfigCount);
 
-const chunksCollName = "cache.chunks." +
-    (collEntry.hasOwnProperty("timestamp") ? extractUUIDFromObject(collEntry.uuid) : 'test.user');
+const chunksCollName = "cache.chunks.test.user";
 const chunksOnShard0 = st.shard0.getDB("config").getCollection(chunksCollName).find().toArray();
 const chunksOnShard1 = st.shard1.getDB("config").getCollection(chunksCollName).find().toArray();
 assert.eq(chunksOnConfigCount, chunksOnShard0.length);

@@ -55,8 +55,7 @@ function testRename(st, dbName, toNs, dropTarget, mustFail) {
     // namespace and get the actual chunks cache collection name of the target collection
     const toConfigCollDoc = mongos.getDB('config').collections.findOne({_id: toNs});
     const chunksNameByUUID = toConfigCollDoc.hasOwnProperty('timestamp');
-    const toChunksCollName =
-        'cache.chunks.' + (chunksNameByUUID ? extractUUIDFromObject(toConfigCollDoc.uuid) : toNs);
+    const toChunksCollName = 'cache.chunks.' + toNs;
 
     // Validate the correctness of the collections metadata in the catalog cache on shards
     for (let db of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {

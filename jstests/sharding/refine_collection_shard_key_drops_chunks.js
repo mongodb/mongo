@@ -42,9 +42,7 @@ assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 5, b: 5}})
 // before refineCollectionShardKey.
 assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: kNsName}));
 
-let collEntry = st.config.collections.findOne({_id: kNsName});
-let configCacheChunks = "config.cache.chunks." +
-    (collEntry.hasOwnProperty("timestamp") ? extractUUIDFromObject(collEntry.uuid) : kNsName);
+let configCacheChunks = "config.cache.chunks." + kNsName;
 let chunkArr = shard.getCollection(configCacheChunks).find({}).sort({min: 1}).toArray();
 assert.eq(3, chunkArr.length);
 assert.eq({a: MinKey, b: MinKey}, chunkArr[0]._id);

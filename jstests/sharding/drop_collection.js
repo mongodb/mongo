@@ -349,9 +349,7 @@ jsTest.log("Test that dropping a sharded collection, the cached metadata on shar
 
     // Get the chunks cache collection name
     const configCollDoc = st.s0.getDB('config').collections.findOne({_id: coll.getFullName()});
-    const chunksCollName = 'cache.chunks.' +
-        (configCollDoc.hasOwnProperty('timestamp') ? extractUUIDFromObject(configCollDoc.uuid)
-                                                   : coll.getFullName());
+    const chunksCollName = 'cache.chunks.' + coll.getFullName();
 
     // Drop the collection
     assert.commandWorked(db.runCommand({drop: coll.getName()}));
