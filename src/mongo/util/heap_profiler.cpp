@@ -353,8 +353,9 @@ private:
     // Stack HashTable Value.
     struct StackInfo {
         int stackNum = 0;        // used for stack short name
-        BSONObj stackObj{};      // symbolized representation
         size_t activeBytes = 0;  // number of live allocated bytes charged to this stack
+        bool logged = false;     // true when stack has been logged once.
+
         explicit StackInfo(int stackNum) : stackNum(stackNum) {}
         StackInfo() {}
     };
@@ -499,12 +500,10 @@ private:
     //
     // Generate bson representation of stack.
     //
-    void generateStackIfNeeded(StackTraceAddressMetadataGenerator& metaGen,
-                               Demangler& demangler,
-                               Stack& stack,
-                               StackInfo& stackInfo) {
-        if (!stackInfo.stackObj.isEmpty())
-            return;
+    void generateStack(StackTraceAddressMetadataGenerator& metaGen,
+                       Demangler& demangler,
+                       Stack& stack,
+                       const StackInfo& stackInfo) {
         BSONArrayBuilder builder;
 
         std::string frameString;
@@ -536,12 +535,11 @@ private:
             }
             builder.append(frameString);
         }
-        stackInfo.stackObj = builder.obj();
         LOGV2(23158,
               "heapProfile stack {stackNum}: {stackObj}",
               "heapProfile stack",
               "stackNum"_attr = stackInfo.stackNum,
-              "stackObj"_attr = stackInfo.stackObj);
+              "stackObj"_attr = builder.done());
     }
 
     //
@@ -554,8 +552,12 @@ private:
     // once a stack is deemed "important" it remains important from that point on.
     // "Important" is a sticky quality to improve the stability of the set of stacks we emit,
     // and we always emit them in stackNum order, greatly improving ftdc compression efficiency.
-    std::set<StackInfo*, bool (*)(StackInfo*, StackInfo*)> importantStacks{
-        [](StackInfo* a, StackInfo* b) -> bool { return a->stackNum < b->stackNum; }};
+    struct ImportantStacksOrder {
+        bool operator()(const StackInfo* a, const StackInfo* b) const {
+            return a->stackNum < b->stackNum;
+        }
+    };
+    std::set<const StackInfo*, ImportantStacksOrder> importantStacks;
 
     int numImportantSamples = 0;                // samples currently included in importantStacks
     const int kMaxImportantSamples = 4 * 3600;  // reset every 4 hours at default 1 sample / sec
@@ -602,37 +604,49 @@ private:
         // forEach guarantees this is safe wrt to insert(), and we never call remove().
         // We use stackinfo_mutex to ensure safety wrt concurrent updates to the StackInfo objects.
         // We can get skew between entries, which is ok.
-        std::vector<StackInfo*> stackInfos;
+        struct HeapEntry {
+            const StackInfo* info;
+            size_t activeBytes;  // snapshot `info->activeBytes` because it changes during sort.
+        };
+        std::vector<HeapEntry> heap;
+        size_t snapshotTotal = 0;
 
         StackTraceAddressMetadataGenerator metaGen;
         Demangler demangler;
         stackHashTable.forEach([&](Stack& stack, StackInfo& stackInfo) {
-            if (stackInfo.activeBytes) {
-                generateStackIfNeeded(metaGen, demangler, stack, stackInfo);
-                stackInfos.push_back(&stackInfo);
+            if (auto bytes = stackInfo.activeBytes) {
+                if (!std::exchange(stackInfo.logged, true)) {
+                    generateStack(metaGen, demangler, stack, stackInfo);
+                }
+                heap.push_back({&stackInfo, bytes});
+                snapshotTotal += bytes;
             }
         });
+        auto heapEnd = heap.end();
 
         // Sort the stacks and find enough stacks to account for at least 99% of the active bytes
         // deem any stack that has ever met this criterion as "important".
-        auto sortByActiveBytes = [](StackInfo* a, StackInfo* b) -> bool {
-            return a->activeBytes > b->activeBytes;
-        };
-        std::stable_sort(stackInfos.begin(), stackInfos.end(), sortByActiveBytes);
+        // Using heap structure to avoid comparing elements that won't make the cut anyway.
+        auto heapCompare = [](auto&& a, auto&& b) { return a.activeBytes > b.activeBytes; };
+        std::make_heap(heap.begin(), heapEnd, heapCompare);
+
         size_t threshold = totalActiveBytes * 0.99;
         size_t cumulative = 0;
-        for (auto it = stackInfos.begin(); it != stackInfos.end(); ++it) {
-            StackInfo* stackInfo = *it;
-            importantStacks.insert(stackInfo);
-            cumulative += stackInfo->activeBytes;
-            if (cumulative > threshold)
+        size_t previous = 0;
+        while (heapEnd != heap.begin()) {
+            const auto& front = heap.front();
+            if (cumulative > threshold && front.activeBytes > previous)
                 break;
+            importantStacks.insert(front.info);
+            previous = front.activeBytes;
+            cumulative += front.activeBytes;
+            std::pop_heap(heap.begin(), heapEnd--, heapCompare);
         }
 
         // Build the stacks subsection by emitting the "important" stacks.
         BSONObjBuilder stacksBuilder(builder.subobjStart("stacks"));
         for (auto it = importantStacks.begin(); it != importantStacks.end(); ++it) {
-            StackInfo* stackInfo = *it;
+            const StackInfo* stackInfo = *it;
             std::ostringstream shortName;
             shortName << "stack" << stackInfo->stackNum;
             BSONObjBuilder stackBuilder(stacksBuilder.subobjStart(shortName.str()));
