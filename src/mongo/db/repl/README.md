@@ -97,7 +97,7 @@ to shards, which means the default write concern on shards will always be consis
 cluster. We don't want to specify `{w: "majority"}` for shard replica sets
 that can keep a primary due to an arbiter's vote, but lose the ability to acknowledge majority
 writes if a majority of data-bearing nodes goes down. So if the result of the DWCF for any replica
-set in the cluster is `{w: 1`}`, we require the cluster to set a CWWC. Once set, we disallow
+set in the cluster is `{w: 1}`, we require the cluster to set a CWWC. Once set, we disallow
 unsetting it so we can prevent PSA shards from implicitly defaulting to `{w: "majority"}` for
 reasons mentioned above. However, if a user decides to set the CWWC to `{w: "majority"}`
 for a PSA set, they may do so. We assume that in this case the user understands
