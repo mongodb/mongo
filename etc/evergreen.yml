@@ -7256,7 +7256,8 @@ buildvariants:
   - name: jsCore_txns
   - name: .logical_session_cache
   - name: parallel_gen
-  - name: .concurrency .common !.kill_terminate
+  # TODO(SERVER-58778): Re-enable concurrency_replication_multi_stmt_txn by removing !.txn
+  - name: .concurrency .common !.kill_terminate !.txn
     distros:
       - rhel80-medium
   - name: concurrency_replication_causal_consistency_gen
