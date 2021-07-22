@@ -32,7 +32,6 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/config.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -123,7 +122,6 @@ protected:
 
 private:
     OperationContext* _opCtx;
-    LastError _lastError;  // This LastError will be used for all operations on this client.
 };
 
 }  // namespace mongo

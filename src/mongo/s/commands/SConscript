@@ -22,7 +22,6 @@ env.Library(
 env.Library(
     target='cluster_commands',
     source=[
-        'batch_downconvert.cpp',
         'cluster_abort_transaction_cmd.cpp',
         'cluster_add_shard_cmd.cpp',
         'cluster_add_shard_to_zone_cmd.cpp',
@@ -152,7 +151,6 @@ env.Library(
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
-        '$BUILD_DIR/mongo/s/cluster_last_error_info',
         '$BUILD_DIR/mongo/s/mongos_topology_coordinator',
         '$BUILD_DIR/mongo/s/query/cluster_aggregate',
         '$BUILD_DIR/mongo/s/query/cluster_client_cursor',

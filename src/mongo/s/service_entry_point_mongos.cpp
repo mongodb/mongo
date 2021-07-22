@@ -48,7 +48,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/warn_deprecated_wire_ops.h"
-#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/strategy.h"
 
 namespace mongo {
@@ -74,7 +73,7 @@ struct HandleRequest : public std::enable_shared_from_this<HandleRequest> {
           msgId(message.header().getId()),
           nsString(getNamespaceString(rec->getDbMessage())) {}
 
-    // Prepares the environment for handling the request (e.g., setting up `ClusterLastErrorInfo`).
+    // Prepares the environment for handling the request.
     void setupEnvironment();
 
     // Returns a future that does the heavy lifting of running client commands.
@@ -114,10 +113,6 @@ void HandleRequest::setupEnvironment() {
     // Start a new LastError session. Any exceptions thrown from here onwards will be returned
     // to the caller (if the type of the message permits it).
     auto client = opCtx->getClient();
-    if (!ClusterLastErrorInfo::get(client)) {
-        ClusterLastErrorInfo::get(client) = std::make_shared<ClusterLastErrorInfo>();
-    }
-    ClusterLastErrorInfo::get(client)->newRequest();
     LastError::get(client).startRequest();
     AuthorizationSession::get(opCtx->getClient())->startRequest(opCtx);
 

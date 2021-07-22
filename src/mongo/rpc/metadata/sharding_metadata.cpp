@@ -50,52 +50,6 @@ const char kGLEStatsElectionIdFieldName[] = "electionId";
 
 }  // namespace
 
-StatusWith<ShardingMetadata> ShardingMetadata::readFromMetadata(const BSONObj& metadataObj) {
-    BSONElement smElem;
-    auto smExtractStatus =
-        bsonExtractTypedField(metadataObj, kGLEStatsFieldName, mongo::Object, &smElem);
-    if (!smExtractStatus.isOK()) {
-        return smExtractStatus;
-    }
-
-    if (smElem.embeddedObject().nFields() != 2) {
-        return Status(ErrorCodes::InvalidOptions,
-                      str::stream() << "The $gleStats object can only have 2 fields, but got "
-                                    << smElem.embeddedObject().toString());
-    }
-
-    repl::OpTime opTime;
-    const BSONElement opTimeElement = smElem.embeddedObject()[kGLEStatsLastOpTimeFieldName];
-    if (opTimeElement.eoo()) {
-        return Status(ErrorCodes::NoSuchKey, "lastOpTime field missing");
-    } else if (opTimeElement.type() == bsonTimestamp) {
-        opTime = repl::OpTime(opTimeElement.timestamp(), repl::OpTime::kUninitializedTerm);
-    } else if (opTimeElement.type() == Date) {
-        opTime = repl::OpTime(Timestamp(opTimeElement.date()), repl::OpTime::kUninitializedTerm);
-    } else if (opTimeElement.type() == Object) {
-        Status status =
-            bsonExtractOpTimeField(smElem.embeddedObject(), kGLEStatsLastOpTimeFieldName, &opTime);
-        if (!status.isOK()) {
-            return status;
-        }
-    } else {
-        return Status(ErrorCodes::TypeMismatch,
-                      str::stream() << "Expected \"" << kGLEStatsLastOpTimeFieldName
-                                    << "\" field in response to replSetHeartbeat "
-                                       "command to have type Date or Timestamp, but found type "
-                                    << typeName(opTimeElement.type()));
-    }
-
-    BSONElement lastElectionIdElem;
-    auto lastElectionIdExtractStatus = bsonExtractTypedField(
-        smElem.embeddedObject(), kGLEStatsElectionIdFieldName, mongo::jstOID, &lastElectionIdElem);
-    if (!lastElectionIdExtractStatus.isOK()) {
-        return lastElectionIdExtractStatus;
-    }
-
-    return ShardingMetadata(opTime, lastElectionIdElem.OID());
-}
-
 Status ShardingMetadata::writeToMetadata(BSONObjBuilder* metadataBob) const {
     BSONObjBuilder subobj(metadataBob->subobjStart(kGLEStatsFieldName));
     if (getLastOpTime().getTerm() > repl::OpTime::kUninitializedTerm) {

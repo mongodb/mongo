@@ -55,7 +55,6 @@
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/kill_sessions.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/logical_time_validator.h"

@@ -49,11 +49,6 @@ namespace rpc {
 class ShardingMetadata {
 public:
     /**
-     * Reads ShardingMetadata from a metadata object.
-     */
-    static StatusWith<ShardingMetadata> readFromMetadata(const BSONObj& metadataObj);
-
-    /**
      * Writes ShardingMetadata to a metadata builder.
      */
     Status writeToMetadata(BSONObjBuilder* metadataBob) const;

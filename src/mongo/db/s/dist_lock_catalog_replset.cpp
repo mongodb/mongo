@@ -35,7 +35,6 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -44,7 +43,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_request.h"

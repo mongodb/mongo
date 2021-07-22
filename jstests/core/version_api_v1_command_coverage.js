@@ -39,7 +39,6 @@ const commands = [
     {cmd: () => ({buildInfo: 1}), apiVersion1: false},
     {cmd: () => ({createUser: counter_fun(), pwd: "pwd", roles: []}), apiVersion1: false},
     {cmd: () => ({dropUser: counter_fun()}), apiVersion1: false},
-    {cmd: () => ({getLastError: 1}), apiVersion1: false},
     {cmd: () => ({serverStatus: 1}), apiVersion1: false},
     {cmd: () => ({usersInfo: 1}), apiVersion1: false},
     {cmd: () => ({aggregate: testColl.getName(), pipeline: [], cursor: {}}), apiVersion1: true},

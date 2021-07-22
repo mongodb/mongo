@@ -50,7 +50,6 @@
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
@@ -546,9 +545,6 @@ private:
                 debug.additiveMetrics.ndeleted = response.getN();
                 break;
         }
-
-        // Save the last opTimes written on each shard for this client, to allow GLE to work
-        ClusterLastErrorInfo::get(opCtx->getClient())->addHostOpTimes(stats.getWriteOpTimes());
 
         // Record the number of shards targeted by this write.
         CurOp::get(opCtx)->debug().nShards =

@@ -44,19 +44,9 @@ namespace DirectClientTests {
 using std::unique_ptr;
 using std::vector;
 
-class ClientBase {
-public:
-    ClientBase() {
-        mongo::LastError::get(cc()).reset();
-    }
-    virtual ~ClientBase() {
-        mongo::LastError::get(cc()).reset();
-    }
-};
-
 const char* ns = "a.b";
 
-class InsertMany : ClientBase {
+class InsertMany {
 public:
     virtual void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -82,7 +72,7 @@ public:
     }
 };
 
-class BadNSCmd : ClientBase {
+class BadNSCmd {
 public:
     virtual void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -97,7 +87,7 @@ public:
     }
 };
 
-class BadNSQuery : ClientBase {
+class BadNSQuery {
 public:
     virtual void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -110,7 +100,7 @@ public:
     }
 };
 
-class BadNSGetMore : ClientBase {
+class BadNSGetMore {
 public:
     virtual void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -122,7 +112,7 @@ public:
     }
 };
 
-class BadNSInsert : ClientBase {
+class BadNSInsert {
 public:
     virtual void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -134,7 +124,7 @@ public:
     }
 };
 
-class BadNSUpdate : ClientBase {
+class BadNSUpdate {
 public:
     virtual void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -146,7 +136,7 @@ public:
     }
 };
 
-class BadNSRemove : ClientBase {
+class BadNSRemove {
 public:
     virtual void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();

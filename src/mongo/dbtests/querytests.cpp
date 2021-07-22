@@ -260,12 +260,7 @@ public:
 
 class ClientBase {
 public:
-    ClientBase() : _client(&_opCtx) {
-        mongo::LastError::get(_opCtx.getClient()).reset();
-    }
-    virtual ~ClientBase() {
-        mongo::LastError::get(_opCtx.getClient()).reset();
-    }
+    ClientBase() : _client(&_opCtx) {}
 
 protected:
     void insert(const char* ns, BSONObj o) {

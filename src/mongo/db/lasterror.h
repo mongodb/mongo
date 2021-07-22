@@ -69,16 +69,6 @@ public:
 
     void recordDelete(long long nDeleted);
 
-    /**
-     * Writes the last-error state described by this object to "b".
-     *
-     * If "blankErr" is true, the "err" field will be explicitly set to null in the result
-     * instead of being omitted when the error string is empty.
-     *
-     * Returns true if there is a non-empty error message.
-     */
-    bool appendSelf(BSONObjBuilder& b, bool blankErr) const;
-
     bool isValid() const {
         return _valid;
     }
@@ -104,8 +94,6 @@ public:
         LastError* const _le;
         const bool _prev;
     };
-
-    static LastError noError;
 
 private:
     enum UpdatedExistingType { NotUpdate, True, False };

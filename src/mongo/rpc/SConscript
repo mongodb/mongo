@@ -181,7 +181,6 @@ if wiredtiger:
             'metadata/egress_metadata_hook_list_test.cpp',
             'metadata/oplog_query_metadata_test.cpp',
             'metadata/repl_set_metadata_test.cpp',
-            'metadata/sharding_metadata_test.cpp',
             'metadata/tracking_metadata_test.cpp',
             'metadata_test.cpp',
             'object_check_test.cpp',

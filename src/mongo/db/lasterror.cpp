@@ -38,8 +38,6 @@
 
 namespace mongo {
 
-LastError LastError::noError;
-
 const Client::Decoration<LastError> LastError::get = Client::declareDecoration<LastError>();
 
 namespace {
@@ -86,40 +84,6 @@ void LastError::recordDelete(long long nDeleted) {
     reset(true);
     _nObjects = nDeleted;
 }
-
-bool LastError::appendSelf(BSONObjBuilder& b, bool blankErr) const {
-    if (!_valid) {
-        if (blankErr)
-            b.appendNull("err");
-        b.append("n", 0);
-        return false;
-    }
-
-    if (_msg.empty()) {
-        if (blankErr) {
-            b.appendNull("err");
-        }
-    } else {
-        b.append("err", _msg);
-        if (_msg.find("E11000 duplicate key error") != std::string::npos) {
-            appendDupKeyFields(b, _msg);
-        }
-    }
-
-    if (_code) {
-        b.append("code", _code);
-        b.append("codeName", ErrorCodes::errorString(ErrorCodes::Error(_code)));
-    }
-    if (_updatedExisting != NotUpdate)
-        b.appendBool("updatedExisting", _updatedExisting == True);
-    if (!_upsertedId.isEmpty()) {
-        b.append(_upsertedId[kUpsertedFieldName]);
-    }
-    b.appendNumber("n", _nObjects);
-
-    return !_msg.empty();
-}
-
 
 void LastError::disable() {
     invariant(!_disabled);

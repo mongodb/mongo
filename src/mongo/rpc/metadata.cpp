@@ -40,7 +40,6 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
-#include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/testing_proctor.h"

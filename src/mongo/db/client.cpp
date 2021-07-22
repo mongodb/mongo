@@ -40,7 +40,6 @@
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/service_context.h"

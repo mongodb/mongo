@@ -33,22 +33,10 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/field_parser.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/db/repl/bson_extract_optime.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/idl/command_generic_argument.h"
-#include "mongo/logv2/log.h"
 #include "mongo/rpc/warn_deprecated_wire_ops.h"
 
 namespace mongo {
 namespace {
-
-using std::string;
-using std::stringstream;
 
 class CmdGetLastError : public ErrmsgCommandDeprecated {
 public:
@@ -68,207 +56,17 @@ public:
     }
 
     std::string help() const override {
-        return "return error status of the last operation on this connection\n"
-               "options:\n"
-               "  { fsync:true } - fsync before returning, or wait for journal commit if running "
-               "with --journal\n"
-               "  { j:true } - wait for journal commit if running with --journal\n"
-               "  { w:n } - await replication to n servers (including self) before returning\n"
-               "  { w:'majority' } - await replication to majority of set\n"
-               "  { wtimeout:m} - timeout for w in m milliseconds";
+        return "no longer supported";
     }
 
     bool errmsgRun(OperationContext* opCtx,
-                   const string& dbname,
-                   const BSONObj& cmdObj,
-                   string& errmsg,
-                   BSONObjBuilder& result) {
-        //
-        // Correct behavior here is very finicky.
-        //
-        // 1.  The first step is to append the error that occurred on the previous operation.
-        // This adds an "err" field to the command, which is *not* the command failing.
-        //
-        // 2.  Next we parse and validate write concern options.  If these options are invalid
-        // the command fails no matter what, even if we actually had an error earlier.  The
-        // reason for checking here is to match legacy behavior on these kind of failures -
-        // we'll still get an "err" field for the write error.
-        //
-        // 3.  If we had an error on the previous operation, we then return immediately.
-        //
-        // 4.  Finally, we actually enforce the write concern.  All errors *except* timeout are
-        // reported with ok : 0.0, to match legacy behavior.
-        //
-        // There is a special case when "wOpTime" and "wElectionId" are explicitly provided by
-        // the client (mongos) - in this case we *only* enforce the write concern if it is
-        // valid.
-        //
-        // We always need to either report "err" (if ok : 1) or "errmsg" (if ok : 0), even if
-        // err is null.
-        //
-
-        LastError* le = &LastError::get(opCtx->getClient());
-        le->disable();
-
-        // Always append lastOp and connectionId
-        Client& c = *opCtx->getClient();
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
-            const repl::OpTime lastOp = repl::ReplClientInfo::forClient(c).getLastOp();
-            if (!lastOp.isNull()) {
-                lastOp.append(&result, "lastOp");
-            }
-        }
-
-        warnDeprecation(c, "getLastError");
-
-        // for sharding; also useful in general for debugging
-        result.appendNumber("connectionId", c.getConnectionId());
-
-        repl::OpTime lastOpTime;
-        bool lastOpTimePresent = true;
-        const BSONElement opTimeElement = cmdObj["wOpTime"];
-        if (opTimeElement.eoo()) {
-            lastOpTimePresent = false;
-            lastOpTime = repl::ReplClientInfo::forClient(c).getLastOp();
-        } else if (opTimeElement.type() == bsonTimestamp) {
-            lastOpTime = repl::OpTime(opTimeElement.timestamp(), repl::OpTime::kUninitializedTerm);
-        } else if (opTimeElement.type() == Date) {
-            lastOpTime =
-                repl::OpTime(Timestamp(opTimeElement.date()), repl::OpTime::kUninitializedTerm);
-        } else if (opTimeElement.type() == Object) {
-            Status status = bsonExtractOpTimeField(cmdObj, "wOpTime", &lastOpTime);
-            if (!status.isOK()) {
-                result.append("badGLE", cmdObj);
-                return CommandHelpers::appendCommandStatusNoThrow(result, status);
-            }
-        } else {
-            uasserted(ErrorCodes::TypeMismatch,
-                      str::stream() << "Expected \"wOpTime\" field in getLastError to "
-                                       "have type Date, Timestamp, or OpTime but found type "
-                                    << typeName(opTimeElement.type()));
-        }
-
-
-        OID electionId;
-        BSONField<OID> wElectionIdField("wElectionId");
-        FieldParser::FieldState extracted =
-            FieldParser::extract(cmdObj, wElectionIdField, &electionId, &errmsg);
-        if (!extracted) {
-            result.append("badGLE", cmdObj);
-            CommandHelpers::appendSimpleCommandStatus(result, false, errmsg);
-            return false;
-        }
-
-        bool electionIdPresent = extracted != FieldParser::FIELD_NONE;
-        bool errorOccurred = false;
-
-        // Errors aren't reported when wOpTime is used
-        if (!lastOpTimePresent) {
-            if (le->getNPrev() != 1) {
-                errorOccurred = LastError::noError.appendSelf(result, false);
-            } else {
-                errorOccurred = le->appendSelf(result, false);
-            }
-        }
-
-        BSONObj writeConcernDoc = ([&] {
-            BSONObjBuilder bob;
-            for (auto&& elem : cmdObj) {
-                if (!isGenericArgument(elem.fieldNameStringData()))
-                    bob.append(elem);
-            }
-            return bob.obj();
-        }());
-
-        WriteConcernOptions writeConcern;
-        auto sw = WriteConcernOptions::parse(writeConcernDoc);
-        Status status = sw.getStatus();
-
-        //
-        // Validate write concern no matter what, this matches 2.4 behavior
-        //
-        if (status.isOK()) {
-            writeConcern = sw.getValue();
-            status = validateWriteConcern(opCtx, writeConcern);
-        }
-
-        if (!status.isOK()) {
-            result.append("badGLE", writeConcernDoc);
-            return CommandHelpers::appendCommandStatusNoThrow(result, status);
-        }
-
-        // Don't wait for replication if there was an error reported - this matches 2.4 behavior
-        if (errorOccurred) {
-            dassert(!lastOpTimePresent);
-            return true;
-        }
-
-        // No error occurred, so we won't duplicate these fields with write concern errors
-        dassert(result.asTempObj()["err"].eoo());
-        dassert(result.asTempObj()["code"].eoo());
-
-        // If we got an electionId, make sure it matches
-        if (electionIdPresent) {
-            if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-                repl::ReplicationCoordinator::modeReplSet) {
-                // Ignore electionIds of 0 from mongos.
-                if (electionId != OID()) {
-                    errmsg = "wElectionId passed but no replication active";
-                    result.append("code", ErrorCodes::BadValue);
-                    result.append("codeName", ErrorCodes::errorString(ErrorCodes::BadValue));
-                    return false;
-                }
-            } else {
-                if (electionId != repl::ReplicationCoordinator::get(opCtx)->getElectionId()) {
-                    LOGV2_DEBUG(20476,
-                                3,
-                                "OID passed in is {passedOID}, but our id is {ourOID}",
-                                "OID mismatch during election",
-                                "passedOID"_attr = electionId,
-                                "ourOID"_attr =
-                                    repl::ReplicationCoordinator::get(opCtx)->getElectionId());
-                    errmsg = "election occurred after write";
-                    result.append("code", ErrorCodes::WriteConcernFailed);
-                    result.append("codeName",
-                                  ErrorCodes::errorString(ErrorCodes::WriteConcernFailed));
-                    return false;
-                }
-            }
-        }
-
-        {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setMessage_inlock("waiting for write concern");
-        }
-
-        WriteConcernResult wcResult;
-        status = waitForWriteConcern(opCtx, lastOpTime, writeConcern, &wcResult);
-        // getLastError command returns a document that contains the writtenTo array. So we compute
-        // the writtenTo array here if we have waited for replication before. The call to
-        // getHostsWrittenTo needs to lock the ReplicationCoordinator mutex to guard against
-        // topology changes. Thus, we only compute this array here for the getLastError command
-        // (instead of in waitForWriteConcern for every single write) to avoid a serialization point
-        // for all writes.
-        if (!lastOpTime.isNull() && writeConcern.needToWaitForOtherNodes()) {
-            wcResult.writtenTo = replCoord->getHostsWrittenTo(
-                lastOpTime,
-                replCoord->populateUnsetWriteConcernOptionsSyncMode(writeConcern).syncMode ==
-                    WriteConcernOptions::SyncMode::JOURNAL);
-        }
-        wcResult.appendTo(&result);
-
-        // For backward compatibility with 2.4, wtimeout returns ok : 1.0
-        if (wcResult.wTimedOut) {
-            dassert(!wcResult.err.empty());  // so we always report err
-            dassert(!status.isOK());
-            result.append("errmsg", "timed out waiting for secondaries");
-            result.append("code", status.code());
-            result.append("codeName", ErrorCodes::errorString(status.code()));
-            return true;
-        }
-
-        return CommandHelpers::appendCommandStatusNoThrow(result, status);
+                   const std::string&,
+                   const BSONObj&,
+                   std::string&,
+                   BSONObjBuilder&) {
+        warnDeprecation(*opCtx->getClient(), "getLastError");
+        uasserted(5739000, "getLastError command is not supported");
+        return false;
     }
 
 } cmdGetLastError;

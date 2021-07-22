@@ -32,7 +32,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/s/cluster_last_error_info.h"
 
 namespace mongo {
 namespace {
@@ -72,7 +71,6 @@ public:
                            BSONObjBuilder& result) {
         if (cmdObj["forShell"].trueValue()) {
             LastError::get(cc()).disable();
-            ClusterLastErrorInfo::get(cc())->disableForCommand();
         }
 
         errmsg = "replSetGetStatus is not supported through mongos";

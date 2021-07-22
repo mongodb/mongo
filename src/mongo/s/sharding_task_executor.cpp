@@ -40,9 +40,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/transaction_router.h"
@@ -166,13 +164,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
 
     std::shared_ptr<OperationTimeTracker> timeTracker = OperationTimeTracker::get(request.opCtx);
 
-    auto clusterGLE = ClusterLastErrorInfo::get(request.opCtx->getClient());
-
-    auto shardingCb = [timeTracker,
-                       clusterGLE,
-                       cb,
-                       grid = Grid::get(request.opCtx),
-                       hosts = request.target](
+    auto shardingCb = [timeTracker, cb, grid = Grid::get(request.opCtx), hosts = request.target](
                           const TaskExecutor::RemoteCommandOnAnyCallbackArgs& args) {
         ON_BLOCK_EXIT([&cb, &args]() { cb(args); });
 
@@ -236,34 +228,6 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         if (!operationTime.eoo()) {
             invariant(operationTime.type() == BSONType::bsonTimestamp);
             timeTracker->updateOperationTime(LogicalTime(operationTime.timestamp()));
-        }
-
-        // Update getLastError info for the client if we're tracking it.
-        if (clusterGLE) {
-            auto swShardingMetadata = rpc::ShardingMetadata::readFromMetadata(args.response.data);
-            if (swShardingMetadata.isOK()) {
-                auto shardingMetadata = std::move(swShardingMetadata.getValue());
-
-                auto shardConn = ConnectionString::parse(target.toString());
-                if (!shardConn.isOK()) {
-                    LOGV2_ERROR(22874,
-                                "Could not parse connection string to update getLastError stats: "
-                                "{connectionString}",
-                                "Could not parse connection string to update getLastError stats",
-                                "connectionString"_attr = target);
-                }
-
-                clusterGLE->addHostOpTime(shardConn.getValue(),
-                                          HostOpTime(shardingMetadata.getLastOpTime(),
-                                                     shardingMetadata.getLastElectionId()));
-            } else if (swShardingMetadata.getStatus() != ErrorCodes::NoSuchKey) {
-                LOGV2_WARNING(22872,
-                              "Got invalid sharding metadata {error} "
-                              "metadata object was '{response}'",
-                              "Could not parse sharding metadata from response",
-                              "error"_attr = redact(swShardingMetadata.getStatus()),
-                              "response"_attr = redact(args.response.data));
-            }
         }
     };
 

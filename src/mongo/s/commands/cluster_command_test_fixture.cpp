@@ -41,7 +41,6 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/tick_source_mock.h"
@@ -126,15 +125,6 @@ DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
     }
 
     const auto opMsgRequest = OpMsgRequest::fromDBAndBody(kNss.db(), cmd);
-
-    // Ensure the clusterGLE on the Client has not yet been initialized.
-    ASSERT(!ClusterLastErrorInfo::get(client.get()));
-
-    // Initialize the cluster last error info for the client with a new request.
-    ClusterLastErrorInfo::get(client.get()) = std::make_shared<ClusterLastErrorInfo>();
-    ASSERT(ClusterLastErrorInfo::get(client.get()));
-    auto clusterGLE = ClusterLastErrorInfo::get(client.get());
-    clusterGLE->newRequest();
 
     AlternativeClientRegion acr(client);
     auto rec = std::make_shared<RequestExecutionContext>(opCtx.get(), opMsgRequest.serialize());

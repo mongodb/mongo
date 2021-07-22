@@ -204,28 +204,16 @@ bool wasLogged(DBClientBase* conn, const std::string& opName, const std::string&
     return false;
 }
 
-std::string getLastError(DBClientBase* conn) {
-    BSONObj info;
-    BSONObjBuilder b;
-    b.append("getlasterror", 1);
-    conn->runCommand("admin", b.obj(), info);
+void getLastError(DBClientBase* conn) {
+    static const auto getLastErrorCommand = fromjson(R"({"getlasterror": 1})");
+    BSONObj replyObj;
+    conn->runCommand("admin", getLastErrorCommand, replyObj);
 
-    if (info["ok"].trueValue()) {
-        BSONElement e = info["err"];
-        if (e.eoo())
-            return "";
-        if (e.type() == Object)
-            return e.toString();
-        return e.str();
-    } else {
-        // command failure
-        BSONElement e = info["errmsg"];
-        if (e.eoo())
-            return "";
-        if (e.type() == Object)
-            return "getLastError command failed: " + e.toString();
-        return "getLastError command failed: " + e.str();
-    }
+    // getLastError command is no longer supported and must always fails.
+    auto status = getStatusFromCommandResult(replyObj);
+    ASSERT_NOT_OK(status) << replyObj;
+    const auto expectedCode = conn->isMongos() ? 5739001 : 5739000;
+    ASSERT_EQ(status.code(), expectedCode) << replyObj;
 }
 
 void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeverity) {
@@ -256,12 +244,12 @@ void exerciseDeprecatedOps(DBClientBase* conn, const std::string& expectedSeveri
     // The first deprecated call after adding a suppression is still logged with elevated severity
     // and after it the suppression kicks in. Any deprecated op can be used to start the suppression
     // period, here we chose getLastError.
-    ASSERT_EQ("", getLastError(conn));
+    getLastError(conn);
 
     ASSERT_THROWS(conn->call(opInsert, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
     ASSERT(wasLogged(conn, "insert", expectedSeverity));
 
-    ASSERT_EQ("", getLastError(conn));
+    getLastError(conn);
     ASSERT(wasLogged(conn, "getLastError", expectedSeverity));
 
     ASSERT_THROWS(conn->call(opUpdate, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
@@ -340,7 +328,7 @@ TEST(OpLegacy, GenericCommandViaOpQuery) {
 
     // Because we cannot link the log entries to the issued commands, limit the search window for
     // the query-related entry in the log by first running a different command (e.g. getLastError).
-    ASSERT_EQ("", getLastError(conn.get()));  // will start failing soon but will still log
+    getLastError(conn.get());
     ASSERT(wasLogged(conn.get(), "getLastError", ""));
 
     // The actual command doesn't matter, as long as it's not 'hello' or 'isMaster'.
@@ -377,7 +365,7 @@ void testAllowedCommand(const char* command) {
 
     // Because we cannot link the log entries to the issued commands, limit the search window for
     // the query-related entry in the log by first running a different command (e.g. getLastError).
-    ASSERT_EQ("", getLastError(conn.get()));  // will start failing soon but will still log
+    getLastError(conn.get());
     ASSERT(wasLogged(conn.get(), "getLastError", ""));
 
     auto opQuery = makeDeprecatedQueryMessage("testOpLegacy.$cmd",

@@ -58,12 +58,7 @@ namespace dps = ::mongo::dotted_path_support;
 
 class ClientBase {
 public:
-    ClientBase() : _client(&_opCtx) {
-        mongo::LastError::get(_opCtx.getClient()).reset();
-    }
-    virtual ~ClientBase() {
-        mongo::LastError::get(_opCtx.getClient()).reset();
-    }
+    ClientBase() : _client(&_opCtx) {}
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();

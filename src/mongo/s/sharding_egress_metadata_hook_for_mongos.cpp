@@ -34,8 +34,6 @@
 #include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
 
 #include "mongo/db/client.h"
-#include "mongo/rpc/metadata/sharding_metadata.h"
-#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
