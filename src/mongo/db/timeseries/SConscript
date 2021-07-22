@@ -38,6 +38,7 @@ env.Library(
         'timeseries_index_schema_conversion_functions.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         'timeseries_idl',
     ],
 )

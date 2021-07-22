@@ -208,10 +208,17 @@ TimeseriesTest.run((insert) => {
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
     assert.commandWorked(insert(coll, doc), 'failed to insert doc: ' + tojson(doc));
 
-    // Reject index keys that do not include the metadata field.
-    assert.commandFailedWithCode(coll.createIndex({not_metadata: 1}), ErrorCodes.CannotCreateIndex);
-    assert.commandFailedWithCode(coll.dropIndex({not_metadata: 1}), ErrorCodes.IndexNotFound);
-    assert.commandFailedWithCode(coll.hideIndex({not_metadata: 1}), ErrorCodes.IndexNotFound);
+    if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+        // Reject index keys that do not include the metadata field.
+        assert.commandFailedWithCode(coll.createIndex({not_metadata: 1}),
+                                     ErrorCodes.CannotCreateIndex);
+        assert.commandFailedWithCode(coll.hideIndex({not_metadata: 1}), ErrorCodes.IndexNotFound);
+        assert.commandFailedWithCode(coll.dropIndex({not_metadata: 1}), ErrorCodes.IndexNotFound);
+    } else {
+        assert.commandWorked(coll.createIndex({not_metadata: 1}));
+        assert.commandWorked(coll.hideIndex({not_metadata: 1}));
+        assert.commandWorked(coll.dropIndex({not_metadata: 1}));
+    }
 
     // Index names are not transformed. dropIndexes passes the request along to the buckets
     // collection, which in this case does not possess the index by that name.

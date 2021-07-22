@@ -26,6 +26,13 @@ var TimeseriesTest = class {
             .featureFlagShardedTimeSeries.value;
     }
 
+    static timeseriesMetricIndexesEnabled(conn) {
+        return assert
+            .commandWorked(
+                conn.adminCommand({getParameter: 1, featureFlagTimeseriesMetricIndexes: 1}))
+            .featureFlagTimeseriesMetricIndexes.value;
+    }
+
     /**
      * Adjusts the values in 'fields' by a random amount.
      * Ensures that the new values stay in the range [0, 100].

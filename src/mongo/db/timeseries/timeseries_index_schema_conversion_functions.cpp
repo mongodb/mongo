@@ -33,6 +33,7 @@
 
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/logv2/log.h"
@@ -83,35 +84,65 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
             continue;
         }
 
-        if (!metaField) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << "Invalid index spec for time-series collection: "
-                                  << redact(timeseriesIndexSpecBSON)
-                                  << ". Indexes are only allowed on the '" << timeField
-                                  << "' field, no other data fields are supported: " << elem};
+        if (metaField) {
+            if (elem.fieldNameStringData() == *metaField) {
+                // The time-series 'metaField' field name always maps to a field named
+                // timeseries::kBucketMetaFieldName on the underlying buckets collection.
+                builder.appendAs(elem, timeseries::kBucketMetaFieldName);
+                continue;
+            }
+
+            // Time-series indexes on sub-documents of the 'metaField' are allowed.
+            if (elem.fieldNameStringData().startsWith(*metaField + ".")) {
+                builder.appendAs(elem,
+                                 str::stream()
+                                     << timeseries::kBucketMetaFieldName << "."
+                                     << elem.fieldNameStringData().substr(metaField->size() + 1));
+                continue;
+            }
         }
 
-        if (elem.fieldNameStringData() == *metaField) {
-            // The time-series 'metaField' field name always maps to a field named
-            // timeseries::kBucketMetaFieldName on the underlying buckets collection.
-            builder.appendAs(elem, timeseries::kBucketMetaFieldName);
-            continue;
+        if (!feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV()) {
+            auto reason = str::stream();
+            reason << "Invalid index spec for time-series collection: "
+                   << redact(timeseriesIndexSpecBSON) << ". ";
+            reason << "Indexes are only supported on the '" << timeField << "' ";
+            if (metaField) {
+                reason << "and '" << *metaField << "' fields. ";
+            } else {
+                reason << "field. ";
+            }
+            reason << "Attempted to create an index on the field '" << elem.fieldName() << "'.";
+            return {ErrorCodes::BadValue, reason};
         }
 
-        // Lastly, time-series indexes on sub-documents of the 'metaField' are allowed.
-        if (elem.fieldNameStringData().startsWith(*metaField + ".")) {
-            builder.appendAs(elem,
-                             str::stream()
-                                 << timeseries::kBucketMetaFieldName << "."
-                                 << elem.fieldNameStringData().substr(metaField->size() + 1));
-            continue;
-        }
-
-        return {ErrorCodes::BadValue,
+        // Indexes on measurement fields are only supported when the 'gTimeseriesMetricIndexes'
+        // feature flag is enabled.
+        if (!elem.isNumber()) {
+            return {
+                ErrorCodes::BadValue,
                 str::stream() << "Invalid index spec for time-series collection: "
                               << redact(timeseriesIndexSpecBSON)
-                              << ". Indexes are only supported on the '" << *metaField << "' and '"
-                              << timeField << "' fields: " << elem};
+                              << ". Indexes on measurement fields must be ascending or descending "
+                                 "(numbers only): "
+                              << elem};
+        }
+
+        if (elem.number() >= 0) {
+            // For ascending key patterns, the { control.max.elem: 1, control.min.elem: 1 }
+            // compound index is created.
+            builder.appendAs(
+                elem, str::stream() << timeseries::kControlMaxFieldNamePrefix << elem.fieldName());
+            builder.appendAs(
+                elem, str::stream() << timeseries::kControlMinFieldNamePrefix << elem.fieldName());
+        } else if (elem.number() < 0) {
+            // For descending key patterns, the { control.min.elem: -1, control.max.elem: -1 }
+            // compound index is created.
+            builder.appendAs(
+                elem, str::stream() << timeseries::kControlMinFieldNamePrefix << elem.fieldName());
+            builder.appendAs(
+                elem, str::stream() << timeseries::kControlMaxFieldNamePrefix << elem.fieldName());
+        }
     }
 
     return builder.obj();
