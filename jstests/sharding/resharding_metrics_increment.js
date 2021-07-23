@@ -3,8 +3,7 @@
  * responds to statistical increments in an expected way.
  *
  * @tags: [
- *   uses_atclustertime,
- *   disabled_due_to_server_58295
+ *   uses_atclustertime
  * ]
  */
 
@@ -126,11 +125,13 @@ const topology = DiscoverTopology.findConnectedNodes(mongos);
         "oplogEntriesApplied": e.applied,
     });
 
-    verifyDict(sub.opcounters, {
-        "insert": e.opcounters.insert,
-        "update": e.opcounters.update,
-        "delete": e.opcounters.delete,
-    });
+    if (!reshardingTest.isMixedVersionCluster()) {
+        verifyDict(sub.opcounters, {
+            "insert": e.opcounters.insert,
+            "update": e.opcounters.update,
+            "delete": e.opcounters.delete,
+        });
+    }
 
     // bytesCopied is harder to pin down but it should be >0.
     assert.betweenIn(1, sub['bytesCopied'], 1024, 'bytesCopied');

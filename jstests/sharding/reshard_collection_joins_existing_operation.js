@@ -9,7 +9,6 @@
  *
  * @tags: [
  *   uses_atclustertime,
- *   disabled_due_to_server_58295
  * ]
  */
 (function() {

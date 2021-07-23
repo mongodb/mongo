@@ -3,8 +3,7 @@
 //
 // @tags: [
 //   requires_majority_read_concern,
-//   uses_atclustertime,
-//   disabled_due_to_server_58295
+//   uses_atclustertime
 // ]
 (function() {
 "use strict";

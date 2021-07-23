@@ -3,7 +3,7 @@
  * begins, it will select a cloneTimestamp that is greater than the operation time of those
  * transactions when they commit.
  *
- * @tags: [uses_atclustertime, disabled_due_to_server_58295]
+ * @tags: [uses_atclustertime]
  */
 (function() {
 "use strict";

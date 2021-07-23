@@ -1,8 +1,10 @@
 /**
+ * TODO SERVER-55912: Remove this tag to re-enable test
  * @tags: [
  *   disabled_due_to_server_58295
  * ]
  */
+
 (function() {
 "use strict";
 
