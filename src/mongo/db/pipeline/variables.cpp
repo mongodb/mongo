@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/client.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/basic.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/str.h"
@@ -40,8 +41,11 @@ namespace mongo {
 constexpr Variables::Id Variables::kRootId;
 constexpr Variables::Id Variables::kRemoveId;
 
-const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {
-    {"ROOT", kRootId}, {"REMOVE", kRemoveId}, {"NOW", kNowId}, {"CLUSTER_TIME", kClusterTimeId}};
+const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {{"ROOT", kRootId},
+                                                                 {"REMOVE", kRemoveId},
+                                                                 {"NOW", kNowId},
+                                                                 {"CLUSTER_TIME", kClusterTimeId},
+                                                                 {"SEARCH_META", kSearchMetaId}};
 
 void Variables::uassertValidNameForUserWrite(StringData varName) {
     // System variables users allowed to write to (currently just one)
@@ -113,6 +117,24 @@ void Variables::setValue(Id id, const Value& value, bool isConstant) {
     _valueList[idAsSizeT] = ValueAndState(value, isConstant);
 }
 
+void Variables::setReservedValue(Id id, const Value& value, bool isConstant) {
+    // If a value has already been set for 'id', and that value was marked as constant, then it
+    // is illegal to modify.
+    switch (id) {
+        case Variables::kSearchMetaId:
+            uassert(5858101,
+                    "Can't set SEARCH_META multiple times per query",
+                    _runtimeConstantsMap.find(id) == _runtimeConstantsMap.end());
+            _runtimeConstantsMap[id] = value;
+            break;
+        default:
+            // Currently it is only allowed to manually set the SEARCH_META builtin variable.
+            uasserted(5858102,
+                      str::stream() << "Attempted to set '$$" << getBuiltinVariableName(id)
+                                    << "' which is not permitted");
+    }
+}
+
 void Variables::setValue(Variables::Id id, const Value& value) {
     const bool isConstant = false;
     setValue(id, value, isConstant);
@@ -154,6 +176,18 @@ Value Variables::getValue(Id id, const Document& root) const {
                 uasserted(4631100, "Use of undefined variable '$$JS_SCOPE'.");
             case Variables::kIsMapReduceId:
                 uasserted(4631101, "Use of undefined variable '$$IS_MR'.");
+            case Variables::kSearchMetaId: {
+                uassert(5858104,
+                        str::stream() << "Must be fully upgraded to 4.4 to access '$$SEARCH_META",
+                        serverGlobalParams.featureCompatibility.getVersion() >=
+                            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+                uassert(5858105,
+                        str::stream() << "Must enable 'enableSearchMeta' server parameter to "
+                                      << "use $searchMeta or $$SEARCH_META variable",
+                        enableSearchMeta.load());
+                auto metaIt = _runtimeConstantsMap.find(id);
+                return metaIt == _runtimeConstantsMap.end() ? Value() : metaIt->second;
+            }
             default:
                 MONGO_UNREACHABLE;
         }

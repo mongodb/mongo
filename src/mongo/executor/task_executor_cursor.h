@@ -107,6 +107,10 @@ public:
         return toRet;
     }
 
+    boost::optional<BSONObj> getCursorVars() {
+        return _cursorVars;
+    }
+
 private:
     /**
      * Runs a remote command and pipes the output back to this object
@@ -137,6 +141,9 @@ private:
     boost::optional<TaskExecutor::CallbackHandle> _cbHandle;
 
     CursorId _cursorId = kUnitializedCursorId;
+
+    // Variables sent alongside the results in the cursor.
+    boost::optional<BSONObj> _cursorVars = boost::none;
 
     // This is a sum of the time spent waiting on remote calls.
     Milliseconds _millisecondsWaiting = Milliseconds(0);

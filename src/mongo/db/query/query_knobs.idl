@@ -415,3 +415,10 @@ server_parameters:
     validator:
         gt: 0
         lte: { expr: BSONObjMaxInternalSize }
+
+  enableSearchMeta:
+    description: "If false queries with $$SEARCH_META or $searchMeta will fail."
+    set_at: [ startup, runtime ]
+    cpp_varname: "enableSearchMeta"
+    cpp_vartype: AtomicWord<bool>
+    default: false

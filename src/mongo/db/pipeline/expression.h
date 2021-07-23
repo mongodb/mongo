@@ -1337,14 +1337,14 @@ public:
 };
 
 
-class ExpressionFieldPath final : public Expression {
+class ExpressionFieldPath : public Expression {
 public:
     bool isRootFieldPath() const {
         return _variable == Variables::kRootId;
     }
 
     boost::intrusive_ptr<Expression> optimize() final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root, Variables* variables) const;
     Value serialize(bool explain) const final;
 
     /*
@@ -1393,11 +1393,12 @@ public:
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
-private:
     ExpressionFieldPath(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         const std::string& fieldPath,
                         Variables::Id variable);
 
+
+private:
     /*
       Internal implementation of evaluate(), used recursively.
 
@@ -1420,6 +1421,22 @@ private:
     const Variables::Id _variable;
 };
 
+/**
+ * A version of ExpressionFieldPath that will throw if evaluated in a sharded pipeline.
+ */
+class ExpressionFieldPathNonSharded : public ExpressionFieldPath {
+public:
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    ExpressionFieldPathNonSharded(ExpressionContext* const expCtx,
+                                  const std::string& fieldPath,
+                                  Variables::Id variable,
+                                  std::string errMsg)
+        : ExpressionFieldPath(expCtx, fieldPath, variable), _errMsg(std::move(errMsg)) {}
+
+private:
+    std::string _errMsg;
+};
 
 class ExpressionFilter final : public Expression {
 public:
