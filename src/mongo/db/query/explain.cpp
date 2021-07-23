@@ -335,7 +335,7 @@ void Explain::explainStages(PlanExecutor* exec,
                             const BSONObj& command,
                             BSONObjBuilder* out) {
     auto&& explainer = exec->getPlanExplainer();
-    auto winningPlanTrialStats = explainer.getWinningPlanStats(verbosity);
+    auto winningPlanTrialStats = explainer.getWinningPlanTrialStats();
     Status executePlanStatus = Status::OK();
     const CollectionPtr* collectionPtr = &collection;
 

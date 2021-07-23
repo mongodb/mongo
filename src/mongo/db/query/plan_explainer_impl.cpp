@@ -742,6 +742,10 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
     return {bob.obj(), std::move(summary)};
 }
 
+PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanTrialStats() const {
+    return getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+}
+
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlansStats(
     ExplainOptions::Verbosity verbosity) const {
     std::vector<PlanStatsDetails> res;

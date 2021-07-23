@@ -319,8 +319,7 @@ DocumentSourceCursor::DocumentSourceCursor(
     if (pExpCtx->explain) {
         // It's safe to access the executor even if we don't have the collection lock since we're
         // just going to call getStats() on it.
-        _winningPlanTrialStats =
-            explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+        _winningPlanTrialStats = explainer.getWinningPlanTrialStats();
     }
 
     if (collection) {

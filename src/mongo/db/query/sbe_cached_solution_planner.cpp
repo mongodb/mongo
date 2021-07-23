@@ -103,6 +103,12 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::finalizeExecutionPlan(
     // tree, as we cannot resume such execution tree from where the trial run has stopped, and, as
     // a result, we cannot stash the results returned so far in the plan executor.
     if (!stats->common.isEOF && candidate.exitedEarly) {
+        if (_cq.getExplain()) {
+            // We save the stats on early exit if it's either an explain operation, as closing and
+            // re-opening the winning plan (below) changes the stats.
+            candidate.data.savedStatsOnEarlyExit =
+                candidate.root->getStats(true /* includeDebugInfo  */);
+        }
         candidate.root->close();
         candidate.root->open(false);
         // Clear the results queue.

@@ -487,6 +487,21 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
         _solution->root(), stats.get(), buildExecPlanDebugInfo(_root, _rootData), verbosity);
 }
 
+PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() const {
+    invariant(_rootData);
+    if (_rootData->savedStatsOnEarlyExit) {
+        invariant(_solution);
+        return buildPlanStatsDetails(
+            _solution->root(),
+            _rootData->savedStatsOnEarlyExit.get(),
+            // This parameter is not used in `buildPlanStatsDetails` if the last parameter is
+            // `ExplainOptions::Verbosity::kExecStats`, as is the case here.
+            boost::none,
+            ExplainOptions::Verbosity::kExecStats);
+    }
+    return getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+}
+
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansStats(
     ExplainOptions::Verbosity verbosity) const {
     if (_rejectedCandidates.empty()) {

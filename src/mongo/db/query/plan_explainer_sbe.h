@@ -60,6 +60,7 @@ public:
     std::string getPlanSummary() const final;
     void getSummaryStats(PlanSummaryStats* statsOut) const final;
     PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
+    PlanStatsDetails getWinningPlanTrialStats() const final;
     std::vector<PlanStatsDetails> getRejectedPlansStats(
         ExplainOptions::Verbosity verbosity) const final;
     std::vector<PlanStatsDetails> getCachedPlanStats(const PlanCacheEntry::DebugInfo&,

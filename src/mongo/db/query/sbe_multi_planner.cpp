@@ -102,6 +102,11 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
     // the trial run has stopped, and, as a result, we cannot stash the results returned so far
     // in the plan executor.
     if (!winner.root->getCommonStats()->isEOF && winner.exitedEarly) {
+        if (_cq.getExplain()) {
+            // We save the stats on early exit if it's either an explain operation, as closing and
+            // re-opening the winning plan (below) changes the stats.
+            winner.data.savedStatsOnEarlyExit = winner.root->getStats(true /* includeDebugInfo  */);
+        }
         winner.root->close();
         winner.root->open(false);
         // Clear the results queue.

@@ -102,6 +102,11 @@ PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanStats(
     return {};
 }
 
+PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanTrialStats() const {
+    // We are not supposed to call this method on a pipeline explainer.
+    MONGO_UNREACHABLE;
+}
+
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerPipeline::getRejectedPlansStats(
     ExplainOptions::Verbosity verbosity) const {
     // Multi-planning is not supported for aggregation pipelines.

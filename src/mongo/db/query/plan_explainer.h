@@ -100,6 +100,11 @@ public:
     virtual PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const = 0;
 
     /**
+     * Returns statistics for the trial period of the winning plan selected by the multi-planner.
+     */
+    virtual PlanStatsDetails getWinningPlanTrialStats() const = 0;
+
+    /**
      * Returns statistics that detail candidate plans rejected by the multi-planner. If no
      * multi-planning has been performed, an empty vector is returned.
      *
