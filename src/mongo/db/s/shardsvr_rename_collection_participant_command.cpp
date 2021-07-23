@@ -77,6 +77,7 @@ public:
             const NamespaceString& fromNss = ns();
             RenameCollectionParticipantDocument participantDoc(
                 fromNss, ForwardableOperationMetadata(opCtx), req.getSourceUUID());
+            participantDoc.setTargetUUID(req.getTargetUUID());
             participantDoc.setRenameCollectionRequest(req.getRenameCollectionRequest());
 
             const auto service = RenameCollectionParticipantService::getService(opCtx);
@@ -148,15 +149,14 @@ public:
             const NamespaceString& fromNss = ns();
             const auto& req = request();
 
-            RenameCollectionParticipantDocument participantDoc(
-                fromNss, ForwardableOperationMetadata(opCtx), req.getSourceUUID());
-            participantDoc.setRenameCollectionRequest(req.getRenameCollectionRequest());
-
             const auto service = RenameCollectionParticipantService::getService(opCtx);
             const auto id = BSON("_id" << fromNss.ns());
             const auto optRenameCollectionParticipant =
                 RenameParticipantInstance::lookup(opCtx, service, id);
             if (optRenameCollectionParticipant) {
+                uassert(ErrorCodes::CommandFailed,
+                        "Provided UUID does not match",
+                        optRenameCollectionParticipant.get()->sourceUUID() == req.getSourceUUID());
                 optRenameCollectionParticipant.get()->getUnblockCrudFuture().get(opCtx);
             }
         }

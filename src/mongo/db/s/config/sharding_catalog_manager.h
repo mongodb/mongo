@@ -472,6 +472,7 @@ public:
     void renameShardedMetadata(OperationContext* opCtx,
                                const NamespaceString& from,
                                const NamespaceString& to,
+                               const WriteConcernOptions& writeConcern,
                                boost::optional<CollectionType> optFromCollType);
 
     //

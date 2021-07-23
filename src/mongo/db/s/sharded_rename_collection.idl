@@ -76,6 +76,10 @@ commands:
             sourceUUID:
                 type: uuid
                 description: "ID of the collection getting renamed."
+            targetUUID:
+                type: uuid
+                description: "ID of the existing collection getting dropped."
+                optional: true
 
     _shardsvrRenameCollectionParticipantUnblock:
         command_name: _shardsvrRenameCollectionParticipantUnblock
@@ -115,6 +119,10 @@ structs:
                 type: uuid
                 description: "ID of the collection getting renamed."
                 optional: true
+            targetUUID:
+                type: uuid
+                description: "ID of the existing collection getting dropped."
+                optional: true
 
     RenameCollectionParticipantDocument:
         description: "Represents a rename collection operation on a participant shard."
@@ -134,3 +142,7 @@ structs:
             sourceUUID:
                 type: uuid
                 description: "ID of the collection getting renamed."
+            targetUUID:
+                type: uuid
+                description: "ID of the existing collection getting dropped."
+                optional: true

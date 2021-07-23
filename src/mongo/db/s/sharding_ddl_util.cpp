@@ -61,7 +61,8 @@ namespace {
 
 void updateTags(OperationContext* opCtx,
                 const NamespaceString& fromNss,
-                const NamespaceString& toNss) {
+                const NamespaceString& toNss,
+                const WriteConcernOptions& writeConcern) {
     const auto query = BSON(TagsType::ns(fromNss.ns()));
     const auto update = BSON("$set" << BSON(TagsType::ns(toNss.ns())));
 
@@ -77,7 +78,7 @@ void updateTags(OperationContext* opCtx,
         }()});
         return updateOp;
     }());
-    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+    request.setWriteConcern(writeConcern.toBSON());
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto response = configShard->runBatchWriteCommand(
@@ -86,7 +87,9 @@ void updateTags(OperationContext* opCtx,
     uassertStatusOK(response.toStatus());
 }
 
-void deleteChunks(OperationContext* opCtx, const UUID& collectionUUID) {
+void deleteChunks(OperationContext* opCtx,
+                  const UUID& collectionUUID,
+                  const WriteConcernOptions& writeConcern) {
     // Remove config.chunks entries
     // TODO SERVER-57221 don't use hint if not relevant anymore for delete performances
     auto hint = BSON(ChunkType::collectionUUID() << 1 << ChunkType::min() << 1);
@@ -103,7 +106,7 @@ void deleteChunks(OperationContext* opCtx, const UUID& collectionUUID) {
         return deleteOp;
     }());
 
-    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+    request.setWriteConcern(writeConcern.toBSON());
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto response = configShard->runBatchWriteCommand(
@@ -112,7 +115,10 @@ void deleteChunks(OperationContext* opCtx, const UUID& collectionUUID) {
     uassertStatusOK(response.toStatus());
 }
 
-void deleteCollection(OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid) {
+void deleteCollection(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      const UUID& uuid,
+                      const WriteConcernOptions& writeConcern) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     // Remove config.collection entry. Query by 'ns' AND 'uuid' so that the remove can be resolved
@@ -121,7 +127,7 @@ void deleteCollection(OperationContext* opCtx, const NamespaceString& nss, const
         opCtx,
         CollectionType::ConfigNS,
         BSON(CollectionType::kNssFieldName << nss.ns() << CollectionType::kUuidFieldName << uuid),
-        ShardingCatalogClient::kMajorityWriteConcern));
+        writeConcern));
 }
 
 write_ops::UpdateCommandRequest buildNoopWriteRequestCommand() {
@@ -199,7 +205,8 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx,
 }
 
 void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
-                                                const NamespaceString& nss) {
+                                                const NamespaceString& nss,
+                                                const WriteConcernOptions& writeConcern) {
     // Remove config.tags entries
     const auto query = BSON(TagsType::ns(nss.ns()));
     const auto hint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
@@ -216,7 +223,7 @@ void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
         return deleteOp;
     }());
 
-    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+    request.setWriteConcern(writeConcern.toBSON());
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto response = configShard->runBatchWriteCommand(
@@ -225,7 +232,9 @@ void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
     uassertStatusOK(response.toStatus());
 }
 
-void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx, const CollectionType& coll) {
+void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx,
+                                           const CollectionType& coll,
+                                           const WriteConcernOptions& writeConcern) {
     IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
     const auto& nss = coll.getNss();
     const auto& uuid = coll.getUuid();
@@ -233,13 +242,15 @@ void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx, const Collec
     ON_BLOCK_EXIT(
         [&] { Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss); });
 
-    deleteCollection(opCtx, nss, uuid);
+    deleteCollection(opCtx, nss, uuid, writeConcern);
 
-    deleteChunks(opCtx, uuid);
+    deleteChunks(opCtx, uuid, writeConcern);
 }
 
 bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx,
-                                                         const NamespaceString& nss) {
+                                                         const NamespaceString& nss,
+                                                         const WriteConcernOptions& writeConcern) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
     IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
@@ -247,8 +258,10 @@ bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx
         [&] { Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss); });
 
     try {
-        auto coll = catalogClient->getCollection(opCtx, nss);
-        removeCollAndChunksMetadataFromConfig(opCtx, coll);
+        auto coll =
+            catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+
+        removeCollAndChunksMetadataFromConfig(opCtx, coll, writeConcern);
         return true;
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // The collection is not sharded or doesn't exist
@@ -258,7 +271,8 @@ bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx
 
 void shardedRenameMetadata(OperationContext* opCtx,
                            CollectionType& fromCollType,
-                           const NamespaceString& toNss) {
+                           const NamespaceString& toNss,
+                           const WriteConcernOptions& writeConcern) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
     auto catalogClient = Grid::get(opCtx)->catalogClient();
@@ -267,7 +281,8 @@ void shardedRenameMetadata(OperationContext* opCtx,
 
     // Delete eventual TO chunk/collection entries referring a dropped collection
     try {
-        auto coll = catalogClient->getCollection(opCtx, toNss);
+        auto coll =
+            catalogClient->getCollection(opCtx, toNss, repl::ReadConcernLevel::kLocalReadConcern);
 
         if (coll.getUuid() == fromCollType.getUuid()) {
             // Metadata rename already happened
@@ -275,19 +290,19 @@ void shardedRenameMetadata(OperationContext* opCtx,
         }
 
         // Delete TO chunk/collection entries referring a dropped collection
-        removeCollAndChunksMetadataFromConfig_notIdempotent(opCtx, toNss);
+        removeCollAndChunksMetadataFromConfig_notIdempotent(opCtx, toNss, writeConcern);
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // The TO collection is not sharded or doesn't exist
     }
 
     // Delete TO tags, even if the TO collection is not sharded or doesn't exist
-    removeTagsMetadataFromConfig_notIdempotent(opCtx, toNss);
+    removeTagsMetadataFromConfig_notIdempotent(opCtx, toNss, writeConcern);
 
     // Delete FROM collection entry
-    deleteCollection(opCtx, fromNss, fromUUID);
+    deleteCollection(opCtx, fromNss, fromUUID, writeConcern);
 
     // Update FROM tags to TO
-    updateTags(opCtx, fromNss, toNss);
+    updateTags(opCtx, fromNss, toNss, writeConcern);
 
     // Update namespace and bump timestamp of the FROM collection entry
     fromCollType.setNss(toNss);
@@ -304,11 +319,8 @@ void shardedRenameMetadata(OperationContext* opCtx,
     }
 
     // Insert the TO collection entry
-    uassertStatusOK(
-        catalogClient->insertConfigDocument(opCtx,
-                                            CollectionType::ConfigNS,
-                                            fromCollType.toBSON(),
-                                            ShardingCatalogClient::kMajorityWriteConcern));
+    uassertStatusOK(catalogClient->insertConfigDocument(
+        opCtx, CollectionType::ConfigNS, fromCollType.toBSON(), writeConcern));
 }
 
 void checkShardedRenamePreconditions(OperationContext* opCtx,
@@ -333,7 +345,7 @@ void checkShardedRenamePreconditions(OperationContext* opCtx,
         // Check that the unsharded target collection doesn't exist
         auto collectionCatalog = CollectionCatalog::get(opCtx);
         auto targetColl = collectionCatalog->lookupCollectionByNamespace(opCtx, toNss);
-        uassert(ErrorCodes::CommandFailed,
+        uassert(5807601,
                 str::stream() << "Target collection " << toNss.ns()
                               << " exists but dropTarget is not set",
                 !targetColl);

@@ -464,6 +464,7 @@ void ShardingCatalogManager::renameShardedMetadata(
     OperationContext* opCtx,
     const NamespaceString& from,
     const NamespaceString& to,
+    const WriteConcernOptions& writeConcern,
     boost::optional<CollectionType> optFromCollType) {
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations. Take _kZoneOpLock in exclusive mode to prevent concurrent zone operations.
@@ -476,7 +477,7 @@ void ShardingCatalogManager::renameShardedMetadata(
     if (optFromCollType) {
         // Rename CSRS metadata in case the source collection is sharded
         auto collType = *optFromCollType;
-        sharding_ddl_util::shardedRenameMetadata(opCtx, collType, to);
+        sharding_ddl_util::shardedRenameMetadata(opCtx, collType, to, writeConcern);
         ShardingLogging::get(opCtx)->logChange(
             opCtx,
             "renameCollection.metadata",
@@ -486,8 +487,10 @@ void ShardingCatalogManager::renameShardedMetadata(
     } else {
         // Remove stale CSRS metadata in case the source collection is unsharded and the
         // target collection was sharded
-        sharding_ddl_util::removeCollAndChunksMetadataFromConfig_notIdempotent(opCtx, to);
-        sharding_ddl_util::removeTagsMetadataFromConfig_notIdempotent(opCtx, to);
+        // throws if the provided UUID does not match
+        sharding_ddl_util::removeCollAndChunksMetadataFromConfig_notIdempotent(
+            opCtx, to, writeConcern);
+        sharding_ddl_util::removeTagsMetadataFromConfig_notIdempotent(opCtx, to, writeConcern);
         ShardingLogging::get(opCtx)->logChange(opCtx,
                                                "renameCollection.metadata",
                                                str::stream()

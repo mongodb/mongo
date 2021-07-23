@@ -98,6 +98,10 @@ public:
         return _doc.getFromNss();
     }
 
+    const UUID& sourceUUID() {
+        return _doc.getSourceUUID();
+    }
+
     const NamespaceString& toNss() {
         return _doc.getTo();
     }

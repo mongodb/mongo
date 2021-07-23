@@ -64,27 +64,29 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx,
 
 /**
  * Erase tags metadata from config server for the given namespace.
- * TODO SERVER-56649 remove this
  */
 void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
-                                                const NamespaceString& nss);
+                                                const NamespaceString& nss,
+                                                const WriteConcernOptions& writeConcern);
 
 
 /**
  * Erase collection metadata from config server and invalidate the locally cached one.
  * In particular remove the collection and chunks metadata associated with the given namespace.
  */
-void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx, const CollectionType& coll);
+void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx,
+                                           const CollectionType& coll,
+                                           const WriteConcernOptions& writeConcern);
 
 /**
  * Erase collection metadata from config server and invalidate the locally cached one.
  * In particular remove the collection and chunks metadata associated with the given namespace.
  *
  * Returns true if the collection existed before being removed.
- * TODO SERVER-56649 remove this
  */
 bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx,
-                                                         const NamespaceString& nss);
+                                                         const NamespaceString& nss,
+                                                         const WriteConcernOptions& writeConcern);
 
 /**
  * Rename sharded collection metadata as part of a renameCollection operation.
@@ -96,7 +98,8 @@ bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx
  */
 void shardedRenameMetadata(OperationContext* opCtx,
                            CollectionType& fromCollType,
-                           const NamespaceString& toNss);
+                           const NamespaceString& toNss,
+                           const WriteConcernOptions& writeConcern);
 
 /**
  * Ensures rename preconditions for sharded collections are met:

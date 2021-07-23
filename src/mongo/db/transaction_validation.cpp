@@ -45,16 +45,17 @@ using namespace fmt::literals;
 
 namespace {
 
-const StringMap<int> retryableWriteCommands = {
-    {"delete", 1},
-    {"findandmodify", 1},
-    {"findAndModify", 1},
-    {"insert", 1},
-    {"update", 1},
-    {"_recvChunkStart", 1},
-    {"_configsvrRemoveTags", 1},
-    {"_shardsvrDropCollectionParticipant", 1},
-};
+const StringMap<int> retryableWriteCommands = {{"delete", 1},
+                                               {"findandmodify", 1},
+                                               {"findAndModify", 1},
+                                               {"insert", 1},
+                                               {"update", 1},
+                                               {"_recvChunkStart", 1},
+                                               {"_configsvrRemoveTags", 1},
+                                               {"_shardsvrDropCollectionParticipant", 1},
+                                               {"_shardsvrRenameCollectionParticipant", 1},
+                                               {"_shardsvrRenameCollectionParticipantUnblock", 1},
+                                               {"_configsvrRenameCollectionMetadata", 1}};
 
 // Commands that can be sent with session info but should not check out a session.
 const StringMap<int> skipSessionCheckoutList = {
