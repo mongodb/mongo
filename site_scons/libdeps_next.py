@@ -730,9 +730,7 @@ def _libdeps_visit(n, tsorted, marked, walking, debug=False):
                 _libdeps_visit_private(child, marked, walking, debug)
 
         marked[n.target_node] = LibdepsVisitationMark.MARKED_PUBLIC
-
-        if getattr(n.target_node.attributes, "needs_link", True):
-            tsorted.append(n.target_node)
+        tsorted.append(n.target_node)
 
     except DependencyCycleError as e:
         if len(e.cycle_nodes) == 1 or e.cycle_nodes[0] != e.cycle_nodes[-1]:
