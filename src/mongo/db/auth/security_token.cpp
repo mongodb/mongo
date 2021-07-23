@@ -31,9 +31,13 @@
 
 #include "mongo/db/auth/security_token.h"
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/init.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_detail.h"
 
 namespace mongo {
 namespace auth {
@@ -43,6 +47,18 @@ MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
     uassert(ErrorCodes::BadValue,
             "acceptOpMsgSecurityToken may not be specified if featureFlagMongoStore is not enabled",
             !gAcceptOpMsgSecurityToken || gFeatureFlagMongoStore.isEnabledAndIgnoreFCV());
+    if (gAcceptOpMsgSecurityToken) {
+        logv2::detail::setGetTenantIDCallback([]() -> boost::optional<OID> {
+            auto* client = Client::getCurrent();
+            auto* opCtx = client ? client->getOperationContext() : nullptr;
+            auto token = getSecurityToken(opCtx);
+            if (token) {
+                return token->getTenant();
+            } else {
+                return boost::none;
+            }
+        });
+    }
 }
 }  // namespace
 

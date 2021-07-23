@@ -40,6 +40,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/auth/security_token.h"
 #include "mongo/logv2/bson_formatter.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/composite_backend.h"
@@ -359,6 +360,12 @@ TEST_F(LogV2Test, Basic) {
 class LogV2TypesTest : public LogV2Test {
 public:
     using LogV2Test::LogV2Test;
+    LogV2TypesTest() : LogV2Test() {
+        detail::setGetTenantIDCallback([this]() -> boost::optional<OID> { return this->tenant; });
+    }
+    ~LogV2TypesTest() {
+        detail::setGetTenantIDCallback(nullptr);
+    }
 
     // The JSON formatter should make the types round-trippable without data loss
     template <typename T>
@@ -367,13 +374,16 @@ public:
         std::istringstream json_stream(json.back());
         pt::ptree ptree;
         pt::json_parser::read_json(json_stream, ptree);
+        ASSERT_EQUALS(OID(ptree.get<std::string>("tenant")), OID(tenant));
         ASSERT_EQUALS(ptree.get<T>(std::string(kAttributesFieldName) + ".name"), expected);
     }
 
     auto lastBSONElement() {
+        ASSERT_EQUALS(BSONObj(bson.back().data()).getField("tenant").OID(), tenant);
         return BSONObj(bson.back().data()).getField(kAttributesFieldName).Obj().getField("name"_sd);
     }
 
+    OID tenant = OID::gen();
     LineCapture text = makeLineCapture(PlainFormatter());
     LineCapture json = makeLineCapture(JSONFormatter());
     LineCapture bson = makeLineCapture(BSONFormatter());

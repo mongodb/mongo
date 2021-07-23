@@ -29,7 +29,10 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/status.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log_attr.h"
@@ -41,6 +44,8 @@
 
 namespace mongo {
 namespace logv2::detail {
+using GetTenantIDFn = std::function<boost::optional<OID>()>;
+void setGetTenantIDCallback(GetTenantIDFn&& fn);
 
 void doLogImpl(int32_t id,
                LogSeverity const& severity,

@@ -41,6 +41,11 @@ const boost::log::attribute_name& severity() {
     return attr;
 }
 
+const boost::log::attribute_name& tenant() {
+    static const boost::log::attribute_name attr("tenant");
+    return attr;
+}
+
 const boost::log::attribute_name& component() {
     static const boost::log::attribute_name attr("component");
     return attr;

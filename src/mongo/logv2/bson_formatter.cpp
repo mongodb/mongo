@@ -123,6 +123,9 @@ void BSONFormatter::operator()(boost::log::record_view const& rec, BSONObjBuilde
     builder.append(constants::kComponentFieldName,
                    extract<LogComponent>(attributes::component(), rec).get().getNameForLog());
     builder.append(constants::kIdFieldName, extract<int32_t>(attributes::id(), rec).get());
+    if (auto ptr = extract<OID>(attributes::tenant(), rec).get_ptr()) {
+        builder.append(constants::kTenantFieldName, *ptr);
+    }
     builder.append(constants::kContextFieldName,
                    extract<StringData>(attributes::threadName(), rec).get());
     builder.append(constants::kMessageFieldName,

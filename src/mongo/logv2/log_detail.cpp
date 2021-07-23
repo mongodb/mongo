@@ -42,6 +42,19 @@
 #include "mongo/util/testing_proctor.h"
 
 namespace mongo::logv2::detail {
+namespace {
+GetTenantIDFn& getTenantID() {
+    // Ensure that we avoid undefined initialization ordering
+    // when logging occurs during process init.
+    // See logv2_test.cpp
+    static GetTenantIDFn fn;
+    return fn;
+}
+}  // namespace
+
+void setGetTenantIDCallback(GetTenantIDFn&& fn) {
+    getTenantID() = std::move(fn);
+}
 
 struct UnstructuredValueExtractor {
     void operator()(const char* name, CustomAttributeValue const& val) {
@@ -158,6 +171,15 @@ void doLogImpl(int32_t id,
             boost::log::attribute_value(
                 new boost::log::attributes::attribute_value_impl<TypeErasedAttributeStorage>(
                     attrs)));
+
+        if (auto fn = getTenantID()) {
+            if (auto id = fn()) {
+                record.attribute_values().insert(
+                    attributes::tenant(),
+                    boost::log::attribute_value(
+                        new boost::log::attributes::attribute_value_impl<OID>(id.get())));
+            }
+        }
 
         source.push_record(std::move(record));
     }

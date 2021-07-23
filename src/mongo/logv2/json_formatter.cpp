@@ -217,6 +217,7 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
                            StringData message,
                            const TypeErasedAttributeStorage& attrs,
                            LogTag tags,
+                           const OID* tenant,
                            LogTruncation truncation) const {
     namespace c = constants;
     static constexpr auto kFmt = JsonStringFormat::ExtendedRelaxedV2_0_0;
@@ -313,6 +314,9 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
         field(top, c::kSeverityFieldName, padNextComma(top, 5, quote(strFn(severityString))));
         field(top, c::kComponentFieldName, padNextComma(top, 11, quote(strFn(componentString))));
         field(top, c::kIdFieldName, padNextComma(top, 8, intFn(id)));
+        if (tenant) {
+            field(top, c::kTenantFieldName, quote(strFn(tenant->toString())));
+        }
         field(top, c::kContextFieldName, quote(strFn(context)));
         field(top, c::kMessageFieldName, quote(escFn(message)));
         if (!attrs.empty()) {
@@ -325,8 +329,9 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
             if (BSONObj o = extractor.truncatedSizes(); !o.isEmpty())
                 field(top, c::kTruncatedSizeFieldName, bsonObjFn(o));
         }
-        if (tags != LogTag::kNone)
+        if (tags != LogTag::kNone) {
             field(top, c::kTagsFieldName, bsonArrFn(tags.toBSONArray()));
+        }
     })();
 }
 
@@ -345,6 +350,7 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
            extract<StringData>(attributes::message(), rec).get(),
            extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get(),
            extract<LogTag>(attributes::tags(), rec).get(),
+           extract<OID>(attributes::tenant(), rec).get_ptr(),
            extract<LogTruncation>(attributes::truncation(), rec).get());
 
     // Write final JSON object to output stream

@@ -6,6 +6,7 @@
 
 const kLogLevelForToken = 4;
 const kAcceptedSecurityTokenID = 5838100;
+const kLogMessageID = 5060500;
 const isMongoStoreEnabled = TestData.setParameters.featureFlagMongoStore;
 
 if (!isMongoStoreEnabled) {
@@ -45,14 +46,24 @@ function runTest(conn, enabled) {
     conn._setSecurityToken({tenant: tenantID});
     if (enabled) {
         // Basic use.
-        assert.commandWorked(admin.runCommand({ping: 1}));
+        assert.commandWorked(admin.runCommand({logMessage: 'This is a test'}));
+
+        // Look for "Accepted Security Token" message with explicit tenant logging.
         // Log line will contain {"$oid": "12345..."} rather than ObjectId.
         const expect = {token: {tenant: {"$oid": tenantID.str}}};
         jsTest.log('Checking for: ' + tojson(expect));
         checkLog.containsJson(conn, kAcceptedSecurityTokenID, expect, 'Security Token not logged');
+
+        // Now look for logMessage log line with implicit logging.
+        const logMessages = checkLog.getGlobalLog(conn)
+                                .map((l) => JSON.parse(l))
+                                .filter((l) => l.id === kLogMessageID);
+        jsTest.log(logMessages);
+        assert.eq(logMessages.length, 1, 'Unexpected number of entries');
+        assert.eq(logMessages[0].tenant, tenantID.str, 'Unable to find tenant ID');
     } else {
         // Attempting to pass a valid looking security token will fail if not enabled.
-        assert.commandFailed(admin.runCommand({ping: 1}));
+        assert.commandFailed(admin.runCommand({logMessage: 'This is a test'}));
     }
 
     // Restore logging and conn token before shutting down.
