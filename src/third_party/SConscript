@@ -223,6 +223,30 @@ env.AddMethod(injectThirdParty, 'InjectThirdParty')
 
 env = env.Clone()
 
+# Construct an empty object file that we can use to produce the
+# library for every shim. This avoids the need to create and name a
+# different empty source file for every third-party library, as we did
+# in the past.
+
+empty_source=env.Textfile(
+    target='third_party_shim.cpp',
+    source=str(),
+)
+env.Alias('generated-sources', empty_source)
+
+empty_object = env.LibraryObject(
+    target='third_party_shim',
+    source=empty_source,
+)
+
+def shim_library(env, name, **kwargs):
+    return env.Library(
+        target=f"shim_{name}",
+        source=empty_object[0],
+        **kwargs,
+    )
+env.AddMethod(shim_library, 'ShimLibrary')
+
 murmurEnv = env.Clone()
 murmurEnv.InjectThirdParty(libraries=['fmt'])
 murmurEnv.SConscript('murmurhash3/SConscript', exports={ 'env' : murmurEnv })

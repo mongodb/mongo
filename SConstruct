@@ -1264,24 +1264,6 @@ env.AddMethod(mongo_platform.env_os_is_wrapper, 'TargetOSIs')
 env.AddMethod(mongo_platform.env_get_os_name_wrapper, 'GetTargetOSName')
 
 
-def shim_library(env, name, needs_link=False, *args, **kwargs):
-    nodes = env.Library(
-        target=f"shim_{name}" if name else name,
-        source=[
-            f"shim_{name}.cpp" if name else name,
-        ],
-        *args,
-        **kwargs
-    )
-
-    for n in nodes:
-        setattr(n.attributes, "needs_link", needs_link)
-
-    return nodes
-
-env.AddMethod(shim_library, 'ShimLibrary')
-
-
 def conf_error(env, msg, *args):
     print(msg.format(*args))
     print("See {0} for details".format(env.File('$CONFIGURELOG').abspath))
