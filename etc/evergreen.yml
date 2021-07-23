@@ -8820,7 +8820,7 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: sasl
 
 - name: enterprise-macos-rosetta-2
