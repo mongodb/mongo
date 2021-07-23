@@ -159,6 +159,8 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     if (_cursorId == kUnitializedCursorId) {
         _ns = cr.getNSS();
         _rcr.dbname = _ns.db().toString();
+        // 'vars' are only included in the first batch.
+        _cursorVars = cr.getVarsField();
     }
 
     _cursorId = cr.getCursorId();

@@ -44,6 +44,7 @@ const char kCursorsField[] = "cursors";
 const char kCursorField[] = "cursor";
 const char kIdField[] = "id";
 const char kNsField[] = "ns";
+const char kVarsField[] = "vars";
 const char kAtClusterTimeField[] = "atClusterTime";
 const char kBatchField[] = "nextBatch";
 const char kBatchFieldInitial[] = "firstBatch";
@@ -129,6 +130,7 @@ CursorResponse::CursorResponse(NamespaceString nss,
                                boost::optional<long long> numReturnedSoFar,
                                boost::optional<BSONObj> postBatchResumeToken,
                                boost::optional<BSONObj> writeConcernError,
+                               boost::optional<BSONObj> varsField,
                                bool partialResultsReturned,
                                bool invalidated)
     : _nss(std::move(nss)),
@@ -138,6 +140,7 @@ CursorResponse::CursorResponse(NamespaceString nss,
       _numReturnedSoFar(numReturnedSoFar),
       _postBatchResumeToken(std::move(postBatchResumeToken)),
       _writeConcernError(std::move(writeConcernError)),
+      _varsField(std::move(varsField)),
       _partialResultsReturned(partialResultsReturned),
       _invalidated(invalidated) {}
 
@@ -199,6 +202,13 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
                               << "' must be of type string in: " << cmdResponse};
     }
     fullns = nsElt.String();
+
+    BSONElement varsElt = cmdResponse[kVarsField];
+    if (!varsElt.eoo() && varsElt.type() != BSONType::Object) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << "Field '" << kVarsField
+                              << "' must be of type object in: " << cmdResponse};
+    }
 
     BSONElement batchElt = cursorObj[kBatchField];
     if (batchElt.eoo()) {
@@ -280,6 +290,7 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
              postBatchResumeTokenElem ? postBatchResumeTokenElem.Obj().getOwned()
                                       : boost::optional<BSONObj>{},
              writeConcernError ? writeConcernError.Obj().getOwned() : boost::optional<BSONObj>{},
+             varsElt ? varsElt.Obj().getOwned() : boost::optional<BSONObj>{},
              partialResultsReturned.trueValue(),
              invalidatedElem.trueValue()}};
 }
