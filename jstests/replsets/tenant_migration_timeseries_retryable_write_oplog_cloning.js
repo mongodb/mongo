@@ -126,12 +126,15 @@ function testOplogCloning(ordered) {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: kTenantId,
     };
-    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
+
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
 
     const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
         tenantId: kTenantId
     });
 
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
     tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);
 
     // Test the aggregation pipeline the recipient would use for getting the oplog chain where
