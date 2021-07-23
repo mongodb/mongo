@@ -64,7 +64,7 @@ Different types of pages are made up of different types of cells.
 there will be pages between the root page and leaf page. These internal
 pages contain keys that point to other pages.
 - The row-store internal page \c WT_PAGE_ROW_INT is made up of a key cell
-(\c WT_CELL_KEY or \c WT_CELL_KEY_OVFL) followed by an offpage-reference
+(\c WT_CELL_KEY or \c WT_CELL_KEY_OVFL) followed by an off-page reference
 (\c WT_CELL_ADDR_XXX).
 - The column-store internal page \c WT_PAGE_COL_INT simply contains an
 off-page reference.

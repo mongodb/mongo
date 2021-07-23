@@ -1,5 +1,6 @@
 personal_ws-1.1 en 200
 ACM
+ADDR
 APIs
 ASAN
 ActiveState
@@ -149,6 +150,7 @@ aR
 abc
 abstime
 ack'ed
+addr
 ajn
 alloc
 allocator
@@ -376,6 +378,7 @@ keyfmt
 keyid
 keyname
 keyvalue
+kv
 kvs
 lang
 lastname

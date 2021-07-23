@@ -104,7 +104,7 @@ efficient than writing strings, and the map file is needed to decode them.
 
 Now the binary log files need to be converted into the text format. To do that
 use the script `wt_optrack_decode.py` in the WiredTiger tree. We will refer to
-the path to your WiredTiger tree as WT. Suppose that the process ID that
+the path to your WiredTiger tree as WiredTiger. Suppose that the process ID that
 generated the operation tracking files is 25660. Then you'd run the decode
 script like so:
 
@@ -124,7 +124,7 @@ nanoseconds.
 
 In the end, you should see lots of output files whose names look like the
 optrack log files, but with the suffixes `-internal.txt` and `-external.txt`.
-The "internal" files are the log files for WT internal sessions (such as
+The "internal" files are the log files for WiredTiger internal sessions (such as
 eviction threads). The "external" files are for the sessions created by the
 client application.
 
@@ -195,7 +195,7 @@ workload described earlier in this tutorial. Please open the URL, because we
 will now walk over what it shows.
 
 The main page shows a number of outlier histograms. Each histogram corresponds
-to a function that was tracked by the operation tracking system in WT. The
+to a function that was tracked by the operation tracking system in WiredTiger. The
 x-axis shows the execution timeline (in nanoseconds). The y-axis shows how many
 abnormally long executions of the function occurred during very period of the
 execution.
