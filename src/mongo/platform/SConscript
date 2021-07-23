@@ -43,8 +43,6 @@ env.Library(
     ],
     LIBDEPS_NO_INHERIT=[
         '$BUILD_DIR/third_party/shim_allocator',
-        '$BUILD_DIR/shim_crt',
-        '$BUILD_DIR/shim_cxx',
     ],
     LIBDEPS=[],
     MONGO_API_NAME="visibility_test_libcommon",
@@ -57,8 +55,6 @@ env.Library(
     ],
     LIBDEPS_NO_INHERIT=[
         '$BUILD_DIR/third_party/shim_allocator',
-        '$BUILD_DIR/shim_crt',
-        '$BUILD_DIR/shim_cxx',
     ],
     LIBDEPS=[],
     LIBDEPS_PRIVATE=[
@@ -74,8 +70,6 @@ env.Library(
     ],
     LIBDEPS_NO_INHERIT=[
         '$BUILD_DIR/third_party/shim_allocator',
-        '$BUILD_DIR/shim_crt',
-        '$BUILD_DIR/shim_cxx',
     ],
     LIBDEPS=[
         "visibility_test_lib1",
@@ -93,8 +87,6 @@ visibility_test1 = env.Program(
     ],
     LIBDEPS_NO_INHERIT=[
         '$BUILD_DIR/third_party/shim_allocator',
-        '$BUILD_DIR/shim_crt',
-        '$BUILD_DIR/shim_cxx',
     ],
     LIBDEPS=[
         "visibility_test_lib1",
@@ -114,8 +106,6 @@ visibility_test2 = env.Program(
     ],
     LIBDEPS_NO_INHERIT=[
         '$BUILD_DIR/third_party/shim_allocator',
-        '$BUILD_DIR/shim_crt',
-        '$BUILD_DIR/shim_cxx',
     ],
     LIBDEPS=[
         "visibility_test_lib2",
