@@ -199,6 +199,7 @@ public:
                    boost::optional<long long> numReturnedSoFar = boost::none,
                    boost::optional<BSONObj> postBatchResumeToken = boost::none,
                    boost::optional<BSONObj> writeConcernError = boost::none,
+                   boost::optional<BSONObj> varsField = boost::none,
                    bool partialResultsReturned = false,
                    bool invalidated = false);
 
@@ -241,6 +242,10 @@ public:
         return _atClusterTime;
     }
 
+    boost::optional<BSONObj> getVarsField() const {
+        return _varsField;
+    }
+
     bool getPartialResultsReturned() const {
         return _partialResultsReturned;
     }
@@ -266,6 +271,7 @@ private:
     boost::optional<long long> _numReturnedSoFar;
     boost::optional<BSONObj> _postBatchResumeToken;
     boost::optional<BSONObj> _writeConcernError;
+    boost::optional<BSONObj> _varsField;
     bool _partialResultsReturned = false;
     bool _invalidated = false;
 };

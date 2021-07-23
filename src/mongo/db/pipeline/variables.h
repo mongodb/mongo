@@ -84,6 +84,7 @@ public:
     static constexpr auto kClusterTimeId = Id(-4);
     static constexpr auto kJsScopeId = Id(-5);
     static constexpr auto kIsMapReduceId = Id(-6);
+    static constexpr auto kSearchMetaId = Id(-7);
 
     // Map from builtin var name to reserved id number.
     static const StringMap<Id> kBuiltinVarNameToId;
@@ -101,6 +102,12 @@ public:
      * has been marked constant.
      */
     void setConstantValue(Variables::Id id, const Value& value);
+
+    /**
+     * Same as 'setValue' but is only allowed on reserved, builtin, variables. Should not be used
+     * when setting from user input.
+     */
+    void setReservedValue(Variables::Id id, const Value& value, bool isConstant);
 
     /**
      * Gets the value of a user-defined or system variable. If the 'id' provided represents the
@@ -175,6 +182,15 @@ public:
 
     LegacyRuntimeConstants transitionalExtractRuntimeConstants() const;
 
+    static auto getBuiltinVariableName(Variables::Id variable) {
+        for (auto& [name, id] : kBuiltinVarNameToId) {
+            if (variable == id) {
+                return name;
+            }
+        }
+        MONGO_UNREACHABLE_TASSERT(5858104);
+    }
+
 private:
     struct ValueAndState {
         ValueAndState() = default;
@@ -186,15 +202,6 @@ private:
     };
 
     void setValue(Id id, const Value& value, bool isConstant);
-
-    static auto getBuiltinVariableName(Variables::Id variable) {
-        for (auto& [name, id] : kBuiltinVarNameToId) {
-            if (variable == id) {
-                return name;
-            }
-        }
-        return std::string();
-    }
 
     IdGenerator _idGenerator;
     stdx::unordered_map<Id, ValueAndState> _definitions;

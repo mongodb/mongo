@@ -79,6 +79,10 @@ structs:
             cursor:
                 description: "A response cursor object."
                 type: InitialResponseCursor
+            vars:
+                description: "An optional field containing additional response information for the query."
+                type: object
+                optional: true
 
     GetMoreResponseCursor:
         description: "A struct representing a subsequent response cursor."

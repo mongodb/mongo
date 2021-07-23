@@ -51,6 +51,7 @@ constexpr StringData kNowName = "NOW"_sd;
 constexpr StringData kClusterTimeName = "CLUSTER_TIME"_sd;
 constexpr StringData kJsScopeName = "JS_SCOPE"_sd;
 constexpr StringData kIsMapReduceName = "IS_MR"_sd;
+constexpr StringData kSearchMetaName = "SEARCH_META"_sd;
 
 const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {
     {kRootName.rawData(), kRootId},
@@ -58,7 +59,8 @@ const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {
     {kNowName.rawData(), kNowId},
     {kClusterTimeName.rawData(), kClusterTimeId},
     {kJsScopeName.rawData(), kJsScopeId},
-    {kIsMapReduceName.rawData(), kIsMapReduceId}};
+    {kIsMapReduceName.rawData(), kIsMapReduceId},
+    {kSearchMetaName.rawData(), kSearchMetaId}};
 
 const std::map<Variables::Id, std::string> Variables::kIdToBuiltinVarName = {
     {kRootId, kRootName.rawData()},
@@ -66,7 +68,8 @@ const std::map<Variables::Id, std::string> Variables::kIdToBuiltinVarName = {
     {kNowId, kNowName.rawData()},
     {kClusterTimeId, kClusterTimeName.rawData()},
     {kJsScopeId, kJsScopeName.rawData()},
-    {kIsMapReduceId, kIsMapReduceName.rawData()}};
+    {kIsMapReduceId, kIsMapReduceName.rawData()},
+    {kSearchMetaId, kSearchMetaName.rawData()}};
 
 const std::map<StringData, std::function<void(const Value&)>> Variables::kSystemVarValidators = {
     {kNowName,
@@ -106,6 +109,24 @@ void Variables::setValue(Id id, const Value& value, bool isConstant) {
     _definitions[id] = {value, isConstant};
 }
 
+void Variables::setReservedValue(Id id, const Value& value, bool isConstant) {
+    // If a value has already been set for 'id', and that value was marked as constant, then it
+    // is illegal to modify.
+    switch (id) {
+        case Variables::kSearchMetaId:
+            tassert(5858101,
+                    "Can't set a variable that has been set to be constant ",
+                    !hasConstantValue(id));
+            _definitions[id] = {value, isConstant};
+            break;
+        default:
+            // Currently it is only allowed to manually set the SEARCH_META builtin variable.
+            tasserted(5858102,
+                      str::stream() << "Attempted to set '$$" << getBuiltinVariableName(id)
+                                    << "' which is not permitted");
+    }
+}
+
 void Variables::setValue(Variables::Id id, const Value& value) {
     const bool isConstant = false;
     setValue(id, value, isConstant);
@@ -142,6 +163,15 @@ Value Variables::getValue(Id id, const Document& root) const {
                 uasserted(51144,
                           str::stream() << "Builtin variable '$$" << getBuiltinVariableName(id)
                                         << "' is not available");
+            case Variables::kSearchMetaId: {
+                uassert(5858105,
+                        str::stream() << "Must enable 'featureFlagSearchMeta' to access '$$"
+                                      << getBuiltinVariableName(id),
+                        ::mongo::feature_flags::gFeatureFlagSearchMeta.isEnabled(
+                            serverGlobalParams.featureCompatibility));
+                auto metaIt = _definitions.find(id);
+                return metaIt == _definitions.end() ? Value() : metaIt->second.value;
+            }
             default:
                 MONGO_UNREACHABLE;
         }

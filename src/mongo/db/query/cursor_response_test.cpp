@@ -211,6 +211,53 @@ TEST(CursorResponseTest, parseFromBSONPartialResultsReturnedFieldWrongType) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
+TEST(CursorResponseTest, parseFromBSONVarsFieldCorrect) {
+    BSONObj varsContents = BSON("randomVar" << 7);
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON(
+        "cursor" << BSON("id" << CursorId(123) << "ns"
+                              << "db.coll"
+                              << "firstBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
+                 << "vars" << varsContents << "ok" << 1));
+    ASSERT_OK(result.getStatus());
+
+    CursorResponse response = std::move(result.getValue());
+    ASSERT_EQ(response.getCursorId(), CursorId(123));
+    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getBatch().size(), 2U);
+    ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
+    ASSERT_TRUE(response.getVarsField());
+    ASSERT_BSONOBJ_EQ(response.getVarsField().get(), varsContents);
+}
+
+TEST(CursorResponseTest, parseFromBSONVarsFieldWrongType) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON(
+        "cursor" << BSON("id" << CursorId(123) << "ns"
+                              << "db.coll"
+                              << "firstBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
+                 << "vars" << 2 << "ok" << 1));
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(CursorResponseTest, parseFromBSONMultipleVars) {
+    BSONObj varsContents = BSON("randomVar" << 7 << "otherVar" << BSON("nested" << 2));
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON(
+        "cursor" << BSON("id" << CursorId(123) << "ns"
+                              << "db.coll"
+                              << "firstBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
+                 << "vars" << varsContents << "ok" << 1));
+    ASSERT_OK(result.getStatus());
+
+    CursorResponse response = std::move(result.getValue());
+    ASSERT_EQ(response.getCursorId(), CursorId(123));
+    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getBatch().size(), 2U);
+    ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
+    ASSERT_TRUE(response.getVarsField());
+    ASSERT_BSONOBJ_EQ(response.getVarsField().get(), varsContents);
+}
+
 TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithPartialResultsReturned) {
     CursorResponseBuilder::Options options;
     options.isInitialResponse = true;
@@ -297,6 +344,7 @@ TEST(CursorResponseTest, toBSONPartialResultsReturned) {
     CursorResponse response(NamespaceString("testdb.testcoll"),
                             CursorId(123),
                             batch,
+                            boost::none,
                             boost::none,
                             boost::none,
                             boost::none,
