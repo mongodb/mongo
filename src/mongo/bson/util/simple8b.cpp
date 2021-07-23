@@ -326,16 +326,6 @@ uint8_t _getSelectorIndex(uint8_t intsNeeded, uint8_t extensionType) {
     return potentialSelectorIdx;
 }
 
-/* This encodes a value using rle. The selector is set as 15 and the count is added in the next 4
- * bits. The value is the previous value stored by simple8b or 0 if no previous value was stored.
- */
-void _createRleEncoding(uint8_t count, BufBuilder& buffer) {
-    uint64_t rleEncoding = kRleSelector;
-    // We will store (count - 1) during encoding and execute (count + 1) during decoding.
-    rleEncoding |= (count - 1) << kSelectorBits;
-    buffer.appendNum(tagLittleEndian(rleEncoding));
-}
-
 }  // namespace
 
 // Base Constructor for PendingValue
@@ -347,6 +337,11 @@ Simple8bBuilder<T>::PendingValue::PendingValue(
     bool skip)
     : val(val), bitCount(bitCount), trailingZerosCount(trailingZerosCount), skip(skip){};
 
+template <typename T>
+Simple8bBuilder<T>::Simple8bBuilder(WriteFn writeFunc) : _writeFn(std::move(writeFunc)) {}
+
+template <typename T>
+Simple8bBuilder<T>::~Simple8bBuilder() = default;
 
 template <typename T>
 bool Simple8bBuilder<T>::append(T value) {
@@ -393,7 +388,7 @@ void Simple8bBuilder<T>::flush() {
         // have not have a valid selector yet.
         do {
             uint64_t simple8bWord = _encodeLargestPossibleWord(_lastValidExtensionType);
-            _buffer.appendNum(tagLittleEndian(simple8bWord));
+            _writeFn(simple8bWord);
         } while (!_pendingValues.empty());
 
         // There are no more words in _pendingValues and RLE is possible.
@@ -401,16 +396,6 @@ void Simple8bBuilder<T>::flush() {
         _rleCount = 0;
         _lastValueInPrevWord = lastPendingValue;
     }
-}
-
-template <typename T>
-char* Simple8bBuilder<T>::data() {
-    return _buffer.buf();
-}
-
-template <typename T>
-size_t Simple8bBuilder<T>::len() {
-    return _buffer.len();
 }
 
 template <typename T>
@@ -492,7 +477,7 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
         do {
             uint64_t simple8bWord = _encodeLargestPossibleWord(_lastValidExtensionType);
             isSelectorPossible = {true, true, true, true};
-            _buffer.appendNum(tagLittleEndian(simple8bWord));
+            _writeFn(simple8bWord);
         } while (!(_doesIntegerFitInCurrentWord(pendingValue)));
 
         if (tryRle && _pendingValues.empty() && lastPendingValue.val == value) {
@@ -526,7 +511,7 @@ void Simple8bBuilder<T>::_appendSkip() {
                                            true})) {
             // Form simple8b word if skip can not fit with last selector
             uint64_t simple8bWord = _encodeLargestPossibleWord(_lastValidExtensionType);
-            _buffer.appendNum(tagLittleEndian(simple8bWord));
+            _writeFn(simple8bWord);
             isSelectorPossible = {true, true, true, true};
             _lastValidExtensionType = kBaseSelector;
         }
@@ -563,15 +548,25 @@ void Simple8bBuilder<T>::_handleRleTermination() {
 
 template <typename T>
 void Simple8bBuilder<T>::_appendRleEncoding() {
+    // This encodes a value using rle. The selector is set as 15 and the count is added in the next
+    // 4 bits. The value is the previous value stored by simple8b or 0 if no previous value was
+    // stored.
+    auto createRleEncoding = [this](uint8_t count) {
+        uint64_t rleEncoding = kRleSelector;
+        // We will store (count - 1) during encoding and execute (count + 1) during decoding.
+        rleEncoding |= (count - 1) << kSelectorBits;
+        _writeFn(rleEncoding);
+    };
+
     uint8_t count = _rleCount / kRleMultiplier;
     // Check to make sure count is big enough for RLE encoding
     if (count >= 1) {
         while (count > kMaxRleCount) {
             // If one RLE word is insufficient use multiple RLE words.
-            _createRleEncoding(kMaxRleCount, _buffer);
+            createRleEncoding(kMaxRleCount);
             count -= kMaxRleCount;
         }
-        _createRleEncoding(count, _buffer);
+        createRleEncoding(count);
         _rleCount %= kRleMultiplier;
     }
 }
@@ -720,7 +715,7 @@ void Simple8b<T>::Iterator::_loadBlock() {
     _mask = kDecodeMask[extensionType][selector];
     _countMask = kTrailingZerosMask[extensionType];
     _countBits = kTrailingZeroBitSize[extensionType];
-    _countMultiplyer = kTrailingZerosMultiplier[extensionType];
+    _countMultiplier = kTrailingZerosMultiplier[extensionType];
     _bitsPerValue = kBitsPerIntForSelector[extensionType][selector] + _countBits;
     _shift = kSelectorBits;
     _rleRemaining = 0;
@@ -743,7 +738,7 @@ void Simple8b<T>::Iterator::_loadValue() {
 
     // Shift in any trailing zeros that are stored in the count for extended selectors 7 and 8.
     auto trailingZeros = (value & _countMask);
-    _value = T(value >> _countBits) << (trailingZeros * _countMultiplyer);
+    _value = static_cast<T>((value >> _countBits)) << (trailingZeros * _countMultiplier);
 }
 
 template <typename T>

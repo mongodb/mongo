@@ -51,9 +51,13 @@ void assertValuesEqual(const Simple8b<T>& actual, const std::vector<boost::optio
 }
 
 template <typename T>
-Simple8bBuilder<T> buildSimple8b(const std::vector<boost::optional<T>>& expectedInts) {
-    Simple8bBuilder<T> builder;
-    for (const auto& elem : expectedInts) {
+std::pair<SharedBuffer, int> buildSimple8b(const std::vector<boost::optional<T>>& expectedValues) {
+    BufBuilder _buffer;
+    Simple8bBuilder<T> builder([&_buffer](uint64_t simple8bBlock) {
+        _buffer.appendNum(simple8bBlock);
+        return true;
+    });
+    for (const auto& elem : expectedValues) {
         if (elem) {
             ASSERT_TRUE(builder.append(*elem));
         } else {
@@ -61,31 +65,31 @@ Simple8bBuilder<T> buildSimple8b(const std::vector<boost::optional<T>>& expected
         }
     }
     builder.flush();
-    return builder;
+
+    auto size = _buffer.len();
+    return {_buffer.release(), size};
 }
 
 template <typename T>
-void testSimple8b(const std::vector<boost::optional<T>>& expectedInts,
+void testSimple8b(const std::vector<boost::optional<T>>& expectedValues,
                   const std::vector<uint8_t>& expectedBinary) {
-    Simple8bBuilder<T> builder = buildSimple8b<T>(expectedInts);
-    auto data = builder.data();
-    auto len = builder.len();
+    auto [buffer, size] = buildSimple8b(expectedValues);
 
-    ASSERT_EQ(len, expectedBinary.size());
-    if (len > 0) {
-        ASSERT_EQ(memcmp(data, expectedBinary.data(), builder.len()), 0);
+    ASSERT_EQ(size, expectedBinary.size());
+    if (size > 0) {
+        ASSERT_EQ(memcmp(buffer.get(), expectedBinary.data(), size), 0);
     }
 
-    Simple8b<T> s8b(builder.data(), builder.len());
-    assertValuesEqual<T>(s8b, expectedInts);
+    Simple8b<T> s8b(buffer.get(), size);
+    assertValuesEqual(s8b, expectedValues);
 }
 
 template <typename T>
-void testSimple8b(const std::vector<boost::optional<T>>& expectedInts) {
-    Simple8bBuilder<T> builder = buildSimple8b<T>(expectedInts);
+void testSimple8b(const std::vector<boost::optional<T>>& expectedValues) {
+    auto [buffer, size] = buildSimple8b<T>(expectedValues);
 
-    Simple8b<T> s8b(builder.data(), builder.len());
-    assertValuesEqual<T>(s8b, expectedInts);
+    Simple8b<T> s8b(buffer.get(), size);
+    assertValuesEqual(s8b, expectedValues);
 }
 
 TEST(Simple8b, NoValues) {
@@ -437,7 +441,11 @@ TEST(Simple8b, WordOfSkips) {
 }
 
 TEST(Simple8b, MultipleFlushes) {
-    Simple8bBuilder<uint64_t> s8b;
+    BufBuilder buffer;
+    Simple8bBuilder<uint64_t> s8b([&buffer](uint64_t simple8bBlock) {
+        buffer.appendNum(simple8bBlock);
+        return true;
+    });
 
     std::vector<uint64_t> values = {1};
     for (size_t i = 0; i < values.size(); ++i) {
@@ -474,8 +482,8 @@ TEST(Simple8b, MultipleFlushes) {
 
     s8b.flush();
 
-    char* hex = s8b.data();
-    size_t len = s8b.len();
+    char* hex = buffer.buf();
+    size_t len = buffer.len();
     ASSERT_EQ(len, expectedBinary.size());
 
     for (size_t i = 0; i < len; ++i) {

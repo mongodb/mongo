@@ -47,6 +47,11 @@ public:
     // Number of different type of selectors and their extensions available
     static constexpr uint8_t kNumOfSelectorTypes = 4;
 
+    // Callback to handle writing of finalized Simple-8b blocks. Machine Endian byte order.
+    using WriteFn = std::function<void(uint64_t)>;
+    Simple8bBuilder(WriteFn writeFunc);
+    ~Simple8bBuilder();
+
     /**
      * Checks if we can append val to an existing RLE and handles the ending of a RLE.
      * The default RLE value at the beginning is 0.
@@ -67,16 +72,6 @@ public:
      * to use one wiht more slots.
      */
     void flush();
-
-    /**
-     * Returns the underlying binary encoding in _buffered.
-     */
-    char* data();
-
-    /**
-     * Returns the number of bytes in the binary buffer returned by the function, data().
-     */
-    size_t len();
 
     /**
      * This stores a value that has yet to be added to the buffer. It also stores the number of bits
@@ -176,9 +171,6 @@ private:
     // If RLE is ongoing, the last value in the previous Simple8b word.
     PendingValue _lastValueInPrevWord = {0, {0, 0, 0, 0}, {0, 0, 0, 0}, false};
 
-    // This buffer holds the simple8b compressed words
-    BufBuilder _buffer;
-
     // These variables hold the max amount of bits for each value in _pendingValues. They are
     // updated whenever values are added or removed from _pendingValues to always reflect the max
     // value in the deque.
@@ -198,6 +190,9 @@ private:
     // This holds values that have not be encoded to the simple8b buffer, but are waiting for a full
     // simple8b word to be filled before writing to buffer.
     std::deque<PendingValue> _pendingValues;
+
+    // User-defined callback to handle writing of finalized Simple-8b blocks
+    WriteFn _writeFn;
 };
 
 /**
@@ -214,7 +209,6 @@ public:
         using iterator_category = std::forward_iterator_tag;
         using difference_type = ptrdiff_t;
         using value_type = boost::optional<T>;
-        // pointer and reference is not used but some traits look for them
         using pointer = const boost::optional<T>*;
         using reference = const boost::optional<T>&;
 
@@ -225,7 +219,7 @@ public:
         size_t blockSize() const;
 
         /**
-         * Returns the value at the current iterator position.
+         * Returns the value in Little Endian byte order at the current iterator position.
          */
         pointer operator->() const {
             return &_value;
@@ -289,8 +283,8 @@ public:
         // Number of bits for the count
         uint8_t _countBits;
 
-        // Multiplyer of the value in count to get number of zeros
-        uint8_t _countMultiplyer;
+        // Multiplier of the value in count to get number of zeros
+        uint8_t _countMultiplier;
     };
 
     /**
