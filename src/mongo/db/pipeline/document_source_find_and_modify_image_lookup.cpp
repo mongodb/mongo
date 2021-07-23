@@ -194,7 +194,7 @@ boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImag
     }
 
     // Stash the 'findAndModify' document to return after downconverting it.
-    repl::OpTime imageOpTime(inputOplog.getTimestamp(), *inputOplog.getTerm());
+    repl::OpTime imageOpTime(inputOplog.getTimestamp() - 1, *inputOplog.getTerm());
     const auto docToStash =
         downConvertFindAndModifyEntry(inputDoc,
                                       imageOpTime,
@@ -212,7 +212,10 @@ boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImag
     forgedNoop.setNss(inputOplog.getNss());
     forgedNoop.setUuid(*inputOplog.getUuid());
 
-    forgedNoop.setOpTime(imageOpTime);
+    // Set the opTime to be the findAndModify timestamp - 1. We guarantee that there will be no
+    // collisions because we always reserve an extra oplog slot when writing the retryable
+    // findAndModify entry on the primary.
+    forgedNoop.setOpTime(repl::OpTime(imageOpTime.getTimestamp(), *inputOplog.getTerm()));
     forgedNoop.setStatementIds({0});
     return Document{forgedNoop.toBSON()};
 }

@@ -276,7 +276,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         ASSERT_EQUALS(sessionId, forgedImageEntry.getSessionId().get());
         ASSERT_EQUALS("n", repl::OpType_serializer(forgedImageEntry.getOpType()));
         ASSERT_EQUALS(0LL, forgedImageEntry.getStatementIds().front());
-        ASSERT_EQUALS(ts, forgedImageEntry.getTimestamp());
+        ASSERT_EQUALS(ts - 1, forgedImageEntry.getTimestamp());
         ASSERT_EQUALS(1, forgedImageEntry.getTerm().get());
 
         // The next doc should be the original findAndModify oplog entry with the 'needsRetryImage'
@@ -289,8 +289,9 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
             : repl::OplogEntry::kPostImageOpTimeFieldName;
         expectedDownConvertedDoc.setField(
             expectedImageOpTimeFieldName,
-            Value{Document{{repl::OpTime::kTimestampFieldName.toString(), opTime.getTimestamp()},
-                           {repl::OpTime::kTermFieldName.toString(), opTime.getTerm()}}});
+            Value{Document{
+                {repl::OpTime::kTimestampFieldName.toString(), forgedImageEntry.getTimestamp()},
+                {repl::OpTime::kTermFieldName.toString(), opTime.getTerm()}}});
         ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDownConvertedDoc.freeze());
 
         ASSERT_TRUE(imageLookup->getNext().isEOF());
