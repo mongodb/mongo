@@ -243,8 +243,6 @@ s2Env.SConscript('s2/SConscript', exports={'env' : s2Env})
 if use_libunwind:
     unwindEnv = env.Clone(
         LIBDEPS_NO_INHERIT=[
-            '$BUILD_DIR/shim_crt',
-            '$BUILD_DIR/shim_cxx',
             '$BUILD_DIR/third_party/shim_allocator',
         ],
     )
@@ -465,8 +463,6 @@ if "tom" in env["MONGO_CRYPTO"]:
 
 gperftoolsEnv = env.Clone(
     LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/shim_crt',
-        '$BUILD_DIR/shim_cxx',
         '$BUILD_DIR/third_party/shim_allocator',
     ],
 )
