@@ -7,6 +7,7 @@
  *     does_not_support_stepdowns,
  *     does_not_support_transactions,
  *     requires_fcv_49,
+ *     requires_replication,
  * ]
  */
 (function() {
