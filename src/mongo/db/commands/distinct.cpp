@@ -339,7 +339,6 @@ public:
             keyBob.append("key", 1);
             keyBob.append("query", 1);
             keyBob.append("collation", 1);
-            keyBob.append("shardVersion", 1);
             return keyBob.obj();
         }();
 

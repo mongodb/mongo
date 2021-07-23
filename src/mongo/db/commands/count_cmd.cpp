@@ -309,7 +309,6 @@ public:
             keyBob.append("limit", 1);
             keyBob.append("hint", 1);
             keyBob.append("collation", 1);
-            keyBob.append("shardVersion", 1);
 
             return keyBob.obj();
         }();

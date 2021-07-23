@@ -732,11 +732,6 @@ void CmdFindAndModify::Invocation::appendMirrorableRequest(BSONObjBuilder* bob) 
                     *req.getCollation());
     }
 
-    const auto& rawCmd = unparsedRequest().body;
-    if (const auto& shardVersion = rawCmd.getField("shardVersion"); !shardVersion.eoo()) {
-        bob->append(shardVersion);
-    }
-
     // Prevent the find from returning multiple documents since we can
     bob->append("batchSize", 1);
     bob->append("singleBatch", true);
