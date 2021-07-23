@@ -34,6 +34,8 @@ last-continuous:
     concurrency_sharded_replication_multiversion_passthrough:
 
     replica_sets_multiversion:
+      - ticket: SERVER-58744
+        test_file: jstests/replsets/apply_ops_capped_collection.js
 
     replica_sets_jscore_multiversion_passthrough:
 
