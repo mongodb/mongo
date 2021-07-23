@@ -212,7 +212,10 @@ boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImag
     forgedNoop.setNss(inputOplog.getNss());
     forgedNoop.setUuid(*inputOplog.getUuid());
 
-    forgedNoop.setOpTime(imageOpTime);
+    // Set the opTime to be the findAndModify timestamp - 1. We guarantee that there will be no
+    // collisions because we always reserve an extra oplog slot when writing the retryable
+    // findAndModify entry on the primary.
+    forgedNoop.setOpTime(repl::OpTime(inputOplog.getTimestamp() - 1, *inputOplog.getTerm()));
     forgedNoop.setStatementIds({0});
     return Document{forgedNoop.toBSON()};
 }

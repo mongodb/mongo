@@ -275,7 +275,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         ASSERT_EQUALS(sessionId, forgedImageEntry.getSessionId().get());
         ASSERT_EQUALS("n", repl::OpType_serializer(forgedImageEntry.getOpType()));
         ASSERT_EQUALS(0LL, forgedImageEntry.getStatementIds().front());
-        ASSERT_EQUALS(ts, forgedImageEntry.getTimestamp());
+        ASSERT_EQUALS(ts - 1, forgedImageEntry.getTimestamp());
         ASSERT_EQUALS(1, forgedImageEntry.getTerm().get());
 
         // The next doc should be the original findAndModify oplog entry with the 'needsRetryImage'
