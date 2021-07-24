@@ -232,19 +232,6 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 // to proceed using the collection uuids to perform destructive operations
                 sharding_ddl_util::performNoopMajorityWriteLocally(opCtx);
 
-                // ensure we do not delete collections of a different DB
-                if (!_firstExecution && _doc.getDatabaseVersion()) {
-                    try {
-                        const auto db = catalogClient->getDatabase(
-                            opCtx, _dbName, repl::ReadConcernLevel::kLocalReadConcern);
-                        if (_doc.getDatabaseVersion()->getUuid() != db.getVersion().getUuid()) {
-                            return;  // skip to _flushDatabaseCacheUpdates
-                        }
-                    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                        return;  // skip to _flushDatabaseCacheUpdates
-                    }
-                }
-
                 for (const auto& coll : allCollectionsForDb) {
                     const auto& nss = coll.getNss();
                     LOGV2_DEBUG(5494505, 2, "Dropping collection", "namespace"_attr = nss);
@@ -313,31 +300,27 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     removeDatabaseMetadataFromConfig(
                         opCtx, _dbName, *metadata().getDatabaseVersion());
                 }
+
+                {
+                    // Send _flushDatabaseCacheUpdates to all shards
+                    auto flushDbCacheUpdatesCmd =
+                        _flushDatabaseCacheUpdatesWithWriteConcern(_dbName.toString());
+                    flushDbCacheUpdatesCmd.setSyncFromConfig(true);
+                    flushDbCacheUpdatesCmd.setDbName(_dbName);
+
+                    IgnoreAPIParametersBlock ignoreApiParametersBlock{opCtx};
+                    sharding_ddl_util::sendAuthenticatedCommandToShards(
+                        opCtx,
+                        "admin",
+                        CommandHelpers::appendMajorityWriteConcern(
+                            flushDbCacheUpdatesCmd.toBSON({})),
+                        allShardIds,
+                        **executor);
+                }
+
+                ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase", _dbName);
+                LOGV2(5494506, "Database dropped", "db"_attr = _dbName);
             }))
-        .then([this, executor = executor, anchor = shared_from_this()] {
-            auto opCtxHolder = cc().makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
-            {
-                const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-                // Send _flushDatabaseCacheUpdates to all shards
-                auto flushDbCacheUpdatesCmd =
-                    _flushDatabaseCacheUpdatesWithWriteConcern(_dbName.toString());
-                flushDbCacheUpdatesCmd.setSyncFromConfig(true);
-                flushDbCacheUpdatesCmd.setDbName(_dbName);
-
-                IgnoreAPIParametersBlock ignoreApiParametersBlock{opCtx};
-                sharding_ddl_util::sendAuthenticatedCommandToShards(
-                    opCtx,
-                    "admin",
-                    CommandHelpers::appendMajorityWriteConcern(flushDbCacheUpdatesCmd.toBSON({})),
-                    allShardIds,
-                    **executor);
-            }
-
-            ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase", _dbName);
-            LOGV2(5494506, "Database dropped", "db"_attr = _dbName);
-        })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (!status.isA<ErrorCategory::NotPrimaryError>() &&
                 !status.isA<ErrorCategory::ShutdownError>()) {
