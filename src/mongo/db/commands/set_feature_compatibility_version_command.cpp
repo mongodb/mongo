@@ -617,7 +617,6 @@ private:
 
         // Time-series collections are only supported in 5.0. If the user tries to downgrade the
         // cluster to an earlier version, they must first remove all time-series collections.
-        // TODO (SERVER-56171): Remove once 5.0 is last-lts.
         for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
             auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, dbName);
             if (!viewCatalog) {
@@ -635,7 +634,6 @@ private:
             });
         }
 
-        // TODO (SERVER-56171): Remove once 5.0 is last-lts.
         removeTimeseriesEntriesFromConfigTransactions(opCtx);
 
         // If the 'useSecondaryDelaySecs' feature flag is disabled in the downgraded FCV, issue a
