@@ -555,24 +555,19 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
         }
 
         // Fail if there are partially written chunks from a previous failed shardCollection.
-
-        if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
-            if (serverGlobalParams.featureCompatibility.getVersion() ==
-                    FCVersion::kFullyDowngradedTo44 ||
-                serverGlobalParams.featureCompatibility.getVersion() == FCVersion::kVersion49) {
-                checkForExistingChunks(opCtx, nss, boost::none);
-            } else if (serverGlobalParams.featureCompatibility.getVersion() ==
-                       FCVersion::kFullyDowngradedTo50) {
-                if (auto optUUID = sharding_ddl_util::getCollectionUUID(opCtx, nss))
-                    checkForExistingChunks(opCtx, nss, optUUID);
-            } else {
-                // In the intermediate state must check for leftovers from both formats
-                checkForExistingChunks(opCtx, nss, boost::none);
-                if (auto optUUID = sharding_ddl_util::getCollectionUUID(opCtx, nss))
-                    checkForExistingChunks(opCtx, nss, optUUID);
-            }
-        } else {
+        if (serverGlobalParams.featureCompatibility.getVersion() ==
+                FCVersion::kFullyDowngradedTo44 ||
+            serverGlobalParams.featureCompatibility.getVersion() == FCVersion::kVersion49) {
             checkForExistingChunks(opCtx, nss, boost::none);
+        } else if (serverGlobalParams.featureCompatibility.getVersion() ==
+                   FCVersion::kFullyDowngradedTo50) {
+            if (auto optUUID = sharding_ddl_util::getCollectionUUID(opCtx, nss))
+                checkForExistingChunks(opCtx, nss, optUUID);
+        } else {
+            // In the intermediate state must check for leftovers from both formats
+            checkForExistingChunks(opCtx, nss, boost::none);
+            if (auto optUUID = sharding_ddl_util::getCollectionUUID(opCtx, nss))
+                checkForExistingChunks(opCtx, nss, optUUID);
         }
 
         checkCollation(opCtx, request);

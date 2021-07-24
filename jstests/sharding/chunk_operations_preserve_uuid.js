@@ -17,20 +17,6 @@ const collName = "foo";
 const ns = dbName + "." + collName;
 var collUUID;  // Initialized after shardCollection
 
-{
-    // Skip test if feature flag disabled
-    let csrs_config_db = st.configRS.getPrimary().getDB('config');
-    const isFeatureFlagEnabled =
-        csrs_config_db
-            .adminCommand({getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1})
-            .featureFlagShardingFullDDLSupportTimestampedVersion.value;
-
-    if (!isFeatureFlagEnabled) {
-        st.stop();
-        return;
-    }
-}
-
 function allChunksWithUUID() {
     var cursor = findChunksUtil.findChunksByNs(st.config, ns);
     do {

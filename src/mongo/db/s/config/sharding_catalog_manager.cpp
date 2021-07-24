@@ -475,20 +475,10 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
 
     // (Generic FCV reference): TODO SERVER-53283 Remove the outermost 'if' statement once 5.0 has
     // branched out.
-    if (!serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading() ||
-        !feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
-        if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            const auto result = createUuidIndexesForConfigChunks(opCtx);
-            if (result != Status::OK()) {
-                return result;
-            }
-
-        } else {
-            const auto result = createNsIndexesForConfigChunks(opCtx);
-            if (result != Status::OK()) {
-                return result;
-            }
+    if (!serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+        const auto result = createUuidIndexesForConfigChunks(opCtx);
+        if (result != Status::OK()) {
+            return result;
         }
     }
 
@@ -636,16 +626,14 @@ void ShardingCatalogManager::upgradeMetadataFor50Phase1(OperationContext* opCtx)
         throw;
     }
 
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
-        try {
-            _upgradeDatabasesEntriesTo50(opCtx);
-            _upgradeCollectionsAndChunksEntriesTo50Phase1(opCtx);
-        } catch (const DBException& e) {
-            LOGV2(5581201,
-                  "Failed to upgrade sharding metadata (phase 1): {error}",
-                  "error"_attr = e.toString());
-            throw;
-        }
+    try {
+        _upgradeDatabasesEntriesTo50(opCtx);
+        _upgradeCollectionsAndChunksEntriesTo50Phase1(opCtx);
+    } catch (const DBException& e) {
+        LOGV2(5581201,
+              "Failed to upgrade sharding metadata (phase 1): {error}",
+              "error"_attr = e.toString());
+        throw;
     }
 
     LOGV2(5581202, "Successfully upgraded metadata to 5.0 (phase 1)");
@@ -654,15 +642,13 @@ void ShardingCatalogManager::upgradeMetadataFor50Phase1(OperationContext* opCtx)
 void ShardingCatalogManager::upgradeMetadataFor50Phase2(OperationContext* opCtx) {
     LOGV2(5581206, "Starting metadata upgrade to 5.0 (phase 2)");
 
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
-        try {
-            _upgradeCollectionsAndChunksEntriesTo50Phase2(opCtx);
-        } catch (const DBException& e) {
-            LOGV2(5581207,
-                  "Failed to upgrade sharding metadata (phase 2): {error}",
-                  "error"_attr = e.toString());
-            throw;
-        }
+    try {
+        _upgradeCollectionsAndChunksEntriesTo50Phase2(opCtx);
+    } catch (const DBException& e) {
+        LOGV2(5581207,
+              "Failed to upgrade sharding metadata (phase 2): {error}",
+              "error"_attr = e.toString());
+        throw;
     }
 
     LOGV2(5581208, "Successfully upgraded metadata to 5.0 (phase 2)");
@@ -671,16 +657,14 @@ void ShardingCatalogManager::upgradeMetadataFor50Phase2(OperationContext* opCtx)
 void ShardingCatalogManager::downgradeMetadataToPre50Phase1(OperationContext* opCtx) {
     LOGV2(5581203, "Starting metadata downgrade to pre 5.0 (phase 1)");
 
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
-        try {
-            _downgradeCollectionsAndChunksEntriesToPre50Phase1(opCtx);
-            _downgradeDatabasesEntriesToPre50(opCtx);
-        } catch (const DBException& e) {
-            LOGV2(5581204,
-                  "Failed to downgrade sharding metadata (phase 1): {error}",
-                  "error"_attr = e.toString());
-            throw;
-        }
+    try {
+        _downgradeCollectionsAndChunksEntriesToPre50Phase1(opCtx);
+        _downgradeDatabasesEntriesToPre50(opCtx);
+    } catch (const DBException& e) {
+        LOGV2(5581204,
+              "Failed to downgrade sharding metadata (phase 1): {error}",
+              "error"_attr = e.toString());
+        throw;
     }
 
     LOGV2(5581205, "Successfully downgraded metadata to pre 5.0 (phase 1)");
@@ -689,15 +673,13 @@ void ShardingCatalogManager::downgradeMetadataToPre50Phase1(OperationContext* op
 void ShardingCatalogManager::downgradeMetadataToPre50Phase2(OperationContext* opCtx) {
     LOGV2(5581209, "Starting metadata downgrade to pre 5.0 (phase 2)");
 
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
-        try {
-            _downgradeCollectionsAndChunksEntriesToPre50Phase2(opCtx);
-        } catch (const DBException& e) {
-            LOGV2(5581210,
-                  "Failed to downgrade sharding metadata (phase 2): {error}",
-                  "error"_attr = e.toString());
-            throw;
-        }
+    try {
+        _downgradeCollectionsAndChunksEntriesToPre50Phase2(opCtx);
+    } catch (const DBException& e) {
+        LOGV2(5581210,
+              "Failed to downgrade sharding metadata (phase 2): {error}",
+              "error"_attr = e.toString());
+        throw;
     }
 
     LOGV2(5581211, "Successfully downgraded metadata to pre 5.0 (phase 2)");

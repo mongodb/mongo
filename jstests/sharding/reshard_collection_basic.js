@@ -28,11 +28,6 @@ let shardIdToShardMap = {};
 shardIdToShardMap[st.shard0.shardName] = st.shard0;
 shardIdToShardMap[st.shard1.shardName] = st.shard1;
 
-const DDLFeatureFlagParam = assert.commandWorked(st.configRS.getPrimary().adminCommand(
-    {getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1}));
-const isDDLFeatureFlagEnabled =
-    DDLFeatureFlagParam.featureFlagShardingFullDDLSupportTimestampedVersion.value;
-
 let getUUIDFromCollectionInfo = (dbName, collName, collInfo) => {
     if (collInfo) {
         return extractUUIDFromObject(collInfo.info.uuid);
@@ -56,11 +51,8 @@ let getAllShardIdsFromExpectedChunks = (expectedChunks) => {
 };
 
 let verifyChunksMatchExpected = (numExpectedChunks, presetExpectedChunks) => {
-    let chunkQuery = {ns: ns};
-    if (isDDLFeatureFlagEnabled) {
-        let collEntry = mongos.getDB('config').getCollection('collections').findOne({_id: ns});
-        chunkQuery = {uuid: collEntry.uuid};
-    }
+    let collEntry = mongos.getDB('config').getCollection('collections').findOne({_id: ns});
+    let chunkQuery = {uuid: collEntry.uuid};
 
     const reshardedChunks = mongosConfig.chunks.find(chunkQuery).toArray();
 
