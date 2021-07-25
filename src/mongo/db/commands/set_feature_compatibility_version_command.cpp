@@ -67,12 +67,10 @@
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
@@ -155,59 +153,6 @@ void waitForCurrentConfigCommitment(OperationContext* opCtx) {
         uasserted(ErrorCodes::CurrentConfigNotCommittedYet, status.reason());
     }
     uassertStatusOK(status);
-}
-
-void removeTimeseriesEntriesFromConfigTransactions(OperationContext* opCtx,
-                                                   const std::vector<LogicalSessionId>& sessions) {
-    DBDirectClient dbClient(opCtx);
-    for (const auto& session : sessions) {
-        dbClient.remove(NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                        QUERY(LogicalSessionRecord::kIdFieldName << session.toBSON()));
-    }
-}
-
-void removeTimeseriesEntriesFromConfigTransactions(OperationContext* opCtx) {
-    DBDirectClient dbClient(opCtx);
-
-    std::vector<LogicalSessionId> sessions;
-
-    static constexpr StringData kLastWriteOpFieldName = "lastWriteOpTime"_sd;
-    auto cursor = dbClient.query(NamespaceString::kSessionTransactionsTableNamespace, Query{});
-    while (cursor->more()) {
-        try {
-            auto entry =
-                TransactionHistoryIterator{
-                    repl::OpTime::parse(cursor->next()[kLastWriteOpFieldName].Obj())}
-                    .next(opCtx);
-            if (entry.getNss().isTimeseriesBucketsCollection()) {
-                sessions.push_back(*entry.getSessionId());
-            }
-        } catch (const DBException& ex) {
-            // IncompleteTransactionHistory can be thrown if the oplog entry referenced by this
-            // config.transactions entry no longer exists.
-            if (ex.code() != ErrorCodes::IncompleteTransactionHistory) {
-                throw;
-            }
-        }
-    }
-
-    if (sessions.empty()) {
-        return;
-    }
-
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-        opCtx->getLogicalSessionId()) {
-        // Perform the deletes using a separate client because direct writes to config.transactions
-        // are not allowed in sessions.
-        auto client =
-            getGlobalServiceContext()->makeClient("removeTimeseriesEntriesFromConfigTransactions");
-        AlternativeClientRegion acr(client);
-
-        removeTimeseriesEntriesFromConfigTransactions(cc().makeOperationContext().get(), sessions);
-    } else {
-        removeTimeseriesEntriesFromConfigTransactions(opCtx, sessions);
-    }
 }
 
 void abortAllReshardCollection(OperationContext* opCtx) {
@@ -614,27 +559,6 @@ private:
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         const bool isReplSet =
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-
-        // Time-series collections are only supported in 5.0. If the user tries to downgrade the
-        // cluster to an earlier version, they must first remove all time-series collections.
-        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-            auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, dbName);
-            if (!viewCatalog) {
-                continue;
-            }
-            viewCatalog->iterate([](const ViewDefinition& view) {
-                uassert(ErrorCodes::CannotDowngrade,
-                        str::stream()
-                            << "Cannot downgrade the cluster when there are time-series "
-                               "collections present; drop all time-series collections before "
-                               "downgrading. First detected time-series collection: "
-                            << view.name(),
-                        !view.timeseries());
-                return true;
-            });
-        }
-
-        removeTimeseriesEntriesFromConfigTransactions(opCtx);
 
         // If the 'useSecondaryDelaySecs' feature flag is disabled in the downgraded FCV, issue a
         // reconfig to change the 'secondaryDelaySecs' field to 'slaveDelay'.
