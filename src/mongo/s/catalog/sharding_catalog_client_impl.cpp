@@ -71,14 +71,11 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-MONGO_FAIL_POINT_DEFINE(failApplyChunkOps);
 
 using repl::OpTime;
 using std::set;
@@ -1003,13 +1000,6 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
     Status status = response.getValue().commandStatus.isOK()
         ? std::move(response.getValue().writeConcernStatus)
         : std::move(response.getValue().commandStatus);
-
-    // TODO (Dianna) This fail point needs to be reexamined when CommitChunkMigration is in:
-    // migrations will no longer be able to exercise it, so split or merge will need to do so.
-    // SERVER-22659.
-    if (MONGO_unlikely(failApplyChunkOps.shouldFail())) {
-        status = Status(ErrorCodes::InternalError, "Failpoint 'failApplyChunkOps' generated error");
-    }
 
     if (!status.isOK()) {
         string errMsg;
