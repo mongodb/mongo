@@ -1105,7 +1105,6 @@ functions:
   "generate resmoke tasks":
     - *fetch_artifacts
     - *f_expansions_write
-    - *add_git_tag
     - *kill_processes
     - *cleanup_environment
     - *set_up_venv
@@ -3938,6 +3937,7 @@ tasks:
     - command: manifest.load
     - *git_get_project
     - *f_expansions_write
+    - *add_git_tag
     - *kill_processes
     - *cleanup_environment
     - func: "set up venv"
