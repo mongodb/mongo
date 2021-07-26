@@ -146,18 +146,23 @@ IndexDataEntry::IndexDataEntry(const std::string& indexDataEntry, KeyFormat keyF
 
 std::string IndexDataEntry::create(RecordId loc, const KeyString::TypeBits& typeBits) {
     // [RecordId size, RecordId, TypeBits size, TypeBits]
-    StackBufBuilder builder;
+    std::string entry;
+    auto writeSizeT = [&entry](size_t val) {
+        auto data = reinterpret_cast<const char*>(&val);
+        entry.append(data, data + sizeof(val));
+    };
+
     if (loc.isLong()) {
-        builder.appendNum(sizeof(int64_t));
-        builder.appendNum(loc.getLong());
+        writeSizeT(sizeof(int64_t));
+        writeSizeT(loc.getLong());
     } else {
         auto str = loc.getStr();
-        builder.appendNum(str.size());
-        builder.appendBuf(str.rawData(), str.size());
+        writeSizeT(str.size());
+        entry.append(str.rawData(), str.size());
     }
-    builder.appendNum(typeBits.getSize());
-    builder.appendBuf(typeBits.getBuffer(), typeBits.getSize());
-    return std::string(builder.buf(), builder.len());
+    writeSizeT(typeBits.getSize());
+    entry.append(typeBits.getBuffer(), typeBits.getSize());
+    return entry;
 }
 
 const uint8_t* IndexDataEntry::buffer() const {
