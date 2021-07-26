@@ -823,7 +823,8 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
                     NamespaceString(ns()),
                     getGlobalReplSettings().usingReplSets() ||
                         repl::ReplSettings::shouldRecoverFromOplogAsStandalone())),
-      _isOplog(NamespaceString::oplog(params.ns)),
+      // We will only provide special support to the local.oplog.rs collection.
+      _isOplog(NamespaceString::kRsOplogNamespace.toString() == params.ns),
       _cappedMaxSize(params.cappedMaxSize),
       _cappedMaxSizeSlack(std::min(params.cappedMaxSize / 10, int64_t(16 * 1024 * 1024))),
       _cappedMaxDocs(params.cappedMaxDocs),

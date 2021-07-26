@@ -419,9 +419,8 @@ private:
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
     ClockSource* const _clockSource;
 
-    // Mutex to protect use of _oplogManagerCount by this instance of KV engine.
+    // Mutex to protect use of _oplogManager by this instance of KV engine.
     mutable Mutex _oplogManagerMutex = MONGO_MAKE_LATCH("::_oplogManagerMutex");
-    std::size_t _oplogManagerCount = 0;
     std::unique_ptr<WiredTigerOplogManager> _oplogManager;
 
     std::string _canonicalName;

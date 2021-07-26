@@ -440,7 +440,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CreateNewStone) {
 
     const int64_t cappedMaxSize = 10 * 1024;  // 10KB
     unique_ptr<RecordStore> rs(
-        harnessHelper->newCappedRecordStore("local.oplog.stones", cappedMaxSize, -1));
+        harnessHelper->newCappedRecordStore("local.oplog.rs", cappedMaxSize, -1));
 
     WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
     WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
@@ -496,7 +496,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_UpdateRecord) {
 
     const int64_t cappedMaxSize = 10 * 1024;  // 10KB
     unique_ptr<RecordStore> rs(
-        harnessHelper->newCappedRecordStore("local.oplog.stones", cappedMaxSize, -1));
+        harnessHelper->newCappedRecordStore("local.oplog.rs", cappedMaxSize, -1));
 
     WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
     WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
@@ -571,7 +571,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_Truncate) {
 
     const int64_t cappedMaxSize = 10 * 1024;  // 10KB
     unique_ptr<RecordStore> rs(
-        harnessHelper->newCappedRecordStore("local.oplog.stones", cappedMaxSize, -1));
+        harnessHelper->newCappedRecordStore("local.oplog.rs", cappedMaxSize, -1));
 
     WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
     WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
@@ -616,7 +616,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
 
     const int64_t cappedMaxSize = 10 * 1024;  // 10KB
     unique_ptr<RecordStore> rs(
-        harnessHelper->newCappedRecordStore("local.oplog.stones", cappedMaxSize, -1));
+        harnessHelper->newCappedRecordStore("local.oplog.rs", cappedMaxSize, -1));
 
     WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
     WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
@@ -725,7 +725,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
 
     const int64_t cappedMaxSize = 10 * 1024;  // 10KB
     unique_ptr<RecordStore> rs(
-        harnessHelper->newCappedRecordStore("local.oplog.stones", cappedMaxSize, -1));
+        harnessHelper->newCappedRecordStore("local.oplog.rs", cappedMaxSize, -1));
 
     WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
     WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
@@ -826,7 +826,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_AscendingOrder) {
 
     const int64_t cappedMaxSize = 10 * 1024;  // 10KB
     unique_ptr<RecordStore> rs(
-        harnessHelper->newCappedRecordStore("local.oplog.stones", cappedMaxSize, -1));
+        harnessHelper->newCappedRecordStore("local.oplog.rs", cappedMaxSize, -1));
 
     WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
     WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();

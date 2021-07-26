@@ -72,7 +72,7 @@ TEST(RecordStoreTestHarness, OplogHack) {
     // the test itself.
     const int64_t cappedMaxSize = 10 * 1024;  // 10KB
     std::unique_ptr<RecordStore> rs(
-        harnessHelper->newCappedRecordStore("local.oplog.foo", cappedMaxSize, -1));
+        harnessHelper->newCappedRecordStore("local.oplog.rs", cappedMaxSize, -1));
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 

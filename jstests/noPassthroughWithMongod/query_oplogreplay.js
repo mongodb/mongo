@@ -7,7 +7,7 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/storage_engine_utils.js");
 
-const t = db.getSiblingDB("local").oplog.jstests_query_oplogreplay;
+const t = db.getSiblingDB("local").oplog.rs;
 
 function dropOplogAndCreateNew(oplog, newCollectionSpec) {
     if (storageEngineIsWiredTigerOrInMemory()) {
