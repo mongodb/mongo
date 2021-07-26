@@ -119,7 +119,7 @@ __verify_last_avail(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 
     ci = &_ci;
     WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
-    WT_ERR(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
+    WT_ERR(__wt_block_ckpt_unpack(session, block, ckpt->raw.data, ckpt->raw.size, ci));
 
     el = &ci->avail;
     if (el->offset != WT_BLOCK_INVALID_OFFSET) {
@@ -148,7 +148,7 @@ __verify_set_file_size(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 
     ci = &_ci;
     WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
-    WT_ERR(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
+    WT_ERR(__wt_block_ckpt_unpack(session, block, ckpt->raw.data, ckpt->raw.size, ci));
 
     if (block->verify_layout) {
         WT_ERR(__wt_scr_alloc(session, 0, &tmp));
@@ -318,10 +318,9 @@ __wt_block_verify_addr(
     wt_off_t offset;
     uint32_t checksum, objectid, size;
 
-    WT_UNUSED(addr_size);
-
     /* Crack the cookie. */
-    WT_RET(__wt_block_buffer_to_addr(block, addr, &objectid, &offset, &size, &checksum));
+    WT_RET(__wt_block_addr_unpack(
+      session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
     /* Add to the per-file list. */
     WT_RET(__verify_filefrag_add(session, block, NULL, offset, size, false));

@@ -383,17 +383,19 @@ __wt_debug_offset(
 
     /*
      * This routine depends on the default block manager's view of files, where an address consists
-     * of a file offset, length, and checksum. This is for debugging only: other block managers
-     * might not see a file or address the same way, that's why there's no block manager method.
+     * of a file ID, file offset, length, and checksum. This is only for debugging, other block
+     * managers might not describe underlying objects the same way, that's why there's no block
+     * manager method.
      *
      * Convert the triplet into an address structure.
      */
     block = S2BT(session)->bm->block;
     endp = addr;
-    WT_RET(__wt_block_addr_to_buffer(block, &endp, block->objectid, offset, size, checksum));
+    WT_RET(__wt_block_addr_pack(block, &endp, block->objectid, offset, size, checksum));
 
     /*
-     * Read the address through the btree I/O functions (so the block is decompressed as necessary).
+     * Read the address through the btree I/O functions (so the block is decompressed and/or
+     * unencrypted as necessary).
      */
     WT_RET(__wt_scr_alloc(session, 0, &buf));
     WT_ERR(__wt_bt_read(session, buf, addr, WT_PTRDIFF(endp, addr)));
