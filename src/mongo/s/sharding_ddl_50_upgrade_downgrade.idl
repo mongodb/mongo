@@ -31,12 +31,6 @@ global:
   cpp_namespace: "mongo::feature_flags"
 
 feature_flags:
-  featureFlagShardingFullDDLSupportTimestampedVersion:
-    description: "Enables the usage of timestamps in Database/Chunk versions."
-    cpp_varname: gShardingFullDDLSupportTimestampedVersion
-    default: true
-    version: 5.0
-
   featureFlagShardingFullDDLSupport:
     description: "Ensures extra guarantees on DDL operations under a sharded cluster."
     cpp_varname: gShardingFullDDLSupport

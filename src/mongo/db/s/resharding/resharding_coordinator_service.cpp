@@ -280,12 +280,11 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             return updateBuilder.obj();
         }
         case CoordinatorStateEnum::kCommitting: {
-            // Update the config.collections entry for the original nss to reflect
-            // the new sharded collection. Set 'uuid' to the reshardingUUID, 'key' to the new shard
-            // key, 'lastmodEpoch' to newCollectionEpoch, and 'timestamp' to
-            // newCollectionTimestamp (if newCollectionTimestamp has a value; i.e. when the
-            // gShardingFullDDLSupportTimestampedVersion feature flag is enabled). Also update the
-            // 'state' field and add the 'recipientFields' to the 'reshardingFields' section.
+            // Update the config.collections entry for the original nss to reflect the new sharded
+            // collection. Set 'uuid' to the reshardingUUID, 'key' to the new shard key,
+            // 'lastmodEpoch' to newCollectionEpoch, and 'timestamp' to newCollectionTimestamp. Also
+            // update the 'state' field and add the 'recipientFields' to the 'reshardingFields'
+            // section.
             auto recipientFields = constructRecipientFields(coordinatorDoc);
             BSONObj setFields =
                 BSON("uuid" << coordinatorDoc.getReshardingUUID() << "key"
@@ -531,8 +530,8 @@ void removeConfigMetadataForTempNss(OperationContext* opCtx,
         opCtx, CollectionType::ConfigNS, delCollEntryRequest, txnNumber);
 
     boost::optional<UUID> reshardingTempUUID;
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+            ServerGlobalParams::FeatureCompatibility::Version::kVersion50)) {
         reshardingTempUUID = coordinatorDoc.getReshardingUUID();
     }
 
@@ -773,8 +772,8 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
 ChunkVersion ReshardingCoordinatorExternalState::calculateChunkVersionForInitialChunks(
     OperationContext* opCtx) {
     boost::optional<Timestamp> timestamp;
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+            ServerGlobalParams::FeatureCompatibility::Version::kVersion50)) {
         const auto now = VectorClock::get(opCtx)->getTime();
         timestamp = now.clusterTime().asTimestamp();
     }
@@ -1537,8 +1536,8 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_persistDecisi
     // collection is a new incarnation of the namespace
     auto newCollectionEpoch = OID::gen();
     boost::optional<Timestamp> newCollectionTimestamp;
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+            ServerGlobalParams::FeatureCompatibility::Version::kVersion50)) {
         auto now = VectorClock::get(opCtx.get())->getTime();
         newCollectionTimestamp = now.clusterTime().asTimestamp();
     }

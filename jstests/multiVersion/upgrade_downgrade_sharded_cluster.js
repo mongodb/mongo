@@ -239,23 +239,11 @@ function checkConfigAndShardsFCV(expectedFCV) {
 }
 
 function runChecksAfterUpgrade() {
-    const isFeatureFlagEnabled =
-        assert
-            .commandWorked(st.configRS.getPrimary().adminCommand(
-                {getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1}))
-            .featureFlagShardingFullDDLSupportTimestampedVersion.value;
-
     checkConfigAndShardsFCV(latestFCV);
 
     testDroppedAndDistributionModeFieldsChecksAfterUpgrade();
-
-    if (isFeatureFlagEnabled) {
-        testTimestampFieldChecksAfterUpgrade();
-        testChunkCollectionUuidFieldChecksAfterUpgrade();
-    } else {
-        jsTest.log(
-            'Skipping tests that require featureFlagShardingFullDDLSupportTimestampedVersion feature to be enabled');
-    }
+    testTimestampFieldChecksAfterUpgrade();
+    testChunkCollectionUuidFieldChecksAfterUpgrade();
 }
 
 function setupStateBeforeDowngrade() {
@@ -263,22 +251,11 @@ function setupStateBeforeDowngrade() {
 }
 
 function runChecksAfterFCVDowngrade(oldVersion) {
-    const isFeatureFlagEnabled =
-        assert
-            .commandWorked(st.configRS.getPrimary().adminCommand(
-                {getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1}))
-            .featureFlagShardingFullDDLSupportTimestampedVersion.value;
-
     checkConfigAndShardsFCV(oldVersion);
 
-    if (isFeatureFlagEnabled) {
-        testAllowedMigrationsFieldChecksAfterFCVDowngrade();
-        testTimestampFieldChecksAfterFCVDowngrade();
-        testChunkCollectionUuidFieldChecksAfterFCVDowngrade();
-    } else {
-        jsTest.log(
-            'Skipping tests that require featureFlagShardingFullDDLSupportTimestampedVersion feature to be enabled');
-    }
+    testAllowedMigrationsFieldChecksAfterFCVDowngrade();
+    testTimestampFieldChecksAfterFCVDowngrade();
+    testChunkCollectionUuidFieldChecksAfterFCVDowngrade();
 }
 
 function runChecksAfterBinDowngrade() {

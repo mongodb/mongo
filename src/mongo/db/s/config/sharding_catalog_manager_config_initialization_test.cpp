@@ -288,8 +288,9 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
     std::vector<BSONObj> expectedChunksIndexes;
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+
+    if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+            ServerGlobalParams::FeatureCompatibility::Version::kVersion50)) {
         expectedChunksIndexes = std::vector<BSONObj>{
             BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                      << "_id_"),

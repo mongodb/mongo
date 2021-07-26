@@ -41,9 +41,7 @@ DatabaseEntryFormat::Format DatabaseEntryFormat::get(const FixedFCVRegion& fcvRe
         case FCVersion::kUpgradingFrom44To50:
         case FCVersion::kUpgradingFrom49To50:
         case FCVersion::kVersion50:
-            return feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()
-                ? Format::kUUIDandTimestamp
-                : Format::kUUIDOnly;
+            return Format::kUUIDandTimestamp;
         default:
             return Format::kUUIDOnly;
     }
@@ -58,18 +56,12 @@ ChunkEntryFormat::Format ChunkEntryFormat::getForVersionCallerGuaranteesFCVStabi
     switch (version) {
         case FCVersion::kUpgradingFrom44To50:
         case FCVersion::kUpgradingFrom49To50:
-            return feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()
-                ? Format::kNamespaceAndUUIDWithTimestamps
-                : Format::kNamespaceOnlyNoTimestamps;
+            return Format::kNamespaceAndUUIDWithTimestamps;
         case FCVersion::kVersion50:
-            return feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()
-                ? Format::kUUIDOnlyWithTimestamps
-                : Format::kNamespaceOnlyNoTimestamps;
+            return Format::kUUIDOnlyWithTimestamps;
         case FCVersion::kDowngradingFrom50To49:
         case FCVersion::kDowngradingFrom50To44:
-            return feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()
-                ? Format::kNamespaceAndUUIDNoTimestamps
-                : Format::kNamespaceOnlyNoTimestamps;
+            return Format::kNamespaceAndUUIDNoTimestamps;
         case FCVersion::kVersion49:
         case FCVersion::kVersion48:
         case FCVersion::kVersion47:
