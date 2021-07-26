@@ -237,17 +237,7 @@ Status ShardingStateRecovery::recover(OperationContext* opCtx) {
           "recoveryDoc"_attr = redact(recoveryDoc.toBSON()));
 
     if (!recoveryDoc.getMinOpTimeUpdaters()) {
-        // Treat the minOpTime as up-to-date
-        const auto prevOpTime = grid->advanceConfigOpTime(
-            opCtx, recoveryDoc.getMinOpTime(), "sharding state recovery document");
-        if (prevOpTime) {
-            LOGV2(22085,
-                  "No in flight metadata change operations, so config server optime updated from "
-                  "{prevConfigServerMinOpTime} to {newConfigServerMinOpTime}",
-                  "No in flight metadata change operations, so config server optime updated",
-                  "prevConfigServerMinOpTime"_attr = *prevOpTime,
-                  "newConfigServerMinOpTime"_attr = recoveryDoc.getMinOpTime());
-        }
+        grid->advanceConfigOpTime(opCtx, recoveryDoc.getMinOpTime());
         return Status::OK();
     }
 

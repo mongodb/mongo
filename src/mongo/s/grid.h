@@ -154,9 +154,7 @@ public:
      * If the config optime was updated, returns the previous value.
      * NOTE: This is not valid to call on a config server instance.
      */
-    boost::optional<repl::OpTime> advanceConfigOpTime(OperationContext* opCtx,
-                                                      repl::OpTime opTime,
-                                                      StringData what);
+    void advanceConfigOpTime(OperationContext* opCtx, repl::OpTime opTime);
 
     /**
      * Clears the grid object so that it can be reused between test executions. This will not
@@ -184,23 +182,11 @@ private:
     // questions about the network configuration, such as getting the current server's hostname.
     executor::NetworkInterface* _network{nullptr};
 
-    CustomConnectionPoolStatsFn _customConnectionPoolStatsFn;
-
     AtomicWord<bool> _shardingInitialized{false};
 
-    // Protects _configOpTime.
     mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "Grid::_mutex");
 
-    // Last known highest opTime from the config server that should be used when doing reads.
-    // This value is updated any time a shard or mongos talks to a config server or a shard.
-    repl::OpTime _configOpTime;
-
-    /**
-     * Called to update what we've seen as the last config server optime.
-     * If the config optime was updated, returns the previous value.
-     * NOTE: This is not valid to call on a config server instance.
-     */
-    boost::optional<repl::OpTime> _advanceConfigOpTime(const repl::OpTime& opTime);
+    CustomConnectionPoolStatsFn _customConnectionPoolStatsFn;
 };
 
 }  // namespace mongo

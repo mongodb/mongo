@@ -103,7 +103,7 @@ Status ShardingEgressMetadataHook::_advanceConfigOpTimeFromShard(OperationContex
                 // is safe to use.
                 const auto& replMetadata = parseStatus.getValue();
                 const auto opTime = replMetadata.getLastOpCommitted();
-                grid->advanceConfigOpTime(opCtx, opTime.opTime, "reply from config server node");
+                grid->advanceConfigOpTime(opCtx, opTime.opTime);
             }
         } else {
             // Regular shards return the config opTime as part of ConfigServerMetadata.
@@ -115,10 +115,7 @@ Status ShardingEgressMetadataHook::_advanceConfigOpTimeFromShard(OperationContex
             const auto& configMetadata = parseStatus.getValue();
             const auto opTime = configMetadata.getOpTime();
             if (opTime.is_initialized()) {
-                grid->advanceConfigOpTime(opCtx,
-                                          opTime.get(),
-                                          str::stream()
-                                              << "reply from shard " << shardId << " node");
+                grid->advanceConfigOpTime(opCtx, opTime.get());
             }
         }
         return Status::OK();

@@ -84,7 +84,7 @@ void advanceConfigOpTimeFromRequestMetadata(OperationContext* opCtx) {
                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                    ActionType::internal));
 
-    Grid::get(opCtx)->advanceConfigOpTime(opCtx, *opTime, "request from");
+    Grid::get(opCtx)->advanceConfigOpTime(opCtx, *opTime);
 }
 
 }  // namespace rpc

@@ -118,68 +118,19 @@ ReadPreferenceSetting Grid::readPreferenceWithConfigTime(
     return readPrefToReturn;
 }
 
-// TODO SERVER-50675: directly use VectorClock's configTime once 5.0 becomes last-lts.
 repl::OpTime Grid::configOpTime() const {
     invariant(serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
-
-    auto configTime = [this] {
-        stdx::lock_guard<Latch> lk(_mutex);
-        return _configOpTime;
-    }();
-
-    const auto& fcv = serverGlobalParams.featureCompatibility;
-    if (fcv.isVersionInitialized() &&
-        fcv.isGreaterThanOrEqualTo(ServerGlobalParams::FeatureCompatibility::Version::kVersion47)) {
-        const auto currentTime = VectorClock::get(grid.owner(this))->getTime();
-        const auto vcConfigTimeTs = currentTime.configTime().asTimestamp();
-        if (!vcConfigTimeTs.isNull() && vcConfigTimeTs >= configTime.getTimestamp()) {
-            // TODO SERVER-44097: investigate why not using a term (e.g. with a LogicalTime)
-            // can lead - upon CSRS stepdowns - to a last applied opTime lower than the
-            // previous primary's committed opTime
-            configTime =
-                mongo::repl::OpTime(vcConfigTimeTs, mongo::repl::OpTime::kUninitializedTerm);
-        }
-    }
-
-    return configTime;
+    const auto currentTime = VectorClock::get(grid.owner(this))->getTime();
+    const auto vcConfigTimeTs = currentTime.configTime().asTimestamp();
+    return mongo::repl::OpTime(vcConfigTimeTs, mongo::repl::OpTime::kUninitializedTerm);
 }
 
-boost::optional<repl::OpTime> Grid::advanceConfigOpTime(OperationContext* opCtx,
-                                                        repl::OpTime opTime,
-                                                        StringData what) {
-    const auto prevOpTime = _advanceConfigOpTime(opTime);
-    if (prevOpTime && prevOpTime->getTerm() != mongo::repl::OpTime::kUninitializedTerm &&
-        opTime.getTerm() != mongo::repl::OpTime::kUninitializedTerm &&
-        prevOpTime->getTerm() != opTime.getTerm()) {
-        std::string clientAddr = "(unknown)";
-        if (opCtx && opCtx->getClient()) {
-            clientAddr = opCtx->getClient()->clientAddress(true);
-        }
-        LOGV2(22792,
-              "Received {reason} {clientAddress} indicating config server"
-              " term has increased, previous opTime {prevOpTime}, now {opTime}",
-              "Term advanced for config server",
-              "opTime"_attr = opTime,
-              "prevOpTime"_attr = prevOpTime,
-              "reason"_attr = what,
-              "clientAddress"_attr = clientAddr);
-    }
-    return prevOpTime;
-}
-
-boost::optional<repl::OpTime> Grid::_advanceConfigOpTime(const repl::OpTime& opTime) {
-    invariant(serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
+void Grid::advanceConfigOpTime(OperationContext* opCtx, repl::OpTime opTime) {
     auto vectorClock = VectorClock::get(grid.owner(this));
-    if (vectorClock->isEnabled()) {
-        vectorClock->gossipInConfigOpTime(opTime);
+    if (!vectorClock->isEnabled()) {
+        return;
     }
-    stdx::lock_guard<Latch> lk(_mutex);
-    if (_configOpTime < opTime) {
-        repl::OpTime prev = _configOpTime;
-        _configOpTime = opTime;
-        return prev;
-    }
-    return boost::none;
+    vectorClock->gossipInConfigOpTime(opTime);
 }
 
 void Grid::clearForUnitTests() {
@@ -190,8 +141,6 @@ void Grid::clearForUnitTests() {
     _balancerConfig.reset();
     _executorPool.reset();
     _network = nullptr;
-
-    _configOpTime = repl::OpTime();
 }
 
 }  // namespace mongo
