@@ -49,6 +49,8 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
+
             const NamespaceString& nss = ns();
 
             uassert(ErrorCodes::IllegalOperation,
