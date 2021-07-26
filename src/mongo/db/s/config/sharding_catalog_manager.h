@@ -346,13 +346,6 @@ public:
                                 const boost::optional<ShardId>& optPrimaryShard,
                                 bool enableSharding);
 
-    /**
-     * Updates metadata in config.databases collection to show the given primary database on its
-     * new shard.
-     */
-    // TODO SERVER-54879 throw out this method once 5.0 becomes last-LTS
-    Status commitMovePrimary(OperationContext* opCtx, const StringData nss, const ShardId& toShard);
-
     //
     // Collection Operations
     //

@@ -63,13 +63,15 @@ let testCases = {
     _configsvrCommitChunksMerge: {skip: "primary only"},
     _configsvrCommitChunkMigration: {skip: "primary only"},
     _configsvrCommitChunkSplit: {skip: "primary only"},
-    _configsvrCommitMovePrimary: {skip: "primary only"},
+    _configsvrCommitMovePrimary:
+        {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrDropCollection:
         {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrDropDatabase:
         {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrMoveChunk: {skip: "primary only"},
-    _configsvrMovePrimary: {skip: "primary only"},
+    _configsvrMovePrimary:
+        {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrRemoveChunks: {skip: "primary only"},
     _configsvrRemoveShardFromZone: {skip: "primary only"},
     _configsvrRemoveTags: {skip: "primary only"},

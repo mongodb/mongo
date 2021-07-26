@@ -34,40 +34,14 @@
 #include "mongo/db/s/move_primary_coordinator.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/s/active_move_primaries_registry.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/move_primary_source_manager.h"
-#include "mongo/db/s/shard_metadata_util.h"
-#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
-namespace {
-/**
- * If the specified status is not OK logs a warning and throws a DBException corresponding to the
- * specified status.
- */
-void uassertStatusOKWithWarning(const Status& status) {
-    if (!status.isOK()) {
-        LOGV2_WARNING(5275800,
-                      "movePrimary failed: {error}",
-                      "movePrimary failed",
-                      "error"_attr = redact(status));
-        uassertStatusOK(status);
-    }
-}
-
-}  // namespace
 
 MovePrimaryCoordinator::MovePrimaryCoordinator(ShardingDDLCoordinatorService* service,
                                                const BSONObj& initialState)
@@ -126,10 +100,8 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
             shardRegistry->reload(opCtx);
 
             const auto& dbName = nss().db();
-            const auto& toShard = uassertStatusOKWithContext(
-                shardRegistry->getShard(opCtx, _doc.getToShardId()),
-                str::stream() << "Could not move database '" << dbName << "' to shard '"
-                              << _doc.getToShardId() << "'");
+            const auto& toShard =
+                uassertStatusOK(shardRegistry->getShard(opCtx, _doc.getToShardId()));
 
             const auto& selfShardId = ShardingState::get(opCtx)->shardId();
             if (selfShardId == toShard->getId()) {
@@ -147,10 +119,10 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
             auto toId = toShard->getId();
             MovePrimarySourceManager movePrimarySourceManager(
                 opCtx, movePrimaryRequest, dbName, primaryId, toId);
-            uassertStatusOKWithWarning(movePrimarySourceManager.clone(opCtx));
-            uassertStatusOKWithWarning(movePrimarySourceManager.enterCriticalSection(opCtx));
-            uassertStatusOKWithWarning(movePrimarySourceManager.commitOnConfig(opCtx));
-            uassertStatusOKWithWarning(movePrimarySourceManager.cleanStaleData(opCtx));
+            uassertStatusOK(movePrimarySourceManager.clone(opCtx));
+            uassertStatusOK(movePrimarySourceManager.enterCriticalSection(opCtx));
+            uassertStatusOK(movePrimarySourceManager.commitOnConfig(opCtx));
+            uassertStatusOK(movePrimarySourceManager.cleanStaleData(opCtx));
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             LOGV2_ERROR(5275804,

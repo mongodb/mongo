@@ -461,10 +461,11 @@ const testCases = {
     _configsvrCommitChunksMerge: {skip: isNotRunOnUserDatabase},
     _configsvrCommitChunkMigration: {skip: isNotRunOnUserDatabase},
     _configsvrCommitChunkSplit: {skip: isNotRunOnUserDatabase},
-    _configsvrCommitMovePrimary: {skip: isNotRunOnUserDatabase},
+    _configsvrCommitMovePrimary:
+        {skip: isNotRunOnUserDatabase},  // Can be removed once 6.0 is last LTS
     _configsvrCreateDatabase: {skip: isNotRunOnUserDatabase},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isNotRunOnUserDatabase},
-    _configsvrMoveChunk: {skip: isNotRunOnUserDatabase},
+    _configsvrMoveChunk: {skip: isNotRunOnUserDatabase},  // Can be removed once 6.0 is last LTS
     _configsvrMovePrimary: {skip: isNotRunOnUserDatabase},
     _configsvrRefineCollectionShardKey: {skip: isNotRunOnUserDatabase},
     _configsvrRemoveShard: {skip: isNotRunOnUserDatabase},

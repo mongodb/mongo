@@ -33,54 +33,13 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/s/active_move_primaries_registry.h"
-#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/move_primary_coordinator.h"
-#include "mongo/db/s/move_primary_source_manager.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_primary_gen.h"
 
 namespace mongo {
 namespace {
-
-/**
- * If the specified status is not OK logs a warning and throws a DBException corresponding to the
- * specified status.
- */
-void uassertStatusOKWithWarning(const Status& status) {
-    if (!status.isOK()) {
-        LOGV2_WARNING(23762,
-                      "movePrimary failed: {error}",
-                      "movePrimary failed",
-                      "error"_attr = redact(status));
-        uassertStatusOK(status);
-    }
-}
-
-void newMovePrimaryFlow(OperationContext* opCtx,
-                        const ShardMovePrimary& cmdObj,
-                        const NamespaceString& dbNss,
-                        const StringData& toShard) {
-    auto const shardingState = ShardingState::get(opCtx);
-    uassertStatusOK(shardingState->canAcceptShardedCommands());
-
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "Move primary must be called with majority writeConcern, got "
-                          << opCtx->getWriteConcern().wMode,
-            opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
-
-    auto coordinatorDoc = MovePrimaryCoordinatorDocument();
-    coordinatorDoc.setShardingDDLCoordinatorMetadata(
-        {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});
-    coordinatorDoc.setToShardId(ShardId(cmdObj.getTo().toString()));
-
-    auto service = ShardingDDLCoordinatorService::getService(opCtx);
-    auto movePrimaryCoordinator = checked_pointer_cast<MovePrimaryCoordinator>(
-        service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
-    movePrimaryCoordinator->getCompletionFuture().get(opCtx);
-}
 
 class MovePrimaryCommand : public BasicCommand {
 public:
@@ -124,8 +83,7 @@ public:
              const std::string& dbname_unused,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto const shardingState = ShardingState::get(opCtx);
-        uassertStatusOK(shardingState->canAcceptShardedCommands());
+        uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
         const auto movePrimaryRequest =
             ShardMovePrimary::parse(IDLParserErrorContext("_shardsvrMovePrimary"), cmdObj);
@@ -156,53 +114,17 @@ public:
         ON_BLOCK_EXIT(
             [opCtx, dbNss] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.db()); });
 
-        if (movePrimaryRequest.getCommandIsFromRouter()) {
-            newMovePrimaryFlow(opCtx, movePrimaryRequest, dbNss, toShard);
-            return true;
-        }
+        auto coordinatorDoc = MovePrimaryCoordinatorDocument();
+        coordinatorDoc.setShardingDDLCoordinatorMetadata(
+            {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});
+        coordinatorDoc.setToShardId(toShard.toString());
 
-        // Make sure we're as up-to-date as possible with shard information. This catches the case
-        // where we might have changed a shard's host by removing/adding a shard with the same name.
-        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
-
-        auto scopedMovePrimary = uassertStatusOK(
-            ActiveMovePrimariesRegistry::get(opCtx).registerMovePrimary(movePrimaryRequest));
-
-        // Check if there is an existing movePrimary running and if so, join it
-        if (scopedMovePrimary.mustExecute()) {
-            auto status = [&] {
-                try {
-                    _runImpl(opCtx, movePrimaryRequest, dbname);
-                    return Status::OK();
-                } catch (const DBException& ex) {
-                    return ex.toStatus();
-                }
-            }();
-            scopedMovePrimary.signalComplete(status);
-            uassertStatusOK(status);
-        } else {
-            uassertStatusOK(scopedMovePrimary.waitForCompletion(opCtx));
-        }
-
+        auto service = ShardingDDLCoordinatorService::getService(opCtx);
+        auto movePrimaryCoordinator = checked_pointer_cast<MovePrimaryCoordinator>(
+            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+        movePrimaryCoordinator->getCompletionFuture().get(opCtx);
         return true;
     }
-
-private:
-    static void _runImpl(OperationContext* opCtx,
-                         const ShardMovePrimary movePrimaryRequest,
-                         const StringData dbname) {
-        ShardId fromShardId = ShardingState::get(opCtx)->shardId();
-        ShardId toShardId = movePrimaryRequest.getTo().toString();
-
-        MovePrimarySourceManager movePrimarySourceManager(
-            opCtx, movePrimaryRequest, dbname, fromShardId, toShardId);
-
-        uassertStatusOKWithWarning(movePrimarySourceManager.clone(opCtx));
-        uassertStatusOKWithWarning(movePrimarySourceManager.enterCriticalSection(opCtx));
-        uassertStatusOKWithWarning(movePrimarySourceManager.commitOnConfig(opCtx));
-        uassertStatusOKWithWarning(movePrimarySourceManager.cleanStaleData(opCtx));
-    }
-
 } movePrimaryCmd;
 
 }  // namespace

@@ -35,7 +35,6 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/s/active_move_primaries_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"

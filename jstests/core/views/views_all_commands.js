@@ -88,7 +88,8 @@ let viewsCommandTests = {
     _configsvrCommitChunksMerge: {skip: isAnInternalCommand},
     _configsvrCommitChunkMigration: {skip: isAnInternalCommand},
     _configsvrCommitChunkSplit: {skip: isAnInternalCommand},
-    _configsvrCommitMovePrimary: {skip: isAnInternalCommand},
+    _configsvrCommitMovePrimary:
+        {skip: isAnInternalCommand},  // Can be removed once 6.0 is last LTS
     _configsvrCommitReshardCollection: {skip: isAnInternalCommand},
     _configsvrCreateDatabase: {skip: isAnInternalCommand},
     _configsvrDropCollection:
@@ -98,7 +99,7 @@ let viewsCommandTests = {
     _configsvrEnableSharding:
         {skip: isAnInternalCommand},  // TODO (SERVER-58843): Remove once 6.0 becomes last LTS
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isAnInternalCommand},
-    _configsvrMoveChunk: {skip: isAnInternalCommand},
+    _configsvrMoveChunk: {skip: isAnInternalCommand},  // Can be removed once 6.0 is last LTS
     _configsvrMovePrimary: {skip: isAnInternalCommand},
     _configsvrRefineCollectionShardKey: {skip: isAnInternalCommand},
     _configsvrRenameCollection: {skip: isAnInternalCommand},

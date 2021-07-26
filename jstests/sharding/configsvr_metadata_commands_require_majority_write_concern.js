@@ -135,9 +135,6 @@ checkCommandMongos({enableSharding: dbName}, setupFuncs.noop, cleanupFuncs.dropD
 checkCommandMongos({movePrimary: dbName, to: st.shard0.name},
                    setupFuncs.createDatabase,
                    cleanupFuncs.dropDatabase);
-checkCommandConfigSvr({_configsvrMovePrimary: dbName, to: st.shard0.name},
-                      setupFuncs.createDatabase,
-                      cleanupFuncs.dropDatabase);
 
 // shardCollection
 checkCommandMongos(
