@@ -136,8 +136,8 @@ void HashAggStage::open(bool reOpen) {
 
     _commonStats.opens++;
 
-    if (!reOpen || !_optimizedClose) {
-        _children[0]->open(reOpen);
+    if (!reOpen || _seekKeysAccessors.empty()) {
+        _children[0]->open(_childOpened);
         _childOpened = true;
 
         if (_collatorAccessor) {
