@@ -272,6 +272,7 @@ variables:
     multiversion_edition: enterprise
     jstestfuzz_num_generated_files: 35
     large_distro_name: windows-vsCurrent-large
+    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
