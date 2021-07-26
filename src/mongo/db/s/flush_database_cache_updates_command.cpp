@@ -67,6 +67,14 @@ public:
                "to be persisted.";
     }
 
+    /**
+     * We accept any apiVersion, apiStrict, and/or apiDeprecationErrors forwarded with this internal
+     * command.
+     */
+    bool acceptsAnyApiVersionParameters() const override {
+        return true;
+    }
+
     bool adminOnly() const override {
         return true;
     }
