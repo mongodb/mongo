@@ -1132,6 +1132,12 @@ void ReplicationCoordinatorExternalStateImpl::setupNoopWriter(Seconds waitTime) 
     _noopWriter = std::make_unique<NoopWriter>(waitTime);
 }
 
+bool ReplicationCoordinatorExternalStateImpl::isShardPartOfShardedCluster(
+    OperationContext* opCtx) const {
+    return serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+        ShardingState::get(opCtx)->enabled();
+}
+
 bool ReplicationCoordinatorExternalStateImpl::isCWWCSetOnConfigShard(
     OperationContext* opCtx) const {
     GetDefaultRWConcern configsvrRequest;
