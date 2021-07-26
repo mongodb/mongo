@@ -62,7 +62,10 @@ assert.eq(2, res.cursor.firstBatch.length, res);
 let cursorId = res.cursor.id;
 
 jsTestLog("Create a hanging operation on the secondary.");
-let findCmdFailPoint = configureFailPoint(secondary, "waitInFindBeforeMakingBatch");
+const fpData = {
+    nss: dbName + "." + collName
+};
+let findCmdFailPoint = configureFailPoint(secondary, "waitInFindBeforeMakingBatch", fpData);
 let findCmd = startParallelShell(runFind, secondary.port);
 findCmdFailPoint.wait();
 
