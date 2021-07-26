@@ -251,6 +251,28 @@ env.Library(
 )
 
 env.Library(
+    target='network_interface_mock_test_fixture',
+    source=[
+        'network_interface_mock_test_fixture.cpp',
+        ],
+    LIBDEPS=[
+        'task_executor_test_fixture',
+        'thread_pool_task_executor',
+    ]
+)
+
+env.Library(
+    target='executor_stress_test_fixture',
+    source=[
+        'executor_stress_test_fixture.cpp',
+        ],
+    LIBDEPS=[
+        'task_executor_test_fixture',
+        'thread_pool_task_executor',
+    ]
+)
+
+env.Library(
     target='task_executor_pool',
     source=[
         'task_executor_pool.cpp',
@@ -295,7 +317,6 @@ env.CppUnitTest(
         'connection_pool_test_fixture.cpp',
         'mock_network_fixture_test.cpp',
         'network_interface_mock_test.cpp',
-        'network_interface_mock_test_fixture.cpp',
         'scoped_task_executor_test.cpp',
         'task_executor_cursor_test.cpp',
         'thread_pool_task_executor_test.cpp',
@@ -304,8 +325,23 @@ env.CppUnitTest(
         'connection_pool_executor',
         'egress_tag_closer_manager',
         'network_interface_mock',
+        'network_interface_mock_test_fixture',
         'scoped_task_executor',
         'task_executor_cursor',
+        'thread_pool_task_executor',
+        'thread_pool_task_executor_test_fixture',
+    ],
+)
+
+env.CppUnitTest(
+    target='executor_with_mock_net_stress_test',
+    source=[
+        'thread_pool_task_executor_with_mock_net_stress_test.cpp',
+    ],
+    LIBDEPS=[
+        'executor_stress_test_fixture',
+        'network_interface_mock',
+        'network_interface_mock_test_fixture',
         'thread_pool_task_executor',
         'thread_pool_task_executor_test_fixture',
     ],
