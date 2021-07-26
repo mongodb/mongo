@@ -51,6 +51,14 @@ namespace {
 
 class ConfigSvrCreateDatabaseCommand final : public TypedCommand<ConfigSvrCreateDatabaseCommand> {
 public:
+    /**
+     * We accept any apiVersion, apiStrict, and/or apiDeprecationErrors forwarded with this internal
+     * command.
+     */
+    bool acceptsAnyApiVersionParameters() const override {
+        return true;
+    }
+
     using Request = ConfigsvrCreateDatabase;
     using Response = ConfigsvrCreateDatabaseResponse;
 

@@ -1522,6 +1522,10 @@ let MongosAPIParametersUtil = (function() {
         for (let i = 0; i < testInstances.length; ++i) {
             const {apiParameters, commandName, runOrExplain} = testInstances[i];
 
+            // Creating a new db implicitly should succeed with 'apiStrict: true'.
+            assert.commandWorked(st.s.getDB("db").runCommand(
+                {create: 'collection', apiVersion: '1', apiStrict: true}));
+
             if (shardedCollection) {
                 jsTestLog("Sharded setup");
                 assert.commandWorked(st.s.getDB("db")["collection"].insert(
