@@ -69,6 +69,10 @@ public:
         return *_executor;
     }
 
+    std::shared_ptr<TaskExecutor> getExecutorPtr() const {
+        return _executor;
+    }
+
     /**
      * Initializes both the NetworkInterfaceMock and TaskExecutor but does not start the executor.
      */
