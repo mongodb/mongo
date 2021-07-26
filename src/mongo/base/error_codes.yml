@@ -472,4 +472,5 @@ error_codes:
     - {code: 17280,name: OBSOLETE_KeyTooLong}
     - {code: 46841,name: ClientMarkedKilled,categories: [Interruption,CancellationError]}
     - {code: 50768,name: NotARetryableWriteCommand}
+    - {code: 56846,name: ConfigServerUnreachable}
 

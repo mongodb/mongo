@@ -5,6 +5,7 @@ var reconnect;
 var getLatestOp;
 var waitForAllMembers;
 var reconfig;
+var safeReconfigShouldFail;
 var awaitOpTime;
 var waitUntilAllNodesCaughtUp;
 var waitForState;
@@ -194,8 +195,9 @@ waitForAllMembers = function(master, timeout) {
  * Run a 'replSetReconfig' command with one retry on NodeNotFound and multiple retries on
  * ConfigurationInProgress, CurrentConfigNotCommittedYet, and
  * NewReplicaSetConfigurationIncompatible.
+ * Expect the reconfig to fail if shouldFail is set to true.
  */
-function reconfigWithRetry(primary, config, force) {
+function reconfigWithRetry(primary, config, force, shouldFail = false, errCode, errMsg) {
     const admin = primary.getDB("admin");
     force = force || false;
     let reconfigCommand = {
@@ -241,7 +243,19 @@ function reconfigWithRetry(primary, config, force) {
             }
         }
 
-        assert.commandWorked(res);
+        if (!shouldFail) {
+            assert.commandWorked(res);
+        } else {
+            assert.commandFailed(res);
+            if (errCode) {
+                assert.eq(res.code, errCode);
+            }
+
+            if (errMsg) {
+                assert(res.errmsg.includes(errMsg));
+            }
+        }
+
         return true;
     });
 }
@@ -405,6 +419,20 @@ reconfig = function(rst, config, force, doNotWaitForMembers) {
         waitForAllMembers(primaryAdminDB);
     }
     return primaryAdminDB;
+};
+
+/**
+ * Tests that a replica set safe reconfiguration on the given ReplSetTest instance should fail.
+ *
+ * @param rst - a ReplSetTest instance.
+ * @param config - the desired target config.
+ * @param force - should this be a 'force' reconfig or not.
+ * @param errCode - if exists, we verify that the reconfig fails with this errCode.
+ * @param errMsg - if exists, we verify that the reconfig fails with error message containing this
+ * errMsg.
+ */
+safeReconfigShouldFail = function(rst, config, force, errCode, errMsg) {
+    reconfigWithRetry(rst.getPrimary(), config, force, true /* shouldFail */, errCode, errMsg);
 };
 
 awaitOpTime = function(catchingUpNode, latestOpTimeNode) {

@@ -322,5 +322,10 @@ bool ReplicationCoordinatorExternalStateMock::isCWWCSetOnConfigShard(
     return true;
 }
 
+bool ReplicationCoordinatorExternalStateMock::isShardPartOfShardedCluster(
+    OperationContext* opCtx) const {
+    return true;
+}
+
 }  // namespace repl
 }  // namespace mongo
