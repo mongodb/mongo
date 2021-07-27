@@ -91,10 +91,12 @@ let testCases = {
     _configsvrCommitMovePrimary: {skip: "internal command"},
     _configsvrCommitReshardCollection: {skip: "internal command"},
     _configsvrCreateDatabase: {skip: "internal command"},
-    _configsvrDropCollection: {skip: "internal command"},
-    _configsvrDropDatabase: {skip: "internal command"},
-    // TODO (SERVER-58843): Remove this line when 6.0 becomes last LTS
-    _configsvrEnableSharding: {skip: "internal command"},
+    _configsvrDropCollection:
+        {skip: "internal command"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
+    _configsvrDropDatabase:
+        {skip: "internal command"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
+    _configsvrEnableSharding:
+        {skip: "internal command"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: "internal command"},
     _configsvrMoveChunk: {skip: "internal command"},
     _configsvrMovePrimary: {skip: "internal command"},

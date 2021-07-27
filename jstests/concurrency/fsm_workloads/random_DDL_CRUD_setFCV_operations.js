@@ -42,22 +42,6 @@ var $config = extendWorkload($config, function($config, $super) {
         jsTestLog('setFCV state finished');
     };
 
-    $config.states.create = function(db, collName, connCache) {
-        assert.soon(() => {
-            try {
-                $super.states.create.apply(this, arguments);
-                return true;
-            } catch (e) {
-                if (e.code === ErrorCodes.ConflictingOperationInProgress) {
-                    // Legacy dropCollection interferes with catalog cache refreshes. Retry.
-                    // TODO SERVER-54879: No longer needed after 5.0 has branched out
-                    return false;
-                }
-                throw e;
-            }
-        });
-    };
-
     $config.states.rename = function(db, collName, connCache) {
         try {
             $super.states.rename.apply(this, arguments);

@@ -33,23 +33,6 @@ var $config = extendWorkload($config, function($config, $super) {
         jsTestLog('setFCV state finished');
     };
 
-    $config.states.shardCollection = function(db, collName) {
-        assert.soon(() => {
-            try {
-                $super.states.shardCollection.apply(this, arguments);
-                return true;
-            } catch (e) {
-                if (e.code === ErrorCodes.ConflictingOperationInProgress) {
-                    // Legacy dropCollection (as part of dropDatabase) interferes with catalog cache
-                    // refreshes done as part of shardCollection. Retry.
-                    // TODO SERVER-54879: No longer needed after 5.0 has branched out
-                    return false;
-                }
-                throw e;
-            }
-        });
-    };
-
     $config.transitions = {
         init: {enableSharding: 0.3, dropDatabase: 0.3, shardCollection: 0.3, setFCV: 0.1},
         enableSharding: {enableSharding: 0.3, dropDatabase: 0.3, shardCollection: 0.3, setFCV: 0.1},
