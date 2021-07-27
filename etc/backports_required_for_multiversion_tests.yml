@@ -22,6 +22,8 @@
 last-continuous:
   # Tests that should be excluded from ALL multiversion suites should be listed here.
   all:
+    - ticket: SERVER-56800
+      test_file: jstests/sharding/cwwc_conflict_add_shard.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
