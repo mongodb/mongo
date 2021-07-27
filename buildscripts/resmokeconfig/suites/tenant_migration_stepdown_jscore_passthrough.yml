@@ -96,6 +96,9 @@ selector:
   - jstests/core/views/invalid_system_views.js
   - jstests/core/views/views_all_commands.js
   - jstests/core/rename_collection_staytemp.js
+  # This test runs createIndexes commands without asserting they succeed and depends on a particular
+  # index to exist.
+  - jstests/core/index_many2.js
 
   #
   # From retryable writes jscore stepdown passthrough
