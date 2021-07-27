@@ -61,11 +61,16 @@ const std::vector<RecipientShardEntry>& getParticipants(
 
 /**
  * Returns true if all participants are in a state greater than or equal to the expectedState.
+ * Returns false if the participants list is empty.
  */
 template <class TState, class TParticipant>
 bool allParticipantsInStateGTE(WithLock lk,
                                TState expectedState,
                                const std::vector<TParticipant>& participants) {
+    if (participants.size() == 0) {
+        return false;
+    }
+
     for (const auto& shard : participants) {
         if (shard.getMutableState().getState() < expectedState) {
             return false;
