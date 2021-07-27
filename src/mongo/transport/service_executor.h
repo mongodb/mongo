@@ -38,7 +38,6 @@
 #include "mongo/stdx/utility.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/transport_mode.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -126,11 +125,6 @@ public:
     virtual Status shutdown(Milliseconds timeout) = 0;
 
     virtual size_t getRunningThreads() const = 0;
-
-    /*
-     * Returns if this service executor is using asynchronous or synchronous networking.
-     */
-    virtual Mode transportMode() const = 0;
 
     /*
      * Appends statistics about task scheduling to a BSONObjBuilder for serverStatus output.

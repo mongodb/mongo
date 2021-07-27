@@ -176,16 +176,10 @@ public:
     Future<void> processMessage();
 
     /*
-     * These get called by the TransportLayer when requested network I/O has completed.
-     */
-    void sourceCallback(Status status);
-    void sinkCallback(Status status);
-
-    /*
      * Source/Sink message from the TransportLayer.
      */
-    Future<void> sourceMessage();
-    Future<void> sinkMessage();
+    void sourceMessage();
+    void sinkMessage();
 
     /*
      * Releases all the resources associated with the session and call the cleanupHook.
@@ -247,7 +241,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
-Future<void> ServiceStateMachine::Impl::sourceMessage() {
+void ServiceStateMachine::Impl::sourceMessage() {
     invariant(_inMessage.empty());
     invariant(_state.load() == State::Source);
     _state.store(State::SourceWait);
@@ -258,56 +252,18 @@ Future<void> ServiceStateMachine::Impl::sourceMessage() {
     // for compressing the sink message.
     _compressorId = boost::none;
 
-    auto sourceMsgImpl = [&] {
-        const auto& transportMode = executor()->transportMode();
-        if (transportMode == transport::Mode::kSynchronous) {
-            MONGO_IDLE_THREAD_BLOCK;
-            return Future<Message>::makeReady(session()->sourceMessage());
-        } else {
-            invariant(transportMode == transport::Mode::kAsynchronous);
-            return session()->asyncSourceMessage();
-        }
-    };
+    StatusWith<Message> msg = [&] {
+        MONGO_IDLE_THREAD_BLOCK;
+        return session()->sourceMessage();
+    }();
 
-    return sourceMsgImpl().onCompletion([this](StatusWith<Message> msg) -> Future<void> {
-        if (msg.isOK()) {
-            _inMessage = std::move(msg.getValue());
-            invariant(!_inMessage.empty());
-        }
-        sourceCallback(msg.getStatus());
-        return Status::OK();
-    });
-}
-
-Future<void> ServiceStateMachine::Impl::sinkMessage() {
-    // Sink our response to the client
-    invariant(_state.load() == State::Process);
-    _state.store(State::SinkWait);
-    auto toSink = std::exchange(_outMessage, {});
-
-    auto sinkMsgImpl = [&] {
-        const auto& transportMode = executor()->transportMode();
-        if (transportMode == transport::Mode::kSynchronous) {
-            // We don't consider ourselves idle while sending the reply since we are still doing
-            // work on behalf of the client. Contrast that with sourceMessage() where we are waiting
-            // for the client to send us more work to do.
-            return Future<void>::makeReady(session()->sinkMessage(std::move(toSink)));
-        } else {
-            invariant(transportMode == transport::Mode::kAsynchronous);
-            return session()->asyncSinkMessage(std::move(toSink));
-        }
-    };
-
-    return sinkMsgImpl().onCompletion([this](Status status) {
-        sinkCallback(std::move(status));
-        return Status::OK();
-    });
-}
-
-void ServiceStateMachine::Impl::sourceCallback(Status status) {
-    invariant(state() == State::SourceWait);
+    if (msg.isOK()) {
+        _inMessage = std::move(msg.getValue());
+        invariant(!_inMessage.empty());
+    }
 
     auto remote = session()->remote();
+    const auto status = msg.getStatus();
 
     if (status.isOK()) {
         _state.store(State::Process);
@@ -315,8 +271,7 @@ void ServiceStateMachine::Impl::sourceCallback(Status status) {
         // If the sourceMessage succeeded then we can move to on to process the message. We simply
         // return from here and the future chain in startNewLoop() will continue to the next state
         // normally.
-
-        // If any other issues arise, close the session.
+        return;
     } else if (ErrorCodes::isInterruption(status.code()) ||
                ErrorCodes::isNetworkError(status.code())) {
         LOGV2_DEBUG(
@@ -326,34 +281,35 @@ void ServiceStateMachine::Impl::sourceCallback(Status status) {
             "Session from remote encountered a network error during SourceMessage",
             "remote"_attr = remote,
             "error"_attr = status);
-        _state.store(State::EndSession);
     } else if (status == TransportLayer::TicketSessionClosedStatus) {
         // Our session may have been closed internally.
         LOGV2_DEBUG(22987,
                     2,
                     "Session from {remote} was closed internally during SourceMessage",
                     "remote"_attr = remote);
-        _state.store(State::EndSession);
     } else {
         LOGV2(22988,
               "Error receiving request from client. Ending connection from remote",
               "error"_attr = status,
               "remote"_attr = remote,
               "connectionId"_attr = session()->id());
-        _state.store(State::EndSession);
     }
+
+    _state.store(State::EndSession);
     uassertStatusOK(status);
 }
 
-void ServiceStateMachine::Impl::sinkCallback(Status status) {
-    invariant(state() == State::SinkWait);
+void ServiceStateMachine::Impl::sinkMessage() {
+    // Sink our response to the client
+    invariant(_state.load() == State::Process);
+    _state.store(State::SinkWait);
 
     // If there was an error sinking the message to the client, then we should print an error and
     // end the session.
     //
     // Otherwise, update the current state depending on whether we're in exhaust or not and return
     // from this function to let startNewLoop() continue the future chaining of state transitions.
-    if (!status.isOK()) {
+    if (auto status = session()->sinkMessage(std::exchange(_outMessage, {})); !status.isOK()) {
         LOGV2(22989,
               "Error sending response to client. Ending connection from remote",
               "error"_attr = status,
@@ -366,6 +322,7 @@ void ServiceStateMachine::Impl::sinkCallback(Status status) {
     } else {
         _state.store(State::Source);
     }
+
     // Performance testing showed a significant benefit from yielding here.
     // TODO SERVER-57531: Once we enable the use of a fixed-size thread pool
     // for handling client connection handshaking, we should only yield here if
@@ -518,20 +475,17 @@ void ServiceStateMachine::Impl::startNewLoop(const Status& executorStatus) {
         return;
     }
 
-    makeReadyFutureWith([&]() -> Future<void> {
-        if (_inExhaust) {
-            return Status::OK();
-        } else {
-            return sourceMessage();
+    makeReadyFutureWith([this] {
+        if (!_inExhaust) {
+            sourceMessage();
         }
-    })
-        .then([this]() { return processMessage(); })
-        .then([this]() -> Future<void> {
-            if (_outMessage.empty()) {
-                return Status::OK();
-            }
 
-            return sinkMessage();
+        return processMessage();
+    })
+        .then([this] {
+            if (!_outMessage.empty()) {
+                sinkMessage();
+            }
         })
         .getAsync([this, anchor = shared_from_this()](Status status) {
             scheduleNewLoop(std::move(status));

@@ -138,8 +138,6 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
     auto sep = ctx->getServiceEntryPoint();
 
     transport::TransportLayerASIO::Options opts(config);
-    opts.transportMode = transport::Mode::kSynchronous;
-
     std::vector<std::unique_ptr<TransportLayer>> retVector;
     retVector.emplace_back(std::make_unique<transport::TransportLayerASIO>(opts, sep));
     return std::make_unique<TransportLayerManager>(std::move(retVector));

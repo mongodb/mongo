@@ -78,10 +78,6 @@ public:
 
     size_t getRunningThreads() const override;
 
-    Mode transportMode() const override {
-        return Mode::kSynchronous;
-    }
-
     void appendStats(BSONObjBuilder* bob) const override;
 
     /**

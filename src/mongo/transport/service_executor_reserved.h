@@ -65,10 +65,6 @@ public:
         return _numRunningWorkerThreads.loadRelaxed();
     }
 
-    Mode transportMode() const override {
-        return Mode::kSynchronous;
-    }
-
     void runOnDataAvailable(const SessionHandle& session,
                             OutOfLineExecutor::Task onCompletionCallback) override;
 

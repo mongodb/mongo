@@ -35,7 +35,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/transport_mode.h"
 
 namespace mongo {
 namespace transport {
