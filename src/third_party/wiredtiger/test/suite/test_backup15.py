@@ -25,20 +25,15 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-
-import wiredtiger
-import os, shutil
+import os
 from wtbackup import backup_base
-from wtdataset import simple_key
-from wtscenario import make_scenarios
-import glob
 
 # test_backup15.py
 # Test cursor backup with a block-based incremental cursor.
 class test_backup15(backup_base):
     bkp_home = "WT_BLOCK"
     bkup_id=0
-    conn_config='cache_size=1G,log=(enabled,file_max=100K)'
+    conn_config='cache_size=1G,log=(enabled,file_max=100K),verbose=[backup]'
     logmax="100K"
     max_iteration=5
     mult=0
@@ -118,6 +113,4 @@ class test_backup15(backup_base):
                 self.take_full_backup(self.home_full)
             self.compare_backups(self.uri, self.home_full, self.home_incr, str(self.bkup_id))
             self.setup_directories(self.home_incr, self.home_full)
-
-if __name__ == '__main__':
-    wttest.run()
+        self.ignoreStdoutPatternIfExists("")
