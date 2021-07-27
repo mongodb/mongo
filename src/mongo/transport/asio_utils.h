@@ -39,15 +39,16 @@
 #include "mongo/base/string_data.h"
 #include "mongo/base/system_error.h"
 #include "mongo/config.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_options.h"
 
-namespace mongo {
-namespace transport {
+namespace mongo::transport {
 
 inline SockAddr endpointToSockAddr(const asio::generic::stream_protocol::endpoint& endPoint) {
     SockAddr wrappedAddr(endPoint.data(), endPoint.size());
@@ -59,38 +60,7 @@ inline HostAndPort endpointToHostAndPort(const asio::generic::stream_protocol::e
     return HostAndPort(endpointToSockAddr(endPoint).toString(true));
 }
 
-inline Status errorCodeToStatus(const std::error_code& ec) {
-    if (!ec)
-        return Status::OK();
-
-    if (ec == asio::error::operation_aborted) {
-        return {ErrorCodes::CallbackCanceled, "Callback was canceled"};
-    }
-
-#ifdef _WIN32
-    if (ec == asio::error::timed_out) {
-#else
-    if (ec == asio::error::try_again || ec == asio::error::would_block) {
-#endif
-        return {ErrorCodes::NetworkTimeout, "Socket operation timed out"};
-    } else if (ec == asio::error::eof) {
-        return {ErrorCodes::HostUnreachable, "Connection closed by peer"};
-    } else if (ec == asio::error::connection_reset) {
-        return {ErrorCodes::HostUnreachable, "Connection reset by peer"};
-    } else if (ec == asio::error::network_reset) {
-        return {ErrorCodes::HostUnreachable, "Connection reset by network"};
-    }
-
-    // If the ec.category() is a mongoErrorCategory() then this error was propogated from
-    // mongodb code and we should just pass the error cdoe along as-is.
-    ErrorCodes::Error errorCode = (ec.category() == mongoErrorCategory())
-        ? ErrorCodes::Error(ec.value())
-        // Otherwise it's an error code from the network and we should pass it along as a
-        // SocketException
-        : ErrorCodes::SocketException;
-    // Either way, include the error message.
-    return {errorCode, ec.message()};
-}
+Status errorCodeToStatus(const std::error_code& ec);
 
 /*
  * The ASIO implementation of poll (i.e. socket.wait()) cannot poll for a mask of events, and
@@ -103,225 +73,23 @@ inline Status errorCodeToStatus(const std::error_code& ec) {
  * check whether it matches the expected events mask.
  * - On error: it returns a Status(ErrorCodes::InternalError)
  */
-template <typename Socket, typename EventsMask>
-StatusWith<EventsMask> pollASIOSocket(Socket& socket, EventsMask mask, Milliseconds timeout) {
-#ifdef _WIN32
-    fd_set readfds;
-    fd_set writefds;
-    fd_set errfds;
-
-    FD_ZERO(&readfds);
-    FD_ZERO(&writefds);
-    FD_ZERO(&errfds);
-
-    auto fd = socket.native_handle();
-    if (mask & POLLIN) {
-        FD_SET(fd, &readfds);
-    }
-    if (mask & POLLOUT) {
-        FD_SET(fd, &writefds);
-    }
-    FD_SET(fd, &errfds);
-
-    timeval timeoutTv{};
-    auto timeoutUs = duration_cast<Microseconds>(timeout);
-    if (timeoutUs >= Seconds{1}) {
-        auto timeoutSec = duration_cast<Seconds>(timeoutUs);
-        timeoutTv.tv_sec = timeoutSec.count();
-        timeoutUs -= timeoutSec;
-    }
-    timeoutTv.tv_usec = timeoutUs.count();
-    int result = ::select(1, &readfds, &writefds, &errfds, &timeoutTv);
-    if (result == SOCKET_ERROR) {
-        auto errDesc = errnoWithDescription(WSAGetLastError());
-        return {ErrorCodes::InternalError, errDesc};
-    }
-    int revents = (FD_ISSET(fd, &readfds) ? POLLIN : 0) | (FD_ISSET(fd, &writefds) ? POLLOUT : 0) |
-        (FD_ISSET(fd, &errfds) ? POLLERR : 0);
-#else
-    pollfd pollItem = {};
-    pollItem.fd = socket.native_handle();
-    pollItem.events = mask;
-
-    int result;
-    boost::optional<Date_t> expiration;
-    if (timeout.count() > 0) {
-        expiration = Date_t::now() + timeout;
-    }
-    do {
-        Milliseconds curTimeout;
-        if (expiration) {
-            curTimeout = *expiration - Date_t::now();
-            if (curTimeout.count() <= 0) {
-                result = 0;
-                break;
-            }
-        } else {
-            curTimeout = timeout;
-        }
-        result = ::poll(&pollItem, 1, curTimeout.count());
-    } while (result == -1 && errno == EINTR);
-
-    if (result == -1) {
-        int errCode = errno;
-        return {ErrorCodes::InternalError, errnoWithDescription(errCode)};
-    }
-    int revents = pollItem.revents;
-#endif
-
-    if (result == 0) {
-        return {ErrorCodes::NetworkTimeout, "Timed out waiting for poll"};
-    } else {
-        return revents;
-    }
-}
+StatusWith<unsigned> pollASIOSocket(asio::generic::stream_protocol::socket& socket,
+                                    unsigned mask,
+                                    Milliseconds timeout);
 
 #ifdef MONGO_CONFIG_SSL
 /**
  * Peeks at a fragment of a client issued TLS handshake packet. Returns a TLS alert
  * packet if the client has selected a protocol which has been disabled by the server.
  */
-template <typename Buffer>
-boost::optional<std::array<std::uint8_t, 7>> checkTLSRequest(const Buffer& buffers) {
-    // This method's caller should have read in at least one MSGHEADER::Value's worth of data.
-    // The fragment we are about to examine must be strictly smaller.
-    static const size_t sizeOfTLSFragmentToRead = 11;
-    invariant(asio::buffer_size(buffers) >= sizeOfTLSFragmentToRead);
-
-    static_assert(sizeOfTLSFragmentToRead < sizeof(MSGHEADER::Value),
-                  "checkTLSRequest's caller read a MSGHEADER::Value, which must be larger than "
-                  "message containing the TLS version");
-
-    /**
-     * The fragment we are to examine is a record, containing a handshake, containing a
-     * ClientHello. We wish to examine the advertised protocol version in the ClientHello.
-     * The following roughly describes the contents of these structures. Note that we do not
-     * need, or wish to, examine the entire ClientHello, we're looking exclusively for the
-     * client_version.
-     *
-     * Below is a rough description of the payload we will be examining. We shall perform some
-     * basic checks to ensure the payload matches these expectations. If it does not, we should
-     * bail out, and not emit protocol version alerts.
-     *
-     * enum {alert(21), handshake(22)} ContentType;
-     * TLSPlaintext {
-     *   ContentType type = handshake(22),
-     *   ProtocolVersion version; // Irrelevant. Clients send the real version in ClientHello.
-     *   uint16 length;
-     *   fragment, see Handshake stuct for contents
-     * ...
-     * }
-     *
-     * enum {client_hello(1)} HandshakeType;
-     * Handshake {
-     *   HandshakeType msg_type = client_hello(1);
-     *   uint24_t length;
-     *   ClientHello body;
-     * }
-     *
-     * ClientHello {
-     *   ProtocolVersion client_version; // <- This is the value we want to extract.
-     * }
-     */
-
-    static const std::uint8_t ContentType_handshake = 22;
-    static const std::uint8_t HandshakeType_client_hello = 1;
-
-    using ProtocolVersion = std::array<std::uint8_t, 2>;
-    static const ProtocolVersion tls10VersionBytes{3, 1};
-    static const ProtocolVersion tls11VersionBytes{3, 2};
-
-    auto request = asio::buffer_cast<const char*>(buffers);
-    auto cdr = ConstDataRangeCursor(request, request + asio::buffer_size(buffers));
-
-    // Parse the record header.
-    // Extract the ContentType from the header, and ensure it is a handshake.
-    StatusWith<std::uint8_t> record_ContentType = cdr.readAndAdvanceNoThrow<std::uint8_t>();
-    if (!record_ContentType.isOK() || record_ContentType.getValue() != ContentType_handshake) {
-        return boost::none;
-    }
-    // Skip the record's ProtocolVersion. Clients tend to send TLS 1.0 in
-    // the record, but then their real protocol version in the enclosed ClientHello.
-    StatusWith<ProtocolVersion> record_protocol_version =
-        cdr.readAndAdvanceNoThrow<ProtocolVersion>();
-    if (!record_protocol_version.isOK()) {
-        return boost::none;
-    }
-    // Parse the record length. It should be be larger than the remaining expected payload.
-    auto record_length = cdr.readAndAdvanceNoThrow<BigEndian<std::uint16_t>>();
-    if (!record_length.isOK() || record_length.getValue() < cdr.length()) {
-        return boost::none;
-    }
-
-    // Parse the handshake header.
-    // Extract the HandshakeType, and ensure it is a ClientHello.
-    StatusWith<std::uint8_t> handshake_type = cdr.readAndAdvanceNoThrow<std::uint8_t>();
-    if (!handshake_type.isOK() || handshake_type.getValue() != HandshakeType_client_hello) {
-        return boost::none;
-    }
-    // Extract the handshake length, and ensure it is larger than the remaining expected
-    // payload. This requires a little work because the packet represents it with a uint24_t.
-    StatusWith<std::array<std::uint8_t, 3>> handshake_length_bytes =
-        cdr.readAndAdvanceNoThrow<std::array<std::uint8_t, 3>>();
-    if (!handshake_length_bytes.isOK()) {
-        return boost::none;
-    }
-    std::uint32_t handshake_length = 0;
-    for (std::uint8_t handshake_byte : handshake_length_bytes.getValue()) {
-        handshake_length <<= 8;
-        handshake_length |= handshake_byte;
-    }
-    if (handshake_length < cdr.length()) {
-        return boost::none;
-    }
-    StatusWith<ProtocolVersion> client_version = cdr.readAndAdvanceNoThrow<ProtocolVersion>();
-    if (!client_version.isOK()) {
-        return boost::none;
-    }
-
-    // Invariant: We read exactly as much data as expected.
-    invariant((cdr.data() - request) == sizeOfTLSFragmentToRead);
-
-    auto isProtocolDisabled = [](SSLParams::Protocols protocol) {
-        const auto& params = getSSLGlobalParams();
-        return std::find(params.sslDisabledProtocols.begin(),
-                         params.sslDisabledProtocols.end(),
-                         protocol) != params.sslDisabledProtocols.end();
-    };
-
-    auto makeTLSProtocolVersionAlert =
-        [](const std::array<std::uint8_t, 2>& versionBytes) -> std::array<std::uint8_t, 7> {
-        /**
-         * The structure for this alert packet is as follows:
-         * TLSPlaintext {
-         *   ContentType type = alert(21);
-         *   ProtocolVersion = versionBytes;
-         *   uint16_t length = 2
-         *   fragment = AlertDescription {
-         *     AlertLevel level = fatal(2);
-         *     AlertDescription = protocol_version(70);
-         *   }
-         *
-         */
-        return std::array<std::uint8_t, 7>{
-            0x15, versionBytes[0], versionBytes[1], 0x00, 0x02, 0x02, 0x46};
-    };
-
-    ProtocolVersion version = client_version.getValue();
-    if (version == tls10VersionBytes && isProtocolDisabled(SSLParams::Protocols::TLS1_0)) {
-        return makeTLSProtocolVersionAlert(version);
-    } else if (client_version == tls11VersionBytes &&
-               isProtocolDisabled(SSLParams::Protocols::TLS1_1)) {
-        return makeTLSProtocolVersionAlert(version);
-    }
-    // TLS1.2 cannot be distinguished from TLS1.3, just by looking at the ProtocolVersion bytes.
-    // TLS 1.3 compatible clients advertise a "supported_versions" extension, which we would
-    // have to extract here.
-    // Hopefully by the time this matters, OpenSSL will properly emit protocol_version alerts.
-
-    return boost::none;
-}
+boost::optional<std::array<std::uint8_t, 7>> checkTLSRequest(const asio::const_buffer& buffer);
 #endif
+
+/**
+ * setSocketOption failed. Log the error.
+ * This is in the .cpp file just to keep LOGV2 out of this header.
+ */
+void failedSetSocketOption(const std::system_error& ex, StringData note, BSONObj optionDescription);
 
 /**
  * Calls Asio `socket.set_option(opt)` with better failure diagnostics.
@@ -342,26 +110,14 @@ void setSocketOption(Socket& socket, const Option& opt, StringData note) {
     try {
         socket.set_option(opt);
     } catch (const std::system_error& ex) {
-        LOGV2_INFO(5693100,
-                   "Asio socket.set_option failed with std::system_error",
-                   "note"_attr = note,
-                   "option"_attr =
-                       [&opt, p = socket.local_endpoint().protocol()] {
-                           return BSONObjBuilder{}
-                               .append("level", opt.level(p))
-                               .append("name", opt.name(p))
-                               .append("data", hexdump(opt.data(p), opt.size(p)))
-                               .obj();
-                       }(),
-                   "error"_attr =
-                       [&ex] {
-                           return BSONObjBuilder{}
-                               .append("what", ex.what())
-                               .append("message", ex.code().message())
-                               .append("category", ex.code().category().name())
-                               .append("value", ex.code().value())
-                               .obj();
-                       }());
+        BSONObj optionDescription = [&opt, p = socket.local_endpoint().protocol()] {
+            return BSONObjBuilder{}
+                .append("level", opt.level(p))
+                .append("name", opt.name(p))
+                .append("data", hexdump(opt.data(p), opt.size(p)))
+                .obj();
+        }();
+        failedSetSocketOption(ex, note, optionDescription);
         throw;
     }
 }
@@ -390,106 +146,89 @@ void setSocketOption(Socket& socket, const Option& opt, std::error_code& ec, Str
  * Example:
  *    Future<size_t> future = my_socket.async_read_some(my_buffer, UseFuture{});
  */
-struct UseFuture {};
-
-namespace use_future_details {
-
-template <typename... Args>
-struct AsyncHandlerHelper {
-    using Result = std::tuple<Args...>;
-    static void complete(Promise<Result>* promise, Args... args) {
-        promise->emplaceValue(args...);
-    }
+struct UseFuture {
+    template <typename... Args>
+    class Adapter;
 };
 
-template <>
-struct AsyncHandlerHelper<> {
-    using Result = void;
-    static void complete(Promise<Result>* promise) {
-        promise->emplaceValue();
-    }
-};
+template <typename... ArgsFromAsio>
+class UseFuture::Adapter {
+private:
+    template <typename Dum, typename... Ts>
+    struct ArgPack : stdx::type_identity<std::tuple<Ts...>> {};
+    template <typename Dum>
+    struct ArgPack<Dum> : stdx::type_identity<void> {};
+    template <typename Dum, typename T>
+    struct ArgPack<Dum, T> : stdx::type_identity<T> {};
 
-template <typename Arg>
-struct AsyncHandlerHelper<Arg> {
-    using Result = Arg;
-    static void complete(Promise<Result>* promise, Arg arg) {
-        promise->emplaceValue(arg);
-    }
-};
+    /**
+     * If an Asio callback takes a leading error_code, it's stripped from
+     * the Future's value_type. Any errors reported by Asio will instead
+     * be delivered by setting the Future's error Status.
+     */
+    template <typename Dum, typename... Ts>
+    struct StripError : ArgPack<Dum, Ts...> {};
+    template <typename Dum, typename... Ts>
+    struct StripError<Dum, std::error_code, Ts...> : ArgPack<Dum, Ts...> {};
 
-template <typename... Args>
-struct AsyncHandlerHelper<std::error_code, Args...> {
-    using Helper = AsyncHandlerHelper<Args...>;
-    using Result = typename Helper::Result;
+    using Result = typename StripError<void, ArgsFromAsio...>::type;
 
-    template <typename... Args2>
-    static void complete(Promise<Result>* promise, std::error_code ec, Args2&&... args) {
-        if (ec) {
-            promise->setError(errorCodeToStatus(ec));
-        } else {
-            Helper::complete(promise, std::forward<Args2>(args)...);
+    struct Handler {
+    private:
+        template <typename... As>
+        void _onSuccess(As&&... args) {
+            promise.emplaceValue(std::forward<As>(args)...);
         }
-    }
-};
-
-template <>
-struct AsyncHandlerHelper<std::error_code> {
-    using Result = void;
-    static void complete(Promise<Result>* promise, std::error_code ec) {
-        if (ec) {
-            promise->setError(errorCodeToStatus(ec));
-        } else {
-            promise->emplaceValue();
+        template <typename... As>
+        void _onInvoke(As&&... args) {
+            _onSuccess(std::forward<As>(args)...);
         }
+        template <typename... As>
+        void _onInvoke(std::error_code ec, As&&... args) {
+            if (ec) {
+                promise.setError(errorCodeToStatus(ec));
+                return;
+            }
+            _onSuccess(std::forward<As>(args)...);
+        }
+
+    public:
+        explicit Handler(const UseFuture&) {}
+
+        template <typename... As>
+        void operator()(As&&... args) {
+            static_assert((std::is_same_v<std::decay_t<As>, std::decay_t<ArgsFromAsio>> && ...),
+                          "Unexpected argument list from Asio async result callback.");
+            _onInvoke(std::forward<As>(args)...);
+        }
+
+        Promise<Result> promise;
+    };
+
+public:
+    using return_type = Future<Result>;
+    using completion_handler_type = Handler;
+
+    explicit Adapter(Handler& handler) {
+        auto&& [p, f] = makePromiseFuture<Result>();
+        _fut = std::move(f);
+        handler.promise = std::move(p);
     }
+
+    return_type get() {
+        return std::move(_fut);
+    }
+
+private:
+    Future<Result> _fut;
 };
 
-template <typename... Args>
-struct AsyncHandler {
-    using Helper = AsyncHandlerHelper<Args...>;
-    using Result = typename Helper::Result;
-
-    explicit AsyncHandler(UseFuture) {}
-
-    template <typename... Args2>
-    void operator()(Args2&&... args) {
-        Helper::complete(&promise, std::forward<Args2>(args)...);
-    }
-
-    Promise<Result> promise;
-};
-
-template <typename... Args>
-struct AsyncResult {
-    using completion_handler_type = AsyncHandler<Args...>;
-    using RealResult = typename AsyncHandler<Args...>::Result;
-    using return_type = Future<RealResult>;
-
-    explicit AsyncResult(completion_handler_type& handler) {
-        auto pf = makePromiseFuture<RealResult>();
-        fut = std::move(pf.future);
-        handler.promise = std::move(pf.promise);
-    }
-
-    auto get() {
-        return std::move(fut);
-    }
-
-    Future<RealResult> fut;
-};
-
-}  // namespace use_future_details
-}  // namespace transport
-}  // namespace mongo
+}  // namespace mongo::transport
 
 namespace asio {
-template <typename Comp, typename Sig>
-class async_result;
-
-template <typename Result, typename... Args>
-class async_result<::mongo::transport::UseFuture, Result(Args...)>
-    : public ::mongo::transport::use_future_details::AsyncResult<Args...> {
-    using ::mongo::transport::use_future_details::AsyncResult<Args...>::AsyncResult;
+template <typename... Args>
+class async_result<mongo::transport::UseFuture, void(Args...)>
+    : public mongo::transport::UseFuture::Adapter<Args...> {
+    using mongo::transport::UseFuture::Adapter<Args...>::Adapter;
 };
 }  // namespace asio

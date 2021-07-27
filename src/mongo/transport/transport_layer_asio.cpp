@@ -468,7 +468,7 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(
     }
 
     std::error_code ec;
-    GenericSocket sock(*_egressReactor);
+    ASIOSession::GenericSocket sock(*_egressReactor);
     WrappedResolver resolver(*_egressReactor);
 
     Date_t timeBefore = Date_t::now();
@@ -529,7 +529,7 @@ StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncCon
     const HostAndPort& peer,
     const Milliseconds& timeout,
     boost::optional<TransientSSLParams> transientSSLParams) {
-    GenericSocket sock(*_egressReactor);
+    ASIOSession::GenericSocket sock(*_egressReactor);
     std::error_code ec;
 
     const auto protocol = endpoint->protocol();
@@ -622,7 +622,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
         Promise<SessionHandle> promise;
 
         Mutex mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "AsyncConnectState::mutex");
-        GenericSocket socket;
+        ASIOSession::GenericSocket socket;
         ASIOReactorTimer timeoutTimer;
         WrappedResolver resolver;
         WrappedEndpoint resolvedEndpoint;
@@ -1185,7 +1185,8 @@ ReactorHandle TransportLayerASIO::getReactor(WhichReactor which) {
 }
 
 void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
-    auto acceptCb = [this, &acceptor](const std::error_code& ec, GenericSocket peerSocket) mutable {
+    auto acceptCb = [this, &acceptor](const std::error_code& ec,
+                                      ASIOSession::GenericSocket peerSocket) mutable {
         if (auto lk = stdx::lock_guard(_mutex); _isShutdown) {
             return;
         }

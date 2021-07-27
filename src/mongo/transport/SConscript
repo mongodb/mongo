@@ -53,6 +53,8 @@ tlEnv.Library(
     target='transport_layer',
     source=[
         'transport_layer_asio.cpp',
+        'asio_utils.cpp',
+        'session_asio.cpp',
         'transport_options.idl',
     ],
     LIBDEPS=[
