@@ -149,6 +149,7 @@ tinfo_init(void)
         tinfo->session = NULL;
         tinfo->cursor = NULL;
 
+        memset(tinfo->insert_list, 0, sizeof(tinfo->insert_list));
         tinfo->insert_list_cnt = 0;
 
         tinfo->state = TINFO_RUNNING;
@@ -685,7 +686,7 @@ ops(void *arg)
     WT_SESSION *session;
     iso_level_t iso_level;
     thread_op op;
-    uint64_t reset_op, session_op, truncate_op;
+    uint64_t max_rows, reset_op, session_op, truncate_op;
     uint32_t range, rnd;
     u_int i, j;
     const char *iso_config;
@@ -814,8 +815,12 @@ ops(void *arg)
                 op = UPDATE;
         }
 
-        /* Select a row. */
-        tinfo->keyno = mmrand(&tinfo->rnd, 1, (u_int)g.rows);
+        /*
+         * Select a row. Column-store extends the object, explicitly read the maximum row count and
+         * then use a local variable so the value won't change inside the loop.
+         */
+        max_rows = (volatile uint64_t)g.rows;
+        tinfo->keyno = mmrand(&tinfo->rnd, 1, (u_int)max_rows);
 
         /*
          * Inserts, removes and updates can be done following a cursor set-key, or based on a cursor
@@ -938,7 +943,7 @@ ops(void *arg)
             }
 
             if (!positioned)
-                tinfo->keyno = mmrand(&tinfo->rnd, 1, (u_int)g.rows);
+                tinfo->keyno = mmrand(&tinfo->rnd, 1, (u_int)max_rows);
 
             /*
              * Truncate up to 5% of the table. If the range overlaps the beginning/end of the table,
@@ -950,7 +955,7 @@ ops(void *arg)
              * (truncating from lower keys to higher keys or vice-versa).
              */
             greater_than = mmrand(&tinfo->rnd, 0, 1) == 1;
-            range = g.rows < 20 ? 0 : mmrand(&tinfo->rnd, 0, (u_int)g.rows / 20);
+            range = max_rows < 20 ? 0 : mmrand(&tinfo->rnd, 0, (u_int)max_rows / 20);
             tinfo->last = tinfo->keyno;
             if (greater_than) {
                 if (g.c_reverse) {
@@ -960,13 +965,13 @@ ops(void *arg)
                         tinfo->last -= range;
                 } else {
                     tinfo->last += range;
-                    if (tinfo->last > g.rows)
+                    if (tinfo->last > max_rows)
                         tinfo->last = 0;
                 }
             } else {
                 if (g.c_reverse) {
                     tinfo->keyno += range;
-                    if (tinfo->keyno > g.rows)
+                    if (tinfo->keyno > max_rows)
                         tinfo->keyno = 0;
                 } else {
                     if (tinfo->keyno <= range)
@@ -1700,7 +1705,7 @@ col_insert_resolve(TINFO *tinfo)
      */
     do {
         WT_ORDERED_READ(v, g.rows);
-        for (i = 0, p = tinfo->insert_list; i < WT_ELEMENTS(tinfo->insert_list); ++i) {
+        for (i = 0, p = tinfo->insert_list; i < WT_ELEMENTS(tinfo->insert_list); ++i, ++p) {
             if (*p == v + 1) {
                 testutil_assert(__wt_atomic_casv64(&g.rows, v, v + 1));
                 *p = 0;
@@ -1746,6 +1751,7 @@ col_insert(TINFO *tinfo, WT_CURSOR *cursor)
     else
         cursor->set_value(cursor, tinfo->value);
 
+    /* Create a record, then add the key to our list of new records for later resolution. */
     if ((ret = cursor->insert(cursor)) != 0)
         return (ret);
 
