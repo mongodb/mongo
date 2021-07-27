@@ -184,6 +184,10 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
     ASSERT_OK(mver.getStatus());
     ASSERT_EQ(ChunkVersion(0, 0, origVersion.epoch(), origVersion.getTimestamp()), mver.getValue());
 
+    // Verify that a collection version is returned
+    auto cver = assertGet(ChunkVersion::parseWithField(versions, "collectionVersion"));
+    ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 0, collEpoch, collTimestamp), cver);
+
     // Verify the chunk ended up in the right shard.
     auto chunkDoc0 =
         uassertStatusOK(getChunkDoc(operationContext(), chunkMin, collEpoch, collTimestamp));
