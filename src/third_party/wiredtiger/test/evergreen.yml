@@ -2151,18 +2151,31 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-
-            GCOV=/opt/mongodbtoolchain/v3/bin/gcov gcovr -r .. -e '.*/bt_(debug|dump|misc|salvage|vrfy).*' -e '.*/(log|progress|verify_build|strerror|env_msg|err_file|cur_config|os_abort)\..*' -e '.*_stat\..*' --html -o ../coverage_report.html
+            mkdir -p ../coverage_report
+            GCOV=/opt/mongodbtoolchain/v3/bin/gcov gcovr -r .. -f ../src -e '.*/bt_(debug|dump|misc|salvage|vrfy).*' -e '.*/(log|progress|verify_build|strerror|env_msg|err_file|cur_config|os_abort)\..*' -e '.*_stat\..*' -e 'bench' -e 'examples' -e 'test' -e 'ext' -e 'dist' -e 'tools' -j 4 --html-details --html-self-contained -o ../coverage_report/2_coverage_report.html
       - command: s3.put
         params:
           aws_secret: ${aws_secret}
           aws_key: ${aws_key}
-          local_file: wiredtiger/coverage_report.html
+          local_files_include_filter: wiredtiger/coverage_report/*
           bucket: build_external
           permissions: public-read
           content_type: text/html
-          display_name: Coverage report
-          remote_file: wiredtiger/${build_variant}/${revision}/coverage_report/coverage_report_${build_id}-${execution}.html
+          remote_file: wiredtiger/${build_variant}/${revision}/coverage_report_${build_id}-${execution}/
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          aws_key: ${aws_key}
+          local_file: wiredtiger/coverage_report/2_coverage_report.html
+          bucket: build_external
+          permissions: public-read
+          content_type: text/html
+          # Ensure that the first character of the display_name is a space
+          # This will ensure that it sorts before the per-file report pages which also get a space
+          # at the start of their display name (why this happens is not yet clear).
+          display_name: " 1 Coverage report main page"
+          remote_file: wiredtiger/${build_variant}/${revision}/coverage_report_${build_id}-${execution}/1_coverage_report_main.html
+
 
   - name: spinlock-gcc-test
     commands:
@@ -2906,7 +2919,7 @@ buildvariants:
 
 - name: code-statistics
   display_name: "Code statistics"
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   run_on:
   - ubuntu1804-test
   expansions:
