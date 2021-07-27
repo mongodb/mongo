@@ -27,6 +27,17 @@ env.Library(
     ],
 )
 
+env.Benchmark(
+    target='simple8b_bm',
+    source=[
+        'simple8b_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'bson_column'
+    ],
+)
+
 env.CppUnitTest(
     target='bson_util_test',
     source=[
