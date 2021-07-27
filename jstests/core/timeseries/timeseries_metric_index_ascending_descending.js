@@ -75,42 +75,83 @@ TimeseriesTest.run((insert) => {
 
     // Test a simple ascending index.
     setup({x: 1});
-    let indexes = bucketsColl.getIndexes();
-    assert.eq(1, indexes.length);
-    assert.eq({"control.max.x": 1, "control.min.x": 1}, indexes[0].key);
-    testHint(indexes[0].name);
+    let userIndexes = coll.getIndexes();
+    assert.eq(1, userIndexes.length);
+    assert.eq({x: 1}, userIndexes[0].key);
+
+    let bucketIndexes = bucketsColl.getIndexes();
+    assert.eq(1, bucketIndexes.length);
+    assert.eq({"control.max.x": 1, "control.min.x": 1}, bucketIndexes[0].key);
+
+    testHint(bucketIndexes[0].name);
 
     // Drop index by key pattern.
     assert.commandWorked(coll.dropIndex({x: 1}));
-    indexes = bucketsColl.getIndexes();
-    assert.eq(0, indexes.length);
+    bucketIndexes = bucketsColl.getIndexes();
+    assert.eq(0, bucketIndexes.length);
 
     // Test a simple descending index.
     setup({x: -1});
-    indexes = bucketsColl.getIndexes();
-    assert.eq(1, indexes.length);
-    assert.eq({"control.min.x": -1, "control.max.x": -1}, indexes[0].key);
-    testHint(indexes[0].name);
+    userIndexes = coll.getIndexes();
+    assert.eq(1, userIndexes.length);
+    assert.eq({x: -1}, userIndexes[0].key);
+
+    bucketIndexes = bucketsColl.getIndexes();
+    assert.eq(1, bucketIndexes.length);
+    assert.eq({"control.min.x": -1, "control.max.x": -1}, bucketIndexes[0].key);
+
+    testHint(bucketIndexes[0].name);
 
     // Drop index by name.
-    assert.commandWorked(coll.dropIndex(indexes[0].name));
-    indexes = bucketsColl.getIndexes();
-    assert.eq(0, indexes.length);
+    assert.commandWorked(coll.dropIndex(bucketIndexes[0].name));
+    bucketIndexes = bucketsColl.getIndexes();
+    assert.eq(0, bucketIndexes.length);
 
     // Test an index on dotted and sub document fields.
     setup({"x.y": 1});
-    indexes = bucketsColl.getIndexes();
-    assert.eq(1, indexes.length);
-    assert.eq({"control.max.x.y": 1, "control.min.x.y": 1}, indexes[0].key);
-    testHint(indexes[0].name);
+    userIndexes = coll.getIndexes();
+    assert.eq(1, userIndexes.length);
+    assert.eq({"x.y": 1}, userIndexes[0].key);
 
-    assert.commandWorked(coll.dropIndex(indexes[0].name));
-    indexes = bucketsColl.getIndexes();
-    assert.eq(0, indexes.length);
+    bucketIndexes = bucketsColl.getIndexes();
+    assert.eq(1, bucketIndexes.length);
+    assert.eq({"control.max.x.y": 1, "control.min.x.y": 1}, bucketIndexes[0].key);
+    testHint(bucketIndexes[0].name);
+
+    assert.commandWorked(coll.dropIndex(bucketIndexes[0].name));
+    bucketIndexes = bucketsColl.getIndexes();
+    assert.eq(0, bucketIndexes.length);
 
     // Test bad input.
     assert.commandFailedWithCode(coll.createIndex({x: "abc"}), ErrorCodes.CannotCreateIndex);
     assert.commandFailedWithCode(coll.createIndex({x: {y: 1}}), ErrorCodes.CannotCreateIndex);
     assert.commandFailedWithCode(coll.createIndex({x: true}), ErrorCodes.CannotCreateIndex);
+
+    // Create indexes on the buckets collection that do not map to any user indexes. The server must
+    // not crash when handling the reverse mapping of these.
+    assert.commandWorked(bucketsColl.createIndex({"control.min.x.y": 1}));
+    assert.commandWorked(bucketsColl.createIndex({"control.min.x.y": 1, "control.min.y.x": 1}));
+    assert.commandWorked(bucketsColl.createIndex({"control.max.x.y": 1}));
+    assert.commandWorked(bucketsColl.createIndex({"control.max.x.y": 1, "control.max.y.x": 1}));
+    assert.commandWorked(bucketsColl.createIndex({"control.min.x.y": 1, "control.max.x.y": 1}));
+    assert.commandWorked(bucketsColl.createIndex({"control.min.x.y": -1, "control.max.x.y": 1}));
+    assert.commandWorked(bucketsColl.createIndex({"control.max.x.y": -1, "control.min.x.y": -1}));
+    assert.commandWorked(bucketsColl.createIndex({"control.max.x.y": 1, "control.min.x.y": -1}));
+
+    assert.commandWorked(bucketsColl.createIndex({"data.x": 1}));
+    assert.commandWorked(bucketsColl.createIndex({"control.min.x.y": 1, "data.x": 1}));
+    assert.commandWorked(bucketsColl.createIndex({"data.x": 1, "control.min.x.y": 1}));
+
+    // The first two-thirds of the below compound indexes represent {"x.y" : 1} and {"x.y" : -1}.
+    assert.commandWorked(
+        bucketsColl.createIndex({"control.max.x.y": 1, "control.min.x.y": 1, "data.x": 1}));
+    assert.commandWorked(
+        bucketsColl.createIndex({"control.min.x.y": -1, "control.max.x.y": -1, "data.x": 1}));
+
+    userIndexes = coll.getIndexes();
+    assert.eq(0, userIndexes.length);
+
+    bucketIndexes = bucketsColl.getIndexes();
+    assert.eq(13, bucketIndexes.length);
 });
 }());

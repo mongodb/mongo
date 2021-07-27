@@ -44,6 +44,31 @@ namespace mongo {
 namespace timeseries {
 
 namespace {
+
+bool isIndexOnControl(const StringData& field) {
+    return field.startsWith(timeseries::kControlMinFieldNamePrefix) ||
+        field.startsWith(timeseries::kControlMaxFieldNamePrefix);
+}
+
+/**
+ * Takes the index specification field name, such as 'control.max.x.y', or 'control.min.z' and
+ * returns a pair of the prefix ('control.min.' or 'control.max.') and key ('x.y' or 'z').
+ */
+std::pair<std::string, std::string> extractControlPrefixAndKey(const StringData& field) {
+    // Can't use rfind() due to dotted fields such as 'control.max.x.y'.
+    size_t numDotsFound = 0;
+    auto fieldIt = std::find_if(field.begin(), field.end(), [&numDotsFound](const char c) {
+        if (c == '.') {
+            numDotsFound++;
+        }
+
+        return numDotsFound == 2;
+    });
+
+    invariant(numDotsFound == 2 && fieldIt != field.end());
+    return {std::string(field.begin(), fieldIt + 1), std::string(fieldIt + 1, field.end())};
+}
+
 StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions& timeseriesOptions,
                                                         const BSONObj& timeseriesIndexSpecBSON,
                                                         bool isShardKeySpec) {
@@ -170,7 +195,9 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
         << timeseries::kControlMaxFieldNamePrefix << timeField;
 
     BSONObjBuilder builder;
-    for (const auto& elem : bucketsIndexSpecBSON) {
+    for (auto elemIt = bucketsIndexSpecBSON.begin(); elemIt != bucketsIndexSpecBSON.end();
+         ++elemIt) {
+        const auto& elem = *elemIt;
         // The index specification on the time field is ascending or descending.
         if (elem.fieldNameStringData() == controlMinTimeField) {
             if (!elem.isNumber()) {
@@ -184,32 +211,91 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
         } else if (elem.fieldNameStringData() == controlMaxTimeField) {
             // Skip 'control.max.<timeField>' since the 'control.min.<timeField>' field is
             // sufficient to determine whether the index is ascending or descending.
+
             continue;
         }
 
-        if (!metaField) {
-            // 'elem' is an invalid index spec field for this time-series collection. It does not
-            // match the time field and there is no metaField set. Therefore, we will not convert
+        if (metaField) {
+            if (elem.fieldNameStringData() == timeseries::kBucketMetaFieldName) {
+                builder.appendAs(elem, *metaField);
+                continue;
+            }
+
+            if (elem.fieldNameStringData().startsWith(timeseries::kBucketMetaFieldName + ".")) {
+                builder.appendAs(elem,
+                                 str::stream() << *metaField << "."
+                                               << elem.fieldNameStringData().substr(
+                                                      timeseries::kBucketMetaFieldName.size() + 1));
+                continue;
+            }
+        }
+
+        if (!feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV()) {
+            // 'elem' is an invalid index spec field for this time-series collection. It matches
+            // neither the time field nor the metaField field. Therefore, we will not convert the
+            // index spec.
+            return {};
+        }
+
+        if (!isIndexOnControl(elem.fieldNameStringData())) {
+            // Only indexes on the control field are allowed beyond this point. We will not convert
             // the index spec.
             return {};
         }
 
-        if (elem.fieldNameStringData() == timeseries::kBucketMetaFieldName) {
-            builder.appendAs(elem, *metaField);
-            continue;
+        // Indexes on measurement fields are built as compound indexes on the two 'control.min' and
+        // 'control.max' fields. We use the BSON iterator to lookahead when doing the reverse
+        // mapping for these indexes.
+        const auto firstOrdering = elem.number();
+        std::string firstControlFieldPrefix;
+        std::string firstControlFieldKey;
+        std::tie(firstControlFieldPrefix, firstControlFieldKey) =
+            extractControlPrefixAndKey(elem.fieldNameStringData());
+
+        elemIt++;
+        if (elemIt == bucketsIndexSpecBSON.end()) {
+            // This measurement index spec on the underlying buckets collection is not valid for
+            // time-series as the compound index is incomplete. We will not convert the index spec.
+            return {};
         }
 
-        if (elem.fieldNameStringData().startsWith(timeseries::kBucketMetaFieldName + ".")) {
-            builder.appendAs(elem,
-                             str::stream() << *metaField << "."
-                                           << elem.fieldNameStringData().substr(
-                                                  timeseries::kBucketMetaFieldName.size() + 1));
-            continue;
+        const auto& nextElem = *elemIt;
+        if (!isIndexOnControl(nextElem.fieldNameStringData())) {
+            // Only indexes on the control field are allowed beyond this point. We will not convert
+            // the index spec.
+            return {};
         }
 
-        // 'elem' is an invalid index spec field for this time-series collection. It matches neither
-        // the time field  nor the metaField field. Therefore, we will not convert the index spec.
-        return {};
+        const auto secondOrdering = nextElem.number();
+        std::string secondControlFieldPrefix;
+        std::string secondControlFieldKey;
+        std::tie(secondControlFieldPrefix, secondControlFieldKey) =
+            extractControlPrefixAndKey(nextElem.fieldNameStringData());
+
+        if (firstOrdering != secondOrdering) {
+            // The compound index has a mixed ascending and descending key pattern. Do not convert
+            // the index spec.
+            return {};
+        }
+
+        if (firstControlFieldPrefix == timeseries::kControlMaxFieldNamePrefix &&
+            secondControlFieldPrefix == timeseries::kControlMinFieldNamePrefix &&
+            firstControlFieldKey == secondControlFieldKey && firstOrdering >= 0) {
+            // Ascending index.
+            builder.appendAs(nextElem, firstControlFieldKey);
+            continue;
+        } else if (firstControlFieldPrefix == timeseries::kControlMinFieldNamePrefix &&
+                   secondControlFieldPrefix == timeseries::kControlMaxFieldNamePrefix &&
+                   firstControlFieldKey == secondControlFieldKey && firstOrdering < 0) {
+            // Descending index.
+            builder.appendAs(nextElem, firstControlFieldKey);
+            continue;
+        } else {
+            // This measurement index spec on the underlying buckets collection is not valid for
+            // time-series as the compound index has the wrong ordering. We will not convert the
+            // index spec.
+            return {};
+        }
     }
 
     return builder.obj();
