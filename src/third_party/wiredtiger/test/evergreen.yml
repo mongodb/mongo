@@ -2606,8 +2606,6 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            sudo su
-            ulimit -n 1000000
             export "PATH=/opt/mongodbtoolchain/v3/bin:$PATH"
             virtualenv -p python3 venv
             source venv/bin/activate
