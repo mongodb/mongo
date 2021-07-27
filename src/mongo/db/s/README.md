@@ -456,13 +456,6 @@ The business logic for most DDL commands that the config server coordinates live
 [**ShardingCatalogManager class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/sharding_catalog_manager.h#L86),
 including the logic for
 [**dropCollection**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/sharding_catalog_manager_collection_operations.cpp#L417).
-However, note that the ShardingCatalogManager class also contains business logic to just commit some
-operations that are otherwise coordinated by a shard.
-* Example of a DDL command (shard collection) for which the config server
-[**hands off coordination**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/configsvr_shard_collection_command.cpp)
-to a shard. The business logic for such commands is in the shard's command body, such as the logic
-for
-[**shardCollection**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/shardsvr_shard_collection.cpp#L7830).
 
 ## Important caveats
 

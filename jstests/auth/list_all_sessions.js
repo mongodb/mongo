@@ -15,9 +15,6 @@ function runListAllSessionsTest(mongod) {
     const config = mongod.getDB("config");
 
     const pipeline = [{'$listSessions': {allUsers: true}}];
-    function listSessions() {
-        return config.system.sessions.aggregate(pipeline);
-    }
 
     admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
     assert(admin.auth('admin', 'pass'));
@@ -42,7 +39,11 @@ function runListAllSessionsTest(mongod) {
 
     // Ensure that the cache now contains the session and is visible by admin
     assert(admin.auth('admin', 'pass'));
-    const resultArray = listSessions().toArray();
+    const resultArray =
+        config.system.sessions
+            .aggregate(
+                [{'$listSessions': {allUsers: true}}, {'$sort': {lastUse: -1}}, {'$limit': 1}])
+            .toArray();
     assert.eq(resultArray.length, 1);
     const cacheid = resultArray[0]._id.id;
     assert(cacheid !== undefined);

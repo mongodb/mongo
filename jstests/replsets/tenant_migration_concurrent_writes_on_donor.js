@@ -469,7 +469,6 @@ const testCases = {
     _configsvrRefineCollectionShardKey: {skip: isNotRunOnUserDatabase},
     _configsvrRemoveShard: {skip: isNotRunOnUserDatabase},
     _configsvrRemoveShardFromZone: {skip: isNotRunOnUserDatabase},
-    _configsvrShardCollection: {skip: isNotRunOnUserDatabase},
     _configsvrUpdateZoneKeyRange: {skip: isNotRunOnUserDatabase},
     _flushDatabaseCacheUpdates: {skip: isNotRunOnUserDatabase},
     _flushDatabaseCacheUpdatesWithWriteConcern: {skip: isNotRunOnUserDatabase},
@@ -491,7 +490,8 @@ const testCases = {
     _shardsvrCreateCollection: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrCreateCollectionParticipant: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrMovePrimary: {skip: isNotRunOnUserDatabase},
-    _shardsvrShardCollection: {skip: isNotRunOnUserDatabase},
+    _shardsvrShardCollection:
+        {skip: isNotRunOnUserDatabase},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _shardsvrRenameCollection: {skip: isOnlySupportedOnShardedCluster},
     _transferMods: {skip: isNotRunOnUserDatabase},
     abortTransaction: {

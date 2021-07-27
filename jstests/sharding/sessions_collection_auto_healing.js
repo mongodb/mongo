@@ -15,10 +15,8 @@ TestData.disableImplicitSessions = true;
 
 var st = new ShardingTest({shards: 0});
 var configSvr = st.configRS.getPrimary();
-var configAdmin = configSvr.getDB("admin");
 
 var mongos = st.s;
-var mongosAdmin = mongos.getDB("admin");
 var mongosConfig = mongos.getDB("config");
 
 // Test that we can use sessions on the config server before we add any shards.
@@ -26,7 +24,7 @@ var mongosConfig = mongos.getDB("config");
     validateSessionsCollection(configSvr, false, false);
     validateSessionsCollection(mongos, false, false);
 
-    assert.commandWorked(configAdmin.runCommand({startSession: 1}));
+    assert.commandWorked(configSvr.adminCommand({startSession: 1}));
 
     validateSessionsCollection(configSvr, false, false);
     validateSessionsCollection(mongos, false, false);
@@ -37,7 +35,7 @@ var mongosConfig = mongos.getDB("config");
     validateSessionsCollection(configSvr, false, false);
     validateSessionsCollection(mongos, false, false);
 
-    assert.commandWorked(mongosAdmin.runCommand({startSession: 1}));
+    assert.commandWorked(mongos.adminCommand({startSession: 1}));
 
     validateSessionsCollection(configSvr, false, false);
     validateSessionsCollection(mongos, false, false);
@@ -46,9 +44,9 @@ var mongosConfig = mongos.getDB("config");
 // Test that the config server does not create the sessions collection
 // if there are not any shards.
 {
-    assert.eq(mongosConfig.shards.count(), 0);
+    assert.eq(mongosConfig.shards.countDocuments({}), 0);
 
-    assert.commandWorked(configAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.commandWorked(configSvr.adminCommand({refreshLogicalSessionCacheNow: 1}));
 
     validateSessionsCollection(configSvr, false, false);
 }
@@ -59,7 +57,6 @@ rs.startSet({shardsvr: ""});
 rs.initiate();
 
 var shard = rs.getPrimary();
-var shardAdmin = shard.getDB("admin");
 var shardConfig = shard.getDB("config");
 
 // Test that we can add this shard, even with a local config.system.sessions collection,
@@ -68,8 +65,8 @@ var shardConfig = shard.getDB("config");
     shardConfig.system.sessions.insert({"hey": "you"});
     validateSessionsCollection(shard, true, false);
 
-    assert.commandWorked(mongosAdmin.runCommand({addShard: rs.getURL()}));
-    assert.eq(mongosConfig.shards.count(), 1);
+    assert.commandWorked(mongos.adminCommand({addShard: rs.getURL()}));
+    assert.eq(mongosConfig.shards.countDocuments({}), 1);
     validateSessionsCollection(shard, false, false);
 }
 
@@ -79,7 +76,7 @@ var shardConfig = shard.getDB("config");
     validateSessionsCollection(configSvr, false, false);
     validateSessionsCollection(shard, false, false);
 
-    assert.commandWorked(shardAdmin.runCommand({startSession: 1}));
+    assert.commandWorked(shard.adminCommand({startSession: 1}));
 
     validateSessionsCollection(configSvr, false, false);
     validateSessionsCollection(shard, false, false);
@@ -92,7 +89,7 @@ var shardConfig = shard.getDB("config");
     validateSessionsCollection(shard, false, false);
     validateSessionsCollection(mongos, false, false);
 
-    assert.commandWorked(mongosAdmin.runCommand({startSession: 1}));
+    assert.commandWorked(mongos.adminCommand({startSession: 1}));
 
     validateSessionsCollection(configSvr, false, false);
     validateSessionsCollection(shard, false, false);
@@ -105,7 +102,7 @@ var shardConfig = shard.getDB("config");
     validateSessionsCollection(configSvr, false, false);
     validateSessionsCollection(shard, false, false);
 
-    assert.commandWorked(shardAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.commandWorked(shard.adminCommand({refreshLogicalSessionCacheNow: 1}));
 
     validateSessionsCollection(configSvr, false, false);
     validateSessionsCollection(shard, false, false);
@@ -116,23 +113,23 @@ var shardConfig = shard.getDB("config");
 {
     validateSessionsCollection(shard, false, false);
 
-    assert.commandWorked(configAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.commandWorked(configSvr.adminCommand({refreshLogicalSessionCacheNow: 1}));
 
     validateSessionsCollection(shard, true, true);
 
     // We will have two sessions because of the session used in the shardCollection's retryable
     // write to shard the sessions collection. It will disappear after we run the refresh
     // function on the shard.
-    assert.eq(shardConfig.system.sessions.count(), 2, "did not flush config's sessions");
+    assert.eq(shardConfig.system.sessions.countDocuments({}), 2, "did not flush config's sessions");
 
     // Now, if we do refreshes on the other servers, their in-mem records will
     // be written to the collection.
-    assert.commandWorked(shardAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
-    assert.eq(shardConfig.system.sessions.count(), 2, "did not flush shard's sessions");
+    assert.commandWorked(shard.adminCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.eq(shardConfig.system.sessions.countDocuments({}), 3, "did not flush shard's sessions");
 
     rs.awaitLastOpCommitted();
-    assert.commandWorked(mongosAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
-    assert.eq(shardConfig.system.sessions.count(), 4, "did not flush mongos' sessions");
+    assert.commandWorked(mongos.adminCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.eq(shardConfig.system.sessions.countDocuments({}), 5, "did not flush mongos' sessions");
 }
 
 // Test that if we drop the index on the sessions collection, only a refresh on the config
@@ -142,12 +139,12 @@ var shardConfig = shard.getDB("config");
 
     validateSessionsCollection(shard, true, false);
 
-    assert.commandWorked(configAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.commandWorked(configSvr.adminCommand({refreshLogicalSessionCacheNow: 1}));
     validateSessionsCollection(shard, true, true);
 
     assert.commandWorked(shardConfig.system.sessions.dropIndex({lastUse: 1}));
 
-    assert.commandWorked(shardAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.commandWorked(shard.adminCommand({refreshLogicalSessionCacheNow: 1}));
     validateSessionsCollection(shard, true, false);
 }
 

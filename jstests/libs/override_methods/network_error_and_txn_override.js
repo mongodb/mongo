@@ -83,7 +83,6 @@ const kNonRetryableCommands = new Set([
     "_configsvrMovePrimary",
     "_configsvrRemoveShard",
     "_configsvrRemoveShardFromZone",
-    "_configsvrShardCollection",
     "_configsvrUpdateZoneKeyRange",
     "_mergeAuthzCollections",
     "_recvChunkStart",

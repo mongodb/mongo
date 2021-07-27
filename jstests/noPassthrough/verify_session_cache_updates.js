@@ -12,49 +12,54 @@ function runTest(conn) {
         conn.getDB("test").test.save({a: i});
     }
 
-    function verify(conn, nRecords) {
-        conn.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
-        assert.eq(nRecords, conn.getDB("config").system.sessions.find({}).count());
+    function countSessions(conn, since) {
+        conn.adminCommand({refreshLogicalSessionCacheNow: 1});
+        return conn.getDB("config").system.sessions.countDocuments({lastUse: {"$gt": since}});
     }
 
-    function getLastUse(conn) {
+    function getLatestSessionTime(conn) {
         conn.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
-        return conn.getDB("config").system.sessions.findOne({}).lastUse;
+        let lastSession = conn.getDB("config")
+                              .system.sessions.aggregate([{"$sort": {lastUse: -1}}, {$limit: 1}])
+                              .toArray();
+        return (lastSession.length ? lastSession[0].lastUse : new Date(0));
     }
+
+    let origSessTime = getLatestSessionTime(conn);
 
     // initially we have no sessions
-    verify(conn, 0);
+    assert.eq(0, countSessions(conn, origSessTime));
 
     // Calling startSession in the shell doesn't initiate the session
     var session = conn.startSession();
-    verify(conn, 0);
+    assert.eq(0, countSessions(conn, origSessTime));
 
     // running a command that doesn't require auth does touch
     session.getDatabase("admin").runCommand("hello");
-    verify(conn, 1);
+    assert.eq(1, countSessions(conn, origSessTime));
 
     // running a session updating command does touch
     session.getDatabase("admin").runCommand({serverStatus: 1});
-    verify(conn, 1);
+    assert.eq(1, countSessions(conn, origSessTime));
 
     // running a session updating command updates last use
     {
-        var lastUse = getLastUse(conn);
+        var lastUse = getLatestSessionTime(conn);
         sleep(200);
         session.getDatabase("admin").runCommand({serverStatus: 1});
-        verify(conn, 1);
-        assert.gt(getLastUse(conn), lastUse);
+        assert.eq(1, countSessions(conn, origSessTime));
+        assert.gt(getLatestSessionTime(conn), lastUse);
     }
 
     // verify that reading from a cursor updates last use
     {
         var cursor = session.getDatabase("test").test.find({}).batchSize(1);
         cursor.next();
-        var lastUse = getLastUse(conn);
+        var lastUse = getLatestSessionTime(conn);
         sleep(200);
-        verify(conn, 1);
+        assert.eq(1, countSessions(conn, origSessTime));
         cursor.next();
-        assert.gt(getLastUse(conn), lastUse);
+        assert.gt(getLatestSessionTime(conn), lastUse);
     }
 
     session.endSession();

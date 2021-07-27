@@ -1105,11 +1105,6 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksEntriesToPre50Phase2(
     LOGV2(5276710, "Successfully downgraded config.chunks (phase 2)");
 }
 
-Lock::ExclusiveLock ShardingCatalogManager::lockZoneMutex(OperationContext* opCtx) {
-    Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
-    return lk;
-}
-
 StatusWith<bool> ShardingCatalogManager::_isShardRequiredByZoneStillInUse(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,

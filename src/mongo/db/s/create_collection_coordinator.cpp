@@ -51,7 +51,6 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/shard_collection_gen.h"
 
 namespace mongo {
 namespace {
@@ -481,8 +480,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
                 audit::logShardCollection(opCtx->getClient(),
                                           nss().ns(),
-                                          *_doc.getCreateCollectionRequest().getShardKey(),
-                                          *_doc.getCreateCollectionRequest().getUnique());
+                                          *_doc.getShardKey(),
+                                          _doc.getUnique().value_or(false));
 
                 if (_splitPolicy->isOptimized()) {
                     // Block reads/writes from here on if we need to create

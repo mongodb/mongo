@@ -29,198 +29,18 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/s/create_collection_coordinator.h"
-#include "mongo/db/s/shard_collection_legacy.h"
-#include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/shard_collection_gen.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace {
-
-using FeatureCompatibility = ServerGlobalParams::FeatureCompatibility;
-using FCVersion = FeatureCompatibility::Version;
-
-BSONObj inferCollationFromLocalCollection(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          const ShardsvrCreateCollection& request) {
-    auto& collation = request.getCollation().value();
-    auto collator = uassertStatusOK(
-        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "The collation for shardCollection must be {locale: 'simple'}, "
-                          << "but found: " << collation,
-            !collator);
-
-    BSONObj res, defaultCollation, collectionOptions;
-    DBDirectClient client(opCtx);
-
-    auto allRes = client.getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
-
-    if (!allRes.empty())
-        res = allRes.front().getOwned();
-
-    if (!res.isEmpty() && res["options"].type() == BSONType::Object) {
-        collectionOptions = res["options"].Obj();
-    }
-
-    // Get collection default collation.
-    BSONElement collationElement;
-    auto status =
-        bsonExtractTypedField(collectionOptions, "collation", BSONType::Object, &collationElement);
-    if (status.isOK()) {
-        defaultCollation = collationElement.Obj();
-        uassert(ErrorCodes::BadValue,
-                "Default collation in collection metadata cannot be empty.",
-                !defaultCollation.isEmpty());
-    } else if (status != ErrorCodes::NoSuchKey) {
-        uassertStatusOK(status);
-    }
-
-    return defaultCollation.getOwned();
-}
-
-// TODO (SERVER-54879): Remove this path after 5.0 branches
-CreateCollectionResponse createCollectionLegacy(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const ShardsvrCreateCollection& request,
-                                                const FixedFCVRegion& fcvRegion) {
-    const auto dbInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, nss.db()));
-
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "sharding not enabled for db " << nss.db(),
-            dbInfo.shardingEnabled());
-
-    if (nss.db() == NamespaceString::kConfigDb) {
-        // Only allowlisted collections in config may be sharded (unless we are in test mode)
-        uassert(ErrorCodes::IllegalOperation,
-                "only special collections in the config db may be sharded",
-                nss == NamespaceString::kLogicalSessionsNamespace);
-    }
-
-    ShardKeyPattern shardKeyPattern(request.getShardKey().value().getOwned());
-
-    // Ensure that hashed and unique are not both set.
-    uassert(ErrorCodes::InvalidOptions,
-            "Hashed shard keys cannot be declared unique. It's possible to ensure uniqueness on "
-            "the hashed field by declaring an additional (non-hashed) unique index on the field.",
-            !shardKeyPattern.isHashedPattern() ||
-                !(request.getUnique() && request.getUnique().value()));
-
-    // Ensure that a time-series collection cannot be sharded
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "can't shard time-series collection " << nss,
-            !timeseries::getTimeseriesOptions(opCtx, nss));
-
-    // Ensure the namespace is valid.
-    uassert(ErrorCodes::IllegalOperation,
-            "can't shard system namespaces",
-            !nss.isSystem() || nss == NamespaceString::kLogicalSessionsNamespace ||
-                nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection());
-
-    auto optNumInitialChunks = request.getNumInitialChunks();
-    if (optNumInitialChunks) {
-        // Ensure numInitialChunks is within valid bounds.
-        // Cannot have more than 8192 initial chunks per shard. Setting a maximum of 1,000,000
-        // chunks in total to limit the amount of memory this command consumes so there is less
-        // danger of an OOM error.
-
-        const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-        const int maxNumInitialChunksForShards = shardIds.size() * 8192;
-        const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
-        int numChunks = optNumInitialChunks.value();
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "numInitialChunks cannot be more than either: "
-                              << maxNumInitialChunksForShards << ", 8192 * number of shards; or "
-                              << maxNumInitialChunksTotal,
-                numChunks >= 0 && numChunks <= maxNumInitialChunksForShards &&
-                    numChunks <= maxNumInitialChunksTotal);
-    }
-
-    ShardsvrShardCollectionRequest shardsvrShardCollectionRequest;
-    shardsvrShardCollectionRequest.set_shardsvrShardCollection(nss);
-    shardsvrShardCollectionRequest.setKey(request.getShardKey().value());
-    if (request.getUnique())
-        shardsvrShardCollectionRequest.setUnique(request.getUnique().value());
-    if (request.getNumInitialChunks())
-        shardsvrShardCollectionRequest.setNumInitialChunks(request.getNumInitialChunks().value());
-    if (request.getPresplitHashedZones())
-        shardsvrShardCollectionRequest.setPresplitHashedZones(
-            request.getPresplitHashedZones().value());
-    if (request.getInitialSplitPoints())
-        shardsvrShardCollectionRequest.setInitialSplitPoints(
-            request.getInitialSplitPoints().value());
-
-    if (request.getCollation()) {
-        shardsvrShardCollectionRequest.setCollation(
-            inferCollationFromLocalCollection(opCtx, nss, request));
-    }
-
-    return shardCollectionLegacy(opCtx,
-                                 nss,
-                                 shardsvrShardCollectionRequest.toBSON(),
-                                 false /* requestIsFromCSRS */,
-                                 fcvRegion);
-}
-
-CreateCollectionResponse createCollection(OperationContext* opCtx,
-                                          NamespaceString nss,
-                                          const ShardsvrCreateCollection& request) {
-    uassert(
-        ErrorCodes::NotImplemented, "create collection not implemented yet", request.getShardKey());
-
-    auto bucketsNs = nss.makeTimeseriesBucketsNamespace();
-    auto bucketsColl =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
-    CreateCollectionRequest createCmdRequest = request.getCreateCollectionRequest();
-
-    // If the 'system.buckets' exists or 'timeseries' parameters are passed in, we know that we are
-    // trying shard a timeseries collection.
-    if (bucketsColl || createCmdRequest.getTimeseries()) {
-        uassert(5731502,
-                "Sharding a timeseries collection feature is not enabled",
-                feature_flags::gFeatureFlagShardedTimeSeries.isEnabledAndIgnoreFCV());
-
-        if (!createCmdRequest.getTimeseries()) {
-            createCmdRequest.setTimeseries(bucketsColl->getTimeseriesOptions());
-        } else if (bucketsColl) {
-            uassert(5731500,
-                    str::stream() << "the 'timeseries' spec provided must match that of exists '"
-                                  << nss << "' collection",
-                    timeseries::optionsAreEqual(*createCmdRequest.getTimeseries(),
-                                                *bucketsColl->getTimeseriesOptions()));
-        }
-        nss = bucketsNs;
-        createCmdRequest.setShardKey(
-            uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
-                *createCmdRequest.getTimeseries(), *createCmdRequest.getShardKey())));
-    }
-
-    auto coordinatorDoc = CreateCollectionCoordinatorDocument();
-    coordinatorDoc.setShardingDDLCoordinatorMetadata(
-        {{std::move(nss), DDLCoordinatorTypeEnum::kCreateCollection}});
-    coordinatorDoc.setCreateCollectionRequest(std::move(createCmdRequest));
-    auto service = ShardingDDLCoordinatorService::getService(opCtx);
-    auto createCollectionCoordinator = checked_pointer_cast<CreateCollectionCoordinator>(
-        service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
-    return createCollectionCoordinator->getResult(opCtx);
-}
 
 class ShardsvrCreateCollectionCommand final : public TypedCommand<ShardsvrCreateCollectionCommand> {
 public:
@@ -244,8 +64,7 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            auto const shardingState = ShardingState::get(opCtx);
-            uassertStatusOK(shardingState->canAcceptShardedCommands());
+            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 
@@ -260,24 +79,43 @@ public:
                     "Create Collection path has not been implemented",
                     request().getShardKey());
 
-            FixedFCVRegion fcvRegion(opCtx);
+            auto nss = ns();
+            auto bucketsNs = nss.makeTimeseriesBucketsNamespace();
+            auto bucketsColl =
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
+            CreateCollectionRequest createCmdRequest = request().getCreateCollectionRequest();
 
-            bool useNewPath = [&] {
-                return feature_flags::gShardingFullDDLSupport.isEnabled(*fcvRegion);
-            }();
+            // If the 'system.buckets' exists or 'timeseries' parameters are passed in, we know that
+            // we are trying shard a timeseries collection.
+            if (bucketsColl || createCmdRequest.getTimeseries()) {
+                uassert(5731502,
+                        "Sharding a timeseries collection feature is not enabled",
+                        feature_flags::gFeatureFlagShardedTimeSeries.isEnabledAndIgnoreFCV());
 
-            if (!useNewPath) {
-                LOGV2_DEBUG(5277911,
-                            1,
-                            "Running legacy create collection procedure",
-                            "namespace"_attr = ns());
-                return createCollectionLegacy(opCtx, ns(), request(), fcvRegion);
+                if (!createCmdRequest.getTimeseries()) {
+                    createCmdRequest.setTimeseries(bucketsColl->getTimeseriesOptions());
+                } else if (bucketsColl) {
+                    uassert(5731500,
+                            str::stream()
+                                << "the 'timeseries' spec provided must match that of exists '"
+                                << nss << "' collection",
+                            timeseries::optionsAreEqual(*createCmdRequest.getTimeseries(),
+                                                        *bucketsColl->getTimeseriesOptions()));
+                }
+                nss = bucketsNs;
+                createCmdRequest.setShardKey(
+                    uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
+                        *createCmdRequest.getTimeseries(), *createCmdRequest.getShardKey())));
             }
 
-            LOGV2_DEBUG(
-                5277910, 1, "Running new create collection procedure", "namespace"_attr = ns());
-
-            return createCollection(opCtx, ns(), request());
+            auto coordinatorDoc = CreateCollectionCoordinatorDocument();
+            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                {{std::move(nss), DDLCoordinatorTypeEnum::kCreateCollection}});
+            coordinatorDoc.setCreateCollectionRequest(std::move(createCmdRequest));
+            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto createCollectionCoordinator = checked_pointer_cast<CreateCollectionCoordinator>(
+                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            return createCollectionCoordinator->getResult(opCtx);
         }
 
     private:

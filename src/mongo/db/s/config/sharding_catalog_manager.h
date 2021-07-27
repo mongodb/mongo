@@ -170,12 +170,6 @@ public:
                                 const NamespaceString& nss,
                                 const ChunkRange& range);
 
-    /**
-     * Exposes the zone operations mutex to external callers in order to allow them to synchronize
-     * with any changes to the zones.
-     */
-    Lock::ExclusiveLock lockZoneMutex(OperationContext* opCtx);
-
     //
     // General utilities related to the ShardingCatalogManager
     //

@@ -116,11 +116,10 @@ public:
      * chunks at a time. For example, the first k chunks are assigned to the first available shard,
      * and the next k chunks are assigned to the second available shard and so on.
      * numContiguousChunksPerShard should only be > 1 when we do not pre-split the range
-     * into larger chunks and then split the resulting chunks on the destination shards as in
-     * configSvrShardCollection, thus should be equal the number of final split points + 1 divided
+     * into larger chunks and then split the resulting chunks on the destination shards,
+     * thus should be equal the number of final split points + 1 divided
      * by the number of initial split points + 1. It serves to preserve the ordering/contigousness
-     * of chunks when split by shardSvrShardCollection so that its yields the exact same shard
-     * assignments as configSvrShardCollection.
+     * of chunks when split by shardSvrShardCollection.
      */
     static ShardCollectionConfig generateShardCollectionInitialChunks(
         const SplitPolicyParams& params,

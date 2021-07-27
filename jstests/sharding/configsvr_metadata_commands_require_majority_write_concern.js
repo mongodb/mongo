@@ -142,9 +142,6 @@ checkCommandConfigSvr({_configsvrMovePrimary: dbName, to: st.shard0.name},
 // shardCollection
 checkCommandMongos(
     {shardCollection: ns, key: {_id: 1}}, setupFuncs.enableSharding, cleanupFuncs.dropDatabase);
-checkCommandConfigSvr({_configsvrShardCollection: ns, key: {_id: 1}},
-                      setupFuncs.enableSharding,
-                      cleanupFuncs.dropDatabase);
 
 // createDatabase
 // Don't check createDatabase against mongos: there is no createDatabase command exposed on

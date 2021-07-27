@@ -29,10 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
-#include <set>
-#include <string>
 #include <vector>
 
 #include "mongo/client/read_preference.h"
@@ -40,27 +36,16 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/initial_split_policy.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/shard_collection_gen.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
 
-using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
-using executor::TaskExecutor;
-using std::set;
-using std::string;
-using std::vector;
 using unittest::assertGet;
 
 class ShardCollectionTestBase : public ConfigServerTestFixture {
@@ -70,7 +55,7 @@ protected:
                            const BSONObj& splitPoints) {
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(shardHost, request.target);
-            string cmdName = request.cmdObj.firstElement().fieldName();
+            std::string cmdName = request.cmdObj.firstElement().fieldName();
             ASSERT_EQUALS("splitVector", cmdName);
             ASSERT_EQUALS(kNamespace.ns(),
                           request.cmdObj["splitVector"].String());  // splitVector uses full ns
@@ -108,8 +93,10 @@ protected:
 };
 
 TEST_F(CreateFirstChunksTest, Split_Disallowed_With_Both_SplitPoints_And_Zones) {
-    ShardsvrShardCollectionRequest request;
+    CreateCollectionRequest request;
     std::vector<BSONObj> splitPoints = {BSONObj()};
+    request.setNumInitialChunks(0);
+    request.setPresplitHashedZones(false);
     request.setInitialSplitPoints(splitPoints);
     std::vector<TagsType> tags = {
         TagsType(kNamespace,
@@ -119,8 +106,8 @@ TEST_F(CreateFirstChunksTest, Split_Disallowed_With_Both_SplitPoints_And_Zones) 
     ASSERT_THROWS_CODE(
         InitialSplitPolicy::calculateOptimizationStrategy(operationContext(),
                                                           kShardKeyPattern,
-                                                          request.getNumInitialChunks(),
-                                                          request.getPresplitHashedZones(),
+                                                          request.getNumInitialChunks().get(),
+                                                          request.getPresplitHashedZones().get(),
                                                           request.getInitialSplitPoints(),
                                                           tags,
                                                           2 /* numShards */,
@@ -131,8 +118,8 @@ TEST_F(CreateFirstChunksTest, Split_Disallowed_With_Both_SplitPoints_And_Zones) 
     ASSERT_THROWS_CODE(
         InitialSplitPolicy::calculateOptimizationStrategy(operationContext(),
                                                           kShardKeyPattern,
-                                                          request.getNumInitialChunks(),
-                                                          request.getPresplitHashedZones(),
+                                                          request.getNumInitialChunks().get(),
+                                                          request.getPresplitHashedZones().get(),
                                                           request.getInitialSplitPoints(),
                                                           tags,
                                                           2 /* numShards */,
@@ -161,16 +148,18 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromSplitVector_Man
         ThreadClient tc("Test", getServiceContext());
         auto opCtx = cc().makeOperationContext();
 
-        ShardsvrShardCollectionRequest request;
-        auto optimization =
-            InitialSplitPolicy::calculateOptimizationStrategy(operationContext(),
-                                                              kShardKeyPattern,
-                                                              request.getNumInitialChunks(),
-                                                              request.getPresplitHashedZones(),
-                                                              request.getInitialSplitPoints(),
-                                                              {}, /* tags */
-                                                              3 /* numShards */,
-                                                              false /* collectionIsEmpty */);
+        CreateCollectionRequest request;
+        request.setNumInitialChunks(0);
+        request.setPresplitHashedZones(false);
+        auto optimization = InitialSplitPolicy::calculateOptimizationStrategy(
+            operationContext(),
+            kShardKeyPattern,
+            request.getNumInitialChunks().get(),
+            request.getPresplitHashedZones().get(),
+            request.getInitialSplitPoints(),
+            {}, /* tags */
+            3 /* numShards */,
+            false /* collectionIsEmpty */);
         ASSERT(!optimization->isOptimized());
         return optimization->createFirstChunks(opCtx.get(),
                                                kShardKeyPattern,
@@ -212,17 +201,19 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromClient_ManyChun
         std::vector<TagsType> zones{};
         bool collectionIsEmpty = false;
 
-        ShardsvrShardCollectionRequest request;
+        CreateCollectionRequest request;
+        request.setNumInitialChunks(0);
+        request.setPresplitHashedZones(false);
         request.setInitialSplitPoints(splitPoints);
-        auto optimization =
-            InitialSplitPolicy::calculateOptimizationStrategy(operationContext(),
-                                                              kShardKeyPattern,
-                                                              request.getNumInitialChunks(),
-                                                              request.getPresplitHashedZones(),
-                                                              request.getInitialSplitPoints(),
-                                                              zones,
-                                                              3 /* numShards */,
-                                                              collectionIsEmpty);
+        auto optimization = InitialSplitPolicy::calculateOptimizationStrategy(
+            operationContext(),
+            kShardKeyPattern,
+            request.getNumInitialChunks().get(),
+            request.getPresplitHashedZones().get(),
+            request.getInitialSplitPoints(),
+            zones,
+            3 /* numShards */,
+            collectionIsEmpty);
         ASSERT(optimization->isOptimized());
         return optimization->createFirstChunks(opCtx.get(),
                                                kShardKeyPattern,
@@ -251,12 +242,14 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_WithZones_OneChunkToPrimary) {
                  ChunkRange(kShardKeyPattern.getKeyPattern().globalMin(), BSON("x" << 0)))};
     bool collectionIsEmpty = false;
 
-    ShardsvrShardCollectionRequest request;
+    CreateCollectionRequest request;
+    request.setNumInitialChunks(0);
+    request.setPresplitHashedZones(false);
     auto optimization =
         InitialSplitPolicy::calculateOptimizationStrategy(operationContext(),
                                                           kShardKeyPattern,
-                                                          request.getNumInitialChunks(),
-                                                          request.getPresplitHashedZones(),
+                                                          request.getNumInitialChunks().get(),
+                                                          request.getPresplitHashedZones().get(),
                                                           request.getInitialSplitPoints(),
                                                           zones,
                                                           3 /* numShards */,
@@ -296,17 +289,19 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_SplitPoints_FromClient_ManyChunksD
         std::vector<TagsType> zones{};
         bool collectionIsEmpty = true;
 
-        ShardsvrShardCollectionRequest request;
+        CreateCollectionRequest request;
+        request.setNumInitialChunks(0);
+        request.setPresplitHashedZones(false);
         request.setInitialSplitPoints(splitPoints);
-        auto optimization =
-            InitialSplitPolicy::calculateOptimizationStrategy(operationContext(),
-                                                              kShardKeyPattern,
-                                                              request.getNumInitialChunks(),
-                                                              request.getPresplitHashedZones(),
-                                                              request.getInitialSplitPoints(),
-                                                              zones,
-                                                              3 /* numShards */,
-                                                              collectionIsEmpty);
+        auto optimization = InitialSplitPolicy::calculateOptimizationStrategy(
+            operationContext(),
+            kShardKeyPattern,
+            request.getNumInitialChunks().get(),
+            request.getPresplitHashedZones().get(),
+            request.getInitialSplitPoints(),
+            zones,
+            3 /* numShards */,
+            collectionIsEmpty);
         ASSERT(optimization->isOptimized());
 
         return optimization->createFirstChunks(operationContext(),
@@ -348,17 +343,19 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_NoSplitPoints_OneChunkToPrimary) {
         std::vector<TagsType> zones{};
         bool collectionIsEmpty = true;
 
-        ShardsvrShardCollectionRequest request;
+        CreateCollectionRequest request;
+        request.setNumInitialChunks(0);
+        request.setPresplitHashedZones(false);
         request.setInitialSplitPoints(splitPoints);
-        auto optimization =
-            InitialSplitPolicy::calculateOptimizationStrategy(operationContext(),
-                                                              kShardKeyPattern,
-                                                              request.getNumInitialChunks(),
-                                                              request.getPresplitHashedZones(),
-                                                              request.getInitialSplitPoints(),
-                                                              zones,
-                                                              3 /* numShards */,
-                                                              collectionIsEmpty);
+        auto optimization = InitialSplitPolicy::calculateOptimizationStrategy(
+            operationContext(),
+            kShardKeyPattern,
+            request.getNumInitialChunks().get(),
+            request.getPresplitHashedZones().get(),
+            request.getInitialSplitPoints(),
+            zones,
+            3 /* numShards */,
+            collectionIsEmpty);
         ASSERT(optimization->isOptimized());
 
         return optimization->createFirstChunks(operationContext(),
@@ -387,12 +384,14 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_WithZones_ManyChunksOnFirstZoneSha
                  "TestZone",
                  ChunkRange(kShardKeyPattern.getKeyPattern().globalMin(), BSON("x" << 0)))};
     bool collectionIsEmpty = true;
-    ShardsvrShardCollectionRequest request;
+    CreateCollectionRequest request;
+    request.setNumInitialChunks(0);
+    request.setPresplitHashedZones(false);
     auto optimization =
         InitialSplitPolicy::calculateOptimizationStrategy(operationContext(),
                                                           kShardKeyPattern,
-                                                          request.getNumInitialChunks(),
-                                                          request.getPresplitHashedZones(),
+                                                          request.getNumInitialChunks().get(),
+                                                          request.getPresplitHashedZones().get(),
                                                           request.getInitialSplitPoints(),
                                                           zones,
                                                           3 /* numShards */,

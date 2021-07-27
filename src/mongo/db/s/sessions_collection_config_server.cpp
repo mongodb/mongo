@@ -29,21 +29,14 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/sessions_collection_config_server.h"
 
-#include "mongo/client/query.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/cluster_ddl.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/shard_collection_gen.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
 namespace mongo {
@@ -63,19 +56,13 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
                           << ": cannot create the collection until there are shards",
             Grid::get(opCtx)->shardRegistry()->getNumShardsNoReload() != 0);
 
-    // TODO (SERVER-54879): Switch this to call cluster::createCollection after 5.0 branches
-    ConfigsvrShardCollectionRequest shardCollection;
-    shardCollection.set_configsvrShardCollection(NamespaceString::kLogicalSessionsNamespace);
-    shardCollection.setKey(BSON("_id" << 1));
+    ShardsvrCreateCollection shardsvrCollRequest(NamespaceString::kLogicalSessionsNamespace);
+    CreateCollectionRequest requestParamsObj;
+    requestParamsObj.setShardKey(BSON("_id" << 1));
+    shardsvrCollRequest.setCreateCollectionRequest(std::move(requestParamsObj));
+    shardsvrCollRequest.setDbName(NamespaceString::kLogicalSessionsNamespace.db());
 
-    DBDirectClient client(opCtx);
-    BSONObj info;
-    if (!client.runCommand(
-            "admin", CommandHelpers::appendMajorityWriteConcern(shardCollection.toBSON()), info)) {
-        uassertStatusOKWithContext(getStatusFromCommandResult(info),
-                                   str::stream() << "Failed to create "
-                                                 << NamespaceString::kLogicalSessionsNamespace);
-    }
+    cluster::createCollection(opCtx, shardsvrCollRequest);
 }
 
 void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {
