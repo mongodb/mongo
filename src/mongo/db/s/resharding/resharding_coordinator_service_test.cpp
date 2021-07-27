@@ -54,6 +54,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
@@ -575,6 +576,63 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransi
     makeRecipientsProceedToDone(opCtx);
 
     coordinator->getCompletionFuture().get(opCtx);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpDuringInitializing) {
+    PauseDuringStateTransitions stateTransitionsGuard{controller(),
+                                                      CoordinatorStateEnum::kPreparingToDonate};
+
+    auto opCtx = operationContext();
+    auto pauseBeforeInsertCoordinatorDoc =
+        globalFailPointRegistry().find("pauseBeforeInsertCoordinatorDoc");
+    auto timesEnteredFailPoint = pauseBeforeInsertCoordinatorDoc->setMode(FailPoint::alwaysOn, 0);
+
+    auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
+    doc.setRecipientShards({});
+    doc.setDonorShards({});
+
+    auto donorChunk = makeAndInsertChunksForDonorShard(
+        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+
+    auto initialChunks =
+        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+
+    std::vector<ReshardedChunk> presetReshardedChunks;
+    for (const auto& chunk : initialChunks) {
+        presetReshardedChunks.emplace_back(chunk.getShard(), chunk.getMin(), chunk.getMax());
+    }
+
+    doc.setPresetReshardedChunks(presetReshardedChunks);
+
+    (void)ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON());
+    auto instanceId =
+        BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+    pauseBeforeInsertCoordinatorDoc->waitForTimesEntered(timesEnteredFailPoint + 1);
+
+    auto coordinator = getCoordinator(opCtx, instanceId);
+    stepDown(opCtx);
+    pauseBeforeInsertCoordinatorDoc->setMode(FailPoint::off, 0);
+    ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(),
+              ErrorCodes::InterruptedDueToReplStateChange);
+
+    coordinator.reset();
+    stepUp(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
+
+    // Ensure that promises are not fulfilled on the new coordinator.
+    auto newCoordinator = getCoordinator(opCtx, instanceId);
+    auto newObserver = newCoordinator->getObserver();
+    ASSERT_FALSE(newObserver->awaitAllDonorsReadyToDonate().isReady());
+    ASSERT_FALSE(newObserver->awaitAllRecipientsFinishedCloning().isReady());
+    ASSERT_FALSE(newObserver->awaitAllRecipientsInStrictConsistency().isReady());
+    ASSERT_FALSE(newObserver->awaitAllDonorsDone().isReady());
+    ASSERT_FALSE(newObserver->awaitAllRecipientsDone().isReady());
+
+    stepDown(opCtx);
+    ASSERT_EQ(newCoordinator->getCompletionFuture().getNoThrow(),
+              ErrorCodes::InterruptedDueToReplStateChange);
 }
 
 /**

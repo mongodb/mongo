@@ -80,6 +80,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCompletion);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeStartingErrorFlow);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforePersistingStateTransition);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeTellDonorToRefresh);
+MONGO_FAIL_POINT_DEFINE(pauseBeforeInsertCoordinatorDoc);
 
 const std::string kReshardingCoordinatorActiveIndexName = "ReshardingCoordinatorActiveIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
@@ -960,7 +961,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(
 
     // If the coordinator is recovering from step-up, make sure to properly initialize the
     // promises to reflect the latest state of this resharding operation.
-    if (coordinatorDoc.getState() != CoordinatorStateEnum::kUnused) {
+    if (coordinatorDoc.getState() > CoordinatorStateEnum::kInitializing) {
         _reshardingCoordinatorObserver->onReshardingParticipantTransition(coordinatorDoc);
     }
 }
@@ -1435,6 +1436,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChan
     // TODO SERVER-53914 to accommodate loading metrics for the coordinator.
     ReshardingMetrics::get(cc().getServiceContext())
         ->onStart(ReshardingMetrics::Role::kCoordinator, getCurrentTime());
+    pauseBeforeInsertCoordinatorDoc.pauseWhileSet();
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::
@@ -1442,7 +1444,6 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kInitializing) {
         return;
     }
-
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
 
