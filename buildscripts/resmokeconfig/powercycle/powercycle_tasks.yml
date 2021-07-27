@@ -27,8 +27,8 @@ tasks:
 - name: powercycle_kill_mongod
   crash_method: kill
 
-- name: powercycle_fcv4.4
-  fcv: "4.4"
+- name: powercycle_last_lts_fcv
+  fcv: "5.0"
 
 - name: powercycle_replication
   repl_set: powercycle

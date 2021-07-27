@@ -5941,7 +5941,7 @@ tasks:
   - func: "run powercycle test"
     timeout_secs: 1800 # 30 minute timeout for no output
 
-- name: powercycle_fcv4.4
+- name: powercycle_last_lts_fcv
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
