@@ -24,10 +24,11 @@ let st = new ShardingTest({shards: 2});
 {
     let db = st.s.getDB("test");
     // _shardsvrDropDatabaseParticipant required for PM-1965
-    failCommandsWithWriteConcernError(st.rs0, ["dropDatabase", "_shardsvrDropDatabaseParticipant"]);
+    failCommandsWithWriteConcernError(st.rs1, ["dropDatabase", "_shardsvrDropDatabaseParticipant"]);
     assert.commandWorked(db.collection.insert({"a": 1}));
+    st.ensurePrimaryShard("test", st.shard0.shardName);
     assert.commandFailedWithCode(db.runCommand({"dropDatabase": 1}), 12345);
-    turnOffFailCommand(st.rs0);
+    turnOffFailCommand(st.rs1);
 }
 
 st.stop();
