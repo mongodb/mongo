@@ -36,10 +36,18 @@
 
 namespace mongo::timeseries {
 
-bool queryOnlyDependsOnMetaField(OperationContext* opCtx,
-                                 const NamespaceString& ns,
-                                 const BSONObj& query,
-                                 StringData metaField);
+
+/**
+ * Returns true if the given query only modifies the time-series collection's given metaField, false
+ * otherwise.
+ */
+bool queryOnlyDependsOnMetaField(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const BSONObj& query,
+    boost::optional<StringData> metaField,
+    const LegacyRuntimeConstants& runtimeConstants = LegacyRuntimeConstants(),
+    const boost::optional<BSONObj>& letParams = boost::none);
 
 /**
  * Returns true if the given update modification only modifies the time-series collection's given
@@ -67,16 +75,4 @@ BSONObj translateQuery(const BSONObj& query, StringData metaField);
 write_ops::UpdateOpEntry translateUpdate(const BSONObj& translatedQuery,
                                          const write_ops::UpdateModification& updateMod,
                                          StringData metaField);
-
-// TODO: SERVER-58774 Remove this method and combine its logic with
-// timeseries::replaceTimeseriesQueryMetaFieldName().
-/**
- * Recurses through the mutablebson element query and replaces any occurrences of the
- * metaField with "meta" accounting for queries that may be in dot notation. shouldReplaceFieldValue
- * is set for $expr queries when "$" + the metaField should be substituted for "$meta".
- */
-void replaceTimeseriesQueryMetaFieldName(mutablebson::Element elem,
-                                         const StringData& metaField,
-                                         bool shouldReplaceFieldValue = false);
-
 }  // namespace mongo::timeseries
