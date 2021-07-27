@@ -122,15 +122,6 @@ bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
         .get();
 }
 
-// TODO: SERVER-58774 Remove this method since it is in an anonymous namespace in
-// timeseries_update_delete_util.
-/**
- * Returns if the given metaField is the first element of the dotted path in the given field.
- */
-bool isMetaFieldFirstElementOfDottedPathField(StringData metaField, StringData field) {
-    return field.substr(0, field.find('.')) == metaField;
-}
-
 // Default for control.version in time-series bucket collection.
 const int kTimeseriesControlVersion = 1;
 

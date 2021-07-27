@@ -69,6 +69,11 @@ TimeseriesTest.run((insert) => {
         expectedErrorCode: ErrorCodes.InvalidOptions
     });
 
+    // Query on the "meta" field.
+    testDelete([objA], [objA], 0, [{q: {"meta": "A"}, limit: 0}], {
+        expectedErrorCode: ErrorCodes.InvalidOptions
+    });
+
     // Query on a single field that is the metaField using dot notation.
     testDelete([objA], [], 1, [{q: {[metaFieldName + ".a"]: "A"}, limit: 0}]);
 
@@ -226,5 +231,12 @@ TimeseriesTest.run((insert) => {
     testDelete([{[timeFieldName]: ISODate(), "meta": "A"}], [], 1, [{q: {}, limit: 0}], {
         includeMetaField: false
     });
+
+    // Query on the "meta" field.
+    testDelete([objA],
+               [objA],
+               0,
+               [{q: {"meta": "A"}, limit: 0}],
+               {expectedErrorCode: ErrorCodes.InvalidOptions, includeMetaField: false});
 });
 })();
