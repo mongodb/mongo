@@ -258,7 +258,8 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
         /* Decode the checkpoint block. */
         if (ckpt->raw.data == NULL)
             continue;
-        if ((ret = __wt_block_ckpt_decode(session, block, ckpt->raw.data, &ci)) == 0) {
+        if ((ret = __wt_block_ckpt_decode(session, block, ckpt->raw.data, ckpt->raw.size, &ci)) ==
+          0) {
             printf(
               "\t\t"
               "file-size: ");

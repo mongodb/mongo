@@ -385,6 +385,12 @@ __sync_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *ski
     if (ref->state != WT_REF_DISK)
         return (0);
 
+    /* Don't read any pages when the cache is operating in aggressive mode. */
+    if (__wt_cache_aggressive(session)) {
+        *skipp = true;
+        return (0);
+    }
+
     /* Don't read pages into cache during startup or shutdown phase. */
     if (F_ISSET(S2C(session), WT_CONN_RECOVERING | WT_CONN_CLOSING_TIMESTAMP)) {
         *skipp = true;

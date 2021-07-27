@@ -1,19 +1,76 @@
 /*! @arch_page arch-metadata Metadata
 
-Metadata in WiredTiger is stored as a table in the \c "WiredTiger.wt" file.
-The table's key is a \c uri string, and the value is its complete
-configuration string.  The configuration itself is a list of key/value
-pairs in string form.  The configuration's keys are dependent on the
-type of \c uri.  Thus, a metadata entry with a \c uri key beginning with
-\c "table:" will be a configuration string
-having configuration entries like \c key_format and \c value_format to
-describe the data encoding for the uri.  A metadata key beginning with
+Metadata in WiredTiger captures important information about the user's database.
+Metadata includes tracking essential information such as the files and tables
+present in the database, their associated configurations, as well as the latest checkpoints.
+The checkpoint information tells WiredTiger where to the find
+root page and all other parts of its tree when accessing the file.
+
+The main metadata in WiredTiger is stored in the \c WiredTiger.wt file.
+
+@section metadata_table Metadata Table
+
+The keys in the \c WiredTiger.wt table are \c uri strings. For example, keys can include \c "table:" & \c "file:"
+prefixed URIs, representing typical row-store WiredTiger tables. A non-exhaustive list of other
+example keys could also include \c "index:", \c "colgroups:" and \c "system:" prefixed URIs, representing
+indexes, colgroups and special system values respectively.
+
+The value corresponding to a given \c uri key in the metadata table is its
+associated configuration string.  The configuration value itself is a list of key/value
+pairs in string form.  The key/value pairs in the configuration strings are dependent on the
+type of \c uri.  Thus, a metadata entry with a \c uri key beginning with \c "table:" will be
+a configuration string having entries such as \c key_format and \c value_format to
+describe the data encoding for the uri. A metadata key beginning with
 \c "file:" will have a different set of configuration entries associated
-with it.
+with it. See @ref config_strings for more details about WiredTiger configuration strings.
 
-A caller of WiredTiger can use WT_SESSION::open_cursor with a \c uri equal to
-\c "meta:" to read the metadata.  Using this interface, metadata can only
-be queried, not changed.  Changes to the metadata are affected by API calls
-such as WT_SESSION::create, WT_SESSION::drop, WT_SESSION::rename.
+@section metadata_checkpoint Storing Checkpoint Metadata
 
+The latest checkpoint information for each btree in the system is stored in its metadata entry. The checkpoint metadata
+provides a known point in time from which WiredTiger can recover a btree's data after a restart.
+The checkpoint metadata for a given btree is stored within the configuration string under its
+associated \c uri key within the \c WiredTiger.wt table. Metadata configuration entries relevant to capturing
+a given btree's checkpoint state include:
+- \c checkpoint: The file's checkpoint entries, including their timestamp, transaction ID and write generation. Most importantly
+this information also tracks an encoded address cookie that describes the blocks that make up the checkpoint's data.
+- \c checkpoint_lsn: The LSN of the last checkpoint.
+- \c checkpoint_backup_info:  Incremental backup information.
+
+@section metadata_turtle Turtle file
+
+The metadata file \c WiredTiger.wt is a regular WiredTiger table itself. As such, the metadata table has a btree that also needs to be
+checkpointed. Since a new metadata entry needs to be created for each btree at the time of checkpointing, the metadata table is the last
+file to be checkpointed in the process. Checkpointing the metadata table last is important
+for capturing a consistent state of the btrees in the database at the time of the last checkpoint.
+
+Due to this ordering, to successfully restore the checkpoint of the \c WiredTiger.wt file, WiredTiger captures the most
+recent checkpointing information of the metadata table in a separate special turtle file called
+\c "WiredTiger.turtle". The turtle file itself is metadata for the WiredTiger metadata. Using the
+turtle file, WiredTiger can read the latest checkpoint information from the file when recovering the \c WiredTiger.wt table.
+Recovering the checkpoint of the \c WiredTiger.wt table in turn restores a consistent view of the checkpointing information
+for the other btrees in the system.
+
+@section metadata_reading Reading Metadata
+
+The contents of the metadata table is ASCII printable. The URIs and configuration values
+are all printable strings.
+
+@subsection metadata_cursor "metadata:" cursor
+
+To read the metadata, a caller can open a cursor, via \c WT_SESSION::open_cursor, with a \c uri equal
+to \c "metadata:". Changes to the metadata cannot be written through the metadata
+cursor interface i.e. the metadata cursor is a read-only interface. Metadata is only changed/affected
+by API calls.
+
+@subsection metadata_create_cursor "metadata:create" cursor
+
+Additionally, to only read strings relating to creation configurations of the various
+\c uri keys present, a cursor can be opened with a \c uri equal to \c "metadata:create". This type of
+cursor causes WiredTiger to strip out internal metadata when querying.
+
+@subsection metadata_wt_util Printing metadata with the wt utility
+
+Lastly the metadata in the \c WiredTiger.wt table can be dumped using the \c wt utility. A command option for
+specifically printing the metadata is \c "wt list -v". This will display the various \c uri key strings with their associated
+configuration strings.
 */

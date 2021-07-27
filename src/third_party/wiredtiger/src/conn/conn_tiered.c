@@ -23,20 +23,27 @@
  * __flush_tier_wait --
  *     Wait for all previous work units queued to be processed.
  */
-static void
-__flush_tier_wait(WT_SESSION_IMPL *session)
+static int
+__flush_tier_wait(WT_SESSION_IMPL *session, const char **cfg)
 {
+    WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
+    uint64_t now, start, timeout;
     int yield_count;
 
     conn = S2C(session);
     yield_count = 0;
+    now = start = 0;
     /*
      * The internal thread needs the schema lock to perform its operations and flush tier also
      * acquires the schema lock. We cannot be waiting in this function while holding that lock or no
      * work will get done.
      */
     WT_ASSERT(session, !FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA));
+    WT_RET(__wt_config_gets(session, cfg, "timeout", &cval));
+    timeout = (uint64_t)cval.val;
+    if (timeout != 0)
+        __wt_seconds(session, &start);
 
     /*
      * It may be worthwhile looking at the add and decrement values and make choices of whether to
@@ -44,11 +51,17 @@ __flush_tier_wait(WT_SESSION_IMPL *session)
      * take a long time so yielding may not be effective.
      */
     while (!WT_FLUSH_STATE_DONE(conn->flush_state)) {
+        if (start != 0) {
+            __wt_seconds(session, &now);
+            if (now - start > timeout)
+                return (EBUSY);
+        }
         if (++yield_count < WT_THOUSAND)
             __wt_yield();
         else
             __wt_cond_wait(session, conn->flush_cond, 200, NULL);
     }
+    return (0);
 }
 
 /*
@@ -337,7 +350,7 @@ __wt_flush_tier(WT_SESSION_IMPL *session, const char *config)
     WT_DECL_RET;
     uint32_t flags;
     const char *cfg[3];
-    bool wait;
+    bool locked, wait;
 
     conn = S2C(session);
     WT_STAT_CONN_INCR(session, flush_tier);
@@ -372,6 +385,7 @@ __wt_flush_tier(WT_SESSION_IMPL *session, const char *config)
         __wt_spin_lock(session, &conn->flush_tier_lock);
     else
         WT_RET(__wt_spin_trylock(session, &conn->flush_tier_lock));
+    locked = true;
 
     /*
      * We cannot perform another flush tier until any earlier ones are done. Often threads will wait
@@ -379,7 +393,7 @@ __wt_flush_tier(WT_SESSION_IMPL *session, const char *config)
      * turned off then any following call must wait and will do so here. We have to wait while not
      * holding the schema lock.
      */
-    __flush_tier_wait(session);
+    WT_ERR(__flush_tier_wait(session, cfg));
     if (wait)
         WT_WITH_CHECKPOINT_LOCK(
           session, WT_WITH_SCHEMA_LOCK(session, ret = __flush_tier_once(session, flags)));
@@ -387,9 +401,14 @@ __wt_flush_tier(WT_SESSION_IMPL *session, const char *config)
         WT_WITH_CHECKPOINT_LOCK_NOWAIT(session, ret,
           WT_WITH_SCHEMA_LOCK_NOWAIT(session, ret, ret = __flush_tier_once(session, flags)));
     __wt_spin_unlock(session, &conn->flush_tier_lock);
+    locked = false;
 
     if (ret == 0 && LF_ISSET(WT_FLUSH_TIER_ON))
-        __flush_tier_wait(session);
+        WT_ERR(__flush_tier_wait(session, cfg));
+
+err:
+    if (locked)
+        __wt_spin_unlock(session, &conn->flush_tier_lock);
     return (ret);
 }
 
@@ -520,6 +539,7 @@ __tiered_mgr_server(void *arg)
     WT_ITEM path, tmp;
     WT_SESSION_IMPL *session;
     WT_TIERED_MANAGER *mgr;
+    const char *cfg[2];
 
     session = arg;
     conn = S2C(session);
@@ -527,6 +547,8 @@ __tiered_mgr_server(void *arg)
 
     WT_CLEAR(path);
     WT_CLEAR(tmp);
+    cfg[0] = "timeout=0";
+    cfg[1] = NULL;
 
     for (;;) {
         /* Wait until the next event. */
@@ -542,7 +564,7 @@ __tiered_mgr_server(void *arg)
         WT_WITH_SCHEMA_LOCK(session, ret = __flush_tier_once(session, 0));
         WT_ERR(ret);
         if (ret == 0)
-            __flush_tier_wait(session);
+            WT_ERR(__flush_tier_wait(session, cfg));
         WT_ERR(__tier_storage_remove(session, false));
     }
 

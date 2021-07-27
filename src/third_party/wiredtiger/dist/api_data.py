@@ -1573,6 +1573,11 @@ methods = {
         \c on setting causes the caller to wait until all work queued for this call to
         be completely processed before returning''',
         choices=['off', 'on']),
+    Config('timeout', '0', r'''
+        maximum amount of time to allow for waiting for previous flushing
+        of objects, in seconds. The actual amount of time spent waiting may
+        exceed the configured value. A value of zero disables the timeout''',
+        type='int'),
 ]),
 
 'WT_SESSION.strerror' : Method([]),

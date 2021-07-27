@@ -40,6 +40,25 @@ functions:
       params:
         path: "WT_TEST-big-endian.tgz"
         destination: "wiredtiger/build_posix/test/format"
+  "fetch artifacts from many-coll" :
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: dbpath_100k_500.tgz
+        bucket: build_external
+        local_file: dbpath_100k_500.tgz
+    - command: shell.exec
+      params:
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+          mkdir -p mongo-tests/largescale/many-collection/dbpath
+    - command: archive.targz_extract
+      params:
+        path: "dbpath_100k_500.tgz"
+        destination: "mongo-tests/largescale/many-collection/dbpath/."
   "fetch mongo-tests repo" :
     command: shell.exec
     params:
@@ -2576,6 +2595,10 @@ tasks:
       - func: "import wiredtiger into mongo"
       - func: "compile mongodb"
       - func: "fetch mongo-tests repo"
+      # After WT-7868 we can use the following function to retrieve an existing database and remove
+      # the "clean-and-populate" option from the script arguments to skip the initial populating
+      # step.
+      # - func: "fetch artifacts from many-coll"
       - command: shell.exec
         params:
           working_dir: mongo-tests/largescale
@@ -2596,21 +2619,26 @@ tasks:
       - func: "get project"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/src"
+          working_dir: "wiredtiger"
           shell: bash
           script: |
             set -o verbose
 
+            # Install Metrix++, ensuring it is outside the 'src' directory
             git clone https://github.com/metrixplusplus/metrixplusplus metrixplusplus
-            python "metrixplusplus/metrix++.py" collect --std.code.lines.code --std.code.complexity.cyclomatic
-            python "metrixplusplus/metrix++.py" view
+
+            # We only want complexity measures for the 'src' directory
+            cd src
+
+            python "../metrixplusplus/metrix++.py" collect --std.code.lines.code --std.code.complexity.cyclomatic
+            python "../metrixplusplus/metrix++.py" view
 
             # Set the cyclomatic complexity limit to 20
-            python "metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:20
+            python "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:20
 
             # Fail if there are functions with cyclomatic complexity larger than 95
             set -o errexit
-            python "metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:95
+            python "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:95
 
 buildvariants:
 
