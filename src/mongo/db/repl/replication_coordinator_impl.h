@@ -39,6 +39,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/repl/initial_syncer.h"
+#include "mongo/db/repl/initial_syncer_interface.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
@@ -1632,7 +1633,7 @@ private:
     // Storage interface used by initial syncer.
     StorageInterface* _storage;  // (PS)
     // InitialSyncer used for initial sync.
-    std::shared_ptr<InitialSyncer>
+    std::shared_ptr<InitialSyncerInterface>
         _initialSyncer;  // (I) pointer set under mutex, copied by callers.
 
     // The non-null OpTime used for committed reads, if there is one.

@@ -216,7 +216,7 @@ ServiceContext::ConstructorActionRegisterer initialSyncerRegisterer(
                StorageInterface* storage,
                ReplicationProcess* replicationProcess,
                const InitialSyncerInterface::OnCompletionFn& onCompletion) {
-                return std::make_unique<InitialSyncer>(opts,
+                return std::make_shared<InitialSyncer>(opts,
                                                        std::move(dataReplicatorExternalState),
                                                        writerPool,
                                                        storage,

@@ -61,7 +61,7 @@ public:
     static void set(ServiceContext* svcCtx,
                     std::unique_ptr<InitialSyncerFactory> newInitialSyncerFactory);
 
-    using CreateInitialSyncerFunction = std::function<std::unique_ptr<InitialSyncerInterface>(
+    using CreateInitialSyncerFunction = std::function<std::shared_ptr<InitialSyncerInterface>(
         InitialSyncerInterface::Options opts,
         std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
         ThreadPool* writerPool,
@@ -73,7 +73,7 @@ public:
      * Make an InitialSyncer if the initialSyncMethod is "logical", or a FileCopyBasedInitialSyncer
      * if the initialSyncMethod is "fileCopyBased".
      */
-    StatusWith<std::unique_ptr<InitialSyncerInterface>> makeInitialSyncer(
+    StatusWith<std::shared_ptr<InitialSyncerInterface>> makeInitialSyncer(
         const std::string& initialSyncMethod,
         InitialSyncerInterface::Options opts,
         std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,

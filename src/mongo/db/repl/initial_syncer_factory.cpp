@@ -53,7 +53,7 @@ void InitialSyncerFactory::set(ServiceContext* svcCtx,
     initialSyncerFactory = std::move(newInitialSyncerFactory);
 }
 
-StatusWith<std::unique_ptr<InitialSyncerInterface>> InitialSyncerFactory::makeInitialSyncer(
+StatusWith<std::shared_ptr<InitialSyncerInterface>> InitialSyncerFactory::makeInitialSyncer(
     const std::string& initialSyncMethod,
     InitialSyncerInterface::Options opts,
     std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
@@ -74,7 +74,6 @@ StatusWith<std::unique_ptr<InitialSyncerInterface>> InitialSyncerFactory::makeIn
                       replicationProcess,
                       onCompletion);
 }
-
 
 void InitialSyncerFactory::registerInitialSyncer(
     const std::string& initialSyncMethod, CreateInitialSyncerFunction createInitialSyncerFunction) {

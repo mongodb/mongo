@@ -69,6 +69,7 @@
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
 #include "mongo/db/repl/hello_response.h"
+#include "mongo/db/repl/initial_syncer_factory.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -775,7 +776,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         LOGV2_DEBUG(4853000, 1, "initial sync complete.");
     };
 
-    std::shared_ptr<InitialSyncer> initialSyncerCopy;
+    std::shared_ptr<InitialSyncerInterface> initialSyncerCopy;
     try {
         {
             // Must take the lock to set _initialSyncer, but not call it.
@@ -784,14 +785,36 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
                 LOGV2(21326, "Initial Sync not starting because replication is shutting down");
                 return;
             }
-            initialSyncerCopy = std::make_shared<InitialSyncer>(
-                createInitialSyncerOptions(this, _externalState.get()),
-                std::make_unique<DataReplicatorExternalStateInitialSync>(this,
-                                                                         _externalState.get()),
-                _externalState->getDbWorkThreadPool(),
-                _storage,
-                _replicationProcess,
-                onCompletion);
+
+            auto initialSyncerFactory = InitialSyncerFactory::get(opCtx->getServiceContext());
+            auto createInitialSyncer = [&](const std::string& method) {
+                return initialSyncerFactory->makeInitialSyncer(
+                    method,
+                    createInitialSyncerOptions(this, _externalState.get()),
+                    std::make_unique<DataReplicatorExternalStateInitialSync>(this,
+                                                                             _externalState.get()),
+                    _externalState->getDbWorkThreadPool(),
+                    _storage,
+                    _replicationProcess,
+                    onCompletion);
+            };
+
+            if (repl::feature_flags::gFileCopyBasedInitialSync.isEnabledAndIgnoreFCV()) {
+                auto swInitialSyncer = createInitialSyncer(initialSyncMethod);
+                if (swInitialSyncer.getStatus().code() == ErrorCodes::NotImplemented &&
+                    initialSyncMethod != "logical") {
+                    LOGV2_WARNING(58154,
+                                  "No such initial sync method was available. Falling back to "
+                                  "logical initial sync.",
+                                  "initialSyncMethod"_attr = initialSyncMethod,
+                                  "error"_attr = swInitialSyncer.getStatus().reason());
+                    swInitialSyncer = createInitialSyncer(std::string("logical"));
+                }
+                initialSyncerCopy = uassertStatusOK(swInitialSyncer);
+            } else {
+                auto swInitialSyncer = createInitialSyncer(std::string("logical"));
+                initialSyncerCopy = uassertStatusOK(swInitialSyncer);
+            }
             _initialSyncer = initialSyncerCopy;
         }
         // InitialSyncer::startup() must be called outside lock because it uses features (eg.
@@ -934,7 +957,7 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
     LOGV2(21328, "Shutting down replication subsystems");
 
     // Used to shut down outside of the lock.
-    std::shared_ptr<InitialSyncer> initialSyncerCopy;
+    std::shared_ptr<InitialSyncerInterface> initialSyncerCopy;
     {
         stdx::unique_lock<Latch> lk(_mutex);
         fassert(28533, !_inShutdown);
@@ -2989,7 +3012,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
 
     BSONObj initialSyncProgress;
     if (responseStyle == ReplSetGetStatusResponseStyle::kInitialSync) {
-        std::shared_ptr<InitialSyncer> initialSyncerCopy;
+        std::shared_ptr<InitialSyncerInterface> initialSyncerCopy;
         {
             stdx::lock_guard<Latch> lk(_mutex);
             initialSyncerCopy = _initialSyncer;
@@ -3223,7 +3246,7 @@ Status ReplicationCoordinatorImpl::processReplSetSyncFrom(OperationContext* opCt
                                                           const HostAndPort& target,
                                                           BSONObjBuilder* resultObj) {
     Status result(ErrorCodes::InternalError, "didn't set status in prepareSyncFromResponse");
-    std::shared_ptr<InitialSyncer> initialSyncerCopy;
+    std::shared_ptr<InitialSyncerInterface> initialSyncerCopy;
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _topCoord->prepareSyncFromResponse(target, resultObj, &result);
