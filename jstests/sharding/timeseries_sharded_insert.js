@@ -2,7 +2,7 @@
  * Test inserts into sharded timeseries collection.
  *
  * @tags: [
- *   requires_fcv_49,
+ *   requires_fcv_50,
  *   requires_find_command,
  * ]
  */
