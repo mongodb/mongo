@@ -28,40 +28,39 @@ const setUpDb = function setUpDatabaseAndEnableSharding() {
 };
 
 // Tests that moveChunk does not succeed when {allowMigrations: false}
-// (function testAllowMigrationsFalsePreventsMoveChunk() {
-//     setUpDb();
+(function testAllowMigrationsFalsePreventsMoveChunk() {
+    setUpDb();
 
-//     const collName = "collA";
-//     const ns = dbName + "." + collName;
+    const collName = "collA";
+    const ns = dbName + "." + collName;
 
-//     assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 0}));
-//     assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 1}));
-//     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
+    assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 0}));
+    assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 1}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
-//     // Confirm that an inProgress moveChunk fails once {allowMigrations: false}
-//     const fp = configureFailPoint(st.shard0, "moveChunkHangAtStep5");
-//     const awaitResult = startParallelShell(
-//         funWithArgs(function(ns, toShardName) {
-//             assert.commandFailedWithCode(
-//                 db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
-//                 ErrorCodes.ConflictingOperationInProgress);
-//         }, ns, st.shard1.shardName), st.s.port);
-//     fp.wait();
-//     assert.commandWorked(
-//         configDB.collections.update({_id: ns}, {$set: {allowMigrations: false}}, {upsert:
-//         true}));
-//     fp.off();
-//     awaitResult();
+    // Confirm that an inProgress moveChunk fails once {allowMigrations: false}
+    const fp = configureFailPoint(st.shard0, "moveChunkHangAtStep4");
+    const awaitResult = startParallelShell(
+        funWithArgs(function(ns, toShardName) {
+            assert.commandFailedWithCode(
+                db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
+                ErrorCodes.ConflictingOperationInProgress);
+        }, ns, st.shard1.shardName), st.s.port);
+    fp.wait();
+    assert.commandWorked(st.configRS.getPrimary().adminCommand(
+        {_configsvrSetAllowMigrations: ns, allowMigrations: false, writeConcern: {w: "majority"}}));
+    fp.off();
+    awaitResult();
 
-//     // {allowMigrations: false} is set, sending a new moveChunk command should also fail.
-//     assert.commandFailedWithCode(
-//         st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}),
-//         ErrorCodes.ConflictingOperationInProgress);
+    // {allowMigrations: false} is set, sending a new moveChunk command should also fail.
+    assert.commandFailedWithCode(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}),
+        ErrorCodes.ConflictingOperationInProgress);
 
-//     // Confirm shard0 reports {allowMigrations: false} in the local cache as well
-//     const cachedEntry = st.shard0.getDB("config").cache.collections.findOne({_id: ns});
-//     assert.eq(false, cachedEntry.allowMigrations);
-// })();
+    // Confirm shard0 reports {allowMigrations: false} in the local cache as well
+    const cachedEntry = st.shard0.getDB("config").cache.collections.findOne({_id: ns});
+    assert.eq(false, cachedEntry.allowMigrations);
+})();
 
 // Tests {allowMigrations: false} disables balancing for collB and does not interfere with balancing
 // for collA.
