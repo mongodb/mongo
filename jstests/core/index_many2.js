@@ -2,12 +2,12 @@
 // collection.
 // @tags: [assumes_no_implicit_index_creation]
 
-t = db.index_many2;
+const t = db.index_many2;
 t.drop();
 
 t.save({x: 1});
 
-assert.eq(1, t.getIndexKeys().length, "A1");
+assert.eq(1, t.getIndexKeys().length, "Expected a single default index.");
 
 function make(n) {
     var x = {};
@@ -15,19 +15,41 @@ function make(n) {
     return x;
 }
 
-for (i = 1; i < 1000; i++) {
+jsTestLog("Creating 1000 indexes.");
+
+// Try to create 1000 indexes. Only 63 will succeed because 64 is the maximum number of indexes
+// allowed on a collection.
+for (let i = 1; i < 1000; i++) {
+    // Cannot assert success because only 63 additional indexes will succeed.
     t.createIndex(make(i));
 }
 
-assert.eq(64, t.getIndexKeys().length, "A2");
+const indexKeys = t.getIndexKeys();
+const num = indexKeys.length;
+assert.eq(64, num, "Expected 64 keys, found: " + num);
 
-num = t.getIndexKeys().length;
+// Drop one of the indexes.
+const indexToDrop = indexKeys.filter(key => key._id !== 1)[num - 2];
 
-t.dropIndex(make(num - 1));
-assert.eq(num - 1, t.getIndexKeys().length, "B0");
+jsTestLog("Dropping index: '" + tojson(indexToDrop) + "'");
 
-t.createIndex({z: 1});
-assert.eq(num, t.getIndexKeys().length, "B1");
+t.dropIndex(indexToDrop);
+assert.eq(num - 1, t.getIndexKeys().length, "After dropping an index, there should be 63 left.");
+
+// Create another index.
+const indexToCreate = {
+    z: 1
+};
+
+jsTestLog("Creating an index: '" + tojson(indexToCreate) + "'");
+
+t.createIndex(indexToCreate);
+assert.eq(num, t.getIndexKeys().length, "Expected 64 indexes.");
+
+// Drop all the indexes except the _id index.
+jsTestLog("Dropping all indexes with wildcard '*'");
 
 t.dropIndexes("*");
-assert.eq(1, t.getIndexKeys().length, "C1");
+assert.eq(1, t.getIndexKeys().length, "Expected only one index after dropping indexes via '*'");
+
+jsTestLog("Test index_many2.js complete.");
