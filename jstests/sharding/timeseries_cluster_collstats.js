@@ -66,11 +66,22 @@ assert(clusterCollStatsResult.timeseries,
 
 // Check that the top-level 'timeseries' fields match the shard's, that the stats were correctly
 // pulled up.
-assert(
-    clusterCollStatsResult.shards["timeseries_cluster_collstats-rs1"].timeseries,
-    "Expected a shard 'timeseries' field but didn't find one: " + tojson(clusterCollStatsResult));
-assert.docEq(clusterCollStatsResult.timeseries,
-             clusterCollStatsResult.shards["timeseries_cluster_collstats-rs1"].timeseries);
+// Note: since the timeseries collection is not yet shardable, the collection can appear on either
+// of the two shards in this test. Consequently, the collstats timeseries results can be present on
+// either of the shards and not the other.
+if (clusterCollStatsResult.shards["timeseries_cluster_collstats-rs0"]) {
+    assert(clusterCollStatsResult.shards["timeseries_cluster_collstats-rs0"].timeseries,
+           "Expected a shard 'timeseries' field but didn't find one: " +
+               tojson(clusterCollStatsResult));
+    assert.docEq(clusterCollStatsResult.timeseries,
+                 clusterCollStatsResult.shards["timeseries_cluster_collstats-rs0"].timeseries);
+} else {
+    assert(clusterCollStatsResult.shards["timeseries_cluster_collstats-rs1"].timeseries,
+           "Expected a shard 'timeseries' field but didn't find one: " +
+               tojson(clusterCollStatsResult));
+    assert.docEq(clusterCollStatsResult.timeseries,
+                 clusterCollStatsResult.shards["timeseries_cluster_collstats-rs1"].timeseries);
+}
 
 st.stop();
 })();
