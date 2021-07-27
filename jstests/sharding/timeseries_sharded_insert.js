@@ -2,9 +2,8 @@
  * Test inserts into sharded timeseries collection.
  *
  * @tags: [
- *   requires_fcv_49,
+ *   requires_fcv_51,
  *   requires_find_command,
- *   disabled_due_to_server_58295
  * ]
  */
 
