@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_51,
- *   requires_find_command,
+ *   requires_find_command
  * ]
  */
 
