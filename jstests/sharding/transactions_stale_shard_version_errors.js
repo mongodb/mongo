@@ -25,7 +25,13 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + '.' + collName;
 
-const st = new ShardingTest({shards: 3, mongos: 2});
+// Disable checking for index consistency to ensure that the config server doesn't trigger a
+// StaleShardVersion exception on shards and cause them to refresh their sharding metadata.
+const nodeOptions = {
+    setParameter: {enableShardedIndexConsistencyCheck: false}
+};
+
+const st = new ShardingTest({shards: 3, mongos: 2, other: {configOptions: nodeOptions}});
 
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
