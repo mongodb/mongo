@@ -10,10 +10,6 @@
  *
  * Alternative $lookup syntax:
  *        {$lookup: {from: {db:<>, coll:<>},...}}
- *
- * @tags: [
- *   disabled_due_to_server_58295
- * ]
  */
 (function() {
 "use strict";
@@ -104,8 +100,10 @@ const nodeList = DiscoverTopology.findNonConfigNodes(st.s);
 
 // Tests that $lookup from config.cache.chunks.* yields the expected results.
 const testLookupFromConfigCacheChunks = (lookupAgg) => {
-    const isShardedLookupEnabled = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1})
-                                       .featureFlagShardedLookup.value;
+    const getShardedLookupParam = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+    const isShardedLookupEnabled =
+        getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+        getShardedLookupParam.featureFlagShardedLookup.value;
 
     jsTestLog(`Running test on lookup: ${tojson(lookupAgg)} with featureFlagShardedLookup: ${
         isShardedLookupEnabled}`);

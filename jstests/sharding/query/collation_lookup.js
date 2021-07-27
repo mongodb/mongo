@@ -5,11 +5,6 @@
  * The comparison of string values between the 'localField' and 'foreignField' should use the
  * collation either explicitly set on the aggregation operation, or the collation inherited from the
  * collection the "aggregate" command was performed on.
- *
- * @tags: [
- *   featureFlagShardedLookup,
- *   disabled_due_to_server_58295
- * ]
  */
 (function() {
 "use strict";
@@ -556,6 +551,15 @@ function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collati
 }
 
 const st = new ShardingTest({shards: 2});
+
+const getShardedLookupParam = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
+
+if (!isShardedLookupEnabled) {
+    st.stop();
+    return;
+}
 
 const testName = "collation_lookup";
 const caseInsensitive = {

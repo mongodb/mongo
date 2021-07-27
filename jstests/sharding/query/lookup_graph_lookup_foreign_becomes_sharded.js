@@ -3,7 +3,7 @@
  * sharded, or if it becomes sharded mid-iteration.
  *
  *@tags: [
- *   requires_persistence, disabled_due_to_server_58295
+ *   requires_persistence
  * ]
  */
 (function() {
@@ -110,8 +110,9 @@ for (let testCase of testCases) {
 assert.commandWorked(
     freshMongos.adminCommand({shardCollection: foreignCollection.getFullName(), key: {_id: 1}}));
 
-const isShardedLookupEnabled = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1})
-                                   .featureFlagShardedLookup.value;
+const getShardedLookupParam = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
 
 // Now run a getMore for each of the test cases. The collection has become sharded mid-iteration, so
 // we should observe the error code associated with the test case.
