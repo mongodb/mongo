@@ -43,6 +43,7 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
@@ -279,6 +280,7 @@ bool fieldIsComputed(BucketSpec spec, std::string field) {
                 expression::isPathPrefixOf(s, field);
         });
 }
+
 }  // namespace
 
 DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
@@ -958,6 +960,41 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
             return std::prev(itr) == container->begin() ? std::prev(itr)
                                                         : std::prev(std::prev(itr));
         }
+    }
+
+    // Attempt to push geoNear on the metaField past $_internalUnpackBucket.
+    if (auto nextNear = dynamic_cast<DocumentSourceGeoNear*>(std::next(itr)->get())) {
+        // Currently we only support geo indexes on the meta field, and we enforce this by
+        // requiring the key field to be set so we can check before we try to look up indexes.
+        auto keyField = nextNear->getKeyField();
+        uassert(5892921,
+                "Must specify 'key' option for $geoNear on a time-series collection",
+                keyField);
+
+        auto metaField = _bucketUnpacker.bucketSpec().metaField;
+        uassert(
+            4581294,
+            "Must specify part of metadata field as 'key' for $geoNear on a time-series collection",
+            metaField && *metaField == keyField->front());
+
+        // Currently we do not support query for $geoNear on a bucket
+        uassert(
+            1938439,
+            "Must not specify 'query' for $geoNear on a time-series collection; use $match instead",
+            nextNear->getQuery().binaryEqual(BSONObj()));
+
+        // Make sure we actually re-write the key field for the buckets collection so we can
+        // locate the index.
+        static const FieldPath baseMetaFieldPath{timeseries::kBucketMetaFieldName};
+        nextNear->setKeyField(keyField->getPathLength() > 1
+                                  ? baseMetaFieldPath.concat(keyField->tail())
+                                  : baseMetaFieldPath);
+
+        // Save the source, remove it, and then push it down.
+        auto source = *std::next(itr);
+        container->erase(std::next(itr));
+        container->insert(itr, source);
+        return std::prev(itr) == container->begin() ? std::prev(itr) : std::prev(std::prev(itr));
     }
 
     // Attempt to map predicates on bucketed fields to predicates on the control field.

@@ -7,7 +7,9 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
+ *   requires_fcv_51,
  *   requires_getmore,
+ *   requires_pipeline_optimization,
  * ]
  */
 
@@ -247,8 +249,22 @@ TimeseriesTest.run((insert) => {
                   .length,
               "Failed to use 2dsphere index: " + tojson(twoDSphereBucketsIndexSpec));
 
-    // TODO (SERVER-55239): do the above on the timeseriescoll, which doesn't currently work.
-    // "errmsg" : "$geoNear is only valid as the first stage in a pipeline."
+    assert.eq(1,
+              timeseriescoll
+                  .aggregate([
+                      {
+                          $geoNear: {
+                              near: {type: "Point", coordinates: [40.4, -70.4]},
+                              key: metaFieldName,
+                              distanceField: "dist",
+                              spherical: true
+                          }
+                      },
+                      {$limit: 1}
+                  ])
+                  .toArray()
+                  .length,
+              "Failed to use 2dsphere index: " + tojson(twoDSphereBucketsIndexSpec));
 
     hideUnhideListIndexes(twoDSphereTimeseriesIndexSpec, twoDSphereBucketsIndexSpec);
 

@@ -342,6 +342,16 @@ public:
         StringData targetStageName, std::function<bool(const DocumentSource* const)> predicate);
 
     /**
+     * Performs common validation for top-level or facet pipelines. Throws if the pipeline is
+     * invalid.
+     *
+     * Includes checking for illegal stage positioning. For example, $out must be at the end, while
+     * a $match stage with a text query must be at the start. Note that this method accepts an
+     * initial source as the first stage, which is illegal for $facet pipelines.
+     */
+    void validateCommon(bool alreadyOptimized) const;
+
+    /**
      * PipelineD is a "sister" class that has additional functionality for the Pipeline. It exists
      * because of linkage requirements. Pipeline needs to function in mongod and mongos. PipelineD
      * contains extra functionality required in mongod, and which can't appear in mongos because the
@@ -371,16 +381,6 @@ private:
      * in optimizeContainer().
      */
     static void stitch(SourceContainer* container);
-
-    /**
-     * Performs common validation for top-level or facet pipelines. Throws if the pipeline is
-     * invalid.
-     *
-     * Includes checking for illegal stage positioning. For example, $out must be at the end, while
-     * a $match stage with a text query must be at the start. Note that this method accepts an
-     * initial source as the first stage, which is illegal for $facet pipelines.
-     */
-    void validateCommon() const;
 
     /**
      * Returns Status::OK if the pipeline can run on mongoS, or an error with a message explaining

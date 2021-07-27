@@ -52,7 +52,15 @@ struct StageConstraints {
      * A PositionRequirement stipulates what specific position the stage must occupy within the
      * pipeline, if any.
      */
-    enum class PositionRequirement { kNone, kFirst, kLast };
+    enum class PositionRequirement {
+        kNone,
+        kFirst,
+        // User can specify this stage anywhere, as long as the system can move the stage to be
+        // first. If pipeline optimization is disabled, then the stage must be first prior to
+        // optimization.
+        kFirstAfterOptimization,
+        kLast
+    };
 
     /**
      * A HostTypeRequirement defines where this stage is permitted to be executed when the

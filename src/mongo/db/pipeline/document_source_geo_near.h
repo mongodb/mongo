@@ -51,7 +51,7 @@ public:
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
-                PositionRequirement::kFirst,
+                PositionRequirement::kFirstAfterOptimization,
                 HostTypeRequirement::kAnyShard,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
@@ -109,6 +109,13 @@ public:
      */
     boost::optional<FieldPath> getKeyField() const {
         return keyFieldPath;
+    }
+
+    /**
+     * Set the field over which to apply the "near" predicate.
+     */
+    void setKeyField(const FieldPath& newPath) {
+        keyFieldPath = newPath;
     }
 
     /**

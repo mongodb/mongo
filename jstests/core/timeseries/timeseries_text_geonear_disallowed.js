@@ -6,6 +6,7 @@
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
+ *   requires_fcv_51,
  *   requires_timeseries,
  * ]
  */
@@ -44,16 +45,6 @@ for (let i = 0; i < nMeasurements; i++) {
 // Test that $geoNear fails cleanly because it cannot be issued against a time-series collection.
 assert.commandFailedWithCode(
     assert.throws(() => tsColl.find({"tags.distance": {$geoNear: [0, 0]}}).itcount()), 5626500);
-
-// $geoNear aggregation stage
-assert.commandFailedWithCode(
-    assert.throws(() => tsColl.aggregate([{
-                     $geoNear: {
-                         near: {type: "Point", coordinates: [106.65589, 10.787627]},
-                         distanceField: "tags.distance",
-                     }
-                 }])),
-                 40602);
 
 // Test that unimplemented match exprs on time-series collections fail cleanly.
 // $near

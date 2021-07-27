@@ -179,7 +179,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parse(
     }
 
     // Next run through the common validation rules that apply to every pipeline.
-    pipeline->validateCommon();
+    constexpr bool alreadyOptimized = false;
+    pipeline->validateCommon(alreadyOptimized);
 
     pipeline->stitch();
     return pipeline;
@@ -190,12 +191,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::create(
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(new Pipeline(std::move(stages), expCtx),
                                                         PipelineDeleter(expCtx->opCtx));
 
-    pipeline->validateCommon();
+    constexpr bool alreadyOptimized = false;
+    pipeline->validateCommon(alreadyOptimized);
     pipeline->stitch();
     return pipeline;
 }
 
-void Pipeline::validateCommon() const {
+void Pipeline::validateCommon(bool alreadyOptimized) const {
     size_t i = 0;
 
     uassert(ErrorCodes::FailedToParse,
@@ -209,8 +211,14 @@ void Pipeline::validateCommon() const {
         // Verify that all stages adhere to their PositionRequirement constraints.
         uassert(40602,
                 str::stream() << stage->getSourceName()
-                              << " is only valid as the first stage in a pipeline.",
+                              << " is only valid as the first stage in a pipeline",
                 !(constraints.requiredPosition == PositionRequirement::kFirst && i != 0));
+        uassert(40603,
+                str::stream() << stage->getSourceName()
+                              << " is only valid as the first stage in an optimized pipeline",
+                !(alreadyOptimized &&
+                  constraints.requiredPosition == PositionRequirement::kFirstAfterOptimization &&
+                  i != 0));
 
         auto matchStage = dynamic_cast<DocumentSourceMatch*>(stage.get());
         uassert(17313,
@@ -650,6 +658,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     if (opts.optimize) {
         pipeline->optimizePipeline();
     }
+
+    constexpr bool alreadyOptimized = true;
+    pipeline->validateCommon(alreadyOptimized);
 
     if (opts.attachCursorSource) {
         pipeline = expCtx->mongoProcessInterface->attachCursorSourceToPipeline(

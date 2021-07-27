@@ -5,6 +5,7 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
+ *   requires_fcv_51,
  *   requires_getmore,
  * ]
  */
@@ -22,7 +23,11 @@ TimeseriesTest.run((insert) => {
     const controlMinTimeFieldName = "control.min." + timeFieldName;
     const controlMaxTimeFieldName = "control.max." + timeFieldName;
 
-    const doc = {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: {tag1: 'a', tag2: 'b'}};
+    const doc = {
+        _id: 0,
+        [timeFieldName]: ISODate(),
+        [metaFieldName]: {tag1: 'a', tag2: 'b', location: [1.0, 2.0]}
+    };
 
     const roundDown = (date) => {
         // Round down to nearest minute.
@@ -195,6 +200,18 @@ TimeseriesTest.run((insert) => {
 
     // metaField hashed index.
     runTest({[metaFieldName]: "hashed"}, {'meta': "hashed"});
+
+    // metaField geo-type indexes.
+    runTest({[metaFieldName + '.location']: "2dsphere"}, {'meta.location': "2dsphere"});
+    runTest({[metaFieldName + '.location']: "2d"}, {'meta.location': "2d"});
+
+    // compound geo-type indexes on metaField
+    runTest({[metaFieldName + '.location']: "2dsphere", [metaFieldName + '.tag1']: -1},
+            {'meta.location': "2dsphere", 'meta.tag1': -1});
+    runTest({[metaFieldName + '.tag1']: -1, [metaFieldName + '.location']: "2dsphere"},
+            {'meta.tag1': -1, 'meta.location': "2dsphere"});
+    runTest({[metaFieldName + '.location']: "2d", [metaFieldName + '.tag1']: -1},
+            {'meta.location': "2d", 'meta.tag1': -1});
 
     /*
      * Test time-series index creation error handling.

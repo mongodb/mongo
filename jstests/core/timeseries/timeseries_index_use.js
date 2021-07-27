@@ -5,7 +5,9 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
+ *   requires_fcv_51,
  *   requires_getmore,
+ *   requires_pipeline_optimization,
  * ]
  */
 (function() {
@@ -19,8 +21,8 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(testDB.dropDatabase());
 
     // Create timeseries collection.
-    const timeFieldName = 'time';
-    const metaFieldName = 'meta';
+    const timeFieldName = 'ts';
+    const metaFieldName = 'mm';
     const coll = testDB.getCollection('t');
     const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
@@ -67,6 +69,27 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(coll.dropIndex("testIndexName"));
     };
 
+    /**
+     * Creates the index specified by the spec and options, then explains the query to ensure that
+     * the created index is used. Runs the query and verifies that the expected number of documents
+     * are matched. Finally, deletes the created index.
+     */
+    const testAggregationUsesIndex = function(
+        pipeline, numMatches, indexSpec, stageType = "IXSCAN", indexOpts = {}) {
+        assert.commandWorked(
+            coll.createIndex(indexSpec, Object.assign({name: "testIndexName"}, indexOpts)));
+
+        let aggregation = coll.aggregate(pipeline);
+        assert.eq(numMatches, aggregation.itcount());
+
+        const explain = coll.explain().aggregate(pipeline);
+        const ixscan = getAggPlanStage(explain, stageType);
+        assert.neq(null, ixscan, tojson(explain));
+        assert.eq("testIndexName", ixscan.indexName, tojson(ixscan));
+
+        assert.commandWorked(coll.dropIndex("testIndexName"));
+    };
+
     /********************************** Tests scalar meta values **********************************/
     resetCollections();
     assert.commandWorked(insert(coll, [
@@ -78,19 +101,26 @@ TimeseriesTest.run((insert) => {
     const timeDate = ISODate('2005-01-01 00:00:00.000Z');
 
     // Test ascending and descending index on timeField.
-    testQueryUsesIndex({'time': {$lte: timeDate}}, 2, {'time': 1});
-    testQueryUsesIndex({'time': {$gte: timeDate}}, 1, {'time': -1});
+    testQueryUsesIndex({[timeFieldName]: {$lte: timeDate}}, 2, {[timeFieldName]: 1});
+    testQueryUsesIndex({[timeFieldName]: {$gte: timeDate}}, 1, {[timeFieldName]: -1});
 
     // Test ascending and descending index on metaField.
-    testQueryUsesIndex({'meta': {$eq: 3}}, 1, {'meta': 1});
-    testQueryUsesIndex({'meta': {$lt: 3}}, 2, {'meta': -1});
+    testQueryUsesIndex({[metaFieldName]: {$eq: 3}}, 1, {[metaFieldName]: 1});
+    testQueryUsesIndex({[metaFieldName]: {$lt: 3}}, 2, {[metaFieldName]: -1});
 
     // Test compound indexes on metaField and timeField.
-    testQueryUsesIndex({'meta': {$gte: 2}}, 3, {'meta': 1, 'time': 1});
-    testQueryUsesIndex({'time': {$lt: timeDate}}, 2, {'time': 1, 'meta': 1});
-    testQueryUsesIndex({'meta': {$lte: 3}, 'time': {$gte: timeDate}}, 1, {'meta': 1, 'time': 1});
-    testQueryUsesIndex({'meta': {$eq: 2}, 'time': {$lte: timeDate}}, 1, {'meta': -1, 'time': -1});
-    testQueryUsesIndex({'meta': {$lt: 3}, 'time': {$lte: timeDate}}, 1, {'time': 1, 'meta': -1});
+    testQueryUsesIndex({[metaFieldName]: {$gte: 2}}, 3, {[metaFieldName]: 1, [timeFieldName]: 1});
+    testQueryUsesIndex(
+        {[timeFieldName]: {$lt: timeDate}}, 2, {[timeFieldName]: 1, [metaFieldName]: 1});
+    testQueryUsesIndex({[metaFieldName]: {$lte: 3}, [timeFieldName]: {$gte: timeDate}},
+                       1,
+                       {[metaFieldName]: 1, [timeFieldName]: 1});
+    testQueryUsesIndex({[metaFieldName]: {$eq: 2}, [timeFieldName]: {$lte: timeDate}},
+                       1,
+                       {[metaFieldName]: -1, [timeFieldName]: -1});
+    testQueryUsesIndex({[metaFieldName]: {$lt: 3}, [timeFieldName]: {$lte: timeDate}},
+                       1,
+                       {[timeFieldName]: 1, [metaFieldName]: -1});
 
     /********************************** Tests object meta values **********************************/
     resetCollections();
@@ -99,53 +129,106 @@ TimeseriesTest.run((insert) => {
         {
             _id: 1,
             [timeFieldName]: ISODate('2000-01-01 00:00:00.000Z'),
-            [metaFieldName]: {a: 4, b: 5}
+            [metaFieldName]: {a: 4, b: 5, loc: [1.0, 2.0]}
         },
         {
             _id: 2,
             [timeFieldName]: ISODate('2010-01-01 00:00:00.000Z'),
-            [metaFieldName]: {a: "1", c: 0}
+            [metaFieldName]: {a: "1", c: 0, loc: [-1.0, -2.0]}
         }
     ]));
 
     // Test indexes on subfields of metaField.
-    testQueryUsesIndex({'meta.a': {$gt: 3}}, 1, {'meta.a': 1});
-    testQueryUsesIndex({'meta.a': {$type: 'string'}}, 1, {'meta.a': -1});
-    testQueryUsesIndex({'meta.b': {$gte: 0}}, 1, {'meta.b': 1}, {sparse: true});
-    testQueryUsesIndex({'meta': {$eq: {a: 1}}}, 1, {'meta': 1});
-    testQueryUsesIndex({'meta': {$in: [{a: 1}, {a: 4, b: 5}]}}, 2, {'meta': 1});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$gt: 3}}, 1, {[metaFieldName + '.a']: 1});
+    testQueryUsesIndex(
+        {[metaFieldName + '.a']: {$type: 'string'}}, 1, {[metaFieldName + '.a']: -1});
+    testQueryUsesIndex(
+        {[metaFieldName + '.b']: {$gte: 0}}, 1, {[metaFieldName + '.b']: 1}, {sparse: true});
+    testQueryUsesIndex({[metaFieldName]: {$eq: {a: 1}}}, 1, {[metaFieldName]: 1});
+    testQueryUsesIndex(
+        {[metaFieldName]: {$in: [{a: 1}, {a: 4, b: 5, loc: [1.0, 2.0]}]}}, 2, {[metaFieldName]: 1});
 
     // Test compound indexes on multiple subfields of metaField.
-    testQueryUsesIndex({'meta.a': {$lt: 3}}, 1, {'meta.a': 1, 'meta.b': -1});
-    testQueryUsesIndex({'meta.a': {$lt: 5}, 'meta.b': {$eq: 5}}, 1, {'meta.a': -1, 'meta.b': 1});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$lt: 3}},
+                       1,
+                       {[metaFieldName + '.a']: 1, [metaFieldName + '.b']: -1});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$lt: 5}, [metaFieldName + '.b']: {$eq: 5}},
+                       1,
+                       {[metaFieldName + '.a']: -1, [metaFieldName + '.b']: 1});
     testQueryUsesIndex(
-        {$or: [{'meta.a': {$eq: 1}}, {'meta.a': {$eq: "1"}}]}, 2, {'meta.a': -1, 'meta.b': -1});
-    testQueryUsesIndex({'meta.b': {$lte: 5}}, 1, {'meta.b': 1, 'meta.c': 1}, {sparse: true});
-    testQueryUsesIndex(
-        {'meta.b': {$lte: 5}, 'meta.c': {$lte: 4}}, 0, {'meta.b': 1, 'meta.c': 1}, {sparse: true});
+        {$or: [{[metaFieldName + '.a']: {$eq: 1}}, {[metaFieldName + '.a']: {$eq: "1"}}]},
+        2,
+        {[metaFieldName + '.a']: -1, [metaFieldName + '.b']: -1});
+    testQueryUsesIndex({[metaFieldName + '.b']: {$lte: 5}},
+                       1,
+                       {[metaFieldName + '.b']: 1, [metaFieldName + '.c']: 1},
+                       {sparse: true});
+    testQueryUsesIndex({[metaFieldName + '.b']: {$lte: 5}, [metaFieldName + '.c']: {$lte: 4}},
+                       0,
+                       {[metaFieldName + '.b']: 1, [metaFieldName + '.c']: 1},
+                       {sparse: true});
 
     // Test compound indexes on timeField and subfields of metaField.
-    testQueryUsesIndex({'meta.a': {$gte: 2}}, 1, {'meta.a': 1, 'time': 1});
-    testQueryUsesIndex({'time': {$lt: timeDate}}, 2, {'time': 1, 'meta.a': 1});
     testQueryUsesIndex(
-        {'meta.a': {$lte: 4}, 'time': {$lte: timeDate}}, 2, {'meta.a': 1, 'time': 1});
+        {[metaFieldName + '.a']: {$gte: 2}}, 1, {[metaFieldName + '.a']: 1, [timeFieldName]: 1});
     testQueryUsesIndex(
-        {'meta.a': {$lte: 4}, 'time': {$lte: timeDate}}, 2, {'meta.a': 1, 'time': -1});
-    testQueryUsesIndex(
-        {'meta.a': {$eq: "1"}, 'time': {$gt: timeDate}}, 1, {'time': -1, 'meta.a': 1});
+        {[timeFieldName]: {$lt: timeDate}}, 2, {[timeFieldName]: 1, [metaFieldName + '.a']: 1});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$lte: 4}, [timeFieldName]: {$lte: timeDate}},
+                       2,
+                       {[metaFieldName + '.a']: 1, [timeFieldName]: 1});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$lte: 4}, [timeFieldName]: {$lte: timeDate}},
+                       2,
+                       {[metaFieldName + '.a']: 1, [timeFieldName]: -1});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$eq: "1"}, [timeFieldName]: {$gt: timeDate}},
+                       1,
+                       {[timeFieldName]: -1, [metaFieldName + '.a']: 1});
 
     // Test wildcard indexes with metaField.
-    testQueryUsesIndex({'meta.a': {$lt: 3}}, 1, {'meta.$**': 1});
-    testQueryUsesIndex({'meta.b': {$gt: 3}}, 1, {'meta.$**': 1});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$lt: 3}}, 1, {[metaFieldName + '.$**']: 1});
+    testQueryUsesIndex({[metaFieldName + '.b']: {$gt: 3}}, 1, {[metaFieldName + '.$**']: 1});
 
     // Test hashed indexes on metaField.
-    testQueryUsesIndex({'meta': {$eq: {a: 1}}}, 1, {'meta': "hashed"});
-    testQueryUsesIndex({'meta.a': {$eq: 1}}, 1, {'meta.a': "hashed"});
-    testQueryUsesIndex({'meta.a': {$eq: 1}}, 1, {'meta.a': "hashed", 'meta.b': -1});
-    testQueryUsesIndex(
-        {'meta.a': {$eq: 1}, 'meta.b': {$gt: 0}}, 0, {'meta.a': "hashed", 'meta.b': -1});
-    testQueryUsesIndex(
-        {'meta.a': {$eq: 1}, 'meta.b': {$gt: 0}}, 0, {'meta.b': -1, 'meta.a': "hashed"});
+    testQueryUsesIndex({[metaFieldName]: {$eq: {a: 1}}}, 1, {[metaFieldName]: "hashed"});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$eq: 1}}, 1, {[metaFieldName + '.a']: "hashed"});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$eq: 1}},
+                       1,
+                       {[metaFieldName + '.a']: "hashed", [metaFieldName + '.b']: -1});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$eq: 1}, [metaFieldName + '.b']: {$gt: 0}},
+                       0,
+                       {[metaFieldName + '.a']: "hashed", [metaFieldName + '.b']: -1});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$eq: 1}, [metaFieldName + '.b']: {$gt: 0}},
+                       0,
+                       {[metaFieldName + '.b']: -1, [metaFieldName + '.a']: "hashed"});
+
+    // Test geo-type indexes on metaField.
+    testQueryUsesIndex({
+        [metaFieldName + '.loc']: {
+            $geoWithin: {
+                $geometry:
+                    {type: "Polygon", coordinates: [[[0, 0], [0, 3], [3, 3], [3, 0], [0, 0]]]}
+            }
+        }
+    },
+                       1,
+                       {[metaFieldName + '.loc']: '2dsphere'});
+    testQueryUsesIndex({[metaFieldName + '.loc']: {$geoWithin: {$center: [[1.01, 2.01], 0.1]}}},
+                       1,
+                       {[metaFieldName + '.loc']: '2d'});
+    testAggregationUsesIndex(
+        [
+            {
+                $geoNear: {
+                    near: {type: "Point", coordinates: [40.4, -70.4]},
+                    distanceField: "dist",
+                    spherical: true,
+                    key: metaFieldName + '.loc'
+                }
+            },
+            {$limit: 1}
+        ],
+        1,
+        {[metaFieldName + '.loc']: '2dsphere'},
+        "GEO_NEAR_2DSPHERE");
 
     /*********************************** Tests array meta values **********************************/
     resetCollections();
@@ -160,9 +243,9 @@ TimeseriesTest.run((insert) => {
     ]));
 
     // Test multikey indexes on metaField.
-    testQueryUsesIndex({'meta': {$eq: {a: 1}}}, 1, {'meta': 1});
-    testQueryUsesIndex({'meta': {$eq: 2}}, 1, {'meta': 1});
-    testQueryUsesIndex({'meta': {$gte: {a: 1}}}, 1, {'meta': -1});
+    testQueryUsesIndex({[metaFieldName]: {$eq: {a: 1}}}, 1, {[metaFieldName]: 1});
+    testQueryUsesIndex({[metaFieldName]: {$eq: 2}}, 1, {[metaFieldName]: 1});
+    testQueryUsesIndex({[metaFieldName]: {$gte: {a: 1}}}, 1, {[metaFieldName]: -1});
 
     resetCollections();
     assert.commandWorked(insert(coll, [
@@ -184,11 +267,12 @@ TimeseriesTest.run((insert) => {
     ]));
 
     // Test multikey indexes on subfields of metaFields.
-    testQueryUsesIndex({'meta.a': {$eq: {b: 1}}}, 1, {'meta.a': 1});
-    testQueryUsesIndex({'meta.a': {$eq: 2}}, 1, {'meta.a': 1});
-    testQueryUsesIndex({'meta.a': {$gte: {a: 1}}}, 1, {'meta.a': -1});
-    testQueryUsesIndex(
-        {'meta.a': {$gte: 1}, 'meta.b': {$exists: 1}}, 1, {'meta.a': -1, 'meta.b': 1});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$eq: {b: 1}}}, 1, {[metaFieldName + '.a']: 1});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$eq: 2}}, 1, {[metaFieldName + '.a']: 1});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$gte: {a: 1}}}, 1, {[metaFieldName + '.a']: -1});
+    testQueryUsesIndex({[metaFieldName + '.a']: {$gte: 1}, [metaFieldName + '.b']: {$exists: 1}},
+                       1,
+                       {[metaFieldName + '.a']: -1, [metaFieldName + '.b']: 1});
 
     /*********************************** Tests string meta values *********************************/
     const collation = {collation: {locale: 'en', strength: 1, numericOrdering: true}};
@@ -210,8 +294,9 @@ TimeseriesTest.run((insert) => {
     ]));
 
     // Test index on metaField when collection collation matches query collation.
-    testQueryUsesIndex({'meta': {$eq: "bye bye"}}, 1, {'meta': 1}, {}, collation);
-    testQueryUsesIndex({'meta': {$gte: "hello hello"}}, 2, {'meta': -1}, {}, collation);
+    testQueryUsesIndex({[metaFieldName]: {$eq: "bye bye"}}, 1, {[metaFieldName]: 1}, {}, collation);
+    testQueryUsesIndex(
+        {[metaFieldName]: {$gte: "hello hello"}}, 2, {[metaFieldName]: -1}, {}, collation);
 
     resetCollections(collation);
     assert.commandWorked(insert(coll, [
@@ -233,7 +318,9 @@ TimeseriesTest.run((insert) => {
     ]));
 
     // Test index on subfields of metaField when collection collation matches query collation.
-    testQueryUsesIndex({'meta.a': {$eq: "bye bye"}}, 1, {'meta.a': 1}, {}, collation);
-    testQueryUsesIndex({'meta.b': {$gt: "bye bye"}}, 2, {'meta.b': -1}, {}, collation);
+    testQueryUsesIndex(
+        {[metaFieldName + '.a']: {$eq: "bye bye"}}, 1, {[metaFieldName + '.a']: 1}, {}, collation);
+    testQueryUsesIndex(
+        {[metaFieldName + '.b']: {$gt: "bye bye"}}, 2, {[metaFieldName + '.b']: -1}, {}, collation);
 });
 })();

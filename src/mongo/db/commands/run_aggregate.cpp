@@ -778,6 +778,9 @@ Status runAggregate(OperationContext* opCtx,
 
         pipeline->optimizePipeline();
 
+        constexpr bool alreadyOptimized = true;
+        pipeline->validateCommon(alreadyOptimized);
+
         // Check if the pipeline has a $geoNear stage, as it will be ripped away during the build
         // query executor phase below (to be replaced with a $geoNearCursorStage later during the
         // executor attach phase).

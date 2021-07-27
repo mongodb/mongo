@@ -154,5 +154,5 @@ resObj = testDB.runCommand({
     }],
     cursor: {}
 });
-assert.eq(resObj.code, 40602, resObj);
+assert.eq(resObj.code, 40603, resObj);
 })();
