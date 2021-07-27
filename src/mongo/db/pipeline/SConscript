@@ -15,6 +15,17 @@ env.SConscript(
 )
 
 env.Library(
+    target="change_stream_preimage",
+    source=[
+        "change_stream_preimage.idl",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='aggregation',
     source=[
         'aggregation.cpp',
