@@ -38,13 +38,13 @@
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/document_path_support.h"
+#include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_close_cursor.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
-#include "mongo/db/pipeline/document_source_change_stream_lookup_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_lookup_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
@@ -261,9 +261,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
         stages.push_back(DocumentSourceChangeStreamAddPreImage::create(expCtx, spec));
     }
 
-    // If 'fullDocument' is set to "updateLookup", add the DSCSAddPostImage stage here.
-    if (spec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup) {
-        stages.push_back(DocumentSourceChangeStreamAddPostImage::create(expCtx));
+    // If 'fullDocument' is not set to "default", add the DSCSAddPostImage stage here.
+    if (spec.getFullDocument() != FullDocumentModeEnum::kDefault) {
+        stages.push_back(DocumentSourceChangeStreamAddPostImage::create(expCtx, spec));
     }
 
     // If the pipeline is built on MongoS, then the DSCSHandleTopologyChange stage acts as the
@@ -327,6 +327,18 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     uassert(51771,
             "the 'fullDocumentBeforeChange' option is not supported in a sharded cluster",
             !(shouldAddPreImage && (expCtx->inMongos || expCtx->needsMerge)));
+
+    // TODO SERVER-58584: remove the feature flag.
+    if (!feature_flags::gFeatureFlagChangeStreamsPreAndPostImages.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Specified value '"
+                              << FullDocumentMode_serializer(spec.getFullDocument())
+                              << "' is not a valid option for the 'fullDocument' parameter of the "
+                                 "$changeStream stage",
+                spec.getFullDocument() == FullDocumentModeEnum::kDefault ||
+                    spec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup);
+    }
 
     uassert(31123,
             "Change streams from mongos may not show migration events",

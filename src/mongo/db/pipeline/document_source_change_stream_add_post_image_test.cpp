@@ -41,10 +41,11 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_change_stream_lookup_post_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
+#include "mongo/idl/server_parameter_test_util.h"
 
 namespace mongo {
 namespace {
@@ -76,13 +77,54 @@ public:
         return ResumeToken(ResumeTokenData(ts, 0, 0, testUuid(), Value(Document{{"_id", id}})))
             .toDocument();
     }
+
+    DocumentSourceChangeStreamSpec getSpec(
+        FullDocumentModeEnum documentMode = FullDocumentModeEnum::kUpdateLookup) {
+        auto spec = DocumentSourceChangeStreamSpec();
+        spec.setFullDocument(documentMode);
+        return spec;
+    }
 };
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest,
+       CannotCreateStageFromBsonWithUnrecognizedFullDocumentMode) {
+    auto expCtx = getExpCtx();
+    auto spec = BSON("$changeStream: " << BSON("fullDocument"
+                                               << "banana"));
+    ASSERT_THROWS_CODE(
+        DocumentSourceChangeStreamAddPostImage::createFromBson(spec.firstElement(), expCtx),
+        AssertionException,
+        ErrorCodes::BadValue);
+}
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldSerializeAsExpectedForExplain) {
+    auto expCtx = getExpCtx();
+    const auto stage = DocumentSourceChangeStreamAddPostImage::create(
+        expCtx, getSpec(FullDocumentModeEnum::kUpdateLookup));
+    const auto expectedOutput =
+        Value(Document{{DocumentSourceChangeStream::kStageName,
+                        Document{{"stage"_sd, DocumentSourceChangeStreamAddPostImage::kStageName},
+                                 {"fullDocument"_sd, "updateLookup"_sd}}}});
+
+    ASSERT_VALUE_EQ(stage->serializeToValue({ExplainOptions::Verbosity::kQueryPlanner}),
+                    expectedOutput);
+}
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldSerializeAsExpectedForDispatch) {
+    auto expCtx = getExpCtx();
+    const auto stage = DocumentSourceChangeStreamAddPostImage::create(
+        expCtx, getSpec(FullDocumentModeEnum::kUpdateLookup));
+    const auto expectedOutput = Value(Document{{DocumentSourceChangeStreamAddPostImage::kStageName,
+                                                Document{{"fullDocument"_sd, "updateLookup"_sd}}}});
+
+    ASSERT_VALUE_EQ(stage->serializeToValue(), expectedOutput);
+}
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingDocumentKeyOnUpdate) {
     auto expCtx = getExpCtx();
 
     // Set up the lookup change post image stage.
-    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx);
+    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "documentKey" field.
     auto mockLocalSource = DocumentSourceMock::createForTest(
@@ -105,7 +147,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingOperation
     auto expCtx = getExpCtx();
 
     // Set up the lookup change post image stage.
-    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx);
+    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalSource = DocumentSourceMock::createForTest(
@@ -128,7 +170,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingNamespace
     auto expCtx = getExpCtx();
 
     // Set up the lookup change post image stage.
-    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx);
+    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalSource = DocumentSourceMock::createForTest(
@@ -152,7 +194,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldHasWrongT
     auto expCtx = getExpCtx();
 
     // Set up the lookup change post image stage.
-    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx);
+    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalSource =
@@ -175,7 +217,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldDoesNotMa
     auto expCtx = getExpCtx();
 
     // Set up the lookup change post image stage.
-    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx);
+    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalSource = DocumentSourceMock::createForTest(
@@ -201,7 +243,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest,
     expCtx->ns = NamespaceString::makeCollectionlessAggregateNSS("test");
 
     // Set up the lookup change post image stage.
-    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx);
+    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalSource = DocumentSourceMock::createForTest(
@@ -226,7 +268,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOn
     expCtx->ns = NamespaceString::makeCollectionlessAggregateNSS("test");
 
     // Set up the lookup change post image stage.
-    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx);
+    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock out the foreign collection.
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
@@ -256,7 +298,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfDocumentKeyIsNot
     auto expCtx = getExpCtx();
 
     // Set up the lookup change post image stage.
-    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx);
+    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with an update document.
     auto mockLocalSource = DocumentSourceMock::createForTest(
@@ -282,7 +324,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
     auto expCtx = getExpCtx();
 
     // Set up the lookup change post image stage.
-    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx);
+    auto lookupChangeStage = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input, pausing every other result.
     auto mockLocalSource = DocumentSourceMock::createForTest(
@@ -334,6 +376,5 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
     ASSERT_TRUE(lookupChangeStage->getNext().isEOF());
     ASSERT_TRUE(lookupChangeStage->getNext().isEOF());
 }
-
 }  // namespace
 }  // namespace mongo

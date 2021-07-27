@@ -50,8 +50,9 @@ public:
      * Creates a DocumentSourceChangeStreamAddPostImage stage.
      */
     static boost::intrusive_ptr<DocumentSourceChangeStreamAddPostImage> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceChangeStreamAddPostImage(expCtx);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const DocumentSourceChangeStreamSpec& spec) {
+        return new DocumentSourceChangeStreamAddPostImage(expCtx, spec.getFullDocument());
     }
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamAddPostImage> createFromBson(
@@ -112,8 +113,13 @@ public:
     }
 
 private:
-    DocumentSourceChangeStreamAddPostImage(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(kStageName, expCtx) {}
+    DocumentSourceChangeStreamAddPostImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           const FullDocumentModeEnum fullDocumentMode)
+        : DocumentSource(kStageName, expCtx), _fullDocumentMode(fullDocumentMode) {
+        tassert(5842300,
+                "the 'fullDocument' field cannot be 'default'",
+                _fullDocumentMode != FullDocumentModeEnum::kDefault);
+    }
 
     /**
      * Performs the lookup to retrieve the full document.
@@ -135,6 +141,11 @@ private:
 
     Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
     Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
+
+    // Determines whether post-images are strictly required or may be included only when available,
+    // and whether to return a point-in-time post-image or the most current majority-committed
+    // version of the updated document.
+    FullDocumentModeEnum _fullDocumentMode = FullDocumentModeEnum::kDefault;
 };
 
 }  // namespace mongo

@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_change_stream_lookup_post_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 
@@ -66,11 +66,7 @@ DocumentSourceChangeStreamAddPostImage::createFromBson(
             elem.type() == BSONType::Object);
     auto parsedSpec = DocumentSourceChangeStreamAddPostImageSpec::parse(
         IDLParserErrorContext("DocumentSourceChangeStreamAddPostImageSpec"), elem.Obj());
-    uassert(5467609,
-            str::stream() << "the 'fullDocument' field can only be 'updateLookup'",
-            parsedSpec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup);
-
-    return new DocumentSourceChangeStreamAddPostImage(expCtx);
+    return new DocumentSourceChangeStreamAddPostImage(expCtx, parsedSpec.getFullDocument());
 }
 
 DocumentSource::GetNextResult DocumentSourceChangeStreamAddPostImage::doGetNext() {
@@ -141,13 +137,12 @@ Value DocumentSourceChangeStreamAddPostImage::lookupPostImage(const Document& up
 Value DocumentSourceChangeStreamAddPostImage::serializeLatest(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return explain
-        ? Value(Document{{DocumentSourceChangeStream::kStageName,
-                          Document{{"stage"_sd, "internalAddPostImage"_sd},
-                                   {"fullDocumentBeforeChange"_sd, "updateLookUp"_sd}}}})
-        : Value(Document{
-              {kStageName,
-               DocumentSourceChangeStreamAddPostImageSpec(FullDocumentModeEnum::kUpdateLookup)
-                   .toBSON()}});
+        ? Value(Document{
+              {DocumentSourceChangeStream::kStageName,
+               Document{{"stage"_sd, kStageName},
+                        {kFullDocumentFieldName, FullDocumentMode_serializer(_fullDocumentMode)}}}})
+        : Value(Document{{kStageName,
+                          DocumentSourceChangeStreamAddPostImageSpec(_fullDocumentMode).toBSON()}});
 }
 
 }  // namespace mongo

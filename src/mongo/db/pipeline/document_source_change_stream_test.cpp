@@ -44,10 +44,10 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
-#include "mongo/db/pipeline/document_source_change_stream_lookup_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_lookup_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
@@ -443,6 +443,10 @@ bool getCSOptimizationFeatureFlagValue() {
     return feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV();
 }
 
+bool isChangeStreamsPreAndPostImagesEnabled() {
+    return feature_flags::gFeatureFlagChangeStreamsPreAndPostImages.isEnabledAndIgnoreFCV();
+}
+
 /**
  * Runs the tests with feature flag 'featureFlagChangeStreamsOptimization' true and false.
  */
@@ -559,6 +563,41 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
                                        expCtx),
         AssertionException,
         ErrorCodes::BadValue);
+}
+
+TEST_F(ChangeStreamStageTest, ShouldRejectUnsupportedFullDocumentOption) {
+    auto expCtx = getExpCtx();
+
+    // New modes that are supposed to be working only when pre-/post-images feature flag is on.
+    FullDocumentModeEnum modes[] = {FullDocumentModeEnum::kWhenAvailable,
+                                    FullDocumentModeEnum::kRequired};
+
+    for (const auto& mode : modes) {
+        auto spec =
+            BSON("$changeStream: " << DocumentSourceChangeStreamAddPostImageSpec(mode).toBSON());
+
+        // TODO SERVER-58584: remove the feature flag.
+        {
+            RAIIServerParameterControllerForTest controller(
+                "featureFlagChangeStreamsPreAndPostImages", false);
+            ASSERT_FALSE(isChangeStreamsPreAndPostImagesEnabled());
+
+            // 'DSChangeStream' is not allowed to be instantiated with new document modes when
+            // pre-/post-images feature flag is disabled.
+            ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), expCtx),
+                               AssertionException,
+                               ErrorCodes::BadValue);
+        }
+        {
+            RAIIServerParameterControllerForTest controller(
+                "featureFlagChangeStreamsPreAndPostImages", true);
+            ASSERT(isChangeStreamsPreAndPostImagesEnabled());
+
+            // 'DSChangeStream' is allowed to be instantiated with new document modes when
+            // pre-/post-images feature flag is enabled.
+            DSChangeStream::createFromBson(spec.firstElement(), expCtx);
+        }
+    }
 }
 
 TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfterOptions) {

@@ -55,7 +55,7 @@ enums:
         values:
             # Do not supply pre-images.
             kOff: "off"
-            # Supply a pre-image if available. Otherwise, omit the output field.
+            # Supply a pre-image if available. Otherwise, return null.
             kWhenAvailable: "whenAvailable"
             # Pre-images are required.Throw an exception if not available.
             kRequired: "required"
@@ -64,8 +64,14 @@ enums:
         description: Possible modes for the 'fullDocument' parameter of the $changeStream stage.
         type: string
         values:
-            kUpdateLookup: "updateLookup"
+            # Post-images will only be populated for insert and replace events.
             kDefault: "default"
+            # The current version of the document will be retrieved for update events.
+            kUpdateLookup: "updateLookup"
+            # Supply a post-image if available. Otherwise, return null.
+            kWhenAvailable: "whenAvailable"
+            # Post-images are required. Throw an exception if not available.
+            kRequired: "required"
 
 structs:
     ResumeTokenClusterTime:

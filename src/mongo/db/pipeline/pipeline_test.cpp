@@ -40,7 +40,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_change_stream_lookup_post_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_lookup_pre_image.h"
 #include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
