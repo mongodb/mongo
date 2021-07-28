@@ -4349,6 +4349,13 @@ ValueSet arrayToSet(const Value& val, const ValueComparator& valueComparator) {
     valueSet.insert(array.begin(), array.end());
     return valueSet;
 }
+
+ValueUnorderedSet arrayToUnorderedSet(const Value& val, const ValueComparator& valueComparator) {
+    const vector<Value>& array = val.getArray();
+    ValueUnorderedSet valueSet = valueComparator.makeUnorderedValueSet();
+    valueSet.insert(array.begin(), array.end());
+    return valueSet;
+}
 }  // namespace
 
 /* ----------------------- ExpressionSetDifference ---------------------------- */
@@ -4478,7 +4485,7 @@ const char* ExpressionSetIntersection::getOpName() const {
 /* ----------------------- ExpressionSetIsSubset ---------------------------- */
 
 namespace {
-Value setIsSubsetHelper(const vector<Value>& lhs, const ValueSet& rhs) {
+Value setIsSubsetHelper(const vector<Value>& lhs, const ValueUnorderedSet& rhs) {
     // do not shortcircuit when lhs.size() > rhs.size()
     // because lhs can have redundant entries
     for (vector<Value>::const_iterator it = lhs.begin(); it != lhs.end(); ++it) {
@@ -4503,8 +4510,8 @@ Value ExpressionSetIsSubset::evaluate(const Document& root, Variables* variables
                           << "argument is of type: " << typeName(rhs.getType()),
             rhs.isArray());
 
-    return setIsSubsetHelper(lhs.getArray(),
-                             arrayToSet(rhs, getExpressionContext()->getValueComparator()));
+    return setIsSubsetHelper(
+        lhs.getArray(), arrayToUnorderedSet(rhs, getExpressionContext()->getValueComparator()));
 }
 
 /**
@@ -4517,7 +4524,7 @@ Value ExpressionSetIsSubset::evaluate(const Document& root, Variables* variables
 class ExpressionSetIsSubset::Optimized : public ExpressionSetIsSubset {
 public:
     Optimized(ExpressionContext* const expCtx,
-              const ValueSet& cachedRhsSet,
+              const ValueUnorderedSet& cachedRhsSet,
               const ExpressionVector& operands)
         : ExpressionSetIsSubset(expCtx), _cachedRhsSet(cachedRhsSet) {
         _children = operands;
@@ -4535,7 +4542,7 @@ public:
     }
 
 private:
-    const ValueSet _cachedRhsSet;
+    const ValueUnorderedSet _cachedRhsSet;
 };
 
 intrusive_ptr<Expression> ExpressionSetIsSubset::optimize() {
@@ -4555,7 +4562,7 @@ intrusive_ptr<Expression> ExpressionSetIsSubset::optimize() {
 
         intrusive_ptr<Expression> optimizedWithConstant(
             new Optimized(this->getExpressionContext(),
-                          arrayToSet(rhs, getExpressionContext()->getValueComparator()),
+                          arrayToUnorderedSet(rhs, getExpressionContext()->getValueComparator()),
                           _children));
         return optimizedWithConstant;
     }

@@ -38,26 +38,35 @@
 
 namespace mongo {
 namespace {
-void testExpression(BSONObj expressionSpec, benchmark::State& state) {
+void benchmarkExpression(BSONObj expressionSpec,
+                         benchmark::State& state,
+                         const std::vector<Document>& documents) {
     QueryTestServiceContext testServiceContext;
     auto opContext = testServiceContext.makeOperationContext();
     NamespaceString nss("test.bm");
-    boost::intrusive_ptr<ExpressionContextForTest> exprContext =
-        new ExpressionContextForTest(opContext.get(), nss);
+    auto exprContext = make_intrusive<ExpressionContextForTest>(opContext.get(), nss);
 
     // Build an expression.
     auto expression = Expression::parseExpression(
         exprContext.get(), expressionSpec, exprContext->variablesParseState);
 
+    expression = expression->optimize();
+
     // Prepare parameters for the 'evaluate()' call.
     auto variables = &(exprContext->variables);
-    Document document;
 
     // Run the test.
     for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(expression->evaluate(document, variables));
+        for (auto document : documents) {
+            benchmark::DoNotOptimize(expression->evaluate(document, variables));
+        }
         benchmark::ClobberMemory();
     }
+}
+
+void benchmarkExpression(BSONObj expressionSpec, benchmark::State& state) {
+    std::vector<Document> documents = {{}};
+    benchmarkExpression(expressionSpec, state, documents);
 }
 
 /**
@@ -87,7 +96,7 @@ void testDateDiffExpression(long long startDate,
     if (startOfWeek) {
         objBuilder << "startOfWeek" << *startOfWeek;
     }
-    testExpression(BSON("$dateDiff" << objBuilder.obj()), state);
+    benchmarkExpression(BSON("$dateDiff" << objBuilder.obj()), state);
 }
 
 void BM_DateDiffEvaluateMinute300Years(benchmark::State& state) {
@@ -145,7 +154,7 @@ void testDateAddExpression(long long startDate,
     if (timezone) {
         objBuilder << "timezone" << *timezone;
     }
-    testExpression(BSON("$dateAdd" << objBuilder.obj()), state);
+    benchmarkExpression(BSON("$dateAdd" << objBuilder.obj()), state);
 }
 
 void BM_DateAddEvaluate10Days(benchmark::State& state) {
@@ -207,7 +216,7 @@ void testDateTruncExpression(long long date,
     if (startOfWeek) {
         objBuilder << "startOfWeek" << *startOfWeek;
     }
-    testExpression(BSON("$dateTrunc" << objBuilder.obj()), state);
+    benchmarkExpression(BSON("$dateTrunc" << objBuilder.obj()), state);
 }
 
 void BM_DateTruncEvaluateMinute15NewYork(benchmark::State& state) {
@@ -320,5 +329,170 @@ BENCHMARK(BM_DateTruncEvaluateMonth6UTCValue2030);
 BENCHMARK(BM_DateTruncEvaluateYear1NewYorkValue2020);
 BENCHMARK(BM_DateTruncEvaluateYear1UTCValue2020);
 BENCHMARK(BM_DateTruncEvaluateYear1NewYorkValue2100);
+
+/**
+ * Tests performance of 'evaluate()' of $getField expression.
+ */
+void BM_GetFieldEvaluateExpression(benchmark::State& state) {
+    BSONObjBuilder objBuilder;
+    objBuilder << "field"
+               << "x.y$z"
+               << "input"
+               << BSON("$const" << BSON("x.y$z"
+                                        << "abc"));
+
+    benchmarkExpression(BSON("$getField" << objBuilder.obj()), state);
+}
+
+void BM_GetFieldEvaluateShortSyntaxExpression(benchmark::State& state) {
+    benchmarkExpression(BSON("$getField" << BSON("$const"
+                                                 << "$foo")),
+                        state);
+}
+
+void BM_GetFieldNestedExpression(benchmark::State& state) {
+    BSONObjBuilder innerObjBuilder;
+    innerObjBuilder << "field"
+                    << "a.b"
+                    << "input" << BSON("$const" << BSON("a.b" << BSON("c" << 123)));
+    BSONObjBuilder outerObjBuilder;
+    outerObjBuilder << "field"
+                    << "c"
+                    << "input" << BSON("$getField" << innerObjBuilder.obj());
+    benchmarkExpression(BSON("$getField" << outerObjBuilder.obj()), state);
+}
+
+BENCHMARK(BM_GetFieldEvaluateExpression);
+BENCHMARK(BM_GetFieldEvaluateShortSyntaxExpression);
+BENCHMARK(BM_GetFieldNestedExpression);
+
+/**
+ * Tests performance of 'evaluate()' of $setField and $unsetField expressions.
+ */
+void testSetFieldExpression(std::string fieldname,
+                            std::string oldFieldValue,
+                            std::string newFieldValue,
+                            benchmark::State& state) {
+    BSONObjBuilder objBuilder;
+    objBuilder << "field" << fieldname << "input"
+               << BSON("$const" << BSON(fieldname << oldFieldValue << "f1" << 1 << "f2" << 2))
+               << "value" << newFieldValue;
+
+    benchmarkExpression(BSON("$setField" << objBuilder.obj()), state);
+}
+
+void BM_SetFieldEvaluateExpression(benchmark::State& state) {
+    testSetFieldExpression("a.b", "x", "y", state);
+}
+
+// The following two functions test different syntax for equivalent expressions:
+// $unsetField is an alias for $setField with $$REMOVE.
+void BM_SetFieldWithRemoveExpression(benchmark::State& state) {
+    testSetFieldExpression("a$b", "x", "$$REMOVE", state);
+}
+
+void BM_UnsetFieldEvaluateExpression(benchmark::State& state) {
+    BSONObjBuilder objBuilder;
+    objBuilder << "field"
+               << "a$b.c"
+               << "input"
+               << BSON("$const" << BSON("a$b.c"
+                                        << "x"
+                                        << "f1" << 1 << "f2" << 2));
+
+    benchmarkExpression(BSON("$unsetField" << objBuilder.obj()), state);
+}
+
+BENCHMARK(BM_SetFieldEvaluateExpression);
+BENCHMARK(BM_SetFieldWithRemoveExpression);
+BENCHMARK(BM_UnsetFieldEvaluateExpression);
+
+BSONArray randomBSONArray(int count, int max, int offset = 0) {
+    BSONArrayBuilder builder;
+    auto rng = PseudoRandom(std::random_device()());
+    for (int i = 0; i < count; i++) {
+        builder.append(std::to_string(offset + rng.nextInt32(max)));
+    }
+    return builder.arr();
+}
+
+BSONArray rangeBSONArray(int count) {
+    BSONArrayBuilder builder;
+    for (int i = 0; i < count; i++) {
+        builder.append(std::to_string(i));
+    }
+    return builder.arr();
+}
+
+/**
+ * Tests performance of $set* expressions.
+ */
+void BM_SetIsSubset_allPresent(benchmark::State& state) {
+    const int kMax = 100000;
+    BSONArray lhs = randomBSONArray(100000, kMax);
+    BSONArray rhs = rangeBSONArray(kMax);
+
+    benchmarkExpression(BSON("$setIsSubset" << BSON_ARRAY("$arr" << rhs)),
+                        state,
+                        std::vector<Document>(100, {{"arr"_sd, lhs}}));
+}
+
+void BM_SetIsSubset_nonePresent(benchmark::State& state) {
+    const int kMax = 100000;
+    BSONArray lhs = randomBSONArray(100000, kMax, kMax);
+    BSONArray rhs = rangeBSONArray(kMax);
+
+    benchmarkExpression(BSON("$setIsSubset" << BSON_ARRAY("$arr" << rhs)),
+                        state,
+                        std::vector<Document>(100, {{"arr"_sd, lhs}}));
+}
+
+void BM_SetIntersection(benchmark::State& state) {
+    const int kMax = 100000;
+    BSONArray lhs = randomBSONArray(100000, kMax);
+    BSONArray rhs = randomBSONArray(100000, kMax);
+
+    benchmarkExpression(BSON("$setIntersection" << BSON_ARRAY("$arr" << rhs)),
+                        state,
+                        std::vector<Document>(100, {{"arr"_sd, lhs}}));
+}
+
+void BM_SetDifference(benchmark::State& state) {
+    const int kMax = 100000;
+    BSONArray lhs = randomBSONArray(100000, kMax);
+    BSONArray rhs = randomBSONArray(100000, kMax);
+
+    benchmarkExpression(BSON("$setDifference" << BSON_ARRAY("$arr" << rhs)),
+                        state,
+                        std::vector<Document>(100, {{"arr"_sd, lhs}}));
+}
+
+void BM_SetEquals(benchmark::State& state) {
+    const int kMax = 100000;
+    BSONArray lhs = randomBSONArray(100000, kMax);
+    BSONArray rhs = randomBSONArray(100000, kMax);
+
+    benchmarkExpression(BSON("$setEquals" << BSON_ARRAY("$arr" << rhs)),
+                        state,
+                        std::vector<Document>(100, {{"arr"_sd, lhs}}));
+}
+
+void BM_SetUnion(benchmark::State& state) {
+    const int kMax = 100000;
+    BSONArray lhs = randomBSONArray(100000, kMax);
+    BSONArray rhs = randomBSONArray(100000, kMax);
+
+    benchmarkExpression(BSON("$setUnion" << BSON_ARRAY("$arr" << rhs)),
+                        state,
+                        std::vector<Document>(100, {{"arr"_sd, lhs}}));
+}
+
+BENCHMARK(BM_SetIsSubset_allPresent);
+BENCHMARK(BM_SetIsSubset_nonePresent);
+BENCHMARK(BM_SetIntersection);
+BENCHMARK(BM_SetDifference);
+BENCHMARK(BM_SetEquals);
+BENCHMARK(BM_SetUnion);
+
 }  // namespace
 }  // namespace mongo
