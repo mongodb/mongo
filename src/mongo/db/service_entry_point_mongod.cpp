@@ -114,6 +114,13 @@ public:
                              const CommandInvocation* invocation,
                              const repl::OpTime& lastOpBeforeRun,
                              BSONObjBuilder& commandResponseBuilder) const override {
+
+        // Prevent waiting for writeConcern if the command is changing an unreplicated namespace.
+        invariant(invocation);
+        if (!invocation->ns().isReplicated()) {
+            return;
+        }
+
         auto lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
         auto waitForWriteConcernAndAppendStatus = [&]() {

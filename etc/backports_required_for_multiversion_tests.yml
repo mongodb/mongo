@@ -24,6 +24,8 @@ last-continuous:
   all:
     - ticket: SERVER-57262
       test_file: jstests/replsets/catchup_takeover_with_higher_config.js
+    - ticket: SERVER-58898
+      test_file: jstests/replsets/write_concern_write_to_local.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -196,6 +198,8 @@ last-lts:
       test_file: jstests/sharding/txn_writes_during_movechunk.js
     - ticket: SERVER-57262
       test_file: jstests/replsets/catchup_takeover_with_higher_config.js
+    - ticket: SERVER-58898
+      test_file: jstests/replsets/write_concern_write_to_local.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
