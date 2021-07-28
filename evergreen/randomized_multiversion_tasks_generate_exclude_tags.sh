@@ -8,4 +8,4 @@ set -o verbose
 
 activate_venv
 PATH="$PATH:/data/multiversion"
-$python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags
+$python buildscripts/resmoke.py generate-multiversion-exclude-tags --oldBinVersion=last_continuous

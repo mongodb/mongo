@@ -145,7 +145,10 @@ DEFAULTS = {
     "config_dir": "buildscripts/resmokeconfig",
 
     # UndoDB options
-    "undo_recorder_path": None
+    "undo_recorder_path": None,
+
+    # Generate multiversion exclude tags options
+    "exclude_tags_file_path": "generated_resmoke_config/multiversion_exclude_tags.yml",
 }
 
 _SuiteOptions = collections.namedtuple("_SuiteOptions", [
@@ -524,6 +527,9 @@ BENCHMARK_REPETITIONS = None
 
 # UndoDB options
 UNDO_RECORDER_PATH = None
+
+# # Generate multiversion exclude tags options
+EXCLUDE_TAGS_FILE_PATH = None
 
 ##
 # Internally used configuration options that aren't exposed to the user

@@ -1,35 +1,22 @@
-#!/usr/bin/env python3
-"""Generate multiversion tests to run in evergreen in parallel."""
-
+"""Generate multiversion exclude tags file."""
+import logging
 import os
 import re
+import sys
 import tempfile
 from collections import defaultdict
+from subprocess import check_output
 from sys import platform
 
-from subprocess import check_output
-
 import requests
-import click
-import structlog
 
+from buildscripts.ciconfig import tags as _tags
+from buildscripts.resmokelib import multiversionconstants
+from buildscripts.resmokelib.config import MultiversionOptions
 from buildscripts.resmokelib.core.programs import get_path_env_var
-from buildscripts.resmokelib.multiversionconstants import (
-    LAST_LTS_MONGO_BINARY, LAST_CONTINUOUS_MONGO_BINARY, REQUIRES_FCV_TAG)
-from buildscripts.util.cmdutils import enable_logging
 from buildscripts.util.fileops import read_yaml_file
-import buildscripts.ciconfig.tags as _tags
-
-# pylint: disable=len-as-condition
-
-LOGGER = structlog.getLogger(__name__)
-
-DEFAULT_CONFIG_DIR = "generated_resmoke_config"
-CONFIG_DIR = DEFAULT_CONFIG_DIR
 
 BACKPORT_REQUIRED_TAG = "backport_required_multiversion"
-EXCLUDE_TAGS = f"{REQUIRES_FCV_TAG},multiversion_incompatible,{BACKPORT_REQUIRED_TAG}"
-EXCLUDE_TAGS_FILE = "multiversion_exclude_tags.yml"
 
 # The directory in which BACKPORTS_REQUIRED_FILE resides.
 ETC_DIR = "etc"
@@ -38,7 +25,7 @@ BACKPORTS_REQUIRED_BASE_URL = "https://raw.githubusercontent.com/mongodb/mongo"
 
 
 def get_backports_required_hash_for_shell_version(mongo_shell_path=None):
-    """Parse the last-lts shell binary to get the commit hash."""
+    """Parse the old shell binary to get the commit hash."""
     env_vars = {}
     path = get_path_env_var(env_vars=env_vars)
     env_vars["PATH"] = os.pathsep.join(path)
@@ -61,61 +48,56 @@ def get_backports_required_hash_for_shell_version(mongo_shell_path=None):
                 return commit_hash
             else:
                 break
-    raise ValueError("Could not find a valid commit hash from the last-lts mongo binary.")
+    raise ValueError(
+        f"Could not find a valid commit hash from the {mongo_shell_path} mongo binary.")
 
 
 def get_old_yaml(commit_hash):
-    """Download BACKPORTS_REQUIRED_FILE from the last LTS commit and return the yaml."""
-    LOGGER.info(f"Downloading file from commit hash of last-lts branch {commit_hash}")
+    """Download BACKPORTS_REQUIRED_FILE from the old commit and return the yaml."""
     response = requests.get(
         f'{BACKPORTS_REQUIRED_BASE_URL}/{commit_hash}/{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}')
     # If the response was successful, no exception will be raised.
     response.raise_for_status()
 
-    last_lts_file = f"{commit_hash}_{BACKPORTS_REQUIRED_FILE}"
+    old_yaml_file = f"{commit_hash}_{BACKPORTS_REQUIRED_FILE}"
     temp_dir = tempfile.mkdtemp()
-    with open(os.path.join(temp_dir, last_lts_file), "w") as fileh:
+    temp_old_yaml_file = os.path.join(temp_dir, old_yaml_file)
+    with open(temp_old_yaml_file, "w") as fileh:
         fileh.write(response.text)
 
-    backports_required_last_lts = read_yaml_file(os.path.join(temp_dir, last_lts_file))
-    return backports_required_last_lts
+    backports_required_old = read_yaml_file(temp_old_yaml_file)
+    return backports_required_old
 
 
-@click.group()
-def main():
-    """Serve as an entry point for the 'run' and 'generate-exclude-tags' commands."""
-    pass
-
-
-@main.command("generate-exclude-tags")
-@click.option("--output", type=str, default=os.path.join(CONFIG_DIR, EXCLUDE_TAGS_FILE),
-              show_default=True, help="Where to output the generated tags.")
-def generate_exclude_yaml(output: str) -> None:
-    # pylint: disable=too-many-locals
+def generate_exclude_yaml(old_bin_version: str, output: str, logger: logging.Logger) -> None:
     """
     Create a tag file associating multiversion tests to tags for exclusion.
 
     Compares the BACKPORTS_REQUIRED_FILE on the current branch with the same file on the
-    last-lts branch to determine which tests should be denylisted.
+    last-lts and/or last-continuous branch to determine which tests should be denylisted.
     """
 
-    enable_logging(False)
-
-    location, _ = os.path.split(os.path.abspath(output))
+    output = os.path.abspath(output)
+    location, _ = os.path.split(output)
     if not os.path.isdir(location):
-        LOGGER.info(f"Cannot write to {output}. Not generating tag file.")
+        logger.info(f"Cannot write to {output}. Not generating tag file.")
         return
 
     backports_required_latest = read_yaml_file(os.path.join(ETC_DIR, BACKPORTS_REQUIRED_FILE))
 
-    # Get the state of the backports_required_for_multiversion_tests.yml file for the last-lts
-    # binary we are running tests against. We do this by using the commit hash from the last-lts
+    # Get the state of the backports_required_for_multiversion_tests.yml file for the old
+    # binary we are running tests against. We do this by using the commit hash from the old
     # mongo shell executable.
-    # TODO: SERVER-55857 Support LAST_LTS after backporting to 5.0.
-    old_version_commit_hash = get_backports_required_hash_for_shell_version(
-        mongo_shell_path=LAST_CONTINUOUS_MONGO_BINARY)
+    shell_version = {
+        MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_MONGO_BINARY,
+        MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_MONGO_BINARY,
+    }[old_bin_version]
 
-    # Get the yaml contents from the last-lts commit.
+    old_version_commit_hash = get_backports_required_hash_for_shell_version(
+        mongo_shell_path=shell_version)
+
+    # Get the yaml contents from the old commit.
+    logger.info(f"Downloading file from commit hash of old branch {old_version_commit_hash}")
     backports_required_old = get_old_yaml(old_version_commit_hash)
 
     def diff(list1, list2):
@@ -140,7 +122,8 @@ def generate_exclude_yaml(output: str) -> None:
 
         return _suites_latest, _suites_old, _always_exclude
 
-    suites_latest, suites_old, always_exclude = get_suite_exclusions('last-continuous')
+    suites_latest, suites_old, always_exclude = get_suite_exclusions(
+        old_bin_version.replace("_", "-"))
 
     tags = _tags.TagsConfig()
 
@@ -156,10 +139,6 @@ def generate_exclude_yaml(output: str) -> None:
         for test in test_set:
             tags.add_tag("js_test", test, f"{suite}_{BACKPORT_REQUIRED_TAG}")
 
-    LOGGER.info(f"Writing exclude tags to {output}.")
+    logger.info(f"Writing exclude tags to {output}.")
     tags.write_file(filename=output,
                     preamble="Tag file that specifies exclusions from multiversion suites.")
-
-
-if __name__ == '__main__':
-    main()  # pylint: disable=no-value-for-parameter

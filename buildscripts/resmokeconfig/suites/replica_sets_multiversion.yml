@@ -16,7 +16,7 @@ selector:
   - jstests/replsets/invalidate_sessions_on_stepdown.js
   - jstests/replsets/initial_sync_fails_unclean_restart.js
 
-  # This tag file can be created using ./buildscripts/evergreen_gen_multiversion_tests.py
+  # This tag file can be created using ./buildscripts/resmoke.py generate-multiversion-exclude-tags
   # or downloaded from the evergreen task.
   tag_file: multiversion_exclude_tags.yml
 

@@ -9,7 +9,7 @@ activate_venv
 
 # Multiversion exclusions can be used when selecting tests.
 PATH="$PATH:/data/multiversion"
-$python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --output=multiversion_exclude_tags.yml
+$python buildscripts/resmoke.py generate-multiversion-exclude-tags --oldBinVersion=last_continuous --excludeTagsFilePath=multiversion_exclude_tags.yml
 
 # Capture a list of new and modified tests. The expansion macro burn_in_tests_build_variant
 # is used to for finding the associated tasks from a different build varaint than the

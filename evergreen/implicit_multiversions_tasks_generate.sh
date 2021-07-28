@@ -9,5 +9,5 @@ activate_venv
 PATH="$PATH:/data/multiversion"
 
 if [ -n "${require_multiversion}" ]; then
-  $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags
+  $python buildscripts/resmoke.py generate-multiversion-exclude-tags --oldBinVersion=last_continuous
 fi

@@ -36,6 +36,7 @@ from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.core import process
 from buildscripts.resmokelib.core import jasper_process
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
+from buildscripts.resmokelib.run import generate_multiversion_exclude_tags
 from buildscripts.resmokelib.run import runtime_recorder
 from buildscripts.resmokelib.run import list_tags
 from buildscripts.resmokelib.run.runtime_recorder import compare_start_time
@@ -124,6 +125,8 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
                 self.find_suites()
             elif self.__command == "list-tags":
                 self.list_tags()
+            elif self.__command == "generate-multiversion-exclude-tags":
+                self.generate_multiversion_exclude_tags()
             elif config.DRY_RUN == "tests":
                 self.dry_run()
             else:
@@ -176,6 +179,11 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
             out_tag_docs = {tag: doc for tag, doc in tag_docs.items() if tag in out_tag_names}
 
         self._resmoke_logger.info("Found tags in suites:%s", list_tags.make_output(out_tag_docs))
+
+    def generate_multiversion_exclude_tags(self):
+        """Generate multiversion exclude tags file."""
+        generate_multiversion_exclude_tags.generate_exclude_yaml(
+            config.MULTIVERSION_BIN_VERSION, config.EXCLUDE_TAGS_FILE_PATH, self._resmoke_logger)
 
     @staticmethod
     def _find_suites_by_test(suites):
@@ -594,6 +602,7 @@ class RunPlugin(PluginInterface):
         RunPlugin._add_list_suites(subparsers)
         RunPlugin._add_find_suites(subparsers)
         RunPlugin._add_list_tags(subparsers)
+        RunPlugin._add_generate_multiversion_exclude_tags(subparsers)
 
     def parse(self, subcommand, parser, parsed_args, **kwargs):
         """
@@ -605,7 +614,8 @@ class RunPlugin(PluginInterface):
         :param kwargs: additional args
         :return: None or a Subcommand
         """
-        if subcommand in ('find-suites', 'list-suites', 'list-tags', 'run'):
+        if subcommand in ('find-suites', 'list-suites', 'list-tags', 'run',
+                          'generate-multiversion-exclude-tags'):
             configure_resmoke.validate_and_update_config(parser, parsed_args)
             if config.EVERGREEN_TASK_ID is not None:
                 return TestRunnerEvg(subcommand, **kwargs)
@@ -797,7 +807,7 @@ class RunPlugin(PluginInterface):
         parser.add_argument(
             "--oldBinVersion", type=str, dest="old_bin_version",
             choices=config.MultiversionOptions.all_options(),
-            help="Chose the multiverion binary version as last-lts or last-continuous.")
+            help="Choose the multiversion binary version as last-lts or last-continuous.")
 
         parser.add_argument(
             "--linearChain", action="store", dest="linear_chain", choices=("on", "off"),
@@ -1143,6 +1153,23 @@ class RunPlugin(PluginInterface):
             "--suites", dest="suite_files", metavar="SUITE1,SUITE2",
             help=("Comma separated list of suite names to get tags from."
                   " All suites are used if unspecified."))
+
+    @classmethod
+    def _add_generate_multiversion_exclude_tags(cls, subparser):
+        """Create and add the parser for the generate-multiversion-exclude-tags subcommand."""
+        parser = subparser.add_parser(
+            "generate-multiversion-exclude-tags",
+            help="Create a tag file associating multiversion tests to tags for exclusion."
+            " Compares the BACKPORTS_REQUIRED_FILE on the current branch with the same file on the"
+            " last-lts and/or last-continuous branch to determine which tests should be denylisted."
+        )
+        parser.set_defaults(logger_file="console")
+        parser.add_argument(
+            "--oldBinVersion", type=str, dest="old_bin_version",
+            choices=config.MultiversionOptions.all_options(),
+            help="Choose the multiversion binary version as last-lts or last-continuous.")
+        parser.add_argument("--excludeTagsFilePath", type=str, dest="exclude_tags_file_path",
+                            help="Where to output the generated tags.")
 
 
 def to_local_args(input_args=None):  # pylint: disable=too-many-branches,too-many-locals

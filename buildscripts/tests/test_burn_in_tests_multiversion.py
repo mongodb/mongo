@@ -220,7 +220,7 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch(
-        "buildscripts.evergreen_gen_multiversion_tests.get_backports_required_hash_for_shell_version"
+        "buildscripts.resmokelib.run.generate_multiversion_exclude_tags.get_backports_required_hash_for_shell_version"
     )
     def test_one_task_one_test(self, mock_hash):
         mock_hash.return_value = MONGO_4_2_HASH
@@ -247,7 +247,7 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch(
-        "buildscripts.evergreen_gen_multiversion_tests.get_backports_required_hash_for_shell_version"
+        "buildscripts.resmokelib.run.generate_multiversion_exclude_tags.get_backports_required_hash_for_shell_version"
     )
     def test_n_task_one_test(self, mock_hash):
         mock_hash.return_value = MONGO_4_2_HASH
@@ -276,7 +276,7 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch(
-        "buildscripts.evergreen_gen_multiversion_tests.get_backports_required_hash_for_shell_version"
+        "buildscripts.resmokelib.run.generate_multiversion_exclude_tags.get_backports_required_hash_for_shell_version"
     )
     def test_one_task_n_test(self, mock_hash):
         mock_hash.return_value = MONGO_4_2_HASH
@@ -303,7 +303,7 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch(
-        "buildscripts.evergreen_gen_multiversion_tests.get_backports_required_hash_for_shell_version"
+        "buildscripts.resmokelib.run.generate_multiversion_exclude_tags.get_backports_required_hash_for_shell_version"
     )
     def test_n_task_m_test(self, mock_hash):
         mock_hash.return_value = MONGO_4_2_HASH

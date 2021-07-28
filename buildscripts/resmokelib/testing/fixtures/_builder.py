@@ -195,7 +195,7 @@ def load_version(version_path_suffix=None, shell_path=None):
         if not os.path.exists(retrieve_dir):
             try:
                 # Avoid circular import
-                import buildscripts.evergreen_gen_multiversion_tests as gen_tests
+                import buildscripts.resmokelib.run.generate_multiversion_exclude_tags as gen_tests
                 commit = gen_tests.get_backports_required_hash_for_shell_version(
                     mongo_shell_path=shell_path)
             except FileNotFoundError as err:
