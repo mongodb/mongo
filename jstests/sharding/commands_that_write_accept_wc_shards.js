@@ -520,13 +520,12 @@ function testInvalidWriteConcern(cmd) {
     // sub-object detailing the failure. This is motivated by the fact that the number of documents
     // written is bounded only by the number of documents produced by the pipeline, which could lead
     // a writeConcernError object to exceed maximum BSON size.
-    if (cmd.req.aggregate !== undefined || cmd.req.mapReduce !== undefined) {
+    if (cmd.req.aggregate || cmd.req.mapReduce) {
         assert.commandFailedWithCode(
             res, [ErrorCodes.WriteConcernFailed, ErrorCodes.UnknownReplWriteConcern]);
 
         cmd.confirmFunc(cmd.isExpectedToWriteOnWriteConcernFailure);
-    } else if (cmd.req.renameCollection !== undefined &&
-               jsTestOptions().mongosBinVersion != 'last-lts') {
+    } else if (cmd.req.renameCollection) {
         // The renameCollection spans multiple nodes and potentially performs writes to the config
         // server, so the user-specified write concern has no effect.
         assert.commandWorked(res);
