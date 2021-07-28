@@ -33,19 +33,16 @@
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
     session_config = 'isolation=snapshot'
 
     def apply_timestamps(self, timestamp):
         self.session.prepare_transaction(
-            'prepare_timestamp=' + timestamp_str(timestamp))
+            'prepare_timestamp=' + self.timestamp_str(timestamp))
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(timestamp))
+            'commit_timestamp=' + self.timestamp_str(timestamp))
         self.session.timestamp_transaction(
-            'durable_timestamp=' + timestamp_str(timestamp))
+            'durable_timestamp=' + self.timestamp_str(timestamp))
 
     def test_timestamp_alter(self):
         base = 'assert06'
@@ -98,7 +95,7 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
 
         # We must move the oldest timestamp forward in order to alter.
         # Otherwise alter closing the file will fail with EBUSY.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(2))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(2))
 
         # Now alter the setting and make sure we detect incorrect usage.
         self.session.alter(uri, cfg_on)
@@ -161,7 +158,7 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Test to make sure that key consistency can be turned off
         # after turning it on.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(5))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5))
         self.session.alter(uri, cfg_off)
 
         # Detection is off we can successfully change the same key with and
@@ -399,11 +396,11 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         c['key_ts6'] = 'value_committs1'
         c['key_ts6'] = 'value22'
         self.session.prepare_transaction(
-            'prepare_timestamp=' + timestamp_str(22))
+            'prepare_timestamp=' + self.timestamp_str(22))
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(22))
+            'commit_timestamp=' + self.timestamp_str(22))
         self.session.timestamp_transaction(
-            'durable_timestamp=' + timestamp_str(22))
+            'durable_timestamp=' + self.timestamp_str(22))
         self.session.commit_transaction()
         c.close()
 
@@ -414,12 +411,12 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.begin_transaction()
         c['key_nots'] = 'value23'
         self.session.prepare_transaction(
-            'prepare_timestamp=' + timestamp_str(23))
+            'prepare_timestamp=' + self.timestamp_str(23))
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(23))
+            'commit_timestamp=' + self.timestamp_str(23))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(
-            'durable_timestamp=' + timestamp_str(23)), msg_usage)
+            'durable_timestamp=' + self.timestamp_str(23)), msg_usage)
         c.close()
         '''
 

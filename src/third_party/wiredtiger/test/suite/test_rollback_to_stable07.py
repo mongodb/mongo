@@ -33,9 +33,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable07.py
 # Test the rollback to stable operation performs as expected following a server crash and
 # recovery. Verify that
@@ -74,8 +71,8 @@ class test_rollback_to_stable07(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value_a = "aaaaa" * 100
         value_b = "bbbbb" * 100
@@ -96,9 +93,9 @@ class test_rollback_to_stable07(test_rollback_to_stable_base):
 
         # Pin stable to timestamp 50 if prepare otherwise 40.
         if self.prepare:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(50))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
         else:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(40))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
 
         # Perform additional updates.
         self.large_updates(uri, value_b, ds, nrows, self.prepare, 60)

@@ -36,9 +36,6 @@ from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
     table_ts_log     = 'table:ts06_ts_logged'
     table_ts_nolog   = 'table:ts06_ts_nologged'
@@ -138,22 +135,22 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.session.begin_transaction()
         # Make three updates with different timestamps.
-        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(1))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(1))
         for k in keys:
             cur_ts_log[k] = 1
             cur_ts_nolog[k] = 1
 
-        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(101))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(101))
         for k in keys:
             cur_ts_log[k] = 2
             cur_ts_nolog[k] = 2
 
-        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(201))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(201))
         for k in keys:
             cur_ts_log[k] = 3
             cur_ts_nolog[k] = 3
 
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(301))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(301))
         cur_ts_log.close()
         cur_ts_nolog.close()
 
@@ -170,9 +167,9 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
         # Check that we see the values till correctly from checkpointed data
         # files in case of multistep transactions.
         # Set oldest and stable timestamps
-        old_ts = timestamp_str(100)
+        old_ts = self.timestamp_str(100)
         # Set the stable timestamp such that last update is beyond it.
-        stable_ts = timestamp_str(200)
+        stable_ts = self.timestamp_str(200)
         self.conn.set_timestamp('oldest_timestamp=' + old_ts)
         self.conn.set_timestamp('stable_timestamp=' + stable_ts)
 

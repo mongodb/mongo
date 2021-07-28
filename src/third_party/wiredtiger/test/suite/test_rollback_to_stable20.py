@@ -34,9 +34,6 @@ from wiredtiger import stat
 from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 
-def timestamp_str(t):
-    return '%x' % t
-
 # Test that rollback to stable does not open any dhandles that don't have unstable updates.
 class test_rollback_to_stable20(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
@@ -55,8 +52,8 @@ class test_rollback_to_stable20(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable timestamp to 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         valuea = "aaaaa" * 100
 
@@ -65,7 +62,7 @@ class test_rollback_to_stable20(test_rollback_to_stable_base):
             self.session.create(uri, create_params)
             self.large_updates(uri, valuea, ds, nrows, 0, 10)
 
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
         self.session.checkpoint()
 

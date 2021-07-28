@@ -33,9 +33,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable12.py
 # Test the rollback to stable operation skipping subtrees in during tree walk.
 class test_rollback_to_stable12(test_rollback_to_stable_base):
@@ -71,8 +68,8 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value_a = "aaaaa" * 100
         value_b = "bbbbb" * 100
@@ -85,9 +82,9 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
 
         # Pin stable to timestamp 30 if prepare otherwise 20.
         if self.prepare:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(30))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
         else:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(20))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
 
         # Load a single row modification to be removed.
         commit_ts = 30
@@ -95,12 +92,12 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
         self.session.begin_transaction()
         cursor[ds.key(1)] = value_b
         if self.prepare:
-            self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(commit_ts-1))
-            self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(commit_ts))
-            self.session.timestamp_transaction('durable_timestamp=' + timestamp_str(commit_ts+1))
+            self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(commit_ts-1))
+            self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
+            self.session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(commit_ts+1))
             self.session.commit_transaction()
         else:
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
         cursor.close()
 
         self.session.checkpoint()

@@ -33,9 +33,6 @@ from wiredtiger import stat, WT_NOTFOUND
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable19.py
 # Test that rollback to stable aborts both insert and remove updates from a single prepared transaction
 class test_rollback_to_stable19(test_rollback_to_stable_base):
@@ -80,8 +77,8 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         valuea = "aaaaa" * 100
 
@@ -94,7 +91,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
             cursor.set_key(i)
             cursor.remove()
         cursor.close()
-        s.prepare_transaction('prepare_timestamp=' + timestamp_str(20))
+        s.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
@@ -116,7 +113,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         cursor2.close()
 
         # Pin stable timestamp to 20.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(20))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
         if not self.in_memory:
             self.session.checkpoint()
 
@@ -155,8 +152,8 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         valuea = "aaaaa" * 100
         valueb = "bbbbb" * 100
@@ -176,7 +173,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
             cursor.set_key(i)
             cursor.remove()
         cursor.close()
-        s.prepare_transaction('prepare_timestamp=' + timestamp_str(40))
+        s.prepare_transaction('prepare_timestamp=' + self.timestamp_str(40))
 
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
@@ -198,7 +195,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         cursor2.close()
 
         # Pin stable timestamp to 40.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(40))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
         if not self.in_memory:
             self.session.checkpoint()
 

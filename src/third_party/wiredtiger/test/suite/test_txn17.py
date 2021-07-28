@@ -35,16 +35,13 @@
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_txn17(wttest.WiredTigerTestCase, suite_subprocess):
     def test_txn_api(self):
         # Test API functionality tagged as requires_transaction.
         # Cannot set a timestamp on a non-running transaction.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.timestamp_transaction(
-                'commit_timestamp=' + timestamp_str(1 << 5000)),
+                'commit_timestamp=' + self.timestamp_str(1 << 5000)),
                 '/only permitted in a running/')
 
         # Cannot call commit on a non-running transaction.

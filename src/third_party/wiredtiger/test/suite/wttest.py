@@ -653,6 +653,9 @@ class WiredTigerTestCase(unittest.TestCase):
         """
         self.assertEqual(int(ts1, 16), int(ts2, 16))
 
+    def timestamp_str(self, t):
+        return '%x' % t
+
     def exceptionToStderr(self, expr):
         """
         Used by assertRaisesHavingMessage to convert an expression

@@ -34,9 +34,6 @@ from wiredtiger import stat
 from wtscenario import make_scenarios
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable02.py
 # Test that rollback to stable brings back the history value to replace on-disk value.
 class test_rollback_to_stable02(test_rollback_to_stable_base):
@@ -81,8 +78,8 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         valuea = "aaaaa" * 100
         valueb = "bbbbb" * 100
@@ -106,9 +103,9 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
 
         # Pin stable to timestamp 30 if prepare otherwise 20.
         if self.prepare:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(30))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
         else:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(20))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
         # Checkpoint to ensure that all the data is flushed.
         if not self.in_memory:
             self.session.checkpoint()

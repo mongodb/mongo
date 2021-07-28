@@ -30,9 +30,6 @@ from test_gc01 import test_gc_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_gc04.py
 # Test that checkpoint must not clean the pages that are not obsolete.
 class test_gc04(test_gc_base):
@@ -55,8 +52,8 @@ class test_gc04(test_gc_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         bigvalue = "aaaaa" * 100
         bigvalue2 = "ddddd" * 100

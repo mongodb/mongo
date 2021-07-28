@@ -31,9 +31,6 @@ from wtdataset import SimpleDataSet, SimpleIndexDataSet
 from wtdataset import SimpleLSMDataSet, ComplexDataSet, ComplexLSMDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' %t
-
 # test_prepare_cursor02.py
 #    WT_CURSOR navigation (next/prev) tests with prepared transactions
 class test_prepare_cursor02(wttest.WiredTigerTestCase):
@@ -69,7 +66,7 @@ class test_prepare_cursor02(wttest.WiredTigerTestCase):
         cursor.set_key(ds.key(1))
         cursor.set_value(ds.value(1))
         cursor.insert()
-        session.prepare_transaction('prepare_timestamp=' + timestamp_str(100))
+        session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(100))
 
         prep_session = self.conn.open_session(self.session_config)
         prep_cursor = prep_session.open_cursor(uri, None)

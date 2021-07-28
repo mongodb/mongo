@@ -33,7 +33,7 @@
 import wiredtiger, wttest
 
 class test_txn25(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
+    conn_config = 'cache_size=50MB,log=(enabled)'
     session_config = 'isolation=snapshot'
 
     def test_txn25(self):

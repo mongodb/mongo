@@ -31,9 +31,6 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' %t
-
 # test_durable_ts03.py
 #    Checking visibility and durability of updates with durable_timestamp
 class test_durable_ts03(wttest.WiredTigerTestCase):
@@ -75,7 +72,7 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
         cursor = session.open_cursor(uri, None)
 
         # Set stable timestamp to checkpoint initial data set.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(100))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(100))
         self.session.checkpoint()
 
         '''
@@ -90,15 +87,15 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
             self.assertEquals(cursor.update(), 0)
             self.assertEquals(cursor.next(), 0)
 
-        session.prepare_transaction('prepare_timestamp=' + timestamp_str(150))
+        session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(150))
         msg = "/is less than the commit timestamp/"
         # Check for error when commit timestamp > durable timestamp.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: session.commit_transaction('commit_timestamp=' +\
-            timestamp_str(200) + ',durable_timestamp=' + timestamp_str(180)), msg)
+            self.timestamp_str(200) + ',durable_timestamp=' + self.timestamp_str(180)), msg)
 
         # Set a stable timestamp so that first update value is durable.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(250))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(250))
 
         # Scenario: 2
         # Check to see durable timestamp < stable timestamp, returns error.
@@ -111,13 +108,13 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
             self.assertEquals(cursor.update(), 0)
             self.assertEquals(cursor.next(), 0)
 
-        session.prepare_transaction('prepare_timestamp=' + timestamp_str(150))
+        session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(150))
 
         msg = "/is less than the stable timestamp/"
         # Check that error is returned when durable timestamp < stable timestamp.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: session.commit_transaction('commit_timestamp=' +\
-            timestamp_str(200) + ',durable_timestamp=' + timestamp_str(240)), msg)
+            self.timestamp_str(200) + ',durable_timestamp=' + self.timestamp_str(240)), msg)
         '''
 
 if __name__ == '__main__':

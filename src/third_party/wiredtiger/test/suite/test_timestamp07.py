@@ -36,9 +36,6 @@ from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'ts07_ts_nologged'
     tablename2 = 'ts07_nots_logged'
@@ -201,23 +198,23 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.begin_transaction()
             c[k] = self.value
             c3[k] = self.value
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(k))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(k))
 
         # print "value inserted in all tables, reading..."
 
         # Now check that we see the expected state when reading at each
         # timestamp.
         for k in orig_keys:
-            self.check(self.session, 'read_timestamp=' + timestamp_str(k),
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(k),
                 k, self.value)
-            self.check(self.session, 'read_timestamp=' + timestamp_str(k),
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(k),
                 k + 1, None)
 
         # print "all values read, updating timestamps"
 
         # Bump the oldest timestamp, we're not going back...
-        self.assertTimestampsEqual(self.conn.query_timestamp(), timestamp_str(self.nkeys))
-        self.oldts = self.stablets = timestamp_str(self.nkeys)
+        self.assertTimestampsEqual(self.conn.query_timestamp(), self.timestamp_str(self.nkeys))
+        self.oldts = self.stablets = self.timestamp_str(self.nkeys)
         self.conn.set_timestamp('oldest_timestamp=' + self.oldts)
         self.conn.set_timestamp('stable_timestamp=' + self.stablets)
         # print "Oldest " + self.oldts
@@ -237,7 +234,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.begin_transaction()
             c[k] = self.value2
             c3[k] = self.value2
-            ts = timestamp_str(k + self.nkeys)
+            ts = self.timestamp_str(k + self.nkeys)
             self.session.commit_transaction('commit_timestamp=' + ts)
             # print "Commit key " + str(k) + " ts " + ts
             count += 1
@@ -252,7 +249,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         # Update the stable timestamp to the latest, but not the oldest
         # timestamp and make sure we can see the data.  Once the stable
         # timestamp is moved we should see all keys with value2.
-        self.stablets = timestamp_str(self.nkeys*2)
+        self.stablets = self.timestamp_str(self.nkeys*2)
         self.conn.set_timestamp('stable_timestamp=' + self.stablets)
         # print "check_stable 2"
         self.check_stable(self.value2, self.nkeys, self.nkeys, self.nkeys)
@@ -274,7 +271,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.begin_transaction()
             c[k] = self.value3
             c3[k] = self.value3
-            ts = timestamp_str(k + self.nkeys*2)
+            ts = self.timestamp_str(k + self.nkeys*2)
             self.session.commit_transaction('commit_timestamp=' + ts)
             # print "Commit key " + str(k) + " ts " + ts
             count += 1

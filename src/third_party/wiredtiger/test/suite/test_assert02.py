@@ -33,9 +33,6 @@
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
     session_config = 'isolation=snapshot'
 
@@ -68,7 +65,7 @@ class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
         c_never = self.session.open_cursor(uri_never)
         c_none = self.session.open_cursor(uri_none)
         self.session.begin_transaction()
-        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(1))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(1))
         c_always['key1'] = 'value1'
         c_def['key1'] = 'value1'
         c_never['key1'] = 'value1'
@@ -91,7 +88,7 @@ class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
         c_never.set_key('key1')
         c_none.set_key('key1')
 
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(1))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(1))
         c_always.search()
         c_def.search()
         c_none.search()

@@ -34,9 +34,6 @@ from wiredtiger import stat, wiredtiger_strerror, WiredTigerError, WT_ROLLBACK
 from wtscenario import make_scenarios
 from time import sleep
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable01.py
 # Shared base class used by rollback to stable tests.
 class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
@@ -77,12 +74,12 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
                 if commit_ts == 0:
                     session.commit_transaction()
                 elif prepare:
-                    session.prepare_transaction('prepare_timestamp=' + timestamp_str(commit_ts-1))
-                    session.timestamp_transaction('commit_timestamp=' + timestamp_str(commit_ts))
-                    session.timestamp_transaction('durable_timestamp=' + timestamp_str(commit_ts+1))
+                    session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(commit_ts-1))
+                    session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
+                    session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(commit_ts+1))
                     session.commit_transaction()
                 else:
-                    session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+                    session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
             cursor.close()
         except WiredTigerError as e:
             rollback_str = wiredtiger_strerror(WT_ROLLBACK)
@@ -104,12 +101,12 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
             if commit_ts == 0:
                 session.commit_transaction()
             elif prepare:
-                session.prepare_transaction('prepare_timestamp=' + timestamp_str(commit_ts-1))
-                session.timestamp_transaction('commit_timestamp=' + timestamp_str(commit_ts))
-                session.timestamp_transaction('durable_timestamp=' + timestamp_str(commit_ts+1))
+                session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(commit_ts-1))
+                session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
+                session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(commit_ts+1))
                 session.commit_transaction()
             else:
-                session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+                session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
             cursor.close()
         except WiredTigerError as e:
             rollback_str = wiredtiger_strerror(WT_ROLLBACK)
@@ -129,12 +126,12 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
                 if commit_ts == 0:
                     session.commit_transaction()
                 elif prepare:
-                    session.prepare_transaction('prepare_timestamp=' + timestamp_str(commit_ts-1))
-                    session.timestamp_transaction('commit_timestamp=' + timestamp_str(commit_ts))
-                    session.timestamp_transaction('durable_timestamp=' + timestamp_str(commit_ts+1))
+                    session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(commit_ts-1))
+                    session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
+                    session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(commit_ts+1))
                     session.commit_transaction()
                 else:
-                    session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+                    session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
             cursor.close()
         except WiredTigerError as e:
             rollback_str = wiredtiger_strerror(WT_ROLLBACK)
@@ -147,7 +144,7 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
         if read_ts == 0:
             session.begin_transaction()
         else:
-            session.begin_transaction('read_timestamp=' + timestamp_str(read_ts))
+            session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         cursor = session.open_cursor(uri)
         count = 0
         for k, v in cursor:
@@ -200,8 +197,8 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         valuea = "aaaaa" * 100
         self.large_updates(uri, valuea, ds, nrows, self.prepare, 10)
@@ -215,9 +212,9 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
 
         # Pin stable to timestamp 20 if prepare otherwise 10.
         if self.prepare:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(20))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
         else:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(10))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
         # Checkpoint to ensure that all the updates are flushed to disk.
         if not self.in_memory:
             self.session.checkpoint()

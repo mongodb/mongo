@@ -33,9 +33,6 @@
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_timestamp09'
     uri = 'table:' + tablename
@@ -48,7 +45,7 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         # Begin by adding some data.
         self.session.begin_transaction()
         self.session.commit_transaction(
-            'commit_timestamp=' + timestamp_str(1))
+            'commit_timestamp=' + self.timestamp_str(1))
         c[1] = 1
 
         # In a single transaction it is illegal to set a commit timestamp
@@ -56,21 +53,21 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         # Check both timestamp_transaction and commit_transaction APIs.
         self.session.begin_transaction()
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(3))
+            'commit_timestamp=' + self.timestamp_str(3))
         c[3] = 3
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.timestamp_transaction(
-                'commit_timestamp=' + timestamp_str(2)),
+                'commit_timestamp=' + self.timestamp_str(2)),
                 '/older than the first commit timestamp/')
         self.session.rollback_transaction()
 
         self.session.begin_transaction()
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(4))
+            'commit_timestamp=' + self.timestamp_str(4))
         c[4] = 4
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(
-                'commit_timestamp=' + timestamp_str(3)),
+                'commit_timestamp=' + self.timestamp_str(3)),
                 '/older than the first commit timestamp/')
 
         # Commit timestamp >= Oldest timestamp
@@ -78,13 +75,13 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.begin_transaction()
         c[3] = 3
         self.session.commit_transaction(
-            'commit_timestamp=' + timestamp_str(3))
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(3))
+            'commit_timestamp=' + self.timestamp_str(3))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(3))
 
         self.session.begin_transaction()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.timestamp_transaction(
-                'commit_timestamp=' + timestamp_str(2)),
+                'commit_timestamp=' + self.timestamp_str(2)),
                 '/less than the oldest timestamp/')
         self.session.rollback_transaction()
 
@@ -92,48 +89,48 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         c[2] = 2
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(
-                'commit_timestamp=' + timestamp_str(2)),
+                'commit_timestamp=' + self.timestamp_str(2)),
                 '/less than the oldest timestamp/')
 
         self.session.begin_transaction()
         c[4] = 4
         self.session.commit_transaction(
-            'commit_timestamp=' + timestamp_str(4))
+            'commit_timestamp=' + self.timestamp_str(4))
 
         # Oldest timestamp <= Stable timestamp and both oldest and stable
         # timestamp should proceed forward.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.conn.set_timestamp('oldest_timestamp=' +
-                timestamp_str(3) + ',stable_timestamp=' + timestamp_str(1)),
+                self.timestamp_str(3) + ',stable_timestamp=' + self.timestamp_str(1)),
                 '/oldest timestamp \(0, 3\) must not be later than stable timestamp \(0, 1\)/')
 
         # Oldest timestamp is 3 at the moment, trying to set it to an earlier
         # timestamp is a no-op.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
-        self.assertTimestampsEqual(self.conn.query_timestamp('get=oldest'), timestamp_str(3))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=oldest'), self.timestamp_str(3))
 
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(3) +
-            ',stable_timestamp=' + timestamp_str(3))
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(5))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(3) +
+            ',stable_timestamp=' + self.timestamp_str(3))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
         # Stable timestamp is 5 at the moment, trying to set it to an earlier
         # timestamp is a no-op.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(4))
-        self.assertTimestampsEqual(self.conn.query_timestamp('get=stable'), timestamp_str(5))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(4))
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=stable'), self.timestamp_str(5))
 
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(5))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.conn.set_timestamp('oldest_timestamp=' +
-                timestamp_str(6)),
+                self.timestamp_str(6)),
                 '/oldest timestamp \(0, 6\) must not be later than stable timestamp \(0, 5\)/')
 
         # Commit timestamp >= Stable timestamp.
         # Check both timestamp_transaction and commit_transaction APIs.
         # Oldest and stable timestamp are set to 5 at the moment.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(6))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(6))
         self.session.begin_transaction()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.timestamp_transaction(
-                'commit_timestamp=' + timestamp_str(5)),
+                'commit_timestamp=' + self.timestamp_str(5)),
                 '/less than the stable timestamp/')
         self.session.rollback_transaction()
 
@@ -141,7 +138,7 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         c[5] = 5
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(
-                'commit_timestamp=' + timestamp_str(5)),
+                'commit_timestamp=' + self.timestamp_str(5)),
                 '/less than the stable timestamp/')
 
         # When explicitly set, commit timestamp for a transaction can be earlier
@@ -149,48 +146,48 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.begin_transaction()
         c[6] = 6
         self.session.commit_transaction(
-            'commit_timestamp=' + timestamp_str(6))
+            'commit_timestamp=' + self.timestamp_str(6))
         self.session.begin_transaction()
         c[8] = 8
         self.session.commit_transaction(
-            'commit_timestamp=' + timestamp_str(8))
+            'commit_timestamp=' + self.timestamp_str(8))
         self.session.begin_transaction()
         c[7] = 7
         self.session.commit_transaction(
-            'commit_timestamp=' + timestamp_str(7))
+            'commit_timestamp=' + self.timestamp_str(7))
 
         # Read timestamp >= Oldest timestamp
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(7) +
-            ',stable_timestamp=' + timestamp_str(7))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(7) +
+            ',stable_timestamp=' + self.timestamp_str(7))
         with self.expectedStdoutPattern('less than the oldest timestamp'):
             self.assertRaisesException(wiredtiger.WiredTigerError,
-                lambda: self.session.begin_transaction('read_timestamp=' + timestamp_str(6)))
+                lambda: self.session.begin_transaction('read_timestamp=' + self.timestamp_str(6)))
 
         # c[8] is not visible at read_timestamp < 8
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(7))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(7))
         self.assertEqual(c[6], 6)
         self.assertEqual(c[7], 7)
         c.set_key(8)
         self.assertEqual(c.search(), wiredtiger.WT_NOTFOUND)
         self.session.commit_transaction()
 
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(8))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(8))
         self.assertEqual(c[6], 6)
         self.assertEqual(c[7], 7)
         self.assertEqual(c[8], 8)
         self.assertTimestampsEqual(
-            self.conn.query_timestamp('get=oldest_reader'), timestamp_str(8))
+            self.conn.query_timestamp('get=oldest_reader'), self.timestamp_str(8))
         self.session.commit_transaction()
 
         # We can move the oldest timestamp backwards with "force"
         self.conn.set_timestamp(
-            'oldest_timestamp=' + timestamp_str(5) + ',force')
+            'oldest_timestamp=' + self.timestamp_str(5) + ',force')
         with self.expectedStdoutPattern('less than the oldest timestamp'):
             self.assertRaisesException(wiredtiger.WiredTigerError,
-                lambda: self.session.begin_transaction('read_timestamp=' + timestamp_str(4)))
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(6))
+                lambda: self.session.begin_transaction('read_timestamp=' + self.timestamp_str(4)))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(6))
         self.assertTimestampsEqual(
-            self.conn.query_timestamp('get=oldest_reader'), timestamp_str(6))
+            self.conn.query_timestamp('get=oldest_reader'), self.timestamp_str(6))
         self.session.commit_transaction()
 
 if __name__ == '__main__':

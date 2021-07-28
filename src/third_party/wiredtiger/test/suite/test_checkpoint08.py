@@ -37,9 +37,6 @@ import wiredtiger, wttest
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_checkpoint08(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
     session_config = 'isolation=snapshot'
@@ -61,8 +58,8 @@ class test_checkpoint08(wttest.WiredTigerTestCase):
         self.session.create(self.uri2, 'key_format=i,value_format=i')
 
         # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         # Setup: Insert some data and checkpoint it. Then modify only
         # the data in the first table and checkpoint. Verify the clean skip
@@ -73,23 +70,23 @@ class test_checkpoint08(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         c1[1] = 1
         c2[1] = 1
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         self.session.begin_transaction()
         c1[1] = 10
         c2[1] = 10
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(3))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(3))
         self.session.checkpoint(None)
 
         # Modify the both tables and reverify.
         self.session.begin_transaction()
         c1[3] = 3
         c2[3] = 3
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(4))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
 
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(4))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(4))
         self.session.checkpoint(None)
 
         val = self.get_stat(self.uri1)
@@ -100,13 +97,13 @@ class test_checkpoint08(wttest.WiredTigerTestCase):
         self.assertNotEqual(hsval, 0)
 
         # Modify the both tables and reverify when oldest timestamp moved.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(4))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(4))
         self.session.begin_transaction()
         c1[4] = 4
         c2[4] = 4
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(5))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
         self.session.checkpoint(None)
 
         val = self.get_stat(self.uri1)

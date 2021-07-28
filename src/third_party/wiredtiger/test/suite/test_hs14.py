@@ -29,9 +29,6 @@
 import time, wiredtiger, wttest
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_hs14.py
 # Ensure that point in time reads with few visible history store records don't
 # damage performance.
@@ -52,7 +49,7 @@ class test_hs14(wttest.WiredTigerTestCase):
     def test_hs14(self):
         uri = 'table:test_hs14'
         self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
 
         value1 = 'a' * 500
@@ -64,22 +61,22 @@ class test_hs14(wttest.WiredTigerTestCase):
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value1
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value2
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value3
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value4
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(4))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
 
         # A checkpoint will ensure that older values are written to the history store.
         self.session.checkpoint()
 
         start = time.time()
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(3))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(3))
         for i in range(1, 10000):
             self.assertEqual(cursor[self.create_key(i)], value3)
         self.session.rollback_transaction()
@@ -92,16 +89,16 @@ class test_hs14(wttest.WiredTigerTestCase):
             self.session.begin_transaction()
             cursor.set_key(self.create_key(i))
             cursor.remove()
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value5
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         # A checkpoint will ensure that older values are written to the history store.
         self.session.checkpoint()
 
         start = time.time()
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(9))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(9))
         for i in range(1, 10000):
             cursor.set_key(self.create_key(i))
             self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)

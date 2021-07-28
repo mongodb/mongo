@@ -32,9 +32,6 @@ from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' %t
-
 # test_durable_rollback_to_stable.py
 #    Checking visibility and durability of updates with durable_timestamp and
 #    with rollback to stable.
@@ -78,7 +75,7 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
         cursor = session.open_cursor(uri, None)
 
         # Set stable timestamp to checkpoint initial data set.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(100))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(100))
         self.session.checkpoint()
 
         # Update all values with value 111 i.e. first update value.
@@ -89,15 +86,15 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
             self.assertEquals(cursor.update(), 0)
             self.assertEquals(cursor.next(), 0)
 
-        session.prepare_transaction('prepare_timestamp=' + timestamp_str(150))
-        session.timestamp_transaction('commit_timestamp=' + timestamp_str(200))
-        session.timestamp_transaction('durable_timestamp=' + timestamp_str(220))
+        session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(150))
+        session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(200))
+        session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(220))
         session.commit_transaction()
 
         # Check the values read are correct with different timestamps.
         # Read the initial dataset.
         self.assertEquals(cursor.reset(), 0)
-        session.begin_transaction('read_timestamp=' + timestamp_str(150))
+        session.begin_transaction('read_timestamp=' + self.timestamp_str(150))
         self.assertEquals(cursor.next(), 0)
         for i in range(1, 50):
             self.assertEquals(cursor.get_value(), ds.value(i))
@@ -106,7 +103,7 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
 
         # Read the first update value with timestamp.
         self.assertEquals(cursor.reset(), 0)
-        session.begin_transaction('read_timestamp=' + timestamp_str(200))
+        session.begin_transaction('read_timestamp=' + self.timestamp_str(200))
         self.assertEquals(cursor.next(), 0)
         for i in range(1, 50):
             self.assertEquals(cursor.get_value(), ds.value(111))
@@ -123,7 +120,7 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
         session.commit_transaction()
 
         # Set a stable timestamp so that first update value is durable.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(250))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(250))
 
         # Update all values with value 222 i.e. second update value.
         self.assertEquals(cursor.reset(), 0)
@@ -134,12 +131,12 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
             self.assertEquals(cursor.update(), 0)
             self.assertEquals(cursor.next(), 0)
 
-        session.prepare_transaction('prepare_timestamp=' + timestamp_str(200))
+        session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(200))
 
         # Commit timestamp is earlier to stable timestamp but durable timestamp
         # is later than stable timestamp. Hence second update value is not durable.
-        session.timestamp_transaction('commit_timestamp=' + timestamp_str(240))
-        session.timestamp_transaction('durable_timestamp=' + timestamp_str(300))
+        session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(240))
+        session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(300))
         session.commit_transaction()
 
         # Checkpoint so that first update value will be visible and durable,
@@ -160,8 +157,8 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
         self.conn.rollback_to_stable()
         session = self.conn.open_session(self.session_config)
         cursor = session.open_cursor(uri, None)
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(250))
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(250))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(250))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(250))
         self.assertEquals(cursor.next(), 0)
         for i in range(1, 50):
             self.assertEquals(cursor.get_value(), ds.value(111))

@@ -37,9 +37,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable16.py
 # Test that rollback to stable removes updates present on disk for column store.
 class test_rollback_to_stable16(wttest.WiredTigerTestCase):
@@ -81,7 +78,7 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
                 cursor[i] = value + str(i)
             else:
                 cursor[i] = value
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(timestamp))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(timestamp))
         cursor.close()
 
     def check(self, check_value, uri, nrows, start_row, read_ts):
@@ -89,7 +86,7 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
         if read_ts == 0:
             session.begin_transaction()
         else:
-            session.begin_transaction('read_timestamp=' + timestamp_str(read_ts))
+            session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         cursor = session.open_cursor(uri)
 
         count = 0
@@ -128,14 +125,14 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
         self.session.create(uri, create_params)
 
         # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         for i in range(len(values)):
             self.insert_update_data(uri, values[i], start_row, nrows, ts[i])
             start_row += nrows
 
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(5))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
 
         if not self.in_memory:
             # Checkpoint to ensure that all the updates are flushed to disk.

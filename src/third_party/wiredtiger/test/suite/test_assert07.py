@@ -34,17 +34,14 @@
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_assert07(wttest.WiredTigerTestCase, suite_subprocess):
     def apply_timestamps(self, timestamp):
         self.session.prepare_transaction(
-            'prepare_timestamp=' + timestamp_str(timestamp))
+            'prepare_timestamp=' + self.timestamp_str(timestamp))
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(timestamp))
+            'commit_timestamp=' + self.timestamp_str(timestamp))
         self.session.timestamp_transaction(
-            'durable_timestamp=' + timestamp_str(timestamp))
+            'durable_timestamp=' + self.timestamp_str(timestamp))
 
     def test_timestamp_alter(self):
         base = 'assert07'

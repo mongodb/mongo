@@ -31,13 +31,11 @@
 # [END_TAGS]
 
 import wiredtiger, wttest
-def timestamp_str(t):
-    return '%x' % t
 
 # test_prepare09.py
 # Validate scenarios involving inserting tombstones when rolling back prepares
 class test_prepare09(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=2MB,statistics=(all)'
+    conn_config = 'cache_size=2MB'
     session_config = 'isolation=snapshot'
 
     def test_prepared_update_is_aborted_correctly_with_on_disk_value(self):
@@ -47,8 +45,8 @@ class test_prepare09(wttest.WiredTigerTestCase):
         value2 = 'b' * 10000
         value3 = 'c' * 10000
 
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-        ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+        ',stable_timestamp=' + self.timestamp_str(1))
 
         self.session.create(uri, create_params)
         cursor = self.session.open_cursor(uri)
@@ -58,7 +56,7 @@ class test_prepare09(wttest.WiredTigerTestCase):
         # Insert a new value.
         self.session.begin_transaction()
         cursor[1] = value1
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Get the previous update onto disk.
         for i in range(2, 10000):
@@ -68,7 +66,7 @@ class test_prepare09(wttest.WiredTigerTestCase):
         # Prepare a full value and roll it back.
         self.session.begin_transaction()
         cursor[1] = value3
-        self.assertEqual(self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(3)), 0)
+        self.assertEqual(self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(3)), 0)
         self.session.rollback_transaction()
 
         # Get the previous update onto disk.
@@ -89,8 +87,8 @@ class test_prepare09(wttest.WiredTigerTestCase):
         value2 = 'b' * 10000
         value3 = 'e' * 10000
         value4 = 'd' * 10000
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-        ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+        ',stable_timestamp=' + self.timestamp_str(1))
 
         self.session.create(uri, create_params)
         cursor = self.session.open_cursor(uri)
@@ -102,7 +100,7 @@ class test_prepare09(wttest.WiredTigerTestCase):
         cursor[1] = value1
         cursor[2] = value2
         cursor[3] = value3
-        self.assertEqual(self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(3)), 0)
+        self.assertEqual(self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(3)), 0)
 
         # Get the prepare onto disk.
         for i in range(4, 10000):

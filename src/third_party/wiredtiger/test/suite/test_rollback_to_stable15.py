@@ -32,9 +32,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable15.py
 # Test that roll back to stable handles updates present in the
 # update-list for both fixed length and variable length column store.
@@ -70,7 +67,7 @@ class test_rollback_to_stable15(wttest.WiredTigerTestCase):
         if read_ts == 0:
             session.begin_transaction()
         else:
-            session.begin_transaction('read_timestamp=' + timestamp_str(read_ts))
+            session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         cursor = session.open_cursor(uri)
         count = 0
         for k, v in cursor:
@@ -89,8 +86,8 @@ class test_rollback_to_stable15(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri)
 
         # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         value20 = 0x20
         value30 = 0x30
@@ -101,17 +98,17 @@ class test_rollback_to_stable15(wttest.WiredTigerTestCase):
         for i in range(1, nrows):
             self.session.begin_transaction()
             cursor[i] = value20
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         #First Update to value 30 at timestamp 5
         for i in range(1, nrows):
             self.session.begin_transaction()
             cursor[i] = value30
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
         cursor.close()
 
         #Set stable timestamp to 2
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(2))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
         self.conn.rollback_to_stable()
         # Check that only value20 is available
         self.check(value20, uri, nrows - 1, 2)
@@ -121,17 +118,17 @@ class test_rollback_to_stable15(wttest.WiredTigerTestCase):
         for i in range(1, nrows):
             self.session.begin_transaction()
             cursor[i] = value30
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(7))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(7))
 
         #Third Update to value40 at timestamp 9
         for i in range(1, nrows):
             self.session.begin_transaction()
             cursor[i] = value40
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(9))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(9))
         cursor.close()
 
         #Set stable timestamp to 7
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(7))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(7))
         self.conn.rollback_to_stable()
         #Check that only value30 is available
         self.check(value30, uri, nrows - 1, 7)

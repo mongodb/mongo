@@ -31,9 +31,6 @@ from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_prepare07.py
 # Test to ensure prepared updates older than oldest timestamp are not visible.
 # this test is mainly to ensure there is no gap in txn_visible_all when active
@@ -45,8 +42,8 @@ class test_prepare07(wttest.WiredTigerTestCase):
 
     def older_prepare_updates(self, uri, ds, nrows, value_a):
         # Commit some updates along with a prepared update, which is not resolved.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(100))
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(100))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(100))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(100))
 
         # Commit some updates.
         value_b = b"bbbbb" * 100
@@ -55,12 +52,12 @@ class test_prepare07(wttest.WiredTigerTestCase):
         cursor.set_key(ds.key(nrows + 1))
         cursor.set_value(value_b)
         self.assertEquals(cursor.update(), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(110))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(110))
         self.session.begin_transaction('isolation=snapshot')
         cursor.set_key(ds.key(nrows + 2))
         cursor.set_value(value_b)
         self.assertEquals(cursor.update(), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(120))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(120))
 
         # Prepare a transaction and keep it open.
         session_p = self.conn.open_session()
@@ -69,36 +66,36 @@ class test_prepare07(wttest.WiredTigerTestCase):
         cursor_p.set_key(ds.key(nrows + 3))
         cursor_p.set_value(value_b)
         self.assertEquals(cursor_p.update(), 0)
-        session_p.prepare_transaction('prepare_timestamp=' + timestamp_str(130))
+        session_p.prepare_transaction('prepare_timestamp=' + self.timestamp_str(130))
 
         # Commit some more updates.
         self.session.begin_transaction('isolation=snapshot')
         cursor.set_key(ds.key(nrows + 4))
         cursor.set_value(value_b)
         self.assertEquals(cursor.update(), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(140))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(140))
         self.session.begin_transaction('isolation=snapshot')
         cursor.set_key(ds.key(nrows + 5))
         cursor.set_value(value_b)
         self.assertEquals(cursor.update(), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(150))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(150))
 
         # Move the oldest and the stable timestamp to the latest.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(155))
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(155))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(155))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(155))
 
         # Commit an update newer than the stable timestamp.
         self.session.begin_transaction('isolation=snapshot')
         cursor.set_key(ds.key(nrows + 6))
         cursor.set_value(value_b)
         self.assertEquals(cursor.update(), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(160))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(160))
 
         # Take a checkpoint here, so that prepared transaction will not be durable..
         self.session.checkpoint()
 
         # Commit the prepared transaction.
-        session_p.commit_transaction('commit_timestamp=' + timestamp_str(140) + ',durable_timestamp=' + timestamp_str(160))
+        session_p.commit_transaction('commit_timestamp=' + self.timestamp_str(140) + ',durable_timestamp=' + self.timestamp_str(160))
 
         # Take a backup and check the values.
         self.backup_dir = os.path.join(self.home, "WT_BACKUP")

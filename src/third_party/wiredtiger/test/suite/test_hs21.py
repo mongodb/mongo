@@ -31,9 +31,6 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wiredtiger import stat
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_hs21.py
 # Test we don't lose any data when idle files with an active history are closed/sweeped.
 # Files with active history, ie content newer than the oldest timestamp can be closed when idle.
@@ -56,13 +53,13 @@ class test_hs21(wttest.WiredTigerTestCase):
         session.begin_transaction()
         for i in range(1, nrows + 1):
             cursor[ds.key(i)] = value
-        session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+        session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
         cursor.close()
 
     def check(self, session, check_value, uri, nrows, read_ts=-1):
         # Validate we read an expected value (optionally at a given read timestamp).
         if read_ts != -1:
-            session.begin_transaction('read_timestamp=' + timestamp_str(read_ts))
+            session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         cursor = session.open_cursor(uri)
         count = 0
         for k, v in cursor:
@@ -110,8 +107,8 @@ class test_hs21(wttest.WiredTigerTestCase):
             active_files.append((base_write_gen, ds))
 
         # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         # Perform a series of updates over our files at timestamp 2. This being data we can later assert
         # to ensure the history store is working as intended.
@@ -122,7 +119,7 @@ class test_hs21(wttest.WiredTigerTestCase):
         # We want to create a long running read transaction in a seperate session which we will persist over the closing and
         # re-opening of handles. We want to ensure the correct data gets read throughout this time period.
         session_read = self.conn.open_session()
-        session_read.begin_transaction('read_timestamp=' + timestamp_str(2))
+        session_read.begin_transaction('read_timestamp=' + self.timestamp_str(2))
         # Check our inital set of updates are seen at the read timestamp.
         for (_, ds) in active_files:
             # Check that all updates at timestamp 2 are seen.

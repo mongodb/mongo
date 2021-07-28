@@ -30,9 +30,6 @@ from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_prepare_hs01.py
 # test to ensure history store eviction is working for prepared transactions.
 class test_prepare_hs01(wttest.WiredTigerTestCase):
@@ -41,7 +38,7 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
 
     def check(self, uri, ds, nrows, nsessions, nkeys, read_ts, expected_value, not_expected_value):
         cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(read_ts))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         for i in range(1, nsessions * nkeys):
             cursor.set_key(ds.key(nrows + i))
             self.assertEquals(cursor.search(), 0)
@@ -67,7 +64,7 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
         # memory. Hence testing if we can read prepared updates from the history store.
 
         # Start with setting a stable timestamp to pin history in cache
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
 
         # Commit some updates to get eviction and history store fired up
         bigvalue1 = b"bbbbb" * 100
@@ -77,7 +74,7 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(bigvalue1)
             self.assertEquals(cursor.insert(), 0)
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(1))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         # Have prepared updates in multiple sessions. This should ensure writing
         # prepared updates to the history store
@@ -95,7 +92,7 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
                 cursors[j].set_key(ds.key(nrows + i))
                 cursors[j].set_value(bigvalue2)
                 self.assertEquals(cursors[j].insert(), 0)
-            sessions[j].prepare_transaction('prepare_timestamp=' + timestamp_str(2))
+            sessions[j].prepare_transaction('prepare_timestamp=' + self.timestamp_str(2))
 
         # Re-read the original versions of all the data. This ensures reading
         # original versions from the history store

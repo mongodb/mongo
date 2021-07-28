@@ -31,10 +31,6 @@ import wiredtiger, wttest
 
 # test_stat09.py
 #    Check oldest active read timestamp statistic
-
-def timestamp_str(t):
-    return '%x' % t
-
 class test_stat09(wttest.WiredTigerTestCase):
     tablename = 'test_stat09'
     uri = 'table:' + tablename
@@ -88,7 +84,7 @@ class test_stat09(wttest.WiredTigerTestCase):
         for k in keys:
             self.session.begin_transaction()
             c[k] = 1
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(k))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(k))
 
         # Create a cursor on statistics that we can use repeatedly
         allstat_cursor = self.session.open_cursor('statistics:', None, None)
@@ -98,15 +94,15 @@ class test_stat09(wttest.WiredTigerTestCase):
 
         # Introduce multiple transactions with varying read_timestamp
         s1 = self.conn.open_session()
-        s1.begin_transaction('read_timestamp=' + timestamp_str(10))
+        s1.begin_transaction('read_timestamp=' + self.timestamp_str(10))
         s2 = self.conn.open_session()
-        s2.begin_transaction('read_timestamp=' + timestamp_str(20))
+        s2.begin_transaction('read_timestamp=' + self.timestamp_str(20))
         s3 = self.conn.open_session()
-        s3.begin_transaction('read_timestamp=' + timestamp_str(30))
+        s3.begin_transaction('read_timestamp=' + self.timestamp_str(30))
         s4 = self.conn.open_session()
-        s4.begin_transaction('read_timestamp=' + timestamp_str(40))
+        s4.begin_transaction('read_timestamp=' + self.timestamp_str(40))
         s5 = self.conn.open_session()
-        s5.begin_transaction('read_timestamp=' + timestamp_str(50))
+        s5.begin_transaction('read_timestamp=' + self.timestamp_str(50))
 
         # Check oldest reader
         self.check_stat_oldest_read(allstat_cursor, 10, commit_range)
@@ -117,18 +113,18 @@ class test_stat09(wttest.WiredTigerTestCase):
 
         # Set and advance the oldest timestamp, it should be ignored for
         # determining the oldest active read.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(5))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5))
         self.check_stat_oldest_read(allstat_cursor, 20, commit_range)
 
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(30))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(30))
         self.check_stat_oldest_read(allstat_cursor, 20, commit_range)
 
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(150))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(150))
         self.check_stat_oldest_read(allstat_cursor, 20, commit_range)
 
         # Move the commit timestamp and check again
         commit_range = 200
-        s2.commit_transaction('commit_timestamp=' + timestamp_str(commit_range))
+        s2.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_range))
         self.check_stat_oldest_read(allstat_cursor, 30, commit_range)
 
         # Close all the readers and check the oldest reader, it should be back to 0

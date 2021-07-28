@@ -38,9 +38,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable18.py
 # Test the rollback to stable shouldn't skip any pages that don't have aggregated time window.
 class test_rollback_to_stable18(test_rollback_to_stable_base):
@@ -76,8 +73,8 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value_a = "aaaaa" * 100
 
@@ -102,11 +99,11 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
 
         # Pin stable and oldest to timestamp 30 if prepare otherwise 20.
         if self.prepare:
-            self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(30) +
-                ',stable_timestamp=' + timestamp_str(30))
+            self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(30) +
+                ',stable_timestamp=' + self.timestamp_str(30))
         else:
-            self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(20) +
-                ',stable_timestamp=' + timestamp_str(20))
+            self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(20) +
+                ',stable_timestamp=' + self.timestamp_str(20))
 
         # Perform rollback to stable.
         self.conn.rollback_to_stable()

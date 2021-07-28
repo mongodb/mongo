@@ -30,9 +30,6 @@ import wttest
 from wiredtiger import WT_NOTFOUND
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_prepare16.py
 # Test that the prepare transaction rollback/commit multiple keys
 # and each key can occupy a leaf page.
@@ -75,8 +72,8 @@ class test_prepare16(wttest.WiredTigerTestCase):
         self.session.create(uri, create_config)
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         valuea = 'a' * 400
 
@@ -87,7 +84,7 @@ class test_prepare16(wttest.WiredTigerTestCase):
 
         cursor.reset()
         cursor.close()
-        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(10))
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(10))
 
         s = self.conn.open_session()
         s.begin_transaction('ignore_prepare = true')
@@ -100,17 +97,17 @@ class test_prepare16(wttest.WiredTigerTestCase):
             evict_cursor.reset()
 
         if self.commit:
-            self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(20))
-            self.session.timestamp_transaction('durable_timestamp=' + timestamp_str(30))
+            self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(20))
+            self.session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(30))
             self.session.commit_transaction()
         else:
             self.session.rollback_transaction()
 
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(30))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
         if not self.in_memory:
             self.session.checkpoint()
 
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(20))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(20))
         cursor = self.session.open_cursor(uri)
         for i in range(1, nrows + 1):
             cursor.set_key(str(i))

@@ -36,9 +36,6 @@ from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
     table_ts_log     = 'ts03_ts_logged'
     table_ts_nolog   = 'ts03_ts_nologged'
@@ -187,7 +184,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.begin_transaction()
             cur_ts_log[k] = self.value
             cur_ts_nolog[k] = self.value
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(k))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(k))
 
         # Scenario: 1
         # Check that we see all the inserted values as per transaction
@@ -207,19 +204,19 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         for i, t in enumerate(orig_keys):
             # Tables using the timestamps should see the values as per the
             # given read_timestamp
-            self.check(self.session, 'read_timestamp=' + timestamp_str(t),
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t),
                 self.table_ts_log, dict((k, self.value) for k in orig_keys[:i+1]))
-            self.check(self.session, 'read_timestamp=' + timestamp_str(t),
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t),
                 self.table_ts_nolog, dict((k, self.value) for k in orig_keys[:i+1]))
             # Tables not using the timestamps should see all the values.
-            self.check(self.session, 'read_timestamp=' + timestamp_str(t),
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t),
                 self.table_nots_log, dict((k, self.value) for k in orig_keys))
-            self.check(self.session, 'read_timestamp=' + timestamp_str(t),
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t),
                 self.table_nots_nolog, dict((k, self.value) for k in orig_keys))
 
         # Bump the oldest_timestamp, we're not going back...
-        self.assertTimestampsEqual(self.conn.query_timestamp(), timestamp_str(100))
-        old_ts = timestamp_str(100)
+        self.assertTimestampsEqual(self.conn.query_timestamp(), self.timestamp_str(100))
+        old_ts = self.timestamp_str(100)
         self.conn.set_timestamp('oldest_timestamp=' + old_ts)
         self.conn.set_timestamp('stable_timestamp=' + old_ts)
 
@@ -248,7 +245,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.begin_transaction()
             cur_ts_log[k] = self.value2
             cur_ts_nolog[k] = self.value2
-            ts = timestamp_str(k + 100)
+            ts = self.timestamp_str(k + 100)
             self.session.commit_transaction('commit_timestamp=' + ts)
             count += 1
 
@@ -270,7 +267,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         # This scenario is same as earlier one with read_timestamp earlier than
         # oldest_timestamp and using the option of rounding read_timestamp to
         # the oldest_timestamp
-        earlier_ts = timestamp_str(90)
+        earlier_ts = self.timestamp_str(90)
         self.check(self.session,
             'read_timestamp=' + earlier_ts +',roundup_timestamps=(read=true)',
             self.table_ts_log, dict((k, self.value) for k in orig_keys))
@@ -294,15 +291,15 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
             expected_dict[i+1] = self.value2
             # Tables using the timestamps should see the updated values as per
             # the given read_timestamp
-            self.check(self.session, 'read_timestamp=' + timestamp_str(t + 100),
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 100),
                 self.table_ts_log, expected_dict)
-            self.check(self.session, 'read_timestamp=' + timestamp_str(t + 100),
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 100),
                 self.table_ts_nolog, expected_dict)
             # Tables not using the timestamps should see all the data values as
             # updated values (i.e. value2).
-            self.check(self.session, 'read_timestamp=' + timestamp_str(t + 100),
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 100),
                 self.table_nots_log, dict((k, self.value2) for k in orig_keys))
-            self.check(self.session, 'read_timestamp=' + timestamp_str(t + 100),
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 100),
                 self.table_nots_nolog, dict((k, self.value2) for k in orig_keys))
 
         # Take a checkpoint using the given configuration.  Then verify
@@ -359,7 +356,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         # Update the stable_timestamp to the latest, but not the
         # oldest_timestamp and make sure we can see the data.  Once the
         # stable_timestamp is moved we should see all keys with value2.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(100+nkeys))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(100+nkeys))
         self.ckpt_backup(self.value2, nkeys, nkeys, nkeys, nkeys)
 
         # If we're not using the log we're done.
@@ -378,7 +375,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.begin_transaction()
             cur_ts_log[k] = self.value3
             cur_ts_nolog[k] = self.value3
-            ts = timestamp_str(k + 200)
+            ts = self.timestamp_str(k + 200)
             self.session.commit_transaction('commit_timestamp=' + ts)
             count += 1
 

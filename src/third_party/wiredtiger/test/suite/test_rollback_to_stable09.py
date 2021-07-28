@@ -32,9 +32,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable09.py
 # Test that rollback to stable does not abort schema operations that are done
 # as they don't have transaction support
@@ -58,7 +55,7 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
     scenarios = make_scenarios(in_memory_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=250MB,statistics=(all)'
+        config = 'cache_size=250MB'
         if self.in_memory:
             config += ',in_memory=true'
         else:
@@ -73,12 +70,12 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
         if commit_ts == 0:
                 session.commit_transaction()
         elif self.prepare:
-            session.prepare_transaction('prepare_timestamp=' + timestamp_str(commit_ts-1))
-            session.timestamp_transaction('commit_timestamp=' + timestamp_str(commit_ts))
-            session.timestamp_transaction('durable_timestamp=' + timestamp_str(commit_ts+1))
+            session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(commit_ts-1))
+            session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
+            session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(commit_ts+1))
             session.commit_transaction()
         else:
-            session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+            session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
 
     def drop_table(self, commit_ts):
         self.pr('drop table')
@@ -88,12 +85,12 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
         if commit_ts == 0:
                 session.commit_transaction()
         elif self.prepare:
-            session.prepare_transaction('prepare_timestamp=' + timestamp_str(commit_ts-1))
-            session.timestamp_transaction('commit_timestamp=' + timestamp_str(commit_ts))
-            session.timestamp_transaction('durable_timestamp=' + timestamp_str(commit_ts+1))
+            session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(commit_ts-1))
+            session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
+            session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(commit_ts+1))
             session.commit_transaction()
         else:
-            session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+            session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
 
     def create_index(self, commit_ts):
         session = self.session
@@ -102,17 +99,17 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
         if commit_ts == 0:
                 session.commit_transaction()
         elif self.prepare:
-            session.prepare_transaction('prepare_timestamp=' + timestamp_str(commit_ts-1))
-            session.timestamp_transaction('commit_timestamp=' + timestamp_str(commit_ts))
-            session.timestamp_transaction('durable_timestamp=' + timestamp_str(commit_ts+1))
+            session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(commit_ts-1))
+            session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
+            session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(commit_ts+1))
             session.commit_transaction()
         else:
-            session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+            session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
 
     def test_rollback_to_stable(self):
         # Pin oldest and stable to timestamp 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         # Create table and index at a later timestamp
         self.create_table(20)

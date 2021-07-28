@@ -28,9 +28,6 @@
 
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_timestamp20.py
 # Exercise fixing up of out-of-order updates in the history store.
 class test_timestamp20(wttest.WiredTigerTestCase):
@@ -40,7 +37,7 @@ class test_timestamp20(wttest.WiredTigerTestCase):
     def test_timestamp20_standard(self):
         uri = 'table:test_timestamp20'
         self.session.create(uri, 'key_format=S,value_format=S')
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
 
         value1 = 'a' * 500
@@ -52,33 +49,33 @@ class test_timestamp20(wttest.WiredTigerTestCase):
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[str(i)] = value2
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(20))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
 
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[str(i)] = value3
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(30))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
 
         old_reader_session = self.conn.open_session()
         old_reader_cursor = old_reader_session.open_cursor(uri)
-        old_reader_session.begin_transaction('read_timestamp=' + timestamp_str(20))
+        old_reader_session.begin_transaction('read_timestamp=' + self.timestamp_str(20))
 
         # Now put two updates out of order. 5 will go to the history store and will trigger a
         # correction to the existing contents.
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[str(i)] = value4
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(25))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(25))
             self.session.begin_transaction()
             cursor[str(i)] = value5
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(40))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(40))
 
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(30))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(30))
         for i in range(1, 10000):
             self.assertEqual(cursor[str(i)], value4)
         self.session.rollback_transaction()
@@ -94,7 +91,7 @@ class test_timestamp20(wttest.WiredTigerTestCase):
     def test_timestamp20_modify(self):
         uri = 'table:test_timestamp20'
         self.session.create(uri, 'key_format=S,value_format=S')
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
 
         value1 = 'a' * 500
@@ -105,20 +102,20 @@ class test_timestamp20(wttest.WiredTigerTestCase):
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         # Now apply a series of modifies.
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor.set_key(str(i))
             self.assertEqual(cursor.modify([wiredtiger.Modify('B', 100, 1)]), 0)
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(20))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
 
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor.set_key(str(i))
             self.assertEqual(cursor.modify([wiredtiger.Modify('C', 200, 1)]), 0)
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(30))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
 
         # Open an old reader at this point.
         #
@@ -126,7 +123,7 @@ class test_timestamp20(wttest.WiredTigerTestCase):
         # has been squashed into a full update.
         old_reader_session = self.conn.open_session()
         old_reader_cursor = old_reader_session.open_cursor(uri)
-        old_reader_session.begin_transaction('read_timestamp=' + timestamp_str(20))
+        old_reader_session.begin_transaction('read_timestamp=' + self.timestamp_str(20))
 
         # Now apply the last modify.
         # This will be the end of the chain of modifies.
@@ -134,21 +131,21 @@ class test_timestamp20(wttest.WiredTigerTestCase):
             self.session.begin_transaction()
             cursor.set_key(str(i))
             self.assertEqual(cursor.modify([wiredtiger.Modify('D', 300, 1)]), 0)
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(40))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(40))
 
         # Now put two updates out of order. 5 will go to the history store and will trigger a
         # correction to the existing contents.
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[str(i)] = value2
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(25))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(25))
             self.session.begin_transaction()
             cursor[str(i)] = value3
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(50))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(50))
 
         # Open up a new transaction and read at 30.
         # We shouldn't be able to see past 5 due to txnid visibility.
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(30))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(30))
         for i in range(1, 10000):
             self.assertEqual(cursor[str(i)], value2)
         self.session.rollback_transaction()

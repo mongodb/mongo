@@ -31,9 +31,6 @@
 
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_bug022(wttest.WiredTigerTestCase):
     uri = 'file:test_bug022'
     conn_config = 'cache_size=50MB'
@@ -41,21 +38,21 @@ class test_bug022(wttest.WiredTigerTestCase):
 
     def test_apply_modifies_on_onpage_tombstone(self):
         self.session.create(self.uri, 'key_format=S,value_format=S')
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
 
         value = 'a' * 500
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[str(i)] = value
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Apply tombstones for every key.
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor.set_key(str(i))
             cursor.remove()
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         self.session.checkpoint()
 

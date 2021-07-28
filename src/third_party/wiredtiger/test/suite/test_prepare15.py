@@ -30,9 +30,6 @@ import wttest
 from wiredtiger import WT_NOTFOUND
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_prepare15.py
 # Test that the prepare transaction rollback removes the on-disk key
 # or replace it with history store and commit retains the changes when
@@ -74,8 +71,8 @@ class test_prepare15(wttest.WiredTigerTestCase):
         self.session.create(uri, create_config)
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         valuea = 'a'
         valueb = 'a'
@@ -84,12 +81,12 @@ class test_prepare15(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
         cursor[str(0)] = valuea
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(20))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
 
         self.session.begin_transaction()
         cursor.set_key(str(0))
         cursor.remove()
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(30))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
         cursor.close()
 
         # Perform an update and remove.
@@ -100,7 +97,7 @@ class test_prepare15(wttest.WiredTigerTestCase):
         cursor.set_key(str(0))
         cursor.remove()
         cursor.close()
-        s.prepare_transaction('prepare_timestamp=' + timestamp_str(40))
+        s.prepare_transaction('prepare_timestamp=' + self.timestamp_str(40))
 
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
@@ -115,8 +112,8 @@ class test_prepare15(wttest.WiredTigerTestCase):
 
         if self.commit:
             # Commit the prepared transaction
-            s.timestamp_transaction('commit_timestamp=' + timestamp_str(50))
-            s.timestamp_transaction('durable_timestamp=' + timestamp_str(60))
+            s.timestamp_transaction('commit_timestamp=' + self.timestamp_str(50))
+            s.timestamp_transaction('durable_timestamp=' + self.timestamp_str(60))
             s.commit_transaction()
         else:
             # Rollback the prepared transaction
@@ -133,7 +130,7 @@ class test_prepare15(wttest.WiredTigerTestCase):
         evict_cursor.close()
         self.session.commit_transaction()
 
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(20))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(20))
         cursor2 = self.session.open_cursor(uri)
         cursor2.set_key(str(0))
         self.assertEquals(cursor2.search(), 0)
@@ -151,8 +148,8 @@ class test_prepare15(wttest.WiredTigerTestCase):
         self.session.create(uri, create_config)
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value = 'a'
 
@@ -164,7 +161,7 @@ class test_prepare15(wttest.WiredTigerTestCase):
         cursor.set_key(str(0))
         cursor.remove()
         cursor.close()
-        s.prepare_transaction('prepare_timestamp=' + timestamp_str(20))
+        s.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
@@ -179,8 +176,8 @@ class test_prepare15(wttest.WiredTigerTestCase):
 
         if self.commit:
             # Commit the prepared transaction
-            s.timestamp_transaction('commit_timestamp=' + timestamp_str(30))
-            s.timestamp_transaction('durable_timestamp=' + timestamp_str(40))
+            s.timestamp_transaction('commit_timestamp=' + self.timestamp_str(30))
+            s.timestamp_transaction('durable_timestamp=' + self.timestamp_str(40))
             s.commit_transaction()
         else:
             # Rollback the prepared transaction

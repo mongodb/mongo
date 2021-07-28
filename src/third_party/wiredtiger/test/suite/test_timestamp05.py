@@ -35,9 +35,6 @@ from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:ts05'
     session_config = 'isolation=snapshot'
@@ -52,7 +49,7 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
         # Commit at 100
         s.begin_transaction()
         s.create(self.uri, 'key_format=i,value_format=S')
-        s.commit_transaction('commit_timestamp=' + timestamp_str(100))
+        s.commit_transaction('commit_timestamp=' + self.timestamp_str(100))
 
         # Make sure the tree is dirty
         c = s.open_cursor(self.uri)
@@ -79,7 +76,7 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
         # Commit at 100
         s.begin_transaction()
         c.close()
-        s.commit_transaction('commit_timestamp=' + timestamp_str(100))
+        s.commit_transaction('commit_timestamp=' + self.timestamp_str(100))
 
         # Make sure the tree is dirty
         c = s.open_cursor(self.uri)

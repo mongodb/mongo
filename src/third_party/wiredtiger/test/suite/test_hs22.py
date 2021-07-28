@@ -28,9 +28,6 @@
 
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_hs22.py
 # Test the case that out of order timestamp
 # update is followed by a tombstone.
@@ -43,7 +40,7 @@ class test_hs22(wttest.WiredTigerTestCase):
         self.session.create(uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(uri)
         self.conn.set_timestamp(
-            'oldest_timestamp=' + timestamp_str(1) + ',stable_timestamp=' + timestamp_str(1))
+            'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
 
         value1 = 'a'
         value2 = 'b'
@@ -51,30 +48,30 @@ class test_hs22(wttest.WiredTigerTestCase):
         # Insert a key.
         self.session.begin_transaction()
         cursor[str(0)] = value1
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         # Remove the key.
         self.session.begin_transaction()
         cursor.set_key(str(0))
         self.assertEqual(cursor.remove(), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(20))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
 
         # Do an out of order timestamp
         # update and write it to the data
         # store later.
         self.session.begin_transaction()
         cursor[str(0)] = value2
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(15))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(15))
 
         # Insert another key.
         self.session.begin_transaction()
         cursor[str(1)] = value1
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(20))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
 
         # Update the key.
         self.session.begin_transaction()
         cursor[str(1)] = value2
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(30))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
 
         # Do a checkpoint to trigger
         # history store reconciliation.
@@ -83,13 +80,13 @@ class test_hs22(wttest.WiredTigerTestCase):
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
 
         # Search the key to evict it.
-        self.session.begin_transaction("read_timestamp=" + timestamp_str(15))
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(15))
         self.assertEqual(evict_cursor[str(0)], value2)
         self.assertEqual(evict_cursor.reset(), 0)
         self.session.rollback_transaction()
 
         # Search the key again to verify the data is still as expected.
-        self.session.begin_transaction("read_timestamp=" + timestamp_str(15))
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(15))
         self.assertEqual(cursor[str(0)], value2)
         self.session.rollback_transaction()
 
@@ -98,7 +95,7 @@ class test_hs22(wttest.WiredTigerTestCase):
         self.session.create(uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(uri)
         self.conn.set_timestamp(
-            'oldest_timestamp=' + timestamp_str(1) + ',stable_timestamp=' + timestamp_str(1))
+            'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
 
         value1 = 'a'
         value2 = 'b'
@@ -106,35 +103,35 @@ class test_hs22(wttest.WiredTigerTestCase):
         # Insert a key.
         self.session.begin_transaction()
         cursor[str(0)] = value1
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         # Remove a key.
         self.session.begin_transaction()
         cursor.set_key(str(0))
         self.assertEqual(cursor.remove(), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(20))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
 
         # Do an out of order timestamp
         # update and write it to the
         # history store later.
         self.session.begin_transaction()
         cursor[str(0)] = value2
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(15))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(15))
 
         # Add another update.
         self.session.begin_transaction()
         cursor[str(0)] = value1
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(20))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
 
         # Insert another key.
         self.session.begin_transaction()
         cursor[str(1)] = value1
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(20))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
 
         # Update the key.
         self.session.begin_transaction()
         cursor[str(1)] = value2
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(30))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
 
         # Do a checkpoint to trigger
         # history store reconciliation.
@@ -143,12 +140,12 @@ class test_hs22(wttest.WiredTigerTestCase):
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
 
         # Search the key to evict it.
-        self.session.begin_transaction("read_timestamp=" + timestamp_str(15))
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(15))
         self.assertEqual(evict_cursor[str(0)], value2)
         self.assertEqual(evict_cursor.reset(), 0)
         self.session.rollback_transaction()
 
         # Search the key again to verify the data is still as expected.
-        self.session.begin_transaction("read_timestamp=" + timestamp_str(15))
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(15))
         self.assertEqual(cursor[str(0)], value2)
         self.session.rollback_transaction()

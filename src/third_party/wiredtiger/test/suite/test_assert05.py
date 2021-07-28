@@ -33,9 +33,6 @@
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
     base = 'assert05'
     base_uri = 'file:' + base
@@ -64,11 +61,11 @@ class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.begin_transaction()
         c[key] = val
         self.session.prepare_transaction(
-            'prepare_timestamp=' + timestamp_str(self.count))
+            'prepare_timestamp=' + self.timestamp_str(self.count))
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(self.count))
+            'commit_timestamp=' + self.timestamp_str(self.count))
         self.session.timestamp_transaction(
-            'durable_timestamp=' + timestamp_str(self.count))
+            'durable_timestamp=' + self.timestamp_str(self.count))
         # All settings other than never should commit successfully
         if (use_ts != 'never'):
             self.session.commit_transaction()
@@ -93,10 +90,10 @@ class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
         c[key] = val
         if (use_ts == 'always'):
             self.session.prepare_transaction(
-                'prepare_timestamp=' + timestamp_str(self.count))
+                'prepare_timestamp=' + self.timestamp_str(self.count))
 
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(self.count))
+            'commit_timestamp=' + self.timestamp_str(self.count))
         # All settings other than always should commit successfully
         if (use_ts != 'always' and use_ts != 'never'):
             self.session.commit_transaction()

@@ -33,9 +33,6 @@
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
     session_config = 'isolation=snapshot'
 
@@ -51,7 +48,7 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(2))
+            'commit_timestamp=' + self.timestamp_str(2))
         c['key'] = 'value2'
         c['key2'] = 'value2'
         self.session.commit_transaction()
@@ -64,7 +61,7 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(5))
+            'commit_timestamp=' + self.timestamp_str(5))
         c['key'] = 'value5'
         self.session.commit_transaction()
         c.close()
@@ -81,7 +78,7 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
         # remain at the non-timestamped value. Also the non-timestamped value
         # stays regardless of rollbacks or reading at a timestamp.
         #
-        stable_ts = timestamp_str(2)
+        stable_ts = self.timestamp_str(2)
         self.conn.set_timestamp('stable_timestamp=' + stable_ts)
         self.session.checkpoint()
         self.conn.rollback_to_stable()
@@ -106,7 +103,7 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(5))
+            'commit_timestamp=' + self.timestamp_str(5))
         c['key2'] = 'value5'
         self.session.commit_transaction()
         c.close()
@@ -140,7 +137,7 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
         # one at that timestamp and inserted without a timestamp. For the second
         # we inserted at timestamp 5 after the non-timestamped insert.
         c = self.session.open_cursor(uri)
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(5))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(5))
         self.assertEquals(c['key'], 'valueNOTS')
         self.assertEquals(c['key2'], 'value5')
         self.session.commit_transaction()

@@ -30,9 +30,6 @@ import wttest
 from wiredtiger import WT_NOTFOUND
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_prepare14.py
 # Test that the transaction visibility of an on-disk update
 # that has both the start and the stop time points from the
@@ -71,8 +68,8 @@ class test_prepare14(wttest.WiredTigerTestCase):
         self.session.create(uri, create_config)
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value = 'a'
 
@@ -84,7 +81,7 @@ class test_prepare14(wttest.WiredTigerTestCase):
         cursor.set_key(str(0))
         cursor.remove()
         cursor.close()
-        s.prepare_transaction('prepare_timestamp=' + timestamp_str(20))
+        s.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")

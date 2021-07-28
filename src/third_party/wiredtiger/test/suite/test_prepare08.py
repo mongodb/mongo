@@ -31,9 +31,6 @@ from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_prepare08.py
 # Test to ensure prepared tombstones are properly aborted/committed even when they are written
 # to the data store.
@@ -48,7 +45,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
             cursor.set_key(ds.key(i))
             cursor.set_value(value)
             self.assertEquals(cursor.update(), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(ts))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
         cursor.close()
 
     def removes(self, ds, uri, nrows, ts):
@@ -57,7 +54,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
         for i in range(1, nrows):
             cursor.set_key(ds.key(i))
             self.assertEquals(cursor.remove(), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(ts))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
         cursor.close()
 
     def check(self, ds, uri, nrows, value, ts, release_evict):
@@ -65,7 +62,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
             cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
         else:
             cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction('ignore_prepare=true,read_timestamp=' + timestamp_str(ts))
+        self.session.begin_transaction('ignore_prepare=true,read_timestamp=' + self.timestamp_str(ts))
         for i in range(1, nrows):
             cursor.set_key(ds.key(i))
             if value == None:
@@ -96,8 +93,8 @@ class test_prepare08(wttest.WiredTigerTestCase):
         value_e = b"eeeee" * 100
 
         # Commit some updates along with a prepared update, which is not resolved.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10))
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
         # Initially load huge data
         self.updates(ds_1, uri_1, nrows, value_a, 20)
@@ -124,7 +121,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
         for i in range(1, nrows):
             cursor_p.set_key(ds_1.key(i))
             self.assertEquals(cursor_p.remove(), 0)
-        session_p.prepare_transaction('prepare_timestamp=' + timestamp_str(40))
+        session_p.prepare_transaction('prepare_timestamp=' + self.timestamp_str(40))
 
         # Adding more updates to other table should trigger eviction on uri_1
         self.updates(ds_2, uri_2, nrows, value_c, 40)
@@ -165,8 +162,8 @@ class test_prepare08(wttest.WiredTigerTestCase):
         value_e = b"eeeee" * 100
 
         # Commit some updates along with a prepared update, which is not resolved.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10))
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
         # Initially load huge data
         self.updates(ds_1, uri_1, nrows, value_a, 20)
@@ -196,7 +193,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
             self.assertEquals(cursor_p.update(), 0)
             cursor_p.set_key(ds_1.key(i))
             self.assertEquals(cursor_p.remove(), 0)
-        session_p.prepare_transaction('prepare_timestamp=' + timestamp_str(40))
+        session_p.prepare_transaction('prepare_timestamp=' + self.timestamp_str(40))
 
         # Adding more updates to other table should trigger eviction on uri_1
         self.updates(ds_2, uri_2, nrows, value_c, 40)
@@ -208,7 +205,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
         self.check(ds_1, uri_1, nrows, value_b, 50, True)
 
         # Commit the prepared session
-        session_p.commit_transaction('commit_timestamp=' + timestamp_str(50) + ',durable_timestamp=' + timestamp_str(60))
+        session_p.commit_transaction('commit_timestamp=' + self.timestamp_str(50) + ',durable_timestamp=' + self.timestamp_str(60))
 
         self.check(ds_1, uri_1, nrows, value_a, 20, False)
         self.check(ds_1, uri_1, nrows, value_b, 30, False)
@@ -239,8 +236,8 @@ class test_prepare08(wttest.WiredTigerTestCase):
         value_e = b"eeeee" * 100
 
         # Commit some updates along with a prepared update, which is not resolved.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10))
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
         # Initially load huge data
         self.updates(ds_1, uri_1, nrows, value_a, 20)
@@ -266,7 +263,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
             self.assertEquals(cursor_p.update(), 0)
             cursor_p.set_key(ds_1.key(i))
             self.assertEquals(cursor_p.remove(), 0)
-        session_p.prepare_transaction('prepare_timestamp=' + timestamp_str(40))
+        session_p.prepare_transaction('prepare_timestamp=' + self.timestamp_str(40))
 
         # Adding more updates to other table should trigger eviction on uri_1
         self.updates(ds_2, uri_2, nrows, value_c, 40)
@@ -278,7 +275,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
         self.check(ds_1, uri_1, 0, None, 50, True)
 
         # Commit the prepared session
-        session_p.commit_transaction('commit_timestamp=' + timestamp_str(50) + ',durable_timestamp=' + timestamp_str(60))
+        session_p.commit_transaction('commit_timestamp=' + self.timestamp_str(50) + ',durable_timestamp=' + self.timestamp_str(60))
 
         self.check(ds_1, uri_1, nrows, value_a, 20, False)
         self.check(ds_1, uri_1, 0, None, 30, False)

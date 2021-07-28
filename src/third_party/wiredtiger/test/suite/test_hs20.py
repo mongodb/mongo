@@ -30,9 +30,6 @@ import time, wiredtiger, wttest
 
 # test_hs20.py
 # Ensure we never reconstruct a reverse modify update in the history store based on the onpage overflow value
-def timestamp_str(t):
-    return '%x' % t
-
 class test_hs20(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,eviction=(threads_max=1)'
     session_config = 'isolation=snapshot'
@@ -43,7 +40,7 @@ class test_hs20(wttest.WiredTigerTestCase):
         self.session.create(uri, 'key_format=S,value_format=S,leaf_value_max=10B')
         cursor = self.session.open_cursor(uri)
         self.conn.set_timestamp(
-            'oldest_timestamp=' + timestamp_str(1) + ',stable_timestamp=' + timestamp_str(1))
+            'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
 
         value1 = 'a' * 500
         value2 = 'b' * 50
@@ -52,7 +49,7 @@ class test_hs20(wttest.WiredTigerTestCase):
         for i in range(0, 10):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Do 2 modifies.
         for i in range(0, 10):
@@ -60,32 +57,32 @@ class test_hs20(wttest.WiredTigerTestCase):
             cursor.set_key(str(i))
             mods = [wiredtiger.Modify('B', 500, 1)]
             self.assertEqual(cursor.modify(mods), 0)
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         for i in range(0, 10):
             self.session.begin_transaction()
             cursor.set_key(str(i))
             mods = [wiredtiger.Modify('C', 501, 1)]
             self.assertEqual(cursor.modify(mods), 0)
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(4))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
 
         # Insert more data to trigger eviction.
         for i in range(10, 100000):
             self.session.begin_transaction()
             cursor[str(i)] = value2
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
         # Update the overflow values.
         for i in range(0, 10):
             self.session.begin_transaction()
             cursor[str(i)] = value2
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
         # Do a checkpoint to move the overflow values to the history store but keep the current in memory disk image.
         self.session.checkpoint()
 
         # Search the first modifies.
         for i in range(0, 10):
-            self.session.begin_transaction('read_timestamp=' + timestamp_str(3))
+            self.session.begin_transaction('read_timestamp=' + self.timestamp_str(3))
             self.assertEqual(cursor[str(i)], value1 + "B")
             self.session.rollback_transaction()

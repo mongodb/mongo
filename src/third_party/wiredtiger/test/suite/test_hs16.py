@@ -29,9 +29,6 @@
 import time, wiredtiger, wttest
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_hs16.py
 # Ensure that we don't panic when inserting an update without timestamp to the history store.
 class test_hs16(wttest.WiredTigerTestCase):
@@ -62,7 +59,7 @@ class test_hs16(wttest.WiredTigerTestCase):
         # Update an update at timestamp 1
         self.session.begin_transaction()
         cursor[self.create_key(1)] = 'b'
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(1))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         # Open anther session to make the next update without timestamp non-globally visible
         session2 = self.setUpSessionOpen(self.conn)
@@ -78,7 +75,7 @@ class test_hs16(wttest.WiredTigerTestCase):
         # Update an update at timestamp 2
         self.session.begin_transaction()
         cursor[self.create_key(1)] = 'd'
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Do a checkpoint, it should not panic
         self.session.checkpoint()

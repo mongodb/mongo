@@ -31,9 +31,6 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_hs02.py
 # Test that truncate with history store entries and timestamps gives expected results.
 class test_hs02(wttest.WiredTigerTestCase):
@@ -55,12 +52,12 @@ class test_hs02(wttest.WiredTigerTestCase):
         for i in range(1, nrows + 1):
             session.begin_transaction()
             cursor[ds.key(i)] = value
-            session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+            session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
         cursor.close()
 
     def check(self, check_value, uri, nrows, read_ts):
         session = self.session
-        session.begin_transaction('read_timestamp=' + timestamp_str(read_ts))
+        session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         cursor = session.open_cursor(uri)
         count = 0
         for k, v in cursor:
@@ -84,8 +81,8 @@ class test_hs02(wttest.WiredTigerTestCase):
         ds2.populate()
 
         # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         bigvalue = "aaaaa" * 100
         self.large_updates(uri, bigvalue, ds, nrows // 3, 1)
@@ -110,7 +107,7 @@ class test_hs02(wttest.WiredTigerTestCase):
         end.set_key(ds.key(nrows // 2))
         self.session.truncate(None, None, end)
         end.close()
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(200))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(200))
 
         # Check that the truncate is visible after commit
         self.check(bigvalue2, uri, nrows // 2, 200)

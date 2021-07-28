@@ -31,9 +31,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable06.py
 # Test that rollback to stable removes all keys when the stable timestamp is earlier than
 # all commit timestamps.
@@ -79,8 +76,8 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value_a = "aaaaa" * 100
         value_b = "bbbbb" * 100

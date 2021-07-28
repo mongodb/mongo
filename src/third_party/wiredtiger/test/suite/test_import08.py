@@ -34,7 +34,7 @@ from test_import01 import test_import_base
 from wtscenario import make_scenarios
 
 class test_import08(test_import_base):
-    conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
+    conn_config = 'cache_size=50MB,log=(enabled)'
     session_config = 'isolation=snapshot'
 
     original_db_file = 'original_db_file'

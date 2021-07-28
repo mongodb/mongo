@@ -31,9 +31,6 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_hs01.py
 # Smoke tests to ensure history store tables are working.
 class test_hs01(wttest.WiredTigerTestCase):
@@ -58,7 +55,7 @@ class test_hs01(wttest.WiredTigerTestCase):
             cursor.set_value(value)
             self.assertEqual(cursor.update(), 0)
             if timestamp == True:
-                session.commit_transaction('commit_timestamp=' + timestamp_str(i + 1))
+                session.commit_transaction('commit_timestamp=' + self.timestamp_str(i + 1))
         cursor.close()
 
     def large_modifies(self, session, uri, offset, ds, nrows, timestamp=False):
@@ -75,7 +72,7 @@ class test_hs01(wttest.WiredTigerTestCase):
 
             self.assertEqual(cursor.modify(mods), 0)
             if timestamp == True:
-                session.commit_transaction('commit_timestamp=' + timestamp_str(i + 1))
+                session.commit_transaction('commit_timestamp=' + self.timestamp_str(i + 1))
         cursor.close()
 
     def durable_check(self, check_value, uri, ds, nrows):
@@ -151,12 +148,12 @@ class test_hs01(wttest.WiredTigerTestCase):
         # Scenario: 3
         # Check to see if the history store is working with the old timestamp.
         bigvalue4 = b"ddddd" * 100
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.large_updates(self.session, uri, bigvalue4, ds, nrows, timestamp=True)
         # Check to see data can be see only till the stable_timestamp
         self.durable_check(bigvalue3, uri, ds, nrows)
 
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(i + 1))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(i + 1))
         # Check that the latest data can be seen.
         self.durable_check(bigvalue4, uri, ds, nrows)
 

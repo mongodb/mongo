@@ -33,9 +33,6 @@
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_prepare06'
     uri = 'table:' + tablename
@@ -47,21 +44,21 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
 
         # It is illegal to set the prepare timestamp older than the oldest
         # timestamp.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(20))
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(30))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(20))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
         self.session.begin_transaction()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.prepare_transaction(
-            'prepare_timestamp=' + timestamp_str(10)),
+            'prepare_timestamp=' + self.timestamp_str(10)),
             "/older than the oldest timestamp/")
         self.session.rollback_transaction()
 
         # Check setting a prepared transaction timestamps earlier than the
         # oldest timestamp is valid with roundup_timestamps settings.
         self.session.begin_transaction('roundup_timestamps=(prepared=true)')
-        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(10))
-        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(15))
-        self.session.timestamp_transaction('durable_timestamp=' + timestamp_str(35))
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(10))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(15))
+        self.session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(35))
         self.session.commit_transaction()
 
         '''
@@ -71,11 +68,11 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
         # oldest timestamp is invalid, if durable timestamp is less than the
         # stable timestamp.
         self.session.begin_transaction('roundup_timestamps=(prepared=true)')
-        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(10))
-        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(15))
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(10))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(15))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.timestamp_transaction(
-            'durable_timestamp=' + timestamp_str(25)),
+            'durable_timestamp=' + self.timestamp_str(25)),
             "/is less than the stable timestamp/")
         self.session.rollback_transaction()
         '''
@@ -83,7 +80,7 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
         # Check the cases with an active reader.
         # Start a new reader to have an active read timestamp.
         s_reader = self.conn.open_session()
-        s_reader.begin_transaction('read_timestamp=' + timestamp_str(40))
+        s_reader.begin_transaction('read_timestamp=' + self.timestamp_str(40))
 
         # It is illegal to set the prepare timestamp as earlier than an active
         # read timestamp even with roundup_timestamps settings.  This is only
@@ -92,7 +89,7 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.begin_transaction('roundup_timestamps=(prepared=true)')
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.session.prepare_transaction(
-                'prepare_timestamp=' + timestamp_str(10)),
+                'prepare_timestamp=' + self.timestamp_str(10)),
                 "/must be greater than the latest active read timestamp/")
             self.session.rollback_transaction()
 
@@ -101,7 +98,7 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.begin_transaction('roundup_timestamps=(prepared=true)')
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.session.prepare_transaction(
-                'prepare_timestamp=' + timestamp_str(40)),
+                'prepare_timestamp=' + self.timestamp_str(40)),
                 "/must be greater than the latest active read timestamp/")
             self.session.rollback_transaction()
 
@@ -112,10 +109,10 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
         # timestamp of a transaction.
         self.session.begin_transaction()
         c[1] = 1
-        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(45))
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(45))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(
-            'commit_timestamp=' + timestamp_str(30)),
+            'commit_timestamp=' + self.timestamp_str(30)),
             "/less than the prepare timestamp/")
         '''
 
@@ -127,12 +124,12 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.begin_transaction('roundup_timestamps=(prepared=true)')
         c[1] = 1
         self.session.prepare_transaction(
-            'prepare_timestamp=' + timestamp_str(45))
-        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(30))
-        #self.session.timestamp_transaction('durable_timestamp=' + timestamp_str(30))
+            'prepare_timestamp=' + self.timestamp_str(45))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(30))
+        #self.session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(30))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.timestamp_transaction(
-            'durable_timestamp=' + timestamp_str(30)),
+            'durable_timestamp=' + self.timestamp_str(30)),
             "/is less than the commit timestamp/")
         self.session.rollback_transaction()
         '''

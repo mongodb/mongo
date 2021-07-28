@@ -31,11 +31,8 @@
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_timestamp19(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
+    conn_config = 'cache_size=50MB,log=(enabled)'
     session_config = 'isolation=snapshot'
 
     def updates(self, uri, value, ds, nrows, commit_ts):
@@ -44,7 +41,7 @@ class test_timestamp19(wttest.WiredTigerTestCase):
         for i in range(0, nrows):
             session.begin_transaction()
             cursor[ds.key(i)] = value
-            session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+            session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
         cursor.close()
 
     def test_timestamp(self):
@@ -62,8 +59,8 @@ class test_timestamp19(wttest.WiredTigerTestCase):
         value_z = 'z' * 1000
 
         # Set the oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-          ', stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+          ', stable_timestamp=' + self.timestamp_str(10))
 
         # Insert values with varying timestamps.
         self.updates(uri, value_x, ds, nrows, 20)
@@ -74,8 +71,8 @@ class test_timestamp19(wttest.WiredTigerTestCase):
         self.session.checkpoint('use_timestamp=true')
 
         # Move the oldest and stable timestamps to 40.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(40) +
-          ', stable_timestamp=' + timestamp_str(40))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(40) +
+          ', stable_timestamp=' + self.timestamp_str(40))
 
         # Update values.
         self.updates(uri, value_z, ds, nrows, 50)
@@ -91,20 +88,20 @@ class test_timestamp19(wttest.WiredTigerTestCase):
         self.session = self.setUpSessionOpen(self.conn)
 
         # The oldest timestamp on recovery is 40. Trying to set it earlier is a no-op.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10))
-        self.assertTimestampsEqual(self.conn.query_timestamp('get=oldest'), timestamp_str(40))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=oldest'), self.timestamp_str(40))
 
         # Trying to set an earlier stable timestamp is an error.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.conn.set_timestamp('stable_timestamp=' + timestamp_str(10)),
+            lambda: self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10)),
             '/oldest timestamp \(0, 40\) must not be later than stable timestamp \(0, 10\)/')
-        self.assertTimestampsEqual(self.conn.query_timestamp('get=stable'), timestamp_str(40))
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=stable'), self.timestamp_str(40))
 
         # Move the oldest and stable timestamps to 70.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(70) +
-          ', stable_timestamp=' + timestamp_str(70))
-        self.assertTimestampsEqual(self.conn.query_timestamp('get=oldest'), timestamp_str(70))
-        self.assertTimestampsEqual(self.conn.query_timestamp('get=stable'), timestamp_str(70))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(70) +
+          ', stable_timestamp=' + self.timestamp_str(70))
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=oldest'), self.timestamp_str(70))
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=stable'), self.timestamp_str(70))
 
 if __name__ == '__main__':
     wttest.run()

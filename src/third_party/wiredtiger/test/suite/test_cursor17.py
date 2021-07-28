@@ -30,9 +30,6 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 from wiredtiger import stat, WT_NOTFOUND
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_cursor17.py
 # Test the cursor traversal optimization for delete heavy workloads. This optimization enables
 # cursor traversal mechanism to skip pages where all records on the page are deleted with a
@@ -60,8 +57,8 @@ class test_cursor17(wttest.WiredTigerTestCase):
         total_keys = 40000
 
         # Keep the oldest and the stable timestamp pinned.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(2))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
         cursor = self.session.open_cursor(uri)
 
         commit_timestamp = 3
@@ -70,7 +67,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         for key in range(total_keys):
             self.session.begin_transaction()
             cursor[key] = value1
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(commit_timestamp))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_timestamp))
             commit_timestamp += 1
 
         # Delete everything on the table except for the first and the last KV pair.
@@ -78,13 +75,13 @@ class test_cursor17(wttest.WiredTigerTestCase):
             self.session.begin_transaction()
             cursor.set_key(key)
             self.assertEqual(cursor.remove(),0)
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(commit_timestamp))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_timestamp))
             commit_timestamp += 1
 
         # Take a checkpoint to reconcile the pages.
         self.session.checkpoint()
 
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(commit_timestamp))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(commit_timestamp))
         # Position the cursor on the first record.
         cursor.set_key(0)
         self.assertEqual(cursor.search(), 0)
@@ -107,11 +104,11 @@ class test_cursor17(wttest.WiredTigerTestCase):
         # Update a key in the middle of the table.
         self.session.begin_transaction()
         cursor[total_keys // 2] = value2
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(commit_timestamp))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_timestamp))
         commit_timestamp += 1
 
         # Make sure we can reach a the record we updated in the middle of the table.
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(commit_timestamp))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(commit_timestamp))
         # Position the cursor on the first record.
         cursor.set_key(0)
         self.assertEqual(cursor.search(), 0)

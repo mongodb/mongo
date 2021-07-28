@@ -35,9 +35,6 @@ from wtdataset import SimpleDataSet, SimpleIndexDataSet
 from wtdataset import SimpleLSMDataSet, ComplexDataSet, ComplexLSMDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' %t
-
 # test_prepare_cursor01.py
 #    WT_CURSOR navigation (next/prev) tests with prepared transactions
 class test_prepare_cursor01(wttest.WiredTigerTestCase):
@@ -103,18 +100,18 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         prep_cursor.set_key(ds.key(51))
         prep_cursor.set_value(ds.value(51))
         prep_cursor.insert()
-        prep_session.prepare_transaction('prepare_timestamp=' + timestamp_str(100))
+        prep_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(100))
 
         # Point all cursors to key 50.
-        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(50))
+        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(50))
         before_ts_c.set_key(ds.key(50))
         self.assertEquals(before_ts_c.search(), 0)
 
-        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(150))
+        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(150))
         between_ts_c.set_key(ds.key(50))
         self.assertEquals(between_ts_c.search(), 0)
 
-        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(250))
+        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(250))
         after_ts_c.set_key(ds.key(50))
         self.assertEquals(after_ts_c.search(), 0)
 
@@ -138,8 +135,8 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor.next())
 
         # Commit the prepared transaction.
-        prep_session.timestamp_transaction('commit_timestamp=' + timestamp_str(200))
-        prep_session.timestamp_transaction('durable_timestamp=' + timestamp_str(200))
+        prep_session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(200))
+        prep_session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(200))
         prep_session.commit_transaction()
 
         before_ts_s.commit_transaction()
@@ -160,18 +157,18 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         prep_cursor.set_key(ds.key(1))
         prep_cursor.set_value(ds.value(1))
         prep_cursor.insert()
-        prep_session.prepare_transaction('prepare_timestamp=' + timestamp_str(100))
+        prep_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(100))
 
         # Point all cursors to key 2.
-        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(50))
+        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(50))
         before_ts_c.set_key(ds.key(2))
         self.assertEquals(before_ts_c.search(), 0)
 
-        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(150))
+        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(150))
         between_ts_c.set_key(ds.key(2))
         self.assertEquals(between_ts_c.search(), 0)
 
-        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(250))
+        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(250))
         after_ts_c.set_key(ds.key(2))
         self.assertEquals(after_ts_c.search(), 0)
 
@@ -196,8 +193,8 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor.prev())
 
         # Commit the prepared transaction.
-        prep_session.timestamp_transaction('commit_timestamp=' + timestamp_str(200))
-        prep_session.timestamp_transaction('durable_timestamp=' + timestamp_str(200))
+        prep_session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(200))
+        prep_session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(200))
         prep_session.commit_transaction()
 
         # As read is between(i.e before commit), prev is not found.
@@ -223,18 +220,18 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         prep_cursor.set_key(ds.key(51))
         prep_cursor.set_value(ds.value(151))
         prep_cursor.update()
-        prep_session.prepare_transaction('prepare_timestamp=' + timestamp_str(300))
+        prep_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(300))
 
         # Point all cursors to key 51.
-        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(250))
+        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(250))
         before_ts_c.set_key(ds.key(50))
         self.assertEquals(before_ts_c.search(), 0)
 
-        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(350))
+        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(350))
         between_ts_c.set_key(ds.key(50))
         self.assertEquals(between_ts_c.search(), 0)
 
-        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(450))
+        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(450))
         after_ts_c.set_key(ds.key(50))
         self.assertEquals(after_ts_c.search(), 0)
 
@@ -256,8 +253,8 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor.next())
 
         # Commit the prepared transaction.
-        prep_session.timestamp_transaction('commit_timestamp=' + timestamp_str(400))
-        prep_session.timestamp_transaction('durable_timestamp=' + timestamp_str(400))
+        prep_session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(400))
+        prep_session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(400))
         prep_session.commit_transaction()
 
         # Check to see before cursor still gets the old value.
@@ -287,18 +284,18 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         prep_cursor.set_key(ds.key(1))
         prep_cursor.set_value(ds.value(111))
         prep_cursor.update()
-        prep_session.prepare_transaction('prepare_timestamp=' + timestamp_str(300))
+        prep_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(300))
 
         # Point all cursors to key 2.
-        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(250))
+        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(250))
         before_ts_c.set_key(ds.key(2))
         self.assertEquals(before_ts_c.search(), 0)
 
-        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(350))
+        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(350))
         between_ts_c.set_key(ds.key(2))
         self.assertEquals(between_ts_c.search(), 0)
 
-        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(450))
+        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(450))
         after_ts_c.set_key(ds.key(2))
         self.assertEquals(after_ts_c.search(), 0)
 
@@ -320,8 +317,8 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor.prev())
 
         # Commit the prepared transaction.
-        prep_session.timestamp_transaction('commit_timestamp=' + timestamp_str(400))
-        prep_session.timestamp_transaction('durable_timestamp=' + timestamp_str(400))
+        prep_session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(400))
+        prep_session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(400))
         prep_session.commit_transaction()
 
         # Check to see before cursor still gets the old value.
@@ -355,18 +352,18 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         prep_session.begin_transaction()
         prep_cursor.set_key(ds.key(51))
         prep_cursor.remove()
-        prep_session.prepare_transaction('prepare_timestamp=' + timestamp_str(500))
+        prep_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(500))
 
         # Point all cursors to key 51.
-        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(450))
+        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(450))
         before_ts_c.set_key(ds.key(50))
         self.assertEquals(before_ts_c.search(), 0)
 
-        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(550))
+        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(550))
         between_ts_c.set_key(ds.key(50))
         self.assertEquals(between_ts_c.search(), 0)
 
-        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(650))
+        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(650))
         after_ts_c.set_key(ds.key(50))
         self.assertEquals(after_ts_c.search(), 0)
 
@@ -387,8 +384,8 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor.next())
 
         # Commit the prepared transaction.
-        prep_session.timestamp_transaction('commit_timestamp=' + timestamp_str(600))
-        prep_session.timestamp_transaction('durable_timestamp=' + timestamp_str(600))
+        prep_session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(600))
+        prep_session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(600))
         prep_session.commit_transaction()
 
         # Check to see before cursor still gets the old value.
@@ -411,18 +408,18 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         prep_session.begin_transaction()
         prep_cursor.set_key(ds.key(1))
         prep_cursor.remove()
-        prep_session.prepare_transaction('prepare_timestamp=' + timestamp_str(500))
+        prep_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(500))
 
         # Point all cursors to key 2.
-        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(450))
+        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(450))
         before_ts_c.set_key(ds.key(2))
         self.assertEquals(before_ts_c.search(), 0)
 
-        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(550))
+        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(550))
         between_ts_c.set_key(ds.key(2))
         self.assertEquals(between_ts_c.search(), 0)
 
-        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(650))
+        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(650))
         after_ts_c.set_key(ds.key(2))
         self.assertEquals(after_ts_c.search(), 0)
 
@@ -443,8 +440,8 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor.prev())
 
         # Commit the prepared transaction.
-        prep_session.timestamp_transaction('commit_timestamp=' + timestamp_str(600))
-        prep_session.timestamp_transaction('durable_timestamp=' + timestamp_str(600))
+        prep_session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(600))
+        prep_session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(600))
         prep_session.commit_transaction()
 
         # Check to see before cursor still gets the old value.
@@ -474,18 +471,18 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         prep_session.begin_transaction()
         prep_cursor.set_key(ds.key(49))
         prep_cursor.remove()
-        prep_session.prepare_transaction('prepare_timestamp=' + timestamp_str(700))
+        prep_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(700))
 
         # Point all cursors to key 48.
-        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(650))
+        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(650))
         before_ts_c.set_key(ds.key(48))
         self.assertEquals(before_ts_c.search(), 0)
 
-        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(750))
+        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(750))
         between_ts_c.set_key(ds.key(48))
         self.assertEquals(between_ts_c.search(), 0)
 
-        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(850))
+        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(850))
         after_ts_c.set_key(ds.key(48))
         self.assertEquals(after_ts_c.search(), 0)
 
@@ -506,8 +503,8 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor.next())
 
         # Commit the prepared transaction.
-        prep_session.timestamp_transaction('commit_timestamp=' + timestamp_str(800))
-        prep_session.timestamp_transaction('durable_timestamp=' + timestamp_str(800))
+        prep_session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(800))
+        prep_session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(800))
         prep_session.commit_transaction()
 
         # Check to see before cursor still gets the old value.
@@ -532,18 +529,18 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         prep_session.begin_transaction()
         prep_cursor.set_key(ds.key(3))
         prep_cursor.remove()
-        prep_session.prepare_transaction('prepare_timestamp=' + timestamp_str(700))
+        prep_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(700))
 
         # Point all cursors to key 4.
-        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(650))
+        before_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(650))
         before_ts_c.set_key(ds.key(4))
         self.assertEquals(before_ts_c.search(), 0)
 
-        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(750))
+        between_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(750))
         between_ts_c.set_key(ds.key(4))
         self.assertEquals(between_ts_c.search(), 0)
 
-        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + timestamp_str(850))
+        after_ts_s.begin_transaction('isolation=' + self.isolation + ',read_timestamp=' + self.timestamp_str(850))
         after_ts_c.set_key(ds.key(4))
         self.assertEquals(after_ts_c.search(), 0)
 
@@ -564,8 +561,8 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor.prev())
 
         # Commit the prepared transaction.
-        prep_session.timestamp_transaction('commit_timestamp=' + timestamp_str(800))
-        prep_session.timestamp_transaction('durable_timestamp=' + timestamp_str(800))
+        prep_session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(800))
+        prep_session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(800))
         prep_session.commit_transaction()
 
         # Check to see before cursor still gets the old value.

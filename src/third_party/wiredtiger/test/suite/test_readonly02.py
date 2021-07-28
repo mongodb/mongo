@@ -42,15 +42,15 @@ class test_readonly02(wttest.WiredTigerTestCase, suite_subprocess):
     entries = 10
 
     conn_params = \
-        'create,statistics=(fast),' + \
+        'create,' + \
         'log=(enabled,file_max=100K,zero_fill=true),' + \
         'operation_tracking=(enabled=false),'
     conn_params_rd = \
-        'create,readonly=true,statistics=(fast),' + \
+        'create,readonly=true,' + \
         'log=(enabled,zero_fill=false),' + \
         'operation_tracking=(enabled=false),'
     conn_params_rdcfg = \
-        'create,readonly=true,statistics=(fast),log=(enabled),' + \
+        'create,readonly=true,log=(enabled),' + \
         'operation_tracking=(enabled=false),'
 
     #

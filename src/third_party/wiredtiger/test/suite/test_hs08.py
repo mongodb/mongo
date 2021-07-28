@@ -30,9 +30,6 @@ import wiredtiger, wttest, time
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_hs08.py
 # Verify modify insert into history store logic.
 class test_hs08(wttest.WiredTigerTestCase):
@@ -57,27 +54,27 @@ class test_hs08(wttest.WiredTigerTestCase):
         self.session.create(uri, create_params)
 
         # Insert a full value.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
         cursor[1] = value1
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Insert 3 modifies in separate transactions.
         self.session.begin_transaction()
         cursor.set_key(1)
         self.assertEqual(cursor.modify([wiredtiger.Modify('A', 1000, 1)]), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         self.session.begin_transaction()
         cursor.set_key(1)
         self.assertEqual(cursor.modify([wiredtiger.Modify('B', 1001, 1)]), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(4))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
 
         self.session.begin_transaction()
         cursor.set_key(1)
         self.assertEqual(cursor.modify([wiredtiger.Modify('C', 1002, 1)]), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
         # Call checkpoint.
         self.session.checkpoint('use_timestamp=true')
@@ -89,15 +86,15 @@ class test_hs08(wttest.WiredTigerTestCase):
         self.assertEqual(squashed_write, 0)
 
         # Validate that we see the correct value at each of the timestamps.
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(3))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(3))
         self.assertEqual(cursor[1], value1 + 'A')
         self.session.commit_transaction()
 
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(4))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(4))
         self.assertEqual(cursor[1], value1 + 'AB')
         self.session.commit_transaction()
 
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(5))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(5))
         self.assertEqual(cursor[1], value1 + 'ABC')
         self.session.commit_transaction()
 
@@ -107,12 +104,12 @@ class test_hs08(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         cursor.set_key(1)
         self.assertEqual(cursor.modify([wiredtiger.Modify('D', 1000, 1)]), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(7))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(7))
 
         self.session.begin_transaction()
         cursor.set_key(1)
         self.assertEqual(cursor.modify([wiredtiger.Modify('E', 1001, 1)]), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(8))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(8))
 
         # Call checkpoint again.
         self.session.checkpoint('use_timestamp=true')
@@ -126,11 +123,11 @@ class test_hs08(wttest.WiredTigerTestCase):
         # Validate that we see the expected value on the modifies, this
         # scenario tests the logic that will retrieve a full value for
         # a modify previously inserted into the history store.
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(7))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(7))
         self.assertEqual(cursor[1], value1 + 'DBC')
         self.session.commit_transaction()
 
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(8))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(8))
         self.assertEqual(cursor[1], value1 + 'DEC')
         self.session.commit_transaction()
 
@@ -140,7 +137,7 @@ class test_hs08(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.modify([wiredtiger.Modify('F', 1002, 1)]), 0)
         self.assertEqual(cursor.modify([wiredtiger.Modify('G', 1003, 1)]), 0)
         self.assertEqual(cursor.modify([wiredtiger.Modify('H', 1004, 1)]), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(9))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(9))
 
         # Call checkpoint again.
         self.session.checkpoint('use_timestamp=true')
@@ -157,13 +154,13 @@ class test_hs08(wttest.WiredTigerTestCase):
         cursor.set_key(1)
         self.assertEqual(cursor.modify([wiredtiger.Modify('F', 1002, 1)]), 0)
         self.assertEqual(cursor.modify([wiredtiger.Modify('G', 1003, 1)]), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         self.session.begin_transaction()
         cursor.set_key(1)
         self.assertEqual(cursor.modify([wiredtiger.Modify('F', 1002, 1)]), 0)
         self.assertEqual(cursor.modify([wiredtiger.Modify('G', 1003, 1)]), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(11))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(11))
 
         # Call checkpoint again.
         self.session.checkpoint('use_timestamp=true')
@@ -179,17 +176,17 @@ class test_hs08(wttest.WiredTigerTestCase):
         # modify to guarantee we squash zero modifies.
         self.session.begin_transaction()
         cursor.set_key(1)
-        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(12))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(12))
         self.assertEqual(cursor.modify([wiredtiger.Modify('F', 1002, 1)]), 0)
-        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(13))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(13))
         self.assertEqual(cursor.modify([wiredtiger.Modify('G', 1003, 1)]), 0)
         self.session.commit_transaction()
 
         self.session.begin_transaction()
         cursor.set_key(1)
-        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(14))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(14))
         self.assertEqual(cursor.modify([wiredtiger.Modify('F', 1002, 1)]), 0)
-        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(15))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(15))
         self.assertEqual(cursor.modify([wiredtiger.Modify('G', 1003, 1)]), 0)
         self.session.commit_transaction()
 

@@ -33,9 +33,6 @@
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_txn23(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     conn_config = 'cache_size=5MB'
@@ -46,12 +43,12 @@ class test_txn23(wttest.WiredTigerTestCase):
         for i in range(0, nrows):
             self.session.begin_transaction()
             cursor[ds.key(i)] = value
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
         cursor.close()
 
     def check(self, check_value, uri, ds, nrows, read_ts):
         for i in range(0, nrows):
-            self.session.begin_transaction('read_timestamp=' + timestamp_str(read_ts))
+            self.session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
             cursor = self.session.open_cursor(uri)
             self.assertEqual(cursor[ds.key(i)], check_value)
             cursor.close()
@@ -73,8 +70,8 @@ class test_txn23(wttest.WiredTigerTestCase):
         ds_2.populate()
 
         # Pin oldest and stable to timestamp 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value_a = "aaaaa" * 100
         value_b = "bbbbb" * 100

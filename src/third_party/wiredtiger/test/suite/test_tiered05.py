@@ -50,7 +50,6 @@ class test_tiered05(wttest.WiredTigerTestCase):
     def conn_config(self):
         os.mkdir(self.bucket)
         return \
-          'statistics=(fast),' + \
           'tiered_manager=(wait=%d),' % self.wait + \
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % self.bucket + \

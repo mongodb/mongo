@@ -33,9 +33,6 @@
 import wiredtiger, wttest
 from wtdataset import simple_key, simple_value
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_prepare_conflict(wttest.WiredTigerTestCase):
     def test_prepare(self):
         # Create a large table with lots of pages.
@@ -68,9 +65,9 @@ class test_prepare_conflict(wttest.WiredTigerTestCase):
         cursor.close()
 
         # Prepare and commit the transaction.
-        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(10))
-        self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(20))
-        self.session.timestamp_transaction('durable_timestamp=' + timestamp_str(20))
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(10))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(20))
+        self.session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(20))
         self.session.commit_transaction()
 
         # WT-6325 reports WT_PREPARE_CONFLICT while iterating the cursor.

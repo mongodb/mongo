@@ -35,17 +35,15 @@
 import wiredtiger, wttest
 from wtdataset import simple_key, simple_value
 
-def timestamp_str(t):
-    return '%x' % t
 class test_prepare13(wttest.WiredTigerTestCase):
     # Force a small cache.
-    conn_config = 'cache_size=10MB,statistics=(all),statistics_log=(json,on_close,wait=1)'
+    conn_config = 'cache_size=10MB'
 
     def test_prepare(self):
         nrows = 20000
         # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         # Create a large table with lots of pages.
         uri = "table:test_prepare13"
@@ -61,12 +59,12 @@ class test_prepare13(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri)
         cursor[simple_key(cursor, 1000)] = "replacement_value"
         cursor.close()
-        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(10))
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(10))
 
         try:
             # Pin oldest and stable to timestamp 10.
-            self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-                ',stable_timestamp=' + timestamp_str(10))
+            self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+                ',stable_timestamp=' + self.timestamp_str(10))
 
             # Open a separate session and cursor and perform updates to let prepared update to evict.
             s = self.conn.open_session()
@@ -74,7 +72,7 @@ class test_prepare13(wttest.WiredTigerTestCase):
             for i in range(2000, nrows):
                 s.begin_transaction()
                 cursor[simple_key(cursor, i)] = simple_value(cursor, i)
-                s.commit_transaction('commit_timestamp=' + timestamp_str(20))
+                s.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
             cursor.close()
 
             # Truncate the middle chunk and expect a conflict.
@@ -90,8 +88,8 @@ class test_prepare13(wttest.WiredTigerTestCase):
             s.rollback_transaction()
 
         finally:
-            self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(50))
-            self.session.timestamp_transaction('durable_timestamp=' + timestamp_str(50))
+            self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(50))
+            self.session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(50))
             self.session.commit_transaction()
 
         s.close()

@@ -33,9 +33,6 @@
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_prepare02(wttest.WiredTigerTestCase, suite_subprocess):
     session_config = 'isolation=snapshot'
 

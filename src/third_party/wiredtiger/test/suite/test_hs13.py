@@ -29,13 +29,10 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_hs13.py
 # Verify reverse modify traversal after eviction.
 class test_hs13(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=2MB,statistics=(all),eviction=(threads_max=1)'
+    conn_config = 'cache_size=2MB,eviction=(threads_max=1)'
     session_config = 'isolation=snapshot'
     key_format_values = [
         # FIXME-WT-5550: The commented columnar tests needs to be enabled once columnar modify type

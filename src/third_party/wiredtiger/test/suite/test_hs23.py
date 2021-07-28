@@ -28,9 +28,6 @@
 
 import wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_hs23.py
 # Test the case that we have update, out of order timestamp
 # update, and update again in the same transaction
@@ -43,7 +40,7 @@ class test_hs23(wttest.WiredTigerTestCase):
         self.session.create(uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(uri)
         self.conn.set_timestamp(
-            'oldest_timestamp=' + timestamp_str(1) + ',stable_timestamp=' + timestamp_str(1))
+            'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
 
         value1 = 'a'
         value2 = 'b'
@@ -54,7 +51,7 @@ class test_hs23(wttest.WiredTigerTestCase):
         # Insert a key.
         self.session.begin_transaction()
         cursor[str(0)] = value1
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Update at 10, update at 20, update at 15 (out of order), and
         # update at 20 in the same transaction
@@ -62,25 +59,25 @@ class test_hs23(wttest.WiredTigerTestCase):
         cursor.set_key(str(0))
         cursor.set_value(value2)
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(10))
+            'commit_timestamp=' + self.timestamp_str(10))
         self.assertEquals(cursor.update(), 0)
 
         cursor.set_key(str(0))
         cursor.set_value(value3)
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(20))
+            'commit_timestamp=' + self.timestamp_str(20))
         self.assertEquals(cursor.update(), 0)
 
         cursor.set_key(str(0))
         cursor.set_value(value4)
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(15))
+            'commit_timestamp=' + self.timestamp_str(15))
         self.assertEquals(cursor.update(), 0)
 
         cursor.set_key(str(0))
         cursor.set_value(value5)
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(20))
+            'commit_timestamp=' + self.timestamp_str(20))
         self.assertEquals(cursor.update(), 0)
         self.session.commit_transaction()
 
@@ -97,11 +94,11 @@ class test_hs23(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
         # Search the latest update
-        self.session.begin_transaction("read_timestamp=" + timestamp_str(20))
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(20))
         self.assertEqual(cursor[str(0)], value5)
         self.session.rollback_transaction()
 
-        # Serarch the out of order timestamp update
-        self.session.begin_transaction("read_timestamp=" + timestamp_str(15))
+        # Search the out of order timestamp update
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(15))
         self.assertEqual(cursor[str(0)], value4)
         self.session.rollback_transaction()

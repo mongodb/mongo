@@ -31,13 +31,11 @@
 # [END_TAGS]
 
 import wiredtiger, wttest
-def timestamp_str(t):
-    return '%x' % t
 
 # test_prepare12.py
 # Test update restore of a page with prepared update.
 class test_prepare12(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=2MB,statistics=(all)'
+    conn_config = 'cache_size=2MB'
     session_config = 'isolation=snapshot'
 
     def test_prepare_update_restore(self):
@@ -48,7 +46,7 @@ class test_prepare12(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri, None)
         self.session.begin_transaction()
         cursor[0] = 'a'
-        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(1))
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(1))
 
         # Insert an uncommitted key
         session2 = self.conn.open_session(None)
@@ -65,8 +63,8 @@ class test_prepare12(wttest.WiredTigerTestCase):
             session3.commit_transaction()
 
         # Commit the prepared update
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(1) + ',durable_timestamp=' + timestamp_str(2))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1) + ',durable_timestamp=' + self.timestamp_str(2))
 
         # Read the prepared update
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(2))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(2))
         self.assertEqual(cursor[0], 'a')
