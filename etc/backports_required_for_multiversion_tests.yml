@@ -24,6 +24,32 @@ last-continuous:
   all:
     - ticket: SERVER-56800
       test_file: jstests/sharding/cwwc_conflict_add_shard.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_min_fetch_ts_with_txn.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_clones_duplicate_key.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_abort_command.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_clones_initial_data.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_commit.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_collection_cloner_resuming.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/reshard_collection_existing_sk_index_not_duplicated.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_metrics.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_fails_on_nonempty_stash.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_txn_cloner.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_size_estimate.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -216,6 +242,32 @@ last-lts:
       test_file: jstests/sharding/cwwc_conflict_add_shard.js
     - ticket: SERVER-57262
       test_file: jstests/replsets/catchup_takeover_with_higher_config.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_min_fetch_ts_with_txn.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_clones_duplicate_key.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_abort_command.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_clones_initial_data.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_commit.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_collection_cloner_resuming.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/reshard_collection_existing_sk_index_not_duplicated.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_metrics.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_fails_on_nonempty_stash.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_txn_cloner.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
+    - ticket: SERVER-57667
+      test_file: jstests/sharding/resharding_size_estimate.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

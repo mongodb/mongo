@@ -60,6 +60,7 @@ env.Library(
         'range_deletion_util.cpp',
         'read_only_catalog_cache_loader.cpp',
         'recoverable_critical_section_service.cpp',
+        'resharding/document_source_resharding_ownership_match.cpp',
         'resharding/resharding_change_event_o2_field.idl',
         'resharding/resharding_collection_cloner.cpp',
         'resharding/resharding_coordinator_commit_monitor.cpp',

@@ -44,11 +44,11 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/s/resharding/document_source_resharding_ownership_match.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
@@ -149,63 +149,18 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
             expCtx));
     }
 
-    stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
-        fromjson("{$replaceWith: {original: '$$ROOT'}}").firstElement(), expCtx));
-
-    Arr extractShardKeyExpr;
-    for (auto&& field : _newShardKeyPattern.toBSON()) {
-        if (ShardKeyPattern::isHashedPatternEl(field)) {
-            extractShardKeyExpr.emplace_back(
-                Doc{{"$toHashedIndexKey", "$original." + field.fieldNameStringData()}});
-        } else {
-            extractShardKeyExpr.emplace_back("$original." + field.fieldNameStringData());
-        }
-    }
-
-    stages.emplace_back(DocumentSourceLookUp::createFromBson(
-        Doc{{"$lookup",
-             Doc{{"from",
-                  Doc{{"db", tempCacheChunksNss.db()}, {"coll", tempCacheChunksNss.coll()}}},
-                 {"let", Doc{{"sk", extractShardKeyExpr}}},
-                 {"pipeline",
-                  Arr{V{Doc{{"$match",
-                             Doc{{"$expr",
-                                  Doc{{"$eq",
-                                       Arr{V{"$shard"_sd}, V{_recipientShard.toString()}}}}}}}}},
-                      V{Doc{fromjson("{$replaceWith: {\
-                            min: {$map: {input: {$objectToArray: '$_id'}, in: '$$this.v'}},\
-                            max: {$map: {input: {$objectToArray: '$max'}, in: '$$this.v'}}\
-                        }}")}},
-                      V{Doc{fromjson("{$addFields: {\
-                            isGlobalMax: {$allElementsTrue: [{$map: {\
-                                input: '$max',\
-                                in: {$eq: [{$type: '$$this'}, 'maxKey']}\
-                            }}]}\
-                        }}")}},
-                      V{Doc{fromjson("{$match: {$expr: {$and: [\
-                            {$gte: ['$$sk', '$min']},\
-                            {$or: [\
-                                {$lt:  ['$$sk', '$max']},\
-                                '$isGlobalMax'\
-                            ]}\
-                        ]}}}")}}}},
-                 {"as", "intersectingChunk"_sd}}}}
-            .toBson()
-            .firstElement(),
-        expCtx));
-
-    stages.emplace_back(
-        DocumentSourceMatch::create(fromjson("{intersectingChunk: {$ne: []}}"), expCtx));
+    stages.emplace_back(DocumentSourceReshardingOwnershipMatch::create(
+        _recipientShard, ShardKeyPattern{_newShardKeyPattern.getKeyPattern()}, expCtx));
 
     // We use $arrayToObject to synthesize the $sortKeys needed by the AsyncResultsMerger to merge
     // the results from all of the donor shards by {_id: 1}. This expression wouldn't be correct if
     // the aggregation pipeline was using a non-"simple" collation.
     stages.emplace_back(
         DocumentSourceReplaceRoot::createFromBson(fromjson("{$replaceWith: {$mergeObjects: [\
-            '$original',\
+            '$$ROOT',\
             {$arrayToObject: {$concatArrays: [[{\
                 k: {$literal: '$sortKey'},\
-                v: ['$original._id']\
+                v: ['$$ROOT._id']\
             }]]}}\
         ]}}")
                                                       .firstElement(),

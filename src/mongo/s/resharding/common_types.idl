@@ -262,3 +262,15 @@ structs:
                 type: date
                 description: "The stop timestamp."
                 optional: true
+
+    DocumentSourceReshardingOwnershipMatchSpec:
+        description: "A struct representing the information needed for a resharding pipeline to
+                      determine which documents belong to a particular shard."
+        strict: true
+        fields:
+            recipientShardId:
+                type: shard_id
+                description: "The id of the recipient shard."
+            reshardingKey:
+                type: KeyPattern
+                description: "The index specification document to use as the new shard key."
