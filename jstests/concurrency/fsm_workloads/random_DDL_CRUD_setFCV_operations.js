@@ -42,20 +42,6 @@ var $config = extendWorkload($config, function($config, $super) {
         jsTestLog('setFCV state finished');
     };
 
-    $config.states.rename = function(db, collName, connCache) {
-        try {
-            $super.states.rename.apply(this, arguments);
-        } catch (e) {
-            if (e.code === ErrorCodes.IllegalOperation) {
-                // This is expected when attempting to rename a sharded collection in FCV prior to
-                // 5.0
-                // TODO SERVER-54879: No longer needed after 5.0 has branched out
-                return;
-            }
-            throw e;
-        }
-    };
-
     $config.transitions = {
         init: {create: 0.23, CRUD: 0.23, drop: 0.23, rename: 0.23, setFCV: 0.08},
         create: {create: 0.23, CRUD: 0.23, drop: 0.23, rename: 0.23, setFCV: 0.08},
