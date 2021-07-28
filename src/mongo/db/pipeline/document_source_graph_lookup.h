@@ -119,10 +119,7 @@ public:
         return constraints;
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        // {shardsStage, mergingStage, sortPattern}
-        return DistributedPlanLogic{nullptr, this, boost::none};
-    }
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         _startWith->addDependencies(deps);

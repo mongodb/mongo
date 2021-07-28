@@ -209,6 +209,18 @@ bool DocumentSourceGraphLookUp::foreignShardedGraphLookupAllowed() const {
         !pExpCtx->opCtx->inMultiDocumentTransaction();
 }
 
+boost::optional<DocumentSource::DistributedPlanLogic>
+DocumentSourceGraphLookUp::distributedPlanLogic() {
+    // If $graphLookup into a sharded foreign collection is allowed, top-level $graphLookup
+    // stages can run in parallel on the shards.
+    if (foreignShardedGraphLookupAllowed() && pExpCtx->subPipelineDepth == 0) {
+        return boost::none;
+    }
+
+    // {shardsStage, mergingStage, sortPattern}
+    return DistributedPlanLogic{nullptr, this, boost::none};
+}
+
 void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
     long long depth = 0;
     bool shouldPerformAnotherQuery;
@@ -528,7 +540,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _variables(expCtx->variables),
       _variablesParseState(expCtx->variablesParseState.copyWith(_variables.useIdGenerator())) {
     const auto& resolvedNamespace = pExpCtx->getResolvedNamespace(_from);
-    _fromExpCtx = pExpCtx->copyWith(resolvedNamespace.ns);
+    _fromExpCtx = pExpCtx->copyForSubPipeline(resolvedNamespace.ns);
 
     // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match stage
     // we'll eventually construct from the input document.
