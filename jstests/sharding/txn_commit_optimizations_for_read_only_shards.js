@@ -341,20 +341,6 @@ const failureModes = {
 
 for (const failureModeName in failureModes) {
     for (const type in transactionTypes) {
-        if (failureModeName.includes("participantCannotMajorityCommitWrites") &&
-            type.includes("ExpectTwoPhaseCommit") &&
-            (jsTestOptions().useRandomBinVersionsWithinReplicaSet ||
-             jsTestOptions().shardMixedBinVersions)) {
-            // In v4.4, the coordinator will also make an abort decision after timing out waiting
-            // for votes in these cases. However, coordinateCommitTransaction will not return as
-            // soon as the decision is made durable on the coordinator, instead it will wait for the
-            // decision to be majority-ack'd by all participants, which can't happen while one of
-            // the participants can't majority commit writes.
-            jsTest.log(
-                `${failureModeName} with ${type} is skipped since we're running v4.4 binaries`);
-            continue;
-        }
-
         txnNumber++;
         assert.lt(txnNumber,
                   MAX_TRANSACTIONS,

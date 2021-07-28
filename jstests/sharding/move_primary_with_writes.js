@@ -1,6 +1,5 @@
 /**
- * The failpoints used here are not defined in the previous release (4.4).
- * @tags: [multiversion_incompatible, does_not_support_stepdowns]
+ * @tags: [does_not_support_stepdowns]
  */
 (function() {
 'use strict';

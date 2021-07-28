@@ -37,17 +37,12 @@ runMoveChunkMakeDonorStepDownAfterFailpoint(st,
                                             false /* shouldMakeMigrationFailToCommitOnConfig */,
                                             ErrorCodes.OperationFailed);
 
-// After SERVER-47982 newer versions will fail with StaleEpoch instead of OperationFailed, which
-// might cause this test to fail on multiversion suite.
-//
-// TODO (SERVER-47265): moveChunk should only fail with StaleEpoch once SERVER-32198 is backported
-// to 4.4.
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
     dbName,
     "hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.OperationFailed, ErrorCodes.StaleEpoch]);
+    ErrorCodes.StaleEpoch);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,

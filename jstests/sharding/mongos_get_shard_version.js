@@ -47,7 +47,6 @@ assert.eq(res.version.i, 0);
 assert.eq(undefined, res.chunks);
 
 // When fullMetadata set to true, chunks should be included in the response
-// if the mongos version is v4.4.
 res = st.s.adminCommand({getShardVersion: ns, fullMetadata: true});
 assert.commandWorked(res);
 assert.eq(res.version.t, 1);

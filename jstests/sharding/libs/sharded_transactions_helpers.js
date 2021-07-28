@@ -127,10 +127,6 @@ function waitForFailpoint(hitFailpointStr, numTimes, timeout) {
  * TODO (SERVER-48114): Remove this function.
  */
 function enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st) {
-    if (jsTest.options().shardMixedBinVersions ||
-        jsTest.options().useRandomBinVersionsWithinReplicaSet)
-        return;
-
     st._rs.forEach(rs => {
         rs.nodes.forEach(node => {
             assert.commandWorked(node.getDB('admin').runCommand({

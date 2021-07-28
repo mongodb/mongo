@@ -93,24 +93,15 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
     assert.eq(st.s0.getDB(dbName).getCollection(collName).countDocuments({}), 1000);
 }
 
-// After SERVER-47982 all the failpoints are hit on the migration recovery, which is performed on
-// another thread which operation context is RecoverRefreshThread. To run this test on a
-// multiversion suite we have to also search for the previous name.
-//
-// TODO (SERVER-47265): operation context name should be RecoverRefreshThread once SERVER-32198 is
-// backported to 4.4
 testKillOpAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible",
-                         "(ensureChunkVersionIsGreaterThan)|(RecoverRefreshThread)");
+                         "RecoverRefreshThread");
 testKillOpAfterFailPoint("hangInRefreshFilteringMetadataUntilSuccessInterruptible",
-                         "(refreshFilteringMetadataUntilSuccess)|(RecoverRefreshThread)");
-testKillOpAfterFailPoint("hangInPersistMigrateCommitDecisionInterruptible",
-                         "(persist migrate commit decision)|(RecoverRefreshThread)");
+                         "RecoverRefreshThread");
+testKillOpAfterFailPoint("hangInPersistMigrateCommitDecisionInterruptible", "RecoverRefreshThread");
 testKillOpAfterFailPoint("hangInDeleteRangeDeletionOnRecipientInterruptible",
-                         "(cancel range deletion on recipient)|(RecoverRefreshThread)");
-testKillOpAfterFailPoint("hangInReadyRangeDeletionLocallyInterruptible",
-                         "(ready local range deletion)|(RecoverRefreshThread)");
-testKillOpAfterFailPoint("hangInAdvanceTxnNumInterruptible",
-                         "(advance migration txn number)|(RecoverRefreshThread)");
+                         "RecoverRefreshThread");
+testKillOpAfterFailPoint("hangInReadyRangeDeletionLocallyInterruptible", "RecoverRefreshThread");
+testKillOpAfterFailPoint("hangInAdvanceTxnNumInterruptible", "RecoverRefreshThread");
 
 st.stop();
 })();
