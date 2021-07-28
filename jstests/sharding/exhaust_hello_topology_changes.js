@@ -77,7 +77,7 @@ awaitRSClientHosts(
 
 // Restart the node we shut down
 jsTestLog("Restarting the node that was just killed.");
-st.rs0.start(rsPrimary);
+st.rs0.start(rsPrimary, {}, true /* restart */);
 
 rsPrimary = st.rs0.getPrimary();
 st.rs0.getReplSetConfig().members.forEach(node => {
