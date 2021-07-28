@@ -31,6 +31,7 @@
 
 #include <third_party/murmurhash3/MurmurHash3.h>
 
+#include <boost/filesystem/path.hpp>
 #include <deque>
 #include <fstream>
 #include <memory>
@@ -250,6 +251,61 @@ public:
         std::vector<SorterRange> ranges;
     };
 
+    /**
+     * Represents the file that a Sorter uses to spill to disk. Supports reading after writing (or
+     * reading without any writing), but does not support writing after any reading has been done.
+     */
+    class File {
+    public:
+        File(std::string path) : _path(std::move(path)) {
+            invariant(!_path.empty());
+        }
+
+        ~File();
+
+        const boost::filesystem::path& path() const {
+            return _path;
+        }
+
+        /**
+         * Signals that the on-disk file should not be cleaned up.
+         */
+        void keep() {
+            _keep = true;
+        };
+
+        /**
+         * Reads the requested data from the file. Cannot write more to the file once this has been
+         * called.
+         */
+        void read(std::streamoff offset, std::streamsize size, void* out);
+
+        /**
+         * Writes the given data to the end of the file. Cannot be called after reading.
+         */
+        void write(const char* data, std::streamsize size);
+
+        /**
+         * Returns the current offset of the end of the file. Cannot be called after reading.
+         */
+        std::streamoff currentOffset();
+
+    private:
+        void _open();
+
+        void _ensureOpenForWriting();
+
+        boost::filesystem::path _path;
+        std::fstream _file;
+
+        // The current offset of the end of the file, or -1 if the file either has not yet been
+        // opened or is already being read.
+        std::streamoff _offset = -1;
+
+        // Whether to keep the on-disk file even after this in-memory object has been destructed.
+        bool _keep = false;
+    };
+
     explicit Sorter(const SortOptions& opts);
 
     /**
@@ -275,8 +331,6 @@ public:
     }
     /**
      * Cannot add more data after calling done().
-     *
-     * The returned Iterator must not outlive the Sorter instance, which manages file clean up.
      */
     virtual Iterator* done() = 0;
 
@@ -304,16 +358,9 @@ protected:
     size_t _numSorted = 0;              // Keeps track of the number of keys sorted.
     uint64_t _totalDataSizeSorted = 0;  // Keeps track of the total size of data sorted.
 
-    // Whether the files written by this Sorter should be kept on destruction.
-    bool _shouldKeepFilesOnDestruction = false;
-
     SortOptions _opts;
 
-    // Used by Sorter::persistDataForShutdown() to return the base file name of the data persisted
-    // by this Sorter.
-    std::string _fileName;
-
-    std::string _fileFullPath;
+    std::shared_ptr<File> _file;
 
     std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
 };
@@ -334,8 +381,7 @@ public:
         Settings;
 
     explicit SortedFileWriter(const SortOptions& opts,
-                              const std::string& fileFullPath,
-                              const std::streampos fileStartOffset,
+                              std::shared_ptr<typename Sorter<Key, Value>::File> file,
                               const Settings& settings = Settings());
 
     void addAlreadySorted(const Key&, const Value&);
@@ -348,31 +394,20 @@ public:
      */
     Iterator* done();
 
-    /**
-     * Only call this after done() has been called to set the end offset.
-     */
-    std::streampos getFileEndOffset() {
-        invariant(!_file.is_open());
-        return _fileEndOffset;
-    }
-
 private:
     void spill();
 
     const Settings _settings;
-    std::string _fileFullPath;
-    std::ofstream _file;
+    std::shared_ptr<typename Sorter<Key, Value>::File> _file;
     BufBuilder _buffer;
 
     // Keeps track of the hash of all data objects spilled to disk. Passed to the FileIterator
     // to ensure data has not been corrupted after reading from disk.
     uint32_t _checksum = 0;
 
-    // Tracks where in the file we started and finished writing the sorted data range so that the
-    // information can be given to the Iterator in done(), and to the user via getFileEndOffset()
-    // for the next SortedFileWriter instance using the same file.
-    std::streampos _fileStartOffset;
-    std::streampos _fileEndOffset;
+    // Tracks where in the file we started writing the sorted data range so that the information can
+    // be given to the Iterator in done().
+    std::streamoff _fileStartOffset;
 
     boost::optional<std::string> _dbName;
 };

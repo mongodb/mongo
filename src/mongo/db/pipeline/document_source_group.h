@@ -197,8 +197,6 @@ private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  boost::optional<size_t> maxMemoryUsageBytes = boost::none);
 
-    ~DocumentSourceGroup();
-
     /**
      * getNext() dispatches to one of these three depending on what type of $group it is. These
      * methods expect '_currentAccumulators' to have been reset before being called, and also expect
@@ -266,9 +264,7 @@ private:
 
     GroupStats _stats;
 
-    std::string _fileName;
-    std::streampos _nextSortedFileWriterOffset = 0;
-    bool _ownsFileDeletion = true;  // unless a MergeIterator is made that takes over.
+    std::shared_ptr<Sorter<Value, Value>::File> _file;
 
     std::vector<std::string> _idFieldNames;  // used when id is a document
     std::vector<boost::intrusive_ptr<Expression>> _idExpressions;

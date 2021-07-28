@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/filesystem/operations.hpp>
 #include <memory>
 
 #include "mongo/db/exec/document_value/document.h"
@@ -400,20 +399,14 @@ DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>&
                      maxMemoryUsageBytes
                          ? *maxMemoryUsageBytes
                          : static_cast<size_t>(internalDocumentSourceGroupMaxMemoryBytes.load())},
+      // We spill to disk in debug mode, regardless of allowDiskUse, to stress the system.
+      _file(
+          !expCtx->inMongos && (expCtx->allowDiskUse || kDebugBuild)
+              ? std::make_shared<Sorter<Value, Value>::File>(expCtx->tempDir + "/" + nextFileName())
+              : nullptr),
       _initialized(false),
       _groups(expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
-      _spilled(false) {
-    if (!expCtx->inMongos && (expCtx->allowDiskUse || kDebugBuild)) {
-        // We spill to disk in debug mode, regardless of allowDiskUse, to stress the system.
-        _fileName = expCtx->tempDir + "/" + nextFileName();
-    }
-}
-
-DocumentSourceGroup::~DocumentSourceGroup() {
-    if (_ownsFileDeletion) {
-        DESTRUCTOR_GUARD(boost::filesystem::remove(_fileName));
-    }
-}
+      _spilled(false) {}
 
 void DocumentSourceGroup::addAccumulator(AccumulationStatement accumulationStatement) {
     _accumulatedFields.push_back(accumulationStatement);
@@ -624,7 +617,6 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
 
                 _sorterIterator.reset(Sorter<Value, Value>::Iterator::merge(
                     _sortedFiles, SortOptions(), SorterComparator(pExpCtx->getValueComparator())));
-                _ownsFileDeletion = false;
 
                 // prepare current to accumulate data
                 _currentAccumulators.reserve(numAccumulators);
@@ -659,8 +651,7 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
 
     stable_sort(ptrs.begin(), ptrs.end(), SpillSTLComparator(pExpCtx->getValueComparator()));
 
-    SortedFileWriter<Value, Value> writer(
-        SortOptions().TempDir(pExpCtx->tempDir), _fileName, _nextSortedFileWriterOffset);
+    SortedFileWriter<Value, Value> writer(SortOptions().TempDir(pExpCtx->tempDir), _file);
     switch (_accumulatedFields.size()) {  // same as ptrs[i]->second.size() for all i.
         case 0:                           // no values, essentially a distinct
             for (size_t i = 0; i < ptrs.size(); i++) {
@@ -698,7 +689,6 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
     }
 
     Sorter<Value, Value>::Iterator* iteratorPtr = writer.done();
-    _nextSortedFileWriterOffset = writer.getFileEndOffset();
     return shared_ptr<Sorter<Value, Value>::Iterator>(iteratorPtr);
 }
 
