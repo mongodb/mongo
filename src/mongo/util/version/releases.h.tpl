@@ -107,10 +107,10 @@ enum class FeatureCompatibilityVersion {
 };
 
 ## Calculate number of versions since v4.4.
-constexpr size_t kSince_$underscores(Version('4.4')) = ${len(fcvs) - 1};
+constexpr size_t kSince_$underscores(Version('4.4')) = ${bisect_left(fcvs, latest)};
 
 // Last LTS was "$last_lts".
-constexpr size_t kSinceLastLTS = ${len(fcvs) - bisect_left(fcvs, last_lts) - 1};
+constexpr size_t kSinceLastLTS = ${bisect_left(fcvs, latest) - bisect_left(fcvs, last_lts)};
 
 class GenericFCV {
 #def define_fcv_alias(id, v):

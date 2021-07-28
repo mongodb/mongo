@@ -79,6 +79,7 @@
 #include "mongo/util/signal_win32.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 
@@ -1220,6 +1221,21 @@ BSONObj RunningMongoChildProcessIds(const BSONObj&, void*) {
     return bob.obj();
 }
 
+// (Generic FCV reference): Propagate generic FCV constants to the shell.
+BSONObj GetFCVConstants(const BSONObj&, void*) {
+    BSONObjBuilder bob;
+    BSONObjBuilder subObj(bob.subobjStart(""));
+
+    subObj.append("latest", multiversion::toString(multiversion::GenericFCV::kLatest));
+    subObj.append("lastContinuous",
+                  multiversion::toString(multiversion::GenericFCV::kLastContinuous));
+    subObj.append("lastLTS", multiversion::toString(multiversion::GenericFCV::kLastLTS));
+    subObj.append("numSinceLastLTS", static_cast<int>(multiversion::kSinceLastLTS));
+    subObj.done();
+
+    return bob.obj();
+}
+
 MongoProgramScope::~MongoProgramScope() {
     DESTRUCTOR_GUARD(KillMongoProgramInstances(); ClearRawMongoProgramOutput(BSONObj(), nullptr);)
 }
@@ -1242,6 +1258,7 @@ void installShellUtilsLauncher(Scope& scope) {
     scope.injectNative("pathExists", PathExists);
     scope.injectNative("copyDbpath", CopyDbpath);
     scope.injectNative("convertTrafficRecordingToBSON", ConvertTrafficRecordingToBSON);
+    scope.injectNative("getFCVConstants", GetFCVConstants);
 }
 }  // namespace shell_utils
 }  // namespace mongo

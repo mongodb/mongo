@@ -204,17 +204,13 @@ var extractMajorVersionFromVersionString = function(versionString) {
 };
 
 // These patterns allow substituting the binary versions used for each version string to support
-// the
-// dev/stable MongoDB release cycle.
-//
-// If you add a new version substitution to this list, you should add it to the lists of
-// versions being checked in 'verify_versions_test.js' to verify it is susbstituted correctly.
+// the dev/stable MongoDB release cycle.
+var fcvConstants = getFCVConstants();
+
 MongoRunner.binVersionSubs = [
     new MongoRunner.VersionSub("latest", shellVersion()),
-    // To-be-updated when we branch for the next release.
-    new MongoRunner.VersionSub("last-continuous", "5.0"),
-    // To be updated when we branch for the next LTS release.
-    new MongoRunner.VersionSub("last-lts", "5.0")
+    new MongoRunner.VersionSub("last-continuous", fcvConstants.lastContinuous),
+    new MongoRunner.VersionSub("last-lts", fcvConstants.lastLTS)
 ];
 
 MongoRunner.getBinVersionFor = function(version) {
