@@ -594,6 +594,35 @@ void ShardingCatalogManager::insertConfigDocumentsInTxn(OperationContext* opCtx,
         doBatchInsert();
 }
 
+boost::optional<BSONObj> ShardingCatalogManager::findOneConfigDocumentInTxn(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    TxnNumber txnNumber,
+    const BSONObj& query) {
+
+    invariant(nss.db() == NamespaceString::kConfigDb);
+
+    FindCommandRequest findCommand(nss);
+    findCommand.setFilter(query);
+    findCommand.setSingleBatch(true);
+    findCommand.setLimit(1);
+
+    auto res =
+        runCommandInLocalTxn(
+            opCtx, nss.db(), false /*startTransaction*/, txnNumber, findCommand.toBSON(BSONObj()))
+            .body;
+    uassertStatusOK(getStatusFromCommandResult(res));
+
+    auto cursor = uassertStatusOK(CursorResponse::parseFromBSON(res));
+    auto result = cursor.releaseBatch();
+
+    if (result.empty()) {
+        return boost::none;
+    }
+
+    return result.front().getOwned();
+}
+
 void ShardingCatalogManager::withTransaction(
     OperationContext* opCtx,
     const NamespaceString& namespaceForInitialFind,

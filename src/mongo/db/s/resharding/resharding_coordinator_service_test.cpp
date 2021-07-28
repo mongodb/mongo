@@ -766,5 +766,41 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
     }
 }
 
+TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNotAllowed) {
+    auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
+    auto opCtx = operationContext();
+    auto donorChunk = makeAndInsertChunksForDonorShard(
+        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+
+    auto initialChunks =
+        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+
+    std::vector<ReshardedChunk> presetReshardedChunks;
+    for (const auto& chunk : initialChunks) {
+        presetReshardedChunks.emplace_back(chunk.getShard(), chunk.getMin(), chunk.getMax());
+    }
+
+    doc.setPresetReshardedChunks(presetReshardedChunks);
+
+    {
+        DBDirectClient client(opCtx);
+        client.update(CollectionType::ConfigNS.ns(),
+                      BSON(CollectionType::kNssFieldName << _originalNss.ns()),
+                      BSON("$set" << BSON(CollectionType::kAllowMigrationsFieldName << false)));
+    }
+
+    auto coordinator = ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON());
+    ASSERT_THROWS_CODE(coordinator->getCompletionFuture().get(opCtx), DBException, 5808201);
+
+    // Check that reshardCollection keeps allowMigrations setting intact.
+    {
+        DBDirectClient client(opCtx);
+        CollectionType collDoc(
+            client.findOne(CollectionType::ConfigNS.ns(),
+                           BSON(CollectionType::kNssFieldName << _originalNss.ns())));
+        ASSERT_FALSE(collDoc.getAllowMigrations());
+    }
+}
+
 }  // namespace
 }  // namespace mongo

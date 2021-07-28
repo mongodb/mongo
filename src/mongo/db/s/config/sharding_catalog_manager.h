@@ -178,7 +178,8 @@ public:
      * Starts and commits a transaction on the config server, with a no-op find on the specified
      * namespace in order to internally start the transaction. All writes done inside the
      * passed-in function must assume that they are run inside a transaction that will be commited
-     * after the function itself has completely finished.
+     * after the function itself has completely finished. Does not support running transaction
+     * operations remotely.
      */
     static void withTransaction(OperationContext* opCtx,
                                 const NamespaceString& namespaceForInitialFind,
@@ -187,7 +188,8 @@ public:
     /**
      * Runs the write 'request' on namespace 'nss' in a transaction with 'txnNumber'. Write must be
      * on a collection in the config database. If expectedNumModified is specified, the number of
-     * documents modified must match expectedNumModified - throws otherwise.
+     * documents modified must match expectedNumModified - throws otherwise. Does not support
+     * running transaction operations remotely.
      */
     BSONObj writeToConfigDocumentInTxn(OperationContext* opCtx,
                                        const NamespaceString& nss,
@@ -197,12 +199,20 @@ public:
     /**
      * Inserts 'docs' to namespace 'nss' in a transaction with 'txnNumber'. Breaks into multiple
      * batches if 'docs' is larger than the max batch size. Write must be on a collection in the
-     * config database.
+     * config database. Does not support running transaction operations remotely.
      */
     void insertConfigDocumentsInTxn(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     std::vector<BSONObj> docs,
                                     TxnNumber txnNumber);
+
+    /**
+     * Find a single document while under a local transaction.
+     */
+    boost::optional<BSONObj> findOneConfigDocumentInTxn(OperationContext* opCtx,
+                                                        const NamespaceString& nss,
+                                                        TxnNumber txnNumber,
+                                                        const BSONObj& query);
 
     //
     // Chunk Operations

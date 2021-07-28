@@ -635,6 +635,23 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
 
     ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
         opCtx, coordinatorDoc.getSourceNss(), [&](OperationContext* opCtx, TxnNumber txnNumber) {
+            auto doc = ShardingCatalogManager::get(opCtx)->findOneConfigDocumentInTxn(
+                opCtx,
+                CollectionType::ConfigNS,
+                txnNumber,
+                BSON(CollectionType::kNssFieldName << coordinatorDoc.getSourceNss().ns()));
+
+            uassert(5808200,
+                    str::stream() << "config.collection entry not found for "
+                                  << coordinatorDoc.getSourceNss().ns(),
+                    doc);
+
+            CollectionType configCollDoc(*doc);
+            uassert(5808201,
+                    str::stream() << "collection " << CollectionType::kAllowMigrationsFieldName
+                                  << " setting is already set to false",
+                    configCollDoc.getAllowMigrations());
+
             // Insert the coordinator document to config.reshardingOperations.
             invariant(coordinatorDoc.getActive());
             try {
