@@ -8,7 +8,6 @@
 // storage engines which do not support the command.
 // @tags: [
 //    requires_fsync,
-//    disabled_due_to_server_58295
 // ]
 
 (function() {

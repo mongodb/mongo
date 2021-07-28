@@ -3,7 +3,7 @@
  * 1. Ignore multi-statement transaction prepare conflicts in the clone phase, and
  * 2. Pick up the changes for prepared transactions in the transfer mods phase.
  *
- * @tags: [uses_transactions, uses_prepare_transaction, disabled_due_to_server_58295]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
 (function() {

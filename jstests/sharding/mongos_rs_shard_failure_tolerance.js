@@ -9,8 +9,6 @@
 // Three different connection states are tested - active (connection is active through whole
 // sequence), idle (connection is connected but not used before a shard change), and new
 // (connection connected after shard change).
-//
-// @tags: [disabled_due_to_server_58295]
 
 // Checking UUID and index consistency involves talking to shard primaries, but by the end of this
 // test, one shard does not have a primary.

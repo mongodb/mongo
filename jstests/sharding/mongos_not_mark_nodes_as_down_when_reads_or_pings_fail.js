@@ -1,8 +1,5 @@
 /*
  * Tests that mongos does not mark nodes as down when reads or pings fail.
- * @tags: [
- *   disabled_due_to_server_58295
- * ]
  */
 (function() {
 'use strict';

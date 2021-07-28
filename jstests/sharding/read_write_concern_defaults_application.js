@@ -26,7 +26,6 @@
  *   requires_majority_read_concern,
  *   requires_profiling,
  *   uses_transactions,
- *   disabled_due_to_server_58295,
  * ]
  */
 (function() {

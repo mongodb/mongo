@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   disabled_due_to_server_58295
  * ]
  */
 

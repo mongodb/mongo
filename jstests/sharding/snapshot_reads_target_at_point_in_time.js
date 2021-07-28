@@ -5,7 +5,6 @@
 //   requires_sharding,
 //   uses_multi_shard_transaction,
 //   uses_transactions,
-//   disabled_due_to_server_58295
 // ]
 (function() {
 "use strict";

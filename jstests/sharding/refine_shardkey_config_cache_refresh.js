@@ -3,8 +3,6 @@
  * in the chunks. This test simulates a stepDown in the middle of making changes to the
  * config.cache collections by the ShardServerCatalogCacheLoader after a refine shard key and makes
  * sure that the shard will be able to eventually reach the valid state on config.cache.
- *
- * @tags: [disabled_due_to_server_58295]
  */
 
 load("jstests/libs/uuid_util.js");

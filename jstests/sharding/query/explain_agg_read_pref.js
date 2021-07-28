@@ -1,8 +1,5 @@
 /**
  * Tests that readPref applies on an explain for an aggregation command.
- * @tags: [
- *   disabled_due_to_server_58295
- * ]
  */
 (function() {
 "use strict";

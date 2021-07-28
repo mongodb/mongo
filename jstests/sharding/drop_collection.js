@@ -1,10 +1,6 @@
 /**
  * Basic test from the drop collection command on a sharded cluster that verifies collections are
  * cleaned up properly.
- *
- * @tags: [
- *   disabled_due_to_server_58295
- * ]
  */
 (function() {
 "use strict";

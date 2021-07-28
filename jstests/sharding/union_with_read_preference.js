@@ -1,6 +1,6 @@
 // Tests that sub-queries across shards as part of $unionWith will obey the read preference
 // specified by the user.
-// @tags: [requires_majority_read_concern, disabled_due_to_server_58295]
+// @tags: [requires_majority_read_concern]
 (function() {
 "use strict";
 

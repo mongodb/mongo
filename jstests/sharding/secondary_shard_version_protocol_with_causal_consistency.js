@@ -3,9 +3,6 @@
  * read concern level 'available' and afterClusterTime specified should error because they ensure
  * contradictory things. A secondary request with afterClusterTime specified and no read concern
  * level should default to 'local' read concern level, using the shard version protocol.
- * @tags: [
- *   disabled_due_to_server_58295
- * ]
  */
 (function() {
 "use strict";

@@ -1,10 +1,6 @@
 /**
  * Explicitly validates that all shards' collections have the correct UUIDs after an initial split
  * which spreads the collection across all available shards.
- *
- * @tags: [
- *   disabled_due_to_server_58295
- * ]
  */
 
 load("jstests/libs/uuid_util.js");

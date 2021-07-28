@@ -1,7 +1,6 @@
 //
 // Tests that refineCollectionShardKey deletes all existing chunks in the persisted routing table
 // cache.
-// @tags: [disabled_due_to_server_58295]
 //
 
 (function() {

@@ -5,7 +5,6 @@
  *   requires_replication,
  *   requires_sharding,
  *   requires_profiling,
- *   disabled_due_to_server_58295
  * ]
  */
 (function() {
