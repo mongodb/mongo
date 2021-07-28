@@ -204,3 +204,15 @@ function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
     // Make sure the options are equal to what we expect
     assert.docEq(getCmdLineOptsResult.parsed, expectedResult.parsed);
 }
+
+// Tests that the passed configuration will not run a new mongod instances. Mainly used to test
+// conflicting parameters at startup.
+//
+// Arguments:
+//   mongoRunnerConfig - Configuration object to pass to the mongo runner
+// Example:
+//
+// testGetCmdLineOptsMongodFailed({ shardsvr : "" });
+function testGetCmdLineOptsMongodFailed(mongoRunnerConfig) {
+    assert.throws(() => MongoRunner.runMongod(mongoRunnerConfig));
+}

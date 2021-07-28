@@ -603,6 +603,14 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
     if (params.count("sharding.clusterRole")) {
         auto clusterRoleParam = params["sharding.clusterRole"].as<std::string>();
+        // Force to set up the node as a replica set, unless we're using queryable backup mode.
+        if (!params.count("storage.queryableBackupMode") && !params.count("replication.replSet") &&
+            !params.count("replication.replSetName")) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Cannot start a " << clusterRoleParam
+                                        << " as a standalone server. Please use the option "
+                                           "--replset to start the node as a replica set.");
+        }
         if (clusterRoleParam == "configsvr") {
             serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
             // Config server requires majority read concern.
