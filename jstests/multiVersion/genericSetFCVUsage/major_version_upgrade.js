@@ -7,11 +7,6 @@
  * - Create a new collection.
  * - Insert a document into the new collection.
  * - Create an index on the new collection.
- *
- * @tags: [
- *   disabled_due_to_server_58295
- * ]
- *
  */
 
 (function() {
