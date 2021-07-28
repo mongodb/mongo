@@ -1640,12 +1640,7 @@ Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
         invariantWTOK(ret);
 
         // Second phase looks up for existence of key to avoid insertion of duplicate key
-        // The usage of 'prefix_key=true' enables an optimization that allows this search to return
-        // more quickly. See SERVER-56509.
-        c->reconfigure(c, "prefix_key=true");
-        ON_BLOCK_EXIT([c] { c->reconfigure(c, "prefix_key=false"); });
-        auto keyExists = _keyExists(opCtx, c, keyString.getBuffer(), sizeWithoutRecordId);
-        if (keyExists) {
+        if (_keyExists(opCtx, c, keyString.getBuffer(), sizeWithoutRecordId)) {
             auto key = KeyString::toBson(
                 keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits());
             return buildDupKeyErrorStatus(
