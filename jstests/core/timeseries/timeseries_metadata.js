@@ -5,8 +5,8 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
+ *   requires_fcv_51,
  *   requires_getmore,
- *   disabled_due_to_server_58295
  * ]
  */
 (function() {
