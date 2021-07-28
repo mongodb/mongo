@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_writes, requires_fcv_50, requires_fcv_51]
+// @tags: [requires_non_retryable_writes, requires_fcv_51]
 
 load("jstests/libs/analyze_plan.js");
 (function() {
@@ -62,9 +62,9 @@ if (isFeatureEnabled) {
     assert.commandWorked(coll.insert(
         {a: 1, name: "Paris TX", loc: {type: "Point", coordinates: [-95.555513, 33.6609389]}}));
     assert.commandWorked(coll.insert(
-        {a: 1, name: "San Antonio", loc: {type: "Point", coordinates: [-98.4936282, 29.4241219]}}));
-    assert.commandWorked(coll.insert(
         {a: 2, name: "Houston", loc: {type: "Point", coordinates: [-95.3632715, 29.7632836]}}));
+    assert.commandWorked(coll.insert(
+        {a: 1, name: "San Antonio", loc: {type: "Point", coordinates: [-98.4936282, 29.4241219]}}));
     assert.commandWorked(coll.insert(
         {a: 3, name: "LA", loc: {type: "Point", coordinates: [-118.2436849, 34.0522342]}}));
     assert.commandWorked(coll.insert(
@@ -78,8 +78,8 @@ if (isFeatureEnabled) {
             [-97.516473, 26.02054],
             [-106.528371, 31.895644],
             [-103.034724, 31.932947],
-            [-102.979798, 36.456096],
-            [-100.051947, 36.482601],
+            [-103.068314, 36.426696],
+            [-100.080033, 36.497382],
             [-99.975048, 34.506004],
             [-94.240190, 33.412542],
             [-94.075400, 29.725640],
@@ -113,46 +113,58 @@ if (isFeatureEnabled) {
     // Search for points only located in a smaller region within our larger index, in this case
     // Texas.
     var command = coll.find({
-        $and: [
-            {loc: {$geoWithin: {$geometry: southWestUSPolygon}}},
-            {loc: {$geoWithin: {$geometry: texasPolygon}}},
-        ]
+        a: 1,
+        loc: {$geoWithin: {$geometry: texasPolygon}},
     });
-    explainResults = command.explain("queryPlanner");
-    winningPlan = getWinningPlan(explainResults.queryPlanner);
+    var explainResults = command.explain("queryPlanner");
+    var winningPlan = getWinningPlan(explainResults.queryPlanner);
     assert(isIxscan(db, winningPlan));
     var results = command.toArray();
-    assert.eq(results.length, 4);
-
-    command = coll.find({
-        a: 1,
-        $and: [
-            {loc: {$geoWithin: {$geometry: southWestUSPolygon}}},
-            {loc: {$geoWithin: {$geometry: texasPolygon}}},
-        ]
-    });
-    explainResults = command.explain("queryPlanner");
-    winningPlan = getWinningPlan(explainResults.queryPlanner);
-    assert(isIxscan(db, winningPlan));
-    results = command.toArray();
     assert.eq(results.length, 3);
 
     // Test index maintenace to make sure a doc is removed from index when it is no longer in the
     // $geoWithin bounds.
     assert.commandWorked(coll.updateMany(
-        {loc: {type: "Point", coordinates: [-95.555513, 33.6609389]}},
+        {name: "Paris TX"},
         {$set: {name: "Paris France", loc: {type: "Point", coordinates: [2.360791, 48.885033]}}}));
-
     command = coll.find({
-        $and: [
-            {loc: {$geoWithin: {$geometry: southWestUSPolygon}}},
-            {loc: {$geoWithin: {$geometry: texasPolygon}}},
-        ]
+        loc: {$geoWithin: {$geometry: texasPolygon}},
     });
     explainResults = command.explain("queryPlanner");
     winningPlan = getWinningPlan(explainResults.queryPlanner);
     assert(isIxscan(db, winningPlan));
     results = command.toArray();
     assert.eq(results.length, 3);
+
+    // Test using { $geoWithin: { $geometry : ...}} query on a collection indexed on $centerSphere
+    // shape. This works because both centersphere and a Geo-JSON polygon define regions using
+    // spherical-geometry.
+    coll.drop();
+    coll.createIndex({loc: "2dsphere"}, {
+        partialFilterExpression:
+            {loc: {$geoWithin: {$centerSphere: [[-74.0064, 40.7142], 10 / 3963.2]}}}
+    });
+    // Point corresponding to UWS of Manhattan.
+    coll.insert({loc: [-73.974709, 40.793110]});
+    // Point corresponding to Downtown Brooklyn.
+    coll.insert({loc: [-73.985728, 40.705174]});
+    // Polygon roughly representing the UWS of Manhattan.
+    var uwsPolygon = {
+        type: "Polygon",
+        coordinates: [[
+            [-73.987286, 40.771117],
+            [-73.980511, 40.801531],
+            [-73.958801, 40.800751],
+            [-73.987286, 40.771117]
+        ]]
+    };
+    command = coll.find({loc: {$geoWithin: {$geometry: uwsPolygon}}});
+    explainResults = command.explain("queryPlanner");
+    winningPlan = getWinningPlan(explainResults.queryPlanner);
+    assert(isIxscan(db, winningPlan));
+    results = command.toArray();
+    // We expect to only find one matching result because we only have one point in our collection
+    // inside the limits of our polygon (or in other words, inside the UWS of Manhattan ).
+    assert.eq(results.length, 1);
 }
 })();

@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
+#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
@@ -346,11 +347,45 @@ bool hasExistencePredicateOnPath(const MatchExpression& expr, StringData path) {
 }
 
 bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
+    // lhs is the query and rhs is the index.
     invariant(lhs);
     invariant(rhs);
 
     if (lhs->equivalent(rhs)) {
         return true;
+    }
+
+    if (lhs->matchType() == MatchExpression::GEO && rhs->matchType() == MatchExpression::GEO) {
+        // lhs is the query, eg {loc: {$geoWithin: {$geometry: {type: "Polygon", coordinates:
+        // [...]}}}} geoWithinObj is {$geoWithin: {$geometry: {type: "Polygon", coordinates:
+        // [...]}}} geoWithinElement is '$geoWithin: {$geometry: {type: "Polygon", coordinates:
+        // [...]}}' geometryObj is  {$geometry: {type: "Polygon", coordinates: [...]}}
+        // geometryElement '$geometry: {type: "Polygon", coordinates: [...]}'
+
+        const GeoMatchExpression* queryMatchExpression =
+            static_cast<const GeoMatchExpression*>(lhs);
+        // We only handle geoWithin queries
+        if (queryMatchExpression->getGeoExpression().getPred() != GeoExpression::WITHIN) {
+            return false;
+        }
+        const GeoMatchExpression* indexMatchExpression =
+            static_cast<const GeoMatchExpression*>(rhs);
+        auto geoWithinObj = queryMatchExpression->getSerializedRightHandSide();
+        auto geoWithinElement = geoWithinObj.firstElement();
+        auto geometryObj = geoWithinElement.Obj();
+
+        // More specifically, we only handle geoWithin queries that use the $geometry operator.
+        if (!geometryObj.hasField("$geometry")) {
+            return false;
+        }
+        auto geometryElement = geometryObj.firstElement();
+        MatchDetails* details = nullptr;
+
+        if (indexMatchExpression->matchesSingleElement(geometryElement, details)) {
+            // The region described by query is within the region captured by the index.
+            // Therefore this index can be used in a potential solution for this query.
+            return true;
+        }
     }
 
     if (rhs->matchType() == MatchExpression::AND) {
