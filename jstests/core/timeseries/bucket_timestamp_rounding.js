@@ -12,7 +12,6 @@
  *   requires_timeseries,
  *   # Same goes for tenant migrations.
  *   tenant_migration_incompatible,
- *   disabled_due_to_server_58295
  * ]
  */
 
