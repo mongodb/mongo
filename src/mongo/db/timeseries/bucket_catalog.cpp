@@ -374,7 +374,11 @@ void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch,
     invariant(batch->_commitRights.load());
 
     if (batch->finished()) {
-        invariant(batch->getResult().getStatus() == ErrorCodes::TimeseriesBucketCleared);
+        auto batchStatus = batch->getResult().getStatus();
+        invariant(batchStatus == ErrorCodes::TimeseriesBucketCleared ||
+                      batchStatus.isA<ErrorCategory::Interruption>(),
+                  str::stream() << "Unexpected error when aborting time-series batch: "
+                                << batchStatus);
         return;
     }
 
