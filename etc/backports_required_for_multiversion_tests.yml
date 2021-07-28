@@ -50,6 +50,8 @@ last-continuous:
       test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
     - ticket: SERVER-57667
       test_file: jstests/sharding/resharding_size_estimate.js
+    - ticket: SERVER-58898
+      test_file: jstests/replsets/write_concern_write_to_local.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -268,6 +270,8 @@ last-lts:
       test_file: jstests/sharding/reshard_collection_joins_existing_operation.js
     - ticket: SERVER-57667
       test_file: jstests/sharding/resharding_size_estimate.js
+    - ticket: SERVER-58898
+      test_file: jstests/replsets/write_concern_write_to_local.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
