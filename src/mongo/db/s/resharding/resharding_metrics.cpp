@@ -155,13 +155,19 @@ private:
 class TimeInterval {
 public:
     void start(Date_t d) noexcept {
-        invariant(!_start, "Already started");
+        if (_start) {
+            LOGV2_WARNING(5892600, "Resharding metrics already started, start() is a no-op");
+            return;
+        }
         _start = d;
     }
 
     void end(Date_t d) noexcept {
         invariant(_start, "Not started");
-        invariant(!_end, "Already stopped");
+        if (_end) {
+            LOGV2_WARNING(5892601, "Resharding metrics already ended, end() is a no-op");
+            return;
+        }
         _end = d;
     }
 
