@@ -4778,7 +4778,8 @@ tasks:
     vars:
       resmoke_args: --suites=sharding_jscore_op_query_passthrough --storageEngine=wiredTiger
 
-- name: sharding_jscore_passthrough_wire_ops_gen
+- <<: *gen_task_template
+  name: sharding_jscore_passthrough_wire_ops_gen
   tags: ["sharding", "jscore"]
   commands:
   - func: "generate resmoke tasks"
