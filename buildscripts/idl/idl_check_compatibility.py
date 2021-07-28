@@ -92,8 +92,6 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     "replyFieldDeserializerNotEqualUnstable-reply-deserializerNotEqualReplyUnstableField",
     "commandDeserializerNotEqualUnstable",
     'create-param-backwards',
-
-    # TODO (SERVER-54923): Decide what to do with commands: (saslStart, saslContinue).
     'saslStart-param-payload',
     'explain-param-use44SortKeys',
     'explain-param-useNewUpsert',
