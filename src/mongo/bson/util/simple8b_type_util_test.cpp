@@ -292,3 +292,14 @@ TEST(Simple8b, TestMinInt) {
     double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.get(), scalar.get());
     ASSERT_EQUALS(val, decodeResult);
 }
+
+TEST(Simple8b, TestObjectId) {
+    OID objId("112233445566778899AABBCC");
+    int64_t encodedObjId = Simple8bTypeUtil::encodeObjectId(objId);
+
+    int64_t expectedEncodedObjId = 0x11AA22BB33CC44;
+    ASSERT_EQUALS(encodedObjId, expectedEncodedObjId);
+
+    OID actualObjId = Simple8bTypeUtil::decodeObjectId(encodedObjId, objId.getInstanceUnique());
+    ASSERT_EQUALS(objId, actualObjId);
+}

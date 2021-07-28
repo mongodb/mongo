@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/oid.h"
+
 #include <array>
 #include <boost/optional.hpp>
 #include <cstdint>
@@ -47,6 +49,16 @@ public:
     // unsigned integer.
     static uint64_t encodeInt64(int64_t val);
     static int64_t decodeInt64(uint64_t val);
+
+    // These methods are for encoding OID with simple8b. The unique identifier is not part of
+    // the encoded integer and must thus be provided when decoding.
+    // Re-organize the bytes so that most of the entropy is in the least significant bytes.
+    // Since TS = Timestamp is in big endian and C = Counter is in big endian,
+    // then rearrange the bytes to:
+    // | Byte Usage | TS3 | C2 | TS2 | C1 | TS1 | C0 | TS0 |
+    // | Byte Index |  0  |  1 |  2  | 3  |  4  | 5  |  6  |
+    static int64_t encodeObjectId(const OID& oid);
+    static OID decodeObjectId(int64_t val, OID::InstanceUnique processUnique);
 
     // These methods add floating point support for encoding and decoding with simple8b up to 8
     // decimal digits. They work by multiplying the floating point value by a multiple of 10 and

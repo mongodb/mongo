@@ -28,6 +28,8 @@
  */
 
 #include "mongo/bson/util/simple8b_type_util.h"
+
+#include "mongo/base/data_type_endian.h"
 #include "mongo/bson/bsonelement.h"
 
 #include <cmath>
@@ -41,6 +43,48 @@ uint64_t Simple8bTypeUtil::encodeInt64(int64_t val) {
 int64_t Simple8bTypeUtil::decodeInt64(uint64_t val) {
     return (val >> 1) ^ (~(val & 1) + 1);
 }
+
+int64_t Simple8bTypeUtil::encodeObjectId(const OID& oid) {
+    uint64_t encoded = 0;
+    uint8_t* encodedBytes = reinterpret_cast<uint8_t*>(&encoded);
+
+    ConstDataView cdv = oid.view();
+
+    // Copy counter and timestamp bytes so that they match the specs in the header.
+    encodedBytes[0] = cdv.read<uint8_t>(3);   // Timestamp index 3.
+    encodedBytes[1] = cdv.read<uint8_t>(11);  // Counter index 2.
+    encodedBytes[2] = cdv.read<uint8_t>(2);   // Timestamp index 2.
+    encodedBytes[3] = cdv.read<uint8_t>(10);  // Counter index 1.
+    encodedBytes[4] = cdv.read<uint8_t>(1);   // Timestamp index 1.
+    encodedBytes[5] = cdv.read<uint8_t>(9);   // Counter index 0.
+    encodedBytes[6] = cdv.read<uint8_t>(0);   // Timestamp index 0.
+
+    return LittleEndian<uint64_t>::load(encoded);
+}
+
+OID Simple8bTypeUtil::decodeObjectId(int64_t val, OID::InstanceUnique processUnique) {
+    unsigned char objId[OID::kOIDSize];
+
+    val = LittleEndian<uint64_t>::store(val);
+    uint8_t* encodedBytes = reinterpret_cast<uint8_t*>(&val);
+
+    // Set Timestamp and Counter variables together.
+    objId[0] = encodedBytes[6];   // Timestamp index 0.
+    objId[1] = encodedBytes[4];   // Timestamp index 1.
+    objId[2] = encodedBytes[2];   // Timestamp index 2.
+    objId[3] = encodedBytes[0];   // Timestamp index 3.
+    objId[9] = encodedBytes[5];   // Counter index 0;
+    objId[10] = encodedBytes[3];  // Counter index 1.
+    objId[11] = encodedBytes[1];  // Counter index 2.
+
+    // Finally set Process Unique.
+    std::copy(processUnique.bytes,
+              processUnique.bytes + OID::kInstanceUniqueSize,
+              objId + OID::kTimestampSize);
+
+    return OID(objId);
+}
+
 
 boost::optional<uint8_t> Simple8bTypeUtil::calculateDecimalShiftMultiplier(double val) {
     // Don't store isnan and isinf and end calculation early
