@@ -111,6 +111,14 @@ void SpillableCache::spillToDisk() {
                 "Exceeded memory limit and can't spill to disk. Set allowDiskUse: true to allow "
                 "spilling",
                 _expCtx->allowDiskUse);
+        tassert(5872800,
+                "SpillableCache attempted to write to disk in an environment which is not prepared "
+                "to do so",
+                _expCtx->opCtx->getServiceContext());
+        tassert(5872801,
+                "SpillableCache attempted to write to disk in an environment without a storage "
+                "engine configured",
+                _expCtx->opCtx->getServiceContext()->getStorageEngine());
         _usedDisk = true;
         _diskCache = _expCtx->mongoProcessInterface->createTemporaryRecordStore(_expCtx);
     }
