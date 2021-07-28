@@ -127,6 +127,9 @@ private:
     std::unique_ptr<ReshardingMetrics> _metrics;
 };
 
+/**
+ * TODO SERVER-58983 re-enable these tests.
+ *
 TEST_F(ReshardingCollectionClonerTest, MinKeyChunk) {
     auto pipeline =
         makePipeline(ShardKeyPattern(fromjson("{x: 1}")),
@@ -271,6 +274,7 @@ TEST_F(ReshardingCollectionClonerTest, CompoundHashedShardKey) {
 
     ASSERT_FALSE(pipeline->getNext());
 }
+ */
 
 }  // namespace
 }  // namespace mongo
