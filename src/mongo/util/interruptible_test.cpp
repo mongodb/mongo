@@ -61,9 +61,7 @@ class DummyInterruptible final : public Interruptible {
     }
     StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
         stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override {
-        while (Date_t::now() < deadline) {
-            sleepmillis(duration_cast<Milliseconds>(kPrecision).count());
-        }
+        mongo::sleepFor(deadline - Date_t::now());
         return stdx::cv_status::timeout;
     }
 
@@ -71,7 +69,6 @@ public:
     // To accommodate for OS scheduling and timing inaccuracies.
     static constexpr auto kPrecision = Milliseconds(5);
 };
-
 
 TEST(Interruptible, WaitUntilDeadline) {
     auto interruptible = std::make_unique<DummyInterruptible>();
