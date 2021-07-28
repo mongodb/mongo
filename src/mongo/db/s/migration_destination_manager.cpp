@@ -848,6 +848,16 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         if (collection) {
             checkUUIDsMatch(collection);
         } else {
+            if (auto collectionByUUID = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(
+                    opCtx, collectionOptionsAndIndexes.uuid)) {
+                uasserted(5860300,
+                          str::stream()
+                              << "Cannot create collection " << nss << " with UUID "
+                              << collectionOptionsAndIndexes.uuid
+                              << " because it conflicts with the UUID of an existing collection "
+                              << collectionByUUID->ns());
+            }
+
             // We do not have a collection by this name. Create the collection with the donor's
             // options.
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
