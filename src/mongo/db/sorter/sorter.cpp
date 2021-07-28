@@ -983,8 +983,11 @@ Sorter<Key, Value>::File::~File() {
         return;
     }
 
-    DESTRUCTOR_GUARD(_file.exceptions(std::ios::failbit));
-    DESTRUCTOR_GUARD(_file.close());
+    if (_file.is_open()) {
+        DESTRUCTOR_GUARD(_file.exceptions(std::ios::failbit));
+        DESTRUCTOR_GUARD(_file.close());
+    }
+
     DESTRUCTOR_GUARD(boost::filesystem::remove(_path));
 }
 
