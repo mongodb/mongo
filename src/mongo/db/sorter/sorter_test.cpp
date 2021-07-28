@@ -281,9 +281,13 @@ public:
     void run() {
         unittest::TempDir tempDir("sortedFileWriterTests");
         const SortOptions opts = SortOptions().TempDir(tempDir.path());
+        auto makeFile = [&] {
+            return std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(opts.tempDir + "/" +
+                                                                          nextFileName());
+        };
+
         {  // small
-            std::string fileName = opts.tempDir + "/" + nextFileName();
-            SortedFileWriter<IntWrapper, IntWrapper> sorter(opts, fileName, 0);
+            SortedFileWriter<IntWrapper, IntWrapper> sorter(opts, makeFile());
             sorter.addAlreadySorted(0, 0);
             sorter.addAlreadySorted(1, -1);
             sorter.addAlreadySorted(2, -2);
@@ -291,19 +295,14 @@ public:
             sorter.addAlreadySorted(4, -4);
             ASSERT_ITERATORS_EQUIVALENT(std::shared_ptr<IWIterator>(sorter.done()),
                                         std::make_shared<IntIterator>(0, 5));
-
-            ASSERT_TRUE(boost::filesystem::remove(fileName));
         }
         {  // big
-            std::string fileName = opts.tempDir + "/" + nextFileName();
-            SortedFileWriter<IntWrapper, IntWrapper> sorter(opts, fileName, 0);
+            SortedFileWriter<IntWrapper, IntWrapper> sorter(opts, makeFile());
             for (int i = 0; i < 10 * 1000 * 1000; i++)
                 sorter.addAlreadySorted(i, -i);
 
             ASSERT_ITERATORS_EQUIVALENT(std::shared_ptr<IWIterator>(sorter.done()),
                                         std::make_shared<IntIterator>(0, 10 * 1000 * 1000));
-
-            ASSERT_TRUE(boost::filesystem::remove(fileName));
         }
 
         ASSERT(boost::filesystem::is_empty(tempDir.path()));
@@ -796,7 +795,7 @@ TEST_F(SorterMakeFromExistingRangesTest, CorruptedFile) {
     auto sorter = std::unique_ptr<IWSorter>(
         IWSorter::makeFromExistingRanges(fileName, makeSampleRanges(), opts, IWComparator(ASC)));
 
-    // Sorter::_numSpills is set when NoLimitSorter is constructed from existing ranges.
+    // The number of spills is set when NoLimitSorter is constructed from existing ranges.
     ASSERT_EQ(makeSampleRanges().size(), sorter->numSpills());
     ASSERT_EQ(0, sorter->numSorted());
 
@@ -833,7 +832,7 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
     auto sorter = std::unique_ptr<IWSorter>(
         IWSorter::makeFromExistingRanges(state.fileName, state.ranges, opts, IWComparator(ASC)));
 
-    // Sorter::_numSpills is set when NoLimitSorter is constructed from existing ranges.
+    // The number of spills is set when NoLimitSorter is constructed from existing ranges.
     ASSERT_EQ(state.ranges.size(), sorter->numSpills());
 
     // Ensure that the restored sorter can accept additional data.
