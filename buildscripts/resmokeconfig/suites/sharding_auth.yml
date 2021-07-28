@@ -33,8 +33,6 @@ selector:
   - jstests/sharding/migration_critical_section_concurrency.js        # SERVER-21713
   # Runs with auth enabled.
   - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
-  # TODO SERVER-58696: Re-enable the below test.
-  - jstests/sharding/implicit_default_write_concern_add_shard.js
 
 executor:
   archive:
