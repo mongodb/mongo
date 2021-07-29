@@ -4,6 +4,7 @@
  * the behavior and syntax is stable.
  *
  * @tags: [
+ *   requires_fcv_51,
  *   uses_api_parameters,
  * ]
  */
